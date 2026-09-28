@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#281a13">
+  <title>Page not found — Veda Spaces</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <style>
+    :root { --ink: #281a13; --paper: #fbf7ef; --cream: #f0e4d4; --copper: #ad6d54; --muted: #625b53; --line: rgba(40,26,19,.18); --serif: 'Cormorant Garamond', Georgia, serif; --sans: 'Manrope', Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { min-height: 100svh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.6; }
+    a { color: inherit; text-decoration: none; }
+    a:focus-visible { outline: 2px solid #c59158; outline-offset: 4px; }
+    header { padding: 1.5rem max(5vw, 1.25rem); border-bottom: 1px solid var(--line); }
+    header img { display: block; width: 120px; height: auto; }
+    main { flex: 1; display: grid; grid-template-columns: 1.1fr .9fr; gap: 6vw; align-items: center; padding: 5rem max(5vw, 1.25rem); max-width: 1200px; width: 100%; margin: 0 auto; }
+    .eyebrow { margin: 0 0 1.4rem; text-transform: uppercase; letter-spacing: .27em; font-weight: 600; font-size: .75rem; color: var(--copper); }
+    h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(3.2rem, 7vw, 6rem); line-height: .9; letter-spacing: -.035em; margin: 0; }
+    h1 em { font-weight: 400; }
+    .lead { max-width: 480px; margin: 1.8rem 0 2.4rem; color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: .75rem 1.4rem; border: 1px solid var(--ink); font-size: .875rem; font-weight: 500; transition: background-color .25s ease, color .25s ease; }
+    .button-dark { background: var(--ink); color: #fff; }
+    .button-dark:hover { background: var(--copper); border-color: var(--copper); }
+    .button-ghost:hover { background: var(--ink); color: #fff; }
+    .contact { background: var(--cream); padding: 2.5rem 2.2rem; }
+    .contact h2 { font-family: var(--serif); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 0 0 1.4rem; }
+    .contact a { display: block; padding: .8rem 0; border-top: 1px solid var(--line); font-size: .9rem; }
+    .contact a:hover { color: var(--copper); }
+    .contact .phone { font-family: var(--serif); font-size: 1.6rem; }
+    footer { padding: 1.5rem max(5vw, 1.25rem); border-top: 1px solid var(--line); font-size: .72rem; color: #7a736a; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; gap: 3rem; padding: 3.5rem 1.25rem; }
+      .actions .button { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" aria-label="Veda Spaces home"><img src="/assets/veda-logo.png" alt="Veda Spaces" width="402" height="354"></a>
+  </header>
+
+  <main>
+    <section>
+      <p class="eyebrow">Error 404 · Page not found</p>
+      <h1>This room<br><em>doesn’t exist.</em></h1>
+      <p class="lead">The page you were looking for may have moved, or the link may be mistyped. Everything about our work, process and projects is on the home page.</p>
+      <div class="actions">
+        <a class="button button-dark" href="/">Back to Home →</a>
+        <a class="button button-ghost" href="/#portfolio">View Our Work</a>
+      </div>
+    </section>
+
+    <aside class="contact" aria-labelledby="contact-heading">
+      <p class="eyebrow">Get in touch</p>
+      <h2 id="contact-heading">Planning a home?<br>Let’s talk.</h2>
+      <a class="phone" href="tel:+919515125153">+91 95151 25153</a>
+      <a href="https://wa.me/919515125153" target="_blank" rel="noopener">Chat on WhatsApp →</a>
+      <a href="mailto:interiors@vedaspaces.com">interiors@vedaspaces.com</a>
+      <a href="/#contact">Send an enquiry →</a>
+    </aside>
+  </main>
+
+  <footer>
+    <span>© 2026 Veda Spaces. All rights reserved.</span>
+    <span>Residential interiors · Design & execution · Hyderabad</span>
+  </footer>
+</body>
+</html>

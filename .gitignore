@@ -1,0 +1,18 @@
+# macOS / Windows
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+
+# Tooling
+node_modules/
+.idea/
+.vscode/
+.wrangler/
+
+# Misc
+*.log
+*.zip
