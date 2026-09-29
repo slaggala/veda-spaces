@@ -1,0 +1,1655 @@
+{
+  "review_id": "VEDA-SPACES-P0-TARGETED-INDEPENDENT-IMPLEMENTATION-REREVIEW-01",
+  "date": "2026-09-29",
+  "repository": "git@github.com:slaggala/veda-spaces.git",
+  "architecture_sha": "778aa8fdd918da48340319696ada3ff673e9fb8e",
+  "original_reviewed_sha": "9236aa3ade38c33d03a57cf7a064ece29937b109",
+  "original_review_commit": "1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4",
+  "target_sha": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
+  "included_commits": [
+    "6fd249c10b72b112c83f86cc2705736a59db28be",
+    "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe"
+  ],
+  "review_branch": "review/p0-independent-implementation-review",
+  "verdict": "NOT CERTIFIED",
+  "ir01_verdict": "IR-01 RESOLVED",
+  "verdict_reason": "No BLOCKER remains, but merge-blocking MAJOR findings RR-01 (site CSP regression; merge deploys dist/ to production), RR-02 and RR-03 (Founder-governance invariants), RR-04 (DEV-007 weakens authentication) remain, and owner decisions required for merge (AM approvals, TG-01, TG-08) are absent.",
+  "authorization": "Review only. No merge, staging or production step is authorized.",
+  "scope_verification": {
+    "head": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
+    "linear_history": true,
+    "force_push_detected": false,
+    "later_unreviewed_commits": false,
+    "certified_architecture_files_modified_or_deleted": 0,
+    "architecture_files_added": 13,
+    "added_files_status": "PROPOSED, NOT APPROVED amendments under docs/architecture/amendments/",
+    "original_review_artifacts_unchanged": true,
+    "working_tree_clean": true,
+    "diff_9236aa3_6fd249c": {
+      "files": 223,
+      "added": 96,
+      "modified": 127,
+      "insertions": 41143,
+      "deletions": 5905
+    },
+    "diff_6fd249c_2f6b59a": {
+      "files": [
+        "api/deploy/Dockerfile"
+      ],
+      "limited_to_runtime_image": true
+    },
+    "secrets_or_forbidden_artifacts": [],
+    "public_lead_api_activated": false
+  },
+  "reproduction": {
+    "sqlite": {
+      "passed": 435,
+      "failed": 0,
+      "skipped": 0
+    },
+    "postgresql_16_4": {
+      "passed": 427,
+      "failed": 0,
+      "skipped": 8
+    },
+    "postgresql_18_4": {
+      "passed": 427,
+      "failed": 0,
+      "skipped": 8
+    },
+    "skips": "6 × test_backups (SQLite snapshots), test_schema.py:93 (pragma), test_schema.py:354 (SQLite format CHECKs)",
+    "frontend": {
+      "node": "22.23.3",
+      "unit_tests_passed": 52,
+      "eslint": "pass",
+      "typecheck": "pass",
+      "contrast_pairs": 58,
+      "build": "pass",
+      "npm_audit": 0,
+      "npm_audit_runtime": 0
+    },
+    "browser": {
+      "run_all": "47/47",
+      "workspace": 7,
+      "access": 16,
+      "site": 14,
+      "axe": 10
+    },
+    "ci": {
+      "run_id": 36559966718,
+      "head_sha": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
+      "jobs": {
+        "api (sqlite)": "success",
+        "api (postgresql)": "success",
+        "security": "success",
+        "app": "success",
+        "browser e2e + axe": "success"
+      },
+      "previous_run_6fd249c": "failure at 'Container image scan' only",
+      "logs_publicly_readable": false
+    },
+    "migrations": {
+      "revisions": 10,
+      "heads": 1,
+      "new_revision": "0009_mfa_challenge_binding",
+      "tables": 24,
+      "columns": 504,
+      "fks": 108,
+      "indexes": 72,
+      "checks": {
+        "sqlite": 498,
+        "postgresql": 164
+      },
+      "downgrade": "refused",
+      "upgrade_with_data_identical": true,
+      "rollback_rehearsal_executed": false
+    },
+    "routes": {
+      "declared": 105,
+      "url_map_rules": 107
+    }
+  },
+  "reconciliation": [
+    {
+      "id": "IR-01",
+      "original_severity": "BLOCKER",
+      "remediation": "auth/mfa.py:218-248,287-304,377-555 (_bound_transaction, _require_eligible); auth/models.py:192-202; migration 0009_mfa_challenge_binding",
+      "evidence": "Baseline 9236aa3: P1/P1b bypass re-confirmed on SQLite + PG (403→200). Head: same attacks → 401 MFA_CHALLENGE_INVALID; 20/20 binding items pass on both engines (49/49 probes each); lead reviewer read the fix",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-11 (DEV-006)",
+      "blocking_scope": "None for IR-01 itself; AM-11 owner decision before merge",
+      "conclusion": "Transaction bound to principal, session, factor, path, state, expiry, single use; row lock on confirm; B/C refuse any bearer"
+    },
+    {
+      "id": "IR-02",
+      "original_severity": "MAJOR",
+      "remediation": "kernel/http.py:546-576; leads/routes.py:75-117; auth/routes.py:44-68",
+      "evidence": "Slow-verifier probe: concurrent staff writes 0.01–0.04 s for intake and login (was 503 after 5.19 s)",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Verification now outside the write unit of work; idempotency re-checked inside"
+    },
+    {
+      "id": "IR-03",
+      "original_severity": "MAJOR",
+      "remediation": "platform/anchor_store.py; maintenance.py:339-438",
+      "evidence": "Q4 cases (prefix delete, tail truncation, middle gap, modification) now detected on both engines; forged manifest (C11) and manifest-before-commit (C12) fail; CLI alarms absent",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production (SEVT-006/007 claim); S3 Object Lock staging evidence",
+      "conclusion": "See RR-05, RR-06, RR-07; S3 behaviour unexecuted"
+    },
+    {
+      "id": "IR-04",
+      "original_severity": "MAJOR",
+      "remediation": "rbac/governance.py:141-157 (standard_still_permitted), :160-178, :325, :404-409",
+      "evidence": "P10, N01–N03, N14 on both engines",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Original reproduction fails closed; the adjacent executed-email-change path remains open (RR-03). Original MINOR→MAJOR upgrade confirmed justified"
+    },
+    {
+      "id": "IR-05",
+      "original_severity": "MAJOR",
+      "remediation": "rbac/governance.py:633-642 require_break_glass_mode; used at :651-662, :699-701, :314-315",
+      "evidence": "P13, N04",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Full break-glass refused while an eligible Founder other than the target exists"
+    },
+    {
+      "id": "IR-06",
+      "original_severity": "MAJOR",
+      "remediation": "rbac/custodians.py:22-59 (STS GetCallerIdentity); cli/main.py:223-230; config.py asserted mode refused outside local/test",
+      "evidence": "N06, N07; STS stubbed in tests",
+      "status": "ACCEPTABLY GATED FOR STAGING",
+      "arch_amendment": "Clarify 06 §7.5 mechanism (minor)",
+      "blocking_scope": "Production (PG-BG); staging rehearsal",
+      "conclusion": "Self-assertion closed; but in the deployed container topology STS sees the instance role (RR-09)"
+    },
+    {
+      "id": "IR-07",
+      "original_severity": "MAJOR",
+      "remediation": "app/src/core/router/routes.ts:34; app/src/modules/auth/approval-cancel-page.ts:25-47; handlers.py:447; app.py:60-68 (RBX register)",
+      "evidence": "P12, N08, N10; SPA source; FE reviewer: page exists, POSTs only on explicit confirm, bad/missing token handled",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-5 (DEV-005)",
+      "blocking_scope": "AM-5 owner decision before merge; PG-BG for production",
+      "conclusion": "Veto usable end-to-end"
+    },
+    {
+      "id": "IR-08",
+      "original_severity": "MAJOR",
+      "remediation": "rbac/guards.py:176-192 (I3 over non-deleted users)",
+      "evidence": "P11, P16 on both engines: Founder DELETE executes",
+      "status": "REGRESSION INTRODUCED",
+      "arch_amendment": "No (unless workflow-restore chosen)",
+      "blocking_scope": "Merge (via RR-02)",
+      "conclusion": "IR-08 itself fixed; deleted Founders keep role/protection and one Founder can restore them (RR-02)"
+    },
+    {
+      "id": "IR-09",
+      "original_severity": "MAJOR",
+      "remediation": "config.py:21-23,176-190,280-352 (ENVIRONMENTS, MIN_KEY_BYTES, validate_environment for staging+production); app.py:107; cli/main.py:29,51",
+      "evidence": "Unset/prod/Staging/dev → ConfigError; staging/production with missing/weak values refused (17/20 problems); migrate validates",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Residual advisories RR-A05 (local env on deployed host) and RR-10 (CIDR/key-quality)"
+    },
+    {
+      "id": "IR-10",
+      "original_severity": "MAJOR",
+      "remediation": "platform/health.py:50-58,85; runbook §2; deploy/deploy.sh:36-40",
+      "evidence": "Readiness: head ready; declared-ahead ready; older not ready. Real N-1 (9236aa3) on migrated schema → 503",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-6 (DEV-008)",
+      "blocking_scope": "AM-6 owner decision before merge; RG-7 for production",
+      "conclusion": "Mechanism works for future releases; first-release rollback = snapshot restore, undocumented (RR-17)"
+    },
+    {
+      "id": "IR-11",
+      "original_severity": "MAJOR",
+      "remediation": "deploy/litestream.yml; docker-compose.yml:27-33; platform/backups.py; cli/main.py:177-205; deploy/deploy.sh; docs/operations/api-runbooks.md",
+      "evidence": "Pip-less CLI snapshot / restore-verify / disk-usage rc 0; runbook defects reproduced; no rehearsal",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Staging (RR-14, RR-15); production RG-1/RG-2/RG-7",
+      "conclusion": "Artefacts exist; off-host replica never verified; snapshot dir ephemeral"
+    },
+    {
+      "id": "IR-12",
+      "original_severity": "MAJOR",
+      "remediation": "kernel/metrics.py; kernel/logging.py:64-70 (EMF); config.py:341-342 (Sentry required in production); runbook §9",
+      "evidence": "API process emits EMF; every CLI/scheduler/worker metric dropped (0 EMF lines)",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Staging alarm acceptance (RR-07); production RG-5",
+      "conclusion": "See RR-07"
+    },
+    {
+      "id": "IR-13",
+      "original_severity": "MAJOR",
+      "remediation": "api/requirements.txt (41 pkgs hashed), requirements-dev.txt (84 hashed); Dockerfile FROM python:3.13-slim@sha256:7c61…; --require-hashes --no-deps; Litestream digest-pinned",
+      "evidence": "Hash-locked install reproduced by lead reviewer; pip-audit --require-hashes clean",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Residual: CI postgres:16 service image not digest-pinned (RR-A15)"
+    },
+    {
+      "id": "IR-14",
+      "original_severity": "MAJOR",
+      "remediation": ".github/workflows/ci.yml (5 jobs, SHA-pinned actions, no continue-on-error/|| true)",
+      "evidence": "GitHub API: run 36559966718 (push, attempt 1) on 2f6b59a — api (sqlite), api (postgresql), security, app, browser e2e + axe all success; 6fd249c run failed only at 'Container image scan'. Logs not readable anonymously",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Author's OI-RM-1 ('first CI run') can close with this run URL"
+    },
+    {
+      "id": "IR-15",
+      "original_severity": "MAJOR",
+      "remediation": "app/src/modules/leads/edits.ts:17-21; lead-form.ts:143-172",
+      "evidence": "Original lost-update probe re-run: other writer's city/priority preserved; history changed_fields=['message']",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Advisory: flag overlapping fields as true conflicts"
+    },
+    {
+      "id": "IR-16",
+      "original_severity": "MAJOR",
+      "remediation": "leads/service.py:824-873; leads/schemas.py:52-63; leads/activities.py:98-104",
+      "evidence": "D01–D05 both engines: 409 without withdrawal/new version; WEBSITE_FORM 422; note required; no web IP/page on staff capture; activity + audit written",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-4 (DEV-004)",
+      "blocking_scope": "AM-4 owner decision before merge",
+      "conclusion": "Residuals RR-12"
+    },
+    {
+      "id": "IR-17",
+      "original_severity": "MAJOR",
+      "remediation": "dist/assets/enhancements.css ([hidden] display:none !important); site.e2e success/fallback checks",
+      "evidence": "site.e2e: form hidden after success and fallback",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Feature: public intake",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-18",
+      "original_severity": "MAJOR",
+      "remediation": "dist/assets/app.js:147-150,172-177,219,232 (widget id, reset on every non-201, no submit without token); app.js:58 requires both metas",
+      "evidence": "Stub E2E reset→201; real Turnstile script + public test key under production CSP: 0 violations; real-key 422→reset→201 not run",
+      "status": "ACCEPTABLY GATED FOR PRODUCTION",
+      "arch_amendment": "No",
+      "blocking_scope": "Feature: public-intake enablement",
+      "conclusion": "Real-key run is an enablement step"
+    },
+    {
+      "id": "IR-19",
+      "original_severity": "MAJOR",
+      "remediation": "app/src/core/router/routes.ts:23-62; shell/app.ts:101-123,227",
+      "evidence": "All 8 routes + Back: correct title, h1 focused (production build, app CSP)",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production: manual screen-reader pass",
+      "conclusion": "Side effect RR-A21"
+    },
+    {
+      "id": "IR-20",
+      "original_severity": "MINOR",
+      "remediation": "auth/mfa.py:330-334, 436-437, 503-504",
+      "evidence": "Probe: path C with ACTIVE factor → 409; confirm ends other links/transactions",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-1",
+      "blocking_scope": "—",
+      "conclusion": "RR-A01: invalidation on 409 path rolled back (no effect)"
+    },
+    {
+      "id": "IR-21",
+      "original_severity": "MINOR",
+      "remediation": "rbac/users.py:127-131; auth/service.py:775-780; auth/mfa.py:294-301,431",
+      "evidence": "P3: replayed/resend-superseded context → 401",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-2 note",
+      "blocking_scope": "—",
+      "conclusion": "Replay before activation still overwrites the password (document in AM-2)"
+    },
+    {
+      "id": "IR-22",
+      "original_severity": "MINOR",
+      "remediation": "kernel/net.py:17-43; kernel/logging.py:153-156",
+      "evidence": "Compressed/expanded/upper-case/IPv4-mapped/zone-id forms group correctly",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-23",
+      "original_severity": "MINOR",
+      "remediation": "kernel/ratelimit.py:22-33 (key email|network)",
+      "evidence": "Victim in another network 200 while attacker 429 — but 40 guesses/min from 8 /64s all evaluated; 18 vs 3 reset emails",
+      "status": "REGRESSION INTRODUCED",
+      "arch_amendment": "AM-7 must be revised",
+      "blocking_scope": "Merge (DEV-007 requires implementation change) / production",
+      "conclusion": "See RR-04"
+    },
+    {
+      "id": "IR-24",
+      "original_severity": "MINOR",
+      "remediation": "auth/service.py:694-756; throttle.py:36-38,134-150",
+      "evidence": "10 failed reauth → 429 even with correct password + ACCOUNT_THROTTLED scope=reauth",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Path C password re-entry still unthrottled (RR-A04)"
+    },
+    {
+      "id": "IR-25",
+      "original_severity": "MINOR",
+      "remediation": "auth/service.py:274-292,781-783; auth/routes.py:74-78; mfa.py:85-93; service.py:413-416; leads/service.py:947-957",
+      "evidence": "All listed events present; ERASURE_BLOCKED persisted (1 event) on both engines",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-26",
+      "original_severity": "MINOR",
+      "remediation": "maintenance.py:441-514 (contiguous prefix, count assertion)",
+      "evidence": "Original Q3 + C10: nothing unexported deleted; verify ok",
+      "status": "REGRESSION INTRODUCED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production (before archival is enabled)",
+      "conclusion": "Boundary loss fixed; the new manifest-before-commit ordering wedges archival (RR-06)"
+    },
+    {
+      "id": "IR-27",
+      "original_severity": "MINOR",
+      "remediation": "kernel/db.py:61,65 (hide_parameters); kernel/logging.py:44-61,98-150; app.py:117-125",
+      "evidence": "Q6: no name/email/message in structured stdout; Sentry transaction events carry query strings; outbox_event.last_error stores recipient emails",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production logging",
+      "conclusion": "See RR-13"
+    },
+    {
+      "id": "IR-28",
+      "original_severity": "MINOR",
+      "remediation": "leads/routes.py:289-294",
+      "evidence": "P4: note/activity/status/re-consent/assign/delete on erased lead → 409 on both engines",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-29",
+      "original_severity": "MINOR",
+      "remediation": "kernel/dto.py:41-44 (single_line); leads/events.py:35-44; leads/service.py:531-537",
+      "evidence": "CRLF name renders on one labelled line; genuine link on its own line",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-30",
+      "original_severity": "MINOR",
+      "remediation": "notifications/worker.py:67-104 (per-message delivery keys)",
+      "evidence": "P5: sends [u1, u2✗, u2] — u1 not re-sent",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Residual at-least-once window accepted"
+    },
+    {
+      "id": "IR-31",
+      "original_severity": "MINOR",
+      "remediation": "dist/assets/app.js:220-230",
+      "evidence": "site.e2e: UNKNOWN_POLICY_VERSION → fallback with reload prompt, no inline field error",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Feature: public intake",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-32",
+      "original_severity": "MINOR",
+      "remediation": "dist/assets/app.js:97-120 (textContent); enhancements.css (#form-note colour); index.html:179-180 (consent/Turnstile hidden unless intake on); dist/_headers:2 (site CSP)",
+      "evidence": "innerHTML and contrast fixed; /privacy absent (gated); site CSP blocks inline <style> of dist/404.html",
+      "status": "REGRESSION INTRODUCED",
+      "arch_amendment": "No",
+      "blocking_scope": "Merge (merge to main deploys dist/ to production; RR-01)",
+      "conclusion": "CSP sub-item regressed the live 404 page"
+    },
+    {
+      "id": "IR-33",
+      "original_severity": "MINOR",
+      "remediation": "none",
+      "evidence": "PG16.4: TRUNCATE, GUC bypass and non-owner GUC bypass still succeed",
+      "status": "ACCEPTABLY GATED FOR PRODUCTION",
+      "arch_amendment": "No",
+      "blocking_scope": "PostgreSQL release gate (PGM-1); SQLite is the P0 production engine",
+      "conclusion": "Tracked"
+    },
+    {
+      "id": "IR-34",
+      "original_severity": "MINOR",
+      "remediation": "none (migration_support.py:299,390)",
+      "evidence": "No drift today",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Before the first registry change (post-production follow-up)",
+      "conclusion": "Tracked, non-blocking"
+    },
+    {
+      "id": "IR-35",
+      "original_severity": "MINOR",
+      "remediation": "kernel/net.py:51-62; kernel/single_instance.py; deploy/gunicorn.conf.py:12-17; cmd_deploy_check; config.py:332-333",
+      "evidence": "GUNICORN_CMD_ARGS=--workers=4 → deploy-check rc 1 and gunicorn refuses; second instance locked out; CF header ignored from untrusted peers",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Residual RR-10 (0.0.0.0/0 accepted)"
+    },
+    {
+      "id": "IR-36",
+      "original_severity": "MINOR",
+      "remediation": "app/src/modules/auth/profile-page.ts:198",
+      "evidence": "Lands on /login; Back shows no stale data; other session 401",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-37",
+      "original_severity": "MINOR",
+      "remediation": "components.ts:48-55,158-178; mfa-pages.ts:34-53,90; user-drawer.ts:266-269; app.ts:200-208",
+      "evidence": "Stepper, toasts, prompt fixed; step-up dialog has no expiry warning; command palette and vs-tabs semantics unchanged",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production",
+      "conclusion": "Author matrix overstates as RESOLVED (RR-18)"
+    },
+    {
+      "id": "IR-38",
+      "original_severity": "MINOR",
+      "remediation": "access.e2e.mjs:93-100,120-124,141-145; new journeys; e2e in CI (ci.yml e2e job)",
+      "evidence": "47/47 reproduced; Chromium only; focus assertion accepts #outlet; site CSP check covers index only; axe site scan bypasses CSP",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production (browser matrix)",
+      "conclusion": "RR-A19"
+    },
+    {
+      "id": "IR-39",
+      "original_severity": "MINOR",
+      "remediation": "pyproject [tool.mypy]; tools/mypy_ratchet.py; tools/mypy-baseline.json; app/eslint.config.js; app/.nvmrc 22.23.3; Vite 7.3.6; WTR 1.0; public npm lockfile",
+      "evidence": "ruff check/format clean; ratchet 157=157 OK; ESLint 0; npm audit 0 (full and runtime); 476/476 packages from registry.npmjs.org",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "New: ratchet fails open (RR-16); ESLint sink gaps (RR-A18)"
+    },
+    {
+      "id": "IR-A01",
+      "original_severity": "ADVISORY",
+      "remediation": "enroll confirm row lock only (mfa.py:401-409)",
+      "evidence": "PG: refresh / recovery-code double use → 409 (version column); per-challenge attempts exceeded (9 of 9 parallel guesses vs limit 5)",
+      "status": "ACCEPTABLY GATED FOR PRODUCTION",
+      "arch_amendment": "No",
+      "blocking_scope": "PostgreSQL cut-over",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A02",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "Timing delta 0.93 ms (head) vs 0.79 ms (baseline)",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Accepted residual"
+    },
+    {
+      "id": "IR-A03",
+      "original_severity": "ADVISORY",
+      "remediation": "auth/service.py:535-540",
+      "evidence": "Public-site origin → 403 on refresh/logout; app origin 200",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A04",
+      "original_severity": "ADVISORY",
+      "remediation": "auth/service.py:686-689",
+      "evidence": "Challenges end on reset; MFA_ENROLLMENT link survives (usable only with the new password)",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "No practical impact"
+    },
+    {
+      "id": "IR-A05",
+      "original_severity": "ADVISORY",
+      "remediation": "app.py:53-102",
+      "evidence": "auth='optional' + permission still starts and runs unchecked for anonymous callers (probe); no current route affected",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Latent"
+    },
+    {
+      "id": "IR-A06",
+      "original_severity": "ADVISORY",
+      "remediation": "none (rbac/roles.py)",
+      "evidence": "ADMIN PATCH own role mfa_required=false → 200",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "Possibly (08 §6.1)",
+      "blocking_scope": "—",
+      "conclusion": "Owner decision"
+    },
+    {
+      "id": "IR-A07",
+      "original_severity": "ADVISORY",
+      "remediation": "governance.py:494-501,530-539 (SENSITIVE_ACTION on deny/cancel); rbac/routes.py:436-458 (403/404 kept)",
+      "evidence": "N16; events added; sensitive-grant email on invite not added",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Decision: KEEP 403/404 DIFFERENCE (§9)"
+    },
+    {
+      "id": "IR-A08",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "Source",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production traffic hardening",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A09",
+      "original_severity": "ADVISORY",
+      "remediation": "config.py:23,293-300 (MIN_KEY_BYTES)",
+      "evidence": "Short keys refused in staging/production",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Key quality residual RR-10"
+    },
+    {
+      "id": "IR-A10",
+      "original_severity": "ADVISORY",
+      "remediation": "none (governance.py:589-620 still binds via outbox_event)",
+      "evidence": "Retention unset ⇒ nothing purged",
+      "status": "ACCEPTABLY GATED FOR STAGING",
+      "arch_amendment": "Text in AM-5",
+      "blocking_scope": "Production: config check retention ≥ 3× break-glass delay",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A11",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "P14 [204, 204]",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "AM-9 (incomplete)",
+      "blocking_scope": "Production (PG-BG policy)",
+      "conclusion": "Owner decision"
+    },
+    {
+      "id": "IR-A12",
+      "original_severity": "ADVISORY",
+      "remediation": "none (kernel/http.py:151-160)",
+      "evidence": "Source",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Accepted as correlation-only"
+    },
+    {
+      "id": "IR-A13",
+      "original_severity": "ADVISORY",
+      "remediation": "kernel/turnstile.py:49-57 (hostname checked)",
+      "evidence": "Source",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "action not checked"
+    },
+    {
+      "id": "IR-A14",
+      "original_severity": "ADVISORY",
+      "remediation": "worker.py:155-181 (OutboxDead metric); health.py:102",
+      "evidence": "Worker metric dropped (RR-07); erasure-audit per-event handling unchanged",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production alerting",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A15",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "—",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "AM-10",
+      "blocking_scope": "Production (DPDP erasure completeness)",
+      "conclusion": "Owner decision"
+    },
+    {
+      "id": "IR-A16",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "PG: 201 + 409 DUPLICATE, 1 lead",
+      "status": "ACCEPTABLY GATED FOR PRODUCTION",
+      "arch_amendment": "No",
+      "blocking_scope": "PostgreSQL release gate",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A17",
+      "original_severity": "ADVISORY",
+      "remediation": "platform/health.py:60-66,112-113",
+      "evidence": "Edge gets {status} only; no secrets",
+      "status": "RESOLVED",
+      "arch_amendment": "AM-6",
+      "blocking_scope": "—",
+      "conclusion": "Details unreachable from host in compose topology (RR-17)"
+    },
+    {
+      "id": "IR-A18",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "Bad datetime inserts succeed on SQLite; no enum CHECKs on 3 columns",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Post-production",
+      "conclusion": "Tracked"
+    },
+    {
+      "id": "IR-A19",
+      "original_severity": "ADVISORY",
+      "remediation": "cli/main.py:130-131 via='CLI'; 0005_audit.py:119",
+      "evidence": "sync-permissions audit row via CLI",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A20",
+      "original_severity": "ADVISORY",
+      "remediation": "none (crypto.py:126,133)",
+      "evidence": "Source",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Post-production",
+      "conclusion": "Tracked"
+    },
+    {
+      "id": "IR-A21",
+      "original_severity": "ADVISORY",
+      "remediation": "components.ts:311 (CSSOM); vite.config.ts:8 sourcemap false; playwright/axe-core devDependencies",
+      "evidence": "0 app CSP violations; no maps in build",
+      "status": "RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "—"
+    },
+    {
+      "id": "IR-A22",
+      "original_severity": "ADVISORY",
+      "remediation": "AM-8 drafted",
+      "evidence": "Source",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "AM-8",
+      "blocking_scope": "—",
+      "conclusion": "Owner decision"
+    },
+    {
+      "id": "IR-A23",
+      "original_severity": "ADVISORY",
+      "remediation": "none",
+      "evidence": "Source",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "Production (Privacy Notice)",
+      "conclusion": "Owner/legal decision"
+    },
+    {
+      "id": "IR-A24",
+      "original_severity": "ADVISORY",
+      "remediation": "none (OI-11)",
+      "evidence": "axe: 18 pre-existing nodes outside the form",
+      "status": "NOT RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "Tracked non-blocker"
+    },
+    {
+      "id": "IR-A25",
+      "original_severity": "ADVISORY",
+      "remediation": "Report and registers corrected (DEV-004 UI claim, counts)",
+      "evidence": "New inaccuracies: IR-37 and the site-CSP '0 violations' claim overstated; registry omits 9 advisories; DEV-004 'visible in timeline' overstated",
+      "status": "PARTIALLY RESOLVED",
+      "arch_amendment": "No",
+      "blocking_scope": "—",
+      "conclusion": "RR-A16, RR-A20"
+    }
+  ],
+  "reconciliation_counts": {
+    "by_status": {
+      "RESOLVED": 30,
+      "PARTIALLY RESOLVED": 13,
+      "ACCEPTABLY GATED FOR STAGING": 2,
+      "REGRESSION INTRODUCED": 4,
+      "ACCEPTABLY GATED FOR PRODUCTION": 4,
+      "NOT RESOLVED": 11
+    },
+    "by_severity_and_status": {
+      "BLOCKER": {
+        "RESOLVED": 1
+      },
+      "MAJOR": {
+        "RESOLVED": 12,
+        "PARTIALLY RESOLVED": 3,
+        "ACCEPTABLY GATED FOR STAGING": 1,
+        "REGRESSION INTRODUCED": 1,
+        "ACCEPTABLY GATED FOR PRODUCTION": 1
+      },
+      "MINOR": {
+        "RESOLVED": 12,
+        "REGRESSION INTRODUCED": 3,
+        "PARTIALLY RESOLVED": 3,
+        "ACCEPTABLY GATED FOR PRODUCTION": 1,
+        "NOT RESOLVED": 1
+      },
+      "ADVISORY": {
+        "ACCEPTABLY GATED FOR PRODUCTION": 2,
+        "NOT RESOLVED": 10,
+        "RESOLVED": 5,
+        "PARTIALLY RESOLVED": 7,
+        "ACCEPTABLY GATED FOR STAGING": 1
+      }
+    }
+  },
+  "deviation_decisions": [
+    {
+      "id": "DEV-001",
+      "subject": "MFA factor uniqueness (PENDING + ACTIVE coexist)",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-1",
+      "basis": "IR-20 condition met; only one ACTIVE factor; PENDING never authenticates"
+    },
+    {
+      "id": "DEV-002",
+      "subject": "Invitation acceptance returns MFA_ENROLLMENT_REQUIRED",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-2",
+      "basis": "Conditions IR-01, IR-21, IR-25 met; AM-2 must state that link replay before activation overwrites the password"
+    },
+    {
+      "id": "DEV-003",
+      "subject": "Optional login CAPTCHA token",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-3",
+      "basis": "Conditions IR-22, IR-09, IR-02 met"
+    },
+    {
+      "id": "DEV-004",
+      "subject": "Staff lead re-consent (corrected)",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-4",
+      "basis": "Corrected behaviour verified on both engines; residuals RR-12"
+    },
+    {
+      "id": "DEV-005",
+      "subject": "Break-glass cancel link endpoint and page",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-5",
+      "basis": "Endpoint, page, authorization, replay prevention, events, RBX registration verified; OpenAPI status code RR-A09"
+    },
+    {
+      "id": "DEV-006",
+      "subject": "mfa_challenge binding columns (IR-01)",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-11",
+      "basis": "Expand-only; no schema/authz/replay/migration regression; AM-11 incomplete (rollback reintroduces IR-01; 02 §8.3 placement)"
+    },
+    {
+      "id": "DEV-007",
+      "subject": "Per-email limits keyed by (email, network)",
+      "decision": "REQUIRES IMPLEMENTATION CHANGE",
+      "amendment": "AM-7 (revise)",
+      "basis": "Removes cross-network guessing bound for MFA holders and reset-email cap (RR-04)"
+    },
+    {
+      "id": "DEV-008",
+      "subject": "Readiness accepts declared newer schema; edge sees {status}",
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "amendment": "AM-6",
+      "basis": "Safe; no secrets; AM-6 must state that rollback of this release is snapshot restore (RR-17)"
+    }
+  ],
+  "amendment_assessments": [
+    {
+      "id": "AM-1",
+      "subject": "03 §5.5 factor index",
+      "assessment": "Technically sound",
+      "owner_approval_before": "Merge",
+      "gaps": "—"
+    },
+    {
+      "id": "AM-2",
+      "subject": "08 §4.5 / 05 §11.3 invite MFA response",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Merge",
+      "gaps": "Add: link replay before activation overwrites the password (path B second proof = link possession)"
+    },
+    {
+      "id": "AM-3",
+      "subject": "08 §4.1/§4.7 optional CAPTCHA input",
+      "assessment": "Technically sound",
+      "owner_approval_before": "Merge",
+      "gaps": "—"
+    },
+    {
+      "id": "AM-4",
+      "subject": "04 §5.4 vs 08 §8.5 re-consent",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Merge",
+      "gaps": "Define 'new version' as later; create-time staff consent; DB-level immutability or dedicated append-only table"
+    },
+    {
+      "id": "AM-5",
+      "subject": "08 §1 / 06 §11 / 09 break-glass cancellation",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Merge",
+      "gaps": "Rollback text contradicts 06 §7.5; does not enforce outbox retention ≥ break-glass window (IR-A10); document in-app deny vs link cancel (RR-A11)"
+    },
+    {
+      "id": "AM-6",
+      "subject": "LOG-005 / 08 §3 / 02 §12.4 readiness and rollback",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Merge",
+      "gaps": "State that rollback of this release is snapshot restore; details unreachable from host under compose (RR-17)"
+    },
+    {
+      "id": "AM-7",
+      "subject": "08 §12 per-email limits",
+      "assessment": "**Technically unsound as written; conflicts with certified 05 §4 intent**",
+      "owner_approval_before": "Merge (revise, do not approve)",
+      "gaps": "Its security-impact statement is false for MFA holders and reset-email volume (RR-04)"
+    },
+    {
+      "id": "AM-8",
+      "subject": "05/03 HMAC-derived action tokens",
+      "assessment": "Technically sound (documentation)",
+      "owner_approval_before": "Production",
+      "gaps": "—"
+    },
+    {
+      "id": "AM-9",
+      "subject": "06 §7.5 hostile sole-Founder veto",
+      "assessment": "Incomplete",
+      "owner_approval_before": "Production",
+      "gaps": "Lists options without a decision; option 3 misses the notified-Founder case (P14); ignores IR-05 interplay (custodians cannot remove an eligible hostile Founder)"
+    },
+    {
+      "id": "AM-10",
+      "subject": "07 §2 PII fields / IP retention",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Production",
+      "gaps": "Omits consent_evidence metadata, outbox_event.last_error, user_agent"
+    },
+    {
+      "id": "AM-11",
+      "subject": "03 §5.7 / 05 §11.3 MFA transaction binding",
+      "assessment": "Technically sound; incomplete",
+      "owner_approval_before": "Merge",
+      "gaps": "Must warn that rollback to 9236aa3 reintroduces IR-01; document binding and refresh-rotation rules; amend 02 §8.3 migration placement (RR-A17)"
+    }
+  ],
+  "ir_a07_decision": "KEEP 403/404 DIFFERENCE",
+  "new_findings": [
+    {
+      "id": "RR-01",
+      "severity": "MAJOR",
+      "src": "RR-FE-1",
+      "origin": "Regression introduced by remediation (IR-32 site CSP)",
+      "title": "Site-wide CSP blocks the 404 page's inline stylesheet; because a push to main deploys dist/ to www.vedaspaces.com, merging ships a broken 404 page to production",
+      "verification": "REPRODUCED (Chromium, exact _headers); lead reviewer confirmed source and computed the same hash",
+      "evidence": [
+        "dist/_headers:2 — style-src 'self' https://fonts.googleapis.com (no 'unsafe-inline', no hash), applied to /*",
+        "dist/404.html:15-44 — inline <style> block, unchanged since 778aa8f; sha256-nsu5zW5KZLyHAh1E42iLcu9GL6H14jnCxGdJDe3Q5v4=",
+        "Chromium: style-src-elem violation on /404.html, /no-such-page and /privacy; page renders unstyled; 778aa8f renders correctly",
+        "README.md:43-45 and deployment.md:31 — a push to main deploys dist/ to production within a minute",
+        "site e2e checks CSP on index.html only (missed this)"
+      ],
+      "requirements": [
+        "SEC-003",
+        "Public site availability",
+        "deployment.md release checklist"
+      ],
+      "scenario": "Branch is merged to main; Cloudflare Pages deploys; every mistyped or stale URL on the live site renders an unstyled page.",
+      "remediation": "Move the 404 styles to /assets/404.css, or add the sha256 hash to style-src; add every dist/*.html page to the site CSP E2E.",
+      "validation": "Browser run of every dist page under the exact _headers with 0 CSP violations.",
+      "blocking": "merge (merge = production site deploy)",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-02",
+      "severity": "MAJOR",
+      "src": "RR-RBAC-1",
+      "origin": "Regression enabled by the IR-08 fix",
+      "title": "A single Founder can restore a Founder deleted through dual-Founder approval (G11 bypass; no governance record)",
+      "verification": "REPRODUCED (SQLite and PostgreSQL); lead reviewer confirmed source",
+      "evidence": [
+        "api/veda/platform/rbac/users.py:253-262 — restore_user applies only G9 (passes Founder→Founder); no G3, no G11, no InvariantGuard, no security event",
+        "api/veda/platform/rbac/guards.py:176-192 — deleted Founder keeps FOUNDER user_role and protection_level",
+        "P11/N11: F1+F2 delete F3 (EXECUTED); F1 alone POST /users/{F3}/restore → 200; F3 back as DISABLED FOUNDER-protected account"
+      ],
+      "requirements": [
+        "RBAC-020",
+        "RBAC-021",
+        "06 §7.1 G9/G11",
+        "06 §7.2.2",
+        "06 §7.2.6"
+      ],
+      "scenario": "One Founder unilaterally reverses a dual-control deletion; reactivation still needs a second Founder, but the dual-control decision is undone without trace.",
+      "remediation": "Apply G11 (403 FOUNDER_PROTECTED + BYPASS_BLOCKED event) and G3 in restore_user; either declare deleted Founders unrestorable or add a RESTORE status to FOUNDER_STATUS_CHANGE (owner choice).",
+      "validation": "P11/N11 → 403 FOUNDER_PROTECTED on both engines; TD-G case.",
+      "arch_amendment": "Only if workflow restore is chosen (06 §7.2.2)",
+      "owner_decision": "Yes — unrestorable vs workflow restore",
+      "blocking": "merge (Founder-governance invariant; same class as IR-04)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-03",
+      "severity": "MAJOR",
+      "src": "RR-RBAC-2",
+      "origin": "Residual of IR-04 not covered by the remediation",
+      "title": "An executed STANDARD email change stays pending through GRANT_FOUNDER and can be verified on the new Founder",
+      "verification": "REPRODUCED (SQLite and PostgreSQL); lead reviewer confirmed source",
+      "evidence": [
+        "api/veda/platform/rbac/governance.py:160-178,325 — only open STANDARD requests are cancelled on GRANT_FOUNDER; proposed_email is never cleared (no reference in governance.py)",
+        "api/veda/platform/auth/service.py:887-923 — verify_email_change has no protection-level check",
+        "N17: ADMIN email change of ADMIN a2 executed → a2 promoted → anonymous POST /auth/email/verify 204 → Founder email = attacker address"
+      ],
+      "requirements": [
+        "RBAC-020",
+        "USER-007",
+        "06 §7.1 G11",
+        "06 §7.2.2 FOUNDER_EMAIL_CHANGE"
+      ],
+      "scenario": "Malicious ADMIN pre-stages an email change on a colleague about to be promoted; after promotion the attacker verifies from their mailbox and future reset links go to the attacker (MFA still guards sign-in).",
+      "remediation": "Clear the proposal and invalidate EMAIL_VERIFICATION/EMAIL_CHANGE_CANCEL tokens on GRANT_FOUNDER (event reason TARGET_BECAME_FOUNDER), or refuse GRANT_FOUNDER while a proposal is pending; make verify refuse for FOUNDER-protected users whose proposal was not self-requested.",
+      "validation": "N17 → verify 400, Founder email unchanged, on both engines.",
+      "blocking": "merge (Founder-governance invariant)",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-04",
+      "severity": "MAJOR",
+      "src": "RR-AUTH-1",
+      "origin": "Regression introduced by DEV-007 (IR-23 fix)",
+      "title": "DEV-007 keys per-email login/forgot limits by (email, network), removing the only cross-network bound on password guessing for MFA holders and multiplying reset-email volume",
+      "verification": "REPRODUCED (SQLite); lead reviewer confirmed source",
+      "evidence": [
+        "api/veda/kernel/ratelimit.py:22-33 — key email|network",
+        "api/veda/platform/auth/service.py:407 — global lock applies only when the user has no factor (throttle.py:6-9)",
+        "api/veda/platform/auth/service.py:464-473 — a correct password returns MFA_REQUIRED (password oracle)",
+        "Probe: 40 guesses in one minute from 8 IPv6 /64s all evaluated (baseline: 5 then 429); 18 reset emails delivered vs 3"
+      ],
+      "requirements": [
+        "AUTH-010",
+        "SEC-011",
+        "05 §4",
+        "08 §12"
+      ],
+      "scenario": "Attacker rotating networks guesses a Founder's password without any global bound, learns it from MFA_REQUIRED, then targets the second factor or reuses the password elsewhere; a victim's mailbox can be flooded with reset emails.",
+      "remediation": "Keep the network-keyed limit for lockout fairness and add a global per-email failure budget (or per-account password-failure counter that applies to MFA holders without locking them out, e.g. CAPTCHA/delay escalation); cap reset emails per email globally.",
+      "validation": "Rotating-network probe bounded; P5 lockout fairness still holds.",
+      "arch_amendment": "AM-7 must be revised before approval",
+      "owner_decision": "Yes — AM-7 as revised",
+      "blocking": "merge (unapproved deviation that weakens authentication) / production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-05",
+      "severity": "MAJOR",
+      "src": "RR-LEAD-1",
+      "origin": "Defect in the new IR-03 design",
+      "title": "A forged archive manifest written with the host credential hides deletion of any prefix of the security-event chain, including anchored rows",
+      "verification": "REPRODUCED (SQLite and PostgreSQL)",
+      "evidence": [
+        "api/veda/platform/maintenance.py:339-438 — verification trusts any manifest; no contiguity check, no export-file hash check, no SECURITY_LOG_ARCHIVED event correlation",
+        "Probe C11: manifest first_seq=1,last_seq=anchor+1 with dummy hash and nonexistent file, then delete rows → verify ok=True",
+        "Export file stays on local disk, not in Object Lock storage"
+      ],
+      "requirements": [
+        "SEVT-006",
+        "SEVT-007",
+        "05 §9.6"
+      ],
+      "scenario": "Host-level attacker (the threat anchoring exists for) writes a manifest, deletes incriminating events, nightly verify reports ok.",
+      "remediation": "Require contiguous manifests chained to anchors, verify export-file hash from write-once storage, correlate with SECURITY_LOG_ARCHIVED events; separate writer/verifier roles.",
+      "validation": "C11 → ok=False on both engines; stub-S3 test of manifest forgery.",
+      "blocking": "production (SEVT-006/007 claim)",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-06",
+      "severity": "MAJOR",
+      "src": "RR-LEAD-2",
+      "origin": "Regression introduced by the IR-03/IR-26 remediation",
+      "title": "Archival writes the write-once manifest before the database commit; any later failure produces a permanent false 'prefix removed' alarm and blocks archival forever",
+      "verification": "REPRODUCED (SQLite and PostgreSQL)",
+      "evidence": [
+        "api/veda/platform/maintenance.py:441-514 — manifest stored before DB delete/commit",
+        "Probe C12: simulated DB failure after manifest → verify reports prefix removed; re-archive refused"
+      ],
+      "requirements": [
+        "SEVT-004",
+        "SEVT-006",
+        "AUDIT-009"
+      ],
+      "scenario": "A transient DB error during the first production archival wedges the security-log lifecycle and raises a false tamper alarm nightly.",
+      "remediation": "Two-phase: write a pending manifest keyed by run id, commit DB, then finalise; verification ignores unfinalised manifests whose rows are still online.",
+      "validation": "C12 → no false alarm, archive retry succeeds.",
+      "blocking": "production (before archival is enabled; archival refuses without OWNER-INPUT-002)",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-07",
+      "severity": "MAJOR",
+      "src": "RR-LEAD-3 + RR-OPS-1",
+      "origin": "Defect in IR-12 remediation",
+      "title": "CLI, scheduler and worker processes never configure logging, so every maintenance/worker metric (backup, chain, anchor, invariants, dead outbox) is dropped and the scheduler ignores job exit codes",
+      "verification": "REPRODUCED (0 EMF lines from CLI jobs; only a plain stderr line from logging.lastResort); lead reviewer confirmed source",
+      "evidence": [
+        "api/veda/app.py:111 — configure_logging is called only from create_app; no CLI path calls it",
+        "api/veda/cli/main.py (cmd_scheduler) — subprocess.run([...maintenance, job], check=False); exit codes discarded",
+        "Probe: disk-usage, snapshot, restore-verify, verify-chain, invariants → 0 EMF metric lines; anchor-store outage → verify raises with no event, metric or CRITICAL",
+        "Tests pass only because they run in-process with logging configured"
+      ],
+      "requirements": [
+        "LOG-006",
+        "OPS-009",
+        "SEVT-009",
+        "RG-5"
+      ],
+      "scenario": "Backups stop, the chain breaks or the outbox dead-letters; no CloudWatch alarm ever fires because no metric is emitted.",
+      "remediation": "Call configure_logging in veda.cli main for every subcommand; scheduler records non-zero exits as metrics/alerts; verify-chain catches store errors and emits CHAIN_VERIFY_FAILED.",
+      "validation": "Subprocess test asserting EMF lines for each job and an alarm metric on non-zero exit.",
+      "blocking": "staging (alarm acceptance) / production (RG-5)",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-08",
+      "severity": "MAJOR",
+      "src": "RR-AUTH-2",
+      "origin": "New token-rotation defect (path A confirm); same pattern pre-exists in change_password",
+      "title": "Path A enrollment confirm retires the session's refresh tokens without a successor link, so a benign concurrent refresh is treated as token theft and revokes the just-elevated session",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/auth/mfa.py:447-463 — _rotate_refresh sets used_on, never replaced_by_id",
+        "api/veda/platform/auth/service.py:588-610 — the 20 s grace window requires a linked successor",
+        "api/veda/platform/auth/service.py:728-741 — change_password has the same pattern"
+      ],
+      "requirements": [
+        "AUTH-005",
+        "05 §6.1"
+      ],
+      "scenario": "A second tab refreshes with the old cookie right after enrollment; the session is revoked and a CRITICAL REFRESH_REUSE_DETECTED event and email are raised (false positive).",
+      "remediation": "Link replaced_by_id on rotation in both paths so the grace window applies.",
+      "validation": "Probe: old cookie within 20 s → access token only; after 20 s → reuse detection.",
+      "blocking": "production",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-09",
+      "severity": "MAJOR",
+      "src": "RR-RBAC-3",
+      "origin": "Residual of IR-06 in the deployed topology",
+      "title": "Break-glass STS identity check sees the host instance role, not the custodian, when the CLI runs via docker compose as the runbook prescribes; with no credentials it crashes without a failure event",
+      "verification": "SOURCE-INSPECTED + REPRODUCED (N06)",
+      "evidence": [
+        "api/veda/platform/rbac/custodians.py:22-25 — default boto3 credential chain",
+        "api/deploy/deploy.sh:24-35 and docs/operations/api-runbooks.md:94-95 — CLI run inside the api container",
+        "N06: instance-role ARN → 403 not a registered custodian; no credentials → uncaught NoCredentialsError"
+      ],
+      "requirements": [
+        "RBAC-021",
+        "06 §7.5 items 2 and 4",
+        "PG-BG"
+      ],
+      "scenario": "In an emergency break-glass cannot be used (fails closed), or an operator registers the instance role and two-person control collapses to one identity.",
+      "remediation": "Pass per-custodian credentials (assume-role with MFA) into the container or run via an SSM document with session credentials; refuse the instance-profile ARN; catch botocore errors and record BREAK_GLASS_* FAILURE; rehearse in staging with two principals and CloudTrail.",
+      "validation": "Staging rehearsal with CloudTrail evidence.",
+      "arch_amendment": "06 §7.5 mechanism wording (minor)",
+      "owner_decision": "Yes — custodian credential model (OWNER-INPUT-004)",
+      "blocking": "production (PG-BG)",
+      "re_review": "Yes, with staging evidence",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-10",
+      "src": "RR-AUTH-3 + RR-OPS-6",
+      "origin": "Residual of IR-09/IR-35",
+      "title": "Environment validation accepts trusted-proxy CIDR 0.0.0.0/0 or ::/0, all-zero / dev-derived / duplicate 32-byte keys, and an unparsable JWT PEM",
+      "verification": "REPRODUCED (config probe) / SOURCE-INSPECTED",
+      "evidence": [
+        "api/veda/config.py:288-292, 332-341"
+      ],
+      "requirements": [
+        "SEC-005",
+        "SEC-006",
+        "AUTH-010"
+      ],
+      "scenario": "A mis-set proxy CIDR lets any client choose its IP, defeating per-IP/network limits and forging IP evidence.",
+      "remediation": "Reject CIDRs broader than /24 or /64 (or require an explicit list), reject weak/duplicate/dev-derived keys, load the ES256 key at startup.",
+      "validation": "Config unit tests for each case.",
+      "blocking": "staging",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-11",
+      "src": "RR-FE-2",
+      "origin": "Introduced at 9236aa3, not caught in the original review",
+      "title": "With intake disabled the enquiry form is novalidate and skips client validation, so an empty submit opens WhatsApp with a blank enquiry (baseline 778aa8f blocked it)",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "dist/index.html:168 (novalidate), :173-174 (required removed); dist/assets/app.js:166-169"
+      ],
+      "requirements": [
+        "LEAD-019",
+        "Public site behaviour"
+      ],
+      "scenario": "Visitors send blank WhatsApp enquiries after merge (live site).",
+      "remediation": "Run clientValidate before the WhatsApp hand-off when intake is disabled.",
+      "validation": "site.e2e: empty flag-off submit shows errors.",
+      "blocking": "merge (ships to the live site on merge; cheap fix)",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-12",
+      "src": "RR-LEAD-4",
+      "origin": "DEV-004 residual",
+      "title": "DEV-004 residuals: alternating between published policy versions is accepted without withdrawal; consent history activity is mutable at DB level; staff create-time consent needs no note and writes no consent activity",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/modules/crm/leads/service.py:837, 552-556"
+      ],
+      "requirements": [
+        "LEAD-012",
+        "LEAD-027"
+      ],
+      "scenario": "Consent evidence churns without a real new notice; create-time staff consent lacks provenance.",
+      "remediation": "Accept only a later version; require note on create-time staff consent; decide DB-level immutability or a dedicated append-only table (AM-4).",
+      "validation": "D02/D05 variants.",
+      "arch_amendment": "AM-4 completion",
+      "owner_decision": "Yes (AM-4)",
+      "blocking": "production",
+      "severity": "MINOR",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-13",
+      "src": "RR-LEAD-5",
+      "origin": "IR-27 residual",
+      "title": "Residual PII paths: Sentry transaction events carry request query strings (e.g. lead search by email); outbox_event.last_error stores provider errors containing recipient emails",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/app.py:117-125 (traces_sample_rate with before_send only)",
+        "api/veda/platform/notifications/worker.py:119"
+      ],
+      "requirements": [
+        "LOG-003",
+        "SEC-009"
+      ],
+      "scenario": "Customer emails reach Sentry and an unmasked DB column.",
+      "remediation": "Add before_send_transaction scrubbing (or disable tracing), redact last_error.",
+      "validation": "Probe asserts no PII in Sentry payloads or last_error.",
+      "blocking": "production",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-14",
+      "src": "RR-OPS-2",
+      "origin": "IR-11 residual",
+      "title": "Snapshot directory defaults to container storage and is not required in staging/production, so deploy.sh's pre-deploy snapshot in a --rm container is lost",
+      "verification": "SOURCE-INSPECTED + config probe",
+      "evidence": [
+        "api/deploy/deploy.sh",
+        "api/veda/config.py (snapshot dir)"
+      ],
+      "requirements": [
+        "OPS-002",
+        "OPS-004"
+      ],
+      "scenario": "A pre-deploy snapshot needed for rollback does not exist.",
+      "remediation": "Require an absolute snapshot dir on the persistent volume in staging/production.",
+      "validation": "Config test + staging deploy evidence.",
+      "blocking": "staging",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-15",
+      "src": "RR-OPS-3",
+      "origin": "IR-11 residual",
+      "title": "Disaster-restore runbook does not work as written: restore-verify fails on a Litestream-restored file, Litestream is not stopped before the swap, one failure path emits no metric, the off-host replica is never verified",
+      "verification": "REPRODUCED (a) / SOURCE-INSPECTED",
+      "evidence": [
+        "docs/operations/api-runbooks.md §3",
+        "api/veda/platform/backups.py"
+      ],
+      "requirements": [
+        "OPS-005",
+        "OPS-009",
+        "RG-1",
+        "RG-2"
+      ],
+      "scenario": "Restore under pressure fails or restores unverified data.",
+      "remediation": "Fix restore-verify for Litestream files, stop replication before swap, verify from the S3 replica on schedule.",
+      "validation": "RG-1/RG-2 rehearsal evidence.",
+      "blocking": "staging",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-16",
+      "src": "RR-OPS-4",
+      "origin": "IR-39 residual",
+      "title": "mypy ratchet fails open: reports '0 errors OK' when mypy is missing or its config is broken; --update silently admits errors from new or renamed files",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/tools/mypy_ratchet.py",
+        "api/tools/mypy-baseline.json (24 files, 157 errors)"
+      ],
+      "requirements": [
+        "12 §5 types gate"
+      ],
+      "scenario": "Typing regressions pass CI.",
+      "remediation": "Fail when mypy is unavailable or reports a config error; forbid baseline growth and new-file entries in --update; key by content not path.",
+      "validation": "Negative tests for each case.",
+      "blocking": "staging (CI gate integrity)",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "RR-17",
+      "src": "RR-OPS-5",
+      "origin": "IR-10 residual",
+      "title": "Rollback documentation gaps: rollback of this release to 9236aa3 is never ready (and would reintroduce IR-01); readiness details are unreachable from the host under the compose topology; deploy.sh only checks the declaration line",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/health.py:60-66",
+        "api/deploy/docker-compose.yml:10",
+        "api/deploy/deploy.sh:38",
+        "AM-6, AM-11 text"
+      ],
+      "requirements": [
+        "OPS-004",
+        "LOG-005"
+      ],
+      "scenario": "Operators attempt an N-1 rollback that cannot pass readiness and would restore a BLOCKER-vulnerable image.",
+      "remediation": "State in runbook, AM-6 and AM-11 that rollback of this release is snapshot restore; read revision inside the container in deploy.sh.",
+      "validation": "RG-7 rehearsal.",
+      "arch_amendment": "AM-6/AM-11 text",
+      "owner_decision": "Yes (AM-6, AM-11)",
+      "blocking": "production (RG-7)",
+      "severity": "MINOR",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "RR-18",
+      "src": "RR-FE-3",
+      "origin": "IR-37 residual; author matrix overstates",
+      "title": "Accessibility remnants: step-up dialog has no pre-expiry warning; command palette listbox/option semantics and vs-tabs tabpanel wiring unchanged; account menu stays open on outside click",
+      "verification": "REPRODUCED / SOURCE-INSPECTED",
+      "evidence": [
+        "app/src/modules/auth/step-up-dialog.ts:71",
+        "command-palette.ts:79-80",
+        "design-system/components.ts:375-380",
+        "shell/app.ts:200-208"
+      ],
+      "requirements": [
+        "UI-011",
+        "UI-016 (AX-06, AX-07, AX-09)"
+      ],
+      "scenario": "Keyboard and screen-reader users cannot operate these controls reliably.",
+      "remediation": "Implement the listed ARIA patterns and the step-up expiry warning.",
+      "validation": "axe + manual SR script.",
+      "blocking": "production",
+      "severity": "MINOR",
+      "arch_amendment": "No",
+      "owner_decision": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    }
+  ],
+  "new_advisories": [
+    {
+      "id": "RR-A01",
+      "working_paper_id": "RR-AUTH-4",
+      "text": "IR-20 link invalidation written on the 409 path is rolled back with the error (mfa.py:330-334); no effect because confirm re-checks."
+    },
+    {
+      "id": "RR-A02",
+      "working_paper_id": "RR-AUTH-5",
+      "text": "PostgreSQL answers 409 VERSION_CONFLICT on concurrent auth writes where SQLite answers 401; PostgreSQL gate."
+    },
+    {
+      "id": "RR-A03",
+      "working_paper_id": "RR-AUTH-6",
+      "text": "tests/unit/test_totp_passwords.py fails 2 tests when run alone without VEDA_ENV=test (test isolation)."
+    },
+    {
+      "id": "RR-A04",
+      "working_paper_id": "RR-AUTH-7",
+      "text": "Path C start password re-entry is not counted by any throttle (mfa.py:318-329)."
+    },
+    {
+      "id": "RR-A05",
+      "working_paper_id": "RR-AUTH-8",
+      "text": "VEDA_ENV=local on a deployed host silently derives public development keys; nothing in gunicorn on_starting refuses local/test in the production image (config.py:190)."
+    },
+    {
+      "id": "RR-A06",
+      "working_paper_id": "RR-AUTH-9",
+      "text": "An expired ENROLLMENT challenge leaves an inert PENDING factor (pre-existing)."
+    },
+    {
+      "id": "RR-A07",
+      "working_paper_id": "RR-RBAC-A1",
+      "text": "Break-glass CLI lets botocore exceptions escape without a FAILURE event."
+    },
+    {
+      "id": "RR-A08",
+      "working_paper_id": "RR-RBAC-A2",
+      "text": "PostgreSQL: break_glass_execute racing a cancel-link raises StaleDataError and aborts the remaining due items that cycle (maintenance.py:588-591)."
+    },
+    {
+      "id": "RR-A09",
+      "working_paper_id": "RR-RBAC-A3",
+      "text": "OpenAPI snapshot documents 200 for cancel-link; the handler returns 204."
+    },
+    {
+      "id": "RR-A10",
+      "working_paper_id": "RR-RBAC-A4",
+      "text": "Stale approver with suspended user.founder.manage gets 403 PERMISSION_DENIED where TD-G G7 expects APPROVER_NOT_ELIGIBLE (pre-existing)."
+    },
+    {
+      "id": "RR-A11",
+      "working_paper_id": "RR-RBAC-A5",
+      "text": "Eligible Founders can deny PENDING custodian break-glass in-app but cannot cancel APPROVED ones except via the link; undocumented (fold into AM-5/AM-9)."
+    },
+    {
+      "id": "RR-A12",
+      "working_paper_id": "RR-RBAC-A6",
+      "text": "cancel_open_standard_requests records an event but sends no approval.decided notification."
+    },
+    {
+      "id": "RR-A13",
+      "working_paper_id": "RR-LEAD-6",
+      "text": "Anchor store: no writer/reader role separation; staging silently uses a same-host local store; verify_chain holds a write transaction for the whole recompute."
+    },
+    {
+      "id": "RR-A14",
+      "working_paper_id": "RR-LEAD-7",
+      "text": "Restore-verify chain check trusts the first online row (backups.py:146), so a prefix-deleted snapshot passes."
+    },
+    {
+      "id": "RR-A15",
+      "working_paper_id": "RR-OPS-7",
+      "text": "CI residuals: postgres:16 service image not digest-pinned; built image never smoke-run; e2e uses Flask dev server; Trivy ignore-unfixed without recorded risk acceptance; 104 secrets-baseline entries none audited. (CI execution itself is now evidenced: run 36559966718.)"
+    },
+    {
+      "id": "RR-A16",
+      "working_paper_id": "RR-OPS-8",
+      "text": "Open-issue registry omits 9 advisories (IR-A03, A04, A05, A09, A13, A17, A19, A21, A25) contrary to its own note; IR-39 text mischaracterises the mypy backlog."
+    },
+    {
+      "id": "RR-A17",
+      "working_paper_id": "RR-OPS-9",
+      "text": "Migration 0009 is chained after 0100_crm_leads, contradicting 02 §8.3 numbering; AM-11 does not amend 02 §8.3."
+    },
+    {
+      "id": "RR-A18",
+      "working_paper_id": "RR-FE-4",
+      "text": "ESLint sink bans miss lit-html unsafe-html path, unsafe-mathml, .innerHTML=${} bindings, createContextualFragment, setHTMLUnsafe; site JS (dist/assets/app.js) is not linted."
+    },
+    {
+      "id": "RR-A19",
+      "working_paper_id": "RR-FE-5",
+      "text": "E2E remnants: axe site scan uses bypassCSP; focus assertion also passes on #outlet; test servers bind to all interfaces."
+    },
+    {
+      "id": "RR-A20",
+      "working_paper_id": "RR-FE-6",
+      "text": "DEV-004 register says superseded consent evidence is visible in the lead timeline; the SPA renders only subject and note."
+    },
+    {
+      "id": "RR-A21",
+      "working_paper_id": "RR-FE-7",
+      "text": "Route-focus hook moves focus to the MFA heading after sign-in instead of the code field."
+    },
+    {
+      "id": "RR-A22",
+      "working_paper_id": "RR-FE-8",
+      "text": "engines ^22 with engine-strict rejects Node 24 LTS; Node 22 EOL 2027-04-30."
+    },
+    {
+      "id": "RR-A23",
+      "working_paper_id": "lead",
+      "text": "Proposed amendments are stored inside docs/architecture/amendments/ on the implementation branch. Certified files are unchanged and every proposal is marked PROPOSED, NOT APPROVED, but merging would place unapproved text inside the certified tree; consider docs/proposals/ or merge only after decisions."
+    },
+    {
+      "id": "RR-A24",
+      "working_paper_id": "lead",
+      "text": "Remediation evidence was generated from an uncommitted tree on top of 9236aa3 before 2f6b59a (per evidence README); CI logs are not publicly readable, so step-level conclusions (API) are the independent CI evidence."
+    },
+    {
+      "id": "RR-A25",
+      "working_paper_id": "FE",
+      "text": "On e2e failure CI uploads e2e artefacts including founder.json (throwaway DB password and TOTP secret); harmless for ephemeral data but should be excluded."
+    }
+  ],
+  "new_severity_counts": {
+    "BLOCKER": 0,
+    "MAJOR": 9,
+    "MINOR": 9,
+    "ADVISORY": 25
+  },
+  "blockers": {
+    "merge": [
+      "RR-01",
+      "RR-02",
+      "RR-03",
+      "RR-04",
+      "RR-11",
+      "OD-1 AM-1/2/3/4/5/6/11 decisions",
+      "OD-2 AM-7 revision",
+      "OD-3 deleted-Founder restore policy",
+      "OD-4 TG-01, TG-08",
+      "OD-5 site production deployment on merge"
+    ],
+    "staging": [
+      "RR-07",
+      "RR-10",
+      "RR-14",
+      "RR-15",
+      "RR-16"
+    ],
+    "production": [
+      "RR-05",
+      "RR-06",
+      "RR-08",
+      "RR-09",
+      "RR-12",
+      "RR-13",
+      "RR-17",
+      "RR-18",
+      "IR-03",
+      "IR-06",
+      "IR-11",
+      "IR-12",
+      "IR-27",
+      "IR-37",
+      "IR-38",
+      "IR-A10",
+      "IR-A14",
+      "OD-6",
+      "OD-7",
+      "OD-8",
+      "all 27 gates"
+    ],
+    "public_intake_enablement": [
+      "IR-18 real-key run",
+      "IR-17",
+      "IR-31",
+      "IR-32 prerequisites",
+      "Privacy Notice",
+      "Turnstile keys",
+      "CSP connect-src",
+      "CORS",
+      "staging verification",
+      "production approval"
+    ],
+    "pg_release_gate": [
+      "IR-33",
+      "IR-A01",
+      "IR-A16",
+      "RR-A02",
+      "RR-A08"
+    ]
+  },
+  "owner_decisions": [
+    "OD-1",
+    "OD-2",
+    "OD-3",
+    "OD-4",
+    "OD-5",
+    "OD-6",
+    "OD-7",
+    "OD-8"
+  ],
+  "gates": {
+    "total": 27,
+    "incorrectly_closed": 0,
+    "TG-01": "Pending",
+    "TG-08": "Pending"
+  },
+  "merge_deploys_production_site": true,
+  "next_authorized_action": "Owner decision only. No merge, staging or production step is authorized. The owner may authorize a further remediation increment on implementation/p0-foundation (new commits, no history rewrite) for merge-scope findings RR-01, RR-02, RR-03, RR-04 and RR-11 (RR-07 recommended), record OD-1..OD-5, and then request a targeted re-review of the resulting frozen SHA."
+}
