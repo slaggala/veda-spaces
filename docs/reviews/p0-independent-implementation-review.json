@@ -1,0 +1,1678 @@
+{
+  "review_id": "VEDA-SPACES-P0-INDEPENDENT-IMPLEMENTATION-REVIEW-01",
+  "date": "2026-09-29",
+  "repository": "git@github.com:slaggala/veda-spaces.git",
+  "architecture_sha": "778aa8fdd918da48340319696ada3ff673e9fb8e",
+  "implementation_branch": "implementation/p0-foundation",
+  "implementation_sha": "9236aa3ade38c33d03a57cf7a064ece29937b109",
+  "review_branch": "review/p0-independent-implementation-review",
+  "verdict": "NOT CERTIFIED",
+  "verdict_reason": "BLOCKER IR-01 (reproduced MFA step-up bypass) and material MAJOR findings in merge scope (IR-04, IR-08, IR-14, IR-16; IR-13 recommended).",
+  "authorization": "Review only. No merge or deployment authorized. Implementation remains unauthorized for merge or deployment until the owner explicitly authorizes the next step.",
+  "severity_counts": {
+    "BLOCKER": 1,
+    "MAJOR": 18,
+    "MINOR": 20,
+    "ADVISORY": 25
+  },
+  "scope_verification": {
+    "commit_on_origin_branch": true,
+    "merge_base_is_certified_sha": true,
+    "later_commits_included": false,
+    "working_tree_clean": true,
+    "architecture_docs_unchanged": true,
+    "review_artifacts_in_implementation_branch": false,
+    "files_changed": 255,
+    "files_added": 250,
+    "files_modified": 5,
+    "files_removed": 0,
+    "modified_files": [
+      ".gitignore",
+      "README.md",
+      "dist/index.html",
+      "dist/assets/app.js",
+      "dist/assets/enhancements.css"
+    ],
+    "generated_or_forbidden_artifacts": [],
+    "real_secrets_found": [],
+    "dist_changes_limited_to_enquiry_form": true
+  },
+  "reproduction": {
+    "backend_sqlite": {
+      "claimed": "273 passed",
+      "observed": {
+        "passed": 273,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "backend_postgresql_18_4": {
+      "claimed": "271 passed, 2 skipped",
+      "observed": {
+        "passed": 271,
+        "failed": 0,
+        "skipped": 2
+      }
+    },
+    "backend_postgresql_16_4": {
+      "claimed": "not run",
+      "observed": {
+        "passed": 271,
+        "failed": 0,
+        "skipped": 2
+      }
+    },
+    "coverage_branch_sqlite_total_pct": 85,
+    "frontend_unit": {
+      "claimed": 47,
+      "observed": 47
+    },
+    "typecheck": "pass",
+    "build": "pass (39.48 KB gzip)",
+    "contrast": "58 pairs pass",
+    "npm_audit_runtime": 0,
+    "npm_audit_dev_nexus": {
+      "total": 195,
+      "critical_json": 19,
+      "critical_text_summary": 17,
+      "high": 5,
+      "low": 171
+    },
+    "npm_audit_dev_ghsa": {
+      "total": 7,
+      "high": 6,
+      "moderate": 1
+    },
+    "pip_audit_runtime": 0,
+    "browser": {
+      "workspace": "7/7",
+      "access": "12/12",
+      "site": "7/7",
+      "axe": "workspace 0 violations; site 19 pre-existing contrast nodes"
+    },
+    "migrations": {
+      "sqlite": {
+        "tables": 24,
+        "columns": 502,
+        "indexes": 72,
+        "fks": 107,
+        "checks": 493,
+        "revisions": 9,
+        "heads": 1
+      },
+      "postgresql_16_4": {
+        "tables": 24,
+        "columns": 502,
+        "indexes": 72,
+        "fks": 107,
+        "checks": 161,
+        "revisions": 9,
+        "heads": 1
+      },
+      "seeds": {
+        "roles": 3,
+        "permissions": 45,
+        "role_permission": 101,
+        "lookup_values": 47,
+        "system_users": 3,
+        "sequences": 1,
+        "human_users": 0,
+        "password_hashes": 0
+      },
+      "downgrade": "refused (NotImplementedError), DB unchanged"
+    },
+    "routes": {
+      "claimed": 105,
+      "observed_declared": 105,
+      "url_map_rules": 107,
+      "note": "107 = 105 + static + non-production openapi.json"
+    },
+    "static_analysis": {
+      "ruff_check": "pass",
+      "ruff_format_files_to_reformat": 83,
+      "mypy": "not configured",
+      "eslint": "absent",
+      "bandit": {
+        "high": 1,
+        "medium": 2,
+        "low": 18
+      }
+    }
+  },
+  "deviation_decisions": {
+    "DEV-001": {
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "conditions": [
+        "IR-20"
+      ],
+      "amendment": "AM-1"
+    },
+    "DEV-002": {
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "conditions": [
+        "IR-01",
+        "IR-21",
+        "IR-25"
+      ],
+      "amendment": "AM-2"
+    },
+    "DEV-003": {
+      "decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "conditions": [
+        "IR-22",
+        "IR-09",
+        "IR-02"
+      ],
+      "amendment": "AM-3"
+    },
+    "DEV-004": {
+      "decision": "REQUIRES IMPLEMENTATION CHANGE",
+      "finding": "IR-16",
+      "amendment": "AM-4"
+    }
+  },
+  "break_glass_cancel_endpoint": {
+    "brief_premise_correct": false,
+    "facts": "08 §1 contains no break-glass cancel endpoint; #47 POST /approvals/{id}/cancel is implemented. The implementation adds POST /api/v1/approvals/cancel-link (RBX-003) realising 06 §7.5 step 5; it is secure but unregistered in 08 §1 and 06 §11, and the emailed SPA route /approvals/cancel does not exist.",
+    "classification": [
+      "documentation mismatch",
+      "implementation defect",
+      "architecture amendment requirement"
+    ],
+    "decision": "REQUIRES IMPLEMENTATION CHANGE",
+    "security_blocker": false,
+    "register_as": "DEV-005",
+    "finding": "IR-07",
+    "amendment": "AM-5"
+  },
+  "previously_reported_defects": {
+    "wrong_audit_actor": "FIXED (probe-confirmed)",
+    "archive_chain_break": "FIXED (probe-confirmed); new boundary defect IR-26",
+    "failed_notification_deleting_in_app_notification": "FIXED (probe-confirmed); retries re-send email IR-30"
+  },
+  "bandit_b701": {
+    "classification": "false positive for XSS/header injection",
+    "residual": "IR-29 plain-text content spoofing"
+  },
+  "open_issues": [
+    {
+      "id": "OI-1",
+      "title": "Deviations DEV-001…DEV-004 need an architecture decision",
+      "evidence": "§5 of this review; register entries all PENDING",
+      "severity": "MAJOR",
+      "requirements": "AUTH-011, MFA-005/013/014, AUTH-010, SEC-011, LEAD-012/024/027",
+      "module": "Platform auth; CRM leads",
+      "merge_impact": "Blocks merge until decisions recorded and DEV-004 fixed/removed",
+      "deployment_impact": "n/a",
+      "remediation": "Record AM-1..AM-4; fix DEV-004 (IR-16); register DEV-005",
+      "tests": "Tests named in the register plus IR-16 validation",
+      "re_review": "Yes (DEV-004)"
+    },
+    {
+      "id": "OI-2",
+      "title": "Break-glass cancel-link not in 08 index",
+      "evidence": "IR-07; 08 §1 has no such row; SPA page missing",
+      "severity": "MAJOR",
+      "requirements": "RBAC-021, 06 §7.5",
+      "module": "Platform RBAC / SPA",
+      "merge_impact": "Does not block merge by itself once registered as DEV-005",
+      "deployment_impact": "Blocks production (PG-BG)",
+      "remediation": "SPA /approvals/cancel page; AM-5",
+      "tests": "Browser E2E via emailed link",
+      "re_review": "Yes"
+    },
+    {
+      "id": "OI-3",
+      "title": "HMAC-derived single-use action tokens",
+      "evidence": "auth/crypto.py:37-39, service.py:170-194; used/expired rows rejected",
+      "severity": "ADVISORY",
+      "requirements": "AUTH-008, AUTH-011, USER-007",
+      "module": "Platform auth",
+      "merge_impact": "None",
+      "deployment_impact": "None",
+      "remediation": "Document trade-off (AM-8)",
+      "tests": "Existing token tests",
+      "re_review": "No"
+    },
+    {
+      "id": "OI-4",
+      "title": "No legal-hold data model; erasure blocking via env var",
+      "evidence": "VEDA_ERASURE_BLOCKED_STATUSES empty",
+      "severity": "MINOR",
+      "requirements": "LEAD-029, AUDIT-011",
+      "module": "CRM leads",
+      "merge_impact": "None",
+      "deployment_impact": "Production only if counsel requires legal hold at launch",
+      "remediation": "Owner/legal decision; model if required",
+      "tests": "Erasure-blocked tests",
+      "re_review": "If implemented"
+    },
+    {
+      "id": "OI-5",
+      "title": "Privacy Notice missing; Turnstile site key and site CSP not configured",
+      "evidence": "IR-32; dist/index.html:179; dist/_headers has no CSP at all (broader than stated)",
+      "severity": "MINOR (feature-gated)",
+      "requirements": "LEAD-001, SEC-003, SEC-009",
+      "module": "Public site",
+      "merge_impact": "None (flag off)",
+      "deployment_impact": "Blocks intake enablement",
+      "remediation": "Publish notice; site key; full site CSP",
+      "tests": "site E2E with real Turnstile test key",
+      "re_review": "Yes (intake enablement)"
+    },
+    {
+      "id": "OI-6",
+      "title": "AWS adapters (SES, KMS, S3 Object Lock anchor) untested",
+      "evidence": "`# pragma: no cover` on SesEmailProvider, AwsKmsProvider, anchor upload; archival anchors local only (IR-03)",
+      "severity": "MAJOR (production)",
+      "requirements": "NOTIF-009, MFA-010, SEVT-007",
+      "module": "Platform notifications / auth / audit",
+      "merge_impact": "None",
+      "deployment_impact": "Blocks production; staging verification required",
+      "remediation": "Staging adapter verification; IR-03 fix",
+      "tests": "Stubbed-client unit tests + staging evidence",
+      "re_review": "Yes (ops)"
+    },
+    {
+      "id": "OI-7",
+      "title": "Alerts are log lines; unseen-network enrollment alert missing",
+      "evidence": "IR-12; maintenance.py/worker.py log.critical/error",
+      "severity": "MAJOR (production)",
+      "requirements": "LOG-006, SEVT-009, 05 §11.3",
+      "module": "Platform",
+      "merge_impact": "None",
+      "deployment_impact": "Blocks production",
+      "remediation": "Metrics + alert routing + test-fire; implement missing alert",
+      "tests": "RG-5",
+      "re_review": "Yes (ops)"
+    },
+    {
+      "id": "OI-8",
+      "title": "No formatter/type checker; no ESLint",
+      "evidence": "IR-39; 83 files unformatted",
+      "severity": "MINOR",
+      "requirements": "12 §5",
+      "module": "Tooling",
+      "merge_impact": "None",
+      "deployment_impact": "Before staging CI",
+      "remediation": "Adopt ruff format, mypy (or waiver), ESLint",
+      "tests": "CI jobs",
+      "re_review": "No"
+    },
+    {
+      "id": "OI-9",
+      "title": "Browser E2E not in CI; CI never executed",
+      "evidence": "IR-14; ci.yml; 12 §5 gates missing",
+      "severity": "MAJOR",
+      "requirements": "OPS-001, DATA-011, SEC-007",
+      "module": "CI",
+      "merge_impact": "**Blocks merge**",
+      "deployment_impact": "—",
+      "remediation": "Green CI incl. postgres:16; add missing gates",
+      "tests": "CI run evidence",
+      "re_review": "Yes (evidence)"
+    },
+    {
+      "id": "OI-10",
+      "title": "Dev toolchain advisories; upgrade needs Node ≥ 20.19",
+      "evidence": "IR-39; Nexus 195 (19 critical JSON), GHSA 7 (6 high)",
+      "severity": "MINOR",
+      "requirements": "SEC-007",
+      "module": "Frontend tooling",
+      "merge_impact": "None",
+      "deployment_impact": "Before staging CI (supply-chain exposure)",
+      "remediation": "Node ≥ 20.19, Vite ≥ 6.4.3, WTR 1.x",
+      "tests": "npm audit in CI",
+      "re_review": "No"
+    },
+    {
+      "id": "OI-11",
+      "title": "Pre-existing public-site contrast (19 nodes)",
+      "evidence": "Appendix F.2; 18 outside form, #form-note inside",
+      "severity": "ADVISORY (18) / MINOR (#form-note)",
+      "requirements": "UI-011, AX-05, AX-08",
+      "module": "Public site",
+      "merge_impact": "None",
+      "deployment_impact": "#form-note before intake enablement",
+      "remediation": "Token fixes",
+      "tests": "axe on site",
+      "re_review": "No"
+    }
+  ],
+  "findings": [
+    {
+      "id": "IR-01",
+      "severity": "BLOCKER",
+      "domain": "Authentication / MFA",
+      "title": "MFA enrollment confirmation is not bound to the caller: a bearer token plus any unbound enrollment challenge grants MFA verification and step-up to the token's session",
+      "verification": "REPRODUCED (SQLite and PostgreSQL); source confirmed by lead reviewer",
+      "evidence": [
+        "api/veda/platform/auth/mfa.py:259 — challenge/session binding is enforced only when ch.session_id is not None; ctx.user.id is never compared with ch.user_id",
+        "api/veda/platform/auth/mfa.py:280 — enrollment path is chosen from the presence of a bearer context (path A) rather than from the challenge",
+        "api/veda/platform/auth/mfa.py:297-301 — path A sets auth_methods='pwd+totp' and mfa_verified_on on the CALLER's session while the factor promoted belongs to ch.user_id",
+        "api/veda/platform/auth/routes.py:289 — POST /auth/mfa/enroll/confirm declared auth='optional'",
+        "Contrast: api/veda/platform/auth/mfa.py:328 (step-up) correctly requires ch.user_id == ctx.user.id and ch.session_id == ctx.session.id",
+        "Probe P1b output: 'admin regenerate codes w/o fresh step-up: 403 STEP_UP_REQUIRED' → 'cross confirm using admin bearer: 200 AUTHENTICATED' → 'admin regenerate codes after cross confirm: 200 [codes]'",
+        "Probe P1: a password-only session of a user holding an MFA-gated sensitive grant went from 403 MFA_REQUIRED to 200 on GET /api/v1/audit-logs"
+      ],
+      "requirements": [
+        "MFA-011",
+        "MFA-012",
+        "MFA-014",
+        "AUTH-015",
+        "05 §11.3",
+        "05 §11.6",
+        "06 §3.2 (G10)"
+      ],
+      "risk": "Complete bypass of step-up (G10) and of MFA-gated sensitive permissions for anyone who holds a victim's access token — exactly the threat step-up exists to contain.",
+      "scenario": "Attacker obtains victim X's bearer access token (XSS elsewhere, shared device, log leak). Attacker also controls an unbound ENROLLMENT challenge and its TOTP secret — trivially obtained as any invitee whose role requires MFA (path B) or as any MFA-required user without a factor (path C). Attacker calls POST /auth/mfa/enroll/confirm with their own challenge_token + code and 'Authorization: Bearer <X token>'. X's session is marked MFA-verified and freshly stepped-up; attacker can then regenerate X's recovery codes, change roles, reset MFA, read security events, etc., without X's authenticator.",
+      "remediation": "Derive the path from the challenge, never from the presence of ctx. If ch.session_id is None (paths B/C) reject any request carrying a bearer token. If ch.session_id is set, require ctx.session.id == ch.session_id AND ctx.user.id == ch.user_id. Always require ctx.user.id == ch.user_id when ctx is present. Store the PENDING factor id on the challenge so confirm promotes exactly that factor.",
+      "validation": "Regression tests reproducing P1 and P1b (and a path-D variant: recovery session + foreign unbound challenge) must fail closed on SQLite and PostgreSQL; full MFA suite green.",
+      "re_review": "Yes — security re-review of the enrollment/step-up state machine",
+      "blocking": "merge",
+      "arch_amendment": "No",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-02",
+      "severity": "MAJOR",
+      "domain": "Leads / Authentication / Availability",
+      "title": "Cloudflare Turnstile siteverify (up to 5 s network I/O) runs while the database-wide SQLite write lock is held (public intake and CAPTCHA-gated login)",
+      "verification": "REPRODUCED (public intake); login path SOURCE-INSPECTED",
+      "evidence": [
+        "api/veda/kernel/http.py:425,464 — every non-GET route opens db.new_session(write=True) before the handler runs",
+        "api/veda/kernel/db.py:46-51 — write sessions issue BEGIN IMMEDIATE (global SQLite write lock); busy_timeout 5000 ms",
+        "api/veda/modules/crm/leads/routes.py:69 — turnstile.verify() inside the write unit of work",
+        "api/veda/platform/auth/service.py:229 — login calls turnstile.verify() inside the write unit of work when captcha_required",
+        "api/veda/kernel/turnstile.py:41 — urlopen(..., timeout=5)",
+        "Probe Q5: 3 s verify delay → concurrent staff POST /leads waited 2.77 s; 6 s delay → staff write returned 503 after 5.19 s"
+      ],
+      "requirements": [
+        "LEAD-018",
+        "AUTH-010",
+        "NFR-003",
+        "ADR-008",
+        "04 §5.1 (transaction covers steps 6–11 only)"
+      ],
+      "risk": "Anonymous traffic serialises every platform write (staff edits, logins, token refresh, outbox) behind a third-party round-trip; a slow or degraded siteverify produces 503s for all staff writes.",
+      "scenario": "Bots submit enquiries with junk tokens from many IPs (20/min/IP allowed); each request holds the write lock for the siteverify RTT. During a Cloudflare slowdown staff writes and refresh-token rotation fail with 503.",
+      "remediation": "Perform idempotency lookup and Turnstile verification in a read-only session (or before opening the write unit of work); open the write transaction only for steps 6–11 and re-check the idempotency key inside it. Apply the same pattern to login.",
+      "validation": "Re-run Q5: staff write latency independent of verify delay; add an integration test with a slow verifier stub for both intake and login.",
+      "blocking": "production; feature:public-intake enablement",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "feature:public-intake",
+        "production"
+      ]
+    },
+    {
+      "id": "IR-03",
+      "severity": "MAJOR",
+      "domain": "Audit / Security events",
+      "title": "Security-event chain verification never consults the external anchor and accepts deletion of the anchored prefix and tail truncation",
+      "verification": "REPRODUCED locally on SQLite and PostgreSQL; S3 path SOURCE-INSPECTED",
+      "evidence": [
+        "api/veda/platform/maintenance.py:240-245 — latest_anchor() reads only local anchors.jsonl",
+        "api/veda/platform/maintenance.py:277-283 — production anchor_chain() writes only to S3, never the local file",
+        "api/veda/platform/maintenance.py:316-320 — archival anchors are written only locally",
+        "api/veda/platform/maintenance.py:253-259 — a missing anchored row is assumed archived; no manifest/hash check",
+        "Probe Q4: deleting rows ≤ anchor seq → verify ok=True; deleting the head row → verify ok=True (both engines)"
+      ],
+      "requirements": [
+        "SEVT-006",
+        "SEVT-007",
+        "05 §9.6",
+        "11 §4 A2"
+      ],
+      "risk": "The 'daily external anchor bounds undetected rewrite to one day' property does not hold; an attacker with the chain key or DB-level access can delete or truncate security evidence without the nightly verification detecting it.",
+      "scenario": "Host-level attacker drops SQLite triggers (accepted residual) and deletes the most recent security events after a compromise; nightly verification reports OK.",
+      "remediation": "Verification must fetch the latest S3 anchor via a read role, require the anchored (seq,row_hash) to be present or covered by a verified archive manifest, require DB head seq ≥ anchored seq, and write archival anchors to S3.",
+      "validation": "Q4 cases must return ok=False; unit test with stubbed S3 client.",
+      "blocking": "production (tamper-evidence claim)",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-04",
+      "severity": "MAJOR",
+      "domain": "Founder governance",
+      "title": "A STANDARD dual-control request survives the target's promotion to Founder and then executes against the Founder (G11 time-of-check/time-of-use bypass)",
+      "verification": "REPRODUCED (SQLite and PostgreSQL)",
+      "evidence": [
+        "api/veda/platform/rbac/governance.py:70-75 — _open_request_guard is scoped per class, so STANDARD and FOUNDER requests coexist on one target",
+        "api/veda/platform/rbac/governance.py:100-108 — _execute_standard runs start_email_change / admin_reset without re-checking protection_level/G11",
+        "Probe P10: ADMIN raises EMAIL_CHANGE on ADMIN a2 → a2 promoted to Founder → a Founder approves the stale STANDARD request → 200 EXECUTED, Founder's proposed_email = attacker-controlled address"
+      ],
+      "requirements": [
+        "RBAC-020",
+        "RBAC-021",
+        "USER-007",
+        "MFA-007",
+        "06 §7.1 G11",
+        "06 §7.4 (eligibility re-checked at execution)"
+      ],
+      "risk": "Founder account-control actions (email change, MFA reset) can be initiated by an ADMIN and completed with one approval, bypassing the Founder-level dual-Founder workflow. Email change leads to password-reset capability for the new mailbox.",
+      "scenario": "Malicious ADMIN files an email-change request against a colleague who is about to be promoted to Founder; after promotion, the stale request is approved (social engineering or confusion) and executes against a Founder.",
+      "remediation": "Re-apply G11 and requester G9 at approval and execution time (FAILED FOUNDER_PROTECTED); additionally cancel open STANDARD requests on GRANT_FOUNDER execution.",
+      "validation": "P10 must end FAILED/FOUNDER_PROTECTED on both engines; add TD-G case.",
+      "blocking": "merge (governance bypass)",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-05",
+      "severity": "MAJOR",
+      "domain": "Founder governance / break-glass",
+      "title": "Custodians can initiate full break-glass while eligible Founders exist (no operating-mode check)",
+      "verification": "REPRODUCED (SQLite and PostgreSQL)",
+      "evidence": [
+        "api/veda/platform/rbac/governance.py:387-408 — break_glass_request validates action, target and open-request guard but never checks that no eligible Founder exists",
+        "Probe P13: with two eligible Founders present, custodians K1+K2 granted FOUNDER to a SALES user after the 24 h delay"
+      ],
+      "requirements": [
+        "RBAC-021",
+        "06 §7.2.2",
+        "06 §7.2.4"
+      ],
+      "risk": "Break-glass becomes a parallel, steady-state path to grant/revoke/disable/MFA-reset any Founder; combined with IR-06 and IR-07, Founders have no usable veto once a custodian approves.",
+      "scenario": "Two custodians (or one via IR-06) grant Founder status to an arbitrary user while the real Founders are available.",
+      "remediation": "Refuse break_glass_request (409, BREAK_GLASS_REQUESTED FAILURE event) unless no eligible Founder other than the target exists; consider letting any eligible Founder cancel APPROVED break-glass requests in-app.",
+      "validation": "P13 → refusal in steady state; TD-G case.",
+      "blocking": "production (PG-BG); break-glass unusable until OWNER-INPUT-004 anyway",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-06",
+      "severity": "MAJOR",
+      "domain": "Founder governance / break-glass",
+      "title": "Break-glass CLI trusts a caller-supplied --principal-arn (two-person control is self-asserted)",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/cli/main.py:253 — --principal-arn argument passed straight through (main.py:189-197)",
+        "api/veda/platform/rbac/governance.py:380-384 — custodian_human only looks the ARN up in configuration; no STS/SSM identity check anywhere",
+        "Probe P13: one shell ran 'request --principal-arn K1' and 'approve --principal-arn K2'; approval accepted and recorded"
+      ],
+      "requirements": [
+        "RBAC-021",
+        "06 §7.5 items 2 and 4 (ARNs verified from SSM session identity / CloudTrail)"
+      ],
+      "risk": "One operator with host access satisfies 'two distinct humans' and produces legitimate-looking, hash-chained BREAK_GLASS_APPROVED evidence with a false principal.",
+      "scenario": "A single custodian with SSM access requests and approves a break-glass Founder grant alone.",
+      "remediation": "Derive the principal from sts:GetCallerIdentity or the SSM session environment; refuse mismatches; record session id and ARN.",
+      "validation": "CLI approve fails when caller identity ≠ supplied ARN (mocked STS); TD-G case.",
+      "blocking": "production (PG-BG)",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-07",
+      "severity": "MAJOR",
+      "domain": "Founder governance / break-glass (Phase 4)",
+      "title": "Break-glass cancel link targets a non-existent SPA route; the 06 §7.5 notified-party veto is unusable end-to-end",
+      "verification": "SOURCE-INSPECTED; emailed URL REPRODUCED (P12); API endpoint REPRODUCED working",
+      "evidence": [
+        "api/veda/platform/notifications/handlers.py:309 — link built as {app_origin}/approvals/cancel#token=…",
+        "app/src/core/router/routes.ts:20-50 — no /approvals/cancel route (falls through to not-found); no SPA code calls /api/v1/approvals/cancel-link",
+        "api/veda/platform/rbac/routes.py:371-379 — POST /api/v1/approvals/cancel-link (RBX-003) works: 256-bit HMAC token, hash-only storage, single use with sibling invalidation (P12: invalid 400 / extra field 422 / valid 204 / replay 400)",
+        "docs/architecture/08-api-design.md §1 — no break-glass cancel row; #47 POST /approvals/{id}/cancel is implemented (rbac/routes.py:363-368)",
+        "docs/architecture/06-rbac.md §11 — RBX-003 register does not list cancel-link"
+      ],
+      "requirements": [
+        "RBAC-021",
+        "06 §7.5 step 5",
+        "12 TD-G G12",
+        "PG-BG"
+      ],
+      "risk": "Governance: the cooling-off veto the architecture relies on to contain break-glass cannot be exercised by its intended users. Security of the endpoint itself: no defect found.",
+      "scenario": "Founders receive the break-glass notification, click the cancel link, and land on a not-found page while the custodian action proceeds.",
+      "remediation": "Add a public SPA page /approvals/cancel that POSTs the fragment token; add browser E2E; amend 08 §1, 06 §11 RBX-003 and 09 (page spec).",
+      "validation": "Browser E2E cancels a pending break-glass request from the emailed link.",
+      "arch_amendment": "Yes — 08 §1 index row, 06 §11 RBX-003 register entry, 09 page",
+      "blocking": "production (PG-BG)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-08",
+      "severity": "MAJOR",
+      "domain": "Founder governance",
+      "title": "FOUNDER_STATUS_CHANGE with DELETED always fails (I3 evaluation drops soft-deleted users but keeps their live FOUNDER role row)",
+      "verification": "REPRODUCED (SQLite and PostgreSQL)",
+      "evidence": [
+        "api/veda/platform/rbac/guards.py:148-152 — holders = live FOUNDER user_role rows; protected = users via soft-delete-filtered query",
+        "api/veda/platform/rbac/users.py:144-150 — DELETE sets is_deleted but leaves FOUNDER user_role live",
+        "api/veda/platform/rbac/governance.py:241-248 — request marked FAILED FOUNDER_STATE_INCONSISTENT",
+        "Probe P11/P16: approved DELETE → FAILED; workaround REVOKE_FOUNDER then DELETE → 204"
+      ],
+      "requirements": [
+        "RBAC-021",
+        "USER-001",
+        "06 §7.2.2"
+      ],
+      "risk": "A documented P0 governance action is unusable (fails closed; no security exposure).",
+      "scenario": "Departed Founder cannot be deleted through the canonical workflow.",
+      "remediation": "Evaluate I3 consistently (include_deleted on both sides, or exclude deleted on both), or soft-delete the FOUNDER user_role on DELETE per an explicit decision; add a TD-G case.",
+      "validation": "P16 DELETE → EXECUTED with invariants I1–I3 holding and nightly invariant job agreeing.",
+      "blocking": "merge (P0 functional acceptance of RBAC-021)",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-09",
+      "severity": "MAJOR",
+      "domain": "Configuration / Production readiness",
+      "title": "Production-safety validation is fail-open: any VEDA_ENV other than exactly 'production' (including staging, unset, 'prod') runs with publicly derivable dev keys, local KMS, capture email and the accept-anything CAPTCHA verifier; production validation is also incomplete",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/config.py:132-143 — keys fall back to values derived from the public constant 'local-development-only'",
+        "api/veda/config.py:207-210 — validate_production returns [] unless settings.is_production",
+        "api/veda/platform/auth/jwt_tokens.py:54-60 — non-production JWT key derived from sha256('veda-dev-jwt::' + env)",
+        "api/veda/kernel/turnstile.py:37-38 — non-cloudflare mode accepts any token not starting with 'fail'",
+        "Probe P6b: env='staging' → validate_production [] and a JWT forged with the derivable key verifies",
+        "DB/ops probe: env 'production' still accepts rate limits disabled, 1-byte HMAC keys, placeholder KMS ARN, localhost origins, relative SQLite path, jwt_kid=dev-1, no Sentry/anchor bucket; cmd_migrate skips validation (cli/main.py:42-52)"
+      ],
+      "requirements": [
+        "SEC-005",
+        "PLAT-008",
+        "OPS-003",
+        "LOG-004",
+        "AUTH-004",
+        "02 §11.4"
+      ],
+      "risk": "An internet-facing staging environment (or a production host with a mistyped VEDA_ENV) accepts forged access tokens, mintable reset/invite links, forgeable security-event chains and decryptable TOTP seeds.",
+      "scenario": "Staging deployed at api-staging.vedaspaces.com without every secret set; an attacker derives the dev JWT key and signs an admin token.",
+      "remediation": "Fail closed: VEDA_ENV must be one of {local,test,staging,production}; only local/test may derive dev keys and only with an explicit opt-in; apply secret checks to staging; add key-length, KMS ARN, https/non-localhost origin, absolute DB path, rate-limit, Sentry, anchor-bucket and non-dev kid checks; validate in migrate.",
+      "validation": "Parameterised unit tests over env values and each missing/weak setting; create_app must refuse.",
+      "blocking": "staging; production",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-10",
+      "severity": "MAJOR",
+      "domain": "Operations / Migrations",
+      "title": "Readiness gate requires DB revision == image head exactly, so the architecture's normal rollback (redeploy N-1 on the migrated schema) always reports not-ready",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/health.py:43-45 — checks['migrations'] = 'head' if current == head else 'behind'; ok &= current == head",
+        "Probe: DB at 0100_crm_leads with N-1 image head 0008_account_security → 503 {\"migrations\":\"behind\"} (label also wrong: DB is ahead)"
+      ],
+      "requirements": [
+        "OPS-004",
+        "LOG-005",
+        "02 §12.4",
+        "11 §2 B3"
+      ],
+      "risk": "The only rollback strategy that justifies the expand-only / no-downgrade policy is non-functional; the running N-1 API also flips to not-ready immediately after migration.",
+      "scenario": "A release migrates, the new image misbehaves, ops redeploys N-1: /health/ready stays 503 and the deploy gate fails; only snapshot restore remains (see IR-11).",
+      "remediation": "Accept the image head or a declared N-1-compatible descendant (e.g., migrations record lineage/compat metadata that readiness checks); fix the 'behind' label.",
+      "validation": "Test that loads an app whose script directory lacks the latest revision against a head DB and expects 200; 503 when genuinely behind or divergent.",
+      "arch_amendment": "Yes — clarify LOG-005 / 08 §3 readiness semantics ('at or compatibly ahead of the image head')",
+      "blocking": "production (and RG-7 rehearsal)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-11",
+      "severity": "MAJOR",
+      "domain": "Operations",
+      "title": "Backup (Litestream config, nightly snapshot), restore verification and API deploy/migrate runbooks are absent from the deliverable",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        "api/deploy/docker-compose.yml references /etc/veda/litestream.yml which is not in the repository",
+        "No VACUUM INTO / snapshot job and no restore-verification job anywhere in api/ (grep)",
+        "deployment.md covers only the marketing site; no API runbooks (11 §8)",
+        "Implementation report §16/§17 acknowledge these gates were not executed"
+      ],
+      "requirements": [
+        "OPS-002",
+        "OPS-004",
+        "OPS-005",
+        "OPS-007",
+        "OPS-009",
+        "RG-1",
+        "RG-2",
+        "RG-7"
+      ],
+      "risk": "Volume loss or a bad migration without a restorable, verified copy; RPO/RTO unproven.",
+      "scenario": "EBS volume failure in production with no replicated copy.",
+      "remediation": "Commit litestream.yml, nightly VACUUM INTO + Object Lock job, restore-verification job with metrics/alerts, a deploy/migrate script implementing 02 §12.4, and 11 §8 runbooks.",
+      "validation": "RG-1, RG-2, RG-7 evidence.",
+      "re_review": "Operational readiness review",
+      "blocking": "production",
+      "arch_amendment": "No",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-12",
+      "severity": "MAJOR",
+      "domain": "Operations / Observability",
+      "title": "No metrics, no alert routing, error tracker optional (LOG-006 is mandatory in P0)",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        "No metrics emission anywhere in api/veda (grep)",
+        "Alerts are stdlib log lines: maintenance.py:265,343,345,406; security_events.py:311; worker.py:97",
+        "Sentry DSN not required in production (config.py validate_production)",
+        "Implementation report OI-7"
+      ],
+      "requirements": [
+        "LOG-004",
+        "LOG-006",
+        "OPS-009",
+        "SEVT-009",
+        "RG-5"
+      ],
+      "risk": "Chain breaks, invariant failures, dead-lettered notifications, replication lag or disk exhaustion go unnoticed.",
+      "scenario": "Outbox dead-letters every lead notification for days; nobody is paged.",
+      "remediation": "Emit the 02 §9 metric set, route CRITICAL/ERROR to paging, require Sentry in production, test-fire each alert.",
+      "validation": "RG-5 evidence.",
+      "re_review": "Operational readiness review",
+      "blocking": "production",
+      "arch_amendment": "No",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-13",
+      "severity": "MAJOR",
+      "domain": "Supply chain / Build reproducibility",
+      "title": "Runtime Python dependencies are open ranges with no lockfile or hashes; container base image floats",
+      "verification": "SOURCE-INSPECTED; drift REPRODUCED (ruff format count 83 vs reported 82 under ruff 0.16.9; resolved SQLAlchemy 2.1.1, Flask-Limiter 4.1.1)",
+      "evidence": [
+        "api/requirements.txt — 10 of 14 packages have no upper bound; no lock/constraints file; no hashes",
+        "api/deploy/Dockerfile — floating python:3.13-slim and pip install -r requirements.txt at build time",
+        ".github/workflows/ci.yml:26 — CI installs a different set from requirements-dev.txt",
+        "Implementation report records no resolved package versions"
+      ],
+      "requirements": [
+        "SEC-007",
+        "OPS-001",
+        "PLAT-008",
+        "11 §5 X11"
+      ],
+      "risk": "The shipped image is not the tested set; a transitive major upgrade can alter auth, JWT or rate-limit behaviour in production; no hash verification.",
+      "scenario": "A new Flask-Limiter or PyJWT major resolves at image build and silently changes limiter keys or token validation.",
+      "remediation": "Generate a hashed lock (pip-compile --generate-hashes / uv), install with --require-hashes in CI and the image, pin the base image by digest, run pip-audit against the lock, record resolved versions in evidence.",
+      "validation": "CI job fails on lock drift; reproducible image digest.",
+      "blocking": "merge (recommended) ; staging; production",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-14",
+      "severity": "MAJOR",
+      "domain": "CI / Quality gates",
+      "title": "CI workflow has never executed and omits PR gates required by 12 §5 (types, N-1 test, OpenAPI diff, dependency/image/secret scan, E2E smoke + axe)",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        ".github/workflows/ci.yml:1-49 — api job: ruff check, pytest, deploy-check; app job: typecheck, lint:tokens, contrast, unit tests, build",
+        "docs/architecture/12-test-strategy.md:342-348 — PR gates list types, migration N-1 test, OpenAPI diff, dependency + image scan, secret scan, E2E smoke + axe",
+        "Implementation report OI-9: 'CI workflow was written but not executed'",
+        "api/veda/cli/main.py:226-231 — deploy-check is a substring match on the gunicorn config (probe: GUNICORN_CMD_ARGS=--workers=4 still reports OK)"
+      ],
+      "requirements": [
+        "OPS-001",
+        "DATA-011",
+        "SEC-007",
+        "12 §5"
+      ],
+      "risk": "MINOR items cannot be tracked through enforceable gates when the gates themselves are not automated; dual-engine and PostgreSQL 16 conformance depends on a pipeline that has never run.",
+      "scenario": "A regression that breaks PostgreSQL or introduces a vulnerable dependency merges unnoticed.",
+      "remediation": "Execute CI green on the PR (including the postgres:16 matrix leg); add mypy (or document the waiver), OpenAPI diff, pip-audit/npm audit, secret scan, container scan and an E2E smoke + axe job.",
+      "validation": "Green CI run URL attached to the re-review evidence.",
+      "blocking": "merge",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-15",
+      "severity": "MAJOR",
+      "domain": "Frontend / Data integrity",
+      "title": "Lead edit 'Re-apply mine' after a version conflict silently reverts the other writer's committed changes",
+      "verification": "REPRODUCED (browser probe + audit log); source confirmed by lead reviewer",
+      "evidence": [
+        "app/src/modules/leads/lead-form.ts:153-181 — on reapply, saveEdit(values, {...original, ...fresh}, fresh.version) diffs the entire stale form against fresh, so every field the other user changed is sent with its old value",
+        "Probe: other client PATCHes city/priority; UI user edits only message and re-applies → server city/priority reverted; audit changed_fields [city, message, priority]"
+      ],
+      "requirements": [
+        "UI-005",
+        "DATA-006",
+        "12 §4.12 TD-F step 4 ('no data loss')",
+        "09 §3.2"
+      ],
+      "risk": "Client defeats server-side optimistic concurrency; silent lost updates to lead contact data and priority.",
+      "scenario": "Two staff edit one lead concurrently; the second user's re-apply undoes the first user's work.",
+      "remediation": "Compute the user's own edits once (diff against the originally loaded record) and on re-apply send only those against fresh.version; surface true field-level conflicts.",
+      "validation": "Unit test for saveEdit diffing; browser TD-F step-4 journey showing only 'message' changed.",
+      "blocking": "production",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-16",
+      "severity": "MAJOR",
+      "domain": "Leads / Privacy (DEV-004)",
+      "title": "DEV-004 staff re-consent overwrites consent evidence, mixes provenance and is accepted without prior withdrawal",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/modules/crm/leads/service.py:462-468 — re-consent overwrites consent_* in the row and clears withdrawal fields",
+        "api/veda/modules/crm/leads/schemas.py:48-50,95 — staff may choose channel WEBSITE_FORM",
+        "Probe P3: after re-consent row shows channel=PHONE_VERBAL with original website ip and source_page retained",
+        "Probe: three consecutive re-consent PATCHes without withdrawal all 200; original survives only in audit_log UPDATE old_value; SALES /history → 403",
+        "Probe P3b: SALES with OWN scope re-consents a withdrawn lead (200); no system activity/timeline entry, reason=None",
+        "Deviation register claims a lead-drawer UI control; app/src contains none"
+      ],
+      "requirements": [
+        "LEAD-012",
+        "LEAD-024",
+        "LEAD-027",
+        "04 §5.4",
+        "08 §8.5",
+        "ADR-005"
+      ],
+      "risk": "Consent evidence (DPDP-relevant) misstates its origin and can be replaced without trace in the lead timeline; the 'original consent evidence' depends on audit rows subject to archival and erasure rewriting.",
+      "scenario": "A salesperson re-consents a customer who withdrew, choosing WEBSITE_FORM; the row now asserts a website consent with the original web IP and the Do-not-contact banner disappears.",
+      "remediation": "Clear/replace consent_ip_address and consent_source_page with the new capture context (NULL for staff channels); forbid WEBSITE_FORM from staff; accept only when withdrawn, never captured, or the policy version changes; require a note/evidence reference and write a system activity; consider an append-only consent-event child table; correct the deviation register.",
+      "validation": "Probe P3/P3b variants: provenance cleared, activity written, re-consent without withdrawal rejected, WEBSITE_FORM rejected.",
+      "arch_amendment": "Yes — reconcile 04 §5.4 with 08 §8.5 and decide in-row vs audit-only retention of prior consent",
+      "blocking": "feature:staff re-consent (remove the consent field from LeadPatchIn or fix before merge)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "merge",
+        "production",
+        "staging"
+      ]
+    },
+    {
+      "id": "IR-17",
+      "severity": "MAJOR",
+      "domain": "Public website intake",
+      "title": "Enquiry form remains visible after success/fallback ([hidden] overridden by .contact-form{display:grid}); resubmission reports a false failure",
+      "verification": "REPRODUCED; CSS source confirmed by lead reviewer",
+      "evidence": [
+        "dist/assets/app.js:122-123 — contactForm.hidden = true",
+        "dist/assets/styles.css (pre-existing) — .contact-form{display:grid} with no [hidden] override",
+        "Probe: after 201 the form computes display:grid (737 px) beside the success panel; resubmitting → 422 IDEMPOTENCY_KEY_REUSED → 'Something went wrong on our side' while the lead is stored",
+        "app/e2e/site.e2e.mjs:38-41 — success check does not assert the form is hidden"
+      ],
+      "requirements": [
+        "LEAD-001",
+        "LEAD-019",
+        "09 §4.11",
+        "AX-08"
+      ],
+      "risk": "Customers are told a stored enquiry failed; duplicate WhatsApp hand-offs.",
+      "scenario": "Visitor submits, edits a field in the still-visible form, resubmits and sees a failure panel.",
+      "remediation": "Add .contact-form[hidden], .form-panel[hidden]{display:none}; assert hidden state in E2E.",
+      "validation": "site.e2e asserts form hidden for success and fallback.",
+      "blocking": "feature:public-intake enablement (veda-api-base)",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "feature:public-intake"
+      ]
+    },
+    {
+      "id": "IR-18",
+      "severity": "MAJOR",
+      "domain": "Public website intake",
+      "title": "Turnstile token is never reset; after any server-side 422 the corrected resubmission reuses a spent token and fails CAPTCHA",
+      "verification": "SOURCE-INSPECTED (precondition REPRODUCED: server-side field 422 after client validation passes)",
+      "evidence": [
+        "api/veda/modules/crm/leads/routes.py:69,72-74 — CAPTCHA verified before validation, consuming the single-use token",
+        "dist/assets/app.js:135,175 — client re-reads the same widget response; no turnstile.reset() anywhere; 'no-widget' sent when absent"
+      ],
+      "requirements": [
+        "LEAD-001",
+        "LEAD-019",
+        "04 §5.1",
+        "02 §2 intake step 3"
+      ],
+      "risk": "Any correctable server validation error converts into a CAPTCHA failure and WhatsApp fallback; enquiries degrade to the manual channel.",
+      "scenario": "Name '12' passes client validation, server returns a field error, user corrects and resubmits → CAPTCHA_FAILED.",
+      "remediation": "Call turnstile.reset(widgetId) after every non-201; gate submit on a token; treat 'api-base set but no site key' as a deploy-check error.",
+      "validation": "E2E with a real Turnstile test key covering 422 → correct → 201.",
+      "blocking": "feature:public-intake enablement",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "feature:public-intake"
+      ]
+    },
+    {
+      "id": "IR-19",
+      "severity": "MAJOR",
+      "domain": "Frontend / Accessibility",
+      "title": "SPA route changes never update the document title nor move focus/announce navigation (WCAG 2.4.2 Level A)",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "app/index.html:8 — static <title>; no document.title assignment in app/src",
+        "app/src/shell/app.ts:91-94 — location change only updates pathname; <main id=outlet tabindex=-1> (app.ts:185) is never focused"
+      ],
+      "requirements": [
+        "UI-011",
+        "UI-016 (AX-01)",
+        "09 §5"
+      ],
+      "risk": "Screen-reader users receive no indication of navigation; all history entries share one title.",
+      "scenario": "Keyboard/screen-reader user activates 'Leads'; focus stays on the sidebar and nothing is announced.",
+      "remediation": "Per-route titles, focus the page heading or #outlet on vaadin-router-location-changed, announce via a polite live region.",
+      "validation": "Browser test asserting title and focus after navigation; manual NVDA/VoiceOver check.",
+      "blocking": "production",
+      "arch_amendment": "No",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-20",
+      "severity": "MINOR",
+      "domain": "Authentication / MFA",
+      "title": "Path C (emailed enrollment link + password) replaces an existing ACTIVE factor without step-up by that factor; open enrollment links survive enrollment by another path",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/auth/mfa.py:222-239 — path C never checks for an ACTIVE factor",
+        "mfa.py enroll_confirm does not invalidate open MFA_ENROLLMENT tokens",
+        "Probe P2/P2b: factor REPLACED while ACTIVE; old link valid after path-A enrollment (200)"
+      ],
+      "requirements": [
+        "MFA-014",
+        "05 §11.3",
+        "DEV-001"
+      ],
+      "risk": "Path C (emailed enrollment link + password) replaces an existing ACTIVE factor without step-up by that factor; open enrollment links survive enrollment by another path",
+      "scenario": "See evidence.",
+      "remediation": "Refuse path C start with 409 when an ACTIVE factor exists; invalidate open MFA_ENROLLMENT tokens on any confirm. Fix together with DEV-001 amendment.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-21",
+      "severity": "MINOR",
+      "domain": "Authentication / Invitation (DEV-002)",
+      "title": "Resending an invitation does not revoke earlier invite_context challenges; link replay mints parallel contexts and overwrites the password",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/rbac/users.py:95-109 — resend invalidates INVITE tokens only",
+        "api/veda/platform/auth/service.py:511-516 — each MFA-path accept creates a new ENROLLMENT challenge",
+        "Probe P3: old invite_context after resend → start 200 → confirm 200 AUTHENTICATED ACTIVE"
+      ],
+      "requirements": [
+        "AUTH-011",
+        "MFA-014",
+        "DEV-002"
+      ],
+      "risk": "Resending an invitation does not revoke earlier invite_context challenges; link replay mints parallel contexts and overwrites the password",
+      "scenario": "See evidence.",
+      "remediation": "On resend and each MFA-path accept, expire open ENROLLMENT challenges and revoke PENDING factors, or bind the challenge to the INVITE token and re-check liveness.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-22",
+      "severity": "MINOR",
+      "domain": "Authentication / Throttling",
+      "title": "IPv6 /64 network grouping is string-based and breaks on compressed addresses, defeating per-network throttle and CAPTCHA and causing false global lockouts",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/kernel/http.py:152-158 and kernel/logging.py:57-63 — ':'.join(ip.split(':')[:4])",
+        "Probe P4: 12 failures from one /64 never set captcha_required; account globally throttled instead"
+      ],
+      "requirements": [
+        "AUTH-010",
+        "SEC-011",
+        "DEV-003"
+      ],
+      "risk": "IPv6 /64 network grouping is string-based and breaks on compressed addresses, defeating per-network throttle and CAPTCHA and causing false global lockouts",
+      "scenario": "See evidence.",
+      "remediation": "Use ipaddress.ip_network(f'{ip}/64', strict=False) (and /24 for IPv4, handling IPv4-mapped); consider /64 keying for the per-IP limiter.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-23",
+      "severity": "MINOR",
+      "domain": "Authentication / Rate limits",
+      "title": "Certified 5/min per-email login limit lets anyone lock a known account out from every network",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/auth/routes.py:43-44; kernel/ratelimit.py:20-26 — key is email only",
+        "Probe P5: five requests from another network → victim's own login 429"
+      ],
+      "requirements": [
+        "AUTH-010",
+        "SEC-011",
+        "05 §4 A-01",
+        "08 §12"
+      ],
+      "risk": "Certified 5/min per-email login limit lets anyone lock a known account out from every network",
+      "scenario": "See evidence.",
+      "remediation": "Key per-email limits on (email, network) or count failures only with an exemption for the last successful network; amend 08 §12.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "Yes — 08 §12",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-24",
+      "severity": "MINOR",
+      "domain": "Authentication",
+      "title": "Password re-entry (reauth) and change-password are not throttled; password guessing with a stolen bearer then satisfies password-based step-up",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        "api/veda/platform/auth/service.py:462-470, 489-495 — no throttle.record_password_failure / account counter"
+      ],
+      "requirements": [
+        "AUTH-010",
+        "MFA-011"
+      ],
+      "risk": "Password re-entry (reauth) and change-password are not throttled; password guessing with a stolen bearer then satisfies password-based step-up",
+      "scenario": "See evidence.",
+      "remediation": "Count reauth/change failures in the account throttle (10 per 15 min) and emit throttle events.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-25",
+      "severity": "MINOR",
+      "domain": "Security events",
+      "title": "Security-event gaps: no event on MFA-path invite password set, invalid action tokens, CSRF-rejected refresh, MFA throttle and per-network throttle activation; erasure refusal event rolled back",
+      "verification": "SOURCE-INSPECTED; erasure part REPRODUCED",
+      "evidence": [
+        "api/veda/platform/auth/service.py:511-516, 186-194",
+        "api/veda/platform/auth/routes.py:49-51",
+        "api/veda/platform/auth/throttle.py:70-77,111-121 (return value ignored at mfa.py:110,140,273,338)",
+        "api/veda/modules/crm/leads/service.py:665-668 — record() then raise; probe P6: 0 ERASURE_BLOCKED events persisted"
+      ],
+      "requirements": [
+        "AUTH-013",
+        "MFA-006",
+        "SEVT-002",
+        "SEVT-011",
+        "LEAD-029"
+      ],
+      "risk": "Security-event gaps: no event on MFA-path invite password set, invalid action tokens, CSRF-rejected refresh, MFA throttle and per-network throttle activation; erasure refusal event rolled back",
+      "scenario": "See evidence.",
+      "remediation": "Record INVITE_ACCEPTED/TOKEN_INVALID, TOKEN_REFRESH FAILURE on CSRF rejection, ACCOUNT_THROTTLED scope=mfa|network; use security_events.defer for ERASURE_BLOCKED.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-26",
+      "severity": "MINOR",
+      "domain": "Audit / Security events",
+      "title": "Security-log archival deletes events it never exported when event time and chain order disagree near the cutoff",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/maintenance.py:303-304 selects occurred_on < cutoff; :327 deletes chain_seq <= last.chain_seq",
+        "Probe Q3 (both engines): row exported? False; still in DB? False; verify ok=True"
+      ],
+      "requirements": [
+        "SEVT-004",
+        "AUDIT-009"
+      ],
+      "risk": "Security-log archival deletes events it never exported when event time and chain order disagree near the cutoff",
+      "scenario": "See evidence.",
+      "remediation": "Select by chain_seq range, export exactly the range deleted, assert counts in the same transaction.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production (before archival is enabled; currently refuses without OWNER-INPUT-002)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-27",
+      "severity": "MINOR",
+      "domain": "Logging / Privacy",
+      "title": "Unhandled exceptions and DB errors log raw PII (stdlib loggers bypass structlog masking; engine lacks hide_parameters)",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/kernel/logging.py:30-43 — scrub applies only to structlog events",
+        "api/veda/app.py:134-137 — log.exception on stdlib logger",
+        "api/veda/kernel/db.py:56-64 — create_engine without hide_parameters=True",
+        "Probe Q6: forced NOT NULL violation on public intake logs enquirer name, email and message",
+        "api/veda/app.py:58-62 — Sentry initialised without before_send scrubbing"
+      ],
+      "requirements": [
+        "LOG-001",
+        "LOG-003",
+        "SEC-009"
+      ],
+      "risk": "Unhandled exceptions and DB errors log raw PII (stdlib loggers bypass structlog masking; engine lacks hide_parameters)",
+      "scenario": "See evidence.",
+      "remediation": "Route stdlib logging through structlog ProcessorFormatter with masking, set hide_parameters=True, add Sentry scrubbing and include_local_variables=False.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-28",
+      "severity": "MINOR",
+      "domain": "Leads / Erasure",
+      "title": "An erased (anonymised) lead still accepts notes, activities and status changes, re-introducing PII after erasure is reported complete",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/modules/crm/leads/activities.py:32-37,101-127; service.py:479-537 — no anonymized_on check",
+        "Probe P4: note with phone 201, activity with email 201, NEW→CONTACTED 200 while allowed_transitions=[]"
+      ],
+      "requirements": [
+        "LEAD-029",
+        "AUDIT-011",
+        "NOTE-001",
+        "ACT-001"
+      ],
+      "risk": "An erased (anonymised) lead still accepts notes, activities and status changes, re-introducing PII after erasure is reported complete",
+      "scenario": "See evidence.",
+      "remediation": "Return 409 INVALID_STATE on every mutating lead/note/activity route when anonymized_on is set.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-29",
+      "severity": "MINOR",
+      "domain": "Notifications",
+      "title": "Plain-text staff notification emails can be content-spoofed via newlines in public form fields",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/kernel/dto.py:31 — strip_controls keeps \\n\\r\\t",
+        "api/veda/modules/crm/leads/events.py:35-57 — public name/city flow into text part",
+        "Probe: forged 'Open the lead:' line above the genuine link; HTML part escaped correctly"
+      ],
+      "requirements": [
+        "NOTIF-005"
+      ],
+      "risk": "Plain-text staff notification emails can be content-spoofed via newlines in public form fields",
+      "scenario": "See evidence.",
+      "remediation": "Collapse whitespace in single-line fields at intake; render untrusted values on labelled lines.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-30",
+      "severity": "MINOR",
+      "domain": "Notifications",
+      "title": "Outbox retry resends email to recipients who already received it",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/platform/notifications/worker.py:78-79",
+        "Probe P5: sends [u1, u2, u1, u2]"
+      ],
+      "requirements": [
+        "NOTIF-004",
+        "02 §10.1"
+      ],
+      "risk": "Outbox retry resends email to recipients who already received it",
+      "scenario": "See evidence.",
+      "remediation": "Track per-(event, recipient, template) delivery state or fan out per recipient.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-31",
+      "severity": "MINOR",
+      "domain": "Public website intake",
+      "title": "UNKNOWN_POLICY_VERSION is shown as an inline field error with no WhatsApp route",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        "dist/assets/app.js:198-201"
+      ],
+      "requirements": [
+        "LEAD-019",
+        "04 §5.1"
+      ],
+      "risk": "UNKNOWN_POLICY_VERSION is shown as an inline field error with no WhatsApp route",
+      "scenario": "See evidence.",
+      "remediation": "Treat UNKNOWN_POLICY_VERSION as non-field: show fallback with reload prompt.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "feature:public-intake (before any policy-version rotation)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "feature:public-intake"
+      ]
+    },
+    {
+      "id": "IR-32",
+      "severity": "MINOR",
+      "domain": "Public website intake",
+      "title": "Enquiry-form prerequisites absent: /privacy page missing, no site CSP, Turnstile site key unset, showErrors() uses innerHTML with server strings, #form-note contrast 4.06:1",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "dist/index.html:179 links /privacy (not present)",
+        "dist/_headers has no Content-Security-Policy (pre-existing)",
+        "dist/assets/app.js:94-105 innerHTML sink (not exploitable today: messages are static server literals)",
+        "#form-note #746e66 on #f1e5d7 = 4.06:1 (needs 4.5:1)"
+      ],
+      "requirements": [
+        "LEAD-001",
+        "SEC-003",
+        "SEC-009",
+        "AX-05",
+        "AX-08",
+        "OI-5"
+      ],
+      "risk": "Enquiry-form prerequisites absent: /privacy page missing, no site CSP, Turnstile site key unset, showErrors() uses innerHTML with server strings, #form-note contrast 4.06:1",
+      "scenario": "See evidence.",
+      "remediation": "Publish the Privacy Notice (v2026-09-v1), add a site CSP incl. Turnstile/API origins, provision the site key, build the summary with textContent, fix #form-note colour.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "feature:public-intake enablement",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "feature:public-intake"
+      ]
+    },
+    {
+      "id": "IR-33",
+      "severity": "MINOR",
+      "domain": "PostgreSQL",
+      "title": "PostgreSQL immutability guard is bypassable (user-settable GUC veda.maintenance, no TRUNCATE trigger) and app/retention roles are never provisioned",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/kernel/migration_support.py:327-351, 387-403",
+        "PG16.4 probe: TRUNCATE succeeded; SET LOCAL veda.maintenance='on' + DELETE removed 206 audit rows; non-owner role with GUC succeeded"
+      ],
+      "requirements": [
+        "07 §6.2",
+        "AUDIT-004",
+        "SEVT-006",
+        "DATA-014"
+      ],
+      "risk": "PostgreSQL immutability guard is bypassable (user-settable GUC veda.maintenance, no TRUNCATE trigger) and app/retention roles are never provisioned",
+      "scenario": "See evidence.",
+      "remediation": "BEFORE TRUNCATE trigger; role-based bypass (SECURITY DEFINER maintenance function) instead of GUC; provision veda_app/veda_retention; assert grants in readiness.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "pg-release-gate (MAJOR for PGM-1)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "pg-release-gate"
+      ]
+    },
+    {
+      "id": "IR-34",
+      "severity": "MINOR",
+      "domain": "Migrations",
+      "title": "Historical migrations import the live permission registry and role matrix, so freshly built environments drift from upgraded ones",
+      "verification": "SOURCE-INSPECTED",
+      "evidence": [
+        "api/veda/kernel/migration_support.py:165-167, 204-206",
+        "api/veda/cli/main.py:101-107 — sync-permissions does not sync role_permission"
+      ],
+      "requirements": [
+        "PLAT-005",
+        "RBAC-018",
+        "OPS-004"
+      ],
+      "risk": "Historical migrations import the live permission registry and role matrix, so freshly built environments drift from upgraded ones",
+      "scenario": "See evidence.",
+      "remediation": "Freeze seed literals per revision; make catalog/matrix changes via new data migrations.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "post-production follow-up (required before first registry change)",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": []
+    },
+    {
+      "id": "IR-35",
+      "severity": "MINOR",
+      "domain": "Operations",
+      "title": "Single-process/instance constraint is enforced only by a text match on gunicorn.conf.py; client IP trusted from CF-Connecting-IP without a trusted-proxy check",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "api/veda/cli/main.py:226-231 — probe: GUNICORN_CMD_ARGS=--workers=4 → 'deploy-check: OK'",
+        "api/veda/kernel/http.py:146-149; kernel/ratelimit.py:17 — CF-Connecting-IP trusted unconditionally"
+      ],
+      "requirements": [
+        "OPS-006",
+        "OPS-010",
+        "RG-3",
+        "RG-6",
+        "SEC-006",
+        "AUTH-010"
+      ],
+      "risk": "Single-process/instance constraint is enforced only by a text match on gunicorn.conf.py; client IP trusted from CF-Connecting-IP without a trusted-proxy check",
+      "scenario": "See evidence.",
+      "remediation": "Runtime single-instance lock and worker assertion; accept CF-Connecting-IP only from configured proxy CIDRs; commit proxy/tunnel config.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-36",
+      "severity": "MINOR",
+      "domain": "Frontend",
+      "title": "'Sign out everywhere' leaves the user on /profile with stale personal data displayed",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "app/src/modules/auth/profile-page.ts:198 — session.logout(true) without navigate('/login')"
+      ],
+      "requirements": [
+        "UI-015",
+        "AUTH-007"
+      ],
+      "risk": "'Sign out everywhere' leaves the user on /profile with stale personal data displayed",
+      "scenario": "See evidence.",
+      "remediation": "Navigate to /login after logout-all; cover all three sign-out entry points in E2E.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-37",
+      "severity": "MINOR",
+      "domain": "Frontend / Accessibility",
+      "title": "Accessibility gaps: 360 px status stepper not keyboard-scrollable (axe serious), unreliable toast announcements, no MFA-timeout warning, window.prompt for sensitive reason, incomplete listbox/menu/tab semantics",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "app/src/design-system/components.ts:36,147",
+        "app/src/modules/admin/user-drawer.ts:264",
+        "app/src/shell/app.ts:171-181"
+      ],
+      "requirements": [
+        "UI-011",
+        "UI-016 (AX-03, AX-06, AX-07, AX-09)"
+      ],
+      "risk": "Accessibility gaps: 360 px status stepper not keyboard-scrollable (axe serious), unreliable toast announcements, no MFA-timeout warning, window.prompt for sensitive reason, incomplete listbox/menu/tab semantics",
+      "scenario": "See evidence.",
+      "remediation": "Fix per item; add manual screen-reader script.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-38",
+      "severity": "MINOR",
+      "domain": "Test evidence quality",
+      "title": "Browser E2E evidence overstates coverage and security-critical modules have the lowest coverage",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "app/e2e/access.e2e.mjs:90-91 — 'API 401/403' check sends no bearer (proves 401 only); :102-103 hard-codes reloadSignedOut = true",
+        "Chromium-only; no forgot/reset, approvals, email-change, role-edit or TD-F step-4 journeys",
+        "Coverage (SQLite, branch): total 85%; rbac/governance.py 73%, kernel/ratelimit.py 57%, identity/service.py 74%",
+        "No existing test exercised cross-user enroll/confirm (IR-01), Founder DELETE (IR-08) or STANDARD→Founder TOCTOU (IR-04)"
+      ],
+      "requirements": [
+        "12 §4.8",
+        "12 §6",
+        "OPS-001"
+      ],
+      "risk": "Browser E2E evidence overstates coverage and security-critical modules have the lowest coverage",
+      "scenario": "See evidence.",
+      "remediation": "Fix the two assertions; add negative security tests for the IR-01/IR-04/IR-08 classes; add Firefox/WebKit legs per 12 §4.8.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production"
+      ]
+    },
+    {
+      "id": "IR-39",
+      "severity": "MINOR",
+      "domain": "Tooling",
+      "title": "No Python formatter or type checker enforced, no ESLint/Prettier; frontend dev toolchain carries dev-only advisories (upgrade needs Node ≥ 20.19)",
+      "verification": "REPRODUCED",
+      "evidence": [
+        "ruff format --check: 83 files would be reformatted (report says 82; unpinned ruff)",
+        "No mypy configuration; no ESLint/Prettier binaries or config",
+        "npm audit (configured Nexus feed): 195 advisories (JSON metadata 19 critical / 5 high / 171 low; text summary says 17 critical); public GHSA feed: 7 (6 high, 1 moderate: esbuild via vite 5.4.21, extract-zip via @web/test-runner); --omit=dev: 0 in both feeds"
+      ],
+      "requirements": [
+        "SEC-007",
+        "12 §5",
+        "OI-8",
+        "OI-10"
+      ],
+      "risk": "No Python formatter or type checker enforced, no ESLint/Prettier; frontend dev toolchain carries dev-only advisories (upgrade needs Node ≥ 20.19)",
+      "scenario": "See evidence.",
+      "remediation": "Adopt ruff format + mypy (or documented waiver), ESLint with lit plugin banning unsafe directives; upgrade Node to ≥ 20.19 and Vite ≥ 6.4.3 / WTR 1.x; add dependency audit to CI.",
+      "validation": "Regression test reproducing the evidence must pass.",
+      "arch_amendment": "No",
+      "blocking": "staging (CI/supply-chain exposure) ; production",
+      "re_review": "Targeted re-review of the fix",
+      "blocking_stages": [
+        "production",
+        "staging"
+      ]
+    }
+  ],
+  "advisories": [
+    {
+      "id": "IR-A01",
+      "text": "PostgreSQL concurrency: refresh rotation, recovery-code consumption and challenge attempt counting are read-then-write without row locks/conditional updates (safe on SQLite via BEGIN IMMEDIATE) — auth/service.py:358-374, mfa.py:70-88,133-147. Fix before PGM-1."
+    },
+    {
+      "id": "IR-A02",
+      "text": "Login timing delta ≈1.2–1.6 ms known vs unknown account (extra post-request write) — auth/service.py:266-283."
+    },
+    {
+      "id": "IR-A03",
+      "text": "Refresh/logout CSRF origin allow-list includes public-site origins (auth/service.py:334); mitigated by CORS preflight; tighten to app_origin."
+    },
+    {
+      "id": "IR-A04",
+      "text": "Password reset does not invalidate open MFA challenges / enrollment links (auth/service.py:443-459)."
+    },
+    {
+      "id": "IR-A05",
+      "text": "Startup route-declaration check is presence-only; RBX ids/paths not validated against the 06 §11 register; public route with a permission would be silently unenforced (app.py:41-49, http.py:69-70,465-474). No current route affected."
+    },
+    {
+      "id": "IR-A06",
+      "text": "PATCH /roles/{id} lacks a self-held-role check and accepts mfa_required (not in 08 §6.1) — rbac/roles.py:70-89."
+    },
+    {
+      "id": "IR-A07",
+      "text": "Approval deny/cancel emit no SENSITIVE_ACTION; invite with sensitive role sends no rbac.sensitive_grant email; approve/deny return 403 where GET returns 404 (existence oracle)."
+    },
+    {
+      "id": "IR-A08",
+      "text": "08 §12 per-user 600 req/5 min limit not implemented; token endpoints unthrottled (entropy makes brute force infeasible)."
+    },
+    {
+      "id": "IR-A09",
+      "text": "HMAC/action/chain keys have no minimum-length check in production (config.py:212-219). Folded into IR-09 remediation."
+    },
+    {
+      "id": "IR-A10",
+      "text": "Cancel-link binding depends on outbox_event rows surviving retention purge (<3 days breaks live links, fail closed)."
+    },
+    {
+      "id": "IR-A11",
+      "text": "A hostile sole Founder can repeatedly cancel custodian break-glass (architecture residual of 06 §7.5; needs owner decision)."
+    },
+    {
+      "id": "IR-A12",
+      "text": "Client-supplied X-Request-ID / CF-Ray adopted as request_id; fine for correlation, not trustworthy as evidence (http.py:133-143)."
+    },
+    {
+      "id": "IR-A13",
+      "text": "Turnstile siteverify hostname/action not checked (turnstile.py:42)."
+    },
+    {
+      "id": "IR-A14",
+      "text": "DEAD outbox rows alert only via log.error; /health ignores DEAD; erasure-audit job lacks per-event failure handling (worker.py:97,122-126; maintenance.py:161-207)."
+    },
+    {
+      "id": "IR-A15",
+      "text": "IP/user-agent retained in audit_log/security_event_log after lead erasure; several free-text fields not in pii_fields (07 §2 gap)."
+    },
+    {
+      "id": "IR-A16",
+      "text": "PostgreSQL concurrent duplicate Idempotency-Key returns 409 instead of the original 201 (lead stored once)."
+    },
+    {
+      "id": "IR-A17",
+      "text": "/health/ready publicly exposes migration/guard/outbox state (health.py:36-62)."
+    },
+    {
+      "id": "IR-A18",
+      "text": "No SQLite format CHECK on UTCDATETIME columns; three CODE(n) columns lack enum CHECKs (event_type, failure_reason, status_reason)."
+    },
+    {
+      "id": "IR-A19",
+      "text": "sync-permissions CLI labels audit rows performed_via=MIGRATION (migration_support.py:117)."
+    },
+    {
+      "id": "IR-A20",
+      "text": "TOTP AES-GCM AAD is constant (crypto.py:120,128); bind to user_id‖factor_id."
+    },
+    {
+      "id": "IR-A21",
+      "text": "App CSP: styleMap first render raises one style-src-attr violation (components.ts:291); production sourcemaps published (vite.config.ts:8); e2e scripts import undeclared playwright/axe-core."
+    },
+    {
+      "id": "IR-A22",
+      "text": "HMAC-derived action tokens (OI-3): acceptable; residual — K_action compromise plus row ids yields every live link; document in 05/03."
+    },
+    {
+      "id": "IR-A23",
+      "text": "WhatsApp fallback URL carries enquirer PII to wa.me (pre-existing, user-initiated); mention in Privacy Notice."
+    },
+    {
+      "id": "IR-A24",
+      "text": "18 pre-existing public-site contrast nodes outside the form (OI-11); highest priority .portfolio-head > p at 2.40:1."
+    },
+    {
+      "id": "IR-A25",
+      "text": "Implementation report/register accuracy: DEV-004 claims a UI control that does not exist; ruff format count 82 vs 83; npm critical count 17 (text) vs 19 (JSON); PostgreSQL 16 not executed by the author (now reproduced by this review)."
+    }
+  ],
+  "blockers": {
+    "merge": [
+      "IR-01",
+      "IR-04",
+      "IR-08",
+      "IR-13",
+      "IR-14",
+      "IR-16",
+      "Deviation decisions recorded (AM-1..AM-5; DEV-005 registered)",
+      "Owner gates TG-01/TG-08 recorded"
+    ],
+    "staging": [
+      "IR-01",
+      "IR-04",
+      "IR-08",
+      "IR-09",
+      "IR-13",
+      "IR-14",
+      "IR-16",
+      "IR-39"
+    ],
+    "production": [
+      "IR-01",
+      "IR-02",
+      "IR-03",
+      "IR-04",
+      "IR-05",
+      "IR-06",
+      "IR-07",
+      "IR-08",
+      "IR-09",
+      "IR-10",
+      "IR-11",
+      "IR-12",
+      "IR-13",
+      "IR-14",
+      "IR-15",
+      "IR-16",
+      "IR-19",
+      "IR-20",
+      "IR-21",
+      "IR-22",
+      "IR-23",
+      "IR-24",
+      "IR-25",
+      "IR-26",
+      "IR-27",
+      "IR-28",
+      "IR-29",
+      "IR-30",
+      "IR-35",
+      "IR-36",
+      "IR-37",
+      "IR-38",
+      "IR-39",
+      "Unexecuted production gates (report §16)"
+    ],
+    "feature_public_intake": [
+      "IR-02",
+      "IR-17",
+      "IR-18",
+      "IR-31",
+      "IR-32"
+    ],
+    "pg_release_gate": [
+      "IR-33",
+      "IR-A01",
+      "IR-A16",
+      "SQLite→PostgreSQL data-migration rehearsal (11 §3.4)"
+    ]
+  },
+  "architecture_amendments": [
+    {
+      "id": "AM-1",
+      "target": "03 §5.5",
+      "trigger": "DEV-001"
+    },
+    {
+      "id": "AM-2",
+      "target": "08 §4.5, 05 §11.3",
+      "trigger": "DEV-002"
+    },
+    {
+      "id": "AM-3",
+      "target": "08 §4.1, §4.7",
+      "trigger": "DEV-003"
+    },
+    {
+      "id": "AM-4",
+      "target": "04 §5.4 vs 08 §8.5, LEAD-027",
+      "trigger": "DEV-004"
+    },
+    {
+      "id": "AM-5",
+      "target": "08 §1, 06 §11 RBX-003, 09",
+      "trigger": "DEV-005 / IR-07"
+    },
+    {
+      "id": "AM-6",
+      "target": "LOG-005, 08 §3, 02 §12.4",
+      "trigger": "IR-10"
+    },
+    {
+      "id": "AM-7",
+      "target": "08 §12",
+      "trigger": "IR-23"
+    },
+    {
+      "id": "AM-8",
+      "target": "05 / 03 (OI-3)",
+      "trigger": "IR-A22"
+    },
+    {
+      "id": "AM-9",
+      "target": "06 §7.5",
+      "trigger": "IR-A11"
+    },
+    {
+      "id": "AM-10",
+      "target": "07 §2",
+      "trigger": "IR-A15"
+    }
+  ],
+  "next_authorized_action": "Owner decision only. No merge, no deployment. Owner may authorize a remediation workstream on implementation/p0-foundation (new commits, no history rewrite) addressing IR-01 first and then merge-scoped MAJOR findings, plus Architecture-Owner decisions on AM-1..AM-5; followed by a targeted independent re-review of the new frozen SHA."
+}
