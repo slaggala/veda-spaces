@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-09-29
 - **Source:** owner Decision 3 of `VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01`. It resolves review finding F-03.
+- **Amended:** final minor remediation (focused re-review finding N-01). This is an architecture correction that implements owner Decision 3 consistently; **no new owner decision is claimed**.
 
 ## Context
 
@@ -53,7 +54,19 @@ The generic profile endpoints (`PATCH /users/{id}`, `PATCH /auth/me`) use **clos
    - I2: at least one ACTIVE recovery administrator holding `user.role.manage`, `role.manage`, `user.mfa.reset` and `user.status.manage` at ALL.
 
    They are enforced in the transaction under the write lock (SQLite `BEGIN IMMEDIATE`; PostgreSQL `SELECT … FOR UPDATE`), plus a nightly check. Time-bound grants are disabled in P0 and may never carry sensitive permissions, so expiry cannot break the invariants.
-5. **Founder transition and deactivation** are separately permissioned (`user.founder.manage`) and audited. They need **step-up and dual control** by two different eligible Founders. If fewer than two exist, **break-glass** requires two distinct AWS IAM custodians (OWNER-INPUT-004), a cooling-off with notification and a cancel link to all Founders and the target, CRITICAL events, and CloudTrail evidence (06 §7.5).
+5. **Founder governance (amended, N-01).** 06 §7.2 is the **single canonical definition**. This ADR adopts it without restating it differently.
+   - **Founder-level actions:**
+     - granting or removing Founder status (which is also the only way to grant or revoke `user.founder.manage`);
+     - Founder MFA recovery;
+     - Founder status change, including deactivation;
+     - Founder email or identity change;
+     - Founder break-glass activation;
+     - Founder approval-policy change (migration or configuration only, with no runtime API).
+   - **Eligibility:** requester and approver are both **Founders** (`protection_level = FOUNDER` + FOUNDER role, kept identical by I3) with **effective** `user.founder.manage`, step-up verified, re-checked at request, approval and execution. The approver is never the requester or the target. Exactly one approval gives two distinct human principals, and duplicate approvals are rejected.
+   - **No manufactured approvers:** the FOUNDER role and `user.founder.manage` have `grant_path = FOUNDER_WORKFLOW_ONLY`. Every generic role, permission and role-definition API rejects them with `FOUNDER_GOVERNANCE_REQUIRED` (G13).
+   - **Single-Founder mode:** the sole Founder requests, and one break-glass custodian who is a different human approves, after a cooling-off with notification and cancel. With no eligible Founder, two custodians who are different humans perform full break-glass (06 §7.5, OWNER-INPUT-004).
+   - **Bootstrap** can create only the first Founder, ever.
+   - **Concurrency:** one open Founder-level request per target, and execution under the write lock with I1–I3 re-evaluated.
 6. **Tests** cover all of the above, negatively as well as positively (12 §4.4).
 
 ## Alternatives considered

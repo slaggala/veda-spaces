@@ -75,7 +75,7 @@ A password alone, or a recovery code alone, never enrolls an authenticator.
 - **No administrator can reset their own MFA** (G3).
 - No action on a stronger account (G9).
 - **Dual control** for any privileged target (G12).
-- **No single Admin can reset the Founder's MFA.** Founder targets use the Founder workflow, which needs two different eligible Founders (G11), or break-glass with two distinct AWS IAM custodians and a notification-and-cancel window (06 §7.5).
+- **No single Admin can reset the Founder's MFA.** Founder targets use the Founder-level action `FOUNDER_MFA_RESET` under the canonical Founder-governance workflow (06 §7.2): a Founder requester plus a different Founder approver, or a break-glass custodian in single-Founder mode, or two custodians when no eligible Founder exists.
 - The enrollment link after a reset goes to the target's **verified** email, never to an administrator.
 
 ### 5. Security events

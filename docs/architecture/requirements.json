@@ -1,12 +1,12 @@
 {
- "schema": "veda-requirements/2",
- "generated_for": "P0 foundation architecture — remediation 01",
+ "schema": "veda-requirements/3",
+ "generated_for": "P0 foundation architecture — final minor remediation (re-review 06a4f6e conditions)",
  "priority_meaning": {
   "P0": "in scope (ADR-009)",
   "P1": "designed, deferred",
   "P2": "designed, deferred"
  },
- "coverage_model": "Substantive classification per requirement (independent-review taxonomy). coverage_refs are navigation references validated for resolvability only; they are not coverage evidence.",
+ "coverage_model": "Substantive classification per requirement (independent-review taxonomy). coverage_refs are navigation references validated for resolvability only; they are not coverage evidence. Baseline for this version is the focused independent re-review (06a4f6e). assessment.history records the frozen review, remediation-01 author, focused re-review and final author classifications.",
  "classifications": [
   "Fully covered",
   "Partially covered",
@@ -34,11 +34,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -58,11 +65,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -82,11 +96,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -106,11 +127,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -154,11 +182,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -178,11 +213,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -202,11 +244,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -226,11 +275,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -250,11 +306,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -270,15 +333,23 @@
     "api": "08 §2.7",
     "ui": null,
     "security": null,
-    "test": "12 §4.6"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-F"
    }
   },
   {
@@ -298,14 +369,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Contradictory (F-04); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Contradictory",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-04",
      "F-09"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Contradictory",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -325,11 +403,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -349,11 +434,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -373,11 +465,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -397,11 +496,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -421,11 +527,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -445,13 +558,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -471,11 +591,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -495,11 +622,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -543,14 +677,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-06",
      "A-12"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -594,11 +735,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -618,13 +766,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-15"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -644,11 +799,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -692,11 +854,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -716,11 +885,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -740,11 +916,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -764,11 +947,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -788,14 +978,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-10); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-10",
      "F-19"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -815,14 +1012,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-10); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-10",
      "F-19"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -842,11 +1046,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -866,13 +1077,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -892,11 +1110,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -916,14 +1141,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-09); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-09",
      "A-01"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -943,13 +1175,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-05"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -969,11 +1208,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -993,11 +1239,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1017,13 +1270,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-05"
     ],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1043,14 +1303,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-01, F-02); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01",
      "F-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1070,13 +1337,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-16"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1096,13 +1370,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-10); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-10"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1122,13 +1403,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Contradictory (F-01); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Contradictory",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Contradictory",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1148,11 +1436,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1172,11 +1467,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1196,11 +1498,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1220,11 +1529,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1244,11 +1560,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1264,15 +1587,23 @@
     "api": "08 §2.7",
     "ui": null,
     "security": null,
-    "test": "12 §4.6"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-F"
    }
   },
   {
@@ -1292,13 +1623,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-08"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1318,11 +1656,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1342,13 +1687,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-07); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-07"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1368,11 +1720,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1381,24 +1740,33 @@
    "source": "D, ADR-003",
    "verification": "SL",
    "status": "in-scope",
-   "title": "A schema conformance check on SQLite and PostgreSQL fails CI on any contract violation.",
+   "title": "A schema conformance check on SQLite and PostgreSQL fails CI on any contract violation, including any ID-like column without a FK that is not exactly one of the ten registered FK-less identifier columns.",
    "coverage_refs": {
     "architecture": "03 §2.7",
     "schema": null,
     "api": null,
     "ui": null,
     "security": null,
-    "test": "12 §4.1"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Fully covered",
+    "basis": "Focused re-review: Partially covered (N-02). Corrected in the final minor remediation — author assessment; requires targeted independent verification (TG-07).",
+    "baseline_classification": "Partially covered",
     "related_findings": [
-     "F-08"
+     "F-08",
+     "N-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Partially covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-H"
    }
   },
   {
@@ -1418,11 +1786,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1442,11 +1817,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1455,25 +1837,34 @@
    "source": "ADR-003",
    "verification": "SL",
    "status": "in-scope",
-   "title": "Behavioral exceptions to the contract (including globally unique indexes and non-FK correlation references) are listed in the exception registry; unregistered deviations fail CI.",
+   "title": "Behavioral exceptions to the contract are listed in the exception registry, including the fully documented allow-list of ten FK-less identifier columns (correlation, polymorphic and group ids); unregistered deviations fail CI.",
    "coverage_refs": {
     "architecture": "03 §2.9",
-    "schema": "03 §2.9",
+    "schema": "03 §2.11",
     "api": null,
     "ui": null,
     "security": null,
-    "test": "12 §4.1"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-08, F-07); remediated in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Partially covered (N-02). Corrected in the final minor remediation — author assessment; requires targeted independent verification (TG-07).",
     "baseline_classification": "Partially covered",
     "related_findings": [
      "F-07",
-     "F-08"
+     "F-08",
+     "N-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Partially covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-H"
    }
   },
   {
@@ -1493,11 +1884,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1517,11 +1915,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1541,11 +1946,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": "OWNER-INPUT-002"
+    "owner_input_dependency": "OWNER-INPUT-002",
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1565,7 +1977,7 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-04",
@@ -1573,7 +1985,14 @@
      "F-17"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1593,13 +2012,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-17"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1619,11 +2045,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1643,11 +2076,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1667,11 +2107,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1691,11 +2138,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1715,11 +2169,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1739,11 +2200,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1763,11 +2231,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1783,18 +2258,26 @@
     "api": "08 §8.8",
     "ui": "09 §4.5",
     "security": null,
-    "test": "12 §4.7"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-05",
      "A-07"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-B"
    }
   },
   {
@@ -1814,11 +2297,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1838,13 +2328,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-15"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1864,13 +2361,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1890,11 +2394,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1914,11 +2425,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1938,11 +2456,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -1986,8 +2511,8 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-05, F-04); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-04",
      "F-05",
@@ -1995,7 +2520,14 @@
      "A-14"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2015,13 +2547,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-05); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-05"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2041,11 +2580,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2113,13 +2659,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-17"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2139,11 +2692,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2163,13 +2723,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-04"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2189,11 +2756,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2213,11 +2787,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2237,11 +2818,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": "OWNER-INPUT-002"
+    "owner_input_dependency": "OWNER-INPUT-002",
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2261,11 +2849,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2285,11 +2880,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2309,11 +2911,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2333,11 +2942,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2357,11 +2973,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2381,11 +3004,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2405,13 +3035,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-12); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-12"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2431,11 +3068,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2455,13 +3099,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-13"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2481,13 +3132,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2507,13 +3165,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Contradictory (F-01); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Contradictory",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Contradictory",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2533,14 +3198,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01",
      "F-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2560,11 +3232,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2584,11 +3263,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2608,14 +3294,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-02); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-02",
      "F-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2635,11 +3328,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2659,13 +3359,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-09"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2685,13 +3392,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-13); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-13"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2711,11 +3425,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2735,11 +3456,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2747,23 +3475,31 @@
    "priority": "P0",
    "source": "Decision 2",
    "verification": "IT",
-   "title": "Self-service recovery requires password re-entry and a recovery code, creates a restricted RECOVERY session limited to re-enrollment, revokes all other sessions, notifies the verified email, rotates recovery codes and applies a cooling-off period.",
+   "title": "Self-service recovery requires password re-entry and a recovery code, completes the login challenge and invalidates all other challenges, creates a restricted RECOVERY session limited to re-enrollment, revokes all other sessions, notifies the verified email, commits re-enrollment atomically with code rotation, and applies a cooling-off period.",
    "coverage_refs": {
     "architecture": "05 §11.5",
     "schema": "03 §5.1",
     "api": "08 §4.7",
     "ui": "09 §4.10",
     "security": "06 §8",
-    "test": "12 §4.5"
+    "test": "12 §4.12"
    },
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-C/TD-D/TD-E"
    }
   },
   {
@@ -2778,16 +3514,24 @@
     "api": "08 §4.7",
     "ui": "09 §4.10",
     "security": "05 §11.3",
-    "test": "12 §4.5"
+    "test": "12 §4.12"
    },
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-E"
    }
   },
   {
@@ -2795,24 +3539,38 @@
    "priority": "P0",
    "source": "Decision 2",
    "verification": "IT",
-   "title": "Administrative MFA reset of a privileged account needs dual control; a Founder's MFA reset needs two distinct eligible Founders or break-glass with two IAM custodians.",
+   "title": "Administrative MFA reset of a privileged account needs dual control; a Founder's MFA reset is the Founder-level action FOUNDER_MFA_RESET under the canonical Founder-governance workflow.",
    "coverage_refs": {
     "architecture": "06 §7.4",
     "schema": "03 §5.8",
     "api": "08 §5.11",
     "ui": "09 §4.12",
     "security": "06 §7.5",
-    "test": "12 §4.4"
+    "test": "12 §4.12"
    },
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
-    "related_findings": [],
+    "basis": "Focused re-review: Partially covered (N-01). Corrected in the final minor remediation — author assessment; requires targeted independent verification (TG-07).",
+    "baseline_classification": "Partially covered",
+    "related_findings": [
+     "N-01"
+    ],
     "test_design": "automated",
-    "owner_input_dependency": "OWNER-INPUT-004"
-   }
+    "owner_input_dependency": "OWNER-INPUT-004",
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Partially covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-G"
+   },
+   "related_requirements": [
+    "RBAC-021",
+    "MFA-007"
+   ]
   },
   {
    "id": "NFR-001",
@@ -2831,13 +3589,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-13"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2857,13 +3622,20 @@
    },
    "assessment": {
     "classification": "Not testable pending owner input",
-    "basis": "Mechanism designed; target value is OWNER-INPUT-001 (owner Decision 6)",
-    "baseline_classification": "Not testable",
+    "basis": "Focused re-review: Not testable pending owner input; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Not testable pending owner input",
     "related_findings": [
      "F-19"
     ],
     "test_design": "owner-gated",
-    "owner_input_dependency": "OWNER-INPUT-001"
+    "owner_input_dependency": "OWNER-INPUT-001",
+    "history": {
+     "frozen_independent_review_7515b23": "Not testable",
+     "remediation_01_author": "Not testable pending owner input",
+     "focused_rereview_06a4f6e": "Not testable pending owner input",
+     "final_minor_remediation_author": "Not testable pending owner input"
+    },
+    "final_author_classification": "Not testable pending owner input"
    }
   },
   {
@@ -2883,13 +3655,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-09"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2933,11 +3712,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -2957,13 +3743,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-20); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-20"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3007,11 +3800,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3031,11 +3831,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3055,11 +3862,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3079,11 +3893,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3103,14 +3924,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-07",
      "F-12"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3130,11 +3958,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3202,13 +4037,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-12"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3228,11 +4070,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3252,13 +4101,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-19"
     ],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3278,13 +4134,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-11"
     ],
     "test_design": "operational",
-    "owner_input_dependency": "OWNER-INPUT-003"
+    "owner_input_dependency": "OWNER-INPUT-003",
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3304,11 +4167,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3328,15 +4198,22 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-12); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-11",
      "F-12",
      "F-19"
     ],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3356,13 +4233,20 @@
    },
    "assessment": {
     "classification": "Not testable pending owner input",
-    "basis": "Mechanism designed; target value is OWNER-INPUT-001 (owner Decision 6)",
-    "baseline_classification": "Not testable",
+    "basis": "Focused re-review: Not testable pending owner input; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Not testable pending owner input",
     "related_findings": [
      "F-19"
     ],
     "test_design": "owner-gated",
-    "owner_input_dependency": "OWNER-INPUT-001"
+    "owner_input_dependency": "OWNER-INPUT-001",
+    "history": {
+     "frozen_independent_review_7515b23": "Not testable",
+     "remediation_01_author": "Not testable pending owner input",
+     "focused_rereview_06a4f6e": "Not testable pending owner input",
+     "final_minor_remediation_author": "Not testable pending owner input"
+    },
+    "final_author_classification": "Not testable pending owner input"
    }
   },
   {
@@ -3382,11 +4266,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3406,11 +4297,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3430,11 +4328,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3454,13 +4359,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-11"
     ],
     "test_design": "operational",
-    "owner_input_dependency": "OWNER-INPUT-003"
+    "owner_input_dependency": "OWNER-INPUT-003",
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3480,11 +4392,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3504,11 +4423,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3528,11 +4454,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3552,11 +4485,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3576,11 +4516,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3600,13 +4547,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3626,11 +4580,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3650,14 +4611,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-18",
      "F-19"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3677,11 +4645,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3701,11 +4676,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3725,11 +4707,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3749,11 +4738,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3773,11 +4769,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3797,13 +4800,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-16"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3823,11 +4833,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3847,11 +4864,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3871,11 +4895,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3895,11 +4926,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3919,11 +4957,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3943,11 +4988,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -3963,15 +5015,23 @@
     "api": "08 §5.7",
     "ui": "09 §4.6",
     "security": null,
-    "test": "12 §4.4"
+    "test": "12 §4.12"
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-A"
    }
   },
   {
@@ -4017,13 +5077,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4043,14 +5110,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-03); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-03",
      "A-06"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4070,11 +5144,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4094,14 +5175,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-03, F-16); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-03",
      "F-16"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4121,11 +5209,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4145,13 +5240,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-10"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4171,13 +5273,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-07"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4197,13 +5306,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-04"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4223,13 +5339,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-16"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4249,14 +5372,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Contradictory (F-06); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Contradictory",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01",
      "F-06"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Contradictory",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4276,11 +5406,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4300,11 +5437,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4324,36 +5468,61 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
-   }
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
+   },
+   "related_requirements": [
+    "RBAC-010",
+    "RBAC-011"
+   ]
   },
   {
    "id": "RBAC-021",
    "priority": "P0",
    "source": "Decision 3",
    "verification": "IT",
-   "title": "Founder-level changes and privileged MFA resets or email changes require step-up and dual control; break-glass requires two IAM custodians, a cooling-off with cancel, and full evidence.",
+   "title": "Founder-level actions (grant/remove Founder status incl. user.founder.manage, Founder MFA recovery, status and email/identity change, break-glass activation, approval-policy change) run only through the canonical Founder-governance workflow: Founder requester and a different Founder approver (or a distinct-human break-glass custodian in single-Founder mode), eligibility re-checked at execution, no generic-API grant path, one open request per target.",
    "coverage_refs": {
     "architecture": "06 §7.2",
     "schema": "03 §5.8",
     "api": "08 §5.11",
     "ui": "09 §4.12",
     "security": "06 §7.5",
-    "test": "12 §4.4"
+    "test": "12 §4.12"
    },
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
-    "related_findings": [],
+    "basis": "Focused re-review: Contradictory (N-01). Corrected in the final minor remediation — author assessment; requires targeted independent verification (TG-07).",
+    "baseline_classification": "Contradictory",
+    "related_findings": [
+     "N-01"
+    ],
     "test_design": "automated",
-    "owner_input_dependency": "OWNER-INPUT-004"
-   }
+    "owner_input_dependency": "OWNER-INPUT-004",
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Contradictory",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered",
+    "test_design_ref": "12 §4.12 TD-G"
+   },
+   "related_requirements": [
+    "MFA-015",
+    "RBAC-020"
+   ]
   },
   {
    "id": "SEC-001",
@@ -4372,11 +5541,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4396,13 +5572,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-19"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4422,11 +5605,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4446,11 +5636,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4470,11 +5667,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4494,11 +5698,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4518,11 +5729,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4542,11 +5760,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4566,13 +5791,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-15); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-15"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4618,13 +5850,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-09); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-09"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4644,13 +5883,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4670,11 +5916,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4694,11 +5947,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4718,14 +5978,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-07",
      "F-11"
     ],
     "test_design": "operational",
-    "owner_input_dependency": "OWNER-INPUT-002"
+    "owner_input_dependency": "OWNER-INPUT-002",
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4745,14 +6012,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-01",
      "F-06"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4772,14 +6046,21 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-11); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-11",
      "A-13"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4799,11 +6080,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4823,11 +6111,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4847,11 +6142,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "operational",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4871,11 +6173,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4895,11 +6204,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4919,13 +6235,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "A-08"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4945,11 +6268,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4969,11 +6299,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -4993,13 +6330,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-20"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5019,11 +6363,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5043,11 +6394,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5067,11 +6425,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5091,11 +6456,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5115,11 +6487,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5139,13 +6518,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-14"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5165,13 +6551,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-14); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-14"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5191,11 +6584,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5215,11 +6615,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5239,13 +6646,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-14); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-14"
     ],
     "test_design": "review",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5265,11 +6679,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5289,11 +6710,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5313,11 +6741,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5337,13 +6772,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Partially covered (F-03); remediated in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": "Partially covered",
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [
      "F-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Partially covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5363,13 +6805,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-03"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5389,11 +6838,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5413,11 +6869,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5437,11 +6900,18 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; unchanged",
+    "basis": "Focused re-review: Fully covered; unchanged.",
     "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5461,13 +6931,20 @@
    },
    "assessment": {
     "classification": "Fully covered",
-    "basis": "Independent baseline: Fully covered; revised in remediation 01 — author assessment; requires independent re-review",
+    "basis": "Focused re-review: Fully covered; design or test design refined in the final minor remediation (N-01/N-03/advisories) — author assessment of the refinement; targeted check TG-07.",
     "baseline_classification": "Fully covered",
     "related_findings": [
      "F-02"
     ],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "Fully covered",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   },
   {
@@ -5487,11 +6964,18 @@
    "status": "in-scope",
    "assessment": {
     "classification": "Fully covered",
-    "basis": "New or promoted in remediation 01 — author assessment; requires independent re-review",
-    "baseline_classification": null,
+    "basis": "Focused re-review: Fully covered; unchanged.",
+    "baseline_classification": "Fully covered",
     "related_findings": [],
     "test_design": "automated",
-    "owner_input_dependency": null
+    "owner_input_dependency": null,
+    "history": {
+     "frozen_independent_review_7515b23": "not in P0 at freeze",
+     "remediation_01_author": "Fully covered",
+     "focused_rereview_06a4f6e": "Fully covered",
+     "final_minor_remediation_author": "Fully covered"
+    },
+    "final_author_classification": "Fully covered"
    }
   }
  ]

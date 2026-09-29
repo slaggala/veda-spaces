@@ -116,7 +116,14 @@ A CI job migrates an empty database on **both** SQLite and PostgreSQL, introspec
 
 1. lacks any of the nine contract columns, or has the wrong logical type or nullability;
 2. has a primary key other than `id` of the GUID type;
-3. lacks the three actor FKs to `app_user.id`, or has an `*_id` column without a FK other than the EXC-009 correlation columns;
+3. lacks the three actor FKs to `app_user.id`, or has an ID-like column (name ending `_id`, `_by` or `_to`, or GUID-typed) **without a FK** that is not **exactly** one of the registered FK-less identifier columns in §2.11 (EXC-009 and EXC-011). A registered column also fails the check if:
+   - its type is not GUID;
+   - it lacks its UUIDv7 format CHECK;
+   - it lacks its required discriminator and pair CHECK;
+   - it lacks its required index;
+   - its registry entry is missing any documentation field.
+
+   The allow-list is the 10 columns in §2.11, no more (N-02). This rule is **not** relaxed globally;
 4. has a column ending in `_id`, or an actor column, whose type is not the GUID type (checked for every FK, DATA-012);
 5. has a unique index on business columns without the `is_deleted = false` predicate, unless allow-listed in §2.9;
 6. has an FK with a cascade action, or uses a native ENUM type;
@@ -163,10 +170,41 @@ Every behavioral exception to the contract is listed here. The conformance check
 | EXC-004 | `outbox_event` | DONE rows hard-deleted after the configured retention, only when no `notification` still references them (§2.10) | Operational queue, not business data | Business effect is audited in `audit_log`. DEAD rows are retained until resolved. |
 | EXC-005 | `notification` | Hard-deleted after the configured retention: read rows after the read-retention, unread rows after the unread-retention | User inbox convenience data | Source event traceable via `source_event_id` until purge |
 | EXC-006 | `user_session`, `user_action_token`, `user_mfa_recovery_code`, `admin_approval_request` | Never soft-deleted. The lifecycle uses `revoked_on`, `used_on` and `invalidated_on`. | These states are more precise than a generic delete flag | Lifecycle transitions write security events |
-| EXC-007 | `refresh_token.token_hash` (`ux_refresh_token__token_hash`), `user_action_token.token_hash` (`ux_user_action_token__token_hash`), `mfa_challenge.token_hash` (`ux_mfa_challenge__token_hash`), `user_mfa_recovery_code.code_hash` (`ux_user_mfa_recovery_code__hash`), `security_event_log.chain_seq` (`ux_security_event_log__chain_seq`), `admin_approval_request (target_user_id, action_type)` for open requests (`ux_admin_approval_request__open_per_target_action`; the table is never soft-deleted, EXC-006), **`lead.public_reference`** (`ux_lead__public_reference`), **`lead.intake_idempotency_key`** (`ux_lead__intake_idempotency_key`, predicate `IS NOT NULL` only), **`notification (source_event_id, recipient_user_id)`** (`ux_notification__event_recipient`, predicate `source_event_id IS NOT NULL` only) | Unique index **without** the `is_deleted` predicate (F-08) | Global uniqueness is intended. Hashes, chain positions, public references and idempotency keys must never be reused, even after soft deletion. A notification is delivered at most once per event and recipient. | The conformance check allow-lists exactly these index names |
+| EXC-007 | `refresh_token.token_hash` (`ux_refresh_token__token_hash`), `user_action_token.token_hash` (`ux_user_action_token__token_hash`), `mfa_challenge.token_hash` (`ux_mfa_challenge__token_hash`), `user_mfa_recovery_code.code_hash` (`ux_user_mfa_recovery_code__hash`), `security_event_log.chain_seq` (`ux_security_event_log__chain_seq`), `admin_approval_request (target_user_id, action_type)` and `(target_user_id)` for open requests (`ux_admin_approval_request__open_per_target_action`, `ux_admin_approval_request__open_founder_target`; the table is never soft-deleted, EXC-006), **`lead.public_reference`** (`ux_lead__public_reference`), **`lead.intake_idempotency_key`** (`ux_lead__intake_idempotency_key`, predicate `IS NOT NULL` only), **`notification (source_event_id, recipient_user_id)`** (`ux_notification__event_recipient`, predicate `source_event_id IS NOT NULL` only) | Unique index **without** the `is_deleted` predicate (F-08) | Global uniqueness is intended. Hashes, chain positions, public references and idempotency keys must never be reused, even after soft deletion. A notification is delivered at most once per event and recipient. | The conformance check allow-lists exactly these index names |
 | EXC-008 | `app_user` rows SYSTEM, WEB_INTAKE, ANONYMOUS | Cannot be soft-deleted, disabled or given credentials | Required actors for FK integrity | Service guard plus seed migration check |
-| EXC-009 | `audit_log.session_id`, `security_event_log.session_id`, `refresh_token.replaced_by_id` | GUID-typed correlation references **without** a database FK (F-07) | Evidence rows must outlive purged sessions, and token chains must be purgeable in any order | The service writes only ids it has just read. Conformance rule 3 exempts exactly these columns. |
+| EXC-009 | `audit_log.session_id`, `security_event_log.session_id`, `refresh_token.replaced_by_id` | GUID-typed correlation references **without** a database FK (F-07) | Evidence rows must outlive purged sessions, and token chains must be purgeable in any order | The service writes only ids it has just read. Together with EXC-011, these form the exact allow-list of §2.11 for conformance rule 3. |
 | EXC-010 | `lead` rows | PII fields overwritten in place by the erasure and retention anonymization procedures (07 §8.2), which is not a soft delete | DPDP erasure and retention (LEAD-028, LEAD-029) | Audited ANONYMIZE action. `anonymized_on` set. |
+| EXC-011 | `audit_log.entity_id`, `audit_log.parent_entity_id`, `audit_log.transaction_id`, `security_event_log.target_entity_id`, `outbox_event.aggregate_id`, `notification.entity_id`, `user_mfa_recovery_code.batch_id` | GUID identifier columns **without** a database FK: polymorphic references and group identifiers (N-02) | A polymorphic target has no single parent table, and group ids have no parent row. Evidence must outlive its targets. | Fully specified per column in §2.11. Exact allow-list. Format and discriminator CHECKs. Conformance tests (12 §4.1). |
+
+### 2.11 Registered FK-less identifier columns (DATA-011, DATA-014, N-02)
+
+These **ten** columns are the complete allow-list for rule 3 of §2.7: three correlation columns (EXC-009) and seven polymorphic or group identifiers (EXC-011). Every other ID-like column must have a DB-enforced FK.
+
+**Common rules for all ten:**
+
+| Rule | Detail |
+|---|---|
+| Type | `GUID`: `CHAR(32)` on SQLite, `uuid` on PostgreSQL (§12) |
+| Format | `CHECK` of canonical UUIDv7 text on SQLite, named `ck_<t>__<col>_format` (same expression as `ck_<t>__id_format`, §12). On PostgreSQL the kernel type validates the version nibble on bind. A malformed value fails the insert. |
+| Writer | Only the kernel writes these columns, from ids it has just read or generated. Clients can never supply them. |
+| Append-only | For `audit_log` and `security_event_log` they are immutable with the row (EXC-001) |
+| No cascade | There is never a cascade or a delete trigger. The referenced entity may later be purged or anonymized. |
+| Orphan semantics | A reference whose target no longer exists (purged, archived, anonymized) is **valid history**. Readers render the id and entity type with "no longer available", and never fail. |
+
+| # | Table.column | Purpose | Why no FK | Discriminator (validated) | Validation rule | Index | Retention | Requirements | Approved by |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `audit_log.session_id` (EXC-009) | Session in which the change was made | Sessions are purged before evidence (§2.10) | — (always a `user_session` id) | Format CHECK | Not required (lookups via `request_id`/`transaction_id`) | With `audit_log` | AUDIT-003, DATA-017 | 03 §2.3, ADR-003 |
+| 2 | `security_event_log.session_id` (EXC-009) | Session context of the event | Same | — (always a `user_session` id) | Format CHECK | Not required | With `security_event_log` | SEVT-002, DATA-017 | 03 §2.3, ADR-004 |
+| 3 | `refresh_token.replaced_by_id` (EXC-009) | Successor in a rotation chain | Chains are purged in any order | — (always a `refresh_token` id) | Format CHECK | Not required | With `refresh_token` | AUTH-005, DATA-017 | 03 §5.2 |
+| 4 | `audit_log.entity_id` (EXC-011) | The audited row | Polymorphic target, any audited table | `entity_type` NOT NULL. Kernel check: it must be a table registered in the audit policy registry (07 §2). CHECK `entity_type` matches `^[a-z][a-z0-9_]{1,59}$`. | Format CHECK + discriminator | `ix_audit_log__entity` (`entity_type`, `entity_id`, `performed_on`) | With `audit_log` | AUDIT-002, DATA-014 | 03 §7, 07 §4 |
+| 5 | `audit_log.parent_entity_id` (EXC-011) | Aggregate root of a child change | Polymorphic parent | `parent_entity_type`. Pair CHECK `(parent_entity_type IS NULL) = (parent_entity_id IS NULL)`. The type must be a registered parent in 07 §2. | Format CHECK + pair CHECK | `ix_audit_log__parent` | With `audit_log` | AUDIT-006, DATA-014 | 03 §7, 07 §4.2 |
+| 6 | `audit_log.transaction_id` (EXC-011) | Groups all audit rows of one DB transaction | Group id: there is no transaction table | — (group id, not an entity reference) | Format CHECK. UUIDv7 generated per unit of work (03 §2.8). | `ix_audit_log__transaction_id` | With `audit_log` | AUDIT-003, DATA-015 | 03 §2.8, 07 §3 |
+| 7 | `security_event_log.target_entity_id` (EXC-011) | Object of a sensitive action (for example a role) | Polymorphic target | `target_entity_type`. Pair CHECK `(target_entity_type IS NULL) = (target_entity_id IS NULL)`. The type must be a registered table. | Format CHECK + pair CHECK | `ix_security_event_log__target` (`target_entity_type`, `target_entity_id`, `occurred_on` DESC) | With `security_event_log` | SEVT-002, RBAC-017 | 03 §5.4, 05 §9.1 |
+| 8 | `outbox_event.aggregate_id` (EXC-011) | Entity that raised the event | Polymorphic, and events must outlive entity changes | `aggregate_type` NOT NULL, validated against registered tables | Format CHECK + discriminator | `ix_outbox_event__aggregate` | Purged per §2.10 step 6 | NOTIF-003, DATA-017 | 03 §8.1, 02 §10.1 |
+| 9 | `notification.entity_id` (EXC-011) | Deep-link target | Polymorphic, optional | `entity_type`. Pair CHECK `(entity_type IS NULL) = (entity_id IS NULL)`. The type must be a registered table. | Format CHECK + pair CHECK | `ix_notification__entity` (`entity_type`, `entity_id`), used by erasure purge (07 §8.2) | Purged per §2.10 step 5 | NOTIF-001, LEAD-029 | 03 §8.2 |
+| 10 | `user_mfa_recovery_code.batch_id` (EXC-011) | Groups codes issued together | Group id: there is no batch table | — (group id) | Format CHECK. UUIDv7 generated per issuance. | `ix_user_mfa_recovery_code__batch` (`user_id`, `batch_id`) | With the codes | MFA-005 | 03 §5.6, 05 §11.5 |
+
+The conformance check reads this table as its allow-list. Adding an eleventh FK-less identifier requires a new row with every column filled, and an ADR or architecture amendment.
 
 ### 2.10 Purge ordering and referential integrity (DATA-017, F-07)
 
@@ -304,7 +342,8 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `name_normalized` | VARCHAR(100) | NOT NULL | — | `lower(trim(name))`, for case-insensitive uniqueness (A-04) |
 | `description` | VARCHAR(500) | NULL | — | |
 | `is_system` | BOOL | NOT NULL | false | Cannot be deleted. Code is immutable. |
-| `is_assignable` | BOOL | NOT NULL | true | |
+| `is_assignable` | BOOL | NOT NULL | true | Whether generic role-assignment APIs may assign this role. FOUNDER is seeded `false`. |
+| `grant_path` | CODE(25) | NOT NULL | `'STANDARD'` | `STANDARD` or `FOUNDER_WORKFLOW_ONLY` (06 §7.1 G13). FOUNDER is seeded `FOUNDER_WORKFLOW_ONLY`. Set only by migration. |
 | `mfa_required` | BOOL | NOT NULL | false | Data-driven MFA policy (MFA-002). Seeded `true` for FOUNDER and ADMIN, `false` for SALES. Changing it requires `role.manage` and is a sensitive action. |
 | `sort_order` | INTEGER | NOT NULL | 100 | |
 
@@ -326,6 +365,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `supports_scope` | BOOL | NOT NULL | false | |
 | `is_sensitive` | BOOL | NOT NULL | false | Derived: `sensitivity_class IS NOT NULL`, enforced by `ck_permission__sensitivity` |
 | `sensitivity_class` | CODE(20) | NULL | — | `ACCOUNT_CONTROL`, `ACCESS_CONTROL`, `SECURITY_DATA`, `BULK_DATA`, `DESTRUCTIVE` (06 §3.1, RBAC-018). Set only by the code registry. |
+| `grant_path` | CODE(25) | NOT NULL | `'STANDARD'` | `FOUNDER_WORKFLOW_ONLY` for `user.founder.manage` (06 §7.2.1). Set only by the code registry. |
 | `is_system` | BOOL | NOT NULL | true | Registry-defined |
 | `requirement_ref` | VARCHAR(50) | NULL | — | Traceability |
 
@@ -461,7 +501,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `failure_reason` | CODE(40) | NULL | — | Controlled vocabulary (05 §9.1) |
 | `permission_code` | VARCHAR(100) | NULL | — | For AUTHORIZATION and sensitive-action events |
 | `target_entity_type` | VARCHAR(60) | NULL | — | For sensitive actions, for example `role` |
-| `target_entity_id` | GUID | NULL | — | |
+| `target_entity_id` | GUID | NULL | — | **Registered FK-less** polymorphic reference (EXC-011, §2.11 #7). Pair CHECK with `target_entity_type`. |
 | `occurred_on` | UTCDATETIME | NOT NULL | tx time | |
 | `ip_address` | VARCHAR(45) | NULL | — | |
 | `user_agent` | VARCHAR(500) | NULL | — | Truncated |
@@ -479,6 +519,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
   - `ix_security_event_log__subject` (`subject_user_id`, `occurred_on` DESC)
   - `ix_security_event_log__type` (`event_type`, `occurred_on` DESC)
   - `ix_security_event_log__ip` (`ip_address`, `occurred_on` DESC)
+  - `ix_security_event_log__target` (`target_entity_type`, `target_entity_id`, `occurred_on` DESC) WHERE `target_entity_id IS NOT NULL` (§2.11)
   - `ix_security_event_log__outcome` (`outcome`, `occurred_on` DESC) WHERE `outcome <> 'SUCCESS'`
 - **Foreign keys:** `subject_user_id` and the contract actors. `session_id` is a correlation id (EXC-009).
 - **Audit:** immutable store (EXC-001, EXC-002).
@@ -509,13 +550,14 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
-| `batch_id` | GUID | NOT NULL | — | UUIDv7 per generated set. Regeneration invalidates earlier batches. |
+| `batch_id` | GUID | NOT NULL | — | UUIDv7 per generated set. Regeneration invalidates earlier batches. **Registered FK-less group id** (EXC-011, §2.11 #10). |
 | `code_hash` | CHAR(64) | NOT NULL | — | HMAC-SHA-256 (key from SSM) of the normalized code. Codes are 10 CSPRNG characters from a 32-symbol alphabet (50 bits), so a keyed hash is appropriate. The plaintext is shown once and never stored or logged (MFA-005). |
 | `used_on` | UTCDATETIME | NULL | — | |
 | `invalidated_on` | UTCDATETIME | NULL | — | |
 
 - **Indexes:**
   - `ux_user_mfa_recovery_code__hash` UNIQUE (`code_hash`) — EXC-007
+  - `ix_user_mfa_recovery_code__batch` (`user_id`, `batch_id`) (§2.11)
   - `ix_user_mfa_recovery_code__user_open` (`user_id`) WHERE `used_on IS NULL AND invalidated_on IS NULL`
 - **Audit:** EVENT_ONLY. EXC-006.
 
@@ -545,16 +587,19 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
-| `action_type` | CODE(30) | NOT NULL | — | `MFA_RESET`, `EMAIL_CHANGE`, `GRANT_FOUNDER`, `REVOKE_FOUNDER`, `DEACTIVATE_FOUNDER`, `FOUNDER_MFA_RESET`, `FOUNDER_EMAIL_CHANGE` |
+| `action_class` | CODE(10) | NOT NULL | — | `STANDARD` (06 §7.4) or `FOUNDER` (06 §7.2) |
+| `action_type` | CODE(30) | NOT NULL | — | STANDARD: `MFA_RESET`, `EMAIL_CHANGE`. FOUNDER: `GRANT_FOUNDER`, `REVOKE_FOUNDER`, `FOUNDER_MFA_RESET`, `FOUNDER_STATUS_CHANGE`, `FOUNDER_EMAIL_CHANGE`. The CHECK ties each type to its class. |
 | `channel` | CODE(12) | NOT NULL | `'IN_APP'` | `IN_APP`, `BREAK_GLASS` |
 | `target_user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
 | `requested_by` | GUID | NOT NULL | — | FK → `app_user.id` (equals `created_by` for IN_APP; SYSTEM for BREAK_GLASS) |
 | `request_payload` | JSON | NOT NULL | — | Action parameters, for example a masked new email. No secrets. |
 | `reason` | VARCHAR(1000) | NOT NULL | — | |
 | `status` | CODE(12) | NOT NULL | `'PENDING'` | `PENDING`, `APPROVED`, `DENIED`, `EXPIRED`, `CANCELLED`, `EXECUTED`, `FAILED` |
+| `status_reason` | CODE(30) | NULL | — | For example `REQUESTER_INELIGIBLE`, `APPROVER_INELIGIBLE`, `LAST_FOUNDER`, `CANCELLED_BY_NOTIFIED_PARTY` |
 | `approver_user_id` | GUID | NULL | — | FK → `app_user.id` (IN_APP) |
-| `external_requester_ref` | VARCHAR(200) | NULL | — | IAM principal ARN of custodian A (BREAK_GLASS) |
-| `external_approver_ref` | VARCHAR(200) | NULL | — | IAM principal ARN of custodian B (BREAK_GLASS). Must differ from the requester. |
+| `external_requester_ref` | VARCHAR(2048) | NULL | — | IAM principal ARN of the requesting custodian (BREAK_GLASS). Sized to the maximum ARN length (N-A6). |
+| `external_approver_ref` | VARCHAR(2048) | NULL | — | IAM principal ARN of the approving custodian. It must map to a different human than the requester (06 §7.5). |
+| `external_approver_human` | VARCHAR(200) | NULL | — | Custodian register mapping of the approver (an `app_user` id or external person label), recorded for the distinct-human check |
 | `decided_on` | UTCDATETIME | NULL | — | |
 | `decision_reason` | VARCHAR(1000) | NULL | — | |
 | `not_before` | UTCDATETIME | NULL | — | Earliest execution time (break-glass cooling-off) |
@@ -563,13 +608,16 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 - **Checks:**
   - `approver_user_id IS NULL OR (approver_user_id <> requested_by AND approver_user_id <> target_user_id)`
-  - `requested_by <> target_user_id`
+  - `requested_by <> target_user_id OR (action_type = 'REVOKE_FOUNDER' AND channel = 'IN_APP')` (self step-down only, 06 §7.2.2)
+  - `approver_user_id IS NULL OR approver_user_id <> requested_by` (never self-approval)
+  - `(action_class = 'FOUNDER') = (action_type IN ('GRANT_FOUNDER','REVOKE_FOUNDER','FOUNDER_MFA_RESET','FOUNDER_STATUS_CHANGE','FOUNDER_EMAIL_CHANGE'))`
   - `external_approver_ref IS NULL OR external_approver_ref <> external_requester_ref`
   - status, action and channel enumerations
 - **Indexes:**
   - `ix_admin_approval_request__pending` (`status`, `expires_on`) WHERE `status = 'PENDING'`
   - `ix_admin_approval_request__target` (`target_user_id`, `created_on` DESC)
   - `ux_admin_approval_request__open_per_target_action` UNIQUE (`target_user_id`, `action_type`) WHERE `status IN ('PENDING','APPROVED')`
+  - `ux_admin_approval_request__open_founder_target` UNIQUE (`target_user_id`) WHERE `action_class = 'FOUNDER' AND status IN ('PENDING','APPROVED')`: at most one open Founder-level request per target (06 §7.2.5)
 - **Audit:** FULL, with parent `app_user` (target). EXC-006: requests are never soft-deleted; status is the lifecycle. Security events per 05 §9.1.
 
 ## 6. Reference data tables
@@ -638,7 +686,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `entity_type` | VARCHAR(60) | NOT NULL | — | Table name, for example `lead` |
-| `entity_id` | GUID | NOT NULL | — | Polymorphic, so no FK |
+| `entity_id` | GUID | NOT NULL | — | Polymorphic. **Registered FK-less** (EXC-011, §2.11 #4). |
 | `action` | CODE(20) | NOT NULL | — | `CREATE`, `UPDATE`, `DELETE`, `RESTORE`, `HARD_DELETE`, `EXPORT`, `ANONYMIZE` |
 | `old_value` | JSON | NULL | — | |
 | `new_value` | JSON | NULL | — | |
@@ -647,8 +695,8 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `performed_on` | UTCDATETIME | NOT NULL | — | Transaction time. Equals `created_on`. |
 | `performed_via` | CODE(20) | NOT NULL | — | `API`, `PUBLIC_FORM`, `SYSTEM_JOB`, `MIGRATION`, `CLI` |
 | `parent_entity_type` | VARCHAR(60) | NULL | — | |
-| `parent_entity_id` | GUID | NULL | — | |
-| `transaction_id` | GUID | NOT NULL | — | UUIDv7 per DB transaction |
+| `parent_entity_id` | GUID | NULL | — | **Registered FK-less** polymorphic reference (EXC-011, §2.11 #5). Pair CHECK with `parent_entity_type`. |
+| `transaction_id` | GUID | NOT NULL | — | UUIDv7 per DB transaction. **Registered FK-less group id** (EXC-011, §2.11 #6). |
 | `request_id` | VARCHAR(64) | NULL | — | |
 | `session_id` | GUID | NULL | — | Correlation id (**non-FK**, EXC-009) |
 | `ip_address` | VARCHAR(45) | NULL | — | |
@@ -672,7 +720,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 |---|---|---|---|---|
 | `event_type` | VARCHAR(80) | NOT NULL | — | |
 | `aggregate_type` | VARCHAR(60) | NOT NULL | — | |
-| `aggregate_id` | GUID | NOT NULL | — | |
+| `aggregate_id` | GUID | NOT NULL | — | **Registered FK-less** polymorphic reference (EXC-011, §2.11 #8) |
 | `payload` | JSON | NOT NULL | — | IDs plus `request_id` only |
 | `status` | CODE(12) | NOT NULL | `'PENDING'` | `PENDING`, `PROCESSING`, `DONE`, `FAILED`, `DEAD` |
 | `attempts` | INTEGER | NOT NULL | 0 | |
@@ -696,7 +744,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `title` | VARCHAR(200) | NOT NULL | — | |
 | `body` | VARCHAR(1000) | NULL | — | |
 | `entity_type` | VARCHAR(60) | NULL | — | |
-| `entity_id` | GUID | NULL | — | |
+| `entity_id` | GUID | NULL | — | **Registered FK-less** polymorphic reference (EXC-011, §2.11 #9). Pair CHECK with `entity_type`. |
 | `link_path` | VARCHAR(300) | NULL | — | |
 | `read_on` | UTCDATETIME | NULL | — | |
 | `source_event_id` | GUID | NULL | — | FK → `outbox_event.id` |
@@ -704,6 +752,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Indexes:**
   - `ix_notification__recipient_unread` WHERE `read_on IS NULL AND is_deleted = false`
   - `ix_notification__recipient_all`
+  - `ix_notification__entity` (`entity_type`, `entity_id`) WHERE `entity_id IS NOT NULL` (§2.11)
   - `ux_notification__event_recipient` UNIQUE (`source_event_id`, `recipient_user_id`) WHERE `source_event_id IS NOT NULL`
 - **Audit:** EVENT_ONLY. EXC-005.
 
@@ -716,7 +765,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | Migration | Seeds |
 |---|---|
 | 0002_identity | SYSTEM, WEB_INTAKE and ANONYMOUS `app_user` rows (§2.3), `protection_level = STANDARD` |
-| 0003_rbac | Roles FOUNDER and ADMIN (`mfa_required = true`), SALES (`mfa_required = false`), all `is_system` · every registry permission with its `sensitivity_class` · the default matrix (06 §6). The migration asserts that SALES holds no sensitive permission. |
+| 0003_rbac | Roles FOUNDER (`mfa_required = true`, `is_assignable = false`, `grant_path = FOUNDER_WORKFLOW_ONLY`), ADMIN (`mfa_required = true`) and SALES (`mfa_required = false`), all `is_system` · every registry permission with its `sensitivity_class` and `grant_path` · the default matrix (06 §6). The migration asserts that SALES holds no sensitive permission, and that `FOUNDER_WORKFLOW_ONLY` permissions appear only in the FOUNDER role (06 §3.1 rule 5). |
 | 0006_reference | Lookup categories and values (§6.2) · `number_sequence` LEAD |
 | — | **No human users** in any migration. The first Founder comes from the CLI bootstrap (AUTH-014). |
 

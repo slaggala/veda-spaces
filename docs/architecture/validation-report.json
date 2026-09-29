@@ -1,29 +1,29 @@
 {
- "report": "Veda Spaces P0 architecture — remediation 01 validation",
+ "report": "Veda Spaces P0 architecture — final minor remediation validation",
  "generated_on": "2026-09-29",
  "branch": "architecture/p0-foundation-freeze",
- "previous_architecture_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
- "independent_review": {
-  "branch": "review/p0-foundation-independent-review",
-  "commit": "7515b232e7407c0bb20afc5abd9656da2c246d0b",
-  "verdict": "NOT CERTIFIED",
-  "baseline_p0": {
-   "Fully covered": 158,
-   "Partially covered": 22,
-   "Contradictory": 4,
-   "Not testable": 2
+ "previous_remediation_commit": "c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+ "frozen_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "focused_rereview": {
+  "commit": "06a4f6e7d535e84c9b4ff427d4d8bedbf96e0ba7",
+  "verdict": "CERTIFIED WITH MINOR CONDITIONS",
+  "p0_classification": {
+   "Fully covered": 202,
+   "Partially covered": 3,
+   "Not testable pending owner input": 2,
+   "Contradictory": 1
   }
  },
  "method": {
-  "coverage": "Substantive classification per requirement using the independent reviewer's taxonomy; the reviewer's matrix is the baseline. Classifications changed by remediation 01 are author assessments that require independent re-review. Navigation references are checked only for resolvability and are not coverage evidence (F-21).",
-  "tooling": "Validation scripts were run in the authoring session and are intentionally not committed (no code in the architecture)."
+  "coverage": "Baseline = focused independent re-review classification per requirement. Only DATA-011, DATA-014, MFA-015 and RBAC-021 differ; they are author assessments pending targeted independent check TG-07. Navigation references are resolvability-checked only.",
+  "tooling": "Validation scripts run in the authoring session; not committed per the 'no implementation code' instruction (advisory N-A8 accepted). Non-vacuity was exercised by injected defects for the new checks."
  },
  "checks": [
   {
    "id": "V01",
    "name": "All Requirement IDs (and named registers) resolve",
    "result": "PASS",
-   "details": "221 registered IDs; 0 unresolved references; 0 missing from 01; named registers EXC 10, RBX 6, ASM 13, OWNER-INPUT 4, TG 6, AX 10; 0 unresolved named refs",
+   "details": "221 registered IDs; 0 unresolved references; 0 missing from 01; named registers EXC 11, RBX 6, ASM 13, OWNER-INPUT 4, TG 8, AX 10; 0 unresolved named refs",
    "evidence": []
   },
   {
@@ -37,21 +37,21 @@
    "id": "V03",
    "name": "All cross-document references resolve",
    "result": "PASS",
-   "details": "1465 section references, 103 relative links, 759 registry navigation references checked",
+   "details": "1663 section references, 110 relative links, 759 registry navigation references checked",
    "evidence": []
   },
   {
    "id": "V04",
    "name": "JSON files are syntactically valid",
    "result": "PASS",
-   "details": "3 JSON files parsed",
+   "details": "4 JSON files parsed",
    "evidence": []
   },
   {
    "id": "V05",
    "name": "No physical table named user",
    "result": "PASS",
-   "details": "24 inventory tables, 24 table definitions scanned; app_user.id referenced 35 times",
+   "details": "24 inventory tables, 24 table definitions scanned; app_user.id referenced 36 times",
    "evidence": []
   },
   {
@@ -107,9 +107,9 @@
   },
   {
    "id": "V13",
-   "name": "Every finding dispositioned; every MINOR resolved or explicitly tracked",
+   "name": "Every finding (35 original + 4 MINOR and 9 ADVISORY from re-review) dispositioned; every MINOR resolved or tracked",
    "result": "PASS",
-   "details": "35 findings; status {'Resolved': 33, 'Tracked before implementation': 1, 'Accepted advisory with reason': 1}",
+   "details": "35 original + 13 re-review findings dispositioned",
    "evidence": []
   },
   {
@@ -121,23 +121,23 @@
   },
   {
    "id": "V15",
-   "name": "No implementation code added; only architecture documentation changed",
+   "name": "No implementation code added; only architecture documentation changed; no review artifact touched",
    "result": "PASS",
-   "details": "30 changed paths, all under docs/architecture/ and all .md/.json",
+   "details": "21 changed paths, all under docs/architecture/ and all .md/.json",
    "evidence": []
   },
   {
    "id": "V16",
    "name": "dist/ unchanged",
    "result": "PASS",
-   "details": "No dist/ diff vs 4dce177 or working tree; content SHA-256 8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8",
+   "details": "No dist/ diff vs c3aae47 or working tree; content SHA-256 8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8",
    "evidence": []
   },
   {
    "id": "V17",
    "name": "Every table follows the audit contract; exception registry complete (incl. F-08 indexes)",
    "result": "PASS",
-   "details": "24 tables; 23 unique indexes checked against the predicate rule or EXC-007",
+   "details": "24 tables; 24 unique indexes checked against the predicate rule or EXC-007",
    "evidence": []
   },
   {
@@ -223,299 +223,172 @@
    "id": "V26",
    "name": "Coverage model is substantive (no citation-derived coverage); every requirement assessed",
    "result": "PASS",
-   "details": "No Traces lines; every requirement has a classification; every upgrade from the independent baseline is flagged for re-review",
+   "details": "No Traces lines; every requirement has a classification and history; every upgrade from the focused re-review baseline is flagged for TG-07",
+   "evidence": []
+  },
+  {
+   "id": "V27",
+   "name": "N-01: canonical Founder approval rules consistent everywhere",
+   "result": "PASS",
+   "details": "06 §7.2 is the single definition; ADR-010, ADR-006, 05, 08 and 09 defer to it; no permissive eligibility text or retired action names remain",
+   "evidence": []
+  },
+  {
+   "id": "V28",
+   "name": "N-01: no direct Founder-power grant path remains",
+   "result": "PASS",
+   "details": "G13 + grant_path flags + seed lock + registry rule 5; generic role, permission and role-definition APIs reject; negative tests G4–G6; matrix grants user.founder.manage only to Founder",
+   "evidence": []
+  },
+  {
+   "id": "V29",
+   "name": "No requester can approve their own request (Founder and standard dual control)",
+   "result": "PASS",
+   "details": "DB CHECK + service eligibility (06 §7.2.3, §7.4) + API error + tests G1/G3",
+   "evidence": []
+  },
+  {
+   "id": "V30",
+   "name": "N-02: ten FK-less identifier columns registered and constrained; rule 3 exact; tests present",
+   "result": "PASS",
+   "details": "10 registry rows, each with 10 documented fields; allow-list equals the required set",
+   "evidence": []
+  },
+  {
+   "id": "V31",
+   "name": "Every ID-like column has a FK or is exactly a registered FK-less column",
+   "result": "PASS",
+   "details": "45 ID-like columns scanned across 24 table definitions",
+   "evidence": []
+  },
+  {
+   "id": "V32",
+   "name": "N-03: six test designs are concrete (all ten fields, requirement IDs)",
+   "result": "PASS",
+   "details": "TD-A…TD-F each state requirement IDs, purpose, preconditions, fixtures, action, expected result, events, negative assertion, cleanup and evidence",
+   "evidence": []
+  },
+  {
+   "id": "V33",
+   "name": "F-19 resolved or enforceably tracked",
+   "result": "PASS",
+   "details": "13 F-19 deficiencies mapped; tracked items reference registry gates with owner, acceptance and evidence",
+   "evidence": []
+  },
+  {
+   "id": "V34",
+   "name": "Every RG, PG and TG gate has all mandatory attributes; failure never defaults to pass",
+   "result": "PASS",
+   "details": "27 gates × 18 attributes; owners are categories; all gate references resolve; PG-DAST has no invented numeric threshold",
+   "evidence": []
+  },
+  {
+   "id": "V35",
+   "name": "TG-01 remains pending; no owner approval is fabricated",
+   "result": "PASS",
+   "details": "TG-01 status Pending; scan for approval claims found only negated or pending statements; decision-log disclaimer present",
+   "evidence": []
+  },
+  {
+   "id": "V36",
+   "name": "Requirement counts consistent (221 / 208 P0 / 10 P1 / 3 P2)",
+   "result": "PASS",
+   "details": "requirements.json and 01 agree with the focused re-review recount",
+   "evidence": []
+  },
+  {
+   "id": "V37",
+   "name": "No P0 contradiction (or partial/uncovered) remains in the author's classification",
+   "result": "PASS",
+   "details": "P0 author classification {'Fully covered': 206, 'Not testable pending owner input': 2}; the four corrected requirements are flagged for TG-07",
    "evidence": []
   }
  ],
- "coverage_gate": {
-  "total_requirements": 221,
+ "coverage": {
+  "total": 221,
   "p0": 208,
   "by_priority": {
    "P0": 208,
    "P1": 10,
    "P2": 3
   },
-  "p0_classification": {
+  "before_p0": {
+   "Fully covered": 202,
+   "Partially covered": 3,
+   "Not testable pending owner input": 2,
+   "Contradictory": 1
+  },
+  "after_p0_author": {
    "Fully covered": 206,
    "Not testable pending owner input": 2
   },
-  "p0_test_design": {
-   "automated": 166,
-   "review": 21,
-   "operational": 19,
-   "owner-gated": 2
-  },
-  "partial_to_fully_covered": [
-   "AUTH-005",
-   "AUTH-006",
-   "AUTH-010",
-   "AUTH-015",
-   "AUTH-017",
-   "DATA-009",
-   "DATA-014",
-   "LEAD-018",
-   "LEAD-019",
-   "LOG-005",
-   "MFA-007",
-   "MFA-010",
-   "NOTE-002",
-   "OPS-004",
-   "RBAC-009",
-   "RBAC-011",
-   "SEC-009",
-   "SEC-011",
-   "SEVT-006",
-   "UI-011",
-   "UI-014",
-   "USER-001"
-  ],
-  "contradictions_removed": [
-   "API-007",
-   "AUTH-018",
-   "MFA-003",
-   "RBAC-017"
-  ],
-  "new_or_promoted_p0": [
-   "AUDIT-011",
-   "AUTH-016",
-   "DATA-017",
-   "LEAD-027",
-   "LEAD-028",
-   "LEAD-029",
-   "LEAD-030",
-   "MFA-012",
-   "MFA-013",
-   "MFA-014",
-   "MFA-015",
-   "OPS-010",
-   "OPS-011",
-   "RBAC-016",
-   "RBAC-018",
-   "RBAC-019",
-   "RBAC-020",
-   "RBAC-021",
-   "SEVT-007",
-   "UI-016",
-   "UI-017",
-   "USER-007"
-  ],
-  "revised_baseline_fully_covered": [
-   "AUDIT-004",
-   "AUDIT-008",
-   "AUTH-008",
-   "AUTH-011",
-   "AUTH-014",
-   "DATA-007",
-   "DATA-011",
-   "LEAD-001",
-   "LEAD-002",
-   "LEAD-010",
-   "LEAD-012",
-   "LEAD-013",
-   "LEAD-023",
-   "LEAD-025",
-   "MFA-001",
-   "MFA-002",
-   "MFA-004",
-   "MFA-005",
-   "MFA-006",
-   "MFA-009",
-   "MFA-011",
-   "NFR-001",
-   "NFR-003",
-   "NOTIF-004",
-   "NOTIF-008",
-   "OPS-001",
-   "OPS-002",
-   "OPS-009",
-   "PLAT-004",
-   "PLAT-006",
-   "PLAT-007",
-   "PLAT-012",
-   "RBAC-008",
-   "RBAC-010",
-   "RBAC-013",
-   "RBAC-014",
-   "RBAC-015",
-   "SEC-002",
-   "SEVT-001",
-   "SEVT-002",
-   "SEVT-004",
-   "SEVT-005",
-   "UI-001",
-   "UI-004",
-   "UI-010",
-   "UI-015",
-   "USER-002",
-   "USER-004",
-   "USER-006"
-  ],
-  "owner_input_dependencies": [
+  "reassessed": [
    {
-    "id": "AUDIT-009",
-    "owner_input": "OWNER-INPUT-002",
-    "classification": "Deferred"
+    "id": "DATA-011",
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-H",
+    "finding": [
+     "F-08",
+     "N-02"
+    ]
    },
    {
-    "id": "DATA-017",
-    "owner_input": "OWNER-INPUT-002",
-    "classification": "Fully covered"
-   },
-   {
-    "id": "LEAD-028",
-    "owner_input": "OWNER-INPUT-002",
-    "classification": "Fully covered"
+    "id": "DATA-014",
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-H",
+    "finding": [
+     "F-07",
+     "F-08",
+     "N-02"
+    ]
    },
    {
     "id": "MFA-015",
-    "owner_input": "OWNER-INPUT-004",
-    "classification": "Fully covered"
-   },
-   {
-    "id": "NFR-002",
-    "owner_input": "OWNER-INPUT-001",
-    "classification": "Not testable pending owner input"
-   },
-   {
-    "id": "OPS-002",
-    "owner_input": "OWNER-INPUT-003",
-    "classification": "Fully covered"
-   },
-   {
-    "id": "OPS-005",
-    "owner_input": "OWNER-INPUT-001",
-    "classification": "Not testable pending owner input"
-   },
-   {
-    "id": "OPS-009",
-    "owner_input": "OWNER-INPUT-003",
-    "classification": "Fully covered"
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-G",
+    "finding": [
+     "N-01"
+    ]
    },
    {
     "id": "RBAC-021",
-    "owner_input": "OWNER-INPUT-004",
-    "classification": "Fully covered"
-   },
-   {
-    "id": "SEVT-004",
-    "owner_input": "OWNER-INPUT-002",
-    "classification": "Fully covered"
+    "before": "Contradictory",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-G",
+    "finding": [
+     "N-01"
+    ]
    }
   ],
   "not_testable_pending_owner_input": [
    "NFR-002",
    "OPS-005"
   ],
-  "review_or_operational_only": [
-   "API-008",
-   "API-009",
-   "AUTH-014",
-   "DATA-009",
-   "LOG-001",
-   "LOG-004",
-   "LOG-006",
-   "MFA-008",
-   "NOTIF-005",
-   "OPS-001",
-   "OPS-002",
-   "OPS-003",
-   "OPS-004",
-   "OPS-006",
-   "OPS-007",
-   "OPS-008",
-   "OPS-009",
-   "OPS-010",
-   "OPS-011",
-   "PLAT-001",
-   "PLAT-002",
-   "PLAT-003",
-   "PLAT-005",
-   "PLAT-006",
-   "PLAT-008",
-   "PLAT-011",
-   "PLAT-012",
-   "RBAC-002",
-   "SEC-001",
-   "SEC-005",
-   "SEC-006",
-   "SEC-007",
-   "SEC-008",
-   "SEC-009",
-   "SEVT-004",
-   "SEVT-007",
-   "SEVT-009",
-   "SEVT-010",
-   "UI-010",
-   "UI-014"
-  ],
+  "test_design": {
+   "automated": 166,
+   "review": 21,
+   "operational": 19,
+   "owner-gated": 2
+  },
   "deferred": [
-   {
-    "id": "ACT-005",
-    "priority": "P1",
-    "title": "Call and WhatsApp buttons prompt a prefilled activity quick-log."
-   },
-   {
-    "id": "AUDIT-007",
-    "priority": "P1",
-    "title": "Bulk exports are audited (who, when, filter, row count)."
-   },
-   {
-    "id": "AUDIT-009",
-    "priority": "P1",
-    "title": "Configurable audit retention with verified archival."
-   },
-   {
-    "id": "AUDIT-013",
-    "priority": "P2",
-    "title": "Tamper-evidence hash chain over audit_log."
-   },
-   {
-    "id": "LEAD-017",
-    "priority": "P1",
-    "title": "Leads can be exported to CSV (permission-gated, audited)."
-   },
-   {
-    "id": "LEAD-021",
-    "priority": "P1",
-    "title": "Quoted amount is recorded in minor units."
-   },
-   {
-    "id": "LEAD-022",
-    "priority": "P2",
-    "title": "Auto-assignment (round robin)."
-   },
-   {
-    "id": "NFR-004",
-    "priority": "P1",
-    "title": "Initial JS below 200 KB gzipped and LCP below 2.5 s on 4G."
-   },
-   {
-    "id": "NOTE-003",
-    "priority": "P1",
-    "title": "Notes can be pinned."
-   },
-   {
-    "id": "NOTIF-006",
-    "priority": "P1",
-    "title": "Follow-up reminders and daily digest."
-   },
-   {
-    "id": "NOTIF-007",
-    "priority": "P2",
-    "title": "WhatsApp Business API notifications."
-   },
-   {
-    "id": "RBAC-007",
-    "priority": "P1",
-    "title": "Time-bound grants (P1): disabled in P0 with 422; when enabled, never allowed on sensitive permissions."
-   },
-   {
-    "id": "SEC-010",
-    "priority": "P1",
-    "title": "Target OWASP ASVS v4 Level 2."
-   }
-  ],
-  "unresolved_blockers": [],
-  "verdict": "READY FOR FOCUSED INDEPENDENT RE-REVIEW"
- }
+   "ACT-005",
+   "AUDIT-007",
+   "AUDIT-009",
+   "AUDIT-013",
+   "LEAD-017",
+   "LEAD-021",
+   "LEAD-022",
+   "NFR-004",
+   "NOTE-003",
+   "NOTIF-006",
+   "NOTIF-007",
+   "RBAC-007",
+   "SEC-010"
+  ]
+ },
+ "unresolved_blockers": [],
+ "author_verdict": "READY FOR FINAL TARGETED INDEPENDENT CHECK"
 }

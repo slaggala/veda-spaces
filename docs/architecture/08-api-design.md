@@ -43,29 +43,29 @@ Every row names its permission code(s), or an RBAC exception (06 §11, RBX-*). "
 | 28 | `PATCH /api/v1/users/{user_id}` | `user.profile.update` (profile fields only) | RBAC-019 |
 | 29 | `POST /api/v1/users/{user_id}/email-change` | `user.email.change` + step-up + G9/G11 (+ dual if privileged) | USER-007 |
 | 30 | `POST /api/v1/users/{user_id}/status` | `user.status.manage` + step-up + G3/G4/G9/G11 | RBAC-019 |
-| 31 | `POST /api/v1/users/{user_id}/unlock` | `user.status.manage` + G9 | AUTH-010 |
+| 31 | `POST /api/v1/users/{user_id}/unlock` | `user.status.manage` + step-up + G9/G11 | AUTH-010 |
 | 32 | `DELETE /api/v1/users/{user_id}` | `user.delete` + step-up + G3/G4/G9/G11 | USER-001 |
 | 33 | `POST /api/v1/users/{user_id}/restore` | `user.restore` + G9 | USER-001 |
 | 34 | `POST /api/v1/users/{user_id}/invite/resend` | `user.create` + G9 | AUTH-011 |
 | 35 | `POST /api/v1/users/{user_id}/password-reset` | `user.password.reset` + G9/G11 | AUTH-008 |
 | 36 | `POST /api/v1/users/{user_id}/sessions/revoke` | `user.session.revoke` + step-up + G9/G11 | AUTH-016 |
 | 37 | `GET /api/v1/users/{user_id}/roles` | `user.read` | RBAC-008 |
-| 38 | `PUT /api/v1/users/{user_id}/roles` | `user.role.manage` + step-up + G1–G4/G9/G11 | RBAC-009 |
+| 38 | `PUT /api/v1/users/{user_id}/roles` | `user.role.manage` + step-up + G1–G4/G9/G11/G13 | RBAC-009 |
 | 39 | `GET /api/v1/users/{user_id}/permissions` | `user.read` | RBAC-006 |
-| 40 | `POST /api/v1/users/{user_id}/permissions` · `DELETE …/permissions/{grant_id}` | `user.permission.manage` + step-up + G1/G3/G4/G9/G11 | RBAC-006 |
+| 40 | `POST /api/v1/users/{user_id}/permissions` · `DELETE …/permissions/{grant_id}` | `user.permission.manage` + step-up + G1/G3/G4/G9/G11/G13 | RBAC-006 |
 | 41 | `GET /api/v1/users/{user_id}/effective-permissions` | `user.read` + `permission.read` | RBAC-016 |
 | 42 | `POST /api/v1/users/{user_id}/mfa/reset` | `user.mfa.reset` + step-up + G3/G9/G11 (+ dual if privileged) | MFA-007 |
-| 43 | `PUT /api/v1/users/{user_id}/mfa-requirement` | `user.mfa.require` + step-up + G3/G9 | MFA-003 |
+| 43 | `PUT /api/v1/users/{user_id}/mfa-requirement` | `user.mfa.require` + step-up + G3/G9/G11 | MFA-003 |
 | 44 | `GET /api/v1/users/assignable` | `lead.assign` | LEAD-007 |
 | **Approvals and Founder workflow** (§5.11) | | | |
-| 45 | `GET /api/v1/approvals` · `GET /api/v1/approvals/{approval_id}` | the permission of the request's action (list is filtered to what the caller may approve or has requested) | RBAC-021 |
-| 46 | `POST /api/v1/approvals/{approval_id}/approve` · `…/deny` | the action's permission + step-up + eligibility (06 §7.4) | RBAC-021 |
+| 45 | `GET /api/v1/approvals` · `GET /api/v1/approvals/{approval_id}` | the permission of the request's action. The list is filtered to requests the caller may approve (06 §7.2.3 for Founder class, 06 §7.4 for standard) or has requested. | RBAC-021 |
+| 46 | `POST /api/v1/approvals/{approval_id}/approve` · `…/deny` | the action's permission + step-up + eligibility: 06 §7.2.3 for FOUNDER class, 06 §7.4 for STANDARD | RBAC-021 |
 | 47 | `POST /api/v1/approvals/{approval_id}/cancel` | requester only (the action's permission) | RBAC-021 |
-| 48 | `POST /api/v1/founder-actions` | `user.founder.manage` + step-up + dual | RBAC-021 |
+| 48 | `POST /api/v1/founder-actions` | `user.founder.manage` (effective) + step-up + the canonical Founder-governance workflow (06 §7.2) | RBAC-021 |
 | **Roles and permissions** (§6) | | | |
 | 49 | `GET /api/v1/roles` · `GET /api/v1/roles/{role_id}` · `GET …/permissions` | `role.read` | RBAC-008 |
-| 50 | `POST /api/v1/roles` · `PATCH /api/v1/roles/{role_id}` · `DELETE /api/v1/roles/{role_id}` | `role.manage` + step-up + G2/G5 | RBAC-008 |
-| 51 | `PUT /api/v1/roles/{role_id}/permissions` | `role.manage` + step-up + G2/G3/G4 | RBAC-009 |
+| 50 | `POST /api/v1/roles` · `PATCH /api/v1/roles/{role_id}` · `DELETE /api/v1/roles/{role_id}` | `role.manage` + step-up + G2/G5/G13 | RBAC-008 |
+| 51 | `PUT /api/v1/roles/{role_id}/permissions` | `role.manage` + step-up + G2/G3/G4/G13 | RBAC-009 |
 | 52 | `GET /api/v1/roles/{role_id}/users` | `role.read` + `user.read` | RBAC-008 |
 | 53 | `GET /api/v1/permissions` · `GET /api/v1/permissions/{permission_id}` | `permission.read` | RBAC-004 |
 | 54 | `PATCH /api/v1/permissions/{permission_id}` | `permission.manage` + step-up | RBAC-004 |
@@ -462,6 +462,7 @@ This is verified by the mass-assignment tests (12 §4.4).
 - `200` with the user_role items.
 - Errors: G1–G4, G9, G11, step-up. `valid_from` / `valid_until` → `422 TIME_BOUND_GRANTS_NOT_ENABLED` (RBAC-007 is P1).
 - Assigning a role that contains sensitive permissions to a user without MFA succeeds. Those permissions are returned as `"pending_mfa": true` and stay suspended until enrollment (MFA-012).
+- **Founder governance (G13).** Adding or removing a role with `grant_path = FOUNDER_WORKFLOW_ONLY` (the FOUNDER role) → `403 FOUNDER_GOVERNANCE_REQUIRED` plus a `FOUNDER_GOVERNANCE_BYPASS_BLOCKED` event. The same applies to any change to a Founder's roles (G11). Use `POST /founder-actions`.
 
 ### 5.8 Direct permissions (`user.permission.manage`)
 
@@ -470,6 +471,7 @@ This is verified by the mass-assignment tests (12 §4.4).
 - `201`.
 - Errors: `422 REASON_REQUIRED` · `422 SCOPE_NOT_SUPPORTED` · `422 TIME_BOUND_GRANTS_NOT_ENABLED` · `403 ESCALATION_DENIED` · `409 DUPLICATE` · `409 LAST_ADMINISTRATOR` (for a DENY that breaks I2).
 - `DELETE …/permissions/{grant_id}` → `204`.
+- **Founder governance (G13).** A GRANT **or DENY** of any `FOUNDER_WORKFLOW_ONLY` permission (`user.founder.manage`), and deletion of such a row → `403 FOUNDER_GOVERNANCE_REQUIRED`.
 
 ### 5.9 `GET /users/{id}/effective-permissions` (RBAC-016, P0)
 
@@ -494,10 +496,10 @@ This is verified by the mass-assignment tests (12 §4.4).
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
 | `GET /approvals?status=PENDING&role=approver\|requester` | — | Requests the caller may decide or has made. Target email masked. | — |
-| `POST /approvals/{id}/approve` | `{ "reason": "Verified with Priya on call" }` (step-up) | `200`. The action is executed in the same transaction, and the status becomes EXECUTED. | `403 APPROVER_NOT_ELIGIBLE` (same person, target, G9, or not FOUNDER-protected for Founder actions) · `409 INVALID_STATE` (expired or decided) · `403 STEP_UP_REQUIRED` |
+| `POST /approvals/{id}/approve` | `{ "reason": "Verified with Priya on call" }` (step-up) | `200`. Eligibility of **both** principals is re-checked, and the action executes in the same transaction under the write lock. Status becomes EXECUTED, or FAILED with a `status_reason`. | `403 APPROVER_NOT_ELIGIBLE` (is the requester, is the target, fails G9, or, for FOUNDER class, is not a Founder with effective `user.founder.manage` per 06 §7.2.3) · `409 INVALID_STATE` (already approved, denied, expired or cancelled, which also covers a second approver) · `409 LAST_FOUNDER` · `403 STEP_UP_REQUIRED` |
 | `POST /approvals/{id}/deny` | `{ "reason": "…" }` (step-up) | `200` DENIED | Same |
 | `POST /approvals/{id}/cancel` | `{}` (requester) | `200` CANCELLED | `409 INVALID_STATE` |
-| `POST /founder-actions` | `{ "action": "GRANT_FOUNDER" \| "REVOKE_FOUNDER" \| "DEACTIVATE_FOUNDER" \| "FOUNDER_MFA_RESET" \| "FOUNDER_EMAIL_CHANGE", "target_user_id": "…", "reason": "…", "new_email": "only for email change" }` (`user.founder.manage`, step-up) | `202 { "approval_id": "…" }` | `403 APPROVER_POOL_INSUFFICIENT` (fewer than two eligible Founders: use break-glass, 06 §7.5) · `409 LAST_FOUNDER` · G3 |
+| `POST /founder-actions` | `{ "action": "GRANT_FOUNDER" \| "REVOKE_FOUNDER" \| "FOUNDER_MFA_RESET" \| "FOUNDER_STATUS_CHANGE" \| "FOUNDER_EMAIL_CHANGE", "target_user_id": "…", "reason": "…", "status": "only for status change", "new_email": "only for email change", "post_roles": "optional for REVOKE_FOUNDER" }` (requester eligibility per 06 §7.2.3, step-up) | Steady state: `202 { "approval_id": "…", "channel": "IN_APP" }`. **Single-Founder mode:** `202 { "approval_id": "…", "channel": "BREAK_GLASS", "not_before": "…" }`, where the second principal is a custodian (06 §7.2.4, §7.5). | `403 APPROVER_NOT_ELIGIBLE` (requester ineligible) · `403 SELF_MODIFICATION_DENIED` (self as target, except REVOKE_FOUNDER step-down) · `409 REQUEST_ALREADY_OPEN` (open Founder-level request for this target) · `409 LAST_FOUNDER` · `422 REASON_REQUIRED` |
 
 ### 5.12 `GET /users/assignable`
 
@@ -520,6 +522,8 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 | `POST /roles` | `{ "code": "SALES_MANAGER", "name": "Sales Manager", "description": "…", "copy_from_role_id": "optional" }` | `201`. `409 DUPLICATE` (code, or case-insensitive name). `403 ESCALATION_DENIED` if the copied role contains permissions the actor doesn't hold (G2, A-06). |
 | `PATCH /roles/{id}` | `{ "name", "description", "is_assignable" }` with `If-Match` | `code` is immutable (`422 IMMUTABLE_FIELD`) |
 | `DELETE /roles/{id}` | — | `409 SYSTEM_OBJECT` · `409 ROLE_IN_USE` (has live assignments; unassign first) |
+
+**Founder governance (G13).** `PATCH`, `DELETE` or `PUT …/permissions` on a role with `grant_path = FOUNDER_WORKFLOW_ONLY`, adding a `FOUNDER_WORKFLOW_ONLY` permission to any role, and `POST /roles` with `copy_from_role_id` of such a role → `403 FOUNDER_GOVERNANCE_REQUIRED`. FOUNDER role definition changes arrive only by migration (06 §7.2.2 `FOUNDER_POLICY_CHANGE`).
 
 `PUT /roles/{id}/permissions` is a declarative full replace:
 
@@ -930,7 +934,8 @@ Plan a follow-up:
 | 403 | `STEP_UP_REQUIRED` | Recent MFA or password re-entry needed. Body: `kind`, and `mfa_token` for MFA. |
 | 403 | `RECOVERY_SESSION_RESTRICTED` | A RECOVERY session called a non-allow-listed endpoint |
 | 403 | `COOLING_OFF` | Post-recovery cooling-off blocks this change (05 §11.5) |
-| 403 | `FOUNDER_PROTECTED` · `APPROVER_NOT_ELIGIBLE` · `APPROVER_POOL_INSUFFICIENT` | Guards G11/G12 (06 §7) |
+| 403 | `FOUNDER_PROTECTED` · `FOUNDER_GOVERNANCE_REQUIRED` · `APPROVER_NOT_ELIGIBLE` | Guards G11/G12/G13 and Founder governance (06 §7) |
+| 409 | `REQUEST_ALREADY_OPEN` · `FOUNDER_STATE_INCONSISTENT` | Founder-governance concurrency and I3 (06 §7.2.5, §7.3) |
 | 202 | `APPROVAL_REQUIRED` | Not an error: the action was queued for dual control (returned in the body `status`) |
 | 409 | `MFA_ALREADY_ENROLLED` · `MFA_REQUIRED_BY_POLICY` | MFA state conflicts |
 | 400 | `RESET_TOKEN_INVALID` · `INVITE_TOKEN_INVALID` · `EMAIL_TOKEN_INVALID` | Unknown, used or expired token |

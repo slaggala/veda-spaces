@@ -303,6 +303,7 @@ Because a hit only quarantines, a false positive from autofill loses nothing: st
 - `POST /leads/{id}/spam-resolution {resolution: NOT_SPAM | CONFIRMED_SPAM}` (`lead.update`, `If-Match`):
   - **NOT_SPAM** releases the lead and emits `lead.created`.
   - **CONFIRMED_SPAM** keeps the lead hidden. It can be soft-deleted, and becomes eligible for purge by retention (§14).
+- **Ageing (N-A3).** A daily scheduled job sends holders of `lead.update` at scope ALL an in-app notification and an email summarizing SUSPECTED leads. Any SUSPECTED lead older than the configured review age (initial default 1 working day) raises an operational alert, so a false positive is never silently parked.
 
 ## 6. Assignment (LEAD-007, LEAD-022)
 

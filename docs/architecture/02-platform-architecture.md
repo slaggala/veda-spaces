@@ -347,6 +347,8 @@ Health: /health/live (process up)
 | Backups | Litestream lag exceeding the owner-approved RPO (OPS-005) · daily snapshot missing · restore verification failed or overdue |
 | Health | `/health/ready` failing for 2 consecutive checks |
 | Degraded | Outbox lag above threshold, or email-provider errors. These alert but never fail readiness or trigger rollback (F-12). |
+| Spam queue ageing | SUSPECTED leads older than the configured review age (04 §5.5, N-A3) |
+| Governance invariants | Nightly I1/I2/I3 failure (CRITICAL), or no effective recovery administrator (High) (06 §7.3) |
 | Disk | > 80% used |
 
 ## 10. Notification architecture

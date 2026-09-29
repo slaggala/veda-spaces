@@ -587,7 +587,9 @@ Approvals                                                   [Pending for me (2)]
 
 - Approve and deny require step-up and a reason.
 - Your own requests and requests about you show "You can't decide this request" (06 §7.4).
-- Founder actions appear only to eligible Founders.
+- Founder-level requests appear only to users eligible to decide them under 06 §7.2.3. They are never shown as approvable to the requester or the target.
+- The request dialog shows the operating mode. In single-Founder mode it reads "Approval by a break-glass custodian; executes no earlier than …".
+- **The role editor and user Access tab show the FOUNDER role and `user.founder.manage` as locked** ("Founder governance only"), with a link to the Founder-actions page (G13).
 - A top-bar badge shows the pending count, from the `approvals` endpoint (08 §5.11).
 
 ### 4.13 Email change, self-service (USER-007)

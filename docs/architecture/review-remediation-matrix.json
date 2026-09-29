@@ -61,7 +61,7 @@
     "RBAC-011"
    ],
    "owner_decision": "Decision 3",
-   "remediation_action": "Retired `user.update`; granular permissions (`user.profile.update`, `user.email.change`, `user.status.manage`, `user.role.manage`, `user.permission.manage`, `user.mfa.reset`, `user.mfa.require`, `user.founder.manage`). Closed profile-only DTOs. Proposed-email workflow. G9 extended to all account-control actions; G3 extended to self-deactivation; G4 invariants I1/I2 under the write lock plus nightly check; G11 Founder protection via `protection_level`; G12 dual control; break-glass.",
+   "remediation_action": "Retired `user.update`; granular permissions (`user.profile.update`, `user.email.change`, `user.status.manage`, `user.role.manage`, `user.permission.manage`, `user.mfa.reset`, `user.mfa.require`, `user.founder.manage`). Closed profile-only DTOs. Proposed-email workflow. G9 extended to all account-control actions; G3 extended to self-deactivation; G4 invariants I1/I2 under the write lock plus nightly check; G11 Founder protection via `protection_level`; G12 dual control; break-glass. FINAL: dual-control eligibility defect addressed by N-01.",
    "documents_changed": "ADR-010, 03 §4.1, §5.8, 05 §8.3, §8.6, 06 §6.2, §7, §10, 08 §1, §4.4, §4.8, §5, 09 §4.6, §4.12, §4.13, 11 §5 X9/X17/X18, 12 §4.4–4.5",
    "validation_evidence_required": "12 §4.4 mass-assignment, G1–G12, Founder and last-administrator concurrency tests; 12 §4.5 email-change tests",
    "status": "Resolved",
@@ -128,10 +128,10 @@
     "NOTIF-004"
    ],
    "owner_decision": "—",
-   "remediation_action": "Session retention defined; evidence `session_id` and `refresh_token.replaced_by_id` are non-FK correlation ids (EXC-009); purge ordering (03 §2.10) with outbox purge excluding referenced rows; retention values are OWNER-INPUT-002.",
+   "remediation_action": "Session retention defined; evidence `session_id` and `refresh_token.replaced_by_id` are non-FK correlation ids (EXC-009); purge ordering (03 §2.10) with outbox purge excluding referenced rows; retention values are OWNER-INPUT-002. FINAL: re-review found a regression (broadened rule 3), corrected by N-02 without changing the purge order.",
    "documents_changed": "03 §2.3, §2.9, §2.10, §5.1–5.4, §7, 05 §7, ADR-003, ADR-004",
    "validation_evidence_required": "12 §4.1 purge-ordering test with foreign_keys=ON on both engines",
-   "status": "Resolved",
+   "status": "Resolved (regression N-02 corrected)",
    "re_review_required": "No"
   },
   {
@@ -328,10 +328,10 @@
     "OPS-005"
    ],
    "owner_decision": "—",
-   "remediation_action": "Added suites: migration upgrade-with-data and N-1 tests, CSRF negatives, token-after-revocation, grace-window replay, SQLite contention, browser/device matrix, DAST/pentest (pre-production gate PG-DAST, TG-03). Coverage gate reports automated tests separately from RV/OP and owner-gated items.",
+   "remediation_action": "Added suites: migration upgrade-with-data and N-1 tests, CSRF negatives, token-after-revocation, grace-window replay, SQLite contention, browser/device matrix, DAST/pentest (pre-production gate PG-DAST, TG-03). Coverage gate reports automated tests separately from RV/OP and owner-gated items. FINAL: every F-19 deficiency is mapped in the F-19 deficiency table (TD-A…TD-F, 12 §4.1/§4.5/§4.8/§4.9, PG-DAST/TG-03, OWNER-INPUT-001/RG-1).",
    "documents_changed": "12 §1–§5, 11 §7.3, §11, coverage-gate",
    "validation_evidence_required": "12 suites present; TG-03 DAST/pentest reports before production",
-   "status": "Resolved",
+   "status": "Resolved (designs); DAST and owner-gated items tracked before production",
    "re_review_required": "No"
   },
   {
@@ -542,7 +542,7 @@
     "NFR-001"
    ],
    "owner_decision": "—",
-   "remediation_action": "Accepted: SUCCESS events share the business transaction for atomicity; the PostgreSQL advisory lock cost is measured in the migration rehearsal (RG-4). Deferred chaining via a sequence is noted as the fallback if throughput is insufficient.",
+   "remediation_action": "Accepted: SUCCESS events share the business transaction for atomicity; the PostgreSQL advisory lock cost is measured in the migration rehearsal (RG-4). Deferred chaining via a sequence is noted as the fallback if throughput is insufficient. FINAL: measurable criterion moved to gate PGM-1 (NFR-001 p95 with chain appends on PostgreSQL).",
    "documents_changed": "05 §9.6, 11 §1.2 S6",
    "validation_evidence_required": "RG-4 chain-append latency measurement",
    "status": "Accepted advisory with reason",
@@ -562,5 +562,292 @@
    "status": "Resolved",
    "re_review_required": "No"
   }
- ]
+ ],
+ "final_minor_remediation": {
+  "rereview_commit": "06a4f6e7d535e84c9b4ff427d4d8bedbf96e0ba7",
+  "rereview_verdict": "CERTIFIED WITH MINOR CONDITIONS",
+  "findings": [
+   {
+    "finding_id": "N-01",
+    "original_severity": "MINOR",
+    "title": "Founder dual-control approver eligibility is contradictory, and Founder powers can be granted outside the Founder workflow",
+    "affected_requirements": [
+     "RBAC-021",
+     "MFA-015",
+     "RBAC-020"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Canonical Founder-governance workflow in 06 §7.2 (single authoritative definition). Founder = protection_level FOUNDER + FOUNDER role (I3). The FOUNDER role and `user.founder.manage` have grant_path FOUNDER_WORKFLOW_ONLY. G13 rejects every generic role, permission or role-definition path (grant, deny, copy, edit). One eligibility rule: requester and approver are Founders with effective user.founder.manage, step-up, re-checked at request, approval and execution; approver ≠ requester ≠ target; one approval; duplicate → 409. Single-Founder mode: a custodian who is a distinct human is the second principal. Full break-glass: two distinct-human custodians. Bootstrap creates only the first Founder ever. One open Founder request per target. Invariants I1–I3 under the write lock. Approval-policy changes have no runtime API.",
+    "documents_changed": "06 §3.1, §5, §6.2, §7.1–7.5, §10; 03 §4.3, §4.4, §5.8, §10; 05 §9.1, §9.8, §10, §11.7; 08 §1, §5.7, §5.8, §5.11, §6.1, §11; 09 §4.12; ADR-010, ADR-006; 11 §6; 12 §4.4, §4.12 TD-G",
+    "validation_evidence_required": "TD-G cases G1–G14 (both engines); TG-07 targeted independent verification",
+    "status": "Resolved (author) — targeted check TG-07",
+    "re_review_required": "Yes (targeted)"
+   },
+   {
+    "finding_id": "N-02",
+    "original_severity": "MINOR",
+    "title": "Regression: broadened conformance rule 3 rejects unregistered FK-less GUID columns",
+    "affected_requirements": [
+     "DATA-011",
+     "DATA-014",
+     "DATA-012"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Registered all seven FK-less columns (EXC-011) plus the three EXC-009 correlation columns in a fully documented 10-row allow-list (03 §2.11): purpose, why no FK, type, format CHECK, discriminator and pair CHECK, index, retention, orphan semantics, requirements and approval. Rule 3 now fails any unregistered ID-like FK-less column and any registered column with the wrong type or missing CHECK, index or documentation. No global relaxation. Purge order unchanged (F-07 not reintroduced).",
+    "documents_changed": "03 §2.7, §2.9, §2.11, §5.4, §5.6, §7, §8.1, §8.2; 12 §4.1, §4.12 TD-H",
+    "validation_evidence_required": "TD-H cases H1–H8; TG-07",
+    "status": "Resolved (author) — targeted check TG-07",
+    "re_review_required": "Yes (targeted)"
+   },
+   {
+    "finding_id": "N-03",
+    "original_severity": "MINOR",
+    "title": "Test-design regressions and gaps in recovery, direct grants and duplicate detection",
+    "affected_requirements": [
+     "RBAC-006",
+     "LEAD-010",
+     "MFA-013",
+     "MFA-014",
+     "API-006",
+     "DATA-006"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Six concrete test designs with requirement IDs, purpose, preconditions, fixtures, action, expected result, events, negative assertions, cleanup and evidence: TD-A DENY-over-GRANT, TD-B duplicate/retry/non-disclosure, TD-C expired recovery session, TD-D challenge reuse after recovery, TD-E failed re-enrollment, TD-F two-writer conflict. 05 §11.5 now states login-challenge completion, invalidation of other challenges, expiry and failure semantics.",
+    "documents_changed": "12 §4.4–4.7, §4.12; 05 §9.1, §11.5",
+    "validation_evidence_required": "TD-A…TD-F reports; TG-07",
+    "status": "Resolved (author) — targeted check TG-07",
+    "re_review_required": "Yes (targeted)"
+   },
+   {
+    "finding_id": "N-04",
+    "original_severity": "MINOR",
+    "title": "Production and tracked gates lack required attributes",
+    "affected_requirements": [
+     "OPS-005",
+     "OPS-008",
+     "NFR-002",
+     "SEC-007"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Canonical gate registry (gate-registry.md/.json), 27 gates: OWNER-INPUT-001…004, TG-01…TG-08, RG-1…RG-9, PG-DAST, PG-RET, PG-BG, PG-EMAIL, PG-PRIV, PGM-1. Each has all 18 attributes, owner categories only, explicit failure behavior (missing, stale or failed = FAIL, never pass) and protected requirements. The A-13 criterion moved to PGM-1 (NFR-001 p95 with chain appends on PostgreSQL). TG-01 stays pending.",
+    "documents_changed": "gate-registry.md, gate-registry.json, 11 §7.2, §7.3, §11",
+    "validation_evidence_required": "Gate-registry attribute validation (V-G); pre-production readiness review",
+    "status": "Resolved (author)",
+    "re_review_required": "No (verify at pre-production readiness review)"
+   },
+   {
+    "finding_id": "N-A1",
+    "original_severity": "ADVISORY",
+    "title": "Path A enrollment after a new sensitive grant relies on a password-derived session",
+    "affected_requirements": [
+     "MFA-014",
+     "MFA-012"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Path A is not available when enrollment is triggered by a newly granted sensitive permission and no factor exists; path C (emailed link) is required (05 §11.3).",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A2",
+    "original_severity": "ADVISORY",
+    "title": "Cooling-off does not suspend SECURITY_DATA, DESTRUCTIVE or BULK_DATA",
+    "affected_requirements": [
+     "MFA-013",
+     "MFA-012"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Cooling-off now suspends all sensitive classes (06 §3.2, §5; 05 §11.5).",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A3",
+    "original_severity": "ADVISORY",
+    "title": "The spam queue has no ageing alert",
+    "affected_requirements": [
+     "LEAD-018",
+     "LEAD-019"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Daily spam-queue summary and an ageing alert (04 §5.5, 02 §9).",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A4",
+    "original_severity": "ADVISORY",
+    "title": "Invariant I2 counts suspended holders",
+    "affected_requirements": [
+     "RBAC-020"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "The nightly job raises a High alert when no effective recovery administrator exists (06 §7.3).",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A5",
+    "original_severity": "ADVISORY",
+    "title": "Endpoint index omits step-up and G11 on two rows",
+    "affected_requirements": [
+     "RBAC-019",
+     "RBAC-021"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "08 §1 rows 31 and 43 aligned with 06 §7.1 (step-up and G11). Rows 38, 40, 50 and 51 add G13.",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A6",
+    "original_severity": "ADVISORY",
+    "title": "Break-glass ARN columns are VARCHAR(200)",
+    "affected_requirements": [
+     "RBAC-021"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Break-glass ARN columns widened to VARCHAR(2048), and a distinct-human mapping column added (03 §5.8).",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A7",
+    "original_severity": "ADVISORY",
+    "title": "Overlapping new requirements",
+    "affected_requirements": [
+     "RBAC-020",
+     "MFA-015"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "`related_requirements` parent/child links for RBAC-020, MFA-015 and RBAC-021 in requirements.json.",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Resolved",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A8",
+    "original_severity": "ADVISORY",
+    "title": "Architecture validation automation is not committed",
+    "affected_requirements": [
+     "PLAT-006"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "The owner instruction forbids adding code to the architecture branch, so validation scripts stay uncommitted. Independent reproduction remains the gate (TG-07), and implementation CI (12 §5) supersedes this for code.",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Accepted advisory with reason",
+    "re_review_required": "No"
+   },
+   {
+    "finding_id": "N-A9",
+    "original_severity": "ADVISORY",
+    "title": "Some RV and OP classifications understate automation",
+    "affected_requirements": [
+     "RBAC-002",
+     "PLAT-008",
+     "PLAT-011"
+    ],
+    "owner_decision": "—",
+    "remediation_action": "Conservative RV/OP classification kept. Reclassify after implementation, when the lint and IT rows exist.",
+    "documents_changed": "see action",
+    "validation_evidence_required": "TG-07 targeted check",
+    "status": "Accepted advisory with reason",
+    "re_review_required": "No"
+   }
+  ],
+  "f19_deficiency_mapping": [
+   {
+    "deficiency": "11 requirements tested only by method, environment or CI sections",
+    "resolution": "Reclassified as review or operational verification, reported separately in the coverage gate (test_design = review/operational)",
+    "status": "Resolved",
+    "where": "coverage-gate.md"
+   },
+   {
+    "deficiency": "Alembic upgrade-with-data and downgrade/rollback tests",
+    "resolution": "12 §4.1 'Upgrade with data' + 'N-1 rollback'",
+    "status": "Resolved (design)",
+    "where": "12 §4.1"
+   },
+   {
+    "deficiency": "CSRF negative tests for /auth/refresh and /auth/logout",
+    "resolution": "12 §4.5 'CSRF'",
+    "status": "Resolved (design)",
+    "where": "12 §4.5"
+   },
+   {
+    "deficiency": "Access-token use after revocation or logout",
+    "resolution": "12 §4.5 'Tokens after revocation' + TD-D",
+    "status": "Resolved (design)",
+    "where": "12 §4.5, §4.12"
+   },
+   {
+    "deficiency": "Refresh grace-window replay",
+    "resolution": "12 §4.5 'Refresh grace window'",
+    "status": "Resolved (design)",
+    "where": "12 §4.5"
+   },
+   {
+    "deficiency": "SQLite write contention (SQLITE_BUSY, BEGIN IMMEDIATE)",
+    "resolution": "12 §4.9 'Load and contention' + TD-F; evidence via RG-4 / TG-06",
+    "status": "Resolved (design); execution tracked RG-4/TG-06",
+    "where": "12 §4.9, §4.12; gate-registry RG-4"
+   },
+   {
+    "deficiency": "Browser and device matrix",
+    "resolution": "12 §4.8 matrix",
+    "status": "Resolved (design)",
+    "where": "12 §4.8"
+   },
+   {
+    "deficiency": "DAST / penetration test before go-live",
+    "resolution": "PG-DAST with a passing definition (no invented numbers); TG-03",
+    "status": "Tracked before production (PG-DAST, TG-03; Security Owner)",
+    "where": "gate-registry PG-DAST"
+   },
+   {
+    "deficiency": "NFR-002 and OPS-005 untestable pending OWNER-INPUT-001",
+    "resolution": "Kept 'Not testable pending owner input'; RG-1 and OWNER-INPUT-001 gates",
+    "status": "Tracked before production (Product Owner)",
+    "where": "gate-registry OWNER-INPUT-001, RG-1"
+   },
+   {
+    "deficiency": "Re-review: removed DENY-precedence resolution test",
+    "resolution": "TD-A",
+    "status": "Resolved (design)",
+    "where": "12 §4.12"
+   },
+   {
+    "deficiency": "Re-review: removed duplicate-detection test",
+    "resolution": "TD-B",
+    "status": "Resolved (design)",
+    "where": "12 §4.12"
+   },
+   {
+    "deficiency": "Re-review: missing recovery expiry, mfa_token single use, re-enrollment failure",
+    "resolution": "TD-C, TD-D, TD-E + 05 §11.5 semantics",
+    "status": "Resolved (design)",
+    "where": "12 §4.12, 05 §11.5"
+   },
+   {
+    "deficiency": "Re-review: thin optimistic-concurrency test",
+    "resolution": "TD-F",
+    "status": "Resolved (design)",
+    "where": "12 §4.12"
+   }
+  ]
+ }
 }

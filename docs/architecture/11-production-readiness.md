@@ -29,7 +29,7 @@ This document critiques documents 02–10, **updated after the independent revie
 | S3 | Exact counts on large lists | Low | Capped totals |
 | S4 | Contains-search | Low | Application-casefolded `search_text` (A-03). `pg_trgm` after the gate. |
 | S5 | Live dashboard aggregates | Low | Read model if NFR-001 is missed |
-| S6 | Security-event chain serialization | Low | Single writer on SQLite. Advisory lock on PostgreSQL, measured in rehearsal (A-13). |
+| S6 | Security-event chain serialization | Low | Single writer on SQLite. The advisory-lock cost on PostgreSQL has an explicit acceptance criterion in gate PGM-1: NFR-001 p95 met with chain appends enabled (A-13). |
 | S7 | Argon2id memory | Medium | Semaphore in the single process. Host sized by benchmark (ASM-010). |
 | S8 | A per-request uncached session read (F-10) | Low | One indexed local read. Measured in RG-4. |
 
@@ -96,7 +96,7 @@ This document critiques documents 02–10, **updated after the independent revie
 | A5 | Authentication telemetry in the entity audit | Resolved | ADR-004 |
 | A6 | Secrets in security events | High | Allow-list writer and prohibited-content test |
 | A7 | Failure events lost on rollback | Resolved | SEVT-011 |
-| A8 | Chain serialization on PostgreSQL | Low | Advisory lock. Measured (A-13, accepted). |
+| A8 | Chain serialization on PostgreSQL | Low | Advisory lock. Pass/fail criterion in PGM-1. Fallback: deferred chaining (A-13). |
 | A9 | Retention durations | Owner input | OWNER-INPUT-002. Nothing is purged until set. |
 | A10 | SENSITIVE_ACTION on reads was ambiguous | Resolved (F-06) | `SENSITIVE_ACTION` for mutations, de-duplicated `SENSITIVE_READ` for reads |
 | A11 | Purge vs FK conflicts | Resolved (F-07) | 03 §2.10 ordering and EXC-009 |
@@ -152,6 +152,8 @@ This document critiques documents 02–10, **updated after the independent revie
 | R9 | Sales forced into MFA by a sensitive permission | Resolved (F-01) | Sales holds no sensitive permission (registry rule 3) |
 | R10 | Time-bound grant expiry bypassing G4 | Resolved (F-16) | Time-bound grants are P1, disabled in P0, and never allowed on sensitive permissions |
 | R11 | Custom roles with broad data access but no sensitive permission don't require MFA | Accepted (Decision 1) | Owner Decision 1 limits mandatory MFA to Founder, Admin and sensitive holders. `role.mfa_required` is available per role. |
+| R12 | One Founder manufacturing a second approver | Resolved (N-01) | Canonical Founder-governance workflow (06 §7.2). FOUNDER role and `user.founder.manage` are grantable only through it (G13). I3 consistency. Custodian as the second principal in single-Founder mode. |
+| R13 | Two accounts controlled by one human acting as requester and approver | Residual, procedural | Identity verification for `GRANT_FOUNDER` (reason field records the out-of-band check). Custodian register maps principals to distinct humans. Notifications to all Founders. |
 
 ## 7. Decisions, owner inputs and production release gates
 
@@ -168,40 +170,28 @@ This document critiques documents 02–10, **updated after the independent revie
 
 ### 7.2 Owner inputs: production release gates (owner Decision 6)
 
-These do **not** block architecture review or implementation planning. They **block production release** where applicable. No values are proposed.
+These do **not** block architecture review or implementation planning. They **block production release** where applicable. No values are proposed. All attributes (owner category, trigger, acceptance, evidence, failure behavior, and so on) are in the **canonical [gate registry](gate-registry.md)**.
 
-| ID | Input needed | Blocks |
-|---|---|---|
-| OWNER-INPUT-001 | Approved RPO, RTO and API availability target | Production release. NFR-002 and OPS-005 are untestable until provided. RG-1. |
-| OWNER-INPUT-002 | Retention periods: audit, security events, sessions, tokens, outbox, notifications, closed leads, application logs | Enabling any purge, archival or anonymization job in production. Until then nothing is deleted. |
-| OWNER-INPUT-003 | Restore-rehearsal cadence | Production release (RG-2 schedule) |
-| OWNER-INPUT-004 | Designation of two break-glass custodians (IAM principals) | Production release. Founder recovery depends on it (06 §7.5). |
+| ID | Input needed | Owner category | Status |
+|---|---|---|---|
+| OWNER-INPUT-001 | Approved RPO, RTO and API availability target | Product Owner | Blocked, awaiting owner input |
+| OWNER-INPUT-002 | Retention periods (all stores) | Privacy Owner | Blocked, awaiting owner input |
+| OWNER-INPUT-003 | Restore-rehearsal cadence | Operations Owner | Blocked, awaiting owner input |
+| OWNER-INPUT-004 | Two break-glass custodians mapped to distinct humans | Security Owner | Blocked, awaiting owner input |
 
-### 7.3 Production release gates
+### 7.3 Release and production gates
 
-| Gate | Condition | Source |
-|---|---|---|
-| RG-1 | OWNER-INPUT-001 approved, and the measured RPO/RTO from a full rebuild rehearsal meet it | Independent review |
-| RG-2 | Automated restore verification green on consecutive scheduled runs, with the alert test-fired | Independent review |
-| RG-3 | Exactly one application instance, **one application process** and one Litestream replicator, enforced by deployment configuration and checked in CI/OP | Review + OPS-010 |
-| RG-4 | Load test at ASM-007 fixture sizes meets NFR-001 and NFR-003 with no sustained `SQLITE_BUSY`. Chain-append latency measured. Single-process throughput confirmed (ASM-013). | Review |
-| RG-5 | Litestream lag, snapshot-missing and disk alerts wired and test-fired | Review |
-| RG-6 | DB path on the dedicated KMS volume. `DeleteOnTermination=false`. | Review |
-| RG-7 | Migration runbook (02 §12.4) rehearsed, including both rollback paths | Review, F-12 |
-| RG-8 | PostgreSQL gate recorded as a hard precondition for procurement, inventory, finance and multi-instance scale | Review |
-| RG-9 | No gated module, second instance or direct BI DB access while SQLite is authoritative | Review |
-| PG-DAST | DAST and manual penetration test of auth, MFA recovery, account control and public intake, with findings triaged | F-19 |
-| PG-RET | OWNER-INPUT-002 approved before any retention, archival or anonymization job is enabled | Decision 6, F-15 |
-| PG-BG | OWNER-INPUT-004 custodians designated, and the break-glass drill executed in staging | Decision 2 |
-| PG-EMAIL | SES production access, SPF, DKIM and DMARC verified. Security notifications, recovery and email-change flows depend on outbound email. | ASM-009 |
-| PG-PRIV | Versioned privacy notice published (ASM-011) | Review |
+The canonical definitions are in [gate-registry.md](gate-registry.md) (N-04): RG-1 … RG-9, PG-DAST, PG-RET, PG-BG, PG-EMAIL, PG-PRIV, and PGM-1 (post-P0 PostgreSQL rehearsal, which carries the A-13 criterion).
+
+- Every gate there lists owner category, trigger point, phase, entry and acceptance criteria, evidence, storage location, approver, failure behavior, revalidation, freshness, dependencies, protected requirements, blocking scope and status.
+- **A failed, missing or stale evaluation is FAIL and never defaults to pass.**
 
 ## 8. Go-live checklist (P0 exit criteria)
 
 This is for the implementation phase, not this remediation.
 
 - [ ] Every P0 requirement verified per its method (12)
-- [ ] All production release gates in §7.3 satisfied
+- [ ] Every gate in [gate-registry.md](gate-registry.md) applicable to production is PASSED with evidence
 - [ ] Conformance check green on both engines
 - [ ] RBAC matrix, guard G1–G12, sensitivity-registry and mass-assignment suites green
 - [ ] MFA enrollment-proof, recovery, cooling-off and admin-reset suites green
@@ -243,13 +233,15 @@ This is for the implementation phase, not this remediation.
 
 ## 11. Tracked gates (findings that need evidence beyond architecture)
 
-Each is linked from the remediation matrix. "Owner" is the accountable party.
+Full attributes are in the [gate registry](gate-registry.md). Summary:
 
-| ID | Finding | Owner | Target phase | Acceptance criteria | Test evidence | Why it can't be closed in the architecture |
-|---|---|---|---|---|---|---|
-| TG-01 | F-18 | Veda Spaces owner | Before implementation | The owner approves the architecture PR (or signs the decision log) from the owner account | Link to the PR approval, recorded in the decision log | Requires the owner's own verifiable action |
-| TG-02 | F-13 | Engineering | Implementation (MFA story) | Enrollment stores a real KMS `GenerateDataKey` blob and a maximum-length ARN on both engines | 12 §4.5 "KMS blob size" test result | Requires real KMS output |
-| TG-03 | F-19 (DAST/pentest) | Engineering + external tester | Before production (PG-DAST) | No open High/Critical findings on the auth, MFA-recovery, account-control and public-intake surfaces | Scan and pentest reports | Requires a running system |
-| TG-04 | F-15 (retention values) | Veda Spaces owner | Before production (PG-RET) | OWNER-INPUT-002 approved; the retention job enabled with those values | Configuration record + 12 §4.7 retention test in staging | Owner decision (Decision 6) |
-| TG-05 | F-12 (runbook rehearsal) | Engineering | Before production (RG-7) | Both rollback paths rehearsed. Data-loss window reported. | Rehearsal record | Requires infrastructure |
-| TG-06 | F-09, F-10 (single process and uncached checks under load) | Engineering | Before production (RG-4) | NFR-001 met with one process. No revocation staleness observed. | Load-test report + 12 §4.5 revocation tests | Requires measurement |
+| ID | Source | Owner category | Phase | Status |
+|---|---|---|---|---|
+| TG-01 | F-18: verifiable owner approval | Product Owner | Pre-implementation | **Pending: no verifiable owner approval exists** |
+| TG-02 | F-13: real KMS blob test | Security Owner | Implementation | Pending |
+| TG-03 | F-19: security assessment (via PG-DAST) | Security Owner | Pre-production | Pending |
+| TG-04 | F-15: retention values applied (via PG-RET) | Privacy Owner | Pre-production | Blocked, awaiting OWNER-INPUT-002 |
+| TG-05 | F-12: runbook rehearsal (via RG-7) | Operations Owner | Pre-production | Pending |
+| TG-06 | F-09, F-10: load and revocation evidence (via RG-4) | Operations Owner | Pre-production | Pending |
+| TG-07 | Re-review condition: targeted independent verification of this final remediation | Architecture Owner | Pre-implementation (affected stories) | Pending |
+| TG-08 | Focused re-review, section 16: explicit owner authorization of implementation | Product Owner | Pre-implementation | Pending: not authorized |

@@ -236,6 +236,11 @@ The schema is in 03 §5.4. This log is separate from `audit_log`.
 | `APPROVAL_REQUESTED` · `APPROVAL_APPROVED` · `APPROVAL_DENIED` · `APPROVAL_EXPIRED` · `APPROVAL_CANCELLED` | AUTHORIZATION | SUCCESS | WARNING |
 | `BREAK_GLASS_REQUESTED` · `BREAK_GLASS_APPROVED` · `BREAK_GLASS_CANCELLED` · `BREAK_GLASS_EXECUTED` | AUTHORIZATION | SUCCESS / FAILURE | CRITICAL |
 | `FOUNDER_TRANSITION` | ACCOUNT | SUCCESS / FAILURE | CRITICAL |
+| `FOUNDER_ACTION_REQUESTED` · `FOUNDER_ACTION_APPROVED` · `FOUNDER_ACTION_DENIED` · `FOUNDER_ACTION_CANCELLED` · `FOUNDER_ACTION_EXECUTED` · `FOUNDER_ACTION_FAILED` | AUTHORIZATION | SUCCESS / FAILURE | CRITICAL (06 §7.2.6) |
+| `FOUNDER_GOVERNANCE_BYPASS_BLOCKED` | AUTHORIZATION | BLOCKED | CRITICAL. A generic API attempted a G13 change. |
+| `BOOTSTRAP_FOUNDER` · `FOUNDER_POLICY_CHANGED` | ACCOUNT | SUCCESS | CRITICAL |
+| `MFA_RECOVERY_SESSION_EXPIRED` | MFA | FAILURE | WARNING. A call was made with an expired RECOVERY session. |
+| `MFA_CHALLENGE_REPLAY_BLOCKED` | MFA | BLOCKED | WARNING. A completed or invalidated `mfa_token` was presented. |
 | `ACCOUNT_THROTTLED` · `ACCOUNT_UNTHROTTLED` | ACCOUNT | SUCCESS | WARNING |
 | `PERMISSION_DENIED` | AUTHORIZATION | BLOCKED | WARNING (de-duplicated per user, code, minute) |
 | `PERMISSION_SUSPENDED` · `PERMISSION_REACTIVATED` | AUTHORIZATION | SUCCESS | WARNING |
@@ -317,7 +322,7 @@ The rules below are initial configuration values (ASM-004).
 | Any `REFRESH_REUSE_DETECTED` | Critical |
 | MFA or recovery failure spikes | High |
 | Any `MFA_RECOVERY_COMPLETED` | High. The user and all `user.mfa.reset` holders are emailed. |
-| Any `ADMIN_MFA_RESET_*`, `BREAK_GLASS_*` or `FOUNDER_TRANSITION` | Critical |
+| Any `ADMIN_MFA_RESET_*`, `BREAK_GLASS_*`, `FOUNDER_*`, `FOUNDER_GOVERNANCE_BYPASS_BLOCKED` or `BOOTSTRAP_FOUNDER` | Critical |
 | Any `EMAIL_CHANGE_REQUESTED` for a privileged account | High |
 | `SENSITIVE_ACTION` for ACCESS_CONTROL | Medium. Founders are emailed. |
 | `SECURITY_LOG_CHAIN_BROKEN` or writer failure | Critical |
@@ -331,8 +336,9 @@ No volumes are asserted. Volumes are measured over the first 30 days of producti
 ## 10. Bootstrap (AUTH-014)
 
 - A one-time CLI `bootstrap-founder --email --name` runs through SSM.
-- It refuses to run if any ACTIVE user already has `protection_level = FOUNDER`.
-- It creates an INVITED user with the FOUNDER role and `protection_level = FOUNDER`, and prints a one-hour INVITE link.
+- It refuses to run if **any non-deleted user** has `protection_level = FOUNDER`, or if a `BOOTSTRAP_FOUNDER` security event has ever been recorded. It can therefore create **only the first Founder** and can never mint a second approver in steady state (06 §7.2.4). The run writes `BOOTSTRAP_FOUNDER`.
+- It creates an INVITED user with the FOUNDER role and `protection_level = FOUNDER` (I3 consistent), and prints a one-hour INVITE link.
+- After bootstrap the system is in **single-Founder mode** (06 §7.2.4). Every later Founder is added only by `GRANT_FOUNDER`, which needs a second principal: a break-glass custodian while only one Founder exists.
 - Invite acceptance forces MFA enrollment inside the invite flow (§8.4, §11.3 path B).
 - No default credentials exist anywhere.
 
@@ -369,7 +375,7 @@ A new authenticator can be enrolled only through one of these paths. Each combin
 
 | Path | When | Proofs | Flow |
 |---|---|---|---|
-| **A. Logged-in** | Voluntary enrollment, or policy newly required while the user has a FULL session | An existing FULL session **plus** fresh password re-entry (`POST /auth/reauth`, within 5 minutes). If a factor already exists, **step-up with that factor** instead (replacement). | `enroll/start {reauth}` → `enroll/confirm {code}` |
+| **A. Logged-in** | Voluntary enrollment, or replacement of an existing factor, from a FULL session | An existing FULL session **plus** fresh password re-entry (`POST /auth/reauth`, within 5 minutes). If a factor already exists, **step-up with that factor** instead (replacement). **Not available when the enrollment is required because of a newly granted sensitive permission and no factor exists (N-A1).** Both proofs would derive from the password, so that case uses path C. | `enroll/start {reauth}` → `enroll/confirm {code}` |
 | **B. Invitation** | First sign-in of an invited user whose policy requires MFA | Invite token (out-of-band, email) **plus** the new password being set | Inside `POST /auth/invite/accept` → `enroll/start {invite_context}` → `enroll/confirm` |
 | **C. Emailed enrollment link** | Login when MFA is required and no ACTIVE factor exists (never enrolled, or after an admin MFA reset) | Password (at login) **plus** a single-use `MFA_ENROLLMENT` token emailed to the **verified** address (30 min) **plus** password re-entry on the enrollment page | Login → `MFA_ENROLLMENT_EMAIL_SENT` → link → `enroll/start {enrollment_token, password}` → `enroll/confirm` |
 | **D. Recovery re-enrollment** | After successful self-service recovery (§11.5) | Password re-entry **plus** a valid recovery code, which together established the RECOVERY session | `enroll/start` (recovery session) → `enroll/confirm` |
@@ -437,9 +443,20 @@ Until `security_cooling_off_until` passes, the following are refused with `403 C
 - password change (the emailed reset in §8.1 remains available);
 - MFA factor removal;
 - recovery-code regeneration;
-- use of the user's `ACCOUNT_CONTROL` and `ACCESS_CONTROL` permissions. These are suspended by the resolver (06 §5).
+- use of **any** of the user's sensitive permissions, all classes (N-A2). These are suspended by the resolver (06 §5).
 
 The UI shows a banner with the end time.
+
+#### Challenge-token and failure semantics (N-03)
+
+| Situation | Behavior |
+|---|---|
+| **Login challenge after successful recovery** | In the same transaction that creates the RECOVERY session, the presented LOGIN `mfa_challenge` is marked `completed_on`. **Every other open `mfa_challenge` of the user** (LOGIN, ENROLLMENT, STEP_UP) is invalidated, meaning expired immediately. Any later presentation of a completed or invalidated `mfa_token` → `401 MFA_CHALLENGE_INVALID` + `MFA_CHALLENGE_REPLAY_BLOCKED`. Tokens are only ever compared by hash, and events never contain them. |
+| **Successful MFA verify** | The LOGIN challenge is likewise marked `completed_on`, so it is single use |
+| **RECOVERY session expired** (15-minute absolute) | Every call → `401 SESSION_INVALID` + `MFA_RECOVERY_SESSION_EXPIRED`. `enroll/start` and `enroll/confirm` are refused. No other endpoint becomes available. Any PENDING factor created in that session is revoked (`ENROLLMENT_ABANDONED`). **The consumed recovery code stays consumed.** The user must start again: login, then a *different* unused recovery code. |
+| **`enroll/confirm` fails inside a RECOVERY session** (wrong code) | Nothing is committed except the attempt counter and the event. The PENDING factor stays PENDING, the old factor is untouched (not yet replaced), the old recovery-code batch stays as it was (the consumed code is **not** restored), other sessions stay revoked, no FULL session is issued, no cooling-off is set, and no sensitive permission becomes effective (RECOVERY sessions resolve to ∅, 06 §5). |
+| Five failed confirms, or ENROLLMENT challenge expiry | The PENDING factor is revoked (`ENROLLMENT_ABANDONED`). The user may call `enroll/start` again **within the same RECOVERY session** until its 15-minute expiry. Each start revokes any previous PENDING factor first, so there is only ever one PENDING factor per user (`ux_user_mfa_factor__user_live`). MFA throttling (§4) applies across attempts. |
+| Commit rule | `enroll/confirm` success is **one** transaction: new factor ACTIVE, old factor REPLACED, new code batch, old batch invalidated, RECOVERY session revoked, FULL session created, cooling-off set, `authz_version`++. Any failure rolls all of it back. Failure events are written in their own transaction (SEVT-011). |
 
 ### 11.6 Step-up and re-authentication (MFA-011)
 
@@ -458,7 +475,7 @@ The UI shows a banner with the end time.
 | No self-reset | G3: no administrator can reset their own MFA. They use self-service recovery (§11.5). |
 | No stronger target | G9: the target's permissions ⊆ the requester's |
 | Dual control | If the target is **privileged** (holds any sensitive permission, including suspended), the reset requires approval by a second eligible holder of `user.mfa.reset` (06 §7.4). Events: `ADMIN_MFA_RESET_REQUESTED`, then `ADMIN_MFA_RESET_APPROVED` or `ADMIN_MFA_RESET_DENIED`. Standard (non-privileged) targets execute directly after step-up. |
-| Founder target | Only through the Founder workflow (06 §7.2, G11). The requester and approver must be two different eligible FOUNDER-protected users. **An Admin can never reset a Founder's MFA**: G9 and G11 both block it. With fewer than two eligible Founders, use break-glass (06 §7.5). |
+| Founder target | Only as the Founder-level action `FOUNDER_MFA_RESET`, under the canonical eligibility and operating modes of 06 §7.2 (G11). **An Admin can never reset a Founder's MFA**: G9 and G11 both block it. |
 | Effect | All factors REVOKED (`ADMIN_RESET`). All recovery codes invalidated. All sessions revoked. Sensitive permissions suspended (`authz_version`++). An `MFA_ENROLLMENT` link is emailed to the target's **verified** address (§11.3 path C). The admin never receives an enrollment token. |
 | Records | `ADMIN_MFA_RESET_COMPLETED` (CRITICAL) + `SENSITIVE_ACTION` + `audit_log` UPDATE rows on `user_mfa_factor`. Notification to the target and to all `user.mfa.reset` holders. |
 

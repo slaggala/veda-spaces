@@ -31,7 +31,7 @@ An **authorization decision** is `can(actor, session, permission_code, resource?
 ## 2. Principles (RBAC-002)
 
 1. **Code checks permission codes only.** Nothing references role codes (`FOUNDER`, `ADMIN`, `SALES`), "is_admin" flags or specific user ids. A CI lint rejects role-code string literals outside migrations and seed files.
-2. **The Founder is not special in authorization code.** Founder capabilities come from the seeded matrix. Founder *protection* comes from the data attribute `app_user.protection_level = 'FOUNDER'` (§7.2), which is set only by the bootstrap CLI and the Founder-transition workflow. It is never inferred from a role name.
+2. **The Founder is not special in authorization code.** Founder capabilities come from the seeded matrix. Founder *protection* comes from the data attribute `app_user.protection_level = 'FOUNDER'` (§7.2), which is set only by the bootstrap CLI and the Founder-governance workflow. Founder-only grantability comes from the data flag `grant_path = FOUNDER_WORKFLOW_ONLY` (G13). Neither is ever inferred from a role name.
 3. **Deny by default.** No grant means deny.
 4. **An explicit DENY beats any GRANT** (RBAC-006).
 5. **Least privilege.** Sales gets OWN scope for leads, and **no sensitive permission** (RBAC-018).
@@ -66,13 +66,14 @@ A permission is **sensitive** if and only if its registry entry has a `sensitivi
 2. `is_sensitive = (sensitivity_class IS NOT NULL)`, enforced by a CHECK constraint (03 §4.4).
 3. The seeded **SALES** role holds **no** sensitive permission.
 4. Adding a sensitive permission to any role is itself a sensitive change: it needs a reason, step-up, and an email to `permission.manage` holders.
+5. A permission with `grant_path = FOUNDER_WORKFLOW_ONLY` (`user.founder.manage`) may be contained **only** in the role with `grant_path = FOUNDER_WORKFLOW_ONLY` (FOUNDER). The seed migration asserts this, and I3 checks it nightly (§7.3).
 
 ### 3.2 Sensitive-permission behavior (RBAC-017, MFA-004, MFA-012)
 
 | Aspect | Rule |
 |---|---|
 | MFA requirement | Holding any sensitive permission, via any role or direct grant and at any scope, makes MFA mandatory for the holder (05 §11.1) |
-| Activation | A sensitive permission is **effective only** when the holder has an ACTIVE MFA factor **and** the current session is MFA-verified (`auth_methods` includes `totp`) and of type `FULL`. For `ACCOUNT_CONTROL` and `ACCESS_CONTROL`, it must also be outside a recovery cooling-off window. Otherwise it is **suspended**: present in grants, absent from the effective map (§5). |
+| Activation | A sensitive permission is **effective only** when the holder has an ACTIVE MFA factor **and** the current session is MFA-verified (`auth_methods` includes `totp`) and of type `FULL`, **and** the holder is outside a recovery cooling-off window. That last condition applies to every sensitive class (N-A2). Otherwise the permission is **suspended**: present in grants, absent from the effective map (§5). |
 | Assignment without MFA | Allowed. The grant shows as **Pending MFA** until the holder enrolls, and a `PERMISSION_SUSPENDED` security event is written at assignment. |
 | MFA removed or reset | All of the user's sensitive permissions are suspended from the next request (the `authz_version` increment, §9) until re-enrollment and an MFA-verified login. Written as `PERMISSION_SUSPENDED` / `PERMISSION_REACTIVATED` events. |
 | Step-up | `ACCOUNT_CONTROL`, `ACCESS_CONTROL`, `BULK_DATA` and `lead.erase` require MFA verified within the last 10 minutes (G10) |
@@ -116,8 +117,7 @@ effective_permissions(user, session) → map<permission_code, scope>
  7. permissions with supports_scope = false → scope := ALL
  8. MFA gate (MFA-012): for each sensitive code:
        if ¬(user has ACTIVE factor ∧ 'totp' ∈ session.auth_methods)          → suspend (remove)
-       if class ∈ {ACCOUNT_CONTROL, ACCESS_CONTROL}
-          ∧ user.security_cooling_off_until > now                           → suspend (remove)
+       if user.security_cooling_off_until > now                             → suspend (remove)   (all sensitive classes, N-A2)
  9. return scope map        (suspended codes are reported separately to /auth/me as "suspended")
 
 live(now) := ¬is_deleted ∧ (valid_from IS NULL ∨ valid_from ≤ now) ∧ (valid_until IS NULL ∨ valid_until > now)
@@ -166,7 +166,7 @@ These capabilities are available to authenticated users by design (06 §11, RBX-
 | `user.permission.manage` 🔒 [ACCESS_CONTROL] | Direct GRANT/DENY on users | RBAC-006 | ✓ | | |
 | `user.mfa.reset` 🔒 [ACCOUNT_CONTROL] | Request, approve or execute another user's MFA reset (05 §11.7) | MFA-007 | ✓ | ✓ | |
 | `user.mfa.require` 🔒 [ACCOUNT_CONTROL] | Set or clear the per-user MFA requirement | MFA-003 | ✓ | ✓ | |
-| `user.founder.manage` 🔒 [ACCOUNT_CONTROL] | Request or approve Founder transition, deactivation or protection changes (§7.2) | RBAC-021 | ✓ | | |
+| `user.founder.manage` 🔒 [ACCOUNT_CONTROL] | Request or approve Founder-level actions (§7.2). `grant_path = FOUNDER_WORKFLOW_ONLY`: held **only** through the FOUNDER role, never grantable directly (G13). | RBAC-021 | ✓ | | |
 | `role.read` | View roles and grants | RBAC-008 | ✓ | ✓ | |
 | `role.manage` 🔒 [ACCESS_CONTROL] | Create, edit or delete roles and role grants | RBAC-008 | ✓ | ✓ | |
 | `permission.read` | View the catalog and holders | RBAC-016 | ✓ | ✓ | |
@@ -233,73 +233,124 @@ A custom role with broad data access (for example `lead.read`=ALL) but no sensit
 |---|---|---|
 | **G1 No escalation via user grants** | To grant permission P at scope S to anyone, the actor must hold P at scope ≥ S | 403 `ESCALATION_DENIED` |
 | **G2 No escalation via roles** | To assign role R, edit R's grants, or create a role **by copying** R (`copy_from_role_id`, A-06), the actor must hold every permission in R at ≥ its scope | 403 `ESCALATION_DENIED` |
-| **G3 No self-administration** | Through administrative endpoints, actors cannot change their own roles, permissions, status, email, MFA (reset or requirement) or protection level. Self-service uses the self-service workflows (05 §8.5, §8.6, §11). | 403 `SELF_MODIFICATION_DENIED` |
-| **G4 Recovery invariants** | Reject any change after which invariant I1 or I2 (§7.3) would fail | 409 `LAST_ADMINISTRATOR` / `LAST_FOUNDER` |
+| **G3 No self-administration** | Through administrative endpoints, actors cannot change their own roles, permissions, status, email, MFA (reset or requirement) or protection level. The only exception is the Founder-governance step-down request, `REVOKE_FOUNDER` on oneself (§7.2), which still needs a second Founder's approval. Self-service uses the self-service workflows (05 §8.5, §8.6, §11). | 403 `SELF_MODIFICATION_DENIED` |
+| **G4 Recovery invariants** | Reject any change after which invariant I1, I2 or I3 (§7.3) would fail | 409 `LAST_ADMINISTRATOR` / `LAST_FOUNDER` / `FOUNDER_STATE_INCONSISTENT` |
 | **G5 System objects** | Can't delete `is_system` roles or rename role and permission codes | 409 `SYSTEM_OBJECT` |
 | **G6 Reason required** | Every sensitive action and every `user_permission` row needs `reason` | 422 `REASON_REQUIRED` |
-| **G7 DENY is always allowed** | Reducing another user's access is never escalation (subject to G3, G4 and G11) | — |
+| **G7 DENY is always allowed** | Reducing another user's access is never escalation (subject to G3, G4, G11 and G13) | — |
 | **G8 TEAM reserved** | Scope TEAM is rejected until org units exist | 422 `SCOPE_NOT_SUPPORTED` |
 | **G9 No action on stronger accounts** | Every account-control action on user U requires U's effective (including suspended) permissions ⊆ the actor's, each at ≤ scope. This covers email change, status change, unlock, delete, restore, session revocation, admin password-reset link, invite resend, MFA reset, MFA requirement change and role/permission removal. | 403 `ESCALATION_DENIED` |
-| **G10 Step-up** | `ACCOUNT_CONTROL`, `ACCESS_CONTROL` and `BULK_DATA` permissions and `lead.erase` require MFA verified in this session within 10 minutes | 403 `STEP_UP_REQUIRED` |
-| **G11 Founder protection** | Any account-control or access-control change targeting a user with `protection_level = FOUNDER` goes only through the Founder workflow (§7.2): `user.founder.manage` plus dual control. Admin-level actors can never deactivate, delete, demote or reset a Founder, and G9 already prevents it. | 403 `FOUNDER_PROTECTED` |
-| **G12 Dual control** | These actions require an approved `admin_approval_request` from a second eligible actor (§7.4): MFA reset of a **privileged** user (holds any sensitive permission, including suspended), email change of a privileged user, and all Founder-workflow actions | 202 `APPROVAL_REQUIRED` (request created) |
+| **G10 Step-up** | Every `ACCOUNT_CONTROL`, `ACCESS_CONTROL` and `BULK_DATA` permission use (including unlock) and `lead.erase` require MFA verified in this session within 10 minutes | 403 `STEP_UP_REQUIRED` |
+| **G11 Founder protection** | Any account-control or access-control change targeting a user with `protection_level = FOUNDER` goes **only** through the Founder-governance workflow (§7.2). Admin-level actors can never deactivate, delete, demote, email-change, MFA-reset or revoke a Founder, and G9 independently prevents it. | 403 `FOUNDER_PROTECTED` |
+| **G12 Dual control (non-Founder)** | An approved `admin_approval_request` from a second eligible actor (§7.4) is required for MFA reset of a **privileged** user (holds any sensitive permission, including suspended) and for email change of a privileged user. Founder-level actions use §7.2 instead. | 202 `APPROVAL_REQUIRED` (request created) |
+| **G13 Founder-governance grant path (N-01)** | Roles and permissions whose `grant_path = FOUNDER_WORKFLOW_ONLY` (the FOUNDER role and `user.founder.manage`) can **never** be added, removed, denied, copied or edited through generic APIs: `PUT /users/{id}/roles`, `POST`/`DELETE /users/{id}/permissions` (GRANT and DENY), `PUT /roles/{id}/permissions`, `PATCH`/`DELETE /roles/{id}`, and `POST /roles` with `copy_from_role_id`. Such changes occur only as the effect of an executed Founder-governance action (§7.2), or by migration for role definitions. No other role may contain a `FOUNDER_WORKFLOW_ONLY` permission. | 403 `FOUNDER_GOVERNANCE_REQUIRED` |
 
-### 7.2 Founder protection and transition (RBAC-021, owner Decision 3)
+### 7.2 Founder-governance workflow: canonical (RBAC-021, MFA-015, owner Decision 3, N-01)
 
-- `app_user.protection_level` is `STANDARD` or `FOUNDER`.
-  - It is set to FOUNDER only by the bootstrap CLI (05 §10) or an approved Founder transition.
-  - No generic endpoint can write it (08 §5.4).
-- Founder workflow actions (`user.founder.manage`, dual control):
+This section is the **single authoritative definition** of Founder governance. ADR-010, 05, 08, 09 and 12 refer to it and must not restate eligibility differently.
 
-| Action | Effect |
+#### 7.2.1 Founder state
+
+A user **is a Founder** if and only if `app_user.protection_level = FOUNDER` **and** the user holds the FOUNDER role.
+
+- Invariant I3 (§7.3) keeps these two facts identical.
+- The FOUNDER role and the `user.founder.manage` permission have `grant_path = FOUNDER_WORKFLOW_ONLY` (03 §4.3, §4.4), and the FOUNDER role has `is_assignable = false`.
+- `user.founder.manage` is contained **only** in the FOUNDER role. A registry rule and a migration assertion enforce this.
+
+So "holding Founder powers" and "being FOUNDER-protected" can never diverge. No other path confers them (G13).
+
+#### 7.2.2 Founder-level actions
+
+Every action below is a Founder-level action. Each runs only through `POST /api/v1/founder-actions` (08 §5.11), or the break-glass CLI (§7.5), and executes only after approval.
+
+| Code | Action | Effect on execution |
+|---|---|---|
+| `GRANT_FOUNDER` | Grant Founder status. This also grants `user.founder.manage`, via the FOUNDER role. | `protection_level = FOUNDER` + FOUNDER role assigned, in one transaction |
+| `REVOKE_FOUNDER` | Remove Founder status. This also revokes `user.founder.manage`. Self step-down is allowed as the requester (G3 exception). | FOUNDER role removed + `protection_level = STANDARD`, in one transaction. The request may also specify the roles to hold afterwards. |
+| `FOUNDER_MFA_RESET` | Founder MFA recovery performed administratively. Self-service recovery (05 §11.5) needs no approval. | As 05 §11.7, with the enrollment link to the target's verified email |
+| `FOUNDER_STATUS_CHANGE` | Deactivate, reactivate, unlock or delete a Founder | Status change with the 06 §7.3 invariants |
+| `FOUNDER_EMAIL_CHANGE` | Founder email or identity change | Starts the proposed-email workflow (05 §8.6) |
+| `FOUNDER_BREAK_GLASS` | Activation of break-glass for any of the above, when §7.2.4 cannot be satisfied in-app | §7.5 |
+| `FOUNDER_POLICY_CHANGE` | A change to Founder approval policy: the FOUNDER role's grants, its `mfa_required`, `grant_path` flags, or the Founder-governance configuration (approval expiry, break-glass delay) | **No runtime API exists.** Only through a migration or configuration change reviewed as an ADR amendment by the Architecture Owner and approved by the Product Owner (outside the application). The deploy records a `FOUNDER_POLICY_CHANGED` security event. |
+
+`GRANT_FOUNDER_MANAGE` and `REVOKE_FOUNDER_MANAGE` are **not** separate actions. `user.founder.manage` exists only inside the FOUNDER role, so granting or revoking it is `GRANT_FOUNDER` or `REVOKE_FOUNDER`.
+
+#### 7.2.3 Eligibility: the only rule
+
+| Role in the request | Eligible when **all** of these hold, **at request time, at approval time, and again at execution time** in the executing transaction |
 |---|---|
-| `GRANT_FOUNDER` | Target gains `protection_level = FOUNDER` and the FOUNDER role |
-| `REVOKE_FOUNDER` | Target returns to STANDARD, and its roles are adjusted in the same approved change |
-| `DEACTIVATE_FOUNDER` | Target is DISABLED |
-| `FOUNDER_MFA_RESET` | Target's MFA is reset |
-| `FOUNDER_EMAIL_CHANGE` | Target's email change begins |
+| **Requester** | ACTIVE HUMAN user · is a Founder (§7.2.1) · `user.founder.manage` is **effective** (not suspended: ACTIVE MFA factor, MFA-verified FULL session, not in cooling-off) · step-up within 10 minutes · **not the target**, except `REVOKE_FOUNDER` self step-down |
+| **Approver** | ACTIVE HUMAN user · is a Founder · `user.founder.manage` effective · step-up within 10 minutes · **not the requester** · **not the target** |
 
-- **Approver eligibility.** The requester and approver must be two **different** ACTIVE users, both FOUNDER-protected (or both holding `user.founder.manage` and satisfying G9 against the target), neither of them the target. Both must be step-up verified.
-- **Break-glass.** When fewer than two eligible approvers exist (for example a single Founder who lost their authenticator, or a Founder leaving the business), the break-glass procedure (§7.5) applies.
+- Exactly **one** in-app approval is required, which gives **two distinct human principals** in total: requester ≠ approver. The request records one `approver_user_id`. A second approval attempt, whether by the same or another user, returns `409 INVALID_STATE`, so there are no duplicate approvers.
+- **Eligibility lost before approval.** If the requester stops being eligible before approval (demoted, deactivated, MFA reset, cooling-off), the request becomes `CANCELLED` with reason `REQUESTER_INELIGIBLE`.
+- **Eligibility lost before execution.** Execution re-checks both principals under the write lock. If either is ineligible, the request becomes `FAILED` and nothing is applied.
+- **Holders of a Founder-level permission who aren't Founders.** By G13 and I3 no such user can exist. If the nightly I3 check ever finds one (for example after an out-of-band database edit), they are treated as ineligible, and a CRITICAL alert is raised.
+
+#### 7.2.4 Operating modes
+
+| Mode | Condition | Rule |
+|---|---|---|
+| **Steady state** | ≥ 2 eligible Founders, excluding the target | In-app request plus in-app approval (§7.2.3) |
+| **Single-Founder mode** | Exactly one eligible Founder (other than the target), for example the normal P0 situation with one Founder | The sole Founder may **request** in-app. The second principal is a break-glass custodian (§7.5), who approves through the CLI and must not be the same human as the requester. The cooling-off, notification and cancel window of §7.5 apply. A Founder can never self-approve. |
+| **No eligible Founder** | The sole Founder is the target (lost device and codes, or departure) or ineligible | Full break-glass: custodian A requests and custodian B approves (§7.5). Both are distinct humans, neither is the target. |
+| **Bootstrap** | Zero Founders have ever existed (empty `app_user` Founder history) | `bootstrap-founder` CLI (05 §10) creates exactly one INVITED Founder. It refuses to run if any non-deleted user has `protection_level = FOUNDER` **or** a prior `BOOTSTRAP_FOUNDER` security event exists. So bootstrap can never be used to mint a second Founder in steady state. Every later Founder comes from `GRANT_FOUNDER`. |
+
+#### 7.2.5 Concurrency and last-Founder safety
+
+- At most **one open Founder-level request per target** across all Founder actions (`ux_admin_approval_request__open_founder_target`, 03 §5.8). A second request for the same target → `409 REQUEST_ALREADY_OPEN`.
+- Requests for **different** targets may be open together. Execution happens under the write lock (SQLite `BEGIN IMMEDIATE`; PostgreSQL `SELECT … FOR UPDATE` on both principals' and the target's `app_user` rows), and re-evaluates I1–I3. Of two concurrent `REVOKE_FOUNDER` requests that would leave no Founder, the second executes as `FAILED` (`LAST_FOUNDER`).
+- `REVOKE_FOUNDER` and `FOUNDER_STATUS_CHANGE` (deactivate or delete) against the last Founder are rejected at request time **and** at execution time with `409 LAST_FOUNDER`.
+
+#### 7.2.6 Records
+
+Every stage writes security events: `FOUNDER_ACTION_REQUESTED`, `…_APPROVED`, `…_DENIED`, `…_CANCELLED`, `…_EXECUTED`, `…_FAILED`, and `FOUNDER_GOVERNANCE_BYPASS_BLOCKED` for G13 rejections. `FOUNDER_TRANSITION` is kept for GRANT and REVOKE executions. Audit rows are written for `admin_approval_request`, `app_user`, `user_role` and `user_mfa_factor`. Notifications go to all Founders, the target (verified email) and the custodians (break-glass).
 
 ### 7.3 Recovery invariants (G4, RBAC-020)
 
 | Invariant | Rule |
 |---|---|
-| **I1 Last Founder** | At least one ACTIVE, non-deleted user with `protection_level = FOUNDER` |
+| **I1 Last Founder** | At least one ACTIVE, non-deleted Founder (§7.2.1) |
 | **I2 Last recovery administrator** | At least one ACTIVE, non-deleted HUMAN user whose granted permissions (suspension ignored) include `user.role.manage`, `role.manage`, `user.mfa.reset` and `user.status.manage` at scope ALL. The Founder may satisfy this. |
+| **I3 Founder-state consistency** | For every user: `protection_level = FOUNDER` ⇔ holds the FOUNDER role. No role other than FOUNDER contains a `FOUNDER_WORKFLOW_ONLY` permission. No `user_permission` row references a `FOUNDER_WORKFLOW_ONLY` permission. |
 
 **Where the invariants are checked:**
 
-- Inside the transaction of every change that can affect them: status change, delete, role or grant removal, DENY, protection-level change, role-grant edits and role deletion. The check re-runs the resolver over the post-change state, before commit.
-- In the database layer as a service-owned final check. Invariant checks run under the SQLite write lock (`BEGIN IMMEDIATE`) or, on PostgreSQL, `SELECT … FOR UPDATE` on the affected `app_user` rows. Concurrent changes therefore cannot both pass.
-- Expiry can't break them: time-bound grants are disabled in P0 and may never contain sensitive permissions (§5).
-- A nightly invariant job alerts (CRITICAL) if either invariant is ever false, for example after an out-of-band database change.
+- Inside the transaction of every change that can affect them, re-running the resolver over the post-change state before commit, under the write lock (SQLite `BEGIN IMMEDIATE`; PostgreSQL `SELECT … FOR UPDATE` on the affected `app_user` rows). Concurrent changes therefore cannot both pass.
+- Time-bound grants are disabled in P0 and may never contain sensitive permissions, so expiry cannot break the invariants (§5).
+- A **nightly invariant job** raises a CRITICAL alert if I1, I2 or I3 is false. It also raises a **High** alert if no **effective** recovery administrator exists: I2 holds, but every such holder is suspended, for example because none has MFA (N-A4).
 - **Self-deactivation** through `/users/{id}/status` is refused by G3 regardless of the invariants.
 
-### 7.4 Dual-control approvals (RBAC-021, MFA-015)
+### 7.4 Dual-control approvals for non-Founder actions (RBAC-021, MFA-015)
 
-Stored in `admin_approval_request` (03 §5.8).
+Stored in `admin_approval_request` (03 §5.8) with `action_class = STANDARD`. Founder-level actions (`action_class = FOUNDER`) follow §7.2 exclusively.
 
 | Step | Rule |
 |---|---|
 | Request | The actor holding the action's permission submits the action with a reason and step-up. The API returns `202 APPROVAL_REQUIRED` with the request id. Event: `APPROVAL_REQUESTED`. |
-| Approve / deny | A **different** eligible actor (holds the same permission, satisfies G9 and, for Founder actions, is FOUNDER-protected) approves or denies with step-up and a reason. Neither approver nor requester may be the target. |
-| Execute | On approval the service executes the action in the same transaction as the status change to EXECUTED. Events: `APPROVAL_APPROVED`, then the action's own events (for example `ADMIN_MFA_RESET_COMPLETED`). |
-| Expiry | Pending requests expire after 24 hours (configuration value) → EXPIRED |
+| Approve / deny | A **different** actor who holds the same permission **effectively**, satisfies G9 against the target, is step-up verified, and is neither the requester nor the target. Eligibility is re-checked at execution. |
+| Execute | On approval the service executes the action in the same transaction as the status change to EXECUTED. |
+| Expiry | Pending requests expire after the configured approval expiry (initial default 24 hours) → EXPIRED |
 | Notification | The target (at the verified email) and all eligible approvers are notified at request and at decision |
 
 ### 7.5 Break-glass governance (RBAC-021)
 
-This is used only when §7.2 or §7.4 cannot be satisfied with in-application approvers.
+This is used in single-Founder mode (as the second principal) and when no eligible Founder exists (§7.2.4).
 
-1. Two **break-glass custodians** are designated by the owner. They are named AWS IAM principals in a dedicated group whose members must use AWS MFA. The designation is production gate OWNER-INPUT-004.
-2. Custodian A runs `break-glass request --action <FOUNDER_MFA_RESET|GRANT_FOUNDER|DEACTIVATE_FOUNDER|…> --target <user> --reason` via SSM Session Manager. This creates a break-glass approval request, and writes a CRITICAL `BREAK_GLASS_REQUESTED` event.
-3. Custodian B, a **different IAM principal** (verified from the SSM session identity and CloudTrail), runs `break-glass approve --request <id>`. The CLI refuses the same principal.
-4. **Cooling-off.** Execution happens no earlier than the break-glass delay (configuration value, initial default 24 h).
-   - Every ACTIVE FOUNDER-protected user and the target (at their verified email) are notified at request time.
-   - Any of them can cancel through the signed link in the notification.
-5. Execution writes audit rows (actor SYSTEM, via CLI, with both custodians recorded) and `BREAK_GLASS_EXECUTED`.
+1. **Custodians.** The owner designates **two break-glass custodians** (OWNER-INPUT-004). They are AWS IAM principals in a dedicated group with AWS MFA required.
+   - Each custodian principal is mapped in the owner-approved custodian register (configuration) to **one human**: an `app_user.id`, or a named external person.
+   - One human may hold at most one custodian principal.
+2. **Separation.**
+   - A custodian can never approve a request they requested.
+   - A custodian can never approve a request whose in-app requester is the same human, by register mapping.
+   - A custodian can never act on a request targeting themselves.
+   - The CLI refuses when requester and approver resolve to the same human, and records both IAM principal ARNs (verified from the SSM session identity and CloudTrail).
+3. **Request.** Either an in-app `founder-actions` request in single-Founder mode, or custodian A running `break-glass request --action … --target … --reason` via SSM Session Manager. A CRITICAL `BREAK_GLASS_REQUESTED` event is written.
+4. **Approval.** In single-Founder mode, one custodian who is not the requester human approves. In full break-glass, custodian B (a different human from custodian A) approves. Either way, at least two distinct human principals are involved.
+5. **Cooling-off.** Execution happens no earlier than the break-glass delay (a configuration value, initial default 24 h).
+   - Every ACTIVE Founder and the target (at their verified email) are notified at request time.
+   - Any of them can cancel through the signed link.
+6. **Execution.** Audit rows are written (actor SYSTEM, via CLI, with both principals recorded) and `BREAK_GLASS_EXECUTED`.
 
 ## 8. Enforcement layers (RBAC-012, RBAC-014)
 
@@ -357,7 +408,8 @@ This is used only when §7.2 or §7.4 cannot be satisfied with in-application ap
   - A sensitive grant to a user without a factor is not effective (403 with `MFA_REQUIRED`).
   - It becomes effective after enrollment in an MFA-verified session.
   - An MFA reset suspends it on the next request.
-- **Guards:** G1–G12 positive and negative, including:
+- **Founder governance (N-01):** the negative tests in 12 §4.12 (TD-G) cover self-approval, requester-approves-own, duplicate approvers, direct FOUNDER-role and `user.founder.manage` grants and denies, role copy, approval after eligibility revoked, non-Founder approver, concurrency and last-Founder removal.
+- **Guards:** G1–G13 positive and negative, including:
   - Admin cannot deactivate, delete, email-change or MFA-reset the Founder.
   - No user can deactivate themselves through `/users/{id}/status`.
   - Concurrent deactivation of the last two recovery administrators leaves exactly one (the invariant holds under the write lock).

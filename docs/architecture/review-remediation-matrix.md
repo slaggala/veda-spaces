@@ -53,3 +53,46 @@ Every finding is listed: 3 MAJOR, 18 MINOR, 14 ADVISORY. "Resolved" is the **aut
 | A-14 | ADVISORY | Honeypot response status differs from success | LEAD-018 | — | Honeypot returns the same 201 shape with a real reference (quarantine). | 04 §5.1, 08 §8.4 | 12 §4.7 identical-response test | **Resolved** | No |
 
 Tracked gates (TG-01…TG-06) are defined with owner, target phase, acceptance criteria and evidence in 11 §11 ([11-production-readiness.md](11-production-readiness.md)).
+
+## Final minor remediation: focused re-review `06a4f6e` (verdict CERTIFIED WITH MINOR CONDITIONS)
+
+Statuses are the **author's**. Targeted independent verification is gate TG-07.
+
+| ID | Severity | Title | Affected requirements | Remediation action | Documents changed | Evidence required | Status | Re-review |
+|---|---|---|---|---|---|---|---|---|
+| N-01 | MINOR | Founder dual-control approver eligibility is contradictory, and Founder powers can be granted outside the Founder workflow | RBAC-021, MFA-015, RBAC-020 | Canonical Founder-governance workflow in 06 §7.2 (single authoritative definition). Founder = protection_level FOUNDER + FOUNDER role (I3). The FOUNDER role and `user.founder.manage` have grant_path FOUNDER_WORKFLOW_ONLY. G13 rejects every generic role, permission or role-definition path (grant, deny, copy, edit). One eligibility rule: requester and approver are Founders with effective user.founder.manage, step-up, re-checked at request, approval and execution; approver ≠ requester ≠ target; one approval; duplicate → 409. Single-Founder mode: a custodian who is a distinct human is the second principal. Full break-glass: two distinct-human custodians. Bootstrap creates only the first Founder ever. One open Founder request per target. Invariants I1–I3 under the write lock. Approval-policy changes have no runtime API. | 06 §3.1, §5, §6.2, §7.1–7.5, §10; 03 §4.3, §4.4, §5.8, §10; 05 §9.1, §9.8, §10, §11.7; 08 §1, §5.7, §5.8, §5.11, §6.1, §11; 09 §4.12; ADR-010, ADR-006; 11 §6; 12 §4.4, §4.12 TD-G | TD-G cases G1–G14 (both engines); TG-07 targeted independent verification | **Resolved (author) — targeted check TG-07** | Yes (targeted) |
+| N-02 | MINOR | Regression: broadened conformance rule 3 rejects unregistered FK-less GUID columns | DATA-011, DATA-014, DATA-012 | Registered all seven FK-less columns (EXC-011) plus the three EXC-009 correlation columns in a fully documented 10-row allow-list (03 §2.11): purpose, why no FK, type, format CHECK, discriminator and pair CHECK, index, retention, orphan semantics, requirements and approval. Rule 3 now fails any unregistered ID-like FK-less column and any registered column with the wrong type or missing CHECK, index or documentation. No global relaxation. Purge order unchanged (F-07 not reintroduced). | 03 §2.7, §2.9, §2.11, §5.4, §5.6, §7, §8.1, §8.2; 12 §4.1, §4.12 TD-H | TD-H cases H1–H8; TG-07 | **Resolved (author) — targeted check TG-07** | Yes (targeted) |
+| N-03 | MINOR | Test-design regressions and gaps in recovery, direct grants and duplicate detection | RBAC-006, LEAD-010, MFA-013, MFA-014, API-006, DATA-006 | Six concrete test designs with requirement IDs, purpose, preconditions, fixtures, action, expected result, events, negative assertions, cleanup and evidence: TD-A DENY-over-GRANT, TD-B duplicate/retry/non-disclosure, TD-C expired recovery session, TD-D challenge reuse after recovery, TD-E failed re-enrollment, TD-F two-writer conflict. 05 §11.5 now states login-challenge completion, invalidation of other challenges, expiry and failure semantics. | 12 §4.4–4.7, §4.12; 05 §9.1, §11.5 | TD-A…TD-F reports; TG-07 | **Resolved (author) — targeted check TG-07** | Yes (targeted) |
+| N-04 | MINOR | Production and tracked gates lack required attributes | OPS-005, OPS-008, NFR-002, SEC-007 | Canonical gate registry (gate-registry.md/.json), 27 gates: OWNER-INPUT-001…004, TG-01…TG-08, RG-1…RG-9, PG-DAST, PG-RET, PG-BG, PG-EMAIL, PG-PRIV, PGM-1. Each has all 18 attributes, owner categories only, explicit failure behavior (missing, stale or failed = FAIL, never pass) and protected requirements. The A-13 criterion moved to PGM-1 (NFR-001 p95 with chain appends on PostgreSQL). TG-01 stays pending. | gate-registry.md, gate-registry.json, 11 §7.2, §7.3, §11 | Gate-registry attribute validation (V-G); pre-production readiness review | **Resolved (author)** | No (verify at pre-production readiness review) |
+| N-A1 | ADVISORY | Path A enrollment after a new sensitive grant relies on a password-derived session | MFA-014, MFA-012 | Path A is not available when enrollment is triggered by a newly granted sensitive permission and no factor exists; path C (emailed link) is required (05 §11.3). | see action | TG-07 targeted check | **Resolved** | No |
+| N-A2 | ADVISORY | Cooling-off does not suspend SECURITY_DATA, DESTRUCTIVE or BULK_DATA | MFA-013, MFA-012 | Cooling-off now suspends all sensitive classes (06 §3.2, §5; 05 §11.5). | see action | TG-07 targeted check | **Resolved** | No |
+| N-A3 | ADVISORY | The spam queue has no ageing alert | LEAD-018, LEAD-019 | Daily spam-queue summary and an ageing alert (04 §5.5, 02 §9). | see action | TG-07 targeted check | **Resolved** | No |
+| N-A4 | ADVISORY | Invariant I2 counts suspended holders | RBAC-020 | The nightly job raises a High alert when no effective recovery administrator exists (06 §7.3). | see action | TG-07 targeted check | **Resolved** | No |
+| N-A5 | ADVISORY | Endpoint index omits step-up and G11 on two rows | RBAC-019, RBAC-021 | 08 §1 rows 31 and 43 aligned with 06 §7.1 (step-up and G11). Rows 38, 40, 50 and 51 add G13. | see action | TG-07 targeted check | **Resolved** | No |
+| N-A6 | ADVISORY | Break-glass ARN columns are VARCHAR(200) | RBAC-021 | Break-glass ARN columns widened to VARCHAR(2048), and a distinct-human mapping column added (03 §5.8). | see action | TG-07 targeted check | **Resolved** | No |
+| N-A7 | ADVISORY | Overlapping new requirements | RBAC-020, MFA-015 | `related_requirements` parent/child links for RBAC-020, MFA-015 and RBAC-021 in requirements.json. | see action | TG-07 targeted check | **Resolved** | No |
+| N-A8 | ADVISORY | Architecture validation automation is not committed | PLAT-006 | The owner instruction forbids adding code to the architecture branch, so validation scripts stay uncommitted. Independent reproduction remains the gate (TG-07), and implementation CI (12 §5) supersedes this for code. | see action | TG-07 targeted check | **Accepted advisory with reason** | No |
+| N-A9 | ADVISORY | Some RV and OP classifications understate automation | RBAC-002, PLAT-008, PLAT-011 | Conservative RV/OP classification kept. Reclassify after implementation, when the lint and IT rows exist. | see action | TG-07 targeted check | **Accepted advisory with reason** | No |
+
+### F-19 deficiency mapping
+
+F-19 is not left as "test gaps". Each deficiency maps to a concrete design or an enforceable gate.
+
+| Deficiency | Resolution | Status | Where |
+|---|---|---|---|
+| 11 requirements tested only by method, environment or CI sections | Reclassified as review or operational verification, reported separately in the coverage gate (test_design = review/operational) | Resolved | coverage-gate.md |
+| Alembic upgrade-with-data and downgrade/rollback tests | 12 §4.1 'Upgrade with data' + 'N-1 rollback' | Resolved (design) | 12 §4.1 |
+| CSRF negative tests for /auth/refresh and /auth/logout | 12 §4.5 'CSRF' | Resolved (design) | 12 §4.5 |
+| Access-token use after revocation or logout | 12 §4.5 'Tokens after revocation' + TD-D | Resolved (design) | 12 §4.5, §4.12 |
+| Refresh grace-window replay | 12 §4.5 'Refresh grace window' | Resolved (design) | 12 §4.5 |
+| SQLite write contention (SQLITE_BUSY, BEGIN IMMEDIATE) | 12 §4.9 'Load and contention' + TD-F; evidence via RG-4 / TG-06 | Resolved (design); execution tracked RG-4/TG-06 | 12 §4.9, §4.12; gate-registry RG-4 |
+| Browser and device matrix | 12 §4.8 matrix | Resolved (design) | 12 §4.8 |
+| DAST / penetration test before go-live | PG-DAST with a passing definition (no invented numbers); TG-03 | Tracked before production (PG-DAST, TG-03; Security Owner) | gate-registry PG-DAST |
+| NFR-002 and OPS-005 untestable pending OWNER-INPUT-001 | Kept 'Not testable pending owner input'; RG-1 and OWNER-INPUT-001 gates | Tracked before production (Product Owner) | gate-registry OWNER-INPUT-001, RG-1 |
+| Re-review: removed DENY-precedence resolution test | TD-A | Resolved (design) | 12 §4.12 |
+| Re-review: removed duplicate-detection test | TD-B | Resolved (design) | 12 §4.12 |
+| Re-review: missing recovery expiry, mfa_token single use, re-enrollment failure | TD-C, TD-D, TD-E + 05 §11.5 semantics | Resolved (design) | 12 §4.12, 05 §11.5 |
+| Re-review: thin optimistic-concurrency test | TD-F | Resolved (design) | 12 §4.12 |
+
+**F-19 disposition:** resolved at design level. Two items remain **tracked before production** with owner category, acceptance and evidence in the gate registry: PG-DAST (via TG-03) and OWNER-INPUT-001 with RG-1.
+

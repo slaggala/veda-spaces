@@ -2,7 +2,7 @@
 
 Source of truth: [`requirements.json`](requirements.json). This matrix is generated from it, so the two cannot diverge. Decisions: [decisions/](decisions/). Review remediation: [review-remediation-matrix.md](review-remediation-matrix.md).
 
-**Coverage model (remediation 01, F-21).** The **Class** column is a *substantive* classification using the independent reviewer's taxonomy. The baseline is the reviewer's own matrix. Requirements new or revised in remediation 01 carry an **author assessment that needs independent re-review**, and the basis for each is in `requirements.json`. The section columns are navigation references, checked only for resolvability. **They are not coverage evidence.**
+**Coverage model (F-21).** The **Class** column is a *substantive* classification using the independent reviewer's taxonomy. **The baseline is the focused independent re-review (`06a4f6e`): 202 fully covered, 3 partially covered, 1 contradictory, 2 not testable.** The four requirements it did not classify as fully covered (DATA-011, DATA-014, MFA-015, RBAC-021) were corrected in the final minor remediation and are shown as FC by **author assessment pending the targeted independent check TG-07**. Every requirement's full classification history is in `requirements.json` (`assessment.history`). The section columns are navigation references, checked only for resolvability. **They are not coverage evidence.**
 
 ## 1. ID scheme and traceability rules
 
@@ -79,15 +79,15 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | DATA-003 | created_on and updated_on are NOT NULL UTC values set by the platform from one transaction clock reading. | P0 | B, ADR-003 | UT | FC | auto | 03 §2.8 | 03 §2.1 | — | — | — | 12 §4.2 |
 | DATA-004 | created_by and updated_by are NOT NULL foreign keys to app_user.id; non-human writes use seeded system users. | P0 | B, ADR-003 | SL | FC | auto | 03 §2.3 | 03 §2.1 | — | — | — | 12 §4.1 |
 | DATA-005 | Soft delete via is_deleted, deleted_on, deleted_by with a consistency constraint. | P0 | B, ADR-003 | SL, IT | FC | auto | 03 §2.4 | 03 §2.1 | — | — | — | 12 §4.2 |
-| DATA-006 | Optimistic concurrency via version; stale updates are rejected. | P0 | B, ADR-003 | IT | FC | auto | 03 §2.5 | 03 §2.1 | 08 §2.7 | — | — | 12 §4.6 |
+| DATA-006 | Optimistic concurrency via version; stale updates are rejected. | P0 | B, ADR-003 | IT | FC | auto | 03 §2.5 | 03 §2.1 | 08 §2.7 | — | — | 12 §4.12 |
 | DATA-007 | Business-key uniqueness applies only among non-deleted rows (partial unique indexes). | P0 | D | IT | FC | auto | 03 §2.6 | 03 §2.6 | — | — | — | 12 §4.1 |
 | DATA-008 | Default reads exclude soft-deleted rows; including them requires explicit opt-in and permission. | P0 | D | IT | FC | auto | 03 §2.4 | — | 08 §2.6 | — | — | 12 §4.2 |
 | DATA-009 | Business records are never hard-deleted outside retention, erasure or registered exceptions. | P0 | D | RV | FC | rv | 03 §2.4 | 03 §2.9 | — | — | — | 12 §4.1 |
 | DATA-010 | Foreign keys are enforced by the database on every engine. | P0 | D | IT | FC | auto | 03 §1 | 03 §12 | — | — | — | 12 §4.1 |
-| DATA-011 | A schema conformance check on SQLite and PostgreSQL fails CI on any contract violation. | P0 | D, ADR-003 | SL | FC | auto | 03 §2.7 | — | — | — | — | 12 §4.1 |
+| DATA-011 | A schema conformance check on SQLite and PostgreSQL fails CI on any contract violation, including any ID-like column without a FK that is not exactly one of the ten registered FK-less identifier columns. | P0 | D, ADR-003 | SL | FC | auto | 03 §2.7 | — | — | — | — | 12 §4.12 |
 | DATA-012 | GUID maps to CHAR(32) on SQLite and native uuid on PostgreSQL; every foreign key uses the GUID type; all type mappings are explicit. | P0 | ADR-002 | SL | FC | auto | 03 §12 | 03 §12 | — | — | — | 12 §4.1 |
 | DATA-013 | Malformed ids are rejected with 422 INVALID_ID; integer ids and sequence values are never exposed as identifiers. | P0 | ADR-002 | IT | FC | auto | 03 §2.2 | — | 08 §2.2 | — | 11 §5 | 12 §4.6 |
-| DATA-014 | Behavioral exceptions to the contract (including globally unique indexes and non-FK correlation references) are listed in the exception registry; unregistered deviations fail CI. | P0 | ADR-003 | SL | FC | auto | 03 §2.9 | 03 §2.9 | — | — | — | 12 §4.1 |
+| DATA-014 | Behavioral exceptions to the contract are listed in the exception registry, including the fully documented allow-list of ten FK-less identifier columns (correlation, polymorphic and group ids); unregistered deviations fail CI. | P0 | ADR-003 | SL | FC | auto | 03 §2.9 | 03 §2.11 | — | — | — | 12 §4.12 |
 | DATA-015 | Contract fields, audit rows and outbox rows are written in the same database transaction as the business change. | P0 | ADR-003 | IT | FC | auto | 03 §2.8 | — | — | — | — | 12 §4.2 |
 | DATA-016 | Money is stored as integer minor units with an ISO currency code. | P0 | D | SL | FC | auto | 03 §1 | 03 §12 | — | — | — | 12 §4.1 |
 | DATA-017 | Purge jobs follow a defined order that never violates referential integrity; evidence rows use registered non-FK correlation ids; operational retention values are owner inputs. | P0 | D (F-07) | IT | FC | auto | 03 §2.10 | 03 §2.9 | — | — | — | 12 §4.1 |
@@ -165,9 +165,9 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | MFA-010 | TOTP secrets are KMS-envelope-encrypted (wrapped key TEXT, ARN separate) and never returned after enrollment. | P0 | ADR-006 | IT | FC | auto | 05 §11.2 | 03 §5.5 | — | — | 02 §11.4 | 12 §4.5 |
 | MFA-011 | Step-up (MFA within 10 minutes) and password re-authentication (within 5 minutes) gate sensitive operations. | P0 | ADR-006 | IT | FC | auto | 05 §11.6 | 03 §5.1 | 08 §4.7 | — | 06 §7 | 12 §4.5 |
 | MFA-012 | Sensitive permissions are effective only with an active factor in an MFA-verified full session; they are suspended when MFA is absent, removed or reset, and account/access-control classes are suspended during recovery cooling-off. | P0 | Decision 1 | IT | FC | auto | 06 §3.2 | 03 §5.1 | 08 §4.4 | 09 §4.6 | 06 §5 | 12 §4.4 |
-| MFA-013 | Self-service recovery requires password re-entry and a recovery code, creates a restricted RECOVERY session limited to re-enrollment, revokes all other sessions, notifies the verified email, rotates recovery codes and applies a cooling-off period. | P0 | Decision 2 | IT | FC | auto | 05 §11.5 | 03 §5.1 | 08 §4.7 | 09 §4.10 | 06 §8 | 12 §4.5 |
-| MFA-014 | A new authenticator is enrolled only through a two-proof path; never with a password alone or a recovery code alone. | P0 | D (F-02) | IT | FC | auto | 05 §11.3 | 03 §5.3 | 08 §4.7 | 09 §4.10 | 05 §11.3 | 12 §4.5 |
-| MFA-015 | Administrative MFA reset of a privileged account needs dual control; a Founder's MFA reset needs two distinct eligible Founders or break-glass with two IAM custodians. | P0 | Decision 2 | IT | FC | auto | 06 §7.4 | 03 §5.8 | 08 §5.11 | 09 §4.12 | 06 §7.5 | 12 §4.4 |
+| MFA-013 | Self-service recovery requires password re-entry and a recovery code, completes the login challenge and invalidates all other challenges, creates a restricted RECOVERY session limited to re-enrollment, revokes all other sessions, notifies the verified email, commits re-enrollment atomically with code rotation, and applies a cooling-off period. | P0 | Decision 2 | IT | FC | auto | 05 §11.5 | 03 §5.1 | 08 §4.7 | 09 §4.10 | 06 §8 | 12 §4.12 |
+| MFA-014 | A new authenticator is enrolled only through a two-proof path; never with a password alone or a recovery code alone. | P0 | D (F-02) | IT | FC | auto | 05 §11.3 | 03 §5.3 | 08 §4.7 | 09 §4.10 | 05 §11.3 | 12 §4.12 |
+| MFA-015 | Administrative MFA reset of a privileged account needs dual control; a Founder's MFA reset is the Founder-level action FOUNDER_MFA_RESET under the canonical Founder-governance workflow. | P0 | Decision 2 | IT | FC | auto | 06 §7.4 | 03 §5.8 | 08 §5.11 | 09 §4.12 | 06 §7.5 | 12 §4.12 |
 
 ### 3.7 RBAC — Authorization
 
@@ -178,7 +178,7 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | RBAC-003 | Permission codes follow the resource.action convention. | P0 | B | SL | FC | auto | 06 §3 | 03 §4.4 | — | — | — | 12 §4.4 |
 | RBAC-004 | Permissions are declared in a code registry and synchronized by migration. | P0 | D | IT | FC | auto | 06 §3 | 03 §4.4 | 08 §6.2 | — | — | 12 §4.4 |
 | RBAC-005 | Each grant carries a data scope: ALL, TEAM (reserved) or OWN. | P0 | D | IT | FC | auto | 06 §4 | 03 §4.6 | — | — | — | 12 §4.4 |
-| RBAC-006 | Direct user GRANT and DENY; DENY always wins. | P0 | B | UT | FC | auto | 06 §5 | 03 §4.7 | 08 §5.7 | 09 §4.6 | — | 12 §4.4 |
+| RBAC-006 | Direct user GRANT and DENY; DENY always wins. | P0 | B | UT | FC | auto | 06 §5 | 03 §4.7 | 08 §5.7 | 09 §4.6 | — | 12 §4.12 |
 | RBAC-007 | Time-bound grants (P1): disabled in P0 with 422; when enabled, never allowed on sensitive permissions. | P1 | D | UT | DEF | auto | 06 §5 | 03 §4.5 | 08 §5.7 | — | — | 12 §4.4 |
 | RBAC-008 | Founder, Admin and Sales roles are seeded with the default matrix. | P0 | B | IT | FC | auto | 06 §6 | 03 §10 | 08 §6.1 | 09 §4.7 | — | 12 §4.4 |
 | RBAC-009 | Anti-escalation: no granting of permissions or scopes the actor lacks (G1, G2 including role copy) and no account-control action on stronger accounts (G9). | P0 | D | IT | FC | auto | 06 §7 | — | — | — | 06 §7 | 12 §4.4 |
@@ -193,7 +193,7 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | RBAC-018 | Sensitivity is a canonical, code-registry classification (sensitivity_class) independent of role names; the seeded Sales role holds no sensitive permission. | P0 | Decision 1 | IT | FC | auto | 06 §3.1 | 03 §4.4 | — | — | 06 §3.1 | 12 §4.4 |
 | RBAC-019 | Profile editing and identity/security editing use separate granular permissions; generic endpoints cannot mass-assign email, password, MFA, roles, permissions, status or Founder/privileged status. | P0 | Decision 3 | IT | FC | auto | 06 §6.2 | 03 §4.1 | 08 §5.4 | 09 §4.6 | 06 §8 | 12 §4.4 |
 | RBAC-020 | Privileged-account protection: no action on stronger accounts, no Admin action on Founder accounts, no self-deactivation, and last-Founder / last-recovery-administrator invariants. | P0 | Decision 3 | IT | FC | auto | 06 §7.3 | — | 08 §5.6 | 09 §4.6 | 06 §7 | 12 §4.4 |
-| RBAC-021 | Founder-level changes and privileged MFA resets or email changes require step-up and dual control; break-glass requires two IAM custodians, a cooling-off with cancel, and full evidence. | P0 | Decision 3 | IT | FC | auto | 06 §7.2 | 03 §5.8 | 08 §5.11 | 09 §4.12 | 06 §7.5 | 12 §4.4 |
+| RBAC-021 | Founder-level actions (grant/remove Founder status incl. user.founder.manage, Founder MFA recovery, status and email/identity change, break-glass activation, approval-policy change) run only through the canonical Founder-governance workflow: Founder requester and a different Founder approver (or a distinct-human break-glass custodian in single-Founder mode), eligibility re-checked at execution, no generic-API grant path, one open request per target. | P0 | Decision 3 | IT | FC | auto | 06 §7.2 | 03 §5.8 | 08 §5.11 | 09 §4.12 | 06 §7.5 | 12 §4.12 |
 
 ### 3.8 USER — User administration
 
@@ -220,7 +220,7 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | LEAD-007 | Leads can be assigned to users who hold lead.read. | P0 | D | IT | FC | auto | 04 §6 | 04 §2 | 08 §8.7 | 09 §4.4 | — | 12 §4.8 |
 | LEAD-008 | Each lead has a unique internal number VS-L-YYYY-NNNNNN, never shown publicly. | P0 | D | IT | FC | auto | 04 §2 | 03 §6.3 | — | — | — | 12 §4.7 |
 | LEAD-009 | Phone numbers are validated and normalized to E.164 with India as the default region, accepting international numbers with a country code. | P0 | ADR-005 | UT | FC | auto | 04 §13 | 04 §2 | 08 §8.4 | — | — | 12 §4.7 |
-| LEAD-010 | Likely duplicates are flagged and never rejected or silently discarded. | P0 | ADR-005 | IT | FC | auto | 04 §7 | 04 §2 | 08 §8.8 | 09 §4.5 | — | 12 §4.7 |
+| LEAD-010 | Likely duplicates are flagged and never rejected or silently discarded. | P0 | ADR-005 | IT | FC | auto | 04 §7 | 04 §2 | 08 §8.8 | 09 §4.5 | — | 12 §4.12 |
 | LEAD-011 | Source and campaign attribution are captured. | P0 | D | IT | FC | auto | 04 §2 | 04 §2 | 08 §8.4 | — | — | 12 §4.7 |
 | LEAD-012 | Consent records policy version, timestamp and source context. | P0 | ADR-005 | IT | FC | auto | 04 §2 | 04 §2 | 08 §8.4 | 09 §4.11 | 11 §5.6 | 12 §4.7 |
 | LEAD-013 | Lead list supports search, filter, sort and pagination. | P0 | B | IT | FC | auto | 08 §8.2 | — | 08 §8.2 | 09 §4.3 | — | 12 §4.7 |
@@ -311,7 +311,7 @@ Source of truth: [`requirements.json`](requirements.json). This matrix is genera
 | API-003 | Errors use RFC 9457 problem details with stable codes. | P0 | B | IT | FC | auto | 08 §2.4 | — | 08 §2.4 | — | — | 12 §4.6 |
 | API-004 | Offset pagination for admin lists and cursor pagination for streams. | P0 | B | IT | FC | auto | 08 §2.5 | — | 08 §2.5 | — | — | 12 §4.6 |
 | API-005 | Filtering, search and allow-listed sorting. | P0 | B | IT | FC | auto | 08 §2.6 | — | 08 §2.6 | — | — | 12 §4.6 |
-| API-006 | Updates require If-Match; stale versions return 409. | P0 | D | IT | FC | auto | 08 §2.7 | — | 08 §2.7 | — | — | 12 §4.6 |
+| API-006 | Updates require If-Match; stale versions return 409. | P0 | D | IT | FC | auto | 08 §2.7 | — | 08 §2.7 | — | — | 12 §4.12 |
 | API-007 | Idempotency-Key with request fingerprint; replay returns the original response; key reuse with a different body returns 422; lookup precedes CAPTCHA. | P0 | D | IT | FC | auto | 08 §2.8 | — | 08 §2.8 | — | — | 12 §4.6 |
 | API-008 | OpenAPI 3.1 is the contract source of truth. | P0 | D | RV | FC | rv | 08 §2.1 | — | 08 §2.1 | — | — | 12 §4.6 |
 | API-009 | Only additive changes within v1; breaking changes require v2. | P0 | D | RV | FC | rv | 08 §2.9 | — | 08 §2.9 | — | — | 12 §4.6 |
