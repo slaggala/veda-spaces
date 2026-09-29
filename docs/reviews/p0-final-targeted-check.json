@@ -1,0 +1,109 @@
+{
+ "check_id": "VEDA-SPACES-P0-FINAL-TARGETED-INDEPENDENT-CHECK",
+ "date": "2026-09-29",
+ "reviewed_commit": "73e74d3a74b32f5d5587f8358af912e273689fdd",
+ "previous_commit": "c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+ "review_branch": "review/p0-foundation-independent-review",
+ "previous_review_commit": "06a4f6e7d535e84c9b4ff427d4d8bedbf96e0ba7",
+ "verdict": "CERTIFIED WITH MINOR CONDITIONS",
+ "targets": {
+  "N-01": "RESOLVED",
+  "N-02": "NOT RESOLVED (MINOR residual R-01)",
+  "N-03": "RESOLVED",
+  "N-04": "RESOLVED",
+  "F-19": "RESOLVED",
+  "regression": "NO REGRESSION"
+ },
+ "diff_verification": {
+  "single_commit": true,
+  "docs_only": true,
+  "files_changed": 21,
+  "dist_unchanged": true,
+  "secret_matches": 0
+ },
+ "remaining_findings": [
+  {
+   "id": "R-01",
+   "severity": "MINOR",
+   "title": "Conformance rule 3 name heuristic captures non-GUID string columns that cannot be registered",
+   "evidence": [
+    "03 §2.7 rule 3 (ID-like = name ends _id/_by/_to or GUID) with the GUID-only allow-list in 03 §2.11",
+    "audit_log.request_id VARCHAR(64)",
+    "security_event_log.request_id VARCHAR(64)",
+    "outbox_event.locked_by VARCHAR(64)",
+    "12 §4.12 TD-H H1 expects the real schema to pass",
+    "validation V31 PASS did not evaluate string columns"
+   ],
+   "reqs": [
+    "DATA-011",
+    "DATA-014"
+   ],
+   "remediation": "Restrict the heuristic to GUID-typed columns or add a documented exempt list of non-entity string correlation columns; add TD-H positive and negative cases",
+   "rereview_scope": "03 §2.7/§2.11, 12 §4.12 TD-H",
+   "blocks": "Only the DATA-011 conformance-check story",
+   "note": "request_id already matched the earlier *_id wording and was missed in the focused re-review's N-02 enumeration; locked_by is new with the broadened pattern"
+  }
+ ],
+ "advisories": [
+  {
+   "id": "A-F1",
+   "title": "Any notified party, including the target, can cancel break-glass",
+   "evidence": "06 §7.5 step 5",
+   "recommendation": "Owner to confirm when designating custodians (OWNER-INPUT-004)"
+  }
+ ],
+ "structural_rechecks": {
+  "requirements": 221,
+  "p0": 208,
+  "p1": 10,
+  "p2": 3,
+  "added_since_c3aae47": 0,
+  "removed": 0,
+  "json_valid": true,
+  "broken_refs": 0,
+  "traces_lines": 0,
+  "sales_sensitive_overlap": 0,
+  "gates": 27,
+  "gates_missing_required_fields": 0,
+  "tg01_status": "Pending — no verifiable owner approval exists"
+ },
+ "certification": {
+  "remaining_owner_approvals_pre_implementation": [
+   "TG-01",
+   "TG-08"
+  ],
+  "remaining_owner_inputs_pre_production": [
+   "OWNER-INPUT-001",
+   "OWNER-INPUT-002",
+   "OWNER-INPUT-003",
+   "OWNER-INPUT-004"
+  ],
+  "remaining_production_gates": [
+   "RG-1",
+   "RG-2",
+   "RG-3",
+   "RG-4",
+   "RG-5",
+   "RG-6",
+   "RG-7",
+   "RG-8",
+   "RG-9",
+   "PG-DAST",
+   "PG-RET",
+   "PG-BG",
+   "PG-EMAIL",
+   "PG-PRIV",
+   "TG-02",
+   "TG-03",
+   "TG-04",
+   "TG-05",
+   "TG-06"
+  ],
+  "post_p0_gates": [
+   "PGM-1"
+  ],
+  "tg01_can_be_completed": "Yes; TG-07 satisfied for N-01, N-03, N-04 and F-19; R-01 recorded as a condition or fixed first",
+  "ready_for_merge": "No review blocker after owner TG-01 approval; recommend including the R-01 fix first; merge is the owner's action",
+  "implementation_may_be_authorized": "Yes, by the owner (TG-08) after TG-01, with the DATA-011 story held until R-01 is corrected and verified"
+ }
+}
