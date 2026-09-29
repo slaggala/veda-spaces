@@ -1,0 +1,446 @@
+{
+  "review_id": "VEDA-SPACES-P0-FINAL-TARGETED-INDEPENDENT-CHECK-02",
+  "date": "2026-09-29",
+  "repository": "git@github.com:slaggala/veda-spaces.git",
+  "architecture_sha": "778aa8fdd918da48340319696ada3ff673e9fb8e",
+  "previous_reviewed_sha": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
+  "target_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
+  "brief_sha_as_written": "6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41",
+  "brief_sha_exists": false,
+  "previous_review_commit": "15d25a759cfc0342bdca45ba4a9c51550270f305",
+  "review_branch": "review/p0-independent-implementation-review",
+  "verdict": "CERTIFIED WITH TECHNICAL CONDITIONS",
+  "authorizes_merge_or_deployment": false,
+  "verdicts": [
+    {
+      "item": "RR-01",
+      "prior": "MAJOR (merge)",
+      "verdict": "RR-01 RESOLVED",
+      "evidence": "dist/404.html now links /assets/404.css; 0 inline <style>/<script>/on*= in dist/*.html; dist/_headers byte-identical to 2f6b59a (no 'unsafe-inline'). Browser under exact _headers: unknown paths and /privacy → HTTP 404 styled page; 0 CSP violations on home, 404, unknown, /privacy; 360 px single column; visible keyboard focus; axe WCAG 2.0/2.1/2.2 AA 0 violations without bypassCSP. Control: 2f6b59a still shows the unstyled page. Homepage unchanged. Real Cloudflare 404 behaviour inferred from Pages docs (no preview run)",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-02",
+      "prior": "MAJOR (merge)",
+      "verdict": "RR-02 RESOLVED",
+      "evidence": "rbac/users.py restore_user refuses FOUNDER-protected targets (403 FOUNDER_PROTECTED + FOUNDER_GOVERNANCE_BYPASS_BLOCKED). Restore only via FOUNDER_STATUS_CHANGE status=RESTORE with a second distinct eligible Founder; requester/target/duplicate approval refused; eligibility re-checked under the governance lock at execution; stale approval fails closed (DUPLICATE on reissued email); generic user/status/role/permission paths refuse; I1–I3 and nightly job hold; audit actor = approving Founder; custodians/break-glass cannot restore; concurrent requests/approvals/invite-vs-restore serialised, no 5xx. SQLite and PostgreSQL. AM-12 PROPOSED, NOT APPROVED",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-03",
+      "prior": "MAJOR (merge)",
+      "verdict": "RR-03 RESOLVED",
+      "evidence": "rbac/governance.py revalidate_after_escalation on promotion clears proposals no longer authorised (EMAIL_CHANGE_CANCELLED reason TARGET_BECAME_FOUNDER); verify_email_change takes the governance lock and recomputes class (fails closed). N17 and break-glass, out-of-band, DENY-removal and concurrent variants closed on both engines; only clean 409 VERSION_CONFLICT under concurrency, no deadlock, no 5xx. Residual FC-RBAC-1 (MINOR). AM-13 PROPOSED, NOT APPROVED",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-04",
+      "prior": "MAJOR (merge)",
+      "verdict": "RR-04 RESOLVED",
+      "evidence": "Layered limiter (kernel/ratelimit.py:16-45; auth/routes.py:57,251): per-IP, wide network (/24, /64), keyed-hash email+network, plus an account-wide password-failure budget that applies to MFA holders via CAPTCHA escalation without lockout. Original RR-AUTH-1 probe: 10 evaluated (was 40), 30 CAPTCHA-refused; correct password without CAPTCHA no longer yields MFA_REQUIRED; reset emails 3 (was 18). CAPTCHA-solving attacker: 94 guesses/simulated hour. Optimal-attacker victim: 31/40 sign-ins succeed, 9 delayed ≤ 30 s, never locked out. Known vs unknown identical; keys hold keyed hash only; spoofed CF-Connecting-IP/X-Forwarded-For from untrusted peer ignored; IR-23 fairness preserved. Residual FC-AUTH-1 (MINOR)",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-05",
+      "prior": "MAJOR (production)",
+      "verdict": "RR-05 RESOLVED (repository)",
+      "evidence": "Forged-manifest attack C11 now detected ('archive export missing'); altered/missing exports, missing middle manifest, truncated archive sequence and unannounced manifests detected on both engines. The separate latest-anchor-only weakness is FC-AUD-1",
+      "blocking_scope": "Production (S3 Object Lock staging evidence)"
+    },
+    {
+      "item": "RR-06",
+      "prior": "MAJOR (production)",
+      "verdict": "RR-06 RESOLVED",
+      "evidence": "Two-phase archive: injected failures before/at/after commit, at finalise, pending/export write, os._exit at four stages, retry and two concurrent archivers — each leaves rows online without alarm or an alarmed 'archive not finalised' state repaired by the next run; C12 false alarm gone; no false alarm after legitimate recovery; no false-success manifest becomes authoritative",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-07",
+      "prior": "MAJOR (staging)",
+      "verdict": "RR-07 NOT RESOLVED (narrowly)",
+      "evidence": "Fixed: CLI/worker/scheduler configure logging and emit EMF lines (cli/main.py:29-36); scheduler records exit codes (ScheduledJobFailed=1, exit_code=3; cli/main.py:201-210); verify-chain records anchor-store errors. Remaining: FC-AUD-2 — the NoEffectiveRecoveryAdmin metric value is redacted by the log scrubber (kernel/logging.py:22 DENYLIST contains 'recovery'; maintenance.py:663), so the runbook alarm (api-runbooks.md:199) can never fire",
+      "blocking_scope": "Staging (alarm acceptance); recommended one-line fix before merge"
+    },
+    {
+      "item": "RR-08",
+      "prior": "MAJOR (production)",
+      "verdict": "RR-08 RESOLVED",
+      "evidence": "Path A confirm and change_password link replaced_by_id within the same session; original reproducer: old cookie within 20 s → access token, no new cookie, no reuse alarm; second use, use after 21 s, and new-then-old → theft → session revoked; logout-all, reset and stale tokens correct; forced mid-confirm failure commits nothing; no token material in logs; SQLite and PostgreSQL consistent. Pre-existing PG race FC-AUTH-4 (MINOR)",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-11",
+      "prior": "MINOR (merge)",
+      "verdict": "RR-11 RESOLVED",
+      "evidence": "dist/assets/app.js validates before every hand-off (consent only when intake on). Empty, missing name, missing phone and 7 invalid-phone cases never open WhatsApp; aria-invalid + linked error text + role=alert summary with focus; values retained; valid submissions (click, Enter, 360 px tap) open correctly encoded wa.me URLs (special characters decode exactly); no consent claim, honeypot, idempotency key, Turnstile or API configuration in the message; 0 API/Turnstile requests; one meta alone keeps intake off",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-16",
+      "prior": "MINOR (staging)",
+      "verdict": "RR-16 RESOLVED",
+      "evidence": "38 cases: exit 2 for mypy absent/corrupt, invalid TOML, malformed baseline, baseline growth beyond CEILING (157), baseline naming a renamed file, exclude/files shrinking the checked set; exit 1 for new-file error, extra error, renamed-file error, bare '# type: ignore', ignore_errors/disable_error_code in pyproject; --update refused under CI (exit 2) and never admits new errors. Residual FC-OPS-1 (MINOR: inline '# mypy:' comments, per-module strict_optional, shadow mypy.ini, spoof package)",
+      "blocking_scope": "—"
+    },
+    {
+      "item": "RR-17",
+      "prior": "MINOR (production)",
+      "verdict": "RR-17 RESOLVED",
+      "evidence": "Runbook prohibits 9236aa3, documents forward-fix, restore requirements and maintenance mode, claims no rehearsal; deploy.sh ROLLBACK_FLOOR hard-coded (env override ineffective); --rollback 9236aa3 and --rollback 2f6b59a refused; readiness evaluated in-container after rollback with all four states. Residual FC-OPS-2 (MINOR): floor enforced only in --rollback mode and refusal is incidental (missing schema-status subcommand); plain './deploy.sh 2f6b59a' would deploy. RG-7 remains a production gate",
+      "blocking_scope": "Production (RG-7)"
+    },
+    {
+      "item": "IR-A05",
+      "prior": "ADVISORY (optional-auth gap)",
+      "verdict": "OPTIONAL-AUTH GAP RESOLVED",
+      "evidence": "Startup rejects optional-auth + permission, public + permission, unregistered/mismatched register entries, private route without permission; accepts valid private and narrowly registered public routes; 105 routes identical to 2f6b59a, none newly public. Residual FC-AUTH-2 (MINOR, latent): an unrecognised auth mode string is not allow-listed",
+      "blocking_scope": "—"
+    }
+  ],
+  "s3_object_lock_staging_gate_required": true,
+  "am7_replacement": "INCOMPLETE",
+  "amendments": [
+    {
+      "id": "AM-1",
+      "subject": "03 §5.5 factor index",
+      "classification": "TECHNICALLY SOUND",
+      "decision_before": "Merge"
+    },
+    {
+      "id": "AM-2",
+      "subject": "08 §4.5 invite MFA response",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (accept invite-link password-overwrite residual)",
+      "decision_before": "Merge"
+    },
+    {
+      "id": "AM-3",
+      "subject": "08 §4.1/§4.7 optional CAPTCHA",
+      "classification": "TECHNICALLY SOUND",
+      "decision_before": "Merge"
+    },
+    {
+      "id": "AM-4",
+      "subject": "04 §5.4 vs 08 §8.5 re-consent",
+      "classification": "INCOMPLETE (gaps honestly labelled: later-version rule, create-time consent, immutability)",
+      "decision_before": "Merge (owner may accept labelled gaps) / completion before production"
+    },
+    {
+      "id": "AM-5",
+      "subject": "08 §1, 06 §11, 09 break-glass cancel",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (outbox retention bound not enforced)",
+      "decision_before": "Merge; retention enforcement before production"
+    },
+    {
+      "id": "AM-6",
+      "subject": "Readiness / rollback",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (resolve FC-12 release floor)",
+      "decision_before": "Merge"
+    },
+    {
+      "id": "AM-7",
+      "subject": "08 §12 layered limiter (replacement)",
+      "classification": "INCOMPLETE (FC-05 reset-link disclosure; FC-A06 outage bound)",
+      "decision_before": "Merge — correct text before approval; real-Turnstile staging evidence"
+    },
+    {
+      "id": "AM-8",
+      "subject": "05/03 HMAC action tokens",
+      "classification": "TECHNICALLY SOUND",
+      "decision_before": "Production"
+    },
+    {
+      "id": "AM-9",
+      "subject": "06 §7.5 hostile sole-Founder veto",
+      "classification": "INCOMPLETE (no decision; not implemented)",
+      "decision_before": "Production"
+    },
+    {
+      "id": "AM-10",
+      "subject": "07 §2 PII fields",
+      "classification": "INCOMPLETE (honestly labelled)",
+      "decision_before": "Production"
+    },
+    {
+      "id": "AM-11",
+      "subject": "03 §5.7 / 05 §11.3 MFA binding",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (refresh rule wording FC-A08; N-1 wording FC-12)",
+      "decision_before": "Merge; RG-7 before production"
+    },
+    {
+      "id": "AM-12",
+      "subject": "06 §7.2.2 Founder RESTORE",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (FC-A10, FC-A12 wording)",
+      "decision_before": "Merge"
+    },
+    {
+      "id": "AM-13",
+      "subject": "Execution-time governance-class revalidation",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (correct withdrawal over-claim FC-08, FC-A09)",
+      "decision_before": "Merge"
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "FC-01",
+      "severity": "MAJOR",
+      "src": "FC-AUD-1",
+      "title": "Security-event verification checks only the latest anchor, so an attacker holding the chain key can rewrite history, recompute the chain and post a new anchor that verifies",
+      "evidence": "api/veda/platform/maintenance.py:426 (store.latest('anchor')); REPRODUCED on both engines with local and S3-model stores",
+      "requirements": "SEVT-006, SEVT-007, 05 §9.6",
+      "remediation": "Verify against every retained anchor (or a hash-linked anchor chain) and against anchors written by a separate writer role; alarm on any anchor that no longer matches",
+      "blocking": "production (tamper-evidence claim); design residual first noted in the original review E.3"
+    },
+    {
+      "id": "FC-02",
+      "severity": "MAJOR",
+      "src": "FC-AUD-2",
+      "title": "NoEffectiveRecoveryAdmin metric value is redacted by the log scrubber, so its CRITICAL alarm can never fire (RR-07 residual)",
+      "evidence": "api/veda/kernel/logging.py:22 DENYLIST includes 'recovery'; api/veda/platform/maintenance.py:663; docs/operations/api-runbooks.md:199; REPRODUCED via CLI and scheduler",
+      "requirements": "LOG-006, RBAC-011, RG-5",
+      "remediation": "Exempt EMF metric keys from key-based redaction (or rename the metric); add a subprocess test asserting every runbook alarm metric is emitted unredacted",
+      "blocking": "staging (alarm acceptance); one-line fix recommended before merge"
+    },
+    {
+      "id": "FC-03",
+      "severity": "MAJOR",
+      "src": "FC-AUD-3",
+      "title": "S3 anchor/archive store writes without IfNoneMatch and reads the current object version, so an overwrite with the app credential creates a new version that verification trusts",
+      "evidence": "api/veda/platform/anchor_store.py (put_object/get_object); SOURCE-INSPECTED plus simulated versioned store; real S3 not exercised",
+      "requirements": "SEVT-007, 05 §9.6",
+      "remediation": "Conditional writes (IfNoneMatch='*'), read by first version / version id recorded in the manifest, writer role without s3:PutObject on existing keys; prove in staging",
+      "blocking": "staging evidence / production gate"
+    },
+    {
+      "id": "FC-04",
+      "severity": "MINOR",
+      "src": "FC-AUTH-8 (root cause by lead reviewer)",
+      "title": "Latent timestamp race: begin_unit_of_work reads the clock before acquiring the write lock, so under contention a later-clocked transaction can create a row that an earlier-clocked transaction then updates, violating ck_*__updated_after_created (fail-closed 500)",
+      "evidence": "api/veda/kernel/db.py:110 (tx_time = clock.now()) precedes :115 (session.connection → BEGIN IMMEDIATE); SQLite busy handler is not FIFO; same ordering at 9236aa3 (pre-existing). Observed once in 22 full-suite runs (1/9 auth reviewer, 0/13 lead reviewer); failing test id not captured",
+      "requirements": "DATA-003, DATA-005, NFR availability",
+      "remediation": "Take tx_time after the connection/lock is acquired (and on PostgreSQL use max(tx_time, row.created_on) or DB clock_timestamp()), add a concurrency test",
+      "blocking": "production"
+    },
+    {
+      "id": "FC-05",
+      "severity": "MINOR",
+      "src": "FC-AUTH-1",
+      "title": "Per-account reset-email cap (3/hour) lets a third party keep the victim without a usable reset link for about half of every hour; AM-7 does not disclose it",
+      "evidence": "REPRODUCED; api/veda/platform/auth/routes.py:251; links expire after 30 min",
+      "requirements": "AUTH-008, AUTH-010",
+      "remediation": "Disclose in AM-7 and consider per-requester-network caps for reset delivery or a victim-initiated bypass",
+      "blocking": "AM-7 wording before owner approval; production"
+    },
+    {
+      "id": "FC-06",
+      "severity": "MINOR",
+      "src": "FC-AUTH-2",
+      "title": "Route auth mode is not allow-listed; an unrecognised mode string makes a permission-declaring route anonymous and passes startup (latent; no current route)",
+      "evidence": "REPRODUCED in probe copy; api/veda/app.py startup checks, kernel/http.py",
+      "requirements": "RBAC-012, 06 §8",
+      "remediation": "Allow-list auth modes at declaration and startup",
+      "blocking": "production (latent)"
+    },
+    {
+      "id": "FC-07",
+      "severity": "MINOR",
+      "src": "FC-AUTH-4",
+      "title": "PostgreSQL only: change_password racing a refresh returns 500 IntegrityError (pre-existing; fails closed)",
+      "evidence": "REPRODUCED 2/10 (4/10 at 2f6b59a)",
+      "requirements": "AUTH-005, AUTH-012",
+      "remediation": "Map to 409 / retry",
+      "blocking": "PostgreSQL release gate"
+    },
+    {
+      "id": "FC-08",
+      "severity": "MINOR",
+      "src": "FC-RBAC-1",
+      "title": "Adding a sensitive permission to a role blocks but does not withdraw a pending admin-requested email change (no cancel event); AM-13 over-claims withdrawal",
+      "evidence": "REPRODUCED both engines: verify refused while privileged; after role reverted the old link verifies (204)",
+      "requirements": "USER-007, 06 §7.1",
+      "remediation": "Withdraw on any class escalation, or correct AM-13 to 'blocked while escalated'",
+      "blocking": "AM-13 wording before owner approval; production"
+    },
+    {
+      "id": "FC-09",
+      "severity": "MINOR",
+      "src": "FC-RBAC-2",
+      "title": "Invitation link keeps its 72 h lifetime after an ADMIN role is assigned to an INVITED user (05 §8.4 says 24 h for privileged invites); pre-existing",
+      "evidence": "REPRODUCED: accepted after 30 h",
+      "requirements": "AUTH-011, 05 §8.4",
+      "remediation": "Shorten/reissue on privilege escalation",
+      "blocking": "production"
+    },
+    {
+      "id": "FC-10",
+      "severity": "MINOR",
+      "src": "FC-FE-2",
+      "title": "Approvals card does not show the requested Founder status, so an approver cannot distinguish RESTORE from DELETE or DISABLE except through the requester's free-text reason (pre-existing UI; server controls unaffected)",
+      "evidence": "app/src/modules/admin/approvals-page.ts:91-95 (unchanged since 9236aa3)",
+      "requirements": "RBAC-021, 06 §7.2 (informed dual control), UI-017",
+      "remediation": "Render request_payload (status, email) in the card and the approve dialog",
+      "blocking": "staging (before Founders use governance)"
+    },
+    {
+      "id": "FC-11",
+      "severity": "MINOR",
+      "src": "FC-OPS-1",
+      "title": "mypy ratchet suppression detection incomplete: inline '# mypy:' config comments, per-module strict_optional overrides, shadow mypy.ini/.mypy.ini and a spoof 'mypy' package admit new errors with exit 0",
+      "evidence": "REPRODUCED; api/tools/mypy_ratchet.py",
+      "requirements": "12 §5",
+      "remediation": "Detect inline config comments and extra config files; pin config path; import mypy from the venv explicitly",
+      "blocking": "staging (CI gate integrity)"
+    },
+    {
+      "id": "FC-12",
+      "severity": "MINOR",
+      "src": "FC-OPS-2",
+      "title": "Rollback floor is schema-only and enforced only in --rollback mode; a pre-6ec2e76 image that knows 0009 (e.g. 2f6b59a, lacking the RR-02/RR-03 fixes) deploys through the normal path; AM-11 wording admits it",
+      "evidence": "REPRODUCED with stubbed docker; api/deploy/deploy.sh",
+      "requirements": "OPS-004, RR-17",
+      "remediation": "Enforce a release floor (image label / git SHA allow-list) in every deploy mode; fix AM-11 text",
+      "blocking": "production"
+    },
+    {
+      "id": "FC-13",
+      "severity": "MINOR",
+      "src": "FC-AUD-4",
+      "title": "Archive export and pending keys use last_seq only; an abandoned attempt plus a retention change can collide with a later segment (archival fails, alarmed, no data loss)",
+      "evidence": "REPRODUCED both engines",
+      "requirements": "SEVT-004",
+      "remediation": "Key by (first_seq, last_seq, run id)",
+      "blocking": "production"
+    },
+    {
+      "id": "FC-14",
+      "severity": "MINOR",
+      "src": "FC-AUD-5",
+      "title": "On SQLite, archival holds the database write lock across object-store I/O",
+      "evidence": "SOURCE-INSPECTED; api/veda/platform/maintenance.py",
+      "requirements": "NFR availability",
+      "remediation": "Upload outside the write transaction",
+      "blocking": "production"
+    },
+    {
+      "id": "FC-15",
+      "severity": "MINOR",
+      "src": "FC-FE-1",
+      "title": "Site focus-ring colour #c59158 is 2.60:1 on the page background and 2.21:1 on the cream card (below 3:1 non-text contrast); pre-existing since 778aa8f",
+      "evidence": "dist/assets/404.css:8",
+      "requirements": "UI-011 (site), WCAG 1.4.11",
+      "remediation": "Darken focus ring",
+      "blocking": "production (site a11y, tracked)"
+    }
+  ],
+  "advisories": [
+    {
+      "id": "FC-A01",
+      "text": "Brief/evidence SHA transcription error: the brief names 6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41, which does not exist; the only object matching 6ec2e76 is 6ec2e76f156e963c7363c4ad9ce93d0bccb11f41 (remote head, parent 2f6b59a, CI run 36574695736). Owner records should cite the correct SHA."
+    },
+    {
+      "id": "FC-A02",
+      "text": "Owner decisions OD-2/OD-3 are recorded as 'given' in the matrix and deviation register (DEV-009/DEV-010) with no decision-log citation; the matrix also renumbers ODs relative to the re-review. The owner must confirm them in a decision record (FC-OPS-4)."
+    },
+    {
+      "id": "FC-A03",
+      "text": "Merge-safety plan's pre-merge list omits TG-01 PASS and amendment approval, which the registry marks merge-blocking (FC-OPS-3)."
+    },
+    {
+      "id": "FC-A04",
+      "text": "Unknown permission codes are accepted at startup (FC-AUTH-3)."
+    },
+    {
+      "id": "FC-A05",
+      "text": "Account budget check-then-record not atomic on PostgreSQL (FC-AUTH-5)."
+    },
+    {
+      "id": "FC-A06",
+      "text": "AM-7 claims a '≤ 15 min' bound during a Turnstile outage that is false under sustained attack (FC-AUTH-6)."
+    },
+    {
+      "id": "FC-A07",
+      "text": "Per-challenge 5-code limit exceeded under parallelism on both engines (FC-AUTH-7, pre-existing IR-A01 residual)."
+    },
+    {
+      "id": "FC-A08",
+      "text": "AM-11 refresh rule 'whenever assurance changes' is broader than implemented (step-up does not rotate)."
+    },
+    {
+      "id": "FC-A09",
+      "text": "Admin-issued password-reset and MFA-enrollment links survive promotion to Founder (FC-RBAC-3)."
+    },
+    {
+      "id": "FC-A10",
+      "text": "Custodian CLI refuses a restore as 'unknown target' with no FAILURE event instead of SECOND_FOUNDER_REQUIRED as AM-12 states (FC-RBAC-4)."
+    },
+    {
+      "id": "FC-A11",
+      "text": "Request/executed/failed security events do not name RESTORE (FC-RBAC-5)."
+    },
+    {
+      "id": "FC-A12",
+      "text": "A restored and reactivated Founder signs in with pre-deletion password and MFA factor; AM-12 silent (FC-RBAC-6)."
+    },
+    {
+      "id": "FC-A13",
+      "text": "E2E static server binds all interfaces (FC-FE-3)."
+    },
+    {
+      "id": "FC-A14",
+      "text": "A PostgreSQL server from a different local session was listening on 127.0.0.1:55432 during this check; this review used its own instance on :55433 and did not touch it."
+    }
+  ],
+  "counts": {
+    "BLOCKER": 0,
+    "MAJOR": 3,
+    "MINOR": 12,
+    "ADVISORY": 14,
+    "merge_scope_MAJOR": 0
+  },
+  "tests": {
+    "sqlite": {
+      "passed": 535,
+      "skipped": 0,
+      "repeat_runs": 12,
+      "flaky_failures_observed": "1 in 22 runs (FC-04)"
+    },
+    "postgresql_16_4": {
+      "passed": 525,
+      "skipped": 10
+    },
+    "postgresql_18_4": {
+      "passed": 525,
+      "skipped": 10
+    },
+    "frontend": {
+      "node": "22.23.3",
+      "unit": 52,
+      "audit": 0
+    },
+    "browser": {
+      "workspace": "7/7",
+      "access": "16/16",
+      "site": "31/31",
+      "axe": "12/12"
+    }
+  },
+  "ci": {
+    "run_id": 36574695736,
+    "head_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
+    "conclusion": "success",
+    "jobs_success": 5,
+    "failure_propagation_evidence": "run 36558306690 failed on a single step"
+  },
+  "merge_conditions_technical": [
+    "Correct AM-7, AM-11, AM-12, AM-13 text; complete AM-4 or owner accepts labelled gaps",
+    "Correct SHA in owner/governance records (FC-A01)",
+    "Recommended: FC-02 one-line fix"
+  ],
+  "merge_owner_decisions": [
+    "AM-1..AM-7, AM-11..AM-13 decisions",
+    "Confirm OD-2/OD-3 in a decision record",
+    "TG-01",
+    "TG-08",
+    "Site production deployment on merge"
+  ],
+  "next_authorized_action": "Owner decision only; no merge, staging or production step is authorized."
+}
