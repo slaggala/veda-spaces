@@ -1,0 +1,219 @@
+{
+  "review_id": "VEDA-SPACES-P0-DOCUMENT-LEVEL-TECHNICAL-CHECK-01",
+  "date": "2026-09-29",
+  "target_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
+  "previous_reviewed_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
+  "architecture_sha": "778aa8fdd918da48340319696ada3ff673e9fb8e",
+  "review_branch": "review/p0-independent-implementation-review",
+  "previous_review_commit": "56c20ba992b519daa79aa3802a28343aab8c0b41",
+  "verdict": "READY WITH DOCUMENT CONDITIONS",
+  "authorizes_merge_or_deployment": false,
+  "verdicts": [
+    {
+      "item": "SHA references",
+      "verdict": "SHA REFERENCES VALID",
+      "evidence": "Every 40-hex and short SHA in the governance documents resolves; the nonexistent brief variant …bc0b11f41 appears 6× and is labelled 'does not exist' each time; 3f5920b is correctly absent from its own tree (owner package line 15 explains). Guard weakness: DC-04"
+    },
+    {
+      "item": "FC-02",
+      "verdict": "FC-02 RESOLVED",
+      "evidence": "Approved metric names handled structurally; NoEffectiveRecoveryAdmin emitted as 1.0 by the `maintenance invariants` CLI and the scheduled job (separate processes), namespace/dimensions match the runbook alarm; recovery codes, tokens, recovery-session ids and unknown recovery keys still redacted; a string/bool/dict/list under an approved metric name is redacted (no smuggling); no alarm routing or test-fire claimed (RG-5 pending)"
+    },
+    {
+      "item": "FC-04",
+      "verdict": "FC-04 RESOLVED",
+      "evidence": "api/veda/kernel/db.py: clock read after session.connection() (BEGIN IMMEDIATE) — lead reviewer read the diff; audit_hook.py: updated_on = max(now, created_on). With both reverted all three new tests fail; each fix caught by its own test; 30/30 SQLite and 10/10 PostgreSQL repeats pass, no deadlock. Also fixes the PG change_password‖refresh 500 (40/40 clean vs 5/30 errors at 6ec2e76). Residual DC-06"
+    },
+    {
+      "item": "FC-06",
+      "verdict": "FC-06 RESOLVED",
+      "evidence": "Blank, unknown, malformed and case-variant modes rejected at declaration, at startup and at request time (mutated spec → 500 before handler); optional/public + permission rejected; private without permission rejected; runtime inventory byte-identical to 6ec2e76 (105 routes)"
+    },
+    {
+      "item": "FC-11",
+      "verdict": "FC-11 NOT RESOLVED",
+      "evidence": "All previously named vectors now fail (37-case matrix). New bypass DC-05: a `.pyi` stub beside a module makes mypy check the stub, hiding that module's 62 baselined errors and any new one; the file-count check enumerates only *.py (tools/mypy_ratchet.py:67, confirmed by lead reviewer). MINOR, staging (CI gate integrity)"
+    },
+    {
+      "item": "FC-12",
+      "verdict": "FC-12 RESOLVED",
+      "evidence": "deploy.sh step 0 refuses 9236aa3, 2f6b59a, 6ec2e76 (no release field), malformed/wrong-type output and a missing image in normal AND rollback mode, before snapshot/stop/migrate; env vars, BASH_ENV and extra flags cannot override; floor derived from the image (release sequence + known revisions), not DB state (lead reviewer read deploy.sh:40-60, cli schema-status); runbook prohibits vulnerable rollback, documents forward-fix, claims no rehearsal; RG-7 remains a gate"
+    }
+  ],
+  "amendments": [
+    {
+      "id": "AM-1",
+      "classification": "TECHNICALLY SOUND"
+    },
+    {
+      "id": "AM-2",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    },
+    {
+      "id": "AM-3",
+      "classification": "TECHNICALLY SOUND"
+    },
+    {
+      "id": "AM-4",
+      "classification": "INCOMPLETE — states 422 where code/tests return 409; 'later version' has no ordering rule; the immutability option conflicts with erasure rewriting consent notes (DC-02)"
+    },
+    {
+      "id": "AM-5",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    },
+    {
+      "id": "AM-6",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    },
+    {
+      "id": "AM-7",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS — upgraded from INCOMPLETE: every claim verified against kernel/ratelimit.py, auth/throttle.py, auth/service.py; discloses reset-link suppression and that a Turnstile outage is fail-closed with unbounded availability impact under attack; makes none of the forbidden claims"
+    },
+    {
+      "id": "AM-8",
+      "classification": "TECHNICALLY SOUND"
+    },
+    {
+      "id": "AM-9",
+      "classification": "INCOMPLETE — owner decision not yet taken; repository/staging/production/provider/owner evidence are separated, but the policy itself is undecided"
+    },
+    {
+      "id": "AM-10",
+      "classification": "INCOMPLETE — omits PII entering outbox_event.last_error from SQL and handler exception text (DC-03)"
+    },
+    {
+      "id": "AM-11",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    },
+    {
+      "id": "AM-12",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    },
+    {
+      "id": "AM-13",
+      "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS"
+    }
+  ],
+  "owner_package": "READY FOR OWNER DECISION",
+  "merge_safety": "OPTION C TECHNICALLY SOUND WITH CONDITIONS",
+  "regression": "none",
+  "findings": [
+    {
+      "id": "DC-01",
+      "severity": "MAJOR (document)",
+      "title": "Merge-safety Option C is not executable as written",
+      "evidence": "(a) app/e2e/run-all.sh:32-33 serves the repo's dist/ and app/e2e/site.e2e.mjs / axe.e2e.mjs assert the new site (404.css ~l.192, flag-off validation ~l.142-155); on a simulated merge-prep tree with main's dist/ the check fails (test_public_intake_disabled reproduced failing), so 'CI passes on merge-prep' cannot be met and main CI would be red after merge. (b) Revert trap: after C, later merges never reintroduce the site changes; merging main back into the branch strips its CSP and 404 fix; a later 404.css fix hits a modify/delete conflict (simulated). (c) The plan branches from and diffs against 6ec2e76 (integrity diff 72 files) — must be 3f5920b (diff 0). (d) `git checkout origin/main -- dist/` leaves dist/assets/404.css behind; needs `git rm -r dist` first or `git restore --source origin/main --staged --worktree dist`",
+      "correction": "Correct the plan: branch from 3f5920b; exact dist restore command; a reviewed CI treatment for merge-prep/main (e.g., site journeys run against a site-fixture or are split into a site-release job) or explicit owner acceptance; a documented procedure for the later site release (revert of the 'keep live site' commit) and for keeping the branch and main in sync; evidence list updated",
+      "needed_before": "Before owner decision on merge safety (owner may instead select Option A or B)"
+    },
+    {
+      "id": "DC-02",
+      "severity": "MINOR (document)",
+      "title": "AM-4 incomplete",
+      "evidence": "See amendment table",
+      "correction": "Correct AM-4 text",
+      "needed_before": "Before owner decision on AM-4"
+    },
+    {
+      "id": "DC-03",
+      "severity": "MINOR (document)",
+      "title": "AM-10 incomplete",
+      "evidence": "api/veda/platform/notifications/worker.py stores str(exc)[:300] in outbox_event.last_error, including SQL/handler exception text",
+      "correction": "Extend AM-10 scope",
+      "needed_before": "Before production (AM-10 is a production-stage decision)"
+    },
+    {
+      "id": "DC-04",
+      "severity": "MINOR (CI/document guard)",
+      "title": "SHA-reference guard does not run in CI and is narrow",
+      "evidence": "api/tests/unit/test_governance_docs.py:82-97 skips when history is unavailable; .github/workflows/ci.yml sets no fetch-depth (depth-1 checkout) so it skips in CI (author evidence also skipped); covers 8 docs and lowercase 40-hex only; a bad SHA in runbooks/README/open-issues.json, a bad short SHA, or a real-but-wrong SHA pass (planted and confirmed)",
+      "correction": "fetch-depth: 0 for the job running it (or a dedicated job); widen the document set and patterns; assert the specific expected SHAs",
+      "needed_before": "Before owner decision (so the package's SHA assurance is enforced) — or owner accepts manual verification"
+    },
+    {
+      "id": "DC-05",
+      "severity": "MINOR",
+      "title": "FC-11 residual: .pyi stub bypass of the mypy ratchet",
+      "evidence": "tools/mypy_ratchet.py:67 enumerates only *.py; stub beside a module hides 62 baselined errors and new ones (REPRODUCED)",
+      "correction": "Refuse *.pyi under veda/ (or include stubs in the count)",
+      "needed_before": "Staging (CI gate integrity)"
+    },
+    {
+      "id": "DC-06",
+      "severity": "MINOR",
+      "title": "FC-04 residual (PostgreSQL): when the guard fires updated_on exceeds the unit's clock reading, so audit history can show UPDATE before CREATE, contradicting 03 §2.8 ('one clock reading per unit of work') without an amendment; raw updates in sync-permissions and sequence allocation are unguarded (fail-and-rollback, no corruption)",
+      "evidence": "api/veda/kernel/audit_hook.py:231-237 (REPRODUCED on embedded PostgreSQL)",
+      "correction": "Document in an amendment (or use a DB-side monotonic clock); guard or document raw update paths",
+      "needed_before": "PostgreSQL release gate; amendment text before production"
+    },
+    {
+      "id": "DC-07",
+      "severity": "MINOR (document)",
+      "title": "Owner package and registers: reviewer-classification column paraphrases the reviewer (adds '— corrected', rewords AM-6/AM-12); 'implemented at this commit' provenance is stale (code from 6ec2e76); 'OD-2/OD-3 given' wording persists in P0-final-merge-blocker-matrix.md and the deviations register although the owner package correctly marks them as assumptions",
+      "evidence": "docs/implementation/P0-owner-decision-package.md; P0-final-merge-blocker-matrix.md; P0-implementation-deviations.md",
+      "correction": "Quote reviewer classifications verbatim; fix provenance; align OD-2/OD-3 wording everywhere",
+      "needed_before": "Before owner decision"
+    },
+    {
+      "id": "DC-08",
+      "severity": "MINOR (pre-existing)",
+      "title": "PostgreSQL deadlock between a Founder RESTORE approval and an invite of the same address returns 503 (retryable); exactly one live holder of the address always",
+      "evidence": "REPRODUCED 3/24 at 3f5920b, 4/24 at 6ec2e76",
+      "correction": "Consistent lock ordering or retry",
+      "needed_before": "PostgreSQL release gate"
+    }
+  ],
+  "advisories": [
+    {
+      "id": "DC-A01",
+      "text": "health.current_revision() maps any DBAPIError to None, so `schema-status` reports state 'missing' with exit 0 during a DB outage/lock/auth failure; no automated path acts unsafely (readiness runs its own query; rollback refuses 'missing'); the manual runbook step could mislead and its output description is stale (DC-TECH-7, DC-REG-2; lead reviewer traced deploy.sh and health.py)"
+    },
+    {
+      "id": "DC-A02",
+      "text": "Ratchet: a coded ignore with any justification text passes (DC-TECH-2); code under `if not TYPE_CHECKING:` is unchecked (DC-TECH-3)"
+    },
+    {
+      "id": "DC-A03",
+      "text": "On PostgreSQL the FC-04 concurrency test passes even with the guard removed; only the deterministic test covers the race there"
+    },
+    {
+      "id": "DC-A04",
+      "text": "Remaining documentation advisories from the document working paper §6 (appendix)"
+    }
+  ],
+  "tests": {
+    "sqlite_full": {
+      "passed": 611
+    },
+    "postgresql_16_4_full": {
+      "passed": 601,
+      "skipped": 10
+    },
+    "frontend_unit": 52,
+    "browser": {
+      "workspace": "7/7",
+      "access": "16/16",
+      "site": "31/31",
+      "axe": "12/12"
+    }
+  },
+  "ci": {
+    "run_id": 36594775516,
+    "head_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
+    "conclusion": "success",
+    "jobs_success": 5,
+    "attempt": 1
+  },
+  "remaining_technical_blockers": [],
+  "document_conditions_before_owner_decision": [
+    "DC-01",
+    "DC-02",
+    "DC-04",
+    "DC-07"
+  ],
+  "gates": {
+    "TG-01": "Pending",
+    "TG-08": "Pending"
+  },
+  "next_authorized_action": "Owner decision only; no merge or deployment authorized."
+}
