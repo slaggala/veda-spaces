@@ -1,0 +1,566 @@
+{
+ "remediation": "VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01",
+ "review_id": "VEDA-SPACES-P0-INDEPENDENT-ARCHITECTURE-REVIEW-01",
+ "reviewed_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "review_branch": "review/p0-foundation-independent-review",
+ "review_commit": "7515b232e7407c0bb20afc5abd9656da2c246d0b",
+ "counts": {
+  "MAJOR": 3,
+  "MINOR": 18,
+  "ADVISORY": 14
+ },
+ "findings": [
+  {
+   "finding_id": "F-01",
+   "original_severity": "MAJOR",
+   "title": "MFA policy contradiction: every Sales user is forced into mandatory MFA",
+   "affected_requirements": [
+    "MFA-003",
+    "MFA-004",
+    "AUTH-015",
+    "AUTH-018",
+    "RBAC-008",
+    "SEVT-005",
+    "RBAC-017"
+   ],
+   "owner_decision": "Decision 1",
+   "remediation_action": "Removed `security_event.read` from Sales; made it ALL-only (no OWN). Canonical sensitivity classification (`sensitivity_class`) in the code registry, with a registry rule that seeded SALES holds no sensitive permission. Sensitive permissions are effective only with MFA (MFA-012), suspended when MFA is absent, removed or reset. `authz_version` covers MFA-state changes and sessions are checked uncached. Sales MFA optional by default. Negative tests for Sales security-event access.",
+   "documents_changed": "ADR-006, ADR-004, 03 §4.3–4.4, 05 §9.5, §11.1, §12, 06 §2–§6, §9, §10, 08 §4.4, §10.1, 09 §4.6, §4.10, 11 §6, 12 §4.3–4.5",
+   "validation_evidence_required": "12 §4.3 access tests (Sales 403 incl. self), 12 §4.4 sensitivity registry + activation + propagation tests, 12 §4.5 MFA policy test",
+   "status": "Resolved",
+   "re_review_required": "Yes"
+  },
+  {
+   "finding_id": "F-02",
+   "original_severity": "MAJOR",
+   "title": "Account recovery weakens MFA: password-only enrollment after an MFA reset or a policy change",
+   "affected_requirements": [
+    "MFA-007",
+    "AUTH-015",
+    "MFA-002",
+    "MFA-004",
+    "USER-006"
+   ],
+   "owner_decision": "Decision 2",
+   "remediation_action": "Enrollment only via four two-proof paths (MFA-014); login with MFA required but no factor emails an enrollment link and returns no token. Recovery = password re-entry + recovery code → restricted RECOVERY session (allow-list, 15 min, no refresh) → re-enrollment with code rotation → cooling-off; other sessions revoked; notification to the verified email. Admin reset: `user.mfa.reset`, step-up, G3/G9/G11, dual control for privileged targets, Founder via two Founders or break-glass with two IAM custodians; enrollment link to the target's verified email. Full event catalog.",
+   "documents_changed": "ADR-006, ADR-010, 03 §5.1, §5.3, §5.8, 05 §3, §8.4, §9.1, §11.3–11.7, 06 §7.2–7.5, §8, 08 §4.1, §4.7, §5.10–5.11, 09 §4.10, §4.12, 11 §5 X14, 12 §4.4–4.5",
+   "validation_evidence_required": "12 §4.5 enrollment-proof, recovery, cooling-off and admin-reset tests; 12 §4.4 dual-control and break-glass tests",
+   "status": "Resolved",
+   "re_review_required": "Yes"
+  },
+  {
+   "finding_id": "F-03",
+   "original_severity": "MAJOR",
+   "title": "Stronger accounts can be taken over or disabled through non-sensitive user-administration endpoints",
+   "affected_requirements": [
+    "RBAC-009",
+    "USER-001",
+    "USER-002",
+    "AUTH-008",
+    "MFA-007",
+    "RBAC-011"
+   ],
+   "owner_decision": "Decision 3",
+   "remediation_action": "Retired `user.update`; granular permissions (`user.profile.update`, `user.email.change`, `user.status.manage`, `user.role.manage`, `user.permission.manage`, `user.mfa.reset`, `user.mfa.require`, `user.founder.manage`). Closed profile-only DTOs. Proposed-email workflow. G9 extended to all account-control actions; G3 extended to self-deactivation; G4 invariants I1/I2 under the write lock plus nightly check; G11 Founder protection via `protection_level`; G12 dual control; break-glass.",
+   "documents_changed": "ADR-010, 03 §4.1, §5.8, 05 §8.3, §8.6, 06 §6.2, §7, §10, 08 §1, §4.4, §4.8, §5, 09 §4.6, §4.12, §4.13, 11 §5 X9/X17/X18, 12 §4.4–4.5",
+   "validation_evidence_required": "12 §4.4 mass-assignment, G1–G12, Founder and last-administrator concurrency tests; 12 §4.5 email-change tests",
+   "status": "Resolved",
+   "re_review_required": "Yes"
+  },
+  {
+   "finding_id": "F-04",
+   "original_severity": "MINOR",
+   "title": "Public-intake idempotency contract is contradictory and not implementable as specified",
+   "affected_requirements": [
+    "API-007",
+    "LEAD-001",
+    "LEAD-025",
+    "LEAD-018"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Request fingerprint (JCS SHA-256) stored with the key; idempotency lookup moved before Turnstile (after rate limiting); single behavior stated in 04 §5.1 and 08 §2.8.",
+   "documents_changed": "04 §2, §5.1, 08 §2.8, §8.4, ADR-005",
+   "validation_evidence_required": "12 §4.6 idempotency tests (spent Turnstile token replay; key reuse 422; lookup-before-CAPTCHA)",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-05",
+   "original_severity": "MINOR",
+   "title": "Public-intake non-success paths can silently drop or misreport genuine enquiries",
+   "affected_requirements": [
+    "LEAD-018",
+    "LEAD-019",
+    "LEAD-010",
+    "LEAD-001"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Honeypot hit stores the lead as `spam_status = SUSPECTED` with the identical 201 response (spam review queue); honeypot markup specified; 02 §2.4, 04 §5.1 and 09 §4.11 aligned so every non-2xx except field-level 422 offers WhatsApp; per-IP limits relaxed for mobile NAT.",
+   "documents_changed": "02 §2.4, 04 §2, §5.1, §5.5, 08 §8.4, §12, 09 §4.3, §4.11, ADR-005",
+   "validation_evidence_required": "12 §4.7 no-silent-loss tests; E2E fallback tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-06",
+   "original_severity": "MINOR",
+   "title": "SENSITIVE_ACTION on reads is self-contradictory",
+   "affected_requirements": [
+    "RBAC-017",
+    "SEVT-005",
+    "AUDIT-008"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Defined 'use': mutations with sensitive permissions → `SENSITIVE_ACTION`; reads with SECURITY_DATA/BULK_DATA → de-duplicated `SENSITIVE_READ`. Aligned 05 §9.1/§9.5, 06 §3.2, 07 §4.3.",
+   "documents_changed": "05 §9.1, §9.5, 06 §3.2, 07 §4.3, ADR-004",
+   "validation_evidence_required": "12 §4.3 sensitive-read test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-07",
+   "original_severity": "MINOR",
+   "title": "Purge and retention rules conflict with ON DELETE RESTRICT foreign keys; session retention undefined",
+   "affected_requirements": [
+    "DATA-009",
+    "DATA-014",
+    "SEVT-004",
+    "NOTIF-004"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Session retention defined; evidence `session_id` and `refresh_token.replaced_by_id` are non-FK correlation ids (EXC-009); purge ordering (03 §2.10) with outbox purge excluding referenced rows; retention values are OWNER-INPUT-002.",
+   "documents_changed": "03 §2.3, §2.9, §2.10, §5.1–5.4, §7, 05 §7, ADR-003, ADR-004",
+   "validation_evidence_required": "12 §4.1 purge-ordering test with foreign_keys=ON on both engines",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-08",
+   "original_severity": "MINOR",
+   "title": "Exception registry is incomplete: unique indexes without the soft-delete predicate are not registered",
+   "affected_requirements": [
+    "DATA-014",
+    "DATA-011",
+    "DATA-007"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "EXC-007 now lists `ux_lead__public_reference`, `ux_lead__intake_idempotency_key` and `ux_notification__event_recipient` with justification; the validator inspects unique-index predicates.",
+   "documents_changed": "03 §2.9, ADR-003",
+   "validation_evidence_required": "12 §4.1 exception-registry SL check; validation V17",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-09",
+   "original_severity": "MINOR",
+   "title": "In-process rate-limit and idempotency stores are per gunicorn worker",
+   "affected_requirements": [
+    "SEC-011",
+    "AUTH-010",
+    "API-007",
+    "MFA-009"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Exactly one gunicorn gthread worker process (OPS-010) so limiter, idempotency and caches are authoritative; deployment check; ASM-013 validated by load test.",
+   "documents_changed": "02 §3.5, §12.2, 05 §4, 08 §2.8, §12, 11 §1.2, §10",
+   "validation_evidence_required": "12 §4.9 single-process config check; RG-4 / TG-06 load evidence",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-10",
+   "original_severity": "MINOR",
+   "title": "Revocation latency and the refresh-reuse grace window are under-specified",
+   "affected_requirements": [
+    "AUTH-005",
+    "AUTH-006",
+    "AUTH-017",
+    "RBAC-013"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Per-request uncached session/user read (effect on next request); grace window specified (access token only, once, no Set-Cookie; `grace_used_on`).",
+   "documents_changed": "03 §5.2, 05 §5, §6.1, 06 §9",
+   "validation_evidence_required": "12 §4.5 token-after-revocation and grace-window tests; TG-06",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-11",
+   "original_severity": "MINOR",
+   "title": "P0 tamper evidence of security_event_log is overstated",
+   "affected_requirements": [
+    "SEVT-006",
+    "SEVT-004",
+    "OPS-004"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Keyed HMAC chain (key in SSM, `chain_key_id`), RFC 8785 canonicalization over application-level values, external Object-Lock anchor promoted to P0 (SEVT-007), archival anchors stored externally; residual root-on-host risk documented.",
+   "documents_changed": "03 §5.4, 05 §9.4, §9.6, 07 §6.3, 11 §4 A2, ADR-004",
+   "validation_evidence_required": "12 §4.3 keyed-chain, wrong-key and cross-engine canonicalization tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-12",
+   "original_severity": "MINOR",
+   "title": "Operational coupling and inconsistent rollback procedures",
+   "affected_requirements": [
+    "LOG-005",
+    "OPS-004",
+    "NOTIF-008",
+    "NOTIF-004"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Readiness excludes outbox/email health (reported as degraded, alerted separately); single deploy/migration runbook with expand-only N-1-compatible migrations and explicit normal and disaster rollback semantics.",
+   "documents_changed": "02 §9, §12.2, §12.4, 11 §2 B3",
+   "validation_evidence_required": "12 §4.1 upgrade-with-data and N-1 tests; 12 §4.6 readiness test; RG-7 / TG-05 rehearsal",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-13",
+   "original_severity": "MINOR",
+   "title": "`user_mfa_factor.secret_key_ref` VARCHAR(200) is likely too small",
+   "affected_requirements": [
+    "MFA-010",
+    "MFA-001"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Split into `wrapped_data_key` TEXT and `kms_key_arn` VARCHAR(2048).",
+   "documents_changed": "03 §5.5, 05 §11.2",
+   "validation_evidence_required": "12 §4.5 KMS blob test (TG-02 in implementation)",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-14",
+   "original_severity": "MINOR",
+   "title": "Dark-mode primary button fails contrast; no on-color token",
+   "affected_requirements": [
+    "UI-011",
+    "UI-014",
+    "UI-010"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Added `--vs-on-copper-strong` (light #FFFFFF, dark #171614: 7.1:1 / 9.5:1), `--vs-on-danger`, `--vs-focus-ring`; dark-theme token table; automated token-pair contrast check for both themes.",
+   "documents_changed": "09 §2.1, §2.5, §5 AX-05",
+   "validation_evidence_required": "12 §4.8 token contrast test (both themes); validation V23",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-15",
+   "original_severity": "MINOR",
+   "title": "No P0 design for lead retention, erasure or consent withdrawal (DPDP)",
+   "affected_requirements": [
+    "SEC-009",
+    "LEAD-012",
+    "AUDIT-011"
+   ],
+   "owner_decision": "Decision 6 (values)",
+   "remediation_action": "Consent withdrawal (LEAD-027), closed-lead retention/anonymization job shipping disabled until OWNER-INPUT-002 (LEAD-028), erasure request workflow (LEAD-029), anonymization procedure promoted to P0 (AUDIT-011).",
+   "documents_changed": "04 §2, §5.4, §14, 07 §8, 08 §8.8, 09 §4.4, 11 §5.6, ADR-005",
+   "validation_evidence_required": "12 §4.2 anonymization test; 12 §4.7 withdrawal, retention and erasure tests; PG-RET / TG-04 for production values",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-16",
+   "original_severity": "MINOR",
+   "title": "Deferred P1 capabilities are embedded in P0 surfaces (scope ambiguity)",
+   "affected_requirements": [
+    "PLAT-012",
+    "RBAC-011",
+    "AUTH-016",
+    "RBAC-007",
+    "RBAC-016"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Promoted AUTH-016 and RBAC-016 to P0; time-bound grants (RBAC-007, P1) disabled in P0 with 422 and never allowed on sensitive permissions; P1 surfaces marked in 08 and 09.",
+   "documents_changed": "06 §5, §7.3, 08 §1, §5.7–5.8, 09 §4.6, ADR-009",
+   "validation_evidence_required": "12 §4.4 time-bound 422 test and invariant tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-17",
+   "original_severity": "MINOR",
+   "title": "Website form mapping drops live data (ASM-005)",
+   "affected_requirements": [
+    "LEAD-023",
+    "LEAD-001",
+    "LEAD-002"
+   ],
+   "owner_decision": "Decision 4",
+   "remediation_action": "`property_type` optional on the public form; values APARTMENT, INDEPENDENT_HOUSE, VILLA, OFFICE, RETAIL, OTHER; 'Home Renovation' moved to PROJECT_TYPE RENOVATION; live-option reconciliation; unknown codes kept in `intake_unmapped` (LEAD-030).",
+   "documents_changed": "03 §6.2, 04 §2, §5.1, §13, 08 §8.4, 09 §4.11, ADR-005",
+   "validation_evidence_required": "12 §4.7 property-type and unknown-code tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-18",
+   "original_severity": "MINOR",
+   "title": "ADR acceptance evidence is not in the repository",
+   "affected_requirements": [
+    "PLAT-006"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Added an approval record to every ADR and a decision log with source instructions. A verifiable owner sign-off (owner approval of the architecture PR) cannot be produced by the author: tracked gate TG-01 (owner: Veda Spaces owner; target: before implementation; acceptance: PR approval from the owner account recorded in the decision log).",
+   "documents_changed": "decisions/ADR-001…010, decisions/decision-log.md, 11 §11",
+   "validation_evidence_required": "TG-01 evidence: link to owner PR approval",
+   "status": "Tracked before implementation",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-19",
+   "original_severity": "MINOR",
+   "title": "Test-strategy gaps behind the reported 199-requirement coverage",
+   "affected_requirements": [
+    "PLAT-006",
+    "OPS-001",
+    "OPS-004",
+    "AUTH-005",
+    "AUTH-006",
+    "SEC-002",
+    "SEC-010",
+    "NFR-002",
+    "OPS-005"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Added suites: migration upgrade-with-data and N-1 tests, CSRF negatives, token-after-revocation, grace-window replay, SQLite contention, browser/device matrix, DAST/pentest (pre-production gate PG-DAST, TG-03). Coverage gate reports automated tests separately from RV/OP and owner-gated items.",
+   "documents_changed": "12 §1–§5, 11 §7.3, §11, coverage-gate",
+   "validation_evidence_required": "12 suites present; TG-03 DAST/pentest reports before production",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-20",
+   "original_severity": "MINOR",
+   "title": "Note 'Undo' depends on a restore endpoint that does not exist",
+   "affected_requirements": [
+    "NOTE-002",
+    "UI-004"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Dropped note Undo; confirmed soft delete; stated no note-restore endpoint.",
+   "documents_changed": "04 §9, 08 §9.1, 09 §3.2",
+   "validation_evidence_required": "12 §4.7 note tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "F-21",
+   "original_severity": "MINOR",
+   "title": "Validation and coverage evidence is largely self-referential",
+   "affected_requirements": [],
+   "owner_decision": "—",
+   "remediation_action": "Removed injected Traces lines; replaced citation coverage with substantive classification per requirement (independent-review taxonomy) using the reviewer's matrix as baseline; coverage refs validated only for resolvability; remediated classifications marked as author assessment pending re-review.",
+   "documents_changed": "requirements.json, 01, validation-report.*, coverage-gate.md, README",
+   "validation_evidence_required": "Validation V26; coverage gate classification table",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-01",
+   "original_severity": "ADVISORY",
+   "title": "Account-lockout denial of service against privileged users",
+   "affected_requirements": [
+    "AUTH-010"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Per (account, network) throttling; distributed-guessing throttle never blocks password+TOTP.",
+   "documents_changed": "03 §4.2, 05 §4",
+   "validation_evidence_required": "12 §4.5 throttling tests",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-02",
+   "original_severity": "ADVISORY",
+   "title": "SQLite immutability is convention-level",
+   "affected_requirements": [
+    "AUDIT-004",
+    "SEVT-001"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Application processes never issue DDL; retention/erasure only from the maintenance CLI; readiness and nightly job verify triggers; residual risk documented.",
+   "documents_changed": "02 §9, 07 §6.2, 11 §4 A2",
+   "validation_evidence_required": "12 §4.2 trigger-presence readiness test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-03",
+   "original_severity": "ADVISORY",
+   "title": "Case-insensitive search differs between engines for non-ASCII text",
+   "affected_requirements": [
+    "PLAT-004",
+    "LEAD-013"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Application-casefolded `search_text` shadow column.",
+   "documents_changed": "04 §2, 11 §3.1",
+   "validation_evidence_required": "12 §4.7 non-ASCII dual-engine search test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-04",
+   "original_severity": "ADVISORY",
+   "title": "Case-sensitive uniqueness of role names and lookup codes",
+   "affected_requirements": [
+    "RBAC-015"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "`role.name_normalized` with case-insensitive unique index.",
+   "documents_changed": "03 §4.3",
+   "validation_evidence_required": "12 §4.4 user lifecycle / role uniqueness test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-05",
+   "original_severity": "ADVISORY",
+   "title": "Invite-link interception yields password and MFA enrollment",
+   "affected_requirements": [
+    "AUTH-011",
+    "AUTH-014"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "24 h invite expiry when roles are sensitive; MFA enrollment inside invite flow; inviter notified on acceptance.",
+   "documents_changed": "05 §8.4, 08 §5.2, 02 §10.3",
+   "validation_evidence_required": "12 §4.4 user lifecycle test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-06",
+   "original_severity": "ADVISORY",
+   "title": "State that G2 applies to `copy_from_role_id`",
+   "affected_requirements": [
+    "RBAC-009"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "G2 applies to `copy_from_role_id`; ESCALATION_DENIED documented.",
+   "documents_changed": "06 §7.1, 08 §6.1",
+   "validation_evidence_required": "12 §4.4 copy-escalation test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-07",
+   "original_severity": "ADVISORY",
+   "title": "Duplicate-resolution target must be scope-checked",
+   "affected_requirements": [
+    "RBAC-014",
+    "LEAD-010"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Duplicate target resolved through the scoped repository; 404 identical to missing.",
+   "documents_changed": "04 §7, 06 §4, 08 §8.8",
+   "validation_evidence_required": "12 §4.4 guard test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-08",
+   "original_severity": "ADVISORY",
+   "title": "`?next=` redirect validation",
+   "affected_requirements": [
+    "UI-001"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "`?next=` allowed only for `^/(?![/\\\\])`; tests.",
+   "documents_changed": "12 §4.8",
+   "validation_evidence_required": "12 §4.8 redirect test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-09",
+   "original_severity": "ADVISORY",
+   "title": "Order app-level rate limiting before server-to-server Turnstile verification",
+   "affected_requirements": [
+    "LEAD-018",
+    "NFR-003"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Application rate limit and idempotency before Turnstile.",
+   "documents_changed": "04 §5.1, 08 §2.8",
+   "validation_evidence_required": "12 §4.6 order test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-10",
+   "original_severity": "ADVISORY",
+   "title": "Example TOTP secret in docs",
+   "affected_requirements": [],
+   "owner_decision": "—",
+   "remediation_action": "Example secrets replaced by `<BASE32-SECRET-SHOWN-ONCE>`.",
+   "documents_changed": "08 §4.7",
+   "validation_evidence_required": "Validation V14 secret scan",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-11",
+   "original_severity": "ADVISORY",
+   "title": "Litestream operational constraints",
+   "affected_requirements": [
+    "OPS-002",
+    "OPS-009"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Litestream constraints documented and monitored.",
+   "documents_changed": "02 §12.3",
+   "validation_evidence_required": "RG-5 alert test-fire; OPS-009 restore verification",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-12",
+   "original_severity": "ADVISORY",
+   "title": "`audit.read` exposes lead PII regardless of lead scope",
+   "affected_requirements": [
+    "AUDIT-008"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "PII fields masked in audit payloads for leads outside the viewer's `lead.read` scope.",
+   "documents_changed": "06 §8, 07 §4.3",
+   "validation_evidence_required": "12 §4.2 masking test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-13",
+   "original_severity": "ADVISORY",
+   "title": "PostgreSQL chain advisory lock is held for the whole business transaction",
+   "affected_requirements": [
+    "SEVT-006",
+    "NFR-001"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Accepted: SUCCESS events share the business transaction for atomicity; the PostgreSQL advisory lock cost is measured in the migration rehearsal (RG-4). Deferred chaining via a sequence is noted as the fallback if throughput is insufficient.",
+   "documents_changed": "05 §9.6, 11 §1.2 S6",
+   "validation_evidence_required": "RG-4 chain-append latency measurement",
+   "status": "Accepted advisory with reason",
+   "re_review_required": "No"
+  },
+  {
+   "finding_id": "A-14",
+   "original_severity": "ADVISORY",
+   "title": "Honeypot response status differs from success",
+   "affected_requirements": [
+    "LEAD-018"
+   ],
+   "owner_decision": "—",
+   "remediation_action": "Honeypot returns the same 201 shape with a real reference (quarantine).",
+   "documents_changed": "04 §5.1, 08 §8.4",
+   "validation_evidence_required": "12 §4.7 identical-response test",
+   "status": "Resolved",
+   "re_review_required": "No"
+  }
+ ]
+}

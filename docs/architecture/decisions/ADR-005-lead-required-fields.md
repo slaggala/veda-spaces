@@ -1,6 +1,6 @@
 # ADR-005: Public lead form fields and intake rules
 
-- **Status:** Accepted
+- **Status:** Accepted (amended by remediation 01)
 - **Date:** 2026-09-29
 
 ## Context
@@ -12,7 +12,7 @@ Lead capture is the P0 business priority. Friction on the public form lowers con
 | Field level | Fields |
 |---|---|
 | **Required** | `name`, `phone`, consent acknowledgement |
-| **Optional** | `email`, `city`, `project_type`, `budget_range`, `message` |
+| **Optional** | `email`, `city`, `project_type`, `budget_range`, **`property_type`** (owner Decision 4), `message` |
 
 The public API schema is closed to exactly these fields, plus machine-supplied attribution, CAPTCHA token and honeypot.
 
@@ -24,6 +24,10 @@ The public API schema is closed to exactly these fields, plus machine-supplied a
 | Consent | Records policy version, server timestamp and source context (channel, form page, IP) (LEAD-012) |
 | Phone | Default region India. International numbers with `+<country code>` are accepted. Invalid numbers are rejected. E.164 storage (LEAD-009). |
 | Duplicates | Flagged, never silently discarded (LEAD-010) |
+| Property type (Decision 4) | Optional. Values: `APARTMENT`, `INDEPENDENT_HOUSE`, `VILLA`, `OFFICE`, `RETAIL`, `OTHER`. "Home Renovation" is **not** a property type; renovation is PROJECT_TYPE `RENOVATION`. Staff can enrich or correct it later. Unknown or future codes on public intake are kept raw in `intake_unmapped` and never reject the enquiry or corrupt records. Lookups are referenced by id, so deactivated values stay valid on old rows (LEAD-030). |
+| Idempotency (F-04) | Key plus a request fingerprint (JCS SHA-256), looked up **before** CAPTCHA. Same fingerprint replays the original response. A different one → `422 IDEMPOTENCY_KEY_REUSED`. |
+| No silent loss (F-05) | A honeypot hit stores the lead as `spam_status = SUSPECTED` with the same 201 response, for staff review. Every non-2xx except field-level 422 offers the WhatsApp hand-off. Per-IP limits are relaxed for mobile carrier NAT, with Turnstile as the primary control. |
+| Consent withdrawal and retention (F-15) | Withdrawal recorded with channel (LEAD-027). Closed-lead anonymization job (LEAD-028, period OWNER-INPUT-002). Erasure requests (LEAD-029). |
 | Abuse protection | Cloudflare Turnstile and rate limiting are required. A honeypot is used. Every block is recorded as a security event (LEAD-018). |
 | Error state | Accessible: error summary, focus management, inline messages, not color-only (LEAD-026, 09 §4.11) |
 | Fallback | The existing WhatsApp hand-off is preserved when the API is unavailable (LEAD-019) |
@@ -37,7 +41,7 @@ The public API schema is closed to exactly these fields, plus machine-supplied a
 | Reject duplicates | Loses genuine repeat enquiries |
 | Return `lead_number` to the enquirer | Exposes sequential business volume (ADR-002) |
 | Accept any phone string | Uncontactable leads |
-| Allow the website's "Property Type" as an extra optional field | Not in the approved list. Captured by staff instead (ASM-005). The owner may amend. |
+| Keep property type staff-only (frozen draft, ASM-005) | Superseded by owner Decision 4: it is now an optional public field |
 
 ## Consequences
 
@@ -65,3 +69,11 @@ LEAD-001, LEAD-002, LEAD-009, LEAD-010, LEAD-012, LEAD-018, LEAD-019, LEAD-023, 
 - Conversion-rate data after launch
 - Adding property type or other fields to the public form
 - Launching international marketing
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-005; amended by `VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01` Decision 4 (F-17, ASM-005), plus architecture fixes for F-04, F-05 and F-15 |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

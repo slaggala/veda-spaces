@@ -6,7 +6,9 @@ Every endpoint either names its permission code, or is listed in the RBAC except
 
 ## 1. Endpoint index
 
-| # | Method & path | Permission | Req |
+Every row names its permission code(s), or an RBAC exception (06 §11, RBX-*). "Step-up" means G10, and "dual" means G12 dual control (06 §7). **P1** rows are designed but not built in P0 (ADR-009).
+
+| # | Method & path | Permission / gate | Req |
 |---|---|---|---|
 | **Ops** | | | |
 | 1 | `GET /health/live` | public (RBX-006) | LOG-005 |
@@ -17,95 +19,96 @@ Every endpoint either names its permission code, or is listed in the RBAC except
 | 5 | `POST /api/v1/auth/logout` | own session (RBX-002) | AUTH-007 |
 | 6 | `POST /api/v1/auth/logout-all` | own session (RBX-002) | AUTH-007 |
 | 7 | `GET /api/v1/auth/me` | `profile.read` | USER-004 |
-| 8 | `PATCH /api/v1/auth/me` | `profile.update` | USER-004 |
-| 9 | `POST /api/v1/auth/password/forgot` | public (RBX-003) | AUTH-008 |
-| 10 | `POST /api/v1/auth/password/reset` | single-use token (RBX-003) | AUTH-008 |
-| 11 | `POST /api/v1/auth/password/change` | own credentials (RBX-004) | AUTH-012 |
-| 12 | `POST /api/v1/auth/invite/accept` | single-use token (RBX-003) | AUTH-011 |
-| 13 | `GET /api/v1/auth/sessions` | `session.read` | AUTH-016 |
-| 14 | `DELETE /api/v1/auth/sessions/{session_id}` | `session.revoke` | AUTH-016 |
-| 15 | `GET /api/v1/auth/.well-known/jwks.json` | public (RBX-006) | AUTH-004 |
-| 15a | `POST /api/v1/auth/mfa/verify` | challenge token (RBX-001) | MFA-001 |
-| 15b | `POST /api/v1/auth/mfa/enroll/start` · `POST /api/v1/auth/mfa/enroll/confirm` | challenge token or own session (RBX-001) | MFA-001 |
-| 15c | `POST /api/v1/auth/mfa/step-up` | own session (RBX-004) | MFA-011 |
-| 15d | `POST /api/v1/auth/mfa/recovery-codes` | own session + step-up (RBX-004) | MFA-005 |
-| 15e | `DELETE /api/v1/auth/mfa/factor` | own session + step-up, only if policy doesn't require MFA (RBX-004) | MFA-003 |
-| 15f | `GET /api/v1/auth/mfa` | `profile.read` | MFA-001 |
+| 8 | `PATCH /api/v1/auth/me` | `profile.update` (profile fields only) | USER-004 |
+| 9 | `PUT /api/v1/auth/me/email` | own account + step-up (RBX-004) | USER-007 |
+| 10 | `POST /api/v1/auth/email/verify` · `POST /api/v1/auth/email/cancel` | single-use token (RBX-003) | USER-007 |
+| 11 | `POST /api/v1/auth/password/forgot` | public (RBX-003) | AUTH-008 |
+| 12 | `POST /api/v1/auth/password/reset` | single-use token (RBX-003) | AUTH-008 |
+| 13 | `POST /api/v1/auth/password/change` | own credentials (RBX-004) | AUTH-012 |
+| 14 | `POST /api/v1/auth/invite/accept` | single-use token (RBX-003) | AUTH-011 |
+| 15 | `POST /api/v1/auth/reauth` | own session (RBX-004) | MFA-011 |
+| 16 | `GET /api/v1/auth/sessions` | `session.read` | AUTH-016 |
+| 17 | `DELETE /api/v1/auth/sessions/{session_id}` | `session.revoke` | AUTH-016 |
+| 18 | `GET /api/v1/auth/.well-known/jwks.json` | public (RBX-006) | AUTH-004 |
+| 19 | `POST /api/v1/auth/mfa/verify` | challenge token (RBX-001) | MFA-001 |
+| 20 | `POST /api/v1/auth/mfa/recovery` | challenge token + password + recovery code (RBX-001) | MFA-013 |
+| 21 | `POST /api/v1/auth/mfa/enroll/start` · `POST /api/v1/auth/mfa/enroll/confirm` | one of the four two-proof paths in 05 §11.3 (RBX-004) | MFA-014 |
+| 22 | `POST /api/v1/auth/mfa/step-up` | own session (RBX-004) | MFA-011 |
+| 23 | `POST /api/v1/auth/mfa/recovery-codes` | own session + step-up, not in cooling-off (RBX-004) | MFA-005 |
+| 24 | `DELETE /api/v1/auth/mfa/factor` | own session + step-up, only if policy does not require MFA (RBX-004) | MFA-003 |
+| 25 | `GET /api/v1/auth/mfa` | `profile.read` | MFA-001 |
 | **Users** (§5) | | | |
-| 16 | `GET /api/v1/users` | `user.read` | USER-001 |
-| 17 | `POST /api/v1/users` | `user.create` (+ `user.role.assign` if roles given) | USER-001 |
-| 18 | `GET /api/v1/users/{user_id}` | `user.read` | USER-001 |
-| 19 | `PATCH /api/v1/users/{user_id}` | `user.update` | USER-001 |
-| 20 | `POST /api/v1/users/{user_id}/deactivate` | `user.deactivate` | USER-002 |
-| 21 | `POST /api/v1/users/{user_id}/activate` | `user.deactivate` | USER-002 |
-| 22 | `POST /api/v1/users/{user_id}/unlock` | `user.update` | AUTH-010 |
-| 23 | `DELETE /api/v1/users/{user_id}` | `user.delete` | USER-001 |
-| 24 | `POST /api/v1/users/{user_id}/restore` | `user.restore` | USER-001 |
-| 25 | `POST /api/v1/users/{user_id}/invite/resend` | `user.create` | AUTH-011 |
-| 26 | `POST /api/v1/users/{user_id}/password-reset` | `user.password.reset` | AUTH-008 |
-| 27 | `POST /api/v1/users/{user_id}/sessions/revoke` | `user.session.revoke` | AUTH-016 |
-| 28 | `GET /api/v1/users/{user_id}/roles` | `user.read` | RBAC-008 |
-| 29 | `PUT /api/v1/users/{user_id}/roles` | `user.role.assign` | RBAC-009 |
-| 30 | `GET /api/v1/users/{user_id}/permissions` | `user.read` | RBAC-006 |
-| 31 | `POST /api/v1/users/{user_id}/permissions` | `user.permission.assign` | RBAC-006 |
-| 32 | `DELETE /api/v1/users/{user_id}/permissions/{grant_id}` | `user.permission.assign` | RBAC-006 |
-| 33 | `GET /api/v1/users/{user_id}/effective-permissions` | `user.read` + `permission.read` | RBAC-016 |
-| 34 | `GET /api/v1/users/assignable` | `lead.assign` | LEAD-007 |
-| 34a | `POST /api/v1/users/{user_id}/mfa/reset` | `user.mfa.manage` + step-up | MFA-007 |
-| 34b | `PUT /api/v1/users/{user_id}/mfa-requirement` | `user.mfa.manage` + step-up | MFA-003 |
+| 26 | `GET /api/v1/users` · `GET /api/v1/users/{user_id}` | `user.read` | USER-001 |
+| 27 | `POST /api/v1/users` | `user.create` (+ `user.role.manage` if roles are given) | USER-001 |
+| 28 | `PATCH /api/v1/users/{user_id}` | `user.profile.update` (profile fields only) | RBAC-019 |
+| 29 | `POST /api/v1/users/{user_id}/email-change` | `user.email.change` + step-up + G9/G11 (+ dual if privileged) | USER-007 |
+| 30 | `POST /api/v1/users/{user_id}/status` | `user.status.manage` + step-up + G3/G4/G9/G11 | RBAC-019 |
+| 31 | `POST /api/v1/users/{user_id}/unlock` | `user.status.manage` + G9 | AUTH-010 |
+| 32 | `DELETE /api/v1/users/{user_id}` | `user.delete` + step-up + G3/G4/G9/G11 | USER-001 |
+| 33 | `POST /api/v1/users/{user_id}/restore` | `user.restore` + G9 | USER-001 |
+| 34 | `POST /api/v1/users/{user_id}/invite/resend` | `user.create` + G9 | AUTH-011 |
+| 35 | `POST /api/v1/users/{user_id}/password-reset` | `user.password.reset` + G9/G11 | AUTH-008 |
+| 36 | `POST /api/v1/users/{user_id}/sessions/revoke` | `user.session.revoke` + step-up + G9/G11 | AUTH-016 |
+| 37 | `GET /api/v1/users/{user_id}/roles` | `user.read` | RBAC-008 |
+| 38 | `PUT /api/v1/users/{user_id}/roles` | `user.role.manage` + step-up + G1–G4/G9/G11 | RBAC-009 |
+| 39 | `GET /api/v1/users/{user_id}/permissions` | `user.read` | RBAC-006 |
+| 40 | `POST /api/v1/users/{user_id}/permissions` · `DELETE …/permissions/{grant_id}` | `user.permission.manage` + step-up + G1/G3/G4/G9/G11 | RBAC-006 |
+| 41 | `GET /api/v1/users/{user_id}/effective-permissions` | `user.read` + `permission.read` | RBAC-016 |
+| 42 | `POST /api/v1/users/{user_id}/mfa/reset` | `user.mfa.reset` + step-up + G3/G9/G11 (+ dual if privileged) | MFA-007 |
+| 43 | `PUT /api/v1/users/{user_id}/mfa-requirement` | `user.mfa.require` + step-up + G3/G9 | MFA-003 |
+| 44 | `GET /api/v1/users/assignable` | `lead.assign` | LEAD-007 |
+| **Approvals and Founder workflow** (§5.11) | | | |
+| 45 | `GET /api/v1/approvals` · `GET /api/v1/approvals/{approval_id}` | the permission of the request's action (list is filtered to what the caller may approve or has requested) | RBAC-021 |
+| 46 | `POST /api/v1/approvals/{approval_id}/approve` · `…/deny` | the action's permission + step-up + eligibility (06 §7.4) | RBAC-021 |
+| 47 | `POST /api/v1/approvals/{approval_id}/cancel` | requester only (the action's permission) | RBAC-021 |
+| 48 | `POST /api/v1/founder-actions` | `user.founder.manage` + step-up + dual | RBAC-021 |
 | **Roles and permissions** (§6) | | | |
-| 35 | `GET /api/v1/roles` | `role.read` | RBAC-008 |
-| 36 | `POST /api/v1/roles` | `role.manage` | RBAC-008 |
-| 37 | `GET /api/v1/roles/{role_id}` | `role.read` | RBAC-008 |
-| 38 | `PATCH /api/v1/roles/{role_id}` | `role.manage` | RBAC-008 |
-| 39 | `DELETE /api/v1/roles/{role_id}` | `role.manage` | RBAC-015 |
-| 40 | `GET /api/v1/roles/{role_id}/permissions` | `role.read` | RBAC-008 |
-| 41 | `PUT /api/v1/roles/{role_id}/permissions` | `role.manage` | RBAC-009 |
-| 42 | `GET /api/v1/roles/{role_id}/users` | `role.read` + `user.read` | RBAC-008 |
-| 43 | `GET /api/v1/permissions` | `permission.read` | RBAC-004 |
-| 44 | `GET /api/v1/permissions/{permission_id}` | `permission.read` | RBAC-004 |
-| 45 | `PATCH /api/v1/permissions/{permission_id}` | `permission.manage` | RBAC-004 |
-| 46 | `GET /api/v1/permissions/{permission_id}/holders` | `permission.read` + `user.read` | RBAC-016 |
+| 49 | `GET /api/v1/roles` · `GET /api/v1/roles/{role_id}` · `GET …/permissions` | `role.read` | RBAC-008 |
+| 50 | `POST /api/v1/roles` · `PATCH /api/v1/roles/{role_id}` · `DELETE /api/v1/roles/{role_id}` | `role.manage` + step-up + G2/G5 | RBAC-008 |
+| 51 | `PUT /api/v1/roles/{role_id}/permissions` | `role.manage` + step-up + G2/G3/G4 | RBAC-009 |
+| 52 | `GET /api/v1/roles/{role_id}/users` | `role.read` + `user.read` | RBAC-008 |
+| 53 | `GET /api/v1/permissions` · `GET /api/v1/permissions/{permission_id}` | `permission.read` | RBAC-004 |
+| 54 | `PATCH /api/v1/permissions/{permission_id}` | `permission.manage` + step-up | RBAC-004 |
+| 55 | `GET /api/v1/permissions/{permission_id}/holders` | `permission.read` + `user.read` | RBAC-016 |
 | **Reference and notifications** (§7) | | | |
-| 47 | `GET /api/v1/lookups` · `GET /api/v1/lookups/{category_code}` | `lookup.read` | PLAT-009 |
-| 48 | `POST /api/v1/lookups/{category_code}/values` · `PATCH …/values/{value_id}` | `lookup.manage` | PLAT-009 |
-| 49 | `GET /api/v1/notifications` · `POST /api/v1/notifications/{id}/read` · `POST /api/v1/notifications/read-all` | `notification.read` | NOTIF-001 |
+| 56 | `GET /api/v1/lookups` · `GET /api/v1/lookups/{category_code}` | `lookup.read` | PLAT-009 |
+| 57 | `POST /api/v1/lookups/{category_code}/values` · `PATCH …/values/{value_id}` | `lookup.manage` | PLAT-009 |
+| 58 | `GET /api/v1/notifications` · `POST …/{id}/read` · `POST …/read-all` | `notification.read` | NOTIF-001 |
 | **Leads** (§8) | | | |
-| 50 | `POST /api/v1/public/leads` | public, Turnstile (RBX-005) | LEAD-001 |
-| 51 | `GET /api/v1/leads` | `lead.read` | LEAD-013 |
-| 52 | `POST /api/v1/leads` | `lead.create` | LEAD-003 |
-| 53 | `GET /api/v1/leads/{lead_id}` | `lead.read` | LEAD-013 |
-| 54 | `PATCH /api/v1/leads/{lead_id}` | `lead.update` | LEAD-002 |
-| 55 | `DELETE /api/v1/leads/{lead_id}` | `lead.delete` | LEAD-016 |
-| 56 | `POST /api/v1/leads/{lead_id}/restore` | `lead.restore` | LEAD-016 |
-| 57 | `POST /api/v1/leads/{lead_id}/status` | `lead.status.change` / `lead.reopen` | LEAD-005 |
-| 58 | `POST /api/v1/leads/{lead_id}/assign` | `lead.assign` | LEAD-007 |
-| 59 | `POST /api/v1/leads/{lead_id}/duplicate-resolution` | `lead.update` | LEAD-010 |
-| 60 | `GET /api/v1/leads/duplicates` | `lead.read` | LEAD-010 |
-| 61 | `GET /api/v1/leads/summary` | `lead.read` | LEAD-014 |
-| 62 | `GET /api/v1/leads/{lead_id}/history` | `lead.read` + `audit.read` | AUDIT-006 |
-| 63 | `POST /api/v1/leads/exports` (P1) | `lead.export` | LEAD-017 |
+| 59 | `POST /api/v1/public/leads` | public, Turnstile (RBX-005) | LEAD-001 |
+| 60 | `GET /api/v1/leads` | `lead.read` | LEAD-013 |
+| 61 | `POST /api/v1/leads` | `lead.create` | LEAD-003 |
+| 62 | `GET /api/v1/leads/{lead_id}` | `lead.read` | LEAD-013 |
+| 63 | `PATCH /api/v1/leads/{lead_id}` | `lead.update` | LEAD-024 |
+| 64 | `DELETE /api/v1/leads/{lead_id}` | `lead.delete` | LEAD-016 |
+| 65 | `POST /api/v1/leads/{lead_id}/restore` | `lead.restore` | LEAD-016 |
+| 66 | `POST /api/v1/leads/{lead_id}/status` | `lead.status.change` / `lead.reopen` | LEAD-005 |
+| 67 | `POST /api/v1/leads/{lead_id}/assign` | `lead.assign` | LEAD-007 |
+| 68 | `POST /api/v1/leads/{lead_id}/duplicate-resolution` | `lead.update` | LEAD-010 |
+| 69 | `POST /api/v1/leads/{lead_id}/spam-resolution` | `lead.update` | LEAD-018 |
+| 70 | `POST /api/v1/leads/{lead_id}/consent/withdraw` | `lead.update` | LEAD-027 |
+| 71 | `POST /api/v1/leads/{lead_id}/erasure` | `lead.erase` + step-up | LEAD-029 |
+| 72 | `GET /api/v1/leads/duplicates` | `lead.read` | LEAD-010 |
+| 73 | `GET /api/v1/leads/summary` | `lead.read` | LEAD-014 |
+| 74 | `GET /api/v1/leads/{lead_id}/history` | `lead.read` + `audit.read` | AUDIT-006 |
+| 75 | `POST /api/v1/leads/exports` (**P1**) | `lead.export` + step-up | LEAD-017 |
 | **Lead notes** (§9) | | | |
-| 64 | `GET /api/v1/leads/{lead_id}/notes` | `lead_note.read` | NOTE-001 |
-| 65 | `POST /api/v1/leads/{lead_id}/notes` | `lead_note.create` | NOTE-001 |
-| 66 | `PATCH /api/v1/leads/{lead_id}/notes/{note_id}` | `lead_note.update` | NOTE-002 |
-| 67 | `DELETE /api/v1/leads/{lead_id}/notes/{note_id}` | `lead_note.delete` | NOTE-002 |
+| 76 | `GET /api/v1/leads/{lead_id}/notes` | `lead_note.read` | NOTE-001 |
+| 77 | `POST /api/v1/leads/{lead_id}/notes` | `lead_note.create` | NOTE-001 |
+| 78 | `PATCH /api/v1/leads/{lead_id}/notes/{note_id}` | `lead_note.update` | NOTE-002 |
+| 79 | `DELETE /api/v1/leads/{lead_id}/notes/{note_id}` | `lead_note.delete` | NOTE-002 |
 | **Lead activities** (§9) | | | |
-| 68 | `GET /api/v1/leads/{lead_id}/activities` | `lead_activity.read` | ACT-001 |
-| 69 | `POST /api/v1/leads/{lead_id}/activities` | `lead_activity.create` | ACT-001 |
-| 70 | `PATCH /api/v1/leads/{lead_id}/activities/{activity_id}` | `lead_activity.update` | ACT-002 |
-| 71 | `POST /api/v1/leads/{lead_id}/activities/{activity_id}/complete` | `lead_activity.update` | ACT-003 |
-| 72 | `POST /api/v1/leads/{lead_id}/activities/{activity_id}/cancel` | `lead_activity.update` | ACT-002 |
-| 73 | `DELETE /api/v1/leads/{lead_id}/activities/{activity_id}` | `lead_activity.delete` | ACT-002 |
-| 74 | `GET /api/v1/activities?owner=me&status=PLANNED` | `lead_activity.read` | LEAD-015 |
-| **Audit** (§10) | | | |
-| 75 | `GET /api/v1/audit-logs` | `audit.read` | AUDIT-008 |
-| 76 | `GET /api/v1/audit-logs/{audit_id}` | `audit.read` | AUDIT-008 |
-| 77 | `GET /api/v1/security-events` | `security_event.read` (ALL or OWN) | SEVT-005 |
+| 80 | `GET /api/v1/leads/{lead_id}/activities` | `lead_activity.read` | ACT-001 |
+| 81 | `POST /api/v1/leads/{lead_id}/activities` | `lead_activity.create` | ACT-001 |
+| 82 | `PATCH /api/v1/leads/{lead_id}/activities/{activity_id}` | `lead_activity.update` | ACT-002 |
+| 83 | `POST …/activities/{activity_id}/complete` · `…/cancel` | `lead_activity.update` | ACT-003 |
+| 84 | `DELETE /api/v1/leads/{lead_id}/activities/{activity_id}` | `lead_activity.delete` | ACT-002 |
+| 85 | `GET /api/v1/activities?owner=me&status=PLANNED` | `lead_activity.read` | LEAD-015 |
+| **Audit and security** (§10) | | | |
+| 86 | `GET /api/v1/audit-logs` · `GET /api/v1/audit-logs/{audit_id}` | `audit.read` | AUDIT-008 |
+| 87 | `GET /api/v1/security-events` · `GET /api/v1/security-events/{event_id}` | `security_event.read` (Founder, Admin; **not** Sales) | SEVT-005 |
 
 ## 2. Conventions
-
-> Traces: API-001
 
 ### 2.1 Contract (API-008)
 
@@ -114,8 +117,6 @@ Every endpoint either names its permission code, or is listed in the RBAC except
 - CI diffs it against `main` and fails on breaking changes (API-009).
 
 ### 2.2 Formats
-
-> Traces: DATA-013, SEC-004
 
 | Item | Rule |
 |---|---|
@@ -155,8 +156,6 @@ Every endpoint either names its permission code, or is listed in the RBAC except
 
 ### 2.4 Errors (API-003): RFC 9457 problem details
 
-> Traces: LOG-002
-
 ```json
 HTTP/1.1 422 Unprocessable Content
 Content-Type: application/problem+json
@@ -190,13 +189,11 @@ Content-Type: application/problem+json
 
 ### 2.6 Filtering, search and sorting (API-005)
 
-> Traces: DATA-008
-
 | Pattern | Example | Meaning |
 |---|---|---|
 | Equality / IN | `status=NEW,CONTACTED` | Comma = OR within a field. Different fields AND. |
 | Special values | `assigned_to=me` · `assigned_to=unassigned` | Resolved server-side |
-| Ranges | `created_on_from=2026-09-01&created_on_to=2026-09-30` | Inclusive from, exclusive to. Dates are interpreted in the user's timezone. |
+| Ranges | `created_on_from=2026-09-01&created_on_to=2026-09-30` | Date-only values are calendar days in the requesting user's `timezone`. They are converted to the UTC half-open range [start of `from`, start of the day after `to`). Datetime values must carry an offset (03 §2.2, PLAT-007). |
 | Boolean | `overdue=true` | Named, documented filters |
 | Search | `q=priya 98480` | Tokenized, each token matched (AND) against allowlisted fields with prefix/contains. Min 2 chars per token. |
 | Sort | `sort=-created_on,name` | `-` = descending. Allowlist per resource. Default is documented. The tie-breaker `id` is always appended. |
@@ -206,20 +203,22 @@ Unknown filter or sort fields → 422 `INVALID_QUERY_PARAM`. They are never sile
 
 ### 2.7 Optimistic concurrency (API-006)
 
-> Traces: DATA-006
-
 - `PATCH`, `PUT` of sub-collections, `DELETE`, and action endpoints that modify a resource (`/status`, `/assign`, `/complete`) **require** `If-Match: "<version>"`.
   - Missing → `428 PRECONDITION_REQUIRED`.
   - Mismatch → `409 VERSION_CONFLICT`. The response includes `current_version` and `updated_by`/`updated_on`, so the UI can explain "Ravi updated this 2 minutes ago".
 - Creates don't need it.
 
-### 2.8 Idempotency (API-007)
+### 2.8 Idempotency (API-007, F-04, F-09)
 
-- `Idempotency-Key` (opaque client string, 16–64 characters from `[A-Za-z0-9_-]`, typically a random UUID) is optional on authenticated `POST` creates, and **required** on `POST /public/leads`. It is not an entity id.
-- The key plus actor plus route is remembered for 24 h. A replay returns the original status and body.
-  - For public leads, the key is stored durably as `lead.intake_idempotency_key`.
-  - For other routes it lives in an in-process TTL store, which moves to Redis at multi-host.
-- Same key with a different body → `422 IDEMPOTENCY_KEY_REUSED`.
+| Item | Rule |
+|---|---|
+| Key | `Idempotency-Key`: an opaque client string, 16–64 characters from `[A-Za-z0-9_-]`. Not an entity id. **Required** on `POST /public/leads`, optional on authenticated `POST` creates. |
+| Fingerprint | SHA-256 of the RFC 8785 (JCS) canonical request body, excluding transient fields (`turnstile_token`, the honeypot field) |
+| Lookup order | Rate limiting → **idempotency lookup** → CAPTCHA and business processing. A replay never re-verifies a spent CAPTCHA token. |
+| Same key, same fingerprint | The original status and body are returned. Nothing is re-executed. |
+| Same key, different fingerprint | `422 IDEMPOTENCY_KEY_REUSED` |
+| Public intake store | Durable: `lead.intake_idempotency_key` and `lead.intake_request_fingerprint` (unique key, EXC-007). No expiry. |
+| Authenticated store | In-process TTL store (24 h) keyed by (actor, route, key). It is authoritative because exactly one application process runs (OPS-010). It is lost on restart, which is documented: a replay after a restart may re-execute, and the client-side double-submit guards remain. It moves to Redis with the same semantics after the PostgreSQL gate. |
 
 ### 2.9 Versioning and compatibility (API-009)
 
@@ -228,8 +227,6 @@ Unknown filter or sort fields → 422 `INVALID_QUERY_PARAM`. They are never sile
 - Breaking changes go to `/api/v2`, with v1 kept ≥ 6 months, a `Deprecation` header and a `Sunset` header.
 
 ## 3. Ops endpoints
-
-> Traces: LOG-005
 
 ```
 GET /health/live   → 200 {"status":"ok"}
@@ -240,8 +237,6 @@ GET /health/ready  → 200 {"status":"ok","checks":{"db":"ok","migrations":"head
 ## 4. Authentication endpoints
 
 ### 4.1 `POST /auth/login`
-
-> Traces: AUTH-001, AUTH-004
 
 Request:
 
@@ -271,13 +266,13 @@ This shape also sets `Set-Cookie: vs_rt=…; HttpOnly; Secure; SameSite=Strict; 
 Second factor needed. No session or cookie is created yet:
 
 ```json
-{ "data": { "status": "MFA_REQUIRED", "mfa_token": "q3Z…", "methods": ["totp", "recovery_code"], "expires_in": 300 } }
+{ "data": { "status": "MFA_REQUIRED", "mfa_token": "q3Z…", "methods": ["totp"], "recovery_available": true, "expires_in": 300 } }
 ```
 
-Enrollment needed first:
+MFA required but no active factor. **No token is returned.** An enrollment link is emailed to the verified address (05 §11.3 path C):
 
 ```json
-{ "data": { "status": "MFA_ENROLLMENT_REQUIRED", "mfa_token": "Hk8…", "expires_in": 900 } }
+{ "data": { "status": "MFA_ENROLLMENT_EMAIL_SENT", "message": "Check your email to set up two-step verification." } }
 ```
 
 Errors:
@@ -290,21 +285,15 @@ Errors:
 
 ### 4.2 `POST /auth/refresh`
 
-> Traces: AUTH-005
-
 - Requires the cookie `vs_rt` and the header `X-Requested-With: veda-workspace`. The body is empty.
 - `200`: `{ "data": { "access_token": "…", "token_type": "Bearer", "expires_in": 900 } }`, plus a rotated cookie.
 - Errors: `401 SESSION_INVALID` (cookie cleared) · `403 CSRF_REJECTED`.
 
 ### 4.3 `POST /auth/logout` · `POST /auth/logout-all`
 
-> Traces: AUTH-007
-
 `204`. The cookie is cleared.
 
 ### 4.4 `GET /auth/me`
-
-> Traces: USER-004
 
 ```json
 {
@@ -326,16 +315,20 @@ Errors:
       "profile.read": "ALL", "profile.update": "ALL", "notification.read": "OWN", "lookup.read": "ALL",
       "session.read": "OWN", "session.revoke": "OWN"
     },
+    "suspended_permissions": [],
+    "session": { "type": "FULL", "auth_methods": ["pwd"], "mfa_verified_on": null, "cooling_off_until": null },
+    "mfa": { "required": false, "required_by": [], "enrolled": false },
+    "email_change": null,
     "version": 3
   }
 }
 ```
 
-`PATCH /auth/me` takes `{ "full_name", "display_name", "phone", "timezone" }` with `If-Match`, and returns 200 with the same shape. Email changes are admin-only in P0.
+The example is a standard Sales user. It shows **no `security_event.read`**, optional MFA, and no suspended permissions (owner Decision 1). For an Admin who hasn't yet completed MFA in this session, `suspended_permissions` lists the sensitive codes with `"reason": "MFA_REQUIRED"`.
+
+`PATCH /auth/me` accepts **only** `full_name`, `display_name`, `phone`, `timezone` and `locale` (closed DTO, `If-Match`). `email`, `password`, `mfa_required`, `status` and roles → `422 FIELD_NOT_UPDATABLE`.
 
 ### 4.5 Password endpoints
-
-> Traces: AUTH-003, AUTH-008, AUTH-009, AUTH-012
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
@@ -345,8 +338,6 @@ Errors:
 | `POST /auth/invite/accept` | `{ "token": "…", "new_password": "…", "full_name": "optional" }` | `204` | `400 INVITE_TOKEN_INVALID` · `422 PASSWORD_POLICY` |
 
 ### 4.6 Sessions (see also 4.7 MFA)
-
-> Traces: AUTH-016
 
 `GET /auth/sessions` returns:
 
@@ -360,146 +351,161 @@ Errors:
 
 ### 4.7 MFA endpoints (ADR-006)
 
-> Traces: MFA-001, MFA-005, MFA-011
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| `POST /auth/mfa/verify` | `{ "mfa_token": "…", "code": "123456" }` | `200` AUTHENTICATED shape (§4.1) + cookie. FULL session with `pwd+totp`. | `401 MFA_CODE_INVALID` · `401 MFA_CHALLENGE_INVALID` · `429` |
+| `POST /auth/mfa/recovery` | `{ "mfa_token": "…", "password": "…", "recovery_code": "K7M3Q-9TDXR" }`. **Password re-entry and a recovery code are both required.** | `200 { "data": { "status": "RECOVERY_SESSION", "access_token": "…", "expires_in": 900, "allowed": ["GET /auth/me", "POST /auth/mfa/enroll/start", "POST /auth/mfa/enroll/confirm", "POST /auth/logout"] } }`. **No refresh cookie.** All other sessions are revoked, and a notification is sent to the verified email. | `401 MFA_RECOVERY_INVALID` (uniform for a bad password or code) · `429` |
+| `POST /auth/reauth` | `{ "password": "…" }` | `204`. Sets `reauth_on` (valid 5 min). | `401 INVALID_CREDENTIALS` |
+| `POST /auth/mfa/enroll/start` | **Exactly one** of: `{ "reauth": true }` (FULL session; `reauth_on` within 5 min, or step-up if a factor exists: path A) · `{ "invite_context": "…" }` (inside invite acceptance: path B) · `{ "enrollment_token": "…", "password": "…" }` (emailed link: path C) · `{}` in a RECOVERY session (path D) | `200 { "data": { "otpauth_uri": "otpauth://totp/Veda%20Spaces:priya%40vedaspaces.com?secret=<BASE32-SECRET-SHOWN-ONCE>&issuer=Veda%20Spaces", "secret": "<BASE32-SECRET-SHOWN-ONCE>", "challenge_token": "…", "expires_in": 900 } }`. The secret is returned **only here, once** (A-10: the placeholder is shown). | `401 ENROLLMENT_PROOF_INVALID` · `403 STEP_UP_REQUIRED` · `409 MFA_ALREADY_ENROLLED` (path A without replacement intent) |
+| `POST /auth/mfa/enroll/confirm` | `{ "challenge_token": "…", "code": "123456", "label": "Priya's phone" }` | `200` AUTHENTICATED shape + `"recovery_codes": [10 codes]` (**shown once**) + `"cooling_off_until"` (path D only). Previous factor and codes revoked. | `401 MFA_CODE_INVALID` |
+| `POST /auth/mfa/step-up` | `{ "mfa_token": "…", "code": "123456" }` (token from `STEP_UP_REQUIRED`) | `204`. Sets `mfa_verified_on`. | `401 MFA_CODE_INVALID` |
+| `POST /auth/mfa/recovery-codes` | `{}` (step-up) | `200 { "data": { "recovery_codes": [ … ] } }`. The previous batch is invalidated. | `403 STEP_UP_REQUIRED` · `403 COOLING_OFF` |
+| `DELETE /auth/mfa/factor` | step-up | `204`. Sensitive permissions are suspended (if any). | `409 MFA_REQUIRED_BY_POLICY` · `403 STEP_UP_REQUIRED` · `403 COOLING_OFF` |
+| `GET /auth/mfa` | — | `200 { "data": { "required": true, "required_by": ["ROLE_POLICY"], "factor": { "type": "TOTP", "label": "…", "confirmed_on": "…", "last_used_on": "…" }, "recovery_codes_remaining": 8, "cooling_off_until": null } }` | — |
+
+- There is no endpoint where a password alone or a recovery code alone yields a new authenticator (MFA-014).
+- `STEP_UP_REQUIRED` bodies include `"kind": "mfa" | "password"` and, for `mfa`, an `mfa_token`.
+- Any call from a RECOVERY session outside `allowed` returns `403 RECOVERY_SESSION_RESTRICTED`.
+
+### 4.8 Self-service email change (USER-007, 05 §8.6)
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /auth/mfa/verify` | `{ "mfa_token": "…", "code": "123456" }` or `{ "mfa_token": "…", "recovery_code": "K7M3Q-9TDXR" }` | `200` AUTHENTICATED shape (§4.1) + cookie | `401 MFA_CODE_INVALID` · `401 MFA_CHALLENGE_INVALID` (expired, exhausted or unknown) · `429 RATE_LIMITED` |
-| `POST /auth/mfa/enroll/start` | `{ "mfa_token": "…" }` (or a session + step-up for voluntary re-enrollment) | `200 { "data": { "otpauth_uri": "otpauth://totp/Veda%20Spaces:priya%40vedaspaces.com?secret=…&issuer=Veda%20Spaces", "secret": "JBSWY3DPEHPK3PXP…", "expires_in": 900 } }`. The secret is returned **only here, once**. | `401 MFA_CHALLENGE_INVALID` · `409 MFA_ALREADY_ENROLLED` |
-| `POST /auth/mfa/enroll/confirm` | `{ "mfa_token": "…", "code": "123456", "label": "Priya's phone" }` | `200` AUTHENTICATED shape + `"recovery_codes": ["K7M3Q-9TDXR", … 10 items]` (**shown once**) | `401 MFA_CODE_INVALID` |
-| `POST /auth/mfa/step-up` | `{ "mfa_token": "…", "code": "123456" }` (token from a `STEP_UP_REQUIRED` response) | `204`. Sets `mfa_verified_on` on the session. | `401 MFA_CODE_INVALID` |
-| `POST /auth/mfa/recovery-codes` | `{}` (step-up required) | `200 { "data": { "recovery_codes": [ … ] } }`. The previous batch is invalidated. | `403 STEP_UP_REQUIRED` |
-| `DELETE /auth/mfa/factor` | step-up required | `204` | `409 MFA_REQUIRED_BY_POLICY` · `403 STEP_UP_REQUIRED` |
-| `GET /auth/mfa` | — | `200 { "data": { "required": true, "required_by": ["ROLE_POLICY"], "factor": { "type": "TOTP", "label": "Priya's phone", "confirmed_on": "…", "last_used_on": "…" }, "recovery_codes_remaining": 8 } }`. `required_by` values are `ROLE_POLICY`, `USER_POLICY` and `SENSITIVE_PERMISSION`. They describe the source generically and never name a role code. | — |
+| `PUT /auth/me/email` | `{ "new_email": "priya.s@vedaspaces.com" }` (step-up: MFA if enrolled, else `POST /auth/reauth`) | `202 { "data": { "status": "VERIFICATION_SENT", "proposed_email": "p***@vedaspaces.com", "expires_on": "…" } }`. The verified email is unchanged. | `403 STEP_UP_REQUIRED` · `403 COOLING_OFF` · `409 DUPLICATE` · `422 INVALID_EMAIL` · `422 SAME_AS_CURRENT` |
+| `POST /auth/email/verify` | `{ "token": "…" }` | `204`. The email is replaced, and all sessions are revoked (sign in again). | `400 EMAIL_TOKEN_INVALID` · `409 DUPLICATE` (address taken meanwhile) |
+| `POST /auth/email/cancel` | `{ "token": "…" }` (from the alert sent to the current address) | `204`. The proposal is cleared. | `400 EMAIL_TOKEN_INVALID` |
 
-A `STEP_UP_REQUIRED` error body includes `"mfa_token"` for the step-up call.
+`GET /auth/me` shows a pending change as `"email_change": { "proposed_email": "p***@…", "requested_on": "…", "expires_on": "…" }`.
 
 ## 5. Users
 
-> Traces: USER-001
+Security-sensitive user attributes are changed **only** through dedicated endpoints with their own permissions and guards (ADR-010, RBAC-019). No generic endpoint can mass-assign them (§5.4).
 
 ### 5.1 `GET /users`
 
-- **Filters:** `q` (name, email) · `status=ACTIVE,INVITED,LOCKED,DISABLED` · `role_id` · `include_deleted`
+- **Filters:** `q` · `status` · `role_id` · `protection_level` · `mfa=enrolled|required_not_enrolled|none` · `include_deleted`
 - **Sort:** `full_name`, `-created_on`, `-last_login_on`
 
 ```json
 {
   "data": [
-    { "id": "0192a3aa…", "email": "priya@vedaspaces.com", "full_name": "Priya Sharma", "display_name": "Priya",
-      "status": "ACTIVE", "roles": [ { "id": "…", "code": "SALES", "name": "Sales" } ],
-      "last_login_on": "2026-09-29T04:10:00.000Z", "created_on": "2026-09-01T06:00:00.000Z",
-      "is_deleted": false, "version": 3 }
+    { "id": "0192a3aa…", "email": "priya@vedaspaces.com", "email_change_pending": false, "full_name": "Priya Sharma",
+      "display_name": "Priya", "status": "ACTIVE", "protection_level": "STANDARD", "is_privileged": false,
+      "roles": [ { "id": "…", "code": "SALES", "name": "Sales" } ],
+      "mfa": { "required": false, "enrolled": true },
+      "last_login_on": "2026-09-29T04:10:00.000Z", "created_on": "2026-09-01T06:00:00.000Z", "is_deleted": false, "version": 3 }
   ],
   "meta": { "page": 1, "page_size": 25, "total": 6, "total_pages": 1 },
   "links": { "self": "/api/v1/users?page=1&page_size=25", "next": null, "prev": null }
 }
 ```
 
+`is_privileged` = holds any sensitive permission, including suspended ones. It is computed, not stored.
+
 ### 5.2 `POST /users` (invite)
 
-> Traces: AUTH-011
-
 ```json
-{ "email": "ravi@vedaspaces.com", "full_name": "Ravi Kumar", "phone": "+919111111111",
-  "timezone": "Asia/Kolkata", "role_ids": ["0192…sales"] }
+{ "email": "ravi@vedaspaces.com", "full_name": "Ravi Kumar", "phone": "+919111111111", "timezone": "Asia/Kolkata", "role_ids": ["0192…"] }
 ```
 
-- `201` with the user (status `INVITED`), and a `Location` header.
-- Errors:
-
-| Status | Code |
-|---|---|
-| 409 | `DUPLICATE` (field `email`) |
-| 403 | `ESCALATION_DENIED` (role exceeds actor) |
-| 403 | `PERMISSION_DENIED` (roles given without `user.role.assign`) |
+- `201` with the user (INVITED). The invite expires in 72 h, or 24 h if the roles contain a sensitive permission (A-05).
+- Errors: `409 DUPLICATE` · `403 ESCALATION_DENIED` · `403 PERMISSION_DENIED` (roles without `user.role.manage`).
+- The request cannot set `protection_level`, `mfa_required` or `status`.
 
 ### 5.3 `GET /users/{id}`
 
-Same shape as a list item, plus `phone`, `timezone`, `locale`, `locked_until`, `must_change_password`, `created_by`, `updated_by`, `updated_on`.
+Returns the list item plus `phone`, `timezone`, `locale`, `email_verified_on`, `email_change` (masked proposal, if pending), `security_cooling_off_until`, `throttled_until`, `must_change_password`, `pending_approvals`, and the audit fields.
 
-### 5.4 `PATCH /users/{id}`
+### 5.4 `PATCH /users/{id}`: profile fields only (RBAC-019, owner Decision 3)
 
-- `If-Match` required. Body is any of `full_name`, `display_name`, `phone`, `timezone`, `locale`, `email` (changing email re-sends verification in P1).
-- `status` can't be changed here. Use the action endpoints.
+| Aspect | Rule |
+|---|---|
+| Permission | `user.profile.update`, with `If-Match` |
+| Closed DTO: the **only** accepted fields | `full_name`, `display_name`, `phone`, `timezone`, `locale` |
+| `email`, `proposed_email`, `password`, `status`, `roles`, `permissions`, `mfa_required`, `protection_level`, `is_founder` | → `422 FIELD_NOT_UPDATABLE`. Each has its own workflow. |
+| Anything else | → `422 UNKNOWN_FIELD` |
+| Self | Allowed only through `PATCH /auth/me` |
 
-### 5.5 Lifecycle actions
+This is verified by the mass-assignment tests (12 §4.4).
 
-> Traces: AUTH-017, USER-002
+### 5.5 Email change for another user (USER-007)
+
+`POST /users/{id}/email-change { "new_email": "…", "reason": "…" }` (`user.email.change`, step-up, G3, G9, G11, `If-Match`):
+
+| Target | Result |
+|---|---|
+| Non-privileged | `202 { "status": "VERIFICATION_SENT" }`. Same workflow as 05 §8.6: the proposed address must verify, and the current address receives an alert with a cancel link. |
+| Privileged (holds any sensitive permission) | `202 { "status": "APPROVAL_REQUIRED", "approval_id": "…" }`. The proposal is created only after approval (G12). |
+| FOUNDER-protected | `403 FOUNDER_PROTECTED`. Use `POST /founder-actions` with `FOUNDER_EMAIL_CHANGE`. |
+
+- An administrator can **never** set the verified email directly.
+- Errors: `403 SELF_MODIFICATION_DENIED` · `403 ESCALATION_DENIED` · `403 STEP_UP_REQUIRED` · `409 DUPLICATE` · `422 REASON_REQUIRED`.
+
+### 5.6 Account status (RBAC-019, RBAC-020)
 
 | Endpoint | Body | Effect | Errors |
 |---|---|---|---|
-| `POST …/deactivate` | `{ "reason": "Left company" }` | status DISABLED · sessions revoked · tokens invalidated | `409 LAST_ADMINISTRATOR` · `403 SELF_MODIFICATION_DENIED` |
-| `POST …/activate` | `{}` | DISABLED → ACTIVE (or INVITED if never accepted) | 409 `INVALID_STATE` |
-| `POST …/unlock` | `{}` | Clears lockout | |
-| `DELETE /users/{id}` | — (`If-Match`) | Soft delete + deactivate effects | G3, G4 |
-| `POST …/restore` | `{}` | Restore as DISABLED | `409 DUPLICATE` (email reused) |
-| `POST …/invite/resend` | `{}` | New INVITE token | `409 INVALID_STATE` (not INVITED) |
-| `POST …/password-reset` | `{}` | Emails a reset link | |
-| `POST …/sessions/revoke` | `{ "reason": "…" }` | Revoke all | |
+| `POST /users/{id}/status` | `{ "status": "DISABLED" \| "ACTIVE", "reason": "…" }` (`If-Match`) | DISABLED revokes all sessions and invalidates tokens, challenges and pending proposals. ACTIVE restores sign-in (INVITED if never accepted). | `403 SELF_MODIFICATION_DENIED` (own account) · `403 ESCALATION_DENIED` (G9) · `403 FOUNDER_PROTECTED` (G11) · `409 LAST_FOUNDER` / `409 LAST_ADMINISTRATOR` (G4) · `403 STEP_UP_REQUIRED` |
+| `POST /users/{id}/unlock` | `{}` | Clears the global throttle | G9 |
+| `DELETE /users/{id}` | `If-Match`, `{ "reason": "…" }` | Soft delete + DISABLED effects | Same as status |
+| `POST /users/{id}/restore` | `{}` | Restored as DISABLED | `409 DUPLICATE` · G9 |
+| `POST /users/{id}/invite/resend` | `{}` | New INVITE token | `409 INVALID_STATE` · G9 |
+| `POST /users/{id}/password-reset` | `{}` | Reset link to the **verified** email | G9 · G11 |
+| `POST /users/{id}/sessions/revoke` | `{ "reason": "…" }` | Revoke all | G9 · G11 · step-up |
 
-### 5.6 Role assignment: `PUT /users/{id}/roles`
-
-This declarative replace diffs the current set and writes soft-deletes and inserts:
+### 5.7 Role assignment: `PUT /users/{id}/roles` (`user.role.manage`)
 
 ```json
-{ "roles": [ { "role_id": "0192…sales" },
-             { "role_id": "0192…admin", "valid_until": "2026-10-15T18:30:00.000Z", "reason": "Covering during leave" } ] }
+{ "roles": [ { "role_id": "0192…sales" } ], "reason": "Joined sales team" }
 ```
 
-`200` returns `{ "data": [ user_role items ] }`. Errors: G1–G4 codes (06 §7).
+- `200` with the user_role items.
+- Errors: G1–G4, G9, G11, step-up. `valid_from` / `valid_until` → `422 TIME_BOUND_GRANTS_NOT_ENABLED` (RBAC-007 is P1).
+- Assigning a role that contains sensitive permissions to a user without MFA succeeds. Those permissions are returned as `"pending_mfa": true` and stay suspended until enrollment (MFA-012).
 
-### 5.7 Direct permissions
+### 5.8 Direct permissions (`user.permission.manage`)
 
-> Traces: RBAC-006
+`POST /users/{id}/permissions { "permission_code": "lead.read", "effect": "GRANT", "scope": "ALL", "reason": "…" }`
 
-`POST /users/{id}/permissions`:
+- `201`.
+- Errors: `422 REASON_REQUIRED` · `422 SCOPE_NOT_SUPPORTED` · `422 TIME_BOUND_GRANTS_NOT_ENABLED` · `403 ESCALATION_DENIED` · `409 DUPLICATE` · `409 LAST_ADMINISTRATOR` (for a DENY that breaks I2).
+- `DELETE …/permissions/{grant_id}` → `204`.
+
+### 5.9 `GET /users/{id}/effective-permissions` (RBAC-016, P0)
 
 ```json
-{ "permission_code": "lead.read", "effect": "GRANT", "scope": "ALL",
-  "valid_until": "2026-10-15T18:30:00.000Z", "reason": "Covering for Ravi" }
+{ "data": { "authz_version": 9, "mfa": { "enrolled": false, "required": true, "required_by": ["SENSITIVE_PERMISSION"] },
+  "permissions": [
+    { "code": "lead.read", "scope": "ALL", "status": "EFFECTIVE", "sources": [ { "type": "ROLE", "role_code": "ADMIN", "scope": "ALL" } ] },
+    { "code": "user.role.manage", "scope": "ALL", "status": "SUSPENDED", "suspended_reason": "MFA_REQUIRED",
+      "sources": [ { "type": "ROLE", "role_code": "ADMIN", "scope": "ALL" } ] },
+    { "code": "lead.export", "status": "DENIED", "sources": [ { "type": "USER_DENY", "grant_id": "0192…", "reason": "Policy" } ] } ] } }
 ```
 
-- `201`. Errors: `422 REASON_REQUIRED` · `422 SCOPE_NOT_SUPPORTED` · `403 ESCALATION_DENIED` · `409 DUPLICATE`.
-- `DELETE /users/{id}/permissions/{grant_id}` → `204` (soft delete).
-
-### 5.8 `GET /users/{id}/effective-permissions` (RBAC-016)
-
-```json
-{
-  "data": {
-    "authz_version": 9,
-    "permissions": [
-      { "code": "lead.read", "scope": "ALL",
-        "sources": [ { "type": "ROLE", "role_code": "SALES", "scope": "OWN" },
-                     { "type": "USER_GRANT", "grant_id": "0192…", "scope": "ALL", "valid_until": "2026-10-15T18:30:00.000Z" } ] },
-      { "code": "lead.export", "scope": null, "denied": true,
-        "sources": [ { "type": "USER_DENY", "grant_id": "0192…", "reason": "Policy" } ] }
-    ]
-  }
-}
-```
-
-### 5.9 User MFA administration (MFA-003, MFA-007)
-
-> Traces: USER-006
+### 5.10 User MFA administration (MFA-003, MFA-007, MFA-015)
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /users/{id}/mfa/reset` | `{ "reason": "Lost phone; identity verified by video call with Founder" }` (`If-Match`) | `204`. Factors revoked, codes invalidated, sessions revoked, notifications sent (05 §11.7). | `403 STEP_UP_REQUIRED` · `403 SELF_MODIFICATION_DENIED` · `403 ESCALATION_DENIED` (G9) · `422 REASON_REQUIRED` |
-| `PUT /users/{id}/mfa-requirement` | `{ "mfa_required": true, "reason": "Handles high-value clients" }` (`If-Match`) | `200` user. Setting `false` only removes the *user-level* source. Role and sensitive-permission sources still apply. | `403 STEP_UP_REQUIRED` · `422 REASON_REQUIRED` |
+| `POST /users/{id}/mfa/reset` | `{ "reason": "Lost phone; identity verified by video call" }` (`If-Match`, step-up) | Non-privileged target: `204` executed. Privileged target: `202 { "status": "APPROVAL_REQUIRED", "approval_id": "…" }`. On execution: factors revoked, codes invalidated, sessions revoked, enrollment link emailed to the **target's verified address**. | `403 SELF_MODIFICATION_DENIED` · `403 ESCALATION_DENIED` · `403 FOUNDER_PROTECTED` · `403 STEP_UP_REQUIRED` · `422 REASON_REQUIRED` |
+| `PUT /users/{id}/mfa-requirement` | `{ "mfa_required": true, "reason": "…" }` (`If-Match`, step-up) | `200` user | `403 SELF_MODIFICATION_DENIED` · G9 |
 
-The user resource (§5.1, §5.3) includes `"mfa": { "required": true, "enrolled": true, "required_by": ["ROLE_POLICY"] }`.
+### 5.11 Approvals and Founder actions (RBAC-021)
 
-### 5.10 `GET /users/assignable`
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| `GET /approvals?status=PENDING&role=approver\|requester` | — | Requests the caller may decide or has made. Target email masked. | — |
+| `POST /approvals/{id}/approve` | `{ "reason": "Verified with Priya on call" }` (step-up) | `200`. The action is executed in the same transaction, and the status becomes EXECUTED. | `403 APPROVER_NOT_ELIGIBLE` (same person, target, G9, or not FOUNDER-protected for Founder actions) · `409 INVALID_STATE` (expired or decided) · `403 STEP_UP_REQUIRED` |
+| `POST /approvals/{id}/deny` | `{ "reason": "…" }` (step-up) | `200` DENIED | Same |
+| `POST /approvals/{id}/cancel` | `{}` (requester) | `200` CANCELLED | `409 INVALID_STATE` |
+| `POST /founder-actions` | `{ "action": "GRANT_FOUNDER" \| "REVOKE_FOUNDER" \| "DEACTIVATE_FOUNDER" \| "FOUNDER_MFA_RESET" \| "FOUNDER_EMAIL_CHANGE", "target_user_id": "…", "reason": "…", "new_email": "only for email change" }` (`user.founder.manage`, step-up) | `202 { "approval_id": "…" }` | `403 APPROVER_POOL_INSUFFICIENT` (fewer than two eligible Founders: use break-glass, 06 §7.5) · `409 LAST_FOUNDER` · G3 |
 
-This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "open_lead_count" }]`. It exists so that Sales-facing screens never need `user.read`.
+### 5.12 `GET /users/assignable`
+
+This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "open_lead_count" }]`.
 
 ## 6. Roles and permissions
 
 ### 6.1 Roles
-
-> Traces: RBAC-008, RBAC-015
 
 `GET /roles` returns:
 
@@ -511,7 +517,7 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 
 | Endpoint | Request | Response / errors |
 |---|---|---|
-| `POST /roles` | `{ "code": "SALES_MANAGER", "name": "Sales Manager", "description": "…", "copy_from_role_id": "optional" }` | `201`. `409 DUPLICATE` (code/name) |
+| `POST /roles` | `{ "code": "SALES_MANAGER", "name": "Sales Manager", "description": "…", "copy_from_role_id": "optional" }` | `201`. `409 DUPLICATE` (code, or case-insensitive name). `403 ESCALATION_DENIED` if the copied role contains permissions the actor doesn't hold (G2, A-06). |
 | `PATCH /roles/{id}` | `{ "name", "description", "is_assignable" }` with `If-Match` | `code` is immutable (`422 IMMUTABLE_FIELD`) |
 | `DELETE /roles/{id}` | — | `409 SYSTEM_OBJECT` · `409 ROLE_IN_USE` (has live assignments; unassign first) |
 
@@ -527,8 +533,6 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 
 ### 6.2 Permissions
 
-> Traces: RBAC-004
-
 `GET /permissions?module=crm&resource=lead&q=status`:
 
 ```json
@@ -543,8 +547,6 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 - `GET /permissions/{id}/holders` returns users with the effective scope and source.
 
 ## 7. Reference data and notifications
-
-> Traces: NOTIF-001, PLAT-009
 
 - `GET /lookups/PROJECT_TYPE?include_inactive=false` returns `{ "data": [ { "id", "code", "label", "description", "sort_order", "is_active", "attributes" } ] }`.
 - `GET /lookups` returns every category with its active values in one call (cached by the SPA, `ETag` plus `Cache-Control: private, max-age=300`).
@@ -562,8 +564,6 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 ## 8. Leads
 
 ### 8.1 Lead resource (read shape)
-
-> Traces: LEAD-002
 
 ```json
 {
@@ -596,9 +596,11 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
     "expected_close_on": "2026-10-20",
     "quoted": null,
     "won_on": null, "lost_on": null, "lost_reason": null, "lost_reason_note": null,
-    "duplicate_status": "NONE", "duplicate_of": null,
+    "duplicate_status": "NONE", "duplicate_of": null, "spam_status": "NONE",
     "consent": { "contact": true, "policy_version": "2026-09-v1", "captured_on": "2026-09-25T14:02:00.000Z",
-                 "channel": "WEBSITE_FORM", "source_page": "/#contact", "ip_address": "49.205.xxx.xxx" },
+                 "channel": "WEBSITE_FORM", "source_page": "/#contact", "ip_address": "49.205.xxx.xxx",
+                 "withdrawn_on": null, "withdrawal_channel": null },
+    "intake_unmapped": null,
     "allowed_transitions": ["QUOTATION_SENT", "NEGOTIATION", "WON", "LOST", "CONTACTED"],
     "created_on": "2026-09-25T14:02:00.000Z", "created_by": { "id": "0000…0002", "display_name": "Website" },
     "updated_on": "2026-09-28T10:00:00.000Z", "updated_by": { "id": "0192a3aa…", "display_name": "Priya" },
@@ -612,8 +614,6 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 
 ### 8.2 `GET /leads`
 
-> Traces: LEAD-013
-
 | Param | Values |
 |---|---|
 | `q` | Matches name, phone (digits), email, lead_number, locality, city |
@@ -624,6 +624,8 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 | `created_on_from/to`, `status_changed_on_from/to` | Dates |
 | `follow_up` | `overdue`, `today`, `this_week`, `none` |
 | `duplicate_status` | `SUSPECTED`, … |
+| `spam_status` | `SUSPECTED`, `CONFIRMED_SPAM`, `NOT_SPAM`. By default, lists exclude SUSPECTED and CONFIRMED_SPAM (spam review queue, 04 §5.5). |
+| `consent` | `withdrawn` (Do-not-contact list) |
 | `include_deleted`, `deleted_only` | Needs `lead.restore` |
 | `sort` | `created_on`, `status_changed_on`, `next_follow_up_on`, `name`, `priority` (±). Default `-created_on`. |
 | `page`, `page_size` | |
@@ -631,8 +633,6 @@ This returns active HUMAN users holding `lead.read`: `[{ "id", "display_name", "
 The list items are a compact projection: `id, lead_number, name, phone, city, locality, project_type, budget_range, status, priority, source, assigned_to, next_follow_up_on, is_follow_up_overdue, duplicate_status, created_on, version`.
 
 ### 8.3 `POST /leads` (manual)
-
-> Traces: LEAD-003
 
 ```json
 {
@@ -659,9 +659,7 @@ The list items are a compact projection: `id, lead_number, name, phone, city, lo
 
 ### 8.4 `POST /public/leads` (ADR-005, LEAD-023, LEAD-025)
 
-> Traces: LEAD-001, LEAD-009, LEAD-011, LEAD-012, LEAD-018
-
-Headers: `Idempotency-Key: 5f0c2b1e9d7a4c3f8e6b5a4d3c2b1a09` · `Origin: https://www.vedaspaces.com`
+Headers: `Idempotency-Key: 5f0c2b1e-9d7a-4c3f-8e6b-5a4d3c2b1a09` · `Origin: https://www.vedaspaces.com`
 
 The request schema is **closed**. Only these fields are accepted:
 
@@ -675,21 +673,22 @@ The request schema is **closed**. Only these fields are accepted:
   "city": "Hyderabad",
   "project_type_code": "MODULAR_KITCHEN",
   "budget_range_code": "5L_10L",
+  "property_type_code": "APARTMENT",
   "message": "3BHK handover in December…",
 
   "attribution": { "utm_source": "instagram", "utm_medium": "paid", "utm_campaign": "diwali-2026",
                    "utm_term": null, "utm_content": null,
                    "landing_page": "/?utm_source=instagram", "referrer_url": "https://l.instagram.com/", "form_page": "/#contact" },
   "turnstile_token": "0.AbCd…",
-  "website": ""
+  "company_website_url": ""
 }
 ```
 
 | Field | Required | Notes |
 |---|---|---|
 | `name`, `phone`, `consent.acknowledged` (= true), `consent.policy_version` | Yes | ADR-005 |
-| `email`, `city`, `project_type_code`, `budget_range_code`, `message` | No | May be enriched by staff later (LEAD-024) |
-| `attribution`, `turnstile_token`, `website` (honeypot, must be empty) | Machine-supplied | Not user-entered data |
+| `email`, `city`, `project_type_code`, `budget_range_code`, `property_type_code`, `message` | No | May be enriched by staff later (LEAD-024). `property_type_code` ∈ APARTMENT, INDEPENDENT_HOUSE, VILLA, OFFICE, RETAIL, OTHER (owner Decision 4). Unknown or inactive optional codes are **not** errors: the value is stored in `intake_unmapped` and the field left empty (LEAD-030). |
+| `attribution`, `turnstile_token`, `company_website_url` (honeypot, must be empty) | Machine-supplied | Not user-entered data. Honeypot markup per 04 §5.1. |
 
 **`201`: the complete response.** No other fields are ever returned (LEAD-025):
 
@@ -701,7 +700,8 @@ Errors:
 
 | Status | Code | Body |
 |---|---|---|
-| 422 | `VALIDATION_FAILED` | `errors[]` with `REQUIRED`, `INVALID_PHONE`, `INVALID_EMAIL`, `INVALID_LOOKUP`, `TOO_LONG`, `UNKNOWN_FIELD` |
+| 422 | `VALIDATION_FAILED` | `errors[]` with `REQUIRED`, `INVALID_PHONE`, `INVALID_EMAIL`, `TOO_LONG`, `UNKNOWN_FIELD` (never `INVALID_LOOKUP` for optional codes) |
+| 422 | `IDEMPOTENCY_KEY_REUSED` | Same key, different request fingerprint (§2.8) |
 | 422 | `CONSENT_REQUIRED` · `UNKNOWN_POLICY_VERSION` | |
 | 422 | `CAPTCHA_FAILED` | |
 | 428 | `IDEMPOTENCY_KEY_REQUIRED` | |
@@ -710,12 +710,11 @@ Errors:
 | 5xx | `INTERNAL_ERROR` / `SERVICE_UNAVAILABLE` | The website then falls back to WhatsApp (LEAD-019) |
 
 - Error bodies contain only the problem fields and `request_id`. They never contain internal lead data or state.
-- A honeypot hit returns `202` with `{ "data": { "message": "Thank you." } }` and creates no lead. It is recorded as a `PUBLIC_INTAKE_BLOCKED` security event.
-- An idempotent replay returns the original `201` body unchanged.
+- **Honeypot hit:** the **same `201` shape** with a real reference. The lead is stored with `spam_status = SUSPECTED` for staff review (04 §5.1, §5.5), so nothing is silently dropped (F-05) and bots can't distinguish the trap (A-14).
+- **Idempotent replay** (same key and fingerprint): the original `201` body unchanged. It is checked **before** CAPTCHA, so a genuine retry with a spent Turnstile token still succeeds (F-04).
+- **Website handling:** see the non-success table in 04 §5.1. Every non-2xx except field-level 422 offers the WhatsApp path.
 
 ### 8.5 `PATCH /leads/{id}`
-
-> Traces: LEAD-021
 
 - `If-Match: "6"` is required.
 - **Updatable (enrichment, LEAD-024):** `name, phone, email, city, locality, project_type_code, property_type_code, budget_range_code, message, priority, source_code, source_detail, expected_close_on, quoted_amount` (P1).
@@ -729,8 +728,6 @@ Errors:
 ```
 
 ### 8.6 `POST /leads/{id}/status`
-
-> Traces: LEAD-005, LEAD-006
 
 `If-Match` is required.
 
@@ -757,26 +754,23 @@ Errors:
 
 ### 8.7 `POST /leads/{id}/assign`
 
-> Traces: LEAD-007
-
 `If-Match` is required. Body is `{ "assigned_to": "0192…" | null, "comment": "optional" }`. It returns `200` with the lead. Errors: `422 INVALID_ASSIGNEE` · `422 NO_OP_ASSIGNMENT`.
 
 ### 8.8 Other lead endpoints
-
-> Traces: AUDIT-006, AUDIT-007, LEAD-010, LEAD-016, LEAD-017
 
 | Endpoint | Request | Response |
 |---|---|---|
 | `DELETE /leads/{id}` | `If-Match`. Optional body `{ "reason": "Test entry" }`. | `204` |
 | `POST /leads/{id}/restore` | `{}` (`If-Match`) | `200` lead. `409 DUPLICATE` never occurs (no unique business key besides number). |
-| `POST /leads/{id}/duplicate-resolution` | `{ "resolution": "CONFIRMED" \| "NOT_DUPLICATE", "duplicate_of_lead_id": "…" }` | `200` lead |
+| `POST /leads/{id}/duplicate-resolution` | `{ "resolution": "CONFIRMED" \| "NOT_DUPLICATE", "duplicate_of_lead_id": "…" }` | `200` lead. A `duplicate_of_lead_id` outside the actor's scope → `404 NOT_FOUND`, identical to a missing lead (A-07). |
+| `POST /leads/{id}/spam-resolution` | `{ "resolution": "NOT_SPAM" \| "CONFIRMED_SPAM" }` (`If-Match`) | `200` lead. NOT_SPAM emits `lead.created`. |
+| `POST /leads/{id}/consent/withdraw` | `{ "channel": "PHONE_VERBAL", "note": "Asked not to be contacted" }` (`If-Match`) | `200` lead. Planned contact activities are cancelled (04 §5.4). |
+| `POST /leads/{id}/erasure` | `{ "request_ref": "DPR-2026-004", "legal_basis": "DPDP s.12 erasure", "reason": "…" }` (`lead.erase`, step-up, `If-Match`) | `200` anonymized lead with `"erasure": { "audit_status": "PENDING" }`. It becomes `COMPLETED` when the maintenance job has anonymized the audit payloads (04 §14.2). `422 ERASURE_BLOCKED` with the basis when retention applies. |
 | `GET /leads/duplicates?phone=&email=&exclude_id=` | — | `{ "data": [ { "id", "lead_number", "name", "status", "assigned_to", "created_on" } ] }` (actor scope) |
 | `GET /leads/{id}/history?cursor=` | — | Cursor list of audit entries for the lead and its children (§10 shape) |
 | `POST /leads/exports` (P1) | Same filters as the list, plus `format: "csv"` | `202 { "export_id" }` → poll `GET /leads/exports/{id}` → signed URL (15 min) |
 
 ### 8.9 `GET /leads/summary`
-
-> Traces: LEAD-014
 
 Params: `period=today|7d|30d|90d|custom&from=&to=`. Everything is scoped by `lead.read`.
 
@@ -803,8 +797,6 @@ Every nested route first resolves the parent lead within the actor's `lead.read`
 
 ### 9.1 Notes
 
-> Traces: NOTE-001, NOTE-002, NOTE-004
-
 `GET /leads/{id}/notes?page=1&page_size=50`. Default sort is pinned first, then `-created_on`.
 
 ```json
@@ -819,11 +811,11 @@ Every nested route first resolves the parent lead within the actor's `lead.read`
 |---|---|---|
 | `POST …/notes` | `{ "body": "…", "is_pinned": false }` | `201`. `422 VISIBILITY_NOT_SUPPORTED` if `CUSTOMER_VISIBLE`. |
 | `PATCH …/notes/{note_id}` | `{ "body"?, "is_pinned"? }` with `If-Match` | `200`. A note outside update scope → `403 PERMISSION_DENIED` (the note is visible, so 403 not 404). |
-| `DELETE …/notes/{note_id}` | `If-Match` | `204` |
+| `DELETE …/notes/{note_id}` | `If-Match` | `204`. Soft delete after a UI confirmation. **There is no Undo and no note-restore endpoint** (F-20). |
+
+All note and activity endpoints return `404 NOT_FOUND` when the parent lead is soft-deleted or out of scope.
 
 ### 9.2 Activities
-
-> Traces: ACT-001, ACT-002, ACT-003
 
 `GET /leads/{id}/activities?type=CALL,SITE_VISIT&status=PLANNED&cursor=` (default sort `-created_on`):
 
@@ -880,8 +872,6 @@ Plan a follow-up:
 
 ## 10. Audit logs and security events
 
-> Traces: AUDIT-002, AUDIT-008
-
 `GET /audit-logs`:
 
 | Param | Values |
@@ -925,25 +915,30 @@ Plan a follow-up:
   "meta": { "limit": 50, "next_cursor": "…", "has_more": true } }
 ```
 
-`email_attempted_hash`, `chain_seq`, `prev_hash` and `row_hash` are never returned. Chain integrity is reported by the verification job, not exposed per row.
+`email_attempted_hash`, `chain_seq`, `prev_hash`, `chain_key_label` and `row_hash` are never returned. Chain integrity is reported by the verification job, not exposed per row.
+
+**Access (owner Decision 1).** Requires `security_event.read`, held by Founder and Admin only and effective only in MFA-verified sessions. **A standard Sales user receives `403 PERMISSION_DENIED`** for every security-events request, including `subject_user_id` = self. There is no OWN scope. Each allowed read writes a de-duplicated `SENSITIVE_READ` event (06 §3.2).
 
 ## 11. Error code catalog
-
-> Traces: RBAC-014
 
 | HTTP | Code | Meaning |
 |---|---|---|
 | 400 | `MALFORMED_JSON` | Body isn't valid JSON |
 | 422 | `INVALID_ID` | An id isn't canonical 32-hex UUIDv7 (ADR-002) |
-| 401 | `MFA_CODE_INVALID` · `MFA_CHALLENGE_INVALID` | MFA verification failed |
-| 403 | `STEP_UP_REQUIRED` | Recent MFA needed. Body includes `mfa_token`. |
+| 422 | `INVALID_DATETIME` | A datetime without an offset (03 §2.2) |
+| 401 | `MFA_CODE_INVALID` · `MFA_CHALLENGE_INVALID` · `MFA_RECOVERY_INVALID` · `ENROLLMENT_PROOF_INVALID` | MFA verification, recovery or enrollment proof failed |
+| 403 | `STEP_UP_REQUIRED` | Recent MFA or password re-entry needed. Body: `kind`, and `mfa_token` for MFA. |
+| 403 | `RECOVERY_SESSION_RESTRICTED` | A RECOVERY session called a non-allow-listed endpoint |
+| 403 | `COOLING_OFF` | Post-recovery cooling-off blocks this change (05 §11.5) |
+| 403 | `FOUNDER_PROTECTED` · `APPROVER_NOT_ELIGIBLE` · `APPROVER_POOL_INSUFFICIENT` | Guards G11/G12 (06 §7) |
+| 202 | `APPROVAL_REQUIRED` | Not an error: the action was queued for dual control (returned in the body `status`) |
 | 409 | `MFA_ALREADY_ENROLLED` · `MFA_REQUIRED_BY_POLICY` | MFA state conflicts |
-| 400 | `RESET_TOKEN_INVALID` / `INVITE_TOKEN_INVALID` | Unknown, used or expired token |
+| 400 | `RESET_TOKEN_INVALID` · `INVITE_TOKEN_INVALID` · `EMAIL_TOKEN_INVALID` | Unknown, used or expired token |
 | 401 | `AUTH_REQUIRED` | No or invalid bearer token |
 | 401 | `TOKEN_EXPIRED` | Access token expired, so the client should refresh |
 | 401 | `SESSION_INVALID` | Session revoked or expired, so the client should log in again |
 | 401 | `INVALID_CREDENTIALS` | Login failed |
-| 403 | `PERMISSION_DENIED` | Missing permission code (`detail` names it) |
+| 403 | `PERMISSION_DENIED` | Missing or suspended permission code. `detail` names it. For suspended codes, `reason` is `MFA_REQUIRED`. |
 | 403 | `PASSWORD_CHANGE_REQUIRED` | Must change password first |
 | 403 | `CSRF_REJECTED` | Refresh or logout without proper Origin/header |
 | 403 | `ESCALATION_DENIED` · `SELF_MODIFICATION_DENIED` | RBAC guards G1–G3 |
@@ -951,11 +946,12 @@ Plan a follow-up:
 | 405 | `METHOD_NOT_ALLOWED` | |
 | 409 | `VERSION_CONFLICT` | Stale `If-Match` |
 | 409 | `DUPLICATE` | Unique business key collision (`errors[].field`) |
-| 409 | `LAST_ADMINISTRATOR` · `SYSTEM_OBJECT` · `ROLE_IN_USE` · `INVALID_STATE` | Guard violations |
+| 409 | `LAST_ADMINISTRATOR` · `LAST_FOUNDER` · `SYSTEM_OBJECT` · `ROLE_IN_USE` · `INVALID_STATE` | Guard violations |
 | 413 | `PAYLOAD_TOO_LARGE` | |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | |
 | 422 | `VALIDATION_FAILED` | See `errors[]` (field codes such as `REQUIRED`, `TOO_LONG`, `INVALID_PHONE`, `INVALID_LOOKUP`, `UNKNOWN_FIELD`) |
 | 422 | `INVALID_STATUS_TRANSITION` · `NO_OP_TRANSITION` · `LOST_REASON_REQUIRED` · `COMMENT_REQUIRED` | Lead state machine |
+| 422 | `SAME_AS_CURRENT` · `CONSENT_WITHDRAWN` · `ERASURE_BLOCKED` · `TIME_BOUND_GRANTS_NOT_ENABLED` | Workflow rules (05 §8.6, 04 §5.4, §14, 06 §5) |
 | 422 | `UNKNOWN_POLICY_VERSION` · `PASSWORD_POLICY` · `PASSWORD_REUSED` · `CAPTCHA_FAILED` · `CONSENT_REQUIRED` · `REASON_REQUIRED` · `SCOPE_NOT_SUPPORTED` · `FIELD_NOT_UPDATABLE` · `IMMUTABLE_FIELD` · `INVALID_QUERY_PARAM` · `IDEMPOTENCY_KEY_REUSED` | |
 | 428 | `PRECONDITION_REQUIRED` · `IDEMPOTENCY_KEY_REQUIRED` | Missing `If-Match` or `Idempotency-Key` |
 | 429 | `RATE_LIMITED` | With `Retry-After` |
@@ -964,8 +960,6 @@ Plan a follow-up:
 
 ## 12. Rate limits (application layer)
 
-> Traces: SEC-011
-
 These sit behind the Cloudflare limits in 02 §11. They are initial configuration values, to be tuned from measured traffic (ASM-004).
 
 | Scope | Limit |
@@ -973,8 +967,10 @@ These sit behind the Cloudflare limits in 02 §11. They are initial configuratio
 | Authenticated user, all endpoints | 600 req / 5 min |
 | `POST /auth/login` | 10/min per IP · 5/min per email |
 | `POST /auth/password/forgot` | 5/min per IP · 3/hour per email |
-| `POST /public/leads` | 5/min per IP · 30/hour per IP |
+| `POST /public/leads` | 20/min per IP · 120/hour per IP. Relaxed for carrier-grade NAT on Indian mobile networks (F-05). Turnstile is the primary bot control. Blocked requests are offered the WhatsApp path. |
 | `POST /auth/mfa/*` | 10/min per IP · 5 attempts per challenge · 10 failures per account per 15 min |
+| `POST /auth/login` failures | Per (account, network) throttling and distributed-guessing throttle (05 §4) |
+| Store | The single-process limiter (OPS-010). Limits are exact, not multiplied by worker count (F-09). |
 | Exports (P1) | 5/hour per user |
 
 Responses carry `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`.

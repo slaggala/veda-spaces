@@ -23,7 +23,7 @@ Every persisted table includes:
 | Non-human writers | Documented seeded system users: SYSTEM (jobs, migrations), WEB_INTAKE (website submissions), ANONYMOUS (unauthenticated security events) (03 §2.3) |
 | Concurrency | `version` provides optimistic concurrency (`If-Match` / 409) |
 | Soft delete | Enforced where applicable via partial unique indexes and a default query filter |
-| Exceptions | Only in the **exception registry** (03 §2.9, EXC-001…008). Exceptions relax behavior only. No table omits a column. |
+| Exceptions | Only in the **exception registry** (03 §2.9, EXC-001…010). Exceptions relax behavior only. No table omits a column. Amendment (F-07, F-08): correlation references without a FK (EXC-009), the complete list of globally unique indexes (EXC-007), in-place PII anonymization (EXC-010), and the purge ordering in 03 §2.10. |
 | Enforcement | A schema conformance check fails CI on any violation, on both engines (03 §2.7) |
 
 **Atomic population (03 §2.8):**
@@ -69,3 +69,11 @@ DATA-001, DATA-003, DATA-004, DATA-005, DATA-006, DATA-007, DATA-008, DATA-009, 
 - Adding table partitioning (PostgreSQL) for evidence stores
 - Any proposal to hard-delete business data outside retention or erasure
 - A new actor type (for example portal users or AI identities)
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-003; amended by `VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01` (F-07, F-08 registry corrections) |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

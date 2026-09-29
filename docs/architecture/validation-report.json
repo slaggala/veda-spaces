@@ -1,419 +1,521 @@
 {
- "report": "Veda Spaces P0 foundation architecture validation",
+ "report": "Veda Spaces P0 architecture — remediation 01 validation",
  "generated_on": "2026-09-29",
  "branch": "architecture/p0-foundation-freeze",
+ "previous_architecture_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "independent_review": {
+  "branch": "review/p0-foundation-independent-review",
+  "commit": "7515b232e7407c0bb20afc5abd9656da2c246d0b",
+  "verdict": "NOT CERTIFIED",
+  "baseline_p0": {
+   "Fully covered": 158,
+   "Partially covered": 22,
+   "Contradictory": 4,
+   "Not testable": 2
+  }
+ },
  "method": {
-  "coverage_rule": "A dimension is covered only if its registry reference resolves to a numbered section and that section explicitly cites the requirement ID.",
-  "trace_annotations": "Section-level 'Traces:' lines were generated from the reviewed registry mapping to make each mapping visible in the covered section. 'natively_cited_before_trace_annotation' shows how many were already cited in prose. Semantic adequacy of each mapping is for the independent reviewer.",
-  "tooling": "Validation scripts were run in the authoring session and are intentionally not committed (no code in this freeze)."
+  "coverage": "Substantive classification per requirement using the independent reviewer's taxonomy; the reviewer's matrix is the baseline. Classifications changed by remediation 01 are author assessments that require independent re-review. Navigation references are checked only for resolvability and are not coverage evidence (F-21).",
+  "tooling": "Validation scripts were run in the authoring session and are intentionally not committed (no code in the architecture)."
  },
  "checks": [
   {
-   "id": "C01",
-   "name": "Every requirement ID resolves",
+   "id": "V01",
+   "name": "All Requirement IDs (and named registers) resolve",
    "result": "PASS",
-   "details": "203 registered IDs; 0 unresolved references; 0 registry IDs missing from matrix; 0 duplicates; named registers: 8 EXC, 6 RBX, 12 ASM, 3 OWNER-INPUT; 0 unresolved named refs",
+   "details": "221 registered IDs; 0 unresolved references; 0 missing from 01; named registers EXC 10, RBX 6, ASM 13, OWNER-INPUT 4, TG 6, AX 10; 0 unresolved named refs",
    "evidence": []
   },
   {
-   "id": "C02",
-   "name": "Every cross-document reference resolves",
+   "id": "V02",
+   "name": "No duplicate Requirement IDs",
    "result": "PASS",
-   "details": "1032 section references and 69 relative links checked; 0 bad refs; 0 bad links",
+   "details": "221 IDs, 221 unique",
    "evidence": []
   },
   {
-   "id": "C03",
-   "name": "Every table follows the audit contract",
+   "id": "V03",
+   "name": "All cross-document references resolve",
    "result": "PASS",
-   "details": "23 tables in inventory; 23 column-definition sections; contract defines all 9 columns; every table registered in 07 §2; behavioral exceptions registered for 10 tables (03 §2.9)",
+   "details": "1465 section references, 103 relative links, 759 registry navigation references checked",
    "evidence": []
   },
   {
-   "id": "C04",
-   "name": "Every foreign key uses the canonical ID type",
+   "id": "V04",
+   "name": "JSON files are syntactically valid",
    "result": "PASS",
-   "details": "41 id/reference columns checked across 23 tables plus 3 contract actor FKs per table; allow-listed non-FK: {'request_id': 'correlation string, not an entity reference'}",
+   "details": "3 JSON files parsed",
    "evidence": []
   },
   {
-   "id": "C05",
-   "name": "No table named user exists",
+   "id": "V05",
+   "name": "No physical table named user",
    "result": "PASS",
-   "details": "Checked table sections, inventory, and FK/DDL-style references in all documents",
+   "details": "24 inventory tables, 24 table definitions scanned; app_user.id referenced 35 times",
    "evidence": []
   },
   {
-   "id": "C06",
-   "name": "app_user is used consistently",
+   "id": "V06",
+   "name": "All complete example and seeded IDs follow the UUIDv7 32-hex contract",
    "result": "PASS",
-   "details": "32 references to app_user.id; no stale names (user.id, auth_event, audit.security.read, intake_submission_id, phone_is_valid)",
+   "details": "12 complete 32-hex identifiers found in documents (elided examples ending in … are excluded); validation pattern and INVALID_ID documented",
    "evidence": []
   },
   {
-   "id": "C07",
-   "name": "No hardcoded Admin-role authorization exists",
+   "id": "V07",
+   "name": "No hardcoded role-name authorization",
    "result": "PASS",
-   "details": "3 mentions found, all in prohibition context; 0 unqualified",
+   "details": "1 mentions, all in prohibition context",
    "evidence": [
-    "06-rbac.md:32: 1. **Code checks permission codes only.** Nothing in the code references role codes (`FOUNDER`, `ADMIN`), \"is_admin\" flags, or specific user",
-    "decisions/ADR-006-mfa-policy.md:41: | Check the role code (`if role in [FOUNDER, ADMIN]`) | Violates RBAC-002 |",
-    "decisions/ADR-006-mfa-policy.md:41: | Check the role code (`if role in [FOUNDER, ADMIN]`) | Violates RBAC-002 |"
+    "06-rbac.md:33: 1. **Code checks permission codes only.** Nothing references role codes (`FOUNDER`, `ADMIN`, `SALES`), \"is_admin\" flags "
    ]
   },
   {
-   "id": "C08",
-   "name": "Every privileged endpoint maps to permissions",
+   "id": "V08",
+   "name": "No default Sales security-event access",
    "result": "PASS",
-   "details": "85 endpoint rows checked; 41 permissions in catalog (06 §6); non-permission endpoints limited to RBAC exception register (6 entries)",
+   "details": "Matrix cell blank for Sales; ALL-only; 05 §9.5 prohibition; /auth/me example; negative tests present",
    "evidence": []
   },
   {
-   "id": "C09",
+   "id": "V09",
+   "name": "No recovery-code-only (or password-only) authenticator enrollment",
+   "result": "PASS",
+   "details": "Two-proof enrollment paths A–D; recovery requires password + code; login returns no enrollment token",
+   "evidence": []
+  },
+  {
+   "id": "V10",
+   "name": "No direct generic email replacement or mass assignment of security attributes",
+   "result": "PASS",
+   "details": "PATCH DTOs profile-only; email only via proposed-email workflow; user.update retired",
+   "evidence": []
+  },
+  {
+   "id": "V11",
+   "name": "Founder and last-administrator protection exists (service and database-safe)",
+   "result": "PASS",
+   "details": "G3/G4/G9/G11/G12, invariants I1/I2 under write lock, nightly check, protection_level attribute, error codes",
+   "evidence": []
+  },
+  {
+   "id": "V12",
+   "name": "All three MAJOR findings substantively resolved (contradiction probes)",
+   "result": "PASS",
+   "details": "F-01: no sensitive permission in the Sales column, Sales MFA optional, MFA-gated activation. F-02: no single-factor enrollment, restricted recovery session, cooling-off. F-03: granular sensitive account-control permissions, G9 over email/status, Founder protection.",
+   "evidence": []
+  },
+  {
+   "id": "V13",
+   "name": "Every finding dispositioned; every MINOR resolved or explicitly tracked",
+   "result": "PASS",
+   "details": "35 findings; status {'Resolved': 33, 'Tracked before implementation': 1, 'Accepted advisory with reason': 1}",
+   "evidence": []
+  },
+  {
+   "id": "V14",
+   "name": "No secret material",
+   "result": "PASS",
+   "details": "Scanned for cloud keys, private keys, tokens, complete JWTs and the published example TOTP key (A-10)",
+   "evidence": []
+  },
+  {
+   "id": "V15",
+   "name": "No implementation code added; only architecture documentation changed",
+   "result": "PASS",
+   "details": "30 changed paths, all under docs/architecture/ and all .md/.json",
+   "evidence": []
+  },
+  {
+   "id": "V16",
+   "name": "dist/ unchanged",
+   "result": "PASS",
+   "details": "No dist/ diff vs 4dce177 or working tree; content SHA-256 8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8",
+   "evidence": []
+  },
+  {
+   "id": "V17",
+   "name": "Every table follows the audit contract; exception registry complete (incl. F-08 indexes)",
+   "result": "PASS",
+   "details": "24 tables; 23 unique indexes checked against the predicate rule or EXC-007",
+   "evidence": []
+  },
+  {
+   "id": "V18",
+   "name": "Every foreign key uses the canonical ID type; non-FK correlation ids are registered",
+   "result": "PASS",
+   "details": "45 reference columns checked; correlation ids registered in EXC-009",
+   "evidence": []
+  },
+  {
+   "id": "V19",
    "name": "SQLite and PostgreSQL mappings are explicit",
    "result": "PASS",
-   "details": "Types used in schema: ['BIGINT', 'BOOL', 'CHAR(n)', 'CODE(n)', 'DATE', 'GUID', 'INTEGER', 'JSON', 'MONEY_MINOR', 'SMALLINT', 'TEXT', 'UTCDATETIME', 'VARCHAR(n)']; all mapped in 03 §12",
+   "details": "Types used: ['BIGINT', 'BOOL', 'CHAR(n)', 'CODE(n)', 'DATE', 'GUID', 'INTEGER', 'JSON', 'MONEY_MINOR', 'SMALLINT', 'TEXT', 'UTCDATETIME', 'VARCHAR(n)']",
    "evidence": []
   },
   {
-   "id": "C10",
-   "name": "Public lead APIs expose no internal fields",
+   "id": "V20",
+   "name": "Public lead API reveals no internal fields; property type optional and consistent",
    "result": "PASS",
-   "details": "2 public response bodies checked (keys ⊆ {reference, message}); request schema limited to ADR-005 fields; only POST /public/leads is public",
+   "details": "Response keys ⊆ {reference, message}; request limited to ADR-005 fields incl. optional property_type_code; identical honeypot response; seeds APARTMENT…OTHER",
    "evidence": []
   },
   {
-   "id": "C11",
+   "id": "V21",
    "name": "Security-event logs contain no secrets",
    "result": "PASS",
-   "details": "19 columns checked against prohibited names; prohibition list present in 05 §9.3; API output excludes hash and chain columns",
+   "details": "20 columns checked; prohibition list present; API excludes hash/chain",
    "evidence": []
   },
   {
-   "id": "C12",
-   "name": "All old undecided text is resolved or removed",
+   "id": "V22",
+   "name": "Deferred modules not promoted into P0",
    "result": "PASS",
-   "details": "Scanned for sign-off/confirm/decide/TBD/revisit markers and invented volume, RPO/RTO or availability figures; 0 matches are validation triggers inside the assumptions/owner-input registers",
+   "details": "No roadmap tables, endpoints or permissions; doc 10 banner present",
    "evidence": []
   },
   {
-   "id": "C13",
-   "name": "Deferred modules are not promoted into P0",
+   "id": "V23",
+   "name": "Accessibility fixes documented as tokens; light and dark contrast verified",
    "result": "PASS",
-   "details": "P0 table inventory, migration order, endpoint index and permission catalog contain no roadmap-module objects; doc 10 carries the ADR-009 banner",
-   "evidence": []
-  },
-  {
-   "id": "C14",
-   "name": "Accessibility fixes are documented as design-system tokens",
-   "result": "PASS",
-   "details": "6 token decisions in 09 §2.5; ratios recomputed",
+   "details": "22 token/background combinations recomputed; AX-01…AX-10 defined",
    "evidence": [
-    "copper-text: computed 5.36 vs stated 5.4",
-    "copper: computed 4.06 vs stated 4.1",
-    "warning: computed 5.33 vs stated 5.3",
-    "white on copper-strong: computed 7.10 vs stated 7.1",
-    "copper on site paper: computed 3.81 vs stated 3.8"
+    "--vs-on-copper-strong on --vs-copper-strong [light] 7.10",
+    "--vs-on-copper-strong on --vs-copper-strong [dark] 9.51",
+    "--vs-on-danger on --vs-danger [light] 6.57",
+    "--vs-on-danger on --vs-danger [dark] 6.16",
+    "--vs-ink [light on #FBF7EF] 15.77",
+    "--vs-ink [dark on #171614] 15.89",
+    "--vs-ink [dark on #201F1C] 14.48",
+    "--vs-ink-muted [light on #FBF7EF] 6.68",
+    "--vs-ink-muted [dark on #171614] 8.43",
+    "--vs-ink-muted [dark on #201F1C] 7.68",
+    "--vs-copper-text [light on #FBF7EF] 5.36",
+    "--vs-copper-text [dark on #171614] 8.32",
+    "--vs-copper-text [dark on #201F1C] 7.58",
+    "--vs-danger [light on #FBF7EF] 6.15",
+    "--vs-danger [dark on #171614] 6.16",
+    "--vs-danger [dark on #201F1C] 5.61",
+    "--vs-success [light on #FBF7EF] 5.76",
+    "--vs-success [dark on #171614] 8.01",
+    "--vs-success [dark on #201F1C] 7.30",
+    "--vs-warning [light on #FBF7EF] 5.33",
+    "--vs-warning [dark on #171614] 9.35",
+    "--vs-warning [dark on #201F1C] 8.52"
    ]
+  },
+  {
+   "id": "V24",
+   "name": "No undecided text or invented RPO/RTO/availability/retention/volume values",
+   "result": "PASS",
+   "details": "Scanned for sign-off, TBD/TODO, invented volumes, RPO/RTO/availability figures and retention defaults",
+   "evidence": []
+  },
+  {
+   "id": "V25",
+   "name": "Money in integer minor units with currency; UTC storage and local display explicit",
+   "result": "PASS",
+   "details": "Monetary columns use MONEY_MINOR + currency; 03 §2.2 time rules",
+   "evidence": []
+  },
+  {
+   "id": "V26",
+   "name": "Coverage model is substantive (no citation-derived coverage); every requirement assessed",
+   "result": "PASS",
+   "details": "No Traces lines; every requirement has a classification; every upgrade from the independent baseline is flagged for re-review",
+   "evidence": []
   }
  ],
  "coverage_gate": {
-  "summary": {
-   "total_requirements": 203,
-   "p0_in_scope": 186,
-   "deferred": 17,
-   "by_priority": {
-    "P0": 186,
-    "P1": 14,
-    "P2": 3
-   },
-   "coverage_by_dimension": {
-    "architecture": {
-     "applicable": 203,
-     "covered": 203,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 145
-    },
-    "schema": {
-     "applicable": 79,
-     "covered": 79,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 27
-    },
-    "api": {
-     "applicable": 75,
-     "covered": 75,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 16
-    },
-    "ui": {
-     "applicable": 53,
-     "covered": 53,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 22
-    },
-    "security": {
-     "applicable": 61,
-     "covered": 61,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 40
-    },
-    "test": {
-     "applicable": 199,
-     "covered": 199,
-     "pct": 100.0,
-     "natively_cited_before_trace_annotation": 95
-    }
-   }
+  "total_requirements": 221,
+  "p0": 208,
+  "by_priority": {
+   "P0": 208,
+   "P1": 10,
+   "P2": 3
   },
-  "uncovered_p0_requirements": [],
-  "deferred_requirements": [
+  "p0_classification": {
+   "Fully covered": 206,
+   "Not testable pending owner input": 2
+  },
+  "p0_test_design": {
+   "automated": 166,
+   "review": 21,
+   "operational": 19,
+   "owner-gated": 2
+  },
+  "partial_to_fully_covered": [
+   "AUTH-005",
+   "AUTH-006",
+   "AUTH-010",
+   "AUTH-015",
+   "AUTH-017",
+   "DATA-009",
+   "DATA-014",
+   "LEAD-018",
+   "LEAD-019",
+   "LOG-005",
+   "MFA-007",
+   "MFA-010",
+   "NOTE-002",
+   "OPS-004",
+   "RBAC-009",
+   "RBAC-011",
+   "SEC-009",
+   "SEC-011",
+   "SEVT-006",
+   "UI-011",
+   "UI-014",
+   "USER-001"
+  ],
+  "contradictions_removed": [
+   "API-007",
+   "AUTH-018",
+   "MFA-003",
+   "RBAC-017"
+  ],
+  "new_or_promoted_p0": [
+   "AUDIT-011",
+   "AUTH-016",
+   "DATA-017",
+   "LEAD-027",
+   "LEAD-028",
+   "LEAD-029",
+   "LEAD-030",
+   "MFA-012",
+   "MFA-013",
+   "MFA-014",
+   "MFA-015",
+   "OPS-010",
+   "OPS-011",
+   "RBAC-016",
+   "RBAC-018",
+   "RBAC-019",
+   "RBAC-020",
+   "RBAC-021",
+   "SEVT-007",
+   "UI-016",
+   "UI-017",
+   "USER-007"
+  ],
+  "revised_baseline_fully_covered": [
+   "AUDIT-004",
+   "AUDIT-008",
+   "AUTH-008",
+   "AUTH-011",
+   "AUTH-014",
+   "DATA-007",
+   "DATA-011",
+   "LEAD-001",
+   "LEAD-002",
+   "LEAD-010",
+   "LEAD-012",
+   "LEAD-013",
+   "LEAD-023",
+   "LEAD-025",
+   "MFA-001",
+   "MFA-002",
+   "MFA-004",
+   "MFA-005",
+   "MFA-006",
+   "MFA-009",
+   "MFA-011",
+   "NFR-001",
+   "NFR-003",
+   "NOTIF-004",
+   "NOTIF-008",
+   "OPS-001",
+   "OPS-002",
+   "OPS-009",
+   "PLAT-004",
+   "PLAT-006",
+   "PLAT-007",
+   "PLAT-012",
+   "RBAC-008",
+   "RBAC-010",
+   "RBAC-013",
+   "RBAC-014",
+   "RBAC-015",
+   "SEC-002",
+   "SEVT-001",
+   "SEVT-002",
+   "SEVT-004",
+   "SEVT-005",
+   "UI-001",
+   "UI-004",
+   "UI-010",
+   "UI-015",
+   "USER-002",
+   "USER-004",
+   "USER-006"
+  ],
+  "owner_input_dependencies": [
+   {
+    "id": "AUDIT-009",
+    "owner_input": "OWNER-INPUT-002",
+    "classification": "Deferred"
+   },
+   {
+    "id": "DATA-017",
+    "owner_input": "OWNER-INPUT-002",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "LEAD-028",
+    "owner_input": "OWNER-INPUT-002",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "MFA-015",
+    "owner_input": "OWNER-INPUT-004",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "NFR-002",
+    "owner_input": "OWNER-INPUT-001",
+    "classification": "Not testable pending owner input"
+   },
+   {
+    "id": "OPS-002",
+    "owner_input": "OWNER-INPUT-003",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "OPS-005",
+    "owner_input": "OWNER-INPUT-001",
+    "classification": "Not testable pending owner input"
+   },
+   {
+    "id": "OPS-009",
+    "owner_input": "OWNER-INPUT-003",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "RBAC-021",
+    "owner_input": "OWNER-INPUT-004",
+    "classification": "Fully covered"
+   },
+   {
+    "id": "SEVT-004",
+    "owner_input": "OWNER-INPUT-002",
+    "classification": "Fully covered"
+   }
+  ],
+  "not_testable_pending_owner_input": [
+   "NFR-002",
+   "OPS-005"
+  ],
+  "review_or_operational_only": [
+   "API-008",
+   "API-009",
+   "AUTH-014",
+   "DATA-009",
+   "LOG-001",
+   "LOG-004",
+   "LOG-006",
+   "MFA-008",
+   "NOTIF-005",
+   "OPS-001",
+   "OPS-002",
+   "OPS-003",
+   "OPS-004",
+   "OPS-006",
+   "OPS-007",
+   "OPS-008",
+   "OPS-009",
+   "OPS-010",
+   "OPS-011",
+   "PLAT-001",
+   "PLAT-002",
+   "PLAT-003",
+   "PLAT-005",
+   "PLAT-006",
+   "PLAT-008",
+   "PLAT-011",
+   "PLAT-012",
+   "RBAC-002",
+   "SEC-001",
+   "SEC-005",
+   "SEC-006",
+   "SEC-007",
+   "SEC-008",
+   "SEC-009",
+   "SEVT-004",
+   "SEVT-007",
+   "SEVT-009",
+   "SEVT-010",
+   "UI-010",
+   "UI-014"
+  ],
+  "deferred": [
+   {
+    "id": "ACT-005",
+    "priority": "P1",
+    "title": "Call and WhatsApp buttons prompt a prefilled activity quick-log."
+   },
    {
     "id": "AUDIT-007",
     "priority": "P1",
-    "title": "Bulk exports are audited (who, when, filter, row count).",
-    "gaps": []
+    "title": "Bulk exports are audited (who, when, filter, row count)."
    },
    {
     "id": "AUDIT-009",
     "priority": "P1",
-    "title": "Configurable audit retention with verified archival.",
-    "gaps": []
-   },
-   {
-    "id": "AUDIT-011",
-    "priority": "P1",
-    "title": "Personal-data anonymization of audit payloads only via an audited procedure.",
-    "gaps": []
+    "title": "Configurable audit retention with verified archival."
    },
    {
     "id": "AUDIT-013",
     "priority": "P2",
-    "title": "Tamper-evidence hash chain over audit_log.",
-    "gaps": []
-   },
-   {
-    "id": "AUTH-016",
-    "priority": "P1",
-    "title": "Users list and revoke their sessions; admins revoke any user's sessions.",
-    "gaps": []
-   },
-   {
-    "id": "SEVT-007",
-    "priority": "P1",
-    "title": "The daily chain head is anchored in S3 Object Lock.",
-    "gaps": []
-   },
-   {
-    "id": "RBAC-007",
-    "priority": "P1",
-    "title": "Role and permission assignments can be time-bound.",
-    "gaps": []
-   },
-   {
-    "id": "RBAC-016",
-    "priority": "P1",
-    "title": "An effective-permissions view explains every permission's source.",
-    "gaps": []
+    "title": "Tamper-evidence hash chain over audit_log."
    },
    {
     "id": "LEAD-017",
     "priority": "P1",
-    "title": "Leads can be exported to CSV (permission-gated, audited).",
-    "gaps": []
+    "title": "Leads can be exported to CSV (permission-gated, audited)."
    },
    {
     "id": "LEAD-021",
     "priority": "P1",
-    "title": "Quoted amount is recorded in minor units.",
-    "gaps": []
+    "title": "Quoted amount is recorded in minor units."
    },
    {
     "id": "LEAD-022",
     "priority": "P2",
-    "title": "Auto-assignment (round robin).",
-    "gaps": [
-     "test (no verification designed)"
-    ]
-   },
-   {
-    "id": "NOTE-003",
-    "priority": "P1",
-    "title": "Notes can be pinned.",
-    "gaps": []
-   },
-   {
-    "id": "ACT-005",
-    "priority": "P1",
-    "title": "Call and WhatsApp buttons prompt a prefilled activity quick-log.",
-    "gaps": [
-     "test (no verification designed)"
-    ]
-   },
-   {
-    "id": "NOTIF-006",
-    "priority": "P1",
-    "title": "Follow-up reminders and daily digest.",
-    "gaps": [
-     "test (no verification designed)"
-    ]
-   },
-   {
-    "id": "NOTIF-007",
-    "priority": "P2",
-    "title": "WhatsApp Business API notifications.",
-    "gaps": [
-     "test (no verification designed)"
-    ]
-   },
-   {
-    "id": "SEC-010",
-    "priority": "P1",
-    "title": "Target OWASP ASVS v4 Level 2.",
-    "gaps": []
+    "title": "Auto-assignment (round robin)."
    },
    {
     "id": "NFR-004",
     "priority": "P1",
-    "title": "Initial JS below 200 KB gzipped and LCP below 2.5 s on 4G.",
-    "gaps": []
-   }
-  ],
-  "assumptions": [
-   {
-    "id": "ASM-001",
-    "text": "The staff user base during P0 is small (tens of people), within a single-instance deployment's capacity"
+    "title": "Initial JS below 200 KB gzipped and LCP below 2.5 s on 4G."
    },
    {
-    "id": "ASM-002",
-    "text": "P0 write concurrency is within SQLite's single-writer capacity"
+    "id": "NOTE-003",
+    "priority": "P1",
+    "title": "Notes can be pinned."
    },
    {
-    "id": "ASM-003",
-    "text": "Table growth classes in 03 §11 are qualitative guesses"
+    "id": "NOTIF-006",
+    "priority": "P1",
+    "title": "Follow-up reminders and daily digest."
    },
    {
-    "id": "ASM-004",
-    "text": "Security-event volumes are unknown. Alert, lockout and rate-limit thresholds are initial configuration values."
+    "id": "NOTIF-007",
+    "priority": "P2",
+    "title": "WhatsApp Business API notifications."
    },
    {
-    "id": "ASM-005",
-    "text": "The website's existing \"Property Type\" field is not sent to the public API, because ADR-005 enumerates the public fields. Staff capture property type during enrichment."
+    "id": "RBAC-007",
+    "priority": "P1",
+    "title": "Time-bound grants (P1): disabled in P0 with 422; when enabled, never allowed on sensitive permissions."
    },
    {
-    "id": "ASM-006",
-    "text": "Retention defaults: audit 2 y online / 8 y total · security events 1 y / 2 y · closed-lead anonymization 3 y"
-   },
-   {
-    "id": "ASM-007",
-    "text": "NFR-001 load-test fixture sizes (100k leads, 1M audit rows) are test fixtures, not forecasts"
-   },
-   {
-    "id": "ASM-008",
-    "text": "Cloudflare stays in front of `api.vedaspaces.com` (proxied)"
-   },
-   {
-    "id": "ASM-009",
-    "text": "SES production access will be granted. Until then, the capture adapter means no outbound email outside production."
-   },
-   {
-    "id": "ASM-010",
-    "text": "A host with at least 2 GB RAM is sufficient for Argon2id parameters"
-   },
-   {
-    "id": "ASM-011",
-    "text": "The website will publish a versioned privacy notice whose version id is sent as `consent.policy_version`"
-   },
-   {
-    "id": "ASM-012",
-    "text": "The AWS region is ap-south-1 (Mumbai). ADR-008 fixes AWS but not the region."
-   }
-  ],
-  "exceptions": {
-   "audit_contract": [
-    {
-     "id": "EXC-001",
-     "tables": "`audit_log`, `security_event_log`",
-     "exception": "Rows are immutable: never updated or soft-deleted. `updated_on = created_on`, `updated_by = created_by`, `version = 1`, `is_deleted = false` for life."
-    },
-    {
-     "id": "EXC-002",
-     "tables": "`audit_log`, `security_event_log`",
-     "exception": "Hard-deleted by the retention job after archival"
-    },
-    {
-     "id": "EXC-003",
-     "tables": "`refresh_token`, `mfa_challenge`",
-     "exception": "Hard-deleted by purge after expiry, never soft-deleted"
-    },
-    {
-     "id": "EXC-004",
-     "tables": "`outbox_event`",
-     "exception": "DONE rows hard-deleted after the configured retention"
-    },
-    {
-     "id": "EXC-005",
-     "tables": "`notification`",
-     "exception": "Hard-deleted after the configured retention once read"
-    },
-    {
-     "id": "EXC-006",
-     "tables": "`user_session`, `password_reset_token`, `user_mfa_recovery_code`",
-     "exception": "Never soft-deleted. The lifecycle uses `revoked_on`, `used_on` and `invalidated_on`."
-    },
-    {
-     "id": "EXC-007",
-     "tables": "Token-hash and chain columns (`refresh_token.token_hash`, `password_reset_token.token_hash`, `mfa_challenge.token_hash`, `user_mfa_recovery_code.code_hash`, `security_event_log.chain_seq`)",
-     "exception": "Unique index **without** the `is_deleted` predicate"
-    },
-    {
-     "id": "EXC-008",
-     "tables": "`app_user` rows SYSTEM, WEB_INTAKE, ANONYMOUS",
-     "exception": "Cannot be soft-deleted, disabled or given credentials"
-    }
-   ],
-   "rbac_non_permission_endpoints": [
-    {
-     "id": "RBX-001",
-     "endpoints": "`POST /auth/login`, `POST /auth/mfa/verify`, `POST /auth/mfa/enroll/*` (with `mfa_token`)"
-    },
-    {
-     "id": "RBX-002",
-     "endpoints": "`POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`"
-    },
-    {
-     "id": "RBX-003",
-     "endpoints": "`POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/invite/accept`"
-    },
-    {
-     "id": "RBX-004",
-     "endpoints": "`POST /auth/password/change`, `POST /auth/mfa/step-up`, `POST /auth/mfa/recovery-codes`, `DELETE /auth/mfa/factor`"
-    },
-    {
-     "id": "RBX-005",
-     "endpoints": "`POST /public/leads`"
-    },
-    {
-     "id": "RBX-006",
-     "endpoints": "`GET /health/*`, `GET /auth/.well-known/jwks.json`"
-    }
-   ]
-  },
-  "owner_inputs_go_live_preconditions": [
-   {
-    "id": "OWNER-INPUT-001",
-    "input": "Approved RPO, RTO and API availability target"
-   },
-   {
-    "id": "OWNER-INPUT-002",
-    "input": "Confirmation of retention durations (audit, security events, closed-lead anonymization)"
-   },
-   {
-    "id": "OWNER-INPUT-003",
-    "input": "Restore-rehearsal cadence"
+    "id": "SEC-010",
+    "priority": "P1",
+    "title": "Target OWASP ASVS v4 Level 2."
    }
   ],
   "unresolved_blockers": [],
-  "verdict": "READY FOR INDEPENDENT ARCHITECTURE REVIEW"
+  "verdict": "READY FOR FOCUSED INDEPENDENT RE-REVIEW"
  }
 }

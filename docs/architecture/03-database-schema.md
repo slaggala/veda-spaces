@@ -1,10 +1,8 @@
 # 03 — Database Architecture and Foundational Schema
 
-Governing decisions: [ADR-001](decisions/ADR-001-app-user-table.md) · [ADR-002](decisions/ADR-002-uuidv7-identifiers.md) · [ADR-003](decisions/ADR-003-audit-contract.md) · [ADR-004](decisions/ADR-004-security-event-log.md) · [ADR-006](decisions/ADR-006-mfa-policy.md)
+Governing decisions: [ADR-001](decisions/ADR-001-app-user-table.md) · [ADR-002](decisions/ADR-002-uuidv7-identifiers.md) · [ADR-003](decisions/ADR-003-audit-contract.md) · [ADR-004](decisions/ADR-004-security-event-log.md) · [ADR-006](decisions/ADR-006-mfa-policy.md) · [ADR-010](decisions/ADR-010-account-control-and-privileged-protection.md)
 
 ## 1. Conventions
-
-> Traces: DATA-010
 
 | Topic | Convention |
 |---|---|
@@ -21,8 +19,6 @@ Governing decisions: [ADR-001](decisions/ADR-001-app-user-table.md) · [ADR-002]
 ## 2. The audit contract (ADR-003)
 
 ### 2.1 Columns
-
-> Traces: DATA-001, DATA-003, DATA-004, DATA-005, DATA-006
 
 Every persisted table starts with these nine columns: domain, security, junction, configuration, reference, log and business tables alike. **No table omits a column.** The exception registry (§2.9) can only relax *behavior* (for example "never soft-deleted"), never remove a column.
 
@@ -62,7 +58,17 @@ Every persisted table starts with these nine columns: domain, security, junction
 | Ordering | UUIDv7 sorts approximately by creation time. Lists use explicit sort keys (`created_on`, `id` as tie-breaker), never implicit id order. |
 | Human-readable numbers | Business numbers such as `lead_number` come from `number_sequence` (§6.3). They are internal display values only: never used as identifiers in API paths and never shown on public surfaces (ADR-002, LEAD-025). |
 
-**Time.** All values are UTC. One clock reading per transaction (§2.8). The UI converts to the user's `timezone` (PLAT-007).
+**Time (PLAT-007).**
+
+| Rule | Detail |
+|---|---|
+| Instants | Every `UTCDATETIME` is an instant stored in UTC. There is one clock reading per transaction (§2.8). |
+| Input | Clients send instants as RFC 3339 with an offset (`2026-09-30T11:00:00+05:30`) or `Z`. The API converts them to UTC. Offset-less datetimes are rejected with `422 INVALID_DATETIME`. |
+| Display | Instants are shown in the viewing user's `app_user.timezone` (IANA, default `Asia/Kolkata`) using the browser Intl API with that zone, **not** the device zone. Public website text uses Asia/Kolkata. |
+| Calendar dates | `DATE` columns (for example `expected_close_on`) are calendar dates with no timezone. They are never converted. |
+| Period filters | "Today", "this week" and `*_from` / `*_to` date filters are interpreted in the requesting user's timezone and converted to UTC half-open ranges `[from, to)` (08 §2.6). |
+| Scheduled jobs | Daily jobs (digest, retention, anchoring) run at configured local times in `Asia/Kolkata`, computed through IANA rules, so DST-observing zones also work if staff are added abroad. |
+| Emails | Times are rendered in the recipient's timezone, with the zone abbreviation. |
 
 ### 2.3 Actor columns and seeded system users (DATA-004, USER-005)
 
@@ -75,6 +81,8 @@ Every persisted table starts with these nine columns: domain, security, junction
 | SYSTEM | `00000000000070008000000000000001` | Migrations, seeding, scheduled jobs, outbox worker, retention jobs |
 | WEB_INTAKE | `00000000000070008000000000000002` | Leads created through the public website form |
 | ANONYMOUS | `00000000000070008000000000000003` | Security events caused by unauthenticated requests (failed logins for unknown emails, password-reset requests, blocked public submissions) |
+
+`created_by`, `updated_by` and `deleted_by` are real FKs. Correlation columns that merely record context (`audit_log.session_id`, `security_event_log.session_id`, `refresh_token.replaced_by_id`) are GUID-typed **non-FK correlation references** (EXC-009), so purge jobs can remove sessions and tokens without violating referential integrity (§2.10).
 
 **Bootstrap.**
 
@@ -108,7 +116,7 @@ A CI job migrates an empty database on **both** SQLite and PostgreSQL, introspec
 
 1. lacks any of the nine contract columns, or has the wrong logical type or nullability;
 2. has a primary key other than `id` of the GUID type;
-3. lacks the three actor FKs to `app_user.id`;
+3. lacks the three actor FKs to `app_user.id`, or has an `*_id` column without a FK other than the EXC-009 correlation columns;
 4. has a column ending in `_id`, or an actor column, whose type is not the GUID type (checked for every FK, DATA-012);
 5. has a unique index on business columns without the `is_deleted = false` predicate, unless allow-listed in §2.9;
 6. has an FK with a cascade action, or uses a native ENUM type;
@@ -117,8 +125,6 @@ A CI job migrates an empty database on **both** SQLite and PostgreSQL, introspec
 9. has a behavioral deviation (no soft delete, hard-delete purge, immutable rows) that is not listed in the exception registry (§2.9).
 
 ### 2.8 Population and transactional atomicity (ADR-003, DATA-015)
-
-> Traces: DATA-003
 
 Audit fields are populated by the platform kernel. They are never set by services, repositories or clients. All writes for one business operation share one database transaction.
 
@@ -147,20 +153,38 @@ API request / job
 
 ### 2.9 Contract exception registry (DATA-014)
 
-> Traces: AUDIT-004
-
 Every behavioral exception to the contract is listed here. The conformance check reads this registry. Columns are never exempt.
 
 | ID | Table(s) | Exception | Justification | Compensating control |
 |---|---|---|---|---|
 | EXC-001 | `audit_log`, `security_event_log` | Rows are immutable: never updated or soft-deleted. `updated_on = created_on`, `updated_by = created_by`, `version = 1`, `is_deleted = false` for life. | They are the evidence stores. Mutation would defeat their purpose. | DB triggers/grants block UPDATE/DELETE (07 §6). The hash chain covers `security_event_log` (SEVT-006). |
 | EXC-002 | `audit_log`, `security_event_log` | Hard-deleted by the retention job after archival | Configurable retention (SEVT-004, AUDIT-009) | Archive to S3 with checksum verification before delete. A summary event is written. |
-| EXC-003 | `refresh_token`, `mfa_challenge` | Hard-deleted by purge after expiry, never soft-deleted | Short-lived secrets-derived rows. Keeping them adds risk and no value. | Lifecycle events are in `security_event_log`. Purge runs as SYSTEM with a summary event. |
-| EXC-004 | `outbox_event` | DONE rows hard-deleted after the configured retention | Operational queue, not business data | Business effect is audited in `audit_log`. DEAD rows are retained until resolved. |
-| EXC-005 | `notification` | Hard-deleted after the configured retention once read | User inbox convenience data | Source event traceable via `source_event_id` until purge |
-| EXC-006 | `user_session`, `password_reset_token`, `user_mfa_recovery_code` | Never soft-deleted. The lifecycle uses `revoked_on`, `used_on` and `invalidated_on`. | These states are more precise than a generic delete flag | Lifecycle transitions write security events |
-| EXC-007 | Token-hash and chain columns (`refresh_token.token_hash`, `password_reset_token.token_hash`, `mfa_challenge.token_hash`, `user_mfa_recovery_code.code_hash`, `security_event_log.chain_seq`) | Unique index **without** the `is_deleted` predicate | Hashes and chain positions must be globally unique | — |
+| EXC-003 | `refresh_token`, `mfa_challenge`, `user_action_token`, `user_session` | Hard-deleted by purge after expiry, use or revocation plus the configured retention, never soft-deleted | Short-lived secrets-derived rows. Keeping them adds risk and no value. | Lifecycle events are in `security_event_log`. Purge runs as SYSTEM with a summary event. |
+| EXC-004 | `outbox_event` | DONE rows hard-deleted after the configured retention, only when no `notification` still references them (§2.10) | Operational queue, not business data | Business effect is audited in `audit_log`. DEAD rows are retained until resolved. |
+| EXC-005 | `notification` | Hard-deleted after the configured retention: read rows after the read-retention, unread rows after the unread-retention | User inbox convenience data | Source event traceable via `source_event_id` until purge |
+| EXC-006 | `user_session`, `user_action_token`, `user_mfa_recovery_code`, `admin_approval_request` | Never soft-deleted. The lifecycle uses `revoked_on`, `used_on` and `invalidated_on`. | These states are more precise than a generic delete flag | Lifecycle transitions write security events |
+| EXC-007 | `refresh_token.token_hash` (`ux_refresh_token__token_hash`), `user_action_token.token_hash` (`ux_user_action_token__token_hash`), `mfa_challenge.token_hash` (`ux_mfa_challenge__token_hash`), `user_mfa_recovery_code.code_hash` (`ux_user_mfa_recovery_code__hash`), `security_event_log.chain_seq` (`ux_security_event_log__chain_seq`), `admin_approval_request (target_user_id, action_type)` for open requests (`ux_admin_approval_request__open_per_target_action`; the table is never soft-deleted, EXC-006), **`lead.public_reference`** (`ux_lead__public_reference`), **`lead.intake_idempotency_key`** (`ux_lead__intake_idempotency_key`, predicate `IS NOT NULL` only), **`notification (source_event_id, recipient_user_id)`** (`ux_notification__event_recipient`, predicate `source_event_id IS NOT NULL` only) | Unique index **without** the `is_deleted` predicate (F-08) | Global uniqueness is intended. Hashes, chain positions, public references and idempotency keys must never be reused, even after soft deletion. A notification is delivered at most once per event and recipient. | The conformance check allow-lists exactly these index names |
 | EXC-008 | `app_user` rows SYSTEM, WEB_INTAKE, ANONYMOUS | Cannot be soft-deleted, disabled or given credentials | Required actors for FK integrity | Service guard plus seed migration check |
+| EXC-009 | `audit_log.session_id`, `security_event_log.session_id`, `refresh_token.replaced_by_id` | GUID-typed correlation references **without** a database FK (F-07) | Evidence rows must outlive purged sessions, and token chains must be purgeable in any order | The service writes only ids it has just read. Conformance rule 3 exempts exactly these columns. |
+| EXC-010 | `lead` rows | PII fields overwritten in place by the erasure and retention anonymization procedures (07 §8.2), which is not a soft delete | DPDP erasure and retention (LEAD-028, LEAD-029) | Audited ANONYMIZE action. `anonymized_on` set. |
+
+### 2.10 Purge ordering and referential integrity (DATA-017, F-07)
+
+Every purge runs as SYSTEM from the maintenance CLI (A-02), in one transaction per batch, in this order:
+
+| Order | Table | Condition | Notes |
+|---|---|---|---|
+| 1 | `mfa_challenge` | `expires_on` older than 1 day | References `user_session` (FK). Purged first. |
+| 2 | `user_action_token` | `used_on`, `invalidated_on` or `expires_on` older than the token retention | References only `app_user` |
+| 3 | `refresh_token` | Its session is purgeable (step 4 condition), **or** `expires_on` older than the token retention | `replaced_by_id` is a non-FK correlation (EXC-009), so deletion order within a chain is irrelevant |
+| 4 | `user_session` | `revoked_on` or `absolute_expires_on` older than `USER_SESSION_RETENTION_DAYS`, with no remaining `refresh_token` or `mfa_challenge` rows | Evidence rows keep `session_id` as a correlation id (EXC-009) |
+| 5 | `notification` | Read, and `read_on` older than the read-retention. Or unread, and `created_on` older than the unread-retention. | Must precede step 6 |
+| 6 | `outbox_event` | `status = 'DONE'`, `processed_on` older than the outbox retention, and `NOT EXISTS (notification.source_event_id = id)` | Never violates `fk_notification__source_event_id` |
+| 7 | Evidence stores | Archival procedure only (07 §8, 05 §9.4) | |
+
+- All retention periods are configuration values. **Their production values are owner input OWNER-INPUT-002.**
+- Each purge writes a summary security event.
+- Tests assert that every step succeeds with `foreign_keys=ON` on both engines (12 §4.1).
 
 ## 3. Entity relationship overview
 
@@ -199,6 +223,8 @@ Every behavioral exception to the contract is listed here. The conformance check
  └──────────────┘                                           └──────────────┘    └──────────────┘
 ```
 
+`admin_approval_request` (§5.8) references `app_user` three times: target, requester and approver.
+
 The nine contract columns and three actor FKs to `app_user` are present on every table. The diagram omits them for readability.
 
 ## 4. Identity and RBAC tables (RBAC-001)
@@ -206,8 +232,6 @@ The nine contract columns and three actor FKs to `app_user` are present on every
 In the column lists below, the nine contract columns (§2.1) are omitted. Every table has them.
 
 ### 4.1 `app_user` — domain entity **User** (ADR-001)
-
-> Traces: PLAT-007, PLAT-013, RBAC-013, USER-001
 
 **Purpose.** Every principal that can act: staff and seeded system users. Future portal principals (customers, vendors) are also `app_user` rows with another `user_type`.
 
@@ -226,7 +250,14 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `status_changed_on` | UTCDATETIME | NOT NULL | tx time | |
 | `timezone` | VARCHAR(40) | NOT NULL | `'Asia/Kolkata'` | IANA name |
 | `locale` | VARCHAR(10) | NOT NULL | `'en-IN'` | |
-| `mfa_required` | BOOL | NOT NULL | false | Per-user MFA requirement. It is how MFA is made mandatory for an individual Sales user (MFA-003). It can only add a requirement, never remove one imposed by role or permission. |
+| `email_verified_on` | UTCDATETIME | NULL | — | Set when the invite is accepted or an email change completes |
+| `proposed_email` | VARCHAR(254) | NULL | — | Pending new address (05 §8.6). **Never used for login, reset or notifications.** |
+| `proposed_email_normalized` | VARCHAR(254) | NULL | — | For the uniqueness check |
+| `proposed_email_requested_on` | UTCDATETIME | NULL | — | |
+| `proposed_email_requested_by` | GUID | NULL | — | FK → `app_user.id` (self or admin) |
+| `protection_level` | CODE(10) | NOT NULL | `'STANDARD'` | `STANDARD`, `FOUNDER` (06 §7.2). Writable only by the bootstrap CLI and the Founder workflow. |
+| `mfa_required` | BOOL | NOT NULL | false | Per-user MFA requirement (MFA-003), set with `user.mfa.require`. It adds a requirement and never removes one imposed by role or permission. |
+| `security_cooling_off_until` | UTCDATETIME | NULL | — | End of the post-recovery cooling-off (05 §11.5) |
 | `authz_version` | INTEGER | NOT NULL | 1 | Incremented whenever effective permissions or MFA policy may change (06 §9) |
 | `last_login_on` | UTCDATETIME | NULL | — | Denormalized for display. Excluded from audit diffs. |
 
@@ -239,13 +270,13 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
   - `ux_app_user__email_normalized` UNIQUE (`email_normalized`) WHERE `is_deleted = false` (USER-003)
   - `ix_app_user__status` (`status`) WHERE `is_deleted = false`
   - `ix_app_user__full_name` (`full_name`)
-- **Checks:** `status IN (…)`, `user_type IN (…)`, `email_normalized = lower(email_normalized)`
+- **Checks:** `status IN (…)`, `user_type IN (…)`, `protection_level IN ('STANDARD','FOUNDER')`, `email_normalized = lower(email_normalized)`, `(proposed_email IS NULL) = (proposed_email_normalized IS NULL)`, `proposed_email_normalized IS NULL OR proposed_email_normalized <> email_normalized`
+- **Additional index:** `ux_app_user__proposed_email` UNIQUE (`proposed_email_normalized`) WHERE `proposed_email_normalized IS NOT NULL AND is_deleted = false`
+- **Write rules:** generic profile endpoints can write only `full_name`, `display_name`, `phone_e164`, `timezone` and `locale` (08 §5.4). Every other column has a dedicated workflow (ADR-010).
 - **Foreign keys:** contract actor FKs only. They are self-referencing.
-- **Audit:** FULL. `last_login_on` and `authz_version` are excluded from diffs.
+- **Audit:** FULL. `last_login_on` and `authz_version` are excluded from diffs. Email, proposed-email, status, protection-level and MFA-flag changes are always diffed.
 
 ### 4.2 `user_credential`
-
-> Traces: AUTH-002, AUTH-010
 
 **Purpose.** Password secret and login bookkeeping, kept separate from the profile. There is one row per HUMAN user.
 
@@ -257,21 +288,20 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `must_change_password` | BOOL | NOT NULL | false | |
 | `failed_login_count` | INTEGER | NOT NULL | 0 | |
 | `failed_window_started_on` | UTCDATETIME | NULL | — | |
-| `locked_until` | UTCDATETIME | NULL | — | |
+| `locked_until` | UTCDATETIME | NULL | — | Global throttle end for distributed guessing (05 §4). Not a hard lock for MFA-enrolled users. |
 
 - **Indexes:** `ux_user_credential__user_id` UNIQUE (`user_id`) WHERE `is_deleted = false`
 - **Foreign keys:** `user_id` → `app_user.id`
-- **Audit:** FULL with `password_hash` redacted. Lockout counters are excluded from diffs because lockouts are security events.
+- **Audit:** FULL with `password_hash` redacted. Throttle counters are excluded from diffs because throttling is recorded as security events (`ACCOUNT_THROTTLED`).
 - **Access:** only the auth module repository. There is no API DTO.
 
 ### 4.3 `role`
-
-> Traces: RBAC-015
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `code` | VARCHAR(50) | NOT NULL | — | `FOUNDER`, `ADMIN`, `SALES`. Pattern `^[A-Z][A-Z0-9_]{1,49}$`. Immutable. **Never referenced by application authorization or MFA logic** (RBAC-002). |
 | `name` | VARCHAR(100) | NOT NULL | — | |
+| `name_normalized` | VARCHAR(100) | NOT NULL | — | `lower(trim(name))`, for case-insensitive uniqueness (A-04) |
 | `description` | VARCHAR(500) | NULL | — | |
 | `is_system` | BOOL | NOT NULL | false | Cannot be deleted. Code is immutable. |
 | `is_assignable` | BOOL | NOT NULL | true | |
@@ -280,12 +310,10 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 - **Indexes:**
   - `ux_role__code` UNIQUE (`code`) WHERE `is_deleted = false`
-  - `ux_role__name` UNIQUE (`name`) WHERE `is_deleted = false`
+  - `ux_role__name_normalized` UNIQUE (`lower(trim(name))` stored as `name_normalized` VARCHAR(100)) WHERE `is_deleted = false` (A-04)
 - **Audit:** FULL. A change increments `authz_version` for all holders.
 
 ### 4.4 `permission`
-
-> Traces: RBAC-003, RBAC-004, RBAC-017
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -296,7 +324,8 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `name` | VARCHAR(120) | NOT NULL | — | |
 | `description` | VARCHAR(500) | NULL | — | |
 | `supports_scope` | BOOL | NOT NULL | false | |
-| `is_sensitive` | BOOL | NOT NULL | false | Holding any sensitive permission makes MFA mandatory (MFA-004). Using one writes a `SENSITIVE_ACTION` security event. |
+| `is_sensitive` | BOOL | NOT NULL | false | Derived: `sensitivity_class IS NOT NULL`, enforced by `ck_permission__sensitivity` |
+| `sensitivity_class` | CODE(20) | NULL | — | `ACCOUNT_CONTROL`, `ACCESS_CONTROL`, `SECURITY_DATA`, `BULK_DATA`, `DESTRUCTIVE` (06 §3.1, RBAC-018). Set only by the code registry. |
 | `is_system` | BOOL | NOT NULL | true | Registry-defined |
 | `requirement_ref` | VARCHAR(50) | NULL | — | Traceability |
 
@@ -323,8 +352,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 ### 4.6 `role_permission`
 
-> Traces: RBAC-005
-
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `role_id` | GUID | NOT NULL | — | FK → `role.id` |
@@ -337,8 +364,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Audit:** FULL, with parent `role`. A change increments `authz_version` for role holders.
 
 ### 4.7 `user_permission`
-
-> Traces: RBAC-006
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -359,8 +384,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 ### 5.1 `user_session`
 
-> Traces: AUTH-006
-
 **Purpose.** One row per sign-in on a device. It is the unit of revocation.
 
 | Column | Type | Null | Default | Notes |
@@ -370,11 +393,13 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `last_seen_on` | UTCDATETIME | NOT NULL | tx time | Updated at most once per 5 min |
 | `idle_expires_on` | UTCDATETIME | NOT NULL | — | Sliding |
 | `absolute_expires_on` | UTCDATETIME | NOT NULL | — | Fixed |
-| `auth_methods` | VARCHAR(50) | NOT NULL | — | `pwd` or `pwd+totp` or `pwd+recovery` |
+| `session_type` | CODE(10) | NOT NULL | `'FULL'` | `FULL`, `RECOVERY` (05 §11.5). RECOVERY sessions have a 15-minute absolute expiry, no refresh token, and an endpoint allow-list. |
+| `auth_methods` | VARCHAR(50) | NOT NULL | — | `pwd`, `pwd+totp` or `pwd+recovery` |
+| `reauth_on` | UTCDATETIME | NULL | — | Last password re-entry (05 §11.6) |
 | `mfa_verified_on` | UTCDATETIME | NULL | — | Last successful MFA in this session. Used for step-up freshness (MFA-011). |
 | `revoked_on` | UTCDATETIME | NULL | — | |
 | `revoked_by` | GUID | NULL | — | FK → `app_user.id` |
-| `revoke_reason` | CODE(30) | NULL | — | `LOGOUT`, `LOGOUT_ALL`, `ADMIN_REVOKE`, `PASSWORD_CHANGED`, `PASSWORD_RESET`, `USER_DISABLED`, `TOKEN_REUSE`, `MFA_RESET`, `EXPIRED` |
+| `revoke_reason` | CODE(30) | NULL | — | `LOGOUT`, `LOGOUT_ALL`, `ADMIN_REVOKE`, `PASSWORD_CHANGED`, `PASSWORD_RESET`, `USER_DISABLED`, `TOKEN_REUSE`, `MFA_RESET`, `MFA_RECOVERY`, `RECOVERY_COMPLETED`, `EMAIL_CHANGED`, `EXPIRED` |
 | `ip_address` | VARCHAR(45) | NULL | — | |
 | `user_agent` | VARCHAR(500) | NULL | — | |
 | `device_label` | VARCHAR(100) | NULL | — | |
@@ -382,11 +407,9 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Indexes:**
   - `ix_user_session__user_active` (`user_id`) WHERE `revoked_on IS NULL`
   - `ix_user_session__absolute_expires_on` (`absolute_expires_on`)
-- **Audit:** EVENT_ONLY (security events). Exception EXC-006.
+- **Audit:** EVENT_ONLY (security events). Exceptions EXC-003 (purge, §2.10) and EXC-006.
 
 ### 5.2 `refresh_token`
-
-> Traces: AUTH-005
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -395,36 +418,34 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `issued_on` | UTCDATETIME | NOT NULL | tx time | |
 | `expires_on` | UTCDATETIME | NOT NULL | — | |
 | `used_on` | UTCDATETIME | NULL | — | |
-| `replaced_by_id` | GUID | NULL | — | FK → `refresh_token.id` |
+| `replaced_by_id` | GUID | NULL | — | Successor token id. **Non-FK correlation** (EXC-009). |
+| `grace_used_on` | UTCDATETIME | NULL | — | Set when the single 20-second grace response has been served (05 §6.1) |
 
 - **Indexes:**
   - `ux_refresh_token__token_hash` UNIQUE (`token_hash`) — EXC-007
   - `ix_refresh_token__session_id` (`session_id`)
   - `ix_refresh_token__expires_on` (`expires_on`)
-- **Audit:** EVENT_ONLY. Purged after expiry (EXC-003).
+- **Audit:** EVENT_ONLY. Purged per §2.10 (EXC-003).
 
-### 5.3 `password_reset_token`
-
-> Traces: AUTH-008
+### 5.3 `user_action_token`
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
-| `purpose` | CODE(20) | NOT NULL | — | `PASSWORD_RESET`, `INVITE` |
+| `purpose` | CODE(25) | NOT NULL | — | `PASSWORD_RESET`, `INVITE`, `MFA_ENROLLMENT`, `EMAIL_VERIFICATION`, `EMAIL_CHANGE_CANCEL`, `APPROVAL_CANCEL` |
 | `token_hash` | CHAR(64) | NOT NULL | — | SHA-256 hex |
-| `expires_on` | UTCDATETIME | NOT NULL | — | RESET +30 min · INVITE +72 h |
+| `expires_on` | UTCDATETIME | NOT NULL | — | RESET +30 min · INVITE +72 h (24 h if the invited roles are sensitive) · MFA_ENROLLMENT +30 min · EMAIL_VERIFICATION +60 min · EMAIL_CHANGE_CANCEL until the proposal ends · APPROVAL_CANCEL until the request ends |
+| `sent_to_email_normalized` | VARCHAR(254) | NOT NULL | — | Destination at issue time: verified email, or the proposed email for EMAIL_VERIFICATION only |
 | `used_on` | UTCDATETIME | NULL | — | |
 | `invalidated_on` | UTCDATETIME | NULL | — | |
 | `requested_ip` | VARCHAR(45) | NULL | — | |
 
 - **Indexes:**
-  - `ux_password_reset_token__token_hash` UNIQUE — EXC-007
-  - `ix_password_reset_token__user_open` (`user_id`, `purpose`) WHERE `used_on IS NULL AND invalidated_on IS NULL`
+  - `ux_user_action_token__token_hash` UNIQUE — EXC-007
+  - `ix_user_action_token__user_open` (`user_id`, `purpose`) WHERE `used_on IS NULL AND invalidated_on IS NULL`
 - **Audit:** EVENT_ONLY. EXC-006.
 
 ### 5.4 `security_event_log` (ADR-004)
-
-> Traces: AUDIT-012, AUTH-013, MFA-006, SEVT-001, SEVT-002, SEVT-003, SEVT-006
 
 **Purpose.** Dedicated append-only log of authentication, session, MFA, account and permission-sensitive events. It is kept separate from `audit_log`. The full design is in 05 §9.
 
@@ -435,7 +456,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `outcome` | CODE(10) | NOT NULL | — | `SUCCESS`, `FAILURE`, `BLOCKED` |
 | `severity` | CODE(10) | NOT NULL | `'INFO'` | `INFO`, `WARNING`, `CRITICAL` |
 | `subject_user_id` | GUID | NULL | — | FK → `app_user.id`. The account the event is about. NULL when unknown. |
-| `session_id` | GUID | NULL | — | FK → `user_session.id` |
+| `session_id` | GUID | NULL | — | Correlation id of the session (**non-FK**, EXC-009) |
 | `email_attempted_hash` | CHAR(64) | NULL | — | HMAC-SHA-256 (server key) of the normalized email, only for unknown-account events. The raw email is never stored. |
 | `failure_reason` | CODE(40) | NULL | — | Controlled vocabulary (05 §9.1) |
 | `permission_code` | VARCHAR(100) | NULL | — | For AUTHORIZATION and sensitive-action events |
@@ -448,7 +469,8 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `detail` | JSON | NULL | — | **Allow-listed keys per event type only** (05 §9.3). Never secrets or request bodies. |
 | `chain_seq` | BIGINT | NOT NULL | — | Internal, gap-free position in the hash chain. Never exposed through any API (ADR-002). |
 | `prev_hash` | CHAR(64) | NULL | — | `row_hash` of `chain_seq - 1`. NULL only for the first row after genesis or an archival anchor. |
-| `row_hash` | CHAR(64) | NOT NULL | — | SHA-256 of `prev_hash ‖ canonical JSON of this row's other columns` |
+| `chain_key_label` | VARCHAR(40) | NOT NULL | — | Label of the SSM-held HMAC key used for this row (05 §9.6). A key label, **not** an entity reference. |
+| `row_hash` | CHAR(64) | NOT NULL | — | `HMAC-SHA-256(K[chain_key_label], prev_hash ‖ JCS(row))` (05 §9.6). The key is never stored in the database. |
 
 - **Actor.** `created_by` = the authenticated user, else ANONYMOUS for unauthenticated requests, else SYSTEM for jobs.
 - **Indexes (SEVT-008):**
@@ -458,12 +480,10 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
   - `ix_security_event_log__type` (`event_type`, `occurred_on` DESC)
   - `ix_security_event_log__ip` (`ip_address`, `occurred_on` DESC)
   - `ix_security_event_log__outcome` (`outcome`, `occurred_on` DESC) WHERE `outcome <> 'SUCCESS'`
-- **Foreign keys:** `subject_user_id`, `session_id`, and the contract actors.
+- **Foreign keys:** `subject_user_id` and the contract actors. `session_id` is a correlation id (EXC-009).
 - **Audit:** immutable store (EXC-001, EXC-002).
 
 ### 5.5 `user_mfa_factor` (ADR-006)
-
-> Traces: MFA-001
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -471,17 +491,18 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `factor_type` | CODE(10) | NOT NULL | `'TOTP'` | `TOTP` only in P0. The CHECK constraint can be widened later for WebAuthn. |
 | `status` | CODE(10) | NOT NULL | `'PENDING'` | `PENDING` (enrollment started), `ACTIVE`, `REVOKED` |
 | `secret_ciphertext` | TEXT | NOT NULL | — | TOTP seed encrypted with AES-256-GCM using a data key wrapped by AWS KMS (envelope encryption). It is never returned after enrollment (MFA-010). |
-| `secret_key_ref` | VARCHAR(200) | NOT NULL | — | Wrapped data key and KMS key id, for rotation |
+| `wrapped_data_key` | TEXT | NOT NULL | — | Base64 KMS `GenerateDataKey` ciphertext blob (F-13). TEXT, so no length assumption. |
+| `kms_key_arn` | VARCHAR(2048) | NOT NULL | — | ARN of the KMS key that wrapped the data key (max ARN length 2048) |
 | `label` | VARCHAR(100) | NULL | — | For example "Priya's phone" |
 | `confirmed_on` | UTCDATETIME | NULL | — | Set on PENDING → ACTIVE |
 | `last_used_step` | BIGINT | NULL | — | Last accepted TOTP time step. Codes at or below it are rejected (replay protection, MFA-009). |
 | `last_used_on` | UTCDATETIME | NULL | — | |
 | `revoked_on` | UTCDATETIME | NULL | — | |
-| `revoke_reason` | CODE(20) | NULL | — | `USER_REMOVED`, `ADMIN_RESET`, `REPLACED`, `ENROLLMENT_ABANDONED` |
+| `revoke_reason` | CODE(20) | NULL | — | `USER_REMOVED`, `ADMIN_RESET`, `REPLACED`, `ENROLLMENT_ABANDONED`, `BREAK_GLASS` |
 
 - **Indexes:**
   - `ux_user_mfa_factor__user_live` UNIQUE (`user_id`, `factor_type`) WHERE `status IN ('PENDING','ACTIVE') AND is_deleted = false`
-- **Audit:** FULL with `secret_ciphertext` and `secret_key_ref` redacted. `last_used_step` and `last_used_on` are excluded from diffs. Security events are also written.
+- **Audit:** FULL with `secret_ciphertext` and `wrapped_data_key` redacted (`kms_key_arn` is not secret). `last_used_step` and `last_used_on` are excluded from diffs. Security events are also written.
 
 ### 5.6 `user_mfa_recovery_code`
 
@@ -489,7 +510,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 |---|---|---|---|---|
 | `user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
 | `batch_id` | GUID | NOT NULL | — | UUIDv7 per generated set. Regeneration invalidates earlier batches. |
-| `code_hash` | CHAR(64) | NOT NULL | — | HMAC-SHA-256 with a server-side key of the normalized code. Codes are 10 random characters from a 32-symbol alphabet (50 bits), so a keyed hash is appropriate. The plaintext is shown once and never stored (MFA-005). |
+| `code_hash` | CHAR(64) | NOT NULL | — | HMAC-SHA-256 (key from SSM) of the normalized code. Codes are 10 CSPRNG characters from a 32-symbol alphabet (50 bits), so a keyed hash is appropriate. The plaintext is shown once and never stored or logged (MFA-005). |
 | `used_on` | UTCDATETIME | NULL | — | |
 | `invalidated_on` | UTCDATETIME | NULL | — | |
 
@@ -505,7 +526,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
-| `purpose` | CODE(20) | NOT NULL | — | `LOGIN`, `ENROLLMENT`, `STEP_UP` |
+| `purpose` | CODE(20) | NOT NULL | — | `LOGIN` (verify or recovery), `ENROLLMENT` (created only after the second proof of 05 §11.3), `STEP_UP` |
 | `token_hash` | CHAR(64) | NOT NULL | — | SHA-256 of the opaque challenge token given to the client |
 | `session_id` | GUID | NULL | — | FK → `user_session.id` (STEP_UP only) |
 | `expires_on` | UTCDATETIME | NOT NULL | — | +5 min (ENROLLMENT +15 min) |
@@ -518,9 +539,40 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
   - `ix_mfa_challenge__expires_on`
 - **Audit:** EVENT_ONLY. Purged after expiry (EXC-003).
 
-## 6. Reference data tables
+### 5.8 `admin_approval_request` (RBAC-021, MFA-015)
 
-> Traces: PLAT-009
+**Purpose.** Dual-control requests for privileged account actions and break-glass (06 §7.4, §7.5).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `action_type` | CODE(30) | NOT NULL | — | `MFA_RESET`, `EMAIL_CHANGE`, `GRANT_FOUNDER`, `REVOKE_FOUNDER`, `DEACTIVATE_FOUNDER`, `FOUNDER_MFA_RESET`, `FOUNDER_EMAIL_CHANGE` |
+| `channel` | CODE(12) | NOT NULL | `'IN_APP'` | `IN_APP`, `BREAK_GLASS` |
+| `target_user_id` | GUID | NOT NULL | — | FK → `app_user.id` |
+| `requested_by` | GUID | NOT NULL | — | FK → `app_user.id` (equals `created_by` for IN_APP; SYSTEM for BREAK_GLASS) |
+| `request_payload` | JSON | NOT NULL | — | Action parameters, for example a masked new email. No secrets. |
+| `reason` | VARCHAR(1000) | NOT NULL | — | |
+| `status` | CODE(12) | NOT NULL | `'PENDING'` | `PENDING`, `APPROVED`, `DENIED`, `EXPIRED`, `CANCELLED`, `EXECUTED`, `FAILED` |
+| `approver_user_id` | GUID | NULL | — | FK → `app_user.id` (IN_APP) |
+| `external_requester_ref` | VARCHAR(200) | NULL | — | IAM principal ARN of custodian A (BREAK_GLASS) |
+| `external_approver_ref` | VARCHAR(200) | NULL | — | IAM principal ARN of custodian B (BREAK_GLASS). Must differ from the requester. |
+| `decided_on` | UTCDATETIME | NULL | — | |
+| `decision_reason` | VARCHAR(1000) | NULL | — | |
+| `not_before` | UTCDATETIME | NULL | — | Earliest execution time (break-glass cooling-off) |
+| `expires_on` | UTCDATETIME | NOT NULL | — | |
+| `executed_on` | UTCDATETIME | NULL | — | |
+
+- **Checks:**
+  - `approver_user_id IS NULL OR (approver_user_id <> requested_by AND approver_user_id <> target_user_id)`
+  - `requested_by <> target_user_id`
+  - `external_approver_ref IS NULL OR external_approver_ref <> external_requester_ref`
+  - status, action and channel enumerations
+- **Indexes:**
+  - `ix_admin_approval_request__pending` (`status`, `expires_on`) WHERE `status = 'PENDING'`
+  - `ix_admin_approval_request__target` (`target_user_id`, `created_on` DESC)
+  - `ux_admin_approval_request__open_per_target_action` UNIQUE (`target_user_id`, `action_type`) WHERE `status IN ('PENDING','APPROVED')`
+- **Audit:** FULL, with parent `app_user` (target). EXC-006: requests are never soft-deleted; status is the lifecycle. Security events per 05 §9.1.
+
+## 6. Reference data tables
 
 ### 6.1 `lookup_category`
 
@@ -536,8 +588,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Audit:** FULL.
 
 ### 6.2 `lookup_value`
-
-> Traces: PLAT-009
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -559,15 +609,13 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | Category | Codes (label) |
 |---|---|
 | PROJECT_TYPE | `FULL_HOME` (Complete Home Interiors), `MODULAR_KITCHEN`, `BEDROOM_WARDROBE` (Bedrooms & Wardrobes), `LIVING_DINING` (Living & Dining), `SPACE_PLANNING` (Space Planning & Styling), `RENOVATION` (Home Renovation), `OTHER` |
-| PROPERTY_TYPE (staff enrichment only) | `APARTMENT`, `VILLA`, `OTHER` |
+| PROPERTY_TYPE (optional on the public form and enrichable by staff, ADR-005) | `APARTMENT` (Apartment / Flat), `INDEPENDENT_HOUSE` (Independent House), `VILLA` (Villa), `OFFICE` (Office), `RETAIL` (Retail / Shop), `OTHER` (Other). "Home Renovation" is **not** a property type. Renovation is PROJECT_TYPE `RENOVATION`. |
 | BUDGET_RANGE | `UNDER_5L`, `5L_10L`, `10L_20L`, `20L_35L`, `35L_50L`, `ABOVE_50L`, `UNDECIDED` |
 | LEAD_SOURCE | `WEBSITE`, `WHATSAPP`, `PHONE`, `WALK_IN`, `REFERRAL`, `INSTAGRAM`, `FACEBOOK`, `GOOGLE_ADS`, `ARCHITECT_PARTNER`, `OTHER` |
 | LOST_REASON | `BUDGET_MISMATCH`, `CHOSE_COMPETITOR`, `PROJECT_POSTPONED`, `NOT_RESPONSIVE`, `OUT_OF_SERVICE_AREA`, `SCOPE_TOO_SMALL`, `DUPLICATE`, `SPAM`, `OTHER` |
 | ACTIVITY_OUTCOME | `CONNECTED`, `NO_ANSWER`, `BUSY`, `CALLBACK_REQUESTED`, `INTERESTED`, `NOT_INTERESTED`, `VISIT_SCHEDULED`, `QUOTE_REQUESTED` |
 
 ### 6.3 `number_sequence`
-
-> Traces: LEAD-008, PLAT-010
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -584,8 +632,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Audit:** configuration columns are FULL. `next_value` and `current_period` are excluded from diffs.
 
 ## 7. `audit_log`
-
-> Traces: AUDIT-001, AUDIT-002, AUDIT-003, AUDIT-006
 
 **Purpose.** The platform-wide entity change journal. The design is in [07-audit.md](07-audit.md). Authentication telemetry is **not** stored here (ADR-004).
 
@@ -604,7 +650,7 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 | `parent_entity_id` | GUID | NULL | — | |
 | `transaction_id` | GUID | NOT NULL | — | UUIDv7 per DB transaction |
 | `request_id` | VARCHAR(64) | NULL | — | |
-| `session_id` | GUID | NULL | — | FK → `user_session.id` |
+| `session_id` | GUID | NULL | — | Correlation id (**non-FK**, EXC-009) |
 | `ip_address` | VARCHAR(45) | NULL | — | |
 | `user_agent` | VARCHAR(500) | NULL | — | |
 | `reason` | VARCHAR(500) | NULL | — | |
@@ -621,8 +667,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 ## 8. Notification tables
 
 ### 8.1 `outbox_event`
-
-> Traces: NOTIF-003, NOTIF-004
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -644,8 +688,6 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 - **Audit:** EVENT_ONLY. EXC-004.
 
 ### 8.2 `notification`
-
-> Traces: NOTIF-001
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -671,12 +713,10 @@ In the column lists below, the nine contract columns (§2.1) are omitted. Every 
 
 ## 10. Seed data
 
-> Traces: RBAC-008, USER-005
-
 | Migration | Seeds |
 |---|---|
-| 0002_identity | SYSTEM, WEB_INTAKE and ANONYMOUS `app_user` rows (§2.3) |
-| 0003_rbac | Roles FOUNDER and ADMIN (`mfa_required = true`), SALES (`mfa_required = false`), all `is_system` · every registry permission · the default matrix (06 §6) |
+| 0002_identity | SYSTEM, WEB_INTAKE and ANONYMOUS `app_user` rows (§2.3), `protection_level = STANDARD` |
+| 0003_rbac | Roles FOUNDER and ADMIN (`mfa_required = true`), SALES (`mfa_required = false`), all `is_system` · every registry permission with its `sensitivity_class` · the default matrix (06 §6). The migration asserts that SALES holds no sensitive permission. |
 | 0006_reference | Lookup categories and values (§6.2) · `number_sequence` LEAD |
 | — | **No human users** in any migration. The first Founder comes from the CLI bootstrap (AUTH-014). |
 
@@ -693,28 +733,27 @@ Growth class is a **design assumption** (ASM-003 in 11 §10) until production tr
 | user_role | rbac | FULL | Yes | — | Low |
 | role_permission | rbac | FULL | Yes | — | Low |
 | user_permission | rbac | FULL | Yes | — | Low |
-| user_session | auth | EVENT_ONLY | No | EXC-006 | Medium |
-| refresh_token | auth | EVENT_ONLY | No | EXC-003, EXC-007 | High (purged) |
-| password_reset_token | auth | EVENT_ONLY | No | EXC-006, EXC-007 | Low |
+| user_session | auth | EVENT_ONLY | No | EXC-003, EXC-006 | Medium (purged) |
+| refresh_token | auth | EVENT_ONLY | No | EXC-003, EXC-007, EXC-009 | High (purged) |
+| user_action_token | auth | EVENT_ONLY | No | EXC-003, EXC-006, EXC-007 | Low (purged) |
+| admin_approval_request | rbac | FULL | No | EXC-006 | Low |
 | user_mfa_factor | mfa | FULL (redacted) | Yes | — | Low |
 | user_mfa_recovery_code | mfa | EVENT_ONLY | No | EXC-006, EXC-007 | Low |
 | mfa_challenge | mfa | EVENT_ONLY | No | EXC-003, EXC-007 | Medium (purged) |
-| security_event_log | security | IMMUTABLE_STORE | No | EXC-001, EXC-002, EXC-007 | High (unmeasured) |
-| audit_log | audit | IMMUTABLE_STORE | No | EXC-001, EXC-002 | High (unmeasured) |
+| security_event_log | security | IMMUTABLE_STORE | No | EXC-001, EXC-002, EXC-007, EXC-009 | High (unmeasured) |
+| audit_log | audit | IMMUTABLE_STORE | No | EXC-001, EXC-002, EXC-009 | High (unmeasured) |
 | lookup_category | reference | FULL | Yes | — | Low |
 | lookup_value | reference | FULL | Yes | — | Low |
 | number_sequence | reference | FULL (config) | Yes | — | Low |
 | outbox_event | notifications | EVENT_ONLY | No | EXC-004 | Medium (purged) |
-| notification | notifications | EVENT_ONLY | Yes | EXC-005 | Medium (purged) |
-| lead | crm | FULL | Yes | — | Medium |
+| notification | notifications | EVENT_ONLY | Yes | EXC-005, EXC-007 | Medium (purged) |
+| lead | crm | FULL | Yes | EXC-007, EXC-010 | Medium |
 | lead_note | crm | FULL | Yes | — | Medium |
 | lead_activity | crm | FULL | Yes | — | Medium |
 
 **Confirmed:** there is no table named `user`. The identity table is `app_user` (ADR-001, PLAT-013).
 
 ## 12. SQLite and PostgreSQL mapping (DATA-012, PLAT-004)
-
-> Traces: DATA-010, DATA-016
 
 The kernel defines each logical type once. Engine-specific DDL is generated by SQLAlchemy dialects and Alembic.
 

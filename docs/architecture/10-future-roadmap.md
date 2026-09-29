@@ -67,8 +67,6 @@ AI consumes outbox events + read models (no writes except through services with 
 
 ### 3.2 Suggested sequencing
 
-> Traces: PLAT-012
-
 | Phase | Modules | Why this order |
 |---|---|---|
 | P0 (authorized, ADR-009) | Platform (auth, MFA, RBAC, users, audit, security events, notifications) + Leads | Revenue: capture and convert enquiries |
@@ -173,7 +171,7 @@ The platform `app_user` stays the login identity and `employee` is the HR record
 - `app_user.user_type = CUSTOMER`, linked by `customer_user` (customer_id, user_id).
 - A new role, **CUSTOMER_PORTAL**, with permissions like `project.read` (OWN = projects of the linked customer), `design.approve`, `invoice.read` and `ticket.create`.
 - Notes with `visibility = CUSTOMER_VISIBLE` (reserved in P0) become visible.
-- Login options: email + password, or phone OTP (new `password_reset_token.purpose = LOGIN_OTP`, an enum widening).
+- Login options: email + password, or phone OTP (new `user_action_token.purpose = LOGIN_OTP`, an enum widening).
 
 #### WARR: warranty and support
 

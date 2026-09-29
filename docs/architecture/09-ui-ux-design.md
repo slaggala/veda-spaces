@@ -1,6 +1,6 @@
 # 09 — UI/UX Design: Veda Workspace
 
-Governing decisions: [ADR-005](decisions/ADR-005-lead-required-fields.md) · [ADR-006](decisions/ADR-006-mfa-policy.md) · [ADR-007](decisions/ADR-007-technology-stack.md)
+Governing decisions: [ADR-005](decisions/ADR-005-lead-required-fields.md) · [ADR-006](decisions/ADR-006-mfa-policy.md) · [ADR-007](decisions/ADR-007-technology-stack.md) · [ADR-010](decisions/ADR-010-account-control-and-privileged-protection.md)
 
 "Veda Workspace" is a working name for the staff app at `app.vedaspaces.com`.
 
@@ -33,7 +33,10 @@ These are derived from the live site (`dist/assets/styles.css`, `enhancements.cs
 | `--vs-line` | `rgba(30,29,26,.14)` | `rgba(243,240,233,.14)` | Hairlines |
 | `--vs-copper` | `#A46D42` | `#C8906A` | Accent fills, focus ring, large text, icons (4.1:1: **non-text/large text only**) |
 | `--vs-copper-text` | `#8C5B37` | `#D9A583` | Copper **text** and links (5.4:1 on paper, passes AA) |
-| `--vs-copper-strong` | `#7A4E2E` | `#E0B394` | Primary button background (white text 7.0:1) |
+| `--vs-copper-strong` | `#7A4E2E` | `#E0B394` | Primary button background. **Always paired with `--vs-on-copper-strong`.** |
+| `--vs-on-copper-strong` | `#FFFFFF` | `#171614` | Text and icons on primary buttons (light 7.1:1, dark 9.5:1) (F-14) |
+| `--vs-on-danger` | `#FFFFFF` | `#171614` | Text on destructive buttons (`--vs-danger` background): light 6.6:1, dark 6.2:1 |
+| `--vs-focus-ring` | `#A46D42` | `#C8906A` | 2 px focus outline with 2 px offset: light 4.1:1 on paper, dark 6.6:1 on paper and 6.0:1 on surface |
 | `--vs-sidebar` | `#201F1C` | `#121110` | Navigation rail (from the site's dark sections) |
 | `--vs-danger` | `#A23B2A` | `#E07A67` | Destructive actions, errors |
 | `--vs-success` | `#3F6B4A` | `#86B894` | Success, WON |
@@ -83,24 +86,39 @@ Fonts are the same Google Fonts families the site already loads. Body minimum is
 
 ### 2.5 Accessibility token decisions (UI-014)
 
-These corrections are made **in the design tokens themselves**, so no component can reintroduce the failures. Ratios were computed with the WCAG 2.x relative-luminance formula.
+These corrections are made **in the design tokens themselves**, so no component can reintroduce the failures. Ratios were computed with the WCAG 2.x relative-luminance formula and are re-checked automatically for **both themes** (12 §4.8).
 
-| ID | Token | Problem found | Decision | Ratio on `--vs-paper` `#FBF7EF` |
+**Light theme** (paper `#FBF7EF`, surface `#FFFFFF`):
+
+| ID | Token | Problem found | Decision | Ratio |
 |---|---|---|---|---|
-| A11Y-T1 | `--vs-copper` `#A46D42` | The brand copper is 3.8:1 on the site paper `#F3F0E9` and 4.1:1 on the workspace paper. It fails AA (4.5:1) for normal text. | Restricted to fills, focus rings, icons and text ≥ 24 px (or ≥ 18.66 px bold), where 3:1 applies | 4.1:1 |
-| A11Y-T2 | `--vs-copper-text` `#8C5B37` | Copper-colored text was needed | New token, mandatory for copper text and links | 5.4:1 |
-| A11Y-T3 | `--vs-copper-strong` `#7A4E2E` | White text on brand copper fails | New token for primary button backgrounds | White text 7.1:1 |
-| A11Y-T4 | `--vs-warning` `#8A5E0F` | The first proposal `#9A6A12` was 4.4:1 and failed | Darkened | 5.3:1 |
-| A11Y-T5 | Status chip pairs (§2.2) | — | All seven pairs verified | 5.3:1 – 7.9:1 on their chip backgrounds |
-| A11Y-T6 | `--vs-focus-ring` = 2 px `--vs-copper` + 2 px offset | Focus visibility | Non-text contrast ≥ 3:1 against paper and surface | 4.1:1 |
+| A11Y-T1 | `--vs-copper` `#A46D42` | Brand copper is 3.8:1 on the site paper and 4.1:1 on the workspace paper, so it fails AA for text | Fills, focus rings, icons and large text only | 4.1:1 |
+| A11Y-T2 | `--vs-copper-text` `#8C5B37` | Copper-colored text was needed | Mandatory for copper text and links | 5.4:1 |
+| A11Y-T3 | `--vs-copper-strong` `#7A4E2E` + `--vs-on-copper-strong` `#FFFFFF` | White text on brand copper fails | Primary button pair | 7.1:1 |
+| A11Y-T4 | `--vs-warning` `#8A5E0F` | The first proposal `#9A6A12` was 4.4:1 | Darkened | 5.3:1 |
+| A11Y-T5 | Status chip pairs (§2.2) | — | Each pair is self-contained (chip background + chip text) and **used unchanged in both themes** | 5.3:1 – 7.9:1 |
+| A11Y-T6 | `--vs-focus-ring` | Focus visibility | Non-text ≥ 3:1 against paper and surface | 4.1:1 |
 
-A design-system lint rejects raw hex colors in components. Only tokens are allowed.
+**Dark theme** (paper `#171614`, surface `#201F1C`):
+
+| ID | Token | Problem found | Decision | Ratio (paper / surface) |
+|---|---|---|---|---|
+| A11Y-T7 | `--vs-copper-strong` `#E0B394` + `--vs-on-copper-strong` `#171614` | **F-14:** white text on `#E0B394` is 1.9:1 | Primary buttons use the dark on-color, never white | 9.5:1 |
+| A11Y-T8 | `--vs-ink` `#F3F0E9` · `--vs-ink-muted` `#B8B0A5` | Verified | — | 15.9 / 14.5 · 8.4 / 7.7 |
+| A11Y-T9 | `--vs-copper-text` `#D9A583` | Verified | — | 8.3 / 7.6 |
+| A11Y-T10 | `--vs-danger` `#E07A67` · `--vs-success` `#86B894` · `--vs-warning` `#E0B45C` | Verified as text | — | 6.2 / 5.6 · 8.0 / 7.3 · 9.4 / 8.5 |
+| A11Y-T11 | `--vs-focus-ring` `#C8906A` | Verified | — | 6.6 / 6.0 |
+| A11Y-T12 | `--vs-on-danger` `#171614` on `--vs-danger` `#E07A67` | Destructive buttons | Dark on-color | 6.2:1 |
+
+**Rules:**
+
+- A design-system lint rejects raw hex colors in components, so only tokens are allowed.
+- Every background token used for a control has a declared `--vs-on-*` pair.
+- The automated contrast test iterates every (on-token, background-token) pair in both themes, and fails below 4.5:1 for text or 3:1 for non-text.
 
 ## 3. Application shell and patterns
 
 ### 3.1 Shell layout
-
-> Traces: NOTIF-001, UI-012
 
 ```
 Desktop ≥ 1200px
@@ -131,13 +149,11 @@ Nav items render only if the user holds the item's permission. For example, the 
 
 ### 3.2 Global patterns
 
-> Traces: PLAT-007
-
 | Pattern | Spec |
 |---|---|
 | Command palette (⌘K / Ctrl-K) | Jump to lead by number, name or phone. Navigate to pages. "New lead". Permission-filtered. |
 | Drawers | Create and edit forms and details for admin entities open in a right drawer (560 px). This keeps list context. They are full screen on mobile. |
-| Toasts | Bottom-center, 4 s, with undo where reversible (for example "Note deleted · Undo" within 8 s, which calls restore) |
+| Toasts | Bottom-center, 4 s, `role="status"`. There is **no Undo** in P0 (F-20). Destructive actions are confirmed beforehand instead, for example "Delete this note?". |
 | Confirmations | Only for destructive or sensitive actions. The dialog names the object ("Delete lead VS-L-2026-000123?"). Sensitive permissions need a reason field. |
 | Version conflict | A modal lists changed fields (from a fresh GET vs local edits) with "Reload theirs" or "Re-apply mine" |
 | Errors | Inline under fields (server `errors[]` mapped by `field`). Page-level problem banner shows `request_id` with a copy button. |
@@ -153,8 +169,6 @@ Nav items render only if the user holds the item's permission. For example, the 
 
 ### 3.4 Permission-aware rendering (UI-013)
 
-> Traces: RBAC-012
-
 - `<vs-can permission="lead.assign">…</vs-can>` renders its slot only if the effective map contains the code. An optional `scope-for=${lead}` evaluates OWN ownership client-side.
 - **Hide vs disable:**
   - Hide actions the user can never perform.
@@ -165,8 +179,6 @@ Nav items render only if the user holds the item's permission. For example, the 
 ## 4. Screens
 
 ### 4.1 Login (UI-001)
-
-> Traces: AUTH-001
 
 ```
 ┌──────────────────────────────────────────────┬─────────────────────────────────────────┐
@@ -200,15 +212,13 @@ Mobile: image becomes a 160px banner; form full width.
 - `autocomplete="username"` and `"current-password"`.
 - Enter submits. The button shows progress and disables during the request.
 - The generic error keeps focus in the password field.
-- After 3 failures, a hint appears: "Locked out? Reset your password."
+- After 3 failures, a hint appears: "Trouble signing in? Reset your password." After repeated failures from this network, a Turnstile challenge appears (05 §4).
 - `?next=` is honored (only relative paths allowed).
-- If the response status is `MFA_REQUIRED` or `MFA_ENROLLMENT_REQUIRED`, the app routes to the MFA screens (§4.10).
+- If the response status is `MFA_REQUIRED`, the app routes to the MFA challenge (§4.10). If it is `MFA_ENROLLMENT_EMAIL_SENT`, the app shows the "Check your email" screen (§4.10). No enrollment is possible from the login screen.
 - If `must_change_password`, the app routes to a Change password screen with the same layout.
 - A "Session expired, please sign in again" banner shows when redirected by 401 `SESSION_INVALID`.
 
 ### 4.2 Forgot password and reset (UI-002)
-
-> Traces: AUTH-003, AUTH-008, AUTH-011
 
 ```
 Forgot password                          Check your email                       Set a new password
@@ -228,8 +238,6 @@ Success → /login with banner "Password updated. Sign in with your new password
 The accept-invite screen reuses the "Set a new password" layout with the title "Welcome to Veda Spaces, Ravi" and an optional name confirmation.
 
 ### 4.3 Lead dashboard (UI-003, LEAD-014)
-
-> Traces: LEAD-013, LEAD-015
 
 ```
 Desktop
@@ -278,9 +286,9 @@ Mobile: rows become cards (name, status pill, project, next follow-up, call/What
 
 Filters sync to the URL query (shareable, back-button friendly) and map 1:1 to API params (08 §8.2).
 
-### 4.4 Lead details (UI-004, ACT-005)
+**Spam review queue (LEAD-018).** A "Spam review (n)" chip appears for holders of `lead.update` at ALL scope. It lists `spam_status = SUSPECTED` leads with [Not spam] and [Confirm spam] actions (04 §5.5). Quarantined leads never appear in normal lists or dashboard counts.
 
-> Traces: ACT-001, ACT-002, LEAD-005, LEAD-007, LEAD-024, NOTE-001, NOTE-003
+### 4.4 Lead details (UI-004, ACT-005)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -316,10 +324,11 @@ Mobile: header + stepper (horizontal scroll) + sticky bottom action bar [Call][W
 - **Call / WhatsApp buttons.** They open `tel:` or `https://wa.me/<e164>`. On return (visibility change), a **quick-log sheet** slides up prefilled (type, outbound, now) with outcome chips. One tap saves (ACT-005).
 - **Plan follow-up.** Quick picks (Later today · Tomorrow 11:00 · In 3 days · Next week), a custom date-time, and an owner (defaults to the lead owner).
 - **Inline editing** of details happens in a drawer, with `If-Match` conflict handling.
+- **Consent withdrawn (LEAD-027).** A persistent "Do not contact" banner appears. The Call and WhatsApp buttons require an acknowledgment, and planning contact activities is blocked. [Record withdrawal…] sits in the ⋯ menu (`lead.update`).
+- **Erase personal data (LEAD-029).** In the ⋯ menu for `lead.erase` holders. It requires step-up, a request reference and typing the lead number. This cannot be undone.
+- **Unmapped intake values.** If `intake_unmapped` is present, an info chip reads "Website sent an unrecognized property type: 'Farmhouse'", with a quick-fix picker (LEAD-030).
 
 ### 4.5 Lead create and edit (UI-005)
-
-> Traces: LEAD-003, LEAD-010
 
 ```
 ┌──────────────────────── New lead (drawer 560px / full-screen mobile) ──────────────────────┐
@@ -353,8 +362,6 @@ Mobile: header + stepper (horizontal scroll) + sticky bottom action bar [Call][W
 
 ### 4.6 User management (UI-006)
 
-> Traces: AUTH-016, MFA-003, MFA-007, RBAC-006, RBAC-016, USER-001, USER-006
-
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │ ADMIN                                                                                       │
@@ -368,7 +375,7 @@ Mobile: header + stepper (horizontal scroll) + sticky bottom action bar [Call][W
 │ (RK) Ravi Kumar              │ Sales, Admin⏱    │ ○ Invited │ —            │ Required ⋯     │
 │ (AN) Anand N                 │ Admin            │ 🔒 Locked │ 1 d ago      │ ✓ On  ⋯        │
 └──────────────────────────────┴──────────────────┴───────────┴──────────────┴────────────────┘
-⏱ = time-bound assignment (tooltip: "until 15 Oct")
+⏱ = time-bound assignment. This is a **P1 surface** (RBAC-007), hidden in P0. ★ = FOUNDER-protected account.
 
 User drawer
 ┌──────────────────────────────── Priya Sharma ──────────────────── [⋯] ┐
@@ -377,18 +384,28 @@ User drawer
 │  ROLES                                              [Edit roles]      │
 │   Sales                         since 1 Sep                           │
 │  DIRECT PERMISSIONS                                 [+ Add exception] │
-│   GRANT lead.read · ALL · until 15 Oct · "Covering for Ravi"   [✕]    │
+│   GRANT lead.read · ALL · "Covering for Ravi"                  [✕]    │
 │   DENY  lead.export                  · "Policy"                [✕]    │
 │  EFFECTIVE PERMISSIONS (explain)                                      │
 │   lead.read  ALL   ← Sales (OWN), Direct grant (ALL)                  │
 │   …                                                                   │
-│ Security tab: MFA ✓ enrolled (Authenticator app, since 2 Sep)         │
-│   Required by: role policy · [Require MFA for this user ☑]            │
-│   [Reset MFA…] (user.mfa.manage + step-up, reason required)          │
-│   Recent sign-in activity (security_event.read)                      │
+│ Security tab (account-control actions; each shown only with its      │
+│ permission, and disabled with a reason when a guard applies):        │
+│   Sign-in email: priya@vedaspaces.com  ✓ verified                    │
+│     [Change email…] (user.email.change · step-up · verification      │
+│      sent to the NEW address · alert to the current address;         │
+│      privileged target → "Needs approval")                           │
+│   Status: Active   [Deactivate…] (user.status.manage · step-up)      │
+│   MFA: ✓ enrolled (Authenticator app, since 2 Sep)                   │
+│     Required by: role policy · [Require MFA for this user ☑]         │
+│     (user.mfa.require)                                                │
+│     [Reset MFA…] (user.mfa.reset · step-up · reason · privileged     │
+│      target → approval by a second admin)                            │
+│   Sensitive permissions: 2 ⚠ Pending MFA (suspended until enrolled)  │
+│   Security events for this user (only with security_event.read)      │
 │ Sessions tab: device, location, last seen [Revoke] · [Revoke all]    │
 │ Activity tab: audit entries performed_by this user (needs audit.read) │
-│ ⋯ menu: Send password reset · Deactivate · Delete (user.delete)       │
+│ ⋯ menu: Send password reset (to verified email) · Delete (user.delete)│
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -397,12 +414,15 @@ User drawer
 - Your own row shows "You can't change your own access" on the Access tab (G3).
 - Roles the actor can't grant are shown disabled with "Includes permissions you don't have" (G1/G2).
 - Deactivating the last administrator shows a server `LAST_ADMINISTRATOR` explanation dialog (G4).
-- **Reset MFA** opens a dialog with an identity-verification checklist and a required reason. It triggers step-up first (G10). It is disabled with an explanation for your own account (G3), and for accounts holding permissions you lack (G9).
+- **Reset MFA** opens a dialog with an identity-verification checklist and a required reason, after step-up (G10).
+  - It is disabled with an explanation for your own account (G3), for accounts holding permissions you lack (G9) and for Founder accounts: "Founder accounts use the Founder workflow" (G11).
+  - For a privileged target, the confirmation reads "This request needs approval by another administrator" and ends in the Approvals inbox (§4.12).
+- **Deactivate** is not available on your own row (G3) or on Founder rows (G11). For the last Founder or the last recovery administrator, the server explains `LAST_FOUNDER` / `LAST_ADMINISTRATOR` (G4).
+- **Change email** never edits the address in place. The dialog explains the two emails that will be sent, and the row shows "Email change pending" until verification.
+- Profile fields (name, display name, phone, timezone, locale) are edited on the Profile tab with `user.profile.update`. That form has no email, status, role or MFA fields.
 - The MFA column shows **Required** (policy requires it, not enrolled yet), **✓ On** (enrolled), **Optional** (not required, not enrolled) or **✓ On (optional)**.
 
 ### 4.7 Role management (UI-007)
-
-> Traces: RBAC-008
 
 ```
 ┌──────────────────────┬──────────────────────────────────────────────────────────────────────┐
@@ -455,8 +475,6 @@ Detail drawer: description [Edit — needs permission.manage] · granted to role
 
 ### 4.9 Audit log viewer (UI-009, AUDIT-008)
 
-> Traces: SEVT-005
-
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │ Audit log                                                                  [Security events]│
@@ -496,65 +514,106 @@ Detail panel (right drawer)
 - It is read-only. There are no actions that mutate.
 - Deep links (`/audit?entity_type=lead&entity_id=…`) are used by the "History" tab and the user Activity tab.
 
-### 4.10 MFA challenge and enrollment (UI-015, MFA-001, MFA-005)
-
-> Traces: AUTH-015
+### 4.10 MFA challenge, enrollment and recovery (UI-015, MFA-001, MFA-005, MFA-013, MFA-014)
 
 ```
-Two-step verification                         Set up two-step verification (required for your account)
-──────────────────────                        ──────────────────────────────────────────────────────────
-Enter the 6-digit code from your              1  Install an authenticator app (Google Authenticator,
-authenticator app.                                Microsoft Authenticator, 1Password, …)
-CODE  [ _ _ _   _ _ _ ]  (autocomplete=        2  Scan this code          ┌──────────┐
-      one-time-code, inputmode=numeric)                                   │ QR CODE  │   Can't scan?
-[ Verify → ]                                                              └──────────┘   Key: JBSW Y3DP …
-Use a recovery code instead                   3  Enter the 6-digit code   [ _ _ _   _ _ _ ]
-⚠ That code didn't work. 3 attempts left.     [ Confirm → ]
+Two-step verification                         Set up two-step verification
+──────────────────────                        ─────────────────────────────
+Enter the 6-digit code from your              Reached by: invite acceptance · the emailed setup link
+authenticator app.                            (after password re-entry) · Profile › Security
+CODE [ ______ ] (one field; autocomplete=     (after "Confirm your password") · recovery session
+      one-time-code, inputmode=numeric)       1 Install an authenticator app
+[ Verify → ]                                  2 Scan ┌──────┐  Can't scan? Key shown once
+Lost your authenticator? Use a recovery code        └──────┘
+⚠ That code didn't work. 3 attempts left.     3 Enter code [ ______ ]   [ Confirm → ]
   (aria-live=assertive; focus returns to input)
 
-Save your recovery codes (shown once)
-K7M3Q-9TDXR   P2W8N-4HJCQ   …  (10)
-[Download .txt] [Copy] [Print]
-☐ I have saved these codes somewhere safe      [ Continue → ]  (disabled until checked)
+Check your email (MFA required, no authenticator yet)
+"We've sent a secure setup link to p***@vedaspaces.com. It expires in 30 minutes."
+(No setup is possible on this screen: a password alone never enrolls an authenticator.)
+
+Recover your account                          Recovery mode (restricted)
+────────────────────                          ──────────────────────────
+Re-enter your password  [ •••••••• ]          Banner: "You're in recovery mode. You can only set up a
+Recovery code           [ XXXXX-XXXXX ]       new authenticator. All your other sessions were signed out,
+[ Recover → ]                                 and we've emailed you about this."
+Uniform error: "Password or recovery          [ Set up new authenticator → ]   [ Sign out ]
+code is incorrect."
+
+Save your new recovery codes (shown once)     After recovery (cooling-off banner, role="status")
+K7M3Q-9TDXR  P2W8N-4HJCQ  … (10)              "For your security, email, password and access changes
+[Download .txt] [Copy] [Print]                 are locked until 30 Sep, 11:02 am."
+☐ I have saved these codes   [ Continue → ]
 ```
 
 **Behavior:**
 
-- The code input is a single field (not six boxes), so paste and password managers work.
-- On a 401, the error names the remaining attempts. On an exhausted challenge, the app returns to sign in.
-- The step-up dialog reuses the challenge component in a modal, titled "Confirm it's you".
-- Profile › Security lets the user view their MFA status, regenerate recovery codes (with step-up), and remove the factor only when the policy doesn't require it.
+- A single code field, so paste and password managers work.
+- Recovery requires **both** password re-entry and a recovery code (owner Decision 2).
+- The recovery-mode shell shows only the setup action and sign-out. Navigation and data screens aren't rendered.
+- Step-up reuses the challenge component in a modal titled "Confirm it's you". For users without MFA, the "Confirm your password" modal is used instead.
+- Profile › Security shows own MFA status, lets the user regenerate recovery codes (step-up, not during cooling-off), and allows removing the factor only when policy doesn't require it.
+- **It shows no security-event history for users without `security_event.read`** (owner Decision 1). The standard Sales profile has no such panel.
 
 ### 4.11 Public enquiry form states (website, LEAD-026, ADR-005)
-
-> Traces: LEAD-012, LEAD-023
 
 This design is for the live site's contact form when LEAD-001 is implemented. It keeps the site's existing styling.
 
 | State | Behavior |
 |---|---|
-| Required fields | Name, Phone and the consent checkbox are marked "Required" in text, not only with an asterisk, and set `aria-required="true"`. All other fields are labelled "(optional)". |
-| Consent | Checkbox: "I agree to be contacted by Veda Spaces about my enquiry, as described in the Privacy Notice." It links to the versioned notice. It is unchecked by default. |
-| Client validation | Runs on submit, not on each keystroke. It mirrors server codes. |
-| Error state | 1. An error summary box at the top of the form (`role="alert"`, heading "Please fix 2 things") that links to each invalid field. 2. Focus moves to the summary. 3. Each invalid field gets inline text ("Enter a valid phone number, e.g. 98765 43210"), `aria-invalid="true"` and `aria-describedby`. 4. Errors are conveyed by text and an icon, not color alone, using `--vs-danger` at ≥ 4.5:1. |
-| CAPTCHA failure | Message: "We couldn't verify you're human. Please try again, or message us on WhatsApp." It includes a WhatsApp link. |
-| Rate limited | "Too many attempts. Please wait a minute, or message us on WhatsApp." |
-| Submitting | The button is disabled with "Sending…". The form sets `aria-busy="true"`. |
-| Success | The form is replaced by a confirmation panel (`role="status"`, focus moved to its heading): "Thank you. Your reference is **K7M3-Q9TD**. Our design team will call you within one working day." It offers an optional "Continue on WhatsApp" link. No internal data is shown. |
-| API unavailable | A network error, 5xx or an 8 s timeout triggers the **existing WhatsApp hand-off** with prefilled text (LEAD-019). A polite live-region note explains: "We're opening WhatsApp so your enquiry reaches us." |
+| Fields | Required: Name, Phone, the consent checkbox. Optional, labelled "(optional)": Email, City, Service Required, **Property Type** (Apartment / Flat, Independent House, Villa, Office, Retail / Shop, Other), Budget, Message. |
+| Required marking | "Required" in text plus `aria-required="true"` |
+| Labels | Every control has a visible `<label>` bound by `for`/`id`. Selects start with a "Choose…" option that is not submitted. |
+| Honeypot | Field `company_website_url`, off-screen, `tabindex="-1"`, `autocomplete="off"`, `aria-hidden="true"` (04 §5.1). It never receives focus and is never announced. |
+| Consent | Unchecked by default. "I agree to be contacted by Veda Spaces about my enquiry, as described in the Privacy Notice (v2026-09-v1)." |
+| Client validation | On submit. It mirrors server codes. |
+| Error state (field-level 422) | 1. An error summary at the top (`role="alert"`, "Please fix 2 things") linking to each field. 2. Focus moves to the summary. 3. Inline text per field with `aria-invalid` and `aria-describedby`. 4. Text plus icon, not color alone. |
+| CAPTCHA failure, rate limit, 428/413, 5xx, network error or 8-second timeout | A message plus a **prominent WhatsApp button** with the prefilled enquiry (LEAD-019, F-05). Nothing ends without a stored lead or a WhatsApp route. |
+| Submitting | The button is disabled with "Sending…", and the form sets `aria-busy="true"` |
+| Success | The panel replaces the form (`role="status"`, focus on its heading): "Thank you. Your reference is **K7M3-Q9TD**…" plus an optional WhatsApp link. The success view is identical for every 201. |
 
-## 5. Accessibility (UI-011)
+### 4.12 Approvals inbox (RBAC-021, MFA-015)
 
-| Area | Commitment |
-|---|---|
-| Standard | WCAG 2.2 AA. axe-core checks in Playwright for every screen (CI gate). |
-| Contrast | Tokens in §2 meet 4.5:1 text and 3:1 non-text. Copper text uses `--vs-copper-text`. |
-| Keyboard | Everything is reachable. Visible focus ring: 2 px `--vs-copper` + 2 px offset. Tables support arrow-key row navigation. Drawers and dialogs trap focus and restore it on close. `Esc` closes. |
-| Screen readers | Web components expose roles and labels. Form errors use `aria-describedby` plus a live region summary. Status pills include text. Timeline is an ordered list. |
-| Target size | ≥ 44×44 px on touch (≥ 24 px minimum per 2.5.8) |
-| Motion | `prefers-reduced-motion` respected |
-| Language | `lang="en-IN"`. Dates and numbers use Intl with the Indian locale. |
-| Zoom | Layout works at 200% and on 320 px widths without horizontal scroll |
+```
+Approvals                                                   [Pending for me (2)] [Requested by me]
+┌───────────────────────────────────────────────────────────────────────────────────────────────┐
+│ MFA reset · Anand N (Admin, privileged)  · requested by Ravi · 2 h ago · expires in 22 h      │
+│   Reason: "Lost phone; verified by video call"                     [Deny…]  [Approve…]         │
+│ Email change · Priya S → p***@gmail.com · requested by Ravi · 10 min ago                      │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+
+- Approve and deny require step-up and a reason.
+- Your own requests and requests about you show "You can't decide this request" (06 §7.4).
+- Founder actions appear only to eligible Founders.
+- A top-bar badge shows the pending count, from the `approvals` endpoint (08 §5.11).
+
+### 4.13 Email change, self-service (USER-007)
+
+- Profile › Sign-in email › [Change…] opens step-up (MFA, or password for non-MFA users), then asks for the new address.
+- A confirmation panel explains: "We've sent a verification link to the new address. Your current address p***@… stays active for sign-in and password recovery until you verify. We've also alerted your current address."
+- The pending state shows on the profile with [Cancel change].
+- Completion signs out all sessions, with a banner on the next sign-in.
+- During cooling-off the action is disabled, with the end time shown.
+
+## 5. Accessibility (UI-011, UI-016)
+
+Standard: WCAG 2.2 AA. Every criterion below is **testable** and mapped to a test in 12 §4.8.
+
+| ID | Area | Testable criterion | How verified |
+|---|---|---|---|
+| AX-01 | Keyboard navigation | Every interactive element is reachable and operable by keyboard in a logical order. There are no keyboard traps except modal focus-traps, which release on close and `Esc`. Tables support arrow-key row navigation. | Playwright keyboard-only journeys: login, MFA challenge, recovery, enrollment, lead create, lead status change, public form |
+| AX-02 | Visible focus | Focus indicator = `--vs-focus-ring` 2 px + 2 px offset, ≥ 3:1 against adjacent colors in both themes, never obscured by sticky headers (2.4.11) | Token contrast test + visual check in E2E screenshots |
+| AX-03 | Error announcements | Form errors: summary with `role="alert"`, focus moved to the summary, and each field linked with `aria-describedby`. Async results use `aria-live` (polite for status, assertive for MFA failures). | axe + a scripted assertion of `aria-*` attributes and focus location after a failed submit |
+| AX-04 | Form labels | Every input has a programmatic label. Required fields use `aria-required` plus text. Autocomplete tokens: `username`, `current-password`, `new-password`, `one-time-code`, `email`, `tel`. | axe `label` rules + attribute assertions |
+| AX-05 | Contrast | Text ≥ 4.5:1 and non-text ≥ 3:1 for every token pair in **light and dark** themes (§2.5) | Automated token-pair contrast test (fails the build) |
+| AX-06 | Mobile | Lead list, lead details, activity logging, login, MFA and the public form are fully usable at 320–360 px width without horizontal scroll. Targets ≥ 44×44 px (≥ 24 px minimum per 2.5.8). Works at 200% zoom. | Playwright at 360×800 (Android Chrome) and 390×844 (iOS Safari/WebKit) + target-size assertion |
+| AX-07 | Login and MFA flows | The code field uses `inputmode="numeric"` and `autocomplete="one-time-code"`. Remaining attempts are announced. Time-outs are announced before expiry. Recovery and enrollment are operable by screen reader. | axe + NVDA/VoiceOver manual script, once per release |
+| AX-08 | Public lead form | AX-01…AX-05 apply. The honeypot is never focusable or announced. Success and fallback panels receive focus and are announced. | axe on the form's idle, error, success and fallback states + keyboard journey |
+| AX-09 | Admin lead workflow | Status stepper exposed as an ordered list with `aria-current`. Transition dialog labelled. Drag-and-drop on the board has a keyboard alternative (move menu). | axe + keyboard journey on board and detail |
+| AX-10 | Motion and language | `prefers-reduced-motion` respected. `lang="en-IN"`. Dates and numbers use Intl in the user's timezone (03 §2.2). | Unit tests on formatting + a reduced-motion snapshot |
 
 ## 6. Screen → API → permission map
 
@@ -568,6 +627,8 @@ This design is for the live site's contact form when LEAD-001 is implemented. It
 | Users | `/users*` | `user.read` · actions per 08 §5 |
 | Roles | `/roles*`, `/permissions` | `role.read` · `role.manage` |
 | Permissions | `/permissions*` | `permission.read` · `permission.manage` |
-| Audit viewer | `/audit-logs`, `/security-events` | `audit.read` · `security_event.read` |
+| Audit viewer | `/audit-logs`, `/security-events` | `audit.read` · `security_event.read` (Founder, Admin; never standard Sales) |
+| Approvals inbox | `/approvals*` | the action's permission (06 §7.4) |
+| Email change (self) | `/auth/me/email`, `/auth/email/*` | own account (RBX-003/004) |
 | MFA challenge / enrollment | `/auth/mfa/*` | challenge token or own session (06 §11) |
 | Public enquiry form (website) | `/public/leads` | public (RBX-005) |

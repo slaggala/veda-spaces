@@ -35,7 +35,14 @@ It does **not** authorize implementation of:
 
 Those remain roadmap items. Each needs its own requirements, ADRs and review.
 
-Requirements marked P1 or P2 inside the in-scope areas (for example LEAD-017 export, NOTE-003 pinning, SEVT-007 external anchoring, AUDIT-013 audit hash chain) are designed but **deferred**. They are reported as deferred in the coverage gate.
+Requirements marked P1 or P2 inside the in-scope areas (for example LEAD-017 export, NOTE-003 pinning, RBAC-007 time-bound grants, AUDIT-013 audit hash chain) are designed but **deferred**. They are reported as deferred in the coverage gate, and their API and UI surfaces are marked P1 and disabled in P0 (F-16).
+
+**Remediation 01 scope adjustments.** These stay within the authorized areas; no roadmap module is added.
+
+| Change | Reason |
+|---|---|
+| Promoted to P0: AUTH-016 (session list and revoke), RBAC-016 (effective-permission explain), SEVT-007 (external chain anchor), AUDIT-011 (audited anonymization procedure) | Resolves F-16 and F-11, and supports F-15 |
+| Added to P0: MFA-012…015, RBAC-018…021, USER-007, LEAD-027…030, DATA-017, OPS-010, OPS-011, UI-016 | Owner Decisions 1–4, and findings F-03, F-05, F-07, F-09 and F-15 |
 
 ## Alternatives considered
 
@@ -68,3 +75,11 @@ README, 01, 04 (§1), 10, 11 (§8), coverage-gate
 
 - Completion of P0 implementation
 - An owner request to start any roadmap module
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-009; amended by `VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01` (scope adjustments above) |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

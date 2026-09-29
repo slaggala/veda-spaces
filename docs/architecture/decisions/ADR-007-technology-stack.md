@@ -52,3 +52,11 @@ PLAT-001, PLAT-002, PLAT-004, PLAT-005, API-001, API-003, API-008, NOTIF-002, NO
 - The PostgreSQL release gate (ADR-008)
 - A major Lit, Flask or SQLAlchemy version change
 - Email deliverability problems
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-007 |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

@@ -41,8 +41,6 @@ Governing decisions: [ADR-005](decisions/ADR-005-lead-required-fields.md) · [AD
 
 ## 2. Entity: `lead`
 
-> Traces: LEAD-002, LEAD-004, LEAD-006, LEAD-007, LEAD-008, LEAD-010, LEAD-015
-
 The nine audit-contract columns and their actor FKs to `app_user.id` (03 §2) come first.
 
 **Field requirement levels (ADR-005, LEAD-023):**
@@ -50,8 +48,8 @@ The nine audit-contract columns and their actor FKs to `app_user.id` (03 §2) co
 | Level | Fields |
 |---|---|
 | **Required on the public form** | `name`, `phone`, consent acknowledgement |
-| **Optional on the public form** | `email`, `city`, `project_type`, `budget_range`, `message` |
-| **Staff-only enrichment** | Everything else (`locality`, `property_type`, `priority`, `expected_close_on`, …) |
+| **Optional on the public form** | `email`, `city`, `project_type`, `budget_range`, `property_type`, `message` (owner Decision 4 added `property_type`) |
+| **Staff-only enrichment** | Everything else (`locality`, `priority`, `expected_close_on`, …) |
 
 All optional fields can be added or edited later by staff with `lead.update` (LEAD-024).
 
@@ -67,7 +65,7 @@ All optional fields can be added or edited later by staff with `lead.update` (LE
 | `city` | VARCHAR(100) | NULL | — | Optional. Free text from the public form. Staff may normalize it. |
 | `locality` | VARCHAR(150) | NULL | — | Staff enrichment |
 | `project_type_id` | GUID | NULL | — | Optional. FK → `lookup_value` (PROJECT_TYPE). |
-| `property_type_id` | GUID | NULL | — | Staff enrichment. FK → `lookup_value` (PROPERTY_TYPE). |
+| `property_type_id` | GUID | NULL | — | Optional on the public form. Enrichable by staff. FK → `lookup_value` (PROPERTY_TYPE: APARTMENT, INDEPENDENT_HOUSE, VILLA, OFFICE, RETAIL, OTHER). |
 | `budget_range_id` | GUID | NULL | — | Optional. FK → `lookup_value` (BUDGET_RANGE). |
 | `message` | TEXT | NULL | — | Optional. Max 4,000 chars, plain text. |
 | `status` | CODE(20) | NOT NULL | `'NEW'` | §3 |
@@ -98,6 +96,14 @@ All optional fields can be added or edited later by staff with `lead.update` (LE
 | `consent_source_page` | VARCHAR(500) | NULL | — | Source context: page path the form was submitted from (website) |
 | `consent_ip_address` | VARCHAR(45) | NULL | — | Source context: submitting IP (website) |
 | `intake_idempotency_key` | VARCHAR(64) | NULL | — | Client-supplied `Idempotency-Key` (API-007). An opaque key, **not** an entity ID. |
+| `intake_request_fingerprint` | CHAR(64) | NULL | — | SHA-256 of the JCS-canonical public request body, excluding `turnstile_token` and the honeypot field (F-04) |
+| `intake_unmapped` | JSON | NULL | — | Raw values of optional lookup fields the API could not map (unknown or inactive codes), kept for staff review. The enquiry is never rejected for them (LEAD-030). |
+| `spam_status` | CODE(15) | NOT NULL | `'NONE'` | `NONE`, `SUSPECTED` (honeypot hit), `CONFIRMED_SPAM`, `NOT_SPAM` (F-05) |
+| `consent_withdrawn_on` | UTCDATETIME | NULL | — | LEAD-027 |
+| `consent_withdrawal_channel` | CODE(20) | NULL | — | `PHONE_VERBAL`, `IN_PERSON`, `WHATSAPP`, `EMAIL`, `WEBSITE` |
+| `consent_withdrawal_note` | VARCHAR(500) | NULL | — | |
+| `search_text` | TEXT | NOT NULL | '' | Application-maintained, casefolded (Unicode `casefold()` + NFKC) concatenation of name, email, phone digits, lead number, public reference, city and locality. Engine-independent search (A-03). |
+| `anonymized_on` | UTCDATETIME | NULL | — | Set by erasure or retention anonymization (LEAD-028, LEAD-029) |
 
 ### Constraints
 
@@ -111,6 +117,8 @@ All optional fields can be added or edited later by staff with `lead.update` (LE
 | `ck_lead__consent_complete` | `consent_contact = false OR (consent_policy_version IS NOT NULL AND consent_captured_on IS NOT NULL AND consent_channel IS NOT NULL)` |
 | `ck_lead__quoted_amount` | `quoted_amount_minor IS NULL OR quoted_amount_minor >= 0` |
 | `ck_lead__not_self_duplicate` | `duplicate_of_lead_id IS NULL OR duplicate_of_lead_id <> id` |
+| `ck_lead__spam_status` | Enumeration |
+| `ck_lead__withdrawal_consistency` | `consent_withdrawn_on IS NULL OR (consent_contact = false AND consent_withdrawal_channel IS NOT NULL)` |
 
 ### Indexes
 
@@ -127,12 +135,15 @@ All optional fields can be added or edited later by staff with `lead.update` (LE
 | `ix_lead__next_follow_up` | `next_follow_up_on` | `status NOT IN ('WON','LOST') AND is_deleted = false` | Due/overdue |
 | `ix_lead__created_on` | `created_on DESC` | — | Dashboard |
 | `ix_lead__source` | `source_id, created_on DESC` | `is_deleted = false` | Source analytics |
+| `ix_lead__spam_queue` | `spam_status, created_on DESC` | `spam_status = 'SUSPECTED' AND is_deleted = false` | Spam review queue |
+| `ix_lead__retention` | `status, status_changed_on` | `status IN ('WON','LOST') AND anonymized_on IS NULL` | Retention job (LEAD-028) |
 
 ### Foreign keys and audit
 
 - **Foreign keys:** `assigned_to` → `app_user.id`; lookup FKs → `lookup_value.id`; `duplicate_of_lead_id` → `lead.id`; plus the contract actor FKs. All use the GUID type (DATA-012).
 - **Lookup-category guard:** the service verifies that each lookup value belongs to the correct category.
-- **Audit:** FULL. Diffs exclude `next_follow_up_on` and `last_activity_on`. The PII fields for anonymization are `name`, `phone`, `phone_raw`, `email`, `email_normalized`, `message`, `locality`, `consent_ip_address`.
+- **Audit:** FULL. Diffs exclude `next_follow_up_on`, `last_activity_on` and `search_text`. The PII fields for anonymization are `name`, `phone`, `phone_raw`, `email`, `email_normalized`, `message`, `locality`, `city`, `consent_ip_address`, `consent_source_page`, `intake_unmapped` and `search_text`.
+- **Default visibility:** lists and the dashboard exclude `spam_status IN ('SUSPECTED','CONFIRMED_SPAM')` unless the `spam_status` filter is given (08 §8.2).
 
 ## 3. Status state machine (LEAD-004, LEAD-005, LEAD-006)
 
@@ -155,8 +166,8 @@ All optional fields can be added or edited later by staff with `lead.update` (LE
 | Open → later open status (forward, skipping allowed) | Yes | `lead.status.change` | Optional comment | STATUS_CHANGE activity · `status_changed_on` |
 | Open → immediately previous status | Yes | `lead.status.change` | Comment **required** | Same |
 | Open → earlier status, more than one step back | No | — | — | 422 `INVALID_STATUS_TRANSITION` |
-| NEGOTIATION / QUOTATION_SENT → WON | Yes | `lead.status.change` | `won_on` (default now) | Outbox `lead.won` |
-| NEW / CONTACTED / SITE_VISIT → WON | Yes | `lead.status.change` | Comment required | Same |
+| NEGOTIATION / QUOTATION_SENT → WON | Yes | `lead.status.change` | `won_on` (default now) | Outbox `lead.won`. Cancels PLANNED activities and clears `next_follow_up_on` (§8). |
+| NEW / CONTACTED / SITE_VISIT → WON | Yes | `lead.status.change` | Comment required | Same as the row above, including cancellation of PLANNED activities |
 | Open → LOST | Yes | `lead.status.change` | `lost_reason_code` required. Note required when the reason is OTHER. | `lost_on`, cancels PLANNED activities, clears `next_follow_up_on` |
 | LOST → CONTACTED | Yes | `lead.reopen` | Comment required | Clears lost fields, outbox `lead.reopened` |
 | WON → NEGOTIATION | Yes | `lead.reopen` | Comment required | Clears `won_on` |
@@ -177,51 +188,85 @@ Status changes **only** through `POST /leads/{id}/status` (08 §8.6).
 
 ## 5. Intake
 
-### 5.1 Public intake (LEAD-001, LEAD-012, LEAD-018, LEAD-019, LEAD-023, LEAD-025)
+### 5.1 Public intake (LEAD-001, LEAD-012, LEAD-018, LEAD-019, LEAD-023, LEAD-025, LEAD-030)
+
+Processing order. Cheap checks come first, and idempotency is checked before the single-use CAPTCHA token (F-04, A-09).
 
 ```
-Browser (www) ── POST /api/v1/public/leads ─────────────────────────────────────────────────► API
-  headers: Idempotency-Key            body: approved fields + consent + attribution + turnstile_token + honeypot
-  1 Cloudflare edge rate limit + WAF (LEAD-018)
-  2 body ≤ 16 KB · schema allows ONLY the approved public fields (unknown field → 422)
-  3 honeypot non-empty → security event PUBLIC_INTAKE_BLOCKED (reason HONEYPOT); 202 generic body; no lead
-  4 Turnstile verification server-to-server → failure: security event PUBLIC_INTAKE_BLOCKED (CAPTCHA_FAILED); 422
-  5 app rate limit per IP → 429 + security event PUBLIC_INTAKE_BLOCKED (RATE_LIMITED)
-  6 idempotency: intake_idempotency_key already stored → return the ORIGINAL 201 body (no new lead)
-  7 validate: name, phone (LEAD-009), consent_acknowledged = true, policy version known
-  8 normalize; map optional codes; source = WEBSITE; consent_channel = WEBSITE_FORM; consent context captured
-  9 duplicate check (§7) → duplicate_status flag — the submission is ALWAYS stored (LEAD-010)
- 10 actor = WEB_INTAKE, via = PUBLIC_FORM; lead_number + public_reference; insert lead;
-    system activity "Enquiry received via website"; audit_log CREATE; outbox lead.created   (one transaction)
- 11 commit → 201 { reference: public_reference, message }  — nothing else (LEAD-025)
+Browser (www) ── POST /api/v1/public/leads ── headers: Idempotency-Key ── body: approved fields + consent + attribution
+                                                                               + turnstile_token + honeypot field
+  1 Cloudflare edge rate limit + WAF
+  2 body ≤ 16 KB; JSON parse; CLOSED schema (unknown field → 422 UNKNOWN_FIELD)
+  3 application rate limit per IP (single-process limiter, OPS-010)          → 429 + PUBLIC_INTAKE_BLOCKED
+  4 IDEMPOTENCY (before CAPTCHA):
+       fingerprint = SHA-256(JCS(body minus turnstile_token and honeypot))
+       key found ∧ fingerprint equal     → return the ORIGINAL 201 body; nothing else runs (no CAPTCHA re-check)
+       key found ∧ fingerprint differs   → 422 IDEMPOTENCY_KEY_REUSED
+  5 Turnstile verification (server-to-server)                                 → 422 CAPTCHA_FAILED + PUBLIC_INTAKE_BLOCKED
+  6 validation: name, phone (LEAD-009), consent.acknowledged = true, known policy_version
+       optional lookup codes (project_type, budget_range, property_type): unknown or inactive → field stored NULL,
+       raw value kept in intake_unmapped (LEAD-030); the enquiry is NOT rejected
+  7 honeypot non-empty → spam_status = SUSPECTED (the lead IS stored, in the spam review queue); the response is identical
+  8 normalize; source = WEBSITE; consent context captured; search_text built
+  9 duplicate check (§7) → duplicate_status flag (never rejects)
+ 10 actor WEB_INTAKE, via PUBLIC_FORM; lead_number + public_reference; insert lead with intake_idempotency_key and
+    intake_request_fingerprint; system activity; audit_log CREATE; outbox lead.created (not for SUSPECTED spam)
+    — all in ONE transaction
+ 11 commit → 201 { reference: public_reference, message }
 ```
 
 **Latency target (NFR-003).** p95 < 800 ms end to end, including Turnstile verification. Email is not on the request path.
 
-**Public response contract (LEAD-025).** The response contains only `reference` (the random `public_reference`) and a static `message`.
+**Public response contract (LEAD-025).** Every accepted submission, including a suspected-spam one, gets the **same** `201 {reference, message}` shape with a real random reference. So:
 
-- It never contains the lead `id`, `lead_number`, status, assignee, duplicate state, timestamps or any echo of input.
-- Error responses contain field-level validation codes only.
-- There is no public read endpoint for leads.
+- there is no silent drop (F-05);
+- bots cannot distinguish the honeypot (A-14);
+- no lead id, `lead_number`, status, assignee, duplicate or spam state, timestamps or echoed input is ever returned;
+- there is no public read endpoint.
 
-**Honeypot and CAPTCHA rejections** are bot-traffic controls, not duplicate handling. Every rejection is recorded as a `PUBLIC_INTAKE_BLOCKED` security event with reason and IP (SEVT-002), so blocked traffic is observable and never silently lost. Real enquirers who fail CAPTCHA see an accessible error and the WhatsApp alternative (09 §4.11).
+**Honeypot markup (F-05).** The trap field is:
 
-**Website form mapping.** This is implemented when LEAD-001 is built. It is not a change to the live site in this freeze.
+- named `company_website_url`, a name that password managers and autofill don't target;
+- given `autocomplete="off"`, `tabindex="-1"` and `aria-hidden="true"`;
+- positioned off-screen with CSS rather than `display:none`;
+- excluded from the accessible form summary.
 
-| Website field (live today) | Public API field | Lead column | Level |
+Because a hit only quarantines, a false positive from autofill loses nothing: staff review the Spam queue (09 §4.3) and mark `NOT_SPAM`, which releases the lead into the normal pipeline and triggers `lead.created` notifications.
+
+**Non-success responses and the website (F-05, LEAD-019).**
+
+| Response | Website behavior |
+|---|---|
+| 201 | Confirmation panel showing the reference |
+| 422 with field errors (`VALIDATION_FAILED`, `CONSENT_REQUIRED`) | Inline accessible errors. The user can correct and resubmit. |
+| Every other non-2xx (422 `CAPTCHA_FAILED`, 428, 413, 429, 5xx), a network error, or an 8-second timeout | The WhatsApp hand-off is offered **prominently** with the prefilled text, together with the specific message (09 §4.11). No path ends without either a stored lead or a WhatsApp route. |
+
+**Website form mapping.** This is implemented with LEAD-001. It is not a change to the live site in this remediation.
+
+| Website field | Public API field | Lead column | Level |
 |---|---|---|---|
 | Full Name | `name` | `name` | Required |
 | Phone Number | `phone` | `phone_raw` → `phone` | Required |
-| *(new)* Consent checkbox + privacy notice link | `consent.acknowledged`, `consent.policy_version` | `consent_*` | Required |
+| *(new)* Consent checkbox and privacy notice link | `consent.acknowledged`, `consent.policy_version` | `consent_*` | Required |
 | Email Address | `email` | `email` | Optional |
 | Project Location | `city` | `city` (free text) | Optional |
-| Service Required | `project_type_code` | `project_type_id` | Optional |
+| Property Type (select; **becomes optional**) | `property_type_code` | `property_type_id` | Optional |
+| Service Required (select; becomes optional) | `project_type_code` | `project_type_id` | Optional |
 | *(new)* Budget select | `budget_range_code` | `budget_range_id` | Optional |
 | Brief Description | `message` | `message` | Optional |
-| Property Type | *not accepted by the public API* | Staff enrichment into `property_type_id` | See ASM-005 |
-| URL `utm_*`, page path, `document.referrer` | `attribution` (metadata, not user-entered) | Attribution columns and `consent_source_page` | Captured automatically |
+| URL `utm_*`, page, `document.referrer` | `attribution` | Attribution and `consent_source_page` | Automatic |
 
-**Fallback (LEAD-019).** On a network error, a timeout (8 s) or a 5xx, the website runs the existing WhatsApp hand-off with the same prefilled text. The live WhatsApp behavior is preserved unchanged.
+**Live-option reconciliation (owner Decision 4).**
+
+| Live option | New code |
+|---|---|
+| Property Type "Apartment / Flat" | `APARTMENT` |
+| Property Type "Independent House / Villa" | Split into two options: `INDEPENDENT_HOUSE` and `VILLA` |
+| Property Type "Home Renovation" | **Removed** from Property Type. It moves to Service Required as PROJECT_TYPE `RENOVATION`. |
+| Property Type "Other" | `OTHER` |
+| *(new)* | `OFFICE`, `RETAIL` |
+
+**Fallback (LEAD-019).** The existing WhatsApp hand-off is preserved unchanged.
 
 ### 5.2 Manual intake (LEAD-003)
 
@@ -236,6 +281,28 @@ Browser (www) ── POST /api/v1/public/leads ───────────
 - Staff with `lead.update` (in scope) can fill or correct any optional or enrichment field at any stage through `PATCH /leads/{id}` (08 §8.5).
 - The lead detail view highlights empty optional fields ("Add budget", "Add project type") to prompt enrichment after the first call.
 - Every change is audited.
+
+### 5.4 Consent withdrawal (LEAD-027)
+
+- `POST /leads/{id}/consent/withdraw {channel, note}` requires `lead.update` in scope and `If-Match`.
+- Effect, in one transaction:
+  - `consent_contact = false`, `consent_withdrawn_on = now`, and the channel and note are recorded;
+  - PLANNED contact activities (CALL, WHATSAPP, EMAIL, MEETING, SITE_VISIT, FOLLOW_UP) are cancelled with the reason `CONSENT_WITHDRAWN`;
+  - `next_follow_up_on` is cleared;
+  - a system activity is written, plus an audit UPDATE.
+- **After withdrawal:**
+  - The UI shows a **Do not contact** banner, and the Call and WhatsApp buttons require an explicit acknowledgment.
+  - Planning new contact activities returns `422 CONSENT_WITHDRAWN`.
+  - Outbound marketing is never sent.
+- The original consent record (`consent_policy_version`, `consent_captured_on`, context) is kept as evidence.
+- Re-consent is recorded as a new consent capture through `PATCH` of the `consent_*` fields, with the channel and policy version. It is audited.
+
+### 5.5 Spam review (LEAD-018, F-05)
+
+- `GET /leads?spam_status=SUSPECTED` (`lead.read`, scope ALL in practice) lists quarantined leads.
+- `POST /leads/{id}/spam-resolution {resolution: NOT_SPAM | CONFIRMED_SPAM}` (`lead.update`, `If-Match`):
+  - **NOT_SPAM** releases the lead and emits `lead.created`.
+  - **CONFIRMED_SPAM** keeps the lead hidden. It can be soft-deleted, and becomes eligible for purge by retention (§14).
 
 ## 6. Assignment (LEAD-007, LEAD-022)
 
@@ -252,7 +319,7 @@ Browser (www) ── POST /api/v1/public/leads ───────────
 
 - **Match rule.** Another live lead with the same `phone`, or the same `email_normalized`, created within the last 180 days.
 - **Outcome.** The new lead is **always stored**, with `duplicate_status = SUSPECTED` and `duplicate_of_lead_id` set. Submissions are never rejected or silently discarded for being duplicates.
-- **Resolution** needs `lead.update`: CONFIRMED (typically then LOST with reason DUPLICATE) or NOT_DUPLICATE.
+- **Resolution** needs `lead.update`: CONFIRMED (typically then LOST with reason DUPLICATE) or NOT_DUPLICATE. A client-supplied `duplicate_of_lead_id` is loaded through the scoped repository. If it is outside the actor's scope, the response is `404 NOT_FOUND`, identical to a non-existent lead (A-07).
 - **Privacy.** Public intake never reveals duplicate status (LEAD-025). Staff see only matches within their scope.
 
 ## 8. Follow-ups (LEAD-015)
@@ -264,8 +331,6 @@ Browser (www) ── POST /api/v1/public/leads ───────────
 - Reminders and the daily digest are P1 (NOTIF-006).
 
 ## 9. Entity: `lead_note` (NOTE-*)
-
-> Traces: NOTE-001, NOTE-002
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -280,13 +345,13 @@ Browser (www) ── POST /api/v1/public/leads ───────────
   - `ix_lead_note__created_by` (`created_by`) WHERE `is_deleted = false`
 - **Foreign keys:** `lead_id` → `lead.id`, plus contract actor FKs.
 - **Audit:** FULL, with parent (`lead`, `lead_id`).
+- **Deleted parent:** creating, editing or listing notes on a soft-deleted lead returns `404 NOT_FOUND`.
+- **Deletion:** note deletion is a confirmed soft delete. There is **no Undo** in P0 and no note-restore endpoint (F-20).
 - **Authorization:**
   - Read requires `lead_note.read` and a visible parent lead.
   - Update and delete with OWN scope are limited to notes the actor authored.
 
 ## 10. Entity: `lead_activity` (ACT-*)
-
-> Traces: ACT-001, ACT-002, ACT-003, ACT-004
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -329,6 +394,7 @@ Browser (www) ── POST /api/v1/public/leads ───────────
 ### Foreign keys, audit and rules
 
 - **Foreign keys:** `lead_id`, `owner_user_id` → `app_user.id`, `outcome_id`, plus contract actor FKs.
+- **Deleted parent:** any activity operation on a soft-deleted lead returns `404 NOT_FOUND`.
 - **Audit:** FULL, with parent (`lead`, `lead_id`).
 - **Lifecycle:**
   - PLANNED → COMPLETED or CANCELLED.
@@ -353,8 +419,6 @@ All metrics respect the viewer's `lead.read` scope.
 
 ## 12. Lead permissions summary
 
-> Traces: LEAD-016
-
 The full catalog is in 06 §6.3.
 
 | Permission | Guards |
@@ -368,11 +432,10 @@ The full catalog is in 06 §6.3.
 | `lead.delete` (scope) | Soft delete |
 | `lead.restore` | Restore, view deleted |
 | `lead.export` | CSV export (P1) |
+| `lead.erase` | Execute an erasure request (§14) |
 | `lead_note.*`, `lead_activity.*` (scope) | Notes, activities |
 
 ## 13. Validation rules
-
-> Traces: LEAD-009
 
 | Field | Rule | Error code |
 |---|---|---|
@@ -381,7 +444,30 @@ The full catalog is in 06 §6.3.
 | consent (public) | `acknowledged` must be true. `policy_version` must match a published version. | `CONSENT_REQUIRED`, `UNKNOWN_POLICY_VERSION` |
 | email | Optional. RFC 5322 practical subset. ≤ 254. | `INVALID_EMAIL` |
 | city | Optional. ≤ 100. | `TOO_LONG` |
-| project_type / budget_range / source / lost_reason / property_type | Active code in the correct category | `INVALID_LOOKUP` |
+| source / lost_reason (staff API) | Active code in the correct category | `INVALID_LOOKUP` |
+| project_type / budget_range / property_type (staff API) | Active code in the correct category | `INVALID_LOOKUP` |
+| project_type / budget_range / property_type (**public API**) | Unknown or inactive → stored NULL, raw value kept in `intake_unmapped`. Never rejects the enquiry (LEAD-030). | — |
 | message | Optional. ≤ 4,000. Control characters stripped. | `TOO_LONG` |
 | quoted_amount (P1) | ≥ 0 | `OUT_OF_RANGE` |
 | assigned_to | Active HUMAN user holding `lead.read`. Canonical GUID. | `INVALID_ASSIGNEE`, `INVALID_ID` |
+
+## 14. Retention, erasure and anonymization (LEAD-028, LEAD-029, AUDIT-011)
+
+### 14.1 Closed-lead retention job (LEAD-028)
+
+| Item | Design |
+|---|---|
+| Scope | Leads with status WON or LOST (or `CONFIRMED_SPAM`) whose `status_changed_on` is older than `LEAD_RETENTION_DAYS`, and that are not linked to a customer (a future module) |
+| Action | Anonymize: PII fields (§2 Audit) are replaced by placeholders (`name = "Anonymized lead"`, other PII NULL or empty) through the ORM. `anonymized_on` is set. Related `lead_note.body` and `lead_activity.description` and `location` are replaced with `"[anonymized]"`. Audit payloads for the lead and its children are anonymized by the 07 §8.2 procedure. An ANONYMIZE audit row is written. |
+| Configuration | `LEAD_RETENTION_DAYS` and `LEAD_RETENTION_ENABLED`. **The period is owner input OWNER-INPUT-002.** The job ships **disabled** and cannot be enabled in production without an approved value. It is testable with test configuration. |
+| Run | Daily, as SYSTEM, from the maintenance CLI, in batches, with a summary security event |
+
+### 14.2 Erasure request (LEAD-029)
+
+| Step | Design |
+|---|---|
+| Intake | A data principal's request arrives through the published privacy contact. Staff record it as a note with the request reference. |
+| Execute | `POST /leads/{id}/erasure {request_ref, legal_basis, reason}` requires `lead.erase` (sensitive, DESTRUCTIVE), step-up (G10) and `If-Match`. In the request transaction, the live lead and child fields are anonymized. An outbox job then has the maintenance CLI anonymize the historical audit payloads (07 §8.2 steps 2, 5 and 6). The lead shows `erasure.audit_status` = `PENDING` until the job completes (`COMPLETED`), and failures alert. |
+| Refusal | When a legal hold or legitimate retention need applies, the request is recorded and refused with a reason. `422 ERASURE_BLOCKED` with the basis. |
+| Evidence | ANONYMIZE audit row with `legal_basis` and `request_ref`, and a `SENSITIVE_ACTION` security event. Security events never contained lead PII (SEVT-003). |
+| Irreversibility | Not undoable. The UI requires typing the lead number to confirm. |

@@ -16,18 +16,18 @@ Every table is registered with exactly one policy. The schema conformance check 
 
 | Policy | Behavior | Tables |
 |---|---|---|
-| `FULL` | Row-level diffs to `audit_log` for CREATE / UPDATE / DELETE / RESTORE / HARD_DELETE | app_user, user_credential, role, permission, user_role, role_permission, user_permission, user_mfa_factor, lookup_category, lookup_value, number_sequence (configuration columns), lead, lead_note, lead_activity |
-| `EVENT_ONLY` | No row diffs. The lifecycle is recorded as `security_event_log` events or is operational state. Behavioral exceptions are registered in 03 §2.9. | user_session, refresh_token, password_reset_token, user_mfa_recovery_code, mfa_challenge, outbox_event, notification |
+| `FULL` | Row-level diffs to `audit_log` for CREATE / UPDATE / DELETE / RESTORE / HARD_DELETE / ANONYMIZE | app_user, user_credential, role, permission, user_role, role_permission, user_permission, user_mfa_factor, admin_approval_request, lookup_category, lookup_value, number_sequence (configuration columns), lead, lead_note, lead_activity |
+| `EVENT_ONLY` | No row diffs. The lifecycle is recorded as `security_event_log` events or is operational state. Behavioral exceptions are registered in 03 §2.9. | user_session, refresh_token, user_action_token, user_mfa_recovery_code, mfa_challenge, outbox_event, notification |
 | `IMMUTABLE_STORE` | Insert-only evidence store | audit_log, security_event_log |
 
 Each FULL registration declares:
 
 | Setting | Values |
 |---|---|
-| `excluded_fields` | `updated_on`, `updated_by`, `version` for all tables · `last_login_on`, `authz_version` (app_user) · lockout counters (user_credential) · `last_used_step`, `last_used_on` (user_mfa_factor) · `next_value`, `current_period` (number_sequence) · `next_follow_up_on`, `last_activity_on` (lead) |
-| `redacted_fields` | `password_hash` · `secret_ciphertext` · `secret_key_ref` |
-| `parent` | lead_note / lead_activity → lead · user_role, user_permission, user_credential, user_mfa_factor → app_user · role_permission → role · lookup_value → lookup_category |
-| `pii_fields` | lead: `name`, `phone`, `phone_raw`, `email`, `email_normalized`, `message`, `locality`, `consent_ip_address` · app_user: `email`, `email_normalized`, `full_name`, `phone_e164` |
+| `excluded_fields` | `updated_on`, `updated_by`, `version` for all tables · `last_login_on`, `authz_version` (app_user) · throttle counters (user_credential) · `last_used_step`, `last_used_on` (user_mfa_factor) · `next_value`, `current_period` (number_sequence) · `next_follow_up_on`, `last_activity_on`, `search_text` (lead) |
+| `redacted_fields` | `password_hash` · `secret_ciphertext` · `wrapped_data_key` |
+| `parent` | lead_note / lead_activity → lead · user_role, user_permission, user_credential, user_mfa_factor → app_user · admin_approval_request → app_user (target) · role_permission → role · lookup_value → lookup_category |
+| `pii_fields` | lead: `name`, `phone`, `phone_raw`, `email`, `email_normalized`, `city`, `message`, `locality`, `consent_ip_address`, `consent_source_page`, `intake_unmapped` · lead_note: `body` · lead_activity: `description`, `location` · app_user: `email`, `email_normalized`, `proposed_email`, `proposed_email_normalized`, `full_name`, `phone_e164` |
 
 An UPDATE that changes only excluded fields produces no audit row.
 
@@ -110,18 +110,19 @@ ActorContext {actor_id (app_user.id — user or seeded system user), via, reques
 
 ### 4.2 Parent linkage
 
-> Traces: AUDIT-006
-
 The hook fills `parent_entity_type` and `parent_entity_id` from the registry. A record's full history (itself plus its children) is one indexed query.
 
-### 4.3 Read and export auditing (AUDIT-007)
+### 4.3 Read and export auditing (AUDIT-007, F-06)
 
-> Traces: LEAD-017
+| Read | Where it is recorded |
+|---|---|
+| Ordinary business reads | Not audited in P0 (application request logs only) |
+| Reads using `SECURITY_DATA` permissions (`audit.read`, `security_event.read`) | `SENSITIVE_READ` security event, de-duplicated per (actor, permission, 15 min) (06 §3.2). Not in `audit_log`. |
+| CSV export (P1, `BULK_DATA`) | EXPORT audit row **and** a `SENSITIVE_READ` event |
+| Mutations using any sensitive permission | Their normal audit rows **plus** one `SENSITIVE_ACTION` security event |
+| Future payroll and HR modules | ACCESS auditing (10 §3.3) |
 
-- Reads aren't audited in P0.
-- CSV export (P1) writes an EXPORT row.
-- Future payroll and HR modules require ACCESS auditing (10 §3.3).
-- Use of sensitive permissions is recorded as a `SENSITIVE_ACTION` security event (05 §9.1).
+**PII masking in the viewer (A-12).** `pii_fields` are masked in `old_value` and `new_value` of lead-related entries whose lead is outside the viewer's `lead.read` scope (06 §8).
 
 ## 5. Redaction and minimization (AUDIT-005)
 
@@ -138,18 +139,16 @@ The hook fills `parent_entity_type` and `parent_entity_id` from the registry. A 
 
 ### 6.2 Database
 
-> Traces: AUDIT-004, SEVT-001
-
 | Engine | Guard on `audit_log` and `security_event_log` |
 |---|---|
-| SQLite | `BEFORE UPDATE` and `BEFORE DELETE` triggers `RAISE(ABORT, 'immutable')`. The retention procedure (§8) runs as a documented maintenance step that drops and recreates the delete trigger inside the same transaction as the archival delete, and writes a summary event. |
+| SQLite | `BEFORE UPDATE` and `BEFORE DELETE` triggers `RAISE(ABORT, 'immutable')`. **The application processes never issue DDL.** Retention and erasure run only from the separate maintenance CLI process (A-02). That process drops and recreates the delete trigger inside the same transaction as the archival delete and writes a summary event. `/health/ready` and the nightly job verify that the triggers exist and alert if they are missing. **Residual risk (accepted, 11 §4):** SQLite has no DB roles, so a process with file access could still alter triggers. That is mitigated by host access controls and the security-log keyed chain. |
 | PostgreSQL | The application role has `INSERT, SELECT` only. A separate retention role has `DELETE`. Triggers block UPDATE. |
 
 ### 6.3 Tamper evidence
 
 | Store | P0 | Later |
 |---|---|---|
-| `security_event_log` | Hash chain + nightly verification (05 §9.6, SEVT-006) | P1: daily external anchor to S3 Object Lock (SEVT-007) |
+| `security_event_log` | **Keyed** HMAC chain with JCS canonicalization, nightly verification, **and** a daily external anchor to S3 Object Lock (compliance mode) (05 §9.6, SEVT-006, SEVT-007) | — |
 | `audit_log` | DB guards + break-glass controls | P2: hash chain with the same design (AUDIT-013), added as nullable columns (additive migration) |
 
 ## 7. Querying and the viewer (AUDIT-008)
@@ -169,13 +168,15 @@ The hook fills `parent_entity_type` and `parent_entity_id` from the registry. A 
 
 ### 8.1 Retention
 
-> Traces: AUDIT-009
-
-| Store | Configuration | Initial default (owner may change) |
+| Store | Configuration | Value |
 |---|---|---|
-| `audit_log` | `AUDIT_ONLINE_RETENTION_DAYS`, `AUDIT_ARCHIVE_RETENTION_DAYS` | 730 online · 2,920 total (8 years, pending legal confirmation, ASM-006) |
-| `security_event_log` | 05 §9.4 | 365 online · 730 total |
-| Application logs | CloudWatch retention setting | 30 days hot · 365 archive |
+| `audit_log` | `AUDIT_ONLINE_RETENTION_DAYS`, `AUDIT_ARCHIVE_RETENTION_DAYS` | **Owner input OWNER-INPUT-002.** The archival job refuses to run until values are configured. |
+| `security_event_log` | 05 §9.4 | OWNER-INPUT-002 |
+| Operational tables (sessions, tokens, outbox, notifications) | 03 §2.10 | OWNER-INPUT-002 |
+| Closed leads | `LEAD_RETENTION_DAYS` (04 §14.1) | OWNER-INPUT-002. The job ships disabled. |
+| Application logs | CloudWatch retention setting | OWNER-INPUT-002 |
+
+No retention values are asserted by this architecture (owner Decision 6). Until they are approved, nothing is deleted by retention, which is the safe default.
 
 **Archival (actor SYSTEM):**
 
@@ -184,16 +185,17 @@ The hook fills `parent_entity_type` and `parent_entity_id` from the registry. A 
 3. Delete (EXC-002).
 4. Write a HARD_DELETE summary row (entity_type `audit_log_partition`).
 
-### 8.2 Personal data erasure (DPDP Act 2023)
+### 8.2 Personal data erasure and anonymization (DPDP Act 2023, AUDIT-011, P0)
 
-> Traces: AUDIT-011
-
-When an erasure request is valid:
+The procedure is used by the erasure request workflow (04 §14.2, `lead.erase`) and by the closed-lead retention job (04 §14.1). When an erasure request is valid:
 
 1. **Live lead fields.** PII is replaced through the ORM, with a normal UPDATE audit row whose old values are redacted.
 2. **Audit history.** A controlled procedure rewrites `pii_fields` values in `audit_log.old_value` and `new_value` to `"[ERASED]"`. It is the only permitted mutation. It runs under the retention role or procedure and writes an ANONYMIZE row.
 3. **Security events.** These contain no lead PII by design (SEVT-003).
 4. **Operational rows.** Outbox and notification rows for the lead are purged.
+5. **Children.** `lead_note.body` and `lead_activity.description` / `location` are anonymized, and their audit payloads are rewritten as in step 2.
+6. **Execution.** The procedure runs from the maintenance CLI process, which is the only process allowed to lift the audit UPDATE trigger (§6.2). It is triggered by the API action through an outbox job, so the application process itself never issues DDL.
+7. **Verification.** A post-check asserts that no `pii_fields` value of the lead remains in `audit_log` for that entity and its children (12 §4.2).
 
 ## 9. Rules for future modules
 

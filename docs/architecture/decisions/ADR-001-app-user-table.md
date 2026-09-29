@@ -2,7 +2,6 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-29
-- **Decision owner:** Veda Spaces (owner approval recorded in the architecture sign-off)
 
 ## Context
 
@@ -52,3 +51,11 @@ README, 01, 02 (§3.2, §8.3), 03 (§1, §2, §3, §4.1, §11), 06 (§1), 08, 11
 
 - Adoption of a database engine where `app_user` conflicts with a reserved word
 - Introduction of database schemas or namespaces per module
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-001 |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

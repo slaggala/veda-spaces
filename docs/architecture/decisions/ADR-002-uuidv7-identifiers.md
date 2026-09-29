@@ -78,3 +78,11 @@ DATA-002, DATA-012, DATA-013, API-001, LEAD-008, LEAD-025
 
 - A need for client-generated ids (offline sync). This would require an amendment defining a trusted id-minting path.
 - Any engine change beyond SQLite and PostgreSQL
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-002 |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

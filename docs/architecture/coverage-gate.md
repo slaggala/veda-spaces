@@ -1,117 +1,114 @@
-# Coverage Gate — P0 Foundation Architecture
+# Coverage Gate — P0 Architecture after Remediation 01
 
-Generated 2026-09-29. Source: [requirements.json](requirements.json), [validation-report.json](validation-report.json).
+Generated 2026-09-29. Source: [requirements.json](requirements.json) (per-requirement classification and basis), [validation-report.json](validation-report.json).
 
-## Verdict
+## Author verdict
 
-**READY FOR INDEPENDENT ARCHITECTURE REVIEW**
+**READY FOR FOCUSED INDEPENDENT RE-REVIEW**
 
-There are no architecture blockers. The owner inputs listed below are **go-live preconditions**, not review blockers.
+This is the **author's** verdict. It is not a certification: only a fresh independent reviewer can certify the corrected architecture.
+
+Production release remains blocked by the owner inputs and release gates in 11 §7 (owner Decision 6).
 
 ## Totals
 
 | Metric | Value |
 |---|---|
-| Total requirements | 203 |
-| P0 (in scope) | 186 |
-| P1 (deferred) | 14 |
-| P2 (deferred) | 3 |
+| Total requirements | 221 (frozen: 203) |
+| P0 in scope | 208 (frozen: 186; +4 promoted, +18 new) |
+| P1 / P2 deferred | 10 / 3 |
 
-## Coverage by dimension
+## P0 classification (independent-review taxonomy)
 
-A dimension applies to a requirement only where the registry gives a reference. **Covered** means the reference resolves and the section explicitly cites the ID. **Natively cited** is how many were already cited in prose before trace annotations were added.
-
-| Dimension | Applicable | Covered | Coverage | Natively cited |
-|---|---|---|---|---|
-| Architecture | 203 | 203 | 100.0% | 145 |
-| Schema | 79 | 79 | 100.0% | 27 |
-| API | 75 | 75 | 100.0% | 16 |
-| UI | 53 | 53 | 100.0% | 22 |
-| Security | 61 | 61 | 100.0% | 40 |
-| Test strategy | 199 | 199 | 100.0% | 95 |
-
-## Uncovered P0 requirements
-
-None.
-
-## Deferred requirements (designed, not in P0)
-
-| ID | Priority | Requirement | Gaps |
-|---|---|---|---|
-| AUDIT-007 | P1 | Bulk exports are audited (who, when, filter, row count). | — |
-| AUDIT-009 | P1 | Configurable audit retention with verified archival. | — |
-| AUDIT-011 | P1 | Personal-data anonymization of audit payloads only via an audited procedure. | — |
-| AUDIT-013 | P2 | Tamper-evidence hash chain over audit_log. | — |
-| AUTH-016 | P1 | Users list and revoke their sessions; admins revoke any user's sessions. | — |
-| SEVT-007 | P1 | The daily chain head is anchored in S3 Object Lock. | — |
-| RBAC-007 | P1 | Role and permission assignments can be time-bound. | — |
-| RBAC-016 | P1 | An effective-permissions view explains every permission's source. | — |
-| LEAD-017 | P1 | Leads can be exported to CSV (permission-gated, audited). | — |
-| LEAD-021 | P1 | Quoted amount is recorded in minor units. | — |
-| LEAD-022 | P2 | Auto-assignment (round robin). | test (no verification designed) |
-| NOTE-003 | P1 | Notes can be pinned. | — |
-| ACT-005 | P1 | Call and WhatsApp buttons prompt a prefilled activity quick-log. | test (no verification designed) |
-| NOTIF-006 | P1 | Follow-up reminders and daily digest. | test (no verification designed) |
-| NOTIF-007 | P2 | WhatsApp Business API notifications. | test (no verification designed) |
-| SEC-010 | P1 | Target OWASP ASVS v4 Level 2. | — |
-| NFR-004 | P1 | Initial JS below 200 KB gzipped and LCP below 2.5 s on 4G. | — |
-
-## Assumptions (11 §10)
-
-| ID | Assumption |
-|---|---|
-| ASM-001 | The staff user base during P0 is small (tens of people), within a single-instance deployment's capacity |
-| ASM-002 | P0 write concurrency is within SQLite's single-writer capacity |
-| ASM-003 | Table growth classes in 03 §11 are qualitative guesses |
-| ASM-004 | Security-event volumes are unknown. Alert, lockout and rate-limit thresholds are initial configuration values. |
-| ASM-005 | The website's existing "Property Type" field is not sent to the public API, because ADR-005 enumerates the public fields. Staff capture property type during enrichment. |
-| ASM-006 | Retention defaults: audit 2 y online / 8 y total · security events 1 y / 2 y · closed-lead anonymization 3 y |
-| ASM-007 | NFR-001 load-test fixture sizes (100k leads, 1M audit rows) are test fixtures, not forecasts |
-| ASM-008 | Cloudflare stays in front of `api.vedaspaces.com` (proxied) |
-| ASM-009 | SES production access will be granted. Until then, the capture adapter means no outbound email outside production. |
-| ASM-010 | A host with at least 2 GB RAM is sufficient for Argon2id parameters |
-| ASM-011 | The website will publish a versioned privacy notice whose version id is sent as `consent.policy_version` |
-| ASM-012 | The AWS region is ap-south-1 (Mumbai). ADR-008 fixes AWS but not the region. |
-
-## Exceptions
-
-### Audit-contract behavioral exceptions (03 §2.9)
-
-| ID | Tables | Exception |
+| Classification | Independent baseline (186 P0) | After remediation 01 (author assessment, 208 P0) |
 |---|---|---|
-| EXC-001 | `audit_log`, `security_event_log` | Rows are immutable: never updated or soft-deleted. `updated_on = created_on`, `updated_by = created_by`, `version = 1`, `is_deleted = false` for life. |
-| EXC-002 | `audit_log`, `security_event_log` | Hard-deleted by the retention job after archival |
-| EXC-003 | `refresh_token`, `mfa_challenge` | Hard-deleted by purge after expiry, never soft-deleted |
-| EXC-004 | `outbox_event` | DONE rows hard-deleted after the configured retention |
-| EXC-005 | `notification` | Hard-deleted after the configured retention once read |
-| EXC-006 | `user_session`, `password_reset_token`, `user_mfa_recovery_code` | Never soft-deleted. The lifecycle uses `revoked_on`, `used_on` and `invalidated_on`. |
-| EXC-007 | Token-hash and chain columns (`refresh_token.token_hash`, `password_reset_token.token_hash`, `mfa_challenge.token_hash`, `user_mfa_recovery_code.code_hash`, `security_event_log.chain_seq`) | Unique index **without** the `is_deleted` predicate |
-| EXC-008 | `app_user` rows SYSTEM, WEB_INTAKE, ANONYMOUS | Cannot be soft-deleted, disabled or given credentials |
+| Fully covered | 158 | 206 |
+| Partially covered | 22 | 0 |
+| Contradictory | 4 | 0 |
+| Referenced but not substantively covered | 0 | 0 |
+| Not covered | 0 | 0 |
+| Not testable pending owner input | 2 | 2 |
+| Deferred | 0 | 0 |
 
-### Endpoints not gated by a permission code (06 §11)
+**How to read this table.**
 
-| ID | Endpoints |
-|---|---|
-| RBX-001 | `POST /auth/login`, `POST /auth/mfa/verify`, `POST /auth/mfa/enroll/*` (with `mfa_token`) |
-| RBX-002 | `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` |
-| RBX-003 | `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/invite/accept` |
-| RBX-004 | `POST /auth/password/change`, `POST /auth/mfa/step-up`, `POST /auth/mfa/recovery-codes`, `DELETE /auth/mfa/factor` |
-| RBX-005 | `POST /public/leads` |
-| RBX-006 | `GET /health/*`, `GET /auth/.well-known/jwks.json` |
+- **109** P0 requirements keep the reviewer's own *Fully covered* classification unchanged.
+- **49** were *Fully covered* at baseline but revised in remediation 01. They need re-review.
+- **26** were partial or contradictory and are now assessed *Fully covered* by the author. They need re-review.
+- **22** are new or promoted, assessed by the author. They need re-review.
 
-## Owner inputs (go-live preconditions, 11 §7)
+Nothing is marked covered because of a citation. Traces lines were removed (F-21).
 
-| ID | Input |
-|---|---|
-| OWNER-INPUT-001 | Approved RPO, RTO and API availability target |
-| OWNER-INPUT-002 | Confirmation of retention durations (audit, security events, closed-lead anonymization) |
-| OWNER-INPUT-003 | Restore-rehearsal cadence |
+## Partial → fully covered (author assessment, re-review required)
 
-## Validation checks
+AUTH-005, AUTH-006, AUTH-010, AUTH-015, AUTH-017, DATA-009, DATA-014, LEAD-018, LEAD-019, LOG-005, MFA-007, MFA-010, NOTE-002, OPS-004, RBAC-009, RBAC-011, SEC-009, SEC-011, SEVT-006, UI-011, UI-014, USER-001
 
-14 of 14 passed. Details: [validation-report.md](validation-report.md).
+## Contradictions removed
 
-## Unresolved blockers
+| Requirement | Former contradiction | Resolution |
+|---|---|---|
+| AUTH-018 | Sales persona 'configurable MFA' contradicted by the seeded matrix | Sales holds no sensitive permission; MFA optional by default (Decision 1) |
+| MFA-003 | Sales held sensitive `security_event.read` (OWN), making MFA mandatory | `security_event.read` removed from Sales, ALL-only (Decision 1) |
+| RBAC-017 | 'Every use emits SENSITIVE_ACTION' vs reads logged only in app logs | `SENSITIVE_ACTION` for mutations, de-duplicated `SENSITIVE_READ` for reads (F-06) |
+| API-007 | 04 §5.1 vs 08 §2.8 idempotency; no fingerprint | Stored request fingerprint; lookup before CAPTCHA; one behavior (F-04) |
+
+## New or promoted P0 requirements (author assessment, re-review required)
+
+AUDIT-011, AUTH-016, DATA-017, LEAD-027, LEAD-028, LEAD-029, LEAD-030, MFA-012, MFA-013, MFA-014, MFA-015, OPS-010, OPS-011, RBAC-016, RBAC-018, RBAC-019, RBAC-020, RBAC-021, SEVT-007, UI-016, UI-017, USER-007
+
+## Requirements dependent on production owner inputs
+
+| Requirement | Owner input | Classification | Effect |
+|---|---|---|---|
+| AUDIT-009 | OWNER-INPUT-002 | Deferred | Designed and testable with test configuration. Production enablement is gated. |
+| DATA-017 | OWNER-INPUT-002 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| LEAD-028 | OWNER-INPUT-002 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| MFA-015 | OWNER-INPUT-004 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| NFR-002 | OWNER-INPUT-001 | Not testable pending owner input | Untestable until provided |
+| OPS-002 | OWNER-INPUT-003 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| OPS-005 | OWNER-INPUT-001 | Not testable pending owner input | Untestable until provided |
+| OPS-009 | OWNER-INPUT-003 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| RBAC-021 | OWNER-INPUT-004 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+| SEVT-004 | OWNER-INPUT-002 | Fully covered | Designed and testable with test configuration. Production enablement is gated. |
+
+## Test-design depth (P0)
+
+| Test design | Count | Meaning |
+|---|---|---|
+| Automated (concrete 12 §4 row) | 166 | UT / IT / E2E / SL |
+| Review only (RV) | 21 | Checklist, not a test (F-19) |
+| Operational only (OP) | 19 | Drill or scheduled verification |
+| Owner-gated | 2 | Untestable until owner input |
+
+Review- or operational-only P0 requirements: API-008, API-009, AUTH-014, DATA-009, LOG-001, LOG-004, LOG-006, MFA-008, NOTIF-005, OPS-001, OPS-002, OPS-003, OPS-004, OPS-006, OPS-007, OPS-008, OPS-009, OPS-010, OPS-011, PLAT-001, PLAT-002, PLAT-003, PLAT-005, PLAT-006, PLAT-008, PLAT-011, PLAT-012, RBAC-002, SEC-001, SEC-005, SEC-006, SEC-007, SEC-008, SEC-009, SEVT-004, SEVT-007, SEVT-009, SEVT-010, UI-010, UI-014
+
+## Deferred requirements
+
+| ID | Priority | Requirement |
+|---|---|---|
+| ACT-005 | P1 | Call and WhatsApp buttons prompt a prefilled activity quick-log. |
+| AUDIT-007 | P1 | Bulk exports are audited (who, when, filter, row count). |
+| AUDIT-009 | P1 | Configurable audit retention with verified archival. |
+| AUDIT-013 | P2 | Tamper-evidence hash chain over audit_log. |
+| LEAD-017 | P1 | Leads can be exported to CSV (permission-gated, audited). |
+| LEAD-021 | P1 | Quoted amount is recorded in minor units. |
+| LEAD-022 | P2 | Auto-assignment (round robin). |
+| NFR-004 | P1 | Initial JS below 200 KB gzipped and LCP below 2.5 s on 4G. |
+| NOTE-003 | P1 | Notes can be pinned. |
+| NOTIF-006 | P1 | Follow-up reminders and daily digest. |
+| NOTIF-007 | P2 | WhatsApp Business API notifications. |
+| RBAC-007 | P1 | Time-bound grants (P1): disabled in P0 with 422; when enabled, never allowed on sensitive permissions. |
+| SEC-010 | P1 | Target OWASP ASVS v4 Level 2. |
+
+## Assumptions, exceptions and gates
+
+- **Assumptions:** 11 §10 (ASM-001…013). ASM-005 and ASM-012 are resolved by owner Decisions 4 and 5. ASM-006 is replaced by OWNER-INPUT-002.
+- **Exceptions:** audit-contract behavioral exceptions EXC-001…010 (03 §2.9). Non-permission endpoints RBX-001…006 (06 §11).
+- **Owner inputs (production gates):** OWNER-INPUT-001…004 (11 §7.2).
+- **Production release gates:** RG-1…RG-9, PG-DAST, PG-RET, PG-BG, PG-EMAIL, PG-PRIV (11 §7.3).
+- **Tracked gates:** TG-01…TG-06 (11 §11).
+
+## Unresolved blockers (architecture)
 
 None.
 

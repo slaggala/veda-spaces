@@ -1,6 +1,6 @@
 # ADR-008: AWS hosting for the backend MVP
 
-- **Status:** Accepted
+- **Status:** Accepted (amended by remediation 01)
 - **Date:** 2026-09-29
 
 ## Context
@@ -16,6 +16,11 @@ The marketing site runs on Cloudflare Pages. The backend needs independent hosti
 - **Secrets** live in SSM Parameter Store, Secrets Manager or KMS, and never in Git (PLAT-008, SEC-005).
 - **Health, readiness, structured logging, metrics and alerting** are mandatory in P0 (LOG-001…006).
 - **RPO and RTO** are owner-approved values. They are not invented by this architecture. Mechanisms are provided and measured in rehearsal (OPS-005, OWNER-INPUT-001).
+- **Region (owner Decision 5):** the initial backend region is **ap-south-1 (Mumbai)**.
+  - The region is a configuration parameter, not hard-coded, and resource ARNs come from configuration.
+  - **No infrastructure is provisioned during architecture remediation.**
+  - **No multi-region availability is claimed for P0.** Cross-region S3 replication of backups, if enabled, is for durability only. Restoring in another region is a manual rebuild whose duration is not claimed (02 §12.3).
+- **Single application process** (OPS-010, F-09): one gunicorn `gthread` worker process, so in-process limiters and caches are authoritative.
 - **PostgreSQL migration is a release gate** before procurement, inventory, finance or multi-instance scale goes live (OPS-008).
 
 ## Alternatives considered
@@ -31,7 +36,8 @@ The marketing site runs on Cloudflare Pages. The backend needs independent hosti
 
 - Brief restart windows on deploy (no zero-downtime claim).
 - Single point of failure accepted for the MVP, with rehearsed recovery.
-- The region is assumed to be ap-south-1 (Mumbai) until the owner confirms (ASM-012).
+- The region ap-south-1 (Mumbai) is approved (owner Decision 5). ASM-012 is resolved.
+- The production release gates (11 §7) include RG-1 … RG-9 from the independent review.
 
 ## Risks
 
@@ -53,3 +59,11 @@ PLAT-003, PLAT-008, OPS-002, OPS-003, OPS-004, OPS-005, OPS-006, OPS-007, OPS-00
 - Any of the PostgreSQL gate conditions
 - Sustained `SQLITE_BUSY` or latency breaches
 - Owner-approved RPO/RTO that the design can't meet
+
+## Approval record
+
+| Item | Value |
+|---|---|
+| Approver | Veda Spaces owner (repository owner) |
+| Approval | 2026-09-29, `VEDA-SPACES-P0-ARCHITECTURE-SIGNOFF-AND-FREEZE`, decision ADR-008; amended by `VEDA-SPACES-P0-ARCHITECTURE-REMEDIATION-01` Decisions 5 and 6 (ASM-012, OWNER-INPUT-001…004) |
+| Evidence | [decision-log.md](decision-log.md). A verifiable owner sign-off (owner approval of the architecture pull request) is tracked gate TG-01 before implementation (F-18). |

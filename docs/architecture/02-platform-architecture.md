@@ -1,6 +1,6 @@
 # 02 — Platform Architecture
 
-Governing decisions: [ADR-001](decisions/ADR-001-app-user-table.md) · [ADR-002](decisions/ADR-002-uuidv7-identifiers.md) · [ADR-003](decisions/ADR-003-audit-contract.md) · [ADR-004](decisions/ADR-004-security-event-log.md) · [ADR-007](decisions/ADR-007-technology-stack.md) · [ADR-008](decisions/ADR-008-aws-hosting.md) · [ADR-009](decisions/ADR-009-p0-scope.md)
+Governing decisions: [ADR-010](decisions/ADR-010-account-control-and-privileged-protection.md) · [ADR-001](decisions/ADR-001-app-user-table.md) · [ADR-002](decisions/ADR-002-uuidv7-identifiers.md) · [ADR-003](decisions/ADR-003-audit-contract.md) · [ADR-004](decisions/ADR-004-security-event-log.md) · [ADR-007](decisions/ADR-007-technology-stack.md) · [ADR-008](decisions/ADR-008-aws-hosting.md) · [ADR-009](decisions/ADR-009-p0-scope.md)
 
 ## 1. System context
 
@@ -52,8 +52,6 @@ All three share the registrable domain `vedaspaces.com`. So the refresh cookie o
 ## 2. Frontend architecture (Lit)
 
 ### 2.1 Decisions
-
-> Traces: PLAT-002
 
 | Concern | Choice | Notes |
 |---|---|---|
@@ -113,18 +111,20 @@ Any API call
 
 The existing `dist/assets/app.js` form gains progressive enhancement. The site stays static with no build step.
 
-1. On submit, the page POSTs JSON to `https://api.vedaspaces.com/api/v1/public/leads`. The body carries only the ADR-005 fields (required: name, phone, consent; optional: email, city, project type, budget range, message), plus a Turnstile token, an `Idempotency-Key` generated when the form is first touched, and attribution metadata.
-2. **2xx:** show the accessible confirmation panel (09 §4.11) with the random public reference. Nothing internal is returned (LEAD-025). Offer "Continue on WhatsApp" as an optional extra.
-3. **Network error, 5xx, or timeout (8 s):** fall back to today's `wa.me` hand-off with the same prefilled text. The enquiry is never lost.
-4. **422:** show field errors inline.
+1. On submit, the page POSTs JSON to `https://api.vedaspaces.com/api/v1/public/leads`. The body carries:
+   - only the ADR-005 fields: required name, phone and consent; optional email, city, project type, budget range, **property type** and message;
+   - a Turnstile token;
+   - an `Idempotency-Key` generated when the form is first touched, and reused on retries;
+   - attribution metadata.
+2. **201:** show the accessible confirmation panel (09 §4.11) with the random public reference. Every 201 carries a reference, including quarantined suspected-spam submissions, so no genuine sender gets a false confirmation. Nothing internal is returned (LEAD-025). Offer "Continue on WhatsApp" as an optional extra.
+3. **Field-level 422** (`VALIDATION_FAILED`, `CONSENT_REQUIRED`, `UNKNOWN_POLICY_VERSION`): show the accessible field errors. The user corrects them and resubmits with the same idempotency key.
+4. **Every other outcome** (422 `CAPTCHA_FAILED`, 428, 413, 429, any 5xx, a network error, or an 8-second timeout): show the specific message **and** prominently offer today's `wa.me` hand-off with the same prefilled text. This matches 04 §5.1 and 09 §4.11 (F-05). No path ends without either a stored lead or a WhatsApp route.
 
 `connect-src` in the site's `_headers` CSP adds `https://api.vedaspaces.com` and `https://challenges.cloudflare.com`.
 
 ## 3. Backend architecture (Flask)
 
 ### 3.1 Style: modular monolith, layered inside each module
-
-> Traces: PLAT-001
 
 ```
             HTTP
@@ -209,20 +209,18 @@ PATCH /api/v1/leads/{id}   If-Match: "4"
 | Concern | Choice |
 |---|---|
 | Runtime | Python 3.12+ |
-| WSGI server | gunicorn (sync workers; 2×CPU+1; SQLite needs WAL for concurrent readers) |
+| WSGI server | gunicorn with the **`gthread` worker class, exactly one worker process** and a configurable thread pool (initial 8 threads). Rationale (F-09, OPS-010): one process means the in-process rate limiter, idempotency store, permission cache and Argon2 semaphore are authoritative, not per worker. Argon2 and SQLite I/O release the GIL, and SQLite (WAL) has a single writer anyway. The worker and scheduler are separate processes with no request-path state. |
 | ORM / migrations | SQLAlchemy 2.x (typed ORM) · Alembic (batch mode for SQLite ALTERs) |
 | Validation / DTOs | Pydantic v2 models, used to generate the OpenAPI 3.1 document |
 | Password hashing | argon2-cffi (Argon2id) |
 | JWT | PyJWT with `cryptography` (ES256) |
 | Phone normalization | `phonenumbers` (libphonenumber port) |
-| Rate limiting | Flask-Limiter with an in-memory store (single host). Move to Redis when there are multiple hosts. |
+| Rate limiting | Flask-Limiter with its in-memory store, which is correct because there is exactly one application process (OPS-010). A deployment check fails if the worker count is not 1. It moves to Redis after the PostgreSQL gate. |
 | Logging | structlog → JSON on stdout |
 | Error tracking | Sentry SDK (PII scrubbing on) |
 | Background work | Dedicated worker process polling the outbox. Scheduler process for periodic jobs. Same codebase and image. |
 
 ## 4. API architecture (summary; detail in 08)
-
-> Traces: API-001
 
 - Resource-oriented REST under `/api/v1`. Nouns are plural and kebab-case in paths (`/lead-notes` only when top-level; notes are nested under leads).
 - JSON bodies with snake_case fields. UTC ISO-8601 timestamps with a `Z` suffix. IDs are 32-hex strings.
@@ -294,17 +292,16 @@ Three distinct records, never conflated:
 
 ### 8.3 Migration ordering (RBAC-001)
 
-> Traces: PLAT-005
-
 ```
 0001_kernel            (no tables; extensions/pragmas docs)
 0002_identity          app_user (+ seed SYSTEM, WEB_INTAKE, ANONYMOUS), user_credential   — no table named user (ADR-001)
 0003_rbac              role, permission, user_role, role_permission, user_permission (+ seed roles, permissions, matrix)
-0004_auth              user_session, refresh_token, password_reset_token, user_mfa_factor, user_mfa_recovery_code,
+0004_auth              user_session, refresh_token, user_action_token, user_mfa_factor, user_mfa_recovery_code,
                        mfa_challenge, security_event_log (+ immutability guards)
 0005_audit             audit_log (+ immutability guards)
 0006_reference         lookup_category, lookup_value (+ seed), number_sequence (+ seed)
 0007_notifications     notification, outbox_event
+0008_account_security  admin_approval_request (+ app_user proposed-email, protection_level and cooling-off columns)
 0100_crm_leads         lead, lead_note, lead_activity
 ```
 
@@ -312,14 +309,16 @@ Module migrations may depend only on platform revisions and upstream modules.
 
 ## 9. Logging and observability architecture
 
-> Traces: LOG-001, LOG-002, LOG-004, LOG-005, NFR-002, SEVT-009
-
 ```
 Flask/gunicorn/worker ─► structlog JSON ─► stdout ─► CloudWatch agent ─► CloudWatch Logs
          │                                                      └► metric filters → alarms → email/SNS
          └─► Sentry (exceptions, performance traces 10% sample, PII scrubbed)
 Cloudflare ─► analytics + WAF events (edge)
-Health: /health/live (process up) · /health/ready (DB reachable, migrations at head, outbox lag < 5 min)
+Health: /health/live (process up)
+        /health/ready  = DB reachable · migrations at head · foreign_keys=ON · immutability triggers present (A-02)
+                         → the only signal that gates deploys and traffic
+        /health/ready body also reports "degraded" signals that NEVER fail readiness (F-12):
+                         outbox lag, email-provider errors, Litestream lag — alerted separately (below)
 ```
 
 **Log line schema:** `ts, level, logger, event, request_id, session_id, user_id, method, route (templated, not raw path), status, duration_ms, ip (truncated /24), error.type, error.fingerprint`.
@@ -347,13 +346,12 @@ Health: /health/live (process up) · /health/ready (DB reachable, migrations at 
 | Outbox | Oldest PENDING above threshold, or any DEAD row |
 | Backups | Litestream lag exceeding the owner-approved RPO (OPS-005) · daily snapshot missing · restore verification failed or overdue |
 | Health | `/health/ready` failing for 2 consecutive checks |
+| Degraded | Outbox lag above threshold, or email-provider errors. These alert but never fail readiness or trigger rollback (F-12). |
 | Disk | > 80% used |
 
 ## 10. Notification architecture
 
 ### 10.1 Transactional outbox (NOTIF-003)
-
-> Traces: NOTIF-004
 
 ```
 Service (in business transaction)
@@ -372,8 +370,6 @@ Stale PROCESSING (> 5 min) reclaimed (worker crash safety). Handlers must be ide
 
 ### 10.2 Channels
 
-> Traces: NOTIF-001, NOTIF-002, NOTIF-007
-
 | Channel | P0 | Provider | Notes |
 |---|---|---|---|
 | In-app | Yes | `notification` table | Polled by the app every 60 s, plus on focus. SSE/WebSocket deferred. |
@@ -382,8 +378,6 @@ Stale PROCESSING (> 5 min) reclaimed (worker crash safety). Handlers must be ide
 | SMS | Not planned | — | Adapter slot only |
 
 ### 10.3 P0 notification catalog
-
-> Traces: NOTIF-005
 
 | Event | Recipients | Channels | Req |
 |---|---|---|---|
@@ -403,18 +397,25 @@ Recipient resolution is **permission-based** ("users holding `lead.assign`"), ne
 
 | Additional security notifications | Recipients | Channel | Req |
 |---|---|---|---|
-| `auth.mfa_reset` | Target user + holders of `user.mfa.manage` | Email | MFA-007 |
+| `auth.mfa_reset_requested` / `auth.mfa_reset_completed` | Target (verified email) + holders of `user.mfa.reset` | Email | MFA-007, MFA-015 |
+| `auth.mfa_enrollment_link` | User (verified email only) | Email | MFA-014 |
+| `auth.mfa_recovery_completed` | User (current **verified** email, never the proposed one) + holders of `user.mfa.reset` | Email | MFA-013 |
 | `auth.mfa_recovery_code_used` | User | Email | MFA-005 |
-| `auth.account_locked` | User | Email | AUTH-010 |
+| `auth.email_change_requested` | **Current verified** address (alert + cancel link) and **proposed** address (verification link) | Email | USER-007 |
+| `auth.email_change_completed` | Old and new addresses | Email | USER-007 |
+| `auth.account_throttled` | User | Email | AUTH-010 |
+| `approval.requested` / `approval.decided` | Eligible approvers + target | Email + in-app | RBAC-021 |
+| `break_glass.requested` | All ACTIVE FOUNDER-protected users + target, with a cancel link | Email | RBAC-021 |
 | `rbac.sensitive_grant` | Holders of `permission.manage` | Email | RBAC-017 |
+| `invite.accepted` | Inviter | Email + in-app | AUTH-011 |
+
+Security notifications always go to the **verified** email. The only message sent to a proposed address is its verification link.
 
 Templates are versioned files: subject, HTML, plain text. They use brand tokens (serif headline, copper accent) and are rendered by the worker with an escaping template engine.
 
 ## 11. Security architecture
 
 ### 11.1 Defense in depth
-
-> Traces: LEAD-018, OPS-007, SEC-001, SEC-006, SEC-008, SEC-011
 
 ```
 Layer 1  Edge (Cloudflare)   TLS 1.2+ (1.3 preferred) · HSTS preload · WAF managed rules · bot fight ·
@@ -430,8 +431,6 @@ Layer 6  Recovery            Litestream PITR · daily snapshots · automated res
 ```
 
 ### 11.2 Headers
-
-> Traces: SEC-001, SEC-003
 
 | Surface | Headers |
 |---|---|
@@ -453,8 +452,6 @@ Layer 6  Recovery            Litestream PITR · daily snapshots · automated res
 
 ### 11.4 Secrets (SEC-005)
 
-> Traces: MFA-010, PLAT-008
-
 | Secret | Store | Rotation |
 |---|---|---|
 | JWT signing keys (ES256; `kid` header, current + previous) | SSM SecureString | 90 days; the previous key stays valid for 1 day |
@@ -463,7 +460,10 @@ Layer 6  Recovery            Litestream PITR · daily snapshots · automated res
 | Sentry DSN | SSM | n/a |
 | Litestream S3 access | IAM instance role | n/a |
 | MFA secret encryption key | AWS KMS customer-managed key; the app role may only Encrypt/Decrypt/GenerateDataKey | Annual automatic KMS rotation |
-| HMAC keys (recovery codes, email-attempt hashes) | SSM SecureString | On compromise, with a documented re-hash procedure |
+| HMAC keys (recovery codes, email-attempt hashes) | SSM SecureString | On compromise. Recovery codes are re-issued, because a keyed hash can't be migrated. |
+| Security-log chain key (`chain_key_label`, 05 §9.6) | SSM SecureString, loaded at process start, never written to disk or logs | Annually or on compromise. A new `chain_key_label` starts a new segment; old keys stay retained for verification. |
+| Anchor bucket writer | Dedicated IAM role with `s3:PutObject` only on the Object Lock (compliance) anchor bucket. The application role cannot delete or overwrite. | n/a |
+| Break-glass custodians | Two named IAM principals in the `veda-breakglass` group, AWS MFA required (06 §7.5). Designation is OWNER-INPUT-004. | On personnel change |
 
 ### 11.5 Data classification
 
@@ -486,22 +486,19 @@ Layer 6  Recovery            Litestream PITR · daily snapshots · automated res
 
 ### 12.2 Production host (P0)
 
-> Traces: PLAT-003
-
 | Item | Choice |
 |---|---|
+| Region | **ap-south-1 (Mumbai)**, approved by the owner (Decision 5, ADR-008). The region is a deployment parameter, not hard-coded, and every AWS resource name and ARN comes from configuration. **No multi-region availability is claimed for P0.** |
 | Host | One EC2 instance (Graviton, e.g. t4g.small) in ap-south-1, or an equivalent Lightsail instance |
 | Deploy unit | Container image built by CI, pushed to ECR, pulled and restarted by a deploy script over SSM |
-| Processes | `api` (gunicorn), `worker` (outbox), `scheduler` (periodic jobs), `litestream` (replicate) — managed by systemd or docker compose |
+| Processes | `api` (gunicorn, **one** gthread worker process), `worker` (outbox), `scheduler` (periodic jobs), `litestream` (exactly one replicator), all managed by systemd or docker compose. The maintenance CLI (purge, archival, break-glass) runs as a separate short-lived process (A-02). |
 | Disk | **Dedicated** encrypted EBS gp3 volume (KMS), mounted at `/var/lib/veda`, `DeleteOnTermination=false`, daily EBS snapshots. The database file never lives in the container's writable layer. The container mounts the volume (OPS-007). |
 | Instance count | **Exactly one** active app instance. No autoscaling group larger than one and no load-balanced replicas while SQLite is authoritative (OPS-006). Deploys incur a brief restart window, and zero-downtime deploys are not claimed. |
-| Deploy sequence | Pull image → run `alembic upgrade head` (after Litestream confirms a fresh snapshot) → restart api/worker → `/health/ready` check → rollback to the previous image on failure |
+| Deploy sequence | The single runbook in §12.4 (F-12) |
 
 **Why not ECS Fargate, App Runner or Lambda now:** they have no durable local disk, and SQLite on EFS/NFS is unsafe for locking. After the PostgreSQL release gate, the API holds no local state and can move to ECS Fargate or App Runner with no code changes.
 
 ### 12.3 Backup, restore verification and recovery objectives (ADR-008)
-
-> Traces: OPS-002, SEC-008
 
 | Item | Design |
 |---|---|
@@ -509,11 +506,27 @@ Layer 6  Recovery            Litestream PITR · daily snapshots · automated res
 | Snapshots | Nightly `VACUUM INTO` snapshot to a separate S3 prefix with Object Lock, plus daily EBS snapshots |
 | Restore verification (OPS-009) | An automated scheduled job restores the latest replica to a scratch instance. It runs `PRAGMA integrity_check` and `foreign_key_check`, compares per-table row counts with production, and runs a read-only smoke test. It publishes a metric and alerts on failure. |
 | RPO / RTO (OPS-005) | **Owner-approved values required.** They are not set by this architecture (OWNER-INPUT-001 in the coverage gate). The mechanisms above give an RPO bounded by the Litestream sync interval and alerting lag. RTO is bounded by the rehearsed rebuild runbook. Both are measured in the first restore rehearsal and reported to the owner for approval. |
-| Rehearsal | A full rebuild and restore rehearsal before go-live, then at a cadence the owner sets |
+| Rehearsal | A full rebuild and restore rehearsal before go-live, then at a cadence the owner sets (OWNER-INPUT-003) |
+| Region and DR implications (Decision 5) | Primary data and backups are in ap-south-1. The Litestream replica bucket may be replicated cross-region (S3 CRR) for **backup durability only**. That is not a standby deployment: restoring in another region would be a manual rebuild using the §12.4 runbook, with configuration pointing at the replica. The achievable recovery time for a regional outage is **not** claimed. It is measured only if the owner commissions a cross-region rehearsal. |
+| Litestream constraints (A-11) | Exactly one Litestream process per database. The application never runs `PRAGMA wal_checkpoint(TRUNCATE)` or `RESTART` (Litestream manages checkpoints), and `wal_autocheckpoint` is left at the value Litestream expects. The Litestream version is pinned in the image, and restore tooling uses the same version. Replication lag and snapshot age are exported as metrics and alerted (§9). The restore-verification job (OPS-009) proves each replica generation restorable. |
 
-### 12.4 CI/CD
+### 12.4 Deploy and migration runbook (OPS-004, F-12)
 
-> Traces: OPS-001, SEC-007
+This is the single procedure. 11 §2 B3 refers to it.
+
+| Step | Action |
+|---|---|
+| Migration policy | All P0+ migrations are **expand-only and compatible with release N-1**: add tables, add nullable columns, add indexes, widen CHECKs. Contract steps (drops, NOT NULL tightening, renames) ship in a later release, after the N-1 compatibility window. No down-migrations are relied on. |
+| 1. Pre-flight | CI green, including the migration upgrade-with-data test (12 §4.1). Litestream lag within the alert threshold. |
+| 2. Snapshot | Force a Litestream snapshot and record its generation id. Take an EBS snapshot. |
+| 3. Quiesce | Pause the outbox worker and scheduler. Keep the API serving. |
+| 4. Migrate | `alembic upgrade head` (expand-only, so it is safe while N-1 code serves) |
+| 5. Deploy | Restart the API on the new image. `/health/ready` must pass. |
+| 6. Resume | Resume the worker and scheduler. |
+| **Rollback, normal** | Redeploy the N-1 image. The schema stays migrated, which is compatible by policy. No data is lost. |
+| **Rollback, disaster** (a migration corrupted data) | Enable maintenance mode: the API returns 503, and the website falls back to WhatsApp. Restore the step-2 snapshot and redeploy N-1. **Data written after step 2 is lost**, and the exact window is reported from `audit_log.performed_on` and security events. Operators re-enter WhatsApp enquiries received during maintenance. |
+
+### 12.5 CI/CD
 
 ```
 PR → lint (ruff, mypy) · schema-lint (DATA-011) · unit · integration[SQLite] · integration[PostgreSQL]
