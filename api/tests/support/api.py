@@ -32,9 +32,19 @@ class ApiClient:
         self.client = client
         self.token: str | None = None
 
-    def call(self, method: str, path: str, json: Any = None, *, token: str | None = None, if_match: int | None = None,
-             headers: dict | None = None, anonymous: bool = False, raw_body: bytes | None = None,
-             content_type: str = "application/json") -> Resp:
+    def call(
+        self,
+        method: str,
+        path: str,
+        json: Any = None,
+        *,
+        token: str | None = None,
+        if_match: int | None = None,
+        headers: dict | None = None,
+        anonymous: bool = False,
+        raw_body: bytes | None = None,
+        content_type: str = "application/json",
+    ) -> Resp:
         hdrs = dict(headers or {})
         bearer = None if anonymous else (token or self.token)
         if bearer:

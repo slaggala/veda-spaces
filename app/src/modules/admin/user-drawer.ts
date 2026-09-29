@@ -28,7 +28,7 @@ export class VsUserDrawer extends SessionElement {
   static override properties = {
     userId: { attribute: false }, roles: { attribute: false }, user: { state: true }, tab: { state: true }, problem: { state: true },
     userRoles: { state: true }, grants: { state: true }, effective: { state: true }, catalog: { state: true }, action: { state: true }, busy: { state: true },
-    statusTarget: { state: true }, actionProblem: { state: true },
+    statusTarget: { state: true }, mfaRequireTarget: { state: true }, actionProblem: { state: true },
   };
   declare userId: string | null;
   declare roles: Role[];
@@ -42,6 +42,7 @@ export class VsUserDrawer extends SessionElement {
   declare action: Action;
   declare busy: boolean;
   declare statusTarget: 'ACTIVE' | 'DISABLED';
+  declare mfaRequireTarget: boolean;
   declare actionProblem: ApiProblem | null;
   static override styles = [...shared, tableStyles, css`dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 12px; margin: 0; } dt { color: var(--vs-ink-muted); } dd { margin: 0; } section { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--vs-line); } .locked { color: var(--vs-ink-muted); font-size: 12px; }`];
 
@@ -59,6 +60,7 @@ export class VsUserDrawer extends SessionElement {
     this.action = '';
     this.busy = false;
     this.statusTarget = 'DISABLED';
+    this.mfaRequireTarget = false;
     this.actionProblem = null;
   }
 
@@ -261,7 +263,10 @@ export class VsUserDrawer extends SessionElement {
       </section>
       <section><h3 class="eyebrow">Two-step verification</h3><p>${MFA_LABEL(u.mfa)}</p>
         ${this.can('user.mfa.require') ? html`<label class="check"><input type="checkbox" .checked=${u.mfa.required} ?disabled=${disabled}
-          @change=${(e: Event) => { const on = (e.target as HTMLInputElement).checked; const reason = prompt('Reason for changing the MFA requirement'); if (!reason) { (e.target as HTMLInputElement).checked = !on; return; } void this.run('MFA requirement updated', () => api.put(`/api/v1/users/${u.id}/mfa-requirement`, { mfa_required: on, reason }, { ifMatch: u.version })); }} /> Require MFA for this user</label>` : nothing}
+          @change=${(e: Event) => { this.mfaRequireTarget = (e.target as HTMLInputElement).checked; (e.target as HTMLInputElement).checked = u.mfa.required; this.action = 'mfa-require'; }} /> Require MFA for this user</label>` : nothing}
+        ${this.action === 'mfa-require' ? html`<div class="card stack"><p>${this.mfaRequireTarget ? 'Require two-step verification for this user.' : 'Stop requiring two-step verification for this user.'}</p>${reasonField('mfa_require_reason')}
+          <div class="row"><span class="spacer"></span><button class="btn" @click=${() => (this.action = '')}>Cancel</button>
+            <button class="btn primary" ?disabled=${this.busy} @click=${() => this.run('MFA requirement updated', () => api.put(`/api/v1/users/${u.id}/mfa-requirement`, { mfa_required: this.mfaRequireTarget, reason: this.formValue('mfa_require_reason') }, { ifMatch: u.version }))}>Save</button></div></div>` : nothing}
         ${this.can('user.mfa.reset') ? html`<div><button class="btn small" ?disabled=${disabled || !u.mfa.enrolled} @click=${() => (this.action = 'mfa-reset')}>Reset MFA…</button></div>` : nothing}
         ${this.action === 'mfa-reset' ? html`<div class="card stack">
           <p><strong>Verify identity first.</strong> Confirm who you are speaking to by video call or in person before resetting.</p>

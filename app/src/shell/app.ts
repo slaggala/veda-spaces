@@ -10,8 +10,9 @@ import { lookupsContext, sessionContext } from '../core/authz/context.js';
 import { filterNav, has, NAV_ITEMS, type NavItem } from '../core/authz/permissions.js';
 import { formatAbsolute, initials } from '../core/format/format.js';
 import { t } from '../core/i18n/strings.js';
-import { buildRoutes, metaForPath } from '../core/router/routes.js';
+import { buildRoutes, metaForPath, titleForPath } from '../core/router/routes.js';
 import { navigate } from '../core/router/next.js';
+import { ensureToaster } from '../design-system/components.js';
 import { icon } from '../design-system/icons.js';
 import { shared } from '../design-system/styles.js';
 import './command-palette.js';
@@ -25,8 +26,12 @@ import './step-up-dialog.js';
  * restricted shell with only "Set up new authenticator" and "Sign out" (09 §4.10).
  */
 export class VsApp extends LitElement {
-  static override properties = { pathname: { state: true }, menuOpen: { state: true }, approvalsPending: { state: true } };
+  static override properties = {
+    pathname: { state: true }, menuOpen: { state: true }, approvalsPending: { state: true }, announced: { state: true },
+  };
   declare pathname: string;
+  declare announced: string;
+  private navigations = 0;
   declare menuOpen: boolean;
   declare approvalsPending: number;
   private sessionProvider = new ContextProvider(this, { context: sessionContext, initialValue: session.state });
@@ -82,6 +87,8 @@ export class VsApp extends LitElement {
     this.pathname = window.location.pathname;
     this.menuOpen = false;
     this.approvalsPending = 0;
+    this.announced = '';
+    ensureToaster();
     api.hooks.onStepUp = (problem) => requestStepUp(problem);
     session.addEventListener('change', () => this.onSessionChange());
     session.addEventListener('session-lost', () => {
@@ -91,7 +98,28 @@ export class VsApp extends LitElement {
     window.addEventListener('vaadin-router-location-changed', (e) => {
       this.pathname = e.detail.location.pathname;
       this.menuOpen = false;
+      this.onNavigated(this.navigations++ === 0);
     });
+  }
+
+  /** WCAG 2.4.2 and AX-01 (IR-19): every route has its own title; after an in-app navigation focus moves to the
+   *  page heading (or the main region) and the new page is announced. The first load keeps the browser's focus. */
+  private onNavigated(first: boolean) {
+    const title = titleForPath(this.pathname);
+    document.title = title;
+    this.announced = title.split(' · ')[0];
+    if (first) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const outlet = this.renderRoot.querySelector<HTMLElement>('#outlet');
+      const page = outlet?.firstElementChild as HTMLElement | null;
+      const heading = (page?.shadowRoot ?? page)?.querySelector<HTMLElement>('h1');
+      if (heading) {
+        if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: false });
+      } else {
+        outlet?.focus();
+      }
+    }));
   }
 
   private onSessionChange() {
@@ -169,10 +197,14 @@ export class VsApp extends LitElement {
                 <span class="spacer"></span>
                 <vs-notifications-tray></vs-notifications-tray>
                 <div class="menu">
-                  <button class="menu-btn" aria-haspopup="true" aria-expanded=${this.menuOpen ? 'true' : 'false'} aria-label="Account menu"
+                  <button class="menu-btn" aria-controls="account-menu" aria-expanded=${this.menuOpen ? 'true' : 'false'} aria-label="Account menu"
                     @click=${() => (this.menuOpen = !this.menuOpen)}><span class="avatar" aria-hidden="true">${initials(me?.display_name || me?.full_name)}</span></button>
                   ${this.menuOpen
-                    ? html`<div class="menu-panel" @keydown=${(e: KeyboardEvent) => e.key === 'Escape' && (this.menuOpen = false)}>
+                    ? html`<div class="menu-panel" id="account-menu" @keydown=${(e: KeyboardEvent) => {
+                        if (e.key !== 'Escape') return;
+                        this.menuOpen = false;
+                        (this.renderRoot.querySelector('.menu-btn') as HTMLElement | null)?.focus();
+                      }}>
                         <span class="small muted">${me?.full_name}</span>
                         <a href="/profile">${icon('settings')} Profile</a>
                         <button @click=${async () => { await session.logout(); navigate('/login'); }}>${icon('logout')} Sign out</button>
@@ -192,7 +224,7 @@ export class VsApp extends LitElement {
           <vs-command-palette .perms=${me?.permissions ?? {}}></vs-command-palette>`
         : nothing}
       <vs-step-up-dialog></vs-step-up-dialog>
-      <span class="sr-only" aria-live="polite">${session.state.status === 'loading' ? t('app.name') : ''}</span>
+      <span class="sr-only" aria-live="polite">${session.state.status === 'loading' ? t('app.name') : this.announced}</span>
     `;
   }
 }

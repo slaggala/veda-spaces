@@ -34,37 +34,75 @@ def _with_cookie(data: dict, status: int = 200) -> Result:
 
 # --- login / session -------------------------------------------------------------------
 
+
 class LoginIn(Closed):
     email: Annotated[str, text(254, min_len=1)]
     password: Annotated[str, Field(min_length=1, max_length=1024)]
     turnstile_token: Annotated[str | None, Field(default=None, max_length=2048)] = None
 
 
-@api.route("POST", "/login", rbx="RBX-001", auth="public", body=LoginIn, requirement="AUTH-001",
-           limits=["10 per minute", ("5 per minute", body_email_key)], summary="Sign in with email and password")
+def _login_prepare(req: Req) -> dict:
+    """Turnstile siteverify for a CAPTCHA-gated sign-in runs before the write lock is taken (IR-02)."""
+    return {"captcha_verified": service.verify_login_captcha(req.body.turnstile_token)}
+
+
+@api.route(
+    "POST",
+    "/login",
+    rbx="RBX-001",
+    auth="public",
+    body=LoginIn,
+    requirement="AUTH-001",
+    prepare=_login_prepare,
+    limits=["10 per minute", ("5 per minute", body_email_key)],
+    summary="Sign in with email and password",
+)
 def login(req: Req):
-    return _with_cookie(service.login(req.session, req.body.email, req.body.password, req.body.turnstile_token))
+    return _with_cookie(
+        service.login(
+            req.session,
+            req.body.email,
+            req.body.password,
+            req.body.turnstile_token,
+            captcha_verified=req.prepared["captcha_verified"],
+        )
+    )
 
 
 @api.route("POST", "/refresh", rbx="RBX-002", auth="public", requirement="AUTH-005", summary="Rotate the refresh token")
 def refresh(req: Req):
-    service.check_csrf(req.headers)
+    try:
+        service.check_csrf(req.headers)
+    except ApiError:
+        security_events.defer("TOKEN_REFRESH", "FAILURE", failure_reason="POLICY", detail={"reason": "CSRF_REJECTED"})
+        raise
     raw = req.cookies.get(settings().cookie_name)
     try:
         return _with_cookie(service.refresh(req.session, raw))
     except ApiError as err:
         if err.code == "SESSION_INVALID":
-            err.headers["Set-Cookie"] = (f"{settings().cookie_name}=; Path=/api/v1/auth; Max-Age=0; HttpOnly; "
-                                         f"SameSite=Strict{'; Secure' if settings().cookie_secure else ''}")
+            err.headers["Set-Cookie"] = (
+                f"{settings().cookie_name}=; Path=/api/v1/auth; Max-Age=0; HttpOnly; "
+                f"SameSite=Strict{'; Secure' if settings().cookie_secure else ''}"
+            )
         raise
 
 
-@api.route("POST", "/logout", rbx="RBX-002", recovery_allowed=True, pwd_change_allowed=True, requirement="AUTH-007",
-           summary="Revoke the current session")
+@api.route(
+    "POST",
+    "/logout",
+    rbx="RBX-002",
+    recovery_allowed=True,
+    pwd_change_allowed=True,
+    requirement="AUTH-007",
+    summary="Revoke the current session",
+)
 def logout(req: Req):
     service.check_csrf(req.headers)
     service.revoke_session(req.session, req.ctx.session, "LOGOUT", event=False)
-    security_events.record(req.session, "LOGOUT", "SUCCESS", subject_user_id=req.ctx.user.id, detail={"scope": "current"})
+    security_events.record(
+        req.session, "LOGOUT", "SUCCESS", subject_user_id=req.ctx.user.id, detail={"scope": "current"}
+    )
     result = no_content()
     result.delete_cookies.append(service.clear_cookie())
     return result
@@ -89,17 +127,35 @@ def jwks_route(req: Req):
 
 # --- profile -------------------------------------------------------------------------------
 
-@api.route("GET", "/me", permission="profile.read", recovery_allowed=True, pwd_change_allowed=True, write=False,
-           requirement="USER-004", summary="Own profile, effective permissions and MFA state")
+
+@api.route(
+    "GET",
+    "/me",
+    permission="profile.read",
+    recovery_allowed=True,
+    pwd_change_allowed=True,
+    write=False,
+    requirement="USER-004",
+    summary="Own profile, effective permissions and MFA state",
+)
 def me(req: Req):
     return ok(identity.me_payload(req.session, req.ctx))
 
 
 class ProfilePatch(Closed):
-    __not_updatable__ = frozenset({
-        "email", "proposed_email", "password", "status", "roles", "permissions", "mfa_required", "protection_level",
-        "is_founder",
-    })
+    __not_updatable__ = frozenset(
+        {
+            "email",
+            "proposed_email",
+            "password",
+            "status",
+            "roles",
+            "permissions",
+            "mfa_required",
+            "protection_level",
+            "is_founder",
+        }
+    )
     full_name: Annotated[str | None, text(150, min_len=1)] = None
     display_name: Annotated[str | None, optional_text(80)] = None
     phone: Annotated[str | None, optional_text(30)] = None
@@ -107,8 +163,15 @@ class ProfilePatch(Closed):
     locale: Annotated[str | None, text(10, min_len=2)] = None
 
 
-@api.route("PATCH", "/me", permission="profile.update", body=ProfilePatch, if_match=True, requirement="USER-004",
-           summary="Edit own profile fields only")
+@api.route(
+    "PATCH",
+    "/me",
+    permission="profile.update",
+    body=ProfilePatch,
+    if_match=True,
+    requirement="USER-004",
+    summary="Edit own profile fields only",
+)
 def patch_me(req: Req):
     req.require_version(req.ctx.user.version)
     identity.apply_profile(req.session, req.ctx.user, req.body)
@@ -120,13 +183,22 @@ class EmailChangeIn(Closed):
     new_email: Email
 
 
-@api.route("PUT", "/me/email", rbx="RBX-004", body=EmailChangeIn, status=202, requirement="USER-007",
-           summary="Start the proposed-email workflow for yourself")
+@api.route(
+    "PUT",
+    "/me/email",
+    rbx="RBX-004",
+    body=EmailChangeIn,
+    status=202,
+    requirement="USER-007",
+    summary="Start the proposed-email workflow for yourself",
+)
 def change_own_email(req: Req):
     require_not_cooling_off(req.ctx.user)
     require_step_up(req.ctx, allow_password=True)
-    return ok(service.start_email_change(req.session, req.ctx.user, req.body.new_email, requested_by=req.ctx.user.id),
-              status=202)
+    return ok(
+        service.start_email_change(req.session, req.ctx.user, req.body.new_email, requested_by=req.ctx.user.id),
+        status=202,
+    )
 
 
 class TokenIn(Closed):
@@ -147,12 +219,22 @@ def cancel_email(req: Req):
 
 # --- passwords -------------------------------------------------------------------------------
 
+
 class ForgotIn(Closed):
     email: Email
 
 
-@api.route("POST", "/password/forgot", rbx="RBX-003", auth="public", body=ForgotIn, status=202, requirement="AUTH-008",
-           limits=["5 per minute", ("3 per hour", body_email_key)], max_body=PUBLIC_MAX_BODY)
+@api.route(
+    "POST",
+    "/password/forgot",
+    rbx="RBX-003",
+    auth="public",
+    body=ForgotIn,
+    status=202,
+    requirement="AUTH-008",
+    limits=["5 per minute", ("3 per hour", body_email_key)],
+    max_body=PUBLIC_MAX_BODY,
+)
 def forgot(req: Req):
     service.forgot_password(req.session, req.body.email)
     return ok({"message": "If an account exists, we've emailed a reset link."}, status=202)
@@ -163,8 +245,15 @@ class ResetIn(Closed):
     new_password: Annotated[str, Field(min_length=1, max_length=1024)]
 
 
-@api.route("POST", "/password/reset", rbx="RBX-003", auth="public", body=ResetIn, requirement="AUTH-008",
-           limits=["5 per minute"])
+@api.route(
+    "POST",
+    "/password/reset",
+    rbx="RBX-003",
+    auth="public",
+    body=ResetIn,
+    requirement="AUTH-008",
+    limits=["5 per minute"],
+)
 def reset(req: Req):
     service.reset_password(req.session, req.body.token, req.body.new_password)
     return no_content()
@@ -189,8 +278,15 @@ class AcceptInviteIn(Closed):
     full_name: Annotated[str | None, optional_text(150)] = None
 
 
-@api.route("POST", "/invite/accept", rbx="RBX-003", auth="public", body=AcceptInviteIn, requirement="AUTH-011",
-           limits=["10 per minute"])
+@api.route(
+    "POST",
+    "/invite/accept",
+    rbx="RBX-003",
+    auth="public",
+    body=AcceptInviteIn,
+    requirement="AUTH-011",
+    limits=["10 per minute"],
+)
 def accept_invite(req: Req):
     outcome = service.accept_invite(req.session, req.body.token, req.body.new_password, req.body.full_name)
     return no_content() if outcome is None else ok(outcome)
@@ -208,6 +304,7 @@ def reauth(req: Req):
 
 # --- own sessions ----------------------------------------------------------------------------
 
+
 class SessionsQuery(Query):
     cursor: str | None = None
     limit: int | None = None
@@ -215,16 +312,32 @@ class SessionsQuery(Query):
 
 @api.route("GET", "/sessions", permission="session.read", query=SessionsQuery, write=False, requirement="AUTH-016")
 def sessions(req: Req):
-    rows = req.session.execute(
-        sa.select(UserSession).where(UserSession.user_id == req.ctx.user.id, UserSession.revoked_on.is_(None),
-                                     UserSession.absolute_expires_on > clock.now())
-        .order_by(UserSession.last_seen_on.desc(), UserSession.id.desc())
-    ).scalars().all()
-    data = [{
-        "id": r.id, "device_label": r.device_label, "session_type": r.session_type, "ip_address": mask_ip(r.ip_address),
-        "ip_city": None, "started_on": clock.to_rfc3339(r.started_on), "last_seen_on": clock.to_rfc3339(r.last_seen_on),
-        "current": r.id == req.ctx.session.id,
-    } for r in rows]
+    rows = (
+        req.session.execute(
+            sa.select(UserSession)
+            .where(
+                UserSession.user_id == req.ctx.user.id,
+                UserSession.revoked_on.is_(None),
+                UserSession.absolute_expires_on > clock.now(),
+            )
+            .order_by(UserSession.last_seen_on.desc(), UserSession.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+    data = [
+        {
+            "id": r.id,
+            "device_label": r.device_label,
+            "session_type": r.session_type,
+            "ip_address": mask_ip(r.ip_address),
+            "ip_city": None,
+            "started_on": clock.to_rfc3339(r.started_on),
+            "last_seen_on": clock.to_rfc3339(r.last_seen_on),
+            "current": r.id == req.ctx.session.id,
+        }
+        for r in rows
+    ]
     return ok(data, meta={"limit": 50, "next_cursor": None, "has_more": False})
 
 
@@ -239,13 +352,21 @@ def revoke_own_session(req: Req, session_id: str):
 
 # --- MFA -----------------------------------------------------------------------------------------
 
+
 class MfaVerifyIn(Closed):
     mfa_token: Annotated[str, Field(min_length=1, max_length=200)]
     code: Annotated[str, Field(min_length=1, max_length=12)]
 
 
-@api.route("POST", "/mfa/verify", rbx="RBX-001", auth="public", body=MfaVerifyIn, requirement="MFA-001",
-           limits=["10 per minute"])
+@api.route(
+    "POST",
+    "/mfa/verify",
+    rbx="RBX-001",
+    auth="public",
+    body=MfaVerifyIn,
+    requirement="MFA-001",
+    limits=["10 per minute"],
+)
 def mfa_verify(req: Req):
     return _with_cookie(mfa.verify_login(req.session, req.body.mfa_token, req.body.code))
 
@@ -256,8 +377,15 @@ class MfaRecoveryIn(Closed):
     recovery_code: Annotated[str, Field(min_length=1, max_length=32)]
 
 
-@api.route("POST", "/mfa/recovery", rbx="RBX-001", auth="public", body=MfaRecoveryIn, requirement="MFA-013",
-           limits=["10 per minute"])
+@api.route(
+    "POST",
+    "/mfa/recovery",
+    rbx="RBX-001",
+    auth="public",
+    body=MfaRecoveryIn,
+    requirement="MFA-013",
+    limits=["10 per minute"],
+)
 def mfa_recovery(req: Req):
     result = ok(mfa.recover(req.session, req.body.mfa_token, req.body.password, req.body.recovery_code))
     result.headers["Cache-Control"] = "no-store"
@@ -272,8 +400,16 @@ class EnrollStartIn(Closed):
     password: Annotated[str | None, Field(default=None, max_length=1024)] = None
 
 
-@api.route("POST", "/mfa/enroll/start", rbx="RBX-004", auth="optional", body=EnrollStartIn, recovery_allowed=True,
-           requirement="MFA-014", limits=["10 per minute"])
+@api.route(
+    "POST",
+    "/mfa/enroll/start",
+    rbx="RBX-004",
+    auth="optional",
+    body=EnrollStartIn,
+    recovery_allowed=True,
+    requirement="MFA-014",
+    limits=["10 per minute"],
+)
 def enroll_start(req: Req):
     result = ok(mfa.enroll_start(req.session, req.ctx, req.body))
     result.headers["Cache-Control"] = "no-store"
@@ -286,10 +422,20 @@ class EnrollConfirmIn(Closed):
     label: Annotated[str | None, optional_text(100)] = None
 
 
-@api.route("POST", "/mfa/enroll/confirm", rbx="RBX-004", auth="optional", body=EnrollConfirmIn, recovery_allowed=True,
-           requirement="MFA-014", limits=["10 per minute"])
+@api.route(
+    "POST",
+    "/mfa/enroll/confirm",
+    rbx="RBX-004",
+    auth="optional",
+    body=EnrollConfirmIn,
+    recovery_allowed=True,
+    requirement="MFA-014",
+    limits=["10 per minute"],
+)
 def enroll_confirm(req: Req):
-    return _with_cookie(mfa.enroll_confirm(req.session, req.ctx, req.body.challenge_token, req.body.code, req.body.label))
+    return _with_cookie(
+        mfa.enroll_confirm(req.session, req.ctx, req.body.challenge_token, req.body.code, req.body.label)
+    )
 
 
 @api.route("POST", "/mfa/step-up", rbx="RBX-004", body=MfaVerifyIn, requirement="MFA-011", limits=["10 per minute"])

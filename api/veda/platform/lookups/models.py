@@ -25,7 +25,9 @@ class LookupCategory(AuditedBase):
 class LookupValue(AuditedBase):
     __tablename__ = "lookup_value"
 
-    category_id: Mapped[str] = mapped_column(GUID(), ForeignKey("lookup_category.id", ondelete="RESTRICT"), nullable=False)
+    category_id: Mapped[str] = mapped_column(
+        GUID(), ForeignKey("lookup_category.id", ondelete="RESTRICT"), nullable=False
+    )
     code: Mapped[str] = mapped_column(sa.String(50), nullable=False)
     label: Mapped[str] = mapped_column(sa.String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(sa.String(500))

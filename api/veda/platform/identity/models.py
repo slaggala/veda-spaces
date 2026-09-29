@@ -28,15 +28,21 @@ class User(AuditedBase):
     user_type: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="HUMAN", server_default="HUMAN")
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="INVITED", server_default="INVITED")
     status_changed_on: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
-    timezone: Mapped[str] = mapped_column(sa.String(40), nullable=False, default="Asia/Kolkata", server_default="Asia/Kolkata")
+    timezone: Mapped[str] = mapped_column(
+        sa.String(40), nullable=False, default="Asia/Kolkata", server_default="Asia/Kolkata"
+    )
     locale: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="en-IN", server_default="en-IN")
     email_verified_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # Added by 0008_account_security (05 §8.6, 06 §7.2, 05 §11.5)
     proposed_email: Mapped[str | None] = mapped_column(sa.String(254))
     proposed_email_normalized: Mapped[str | None] = mapped_column(sa.String(254))
     proposed_email_requested_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
-    proposed_email_requested_by: Mapped[str | None] = mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"))
-    protection_level: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="STANDARD", server_default="STANDARD")
+    proposed_email_requested_by: Mapped[str | None] = mapped_column(
+        GUID(), ForeignKey("app_user.id", ondelete="RESTRICT")
+    )
+    protection_level: Mapped[str] = mapped_column(
+        sa.String(10), nullable=False, default="STANDARD", server_default="STANDARD"
+    )
     mfa_required: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     security_cooling_off_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
     authz_version: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=1, server_default=sa.text("1"))
@@ -47,7 +53,9 @@ class User(AuditedBase):
         in_check("app_user", "user_type", USER_TYPES),
         in_check("app_user", "protection_level", PROTECTION_LEVELS),
         CheckConstraint("email_normalized = lower(email_normalized)", name="ck_app_user__email_normalized_lower"),
-        CheckConstraint("(proposed_email IS NULL) = (proposed_email_normalized IS NULL)", name="ck_app_user__proposed_email_pair"),
+        CheckConstraint(
+            "(proposed_email IS NULL) = (proposed_email_normalized IS NULL)", name="ck_app_user__proposed_email_pair"
+        ),
         CheckConstraint(
             "proposed_email_normalized IS NULL OR proposed_email_normalized <> email_normalized",
             name="ck_app_user__proposed_email_differs",
@@ -57,9 +65,13 @@ class User(AuditedBase):
         Index("ix_app_user__status", "status", **live_where()),
         Index("ix_app_user__full_name", "full_name"),
         Index(
-            "ux_app_user__proposed_email", "proposed_email_normalized", unique=True,
-            **where("proposed_email_normalized IS NOT NULL AND is_deleted = 0",
-                    "proposed_email_normalized IS NOT NULL AND is_deleted = false"),
+            "ux_app_user__proposed_email",
+            "proposed_email_normalized",
+            unique=True,
+            **where(
+                "proposed_email_normalized IS NOT NULL AND is_deleted = 0",
+                "proposed_email_normalized IS NOT NULL AND is_deleted = false",
+            ),
         ),
     )
 

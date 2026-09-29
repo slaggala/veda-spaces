@@ -75,3 +75,14 @@ describe('route guard', () => {
     expect(evaluateGuard({ access: 'auth', passwordChange: true }, { ...ctx, path: '/change-password' })).to.equal(null);
   });
 });
+
+describe('route titles (WCAG 2.4.2, IR-19)', () => {
+  it('gives every route its own document title', async () => {
+    const { ROUTES, titleForPath } = await import('../src/core/router/routes.js');
+    const titles = new Set(ROUTES.map((r) => titleForPath(r.path.replace(':id', '0190a0b1c2d37e8f9a0b1c2d3e4f5a6b'))));
+    expect(titles.size).to.equal(ROUTES.length);
+    expect(titleForPath('/leads')).to.equal('Leads · Veda Workspace');
+    expect(titleForPath('/approvals/cancel')).to.equal('Cancel break-glass request · Veda Workspace');
+    expect(titleForPath('/nowhere')).to.equal('Page not found · Veda Workspace');
+  });
+});

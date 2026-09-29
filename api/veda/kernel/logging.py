@@ -7,10 +7,13 @@ Authorization headers are never logged; emails and phones are masked.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import sys
 import time
+import traceback
+from typing import Any
 
 import structlog
 
@@ -38,46 +41,144 @@ def _scrub(_, __, event_dict):
     return event_dict
 
 
+def _safe_exception(_, __, event_dict):
+    """Exceptions are logged as type, fingerprint and stack frames only. The message is dropped: database errors
+    carry bound values and failing rows (names, phones, messages) that masking cannot recognise (IR-27, LOG-003)."""
+    exc_info = event_dict.pop("exc_info", None)
+    if exc_info is True:
+        exc_info = sys.exc_info()
+    if isinstance(exc_info, BaseException):
+        exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+    if exc_info and exc_info[0] is not None:
+        frames = traceback.extract_tb(exc_info[2])
+        stack = [f"{f.filename.rsplit('/veda/', 1)[-1]}:{f.lineno} {f.name}" for f in frames]
+        event_dict["error_type"] = exc_info[0].__name__
+        event_dict["error_fingerprint"] = hashlib.sha256(
+            (exc_info[0].__name__ + "|" + "|".join(stack)).encode()
+        ).hexdigest()[:16]
+        event_dict["stack"] = stack[-15:]
+    event_dict.pop("exception", None)
+    return event_dict
+
+
+def _emf(_, __, event_dict):
+    """Metric lines (veda.kernel.metrics) carry an EMF document that must sit at the JSON root (IR-12)."""
+    record = event_dict.get("_record")
+    payload = getattr(record, "emf", None) if record is not None else event_dict.pop("emf", None)
+    if payload:
+        event_dict.update(payload)
+    return event_dict
+
+
+SHARED: list[Any] = [
+    structlog.contextvars.merge_contextvars,
+    structlog.stdlib.add_log_level,
+    structlog.stdlib.add_logger_name,
+    structlog.processors.TimeStamper(fmt="iso", utc=True, key="ts"),
+]
+
+
+class _StdoutHandler(logging.StreamHandler):
+    """Writes to whatever sys.stdout is when the record is emitted, never to a stream captured at start-up that
+    may since have been replaced or closed (test runners, reloaders)."""
+
+    def __init__(self) -> None:
+        self._override = None
+        super().__init__(sys.stdout)
+
+    @property
+    def stream(self):
+        return self._override or sys.stdout
+
+    @stream.setter
+    def stream(self, value) -> None:
+        self._override = None if value is sys.stdout else value
+
+
 def configure_logging(level: str = "INFO") -> None:
-    logging.basicConfig(format="%(message)s", stream=sys.stdout, level=getattr(logging, level.upper(), logging.INFO))
+    """Every record, structlog or stdlib (Flask, gunicorn, SQLAlchemy, the worker), leaves as one masked JSON line."""
+    handler = _StdoutHandler()
+    handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=[*SHARED, _emf, _safe_exception],
+            processors=[
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                _scrub,
+                structlog.processors.JSONRenderer(),
+            ],
+        )
+    )
+    handler._veda = True  # type: ignore[attr-defined]
+    root = logging.getLogger()
+    for existing in list(root.handlers):
+        if getattr(existing, "_veda", False):  # replace our own handler only (re-configuration, tests)
+            root.removeHandler(existing)
+    root.addHandler(handler)
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
     logging.getLogger("alembic").setLevel(logging.WARNING)
     structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.stdlib.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso", utc=True, key="ts"),
-            _scrub,
-            structlog.processors.JSONRenderer(),
-        ],
+        processors=[*SHARED, _safe_exception, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
 
 
+def sentry_before_send(event, _hint):
+    """Sentry receives exception types and frames only: values, request bodies, cookies, headers and local
+    variables are removed (IR-27, LOG-004)."""
+    for exc in (event.get("exception") or {}).get("values", []) or []:
+        exc["value"] = "[omitted]"
+        for frame in (exc.get("stacktrace") or {}).get("frames", []) or []:
+            frame.pop("vars", None)
+    request = event.get("request")
+    if isinstance(request, dict):
+        for key in ("data", "cookies", "query_string", "env"):
+            request.pop(key, None)
+        request["headers"] = {
+            k: v
+            for k, v in (request.get("headers") or {}).items()
+            if k.lower() in ("user-agent", "x-request-id", "content-type")
+        }
+    event.pop("user", None)
+    if isinstance(event.get("logentry"), dict):
+        event["logentry"]["message"] = _mask(str(event["logentry"].get("message", "")))
+        event["logentry"].pop("params", None)
+    for crumb in (event.get("breadcrumbs") or {}).get("values", []) or []:
+        if isinstance(crumb.get("message"), str):
+            crumb["message"] = _mask(crumb["message"])
+        crumb.pop("data", None)
+    return event
+
+
 def _truncate_ip(ip: str | None) -> str | None:
-    if not ip:
-        return None
-    if ":" in ip:
-        return ":".join(ip.split(":")[:4]) + "::/64"
-    parts = ip.split(".")
-    return ".".join(parts[:3]) + ".0/24" if len(parts) == 4 else ip
+    from veda.kernel import net
+
+    return net.network_of(ip) if ip else None
 
 
 def log_request(resp, started: float | None) -> None:
     from flask import g, request
 
+    from veda.kernel import metrics, net
     from veda.kernel.context import current_actor
 
     ctx = current_actor()
     rule = request.url_rule.rule if request.url_rule else "unmatched"
+    duration_ms = round((time.perf_counter() - started) * 1000, 1) if started else 0.0
+    # The request line doubles as the request-count / latency / status metric (EMF, LOG-006).
+    emf = metrics.emf(
+        {"Requests": (1, "Count"), "Latency": (duration_ms, "Milliseconds")},
+        {"Route": rule, "StatusClass": f"{resp.status_code // 100}xx"},
+    )
     structlog.get_logger("veda.http").info(
         "request",
         request_id=g.get("request_id"),
         method=request.method,
         route=rule,
         status=resp.status_code,
-        duration_ms=round((time.perf_counter() - started) * 1000, 1) if started else None,
-        ip=_truncate_ip(request.headers.get("CF-Connecting-IP") or request.remote_addr),
+        duration_ms=duration_ms,
+        **emf,
+        ip=_truncate_ip(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP"))),
         user_id=ctx.actor_id if ctx else None,
         session_id=ctx.session_id if ctx else None,
     )

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import socket
@@ -44,10 +45,12 @@ def claim(batch: int = 20, *, only: frozenset[str] | None = None, include_mainte
     label = worker_label()
     with actor(_system()), db.unit_of_work(write=True) as s:
         now = db.tx_time(s)
-        q = sa.select(OutboxEvent).where(sa.or_(
-            sa.and_(OutboxEvent.status.in_(("PENDING", "FAILED")), OutboxEvent.next_attempt_on <= now),
-            sa.and_(OutboxEvent.status == "PROCESSING", OutboxEvent.locked_on < now - STALE_AFTER),
-        ))
+        q = sa.select(OutboxEvent).where(
+            sa.or_(
+                sa.and_(OutboxEvent.status.in_(("PENDING", "FAILED")), OutboxEvent.next_attempt_on <= now),
+                sa.and_(OutboxEvent.status == "PROCESSING", OutboxEvent.locked_on < now - STALE_AFTER),
+            )
+        )
         if only is not None:
             q = q.where(OutboxEvent.event_type.in_(only))
         elif not include_maintenance:
@@ -61,11 +64,28 @@ def claim(batch: int = 20, *, only: frozenset[str] | None = None, include_mainte
         return [ev.id for ev in events]
 
 
+DELIVERED_KEY = "_email_delivered"
+
+
+def delivery_key(message) -> str:
+    """Identity of one email of an event: template and recipients (no content, no addresses in clear)."""
+    return hashlib.sha256(f"{message.template}|{','.join(sorted(message.to))}".encode()).hexdigest()[:32]
+
+
+def _mark_delivered(event_id: str, key: str, request_id: str | None) -> None:
+    with actor(_system(request_id)), db.unit_of_work(write=True) as s:
+        ev = s.get(OutboxEvent, event_id)
+        payload = dict(ev.payload or {})
+        payload[DELIVERED_KEY] = sorted({*payload.get(DELIVERED_KEY, []), key})
+        ev.payload = payload
+
+
 def process(event_id: str, *, handler=None) -> bool:
     try:
         with db.unit_of_work(write=True) as probe:
             ev = probe.get(OutboxEvent, event_id)
             request_id = (ev.payload or {}).get("request_id") if ev else None
+            delivered = set((ev.payload or {}).get(DELIVERED_KEY, [])) if ev else set()
         # 1. In-app handler work commits on its own (idempotent per event and recipient).
         begin_email_queue()
         with actor(_system(request_id)), db.unit_of_work(write=True) as s:
@@ -75,8 +95,14 @@ def process(event_id: str, *, handler=None) -> bool:
                 return False
             (handler or dispatch)(s, ev)
         # 2. Email after commit; a provider failure marks the event FAILED and never touches business data.
+        #    Each delivered message is recorded on the event, so a retry sends only what has not gone out (IR-30).
         for message in take_email_queue():
+            key = delivery_key(message)
+            if key in delivered:
+                continue
             email_mod.provider().send(message)
+            _mark_delivered(event_id, key, request_id)
+            delivered.add(key)
         with actor(_system(request_id)), db.unit_of_work(write=True) as s:
             ev = s.get(OutboxEvent, event_id)
             ev.status, ev.processed_on, ev.last_error = "DONE", db.tx_time(s), None
@@ -97,7 +123,7 @@ def process(event_id: str, *, handler=None) -> bool:
                     log.error("outbox_event_dead event_id=%s type=%s", ev.id, ev.event_type)
                 else:
                     ev.status = "FAILED"
-                    ev.next_attempt_on = now + timedelta(seconds=min(2 ** ev.attempts, 3600))
+                    ev.next_attempt_on = now + timedelta(seconds=min(2**ev.attempts, 3600))
         return False
 
 
@@ -121,9 +147,39 @@ def drain_all(max_rounds: int = 50, **kwargs) -> int:
 
 def lag_seconds() -> float | None:
     with db.unit_of_work(write=False) as s:
-        oldest = s.execute(sa.select(sa.func.min(OutboxEvent.created_on)).where(
-            OutboxEvent.status.in_(("PENDING", "FAILED")))).scalar()
+        oldest = s.execute(
+            sa.select(sa.func.min(OutboxEvent.created_on)).where(OutboxEvent.status.in_(("PENDING", "FAILED")))
+        ).scalar()
     return None if oldest is None else max(0.0, (clock.now() - oldest).total_seconds())
+
+
+def outbox_stats() -> dict[str, float]:
+    """Depth and age of undelivered events and the number of dead-lettered ones (02 §9 alerts, IR-A14)."""
+    with db.unit_of_work(write=False) as s:
+        depth, oldest = s.execute(
+            sa.select(sa.func.count(), sa.func.min(OutboxEvent.created_on)).where(
+                OutboxEvent.status.in_(("PENDING", "FAILED"))
+            )
+        ).one()
+        dead = s.execute(sa.select(sa.func.count()).where(OutboxEvent.status == "DEAD")).scalar() or 0
+    age = 0.0 if oldest is None else max(0.0, (clock.now() - oldest).total_seconds())
+    return {"depth": float(depth or 0), "oldest_age_s": age, "dead": float(dead)}
+
+
+def emit_outbox_metrics() -> dict[str, float]:
+    from veda.kernel import metrics
+
+    stats = outbox_stats()
+    metrics.emit_many(
+        {
+            "OutboxDepth": (stats["depth"], "Count"),
+            "OutboxOldestAge": (stats["oldest_age_s"], "Seconds"),
+            "OutboxDead": (stats["dead"], "Count"),
+        }
+    )
+    if stats["dead"]:
+        log.error("outbox_dead_events count=%d", int(stats["dead"]))
+    return stats
 
 
 def run_forever(poll_seconds: float = 2.0) -> None:  # pragma: no cover - process loop
@@ -136,8 +192,12 @@ def run_forever(poll_seconds: float = 2.0) -> None:  # pragma: no cover - proces
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     log.info("outbox_worker_started label=%s", worker_label())
+    last_metrics = 0.0
     while not _stop:
         try:
+            if time.monotonic() - last_metrics >= 60:
+                emit_outbox_metrics()
+                last_metrics = time.monotonic()
             if drain_once() == 0:
                 time.sleep(poll_seconds)
         except Exception:

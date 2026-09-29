@@ -19,7 +19,14 @@ def enqueue(session: Session, event_type: str, aggregate_type: str, aggregate_id
     ctx = current_actor()
     payload = {k: v for k, v in ids.items() if v is not None}
     payload["request_id"] = ctx.request_id if ctx else None
-    session.add(OutboxEvent(
-        event_type=event_type, aggregate_type=aggregate_type, aggregate_id=aggregate_id, payload=payload,
-        status="PENDING", attempts=0, next_attempt_on=db.tx_time(session),
-    ))
+    session.add(
+        OutboxEvent(
+            event_type=event_type,
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
+            payload=payload,
+            status="PENDING",
+            attempts=0,
+            next_attempt_on=db.tx_time(session),
+        )
+    )

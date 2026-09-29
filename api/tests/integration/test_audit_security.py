@@ -17,6 +17,7 @@ from veda.platform.notifications.models import OutboxEvent
 
 # --- audit capture (AUDIT-*, DATA-015) ------------------------------------------------------------
 
+
 def test_AUDIT_001_full_lifecycle_rows_with_actor_and_transaction(api, factory):
     founder = factory.user(founder=True)
     factory.login(api, founder)
@@ -24,7 +25,9 @@ def test_AUDIT_001_full_lifecycle_rows_with_actor_and_transaction(api, factory):
     rows_ = audits(lead["id"])
     create = rows_[0]
     assert create.action == "CREATE" and create.performed_by == founder.id and create.performed_via == "API"
-    assert create.request_id and create.session_id and create.transaction_id and create.new_value["name"] == "Anita Reddy"
+    assert (
+        create.request_id and create.session_id and create.transaction_id and create.new_value["name"] == "Anita Reddy"
+    )
     same_tx = audits(transaction_id=create.transaction_id)
     assert {r.entity_type for r in same_tx} >= {"lead", "lead_activity"}, "one transaction id per unit of work"
     api.patch(f"/api/v1/leads/{lead['id']}", {"priority": "HIGH"}, if_match=lead["version"])
@@ -50,8 +53,11 @@ def test_AUDIT_005_redaction(api, factory):
 def test_AUDIT_010_write_without_actor_context_is_refused(app):
     with pytest.raises(AuditContextMissing):
         with db.unit_of_work(write=True) as s:
-            s.add(LookupValue(category_id=s.execute(sa.select(LookupValue.category_id)).scalars().first(),
-                              code="X", label="X"))
+            s.add(
+                LookupValue(
+                    category_id=s.execute(sa.select(LookupValue.category_id)).scalars().first(), code="X", label="X"
+                )
+            )
 
 
 def test_DATA_015_atomicity_forced_error_leaves_nothing(app):
@@ -60,8 +66,16 @@ def test_DATA_015_atomicity_forced_error_leaves_nothing(app):
     before_outbox = len(rows(sa.select(OutboxEvent)))
     with pytest.raises(RuntimeError):
         with actor(system_context()), db.unit_of_work(write=True) as s:
-            u = User(email="x@vedaspaces.test", email_normalized="x@vedaspaces.test", full_name="X", user_type="HUMAN",
-                     status="INVITED", status_changed_on=db.tx_time(s), protection_level="STANDARD", authz_version=1)
+            u = User(
+                email="x@vedaspaces.test",
+                email_normalized="x@vedaspaces.test",
+                full_name="X",
+                user_type="HUMAN",
+                status="INVITED",
+                status_changed_on=db.tx_time(s),
+                protection_level="STANDARD",
+                authz_version=1,
+            )
             s.add(u)
             s.flush()
             from veda.kernel import outbox
@@ -114,6 +128,7 @@ def test_audit_viewer_cursor_pagination(api, factory):
 
 
 # --- security events (SEVT-*) ---------------------------------------------------------------------
+
 
 def test_SEVT_006_keyed_chain_verifies_and_detects_tampering(api, factory):
     sales = factory.user("SALES")

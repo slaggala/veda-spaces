@@ -27,8 +27,15 @@ from veda.kernel.types import GUID, JSONType, UTCDateTime  # noqa: E402
 REVISIONS: dict[str, list[str]] = {
     "0002_identity": ["app_user", "user_credential"],
     "0003_rbac": ["role", "permission", "user_role", "role_permission", "user_permission"],
-    "0004_auth": ["user_session", "refresh_token", "user_action_token", "user_mfa_factor", "user_mfa_recovery_code",
-                  "mfa_challenge", "security_event_log"],
+    "0004_auth": [
+        "user_session",
+        "refresh_token",
+        "user_action_token",
+        "user_mfa_factor",
+        "user_mfa_recovery_code",
+        "mfa_challenge",
+        "security_event_log",
+    ],
     "0005_audit": ["audit_log"],
     "0006_reference": ["lookup_category", "lookup_value", "number_sequence"],
     "0007_notifications": ["outbox_event", "notification"],
@@ -36,12 +43,18 @@ REVISIONS: dict[str, list[str]] = {
     "0100_crm_leads": ["lead", "lead_note", "lead_activity"],
 }
 
-# Columns of app_user introduced by 0008_account_security (02 §8.3).
+# Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),
+# mfa_challenge by 0009_mfa_challenge_binding (IR-01). Those revisions ALTER the table by hand.
 DEFERRED_COLUMNS = {
     "app_user": {
-        "proposed_email", "proposed_email_normalized", "proposed_email_requested_on", "proposed_email_requested_by",
-        "protection_level", "security_cooling_off_until",
-    }
+        "proposed_email",
+        "proposed_email_normalized",
+        "proposed_email_requested_on",
+        "proposed_email_requested_by",
+        "protection_level",
+        "security_cooling_off_until",
+    },
+    "mfa_challenge": {"factor_id", "enrollment_path"},
 }
 
 

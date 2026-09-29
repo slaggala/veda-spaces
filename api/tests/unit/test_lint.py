@@ -9,7 +9,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "veda"
-SEED_FILES = {"veda/platform/rbac/registry.py", "veda/modules/crm/leads/permissions.py", "veda/kernel/migration_support.py"}
+SEED_FILES = {
+    "veda/platform/rbac/registry.py",
+    "veda/modules/crm/leads/permissions.py",
+    "veda/kernel/migration_support.py",
+}
 DATA_ATTRIBUTE_CONTEXT = ("protection_level", "PROTECTION_LEVELS", "action_class", "APPROVAL_CLASSES")
 
 
@@ -38,7 +42,9 @@ def test_RBAC_002_no_role_code_literals_outside_seed_files():
 def test_no_role_code_comparisons_anywhere():
     for path in python_files():
         text = path.read_text()
-        assert not re.search(r"Role\.code\s*==\s*[\"']", text) or rel(path) in SEED_FILES | {"veda/cli/main.py"}, rel(path)
+        assert not re.search(r"Role\.code\s*==\s*[\"']", text) or rel(path) in SEED_FILES | {"veda/cli/main.py"}, rel(
+            path
+        )
 
 
 def test_RBAC_012_every_route_declares_a_permission_or_rbx(app):
@@ -60,6 +66,31 @@ def test_startup_fails_for_undeclared_route(app):
 
     with pytest.raises(RuntimeError, match="no permission or RBX declaration"):
         check_route_declarations(app)
+
+
+def test_IRA05_rbx_exceptions_are_checked_against_the_register(app):
+    """A route may use an RBX exception only if 06 §11 lists it, and a public route cannot carry a permission."""
+    from dataclasses import replace
+
+    from veda.app import RBX_REGISTER, check_route_declarations
+    from veda.kernel import http
+
+    check_route_declarations(app)  # the real application passes
+    used = {(s.method, s.rule) for s in http.ROUTES if s.rbx}
+    assert used == set().union(*RBX_REGISTER.values()), "register and routes agree exactly"
+    original = list(http.ROUTES)
+    try:
+        spec = next(s for s in http.ROUTES if s.rule == "/api/v1/auth/login")
+        http.ROUTES[http.ROUTES.index(spec)] = replace(spec, rbx="RBX-006")
+        with pytest.raises(RuntimeError, match="not in the RBX-006 register"):
+            check_route_declarations(app)
+        http.ROUTES[:] = original
+        spec = next(s for s in http.ROUTES if s.rule == "/api/v1/public/leads")
+        http.ROUTES[http.ROUTES.index(spec)] = replace(spec, permission=("lead.read",))
+        with pytest.raises(RuntimeError, match="cannot be enforced"):
+            check_route_declarations(app)
+    finally:
+        http.ROUTES[:] = original
 
 
 def test_PLAT_011_module_boundaries():
@@ -85,10 +116,19 @@ def test_PLAT_011_module_boundaries():
 
 
 def test_no_raw_sql_or_bulk_mutation_in_services():
-    allowed = {"veda/kernel/migration_support.py", "veda/platform/maintenance.py", "veda/kernel/db.py",
-               "veda/platform/health.py", "veda/kernel/conformance.py", "veda/kernel/sequences.py"}
-    pattern = re.compile(r"exec_driver_sql|sa\.update\(|sa\.delete\(|\.update\(\)\.where|\.delete\(\)\.where|"
-                         r"sa\.text\(\"(?:SELECT|UPDATE|DELETE|INSERT)")
+    allowed = {
+        "veda/kernel/migration_support.py",
+        "veda/platform/maintenance.py",
+        "veda/platform/backups.py",  # reads a restored scratch copy, never the live database's business rows
+        "veda/kernel/db.py",
+        "veda/platform/health.py",
+        "veda/kernel/conformance.py",
+        "veda/kernel/sequences.py",
+    }
+    pattern = re.compile(
+        r"exec_driver_sql|sa\.update\(|sa\.delete\(|\.update\(\)\.where|\.delete\(\)\.where|"
+        r"sa\.text\(\"(?:SELECT|UPDATE|DELETE|INSERT)"
+    )
     offenders = []
     for path in python_files():
         if rel(path) in allowed or "/models.py" in rel(path):

@@ -22,8 +22,16 @@ api = Api("lookups", "/api/v1/lookups", tags=("lookups",))
 @api.route("GET", "", permission="lookup.read", write=False, requirement="PLAT-009")
 def all_lookups(req: Req):
     cats = req.session.execute(sa.select(LookupCategory).order_by(LookupCategory.code)).scalars().all()
-    data = [{"code": c.code, "name": c.name, "description": c.description, "module": c.module,
-             "values": [service.present_value(v) for v in service.all_values(req.session, c.code)]} for c in cats]
+    data = [
+        {
+            "code": c.code,
+            "name": c.name,
+            "description": c.description,
+            "module": c.module,
+            "values": [service.present_value(v) for v in service.all_values(req.session, c.code)],
+        }
+        for c in cats
+    ]
     result = ok(data)
     digest = hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()[:16]
     result.headers["Cache-Control"] = "private, max-age=300"
@@ -40,8 +48,12 @@ class LookupQuery(Query):
 def category_values(req: Req, category_code: str):
     if service.category(req.session, category_code) is None:
         raise not_found()
-    return ok([service.present_value(v) for v in service.all_values(req.session, category_code,
-                                                                    include_inactive=req.query.include_inactive)])
+    return ok(
+        [
+            service.present_value(v)
+            for v in service.all_values(req.session, category_code, include_inactive=req.query.include_inactive)
+        ]
+    )
 
 
 class ValueIn(Closed):
@@ -53,15 +65,24 @@ class ValueIn(Closed):
     attributes: dict[str, Any] | None = None
 
 
-@api.route("POST", "/<category_code>/values", permission="lookup.manage", body=ValueIn, status=201, requirement="PLAT-009")
+@api.route(
+    "POST", "/<category_code>/values", permission="lookup.manage", body=ValueIn, status=201, requirement="PLAT-009"
+)
 def create_value(req: Req, category_code: str):
     cat = service.category(req.session, category_code)
     if cat is None:
         raise not_found()
     if service.resolve_code(req.session, category_code, req.body.code, active_only=False):
         raise ApiError(409, "DUPLICATE", "This code exists in the category.")
-    v = LookupValue(category_id=cat.id, code=req.body.code, label=req.body.label, description=req.body.description,
-                    sort_order=req.body.sort_order, is_active=req.body.is_active, attributes=req.body.attributes)
+    v = LookupValue(
+        category_id=cat.id,
+        code=req.body.code,
+        label=req.body.label,
+        description=req.body.description,
+        sort_order=req.body.sort_order,
+        is_active=req.body.is_active,
+        attributes=req.body.attributes,
+    )
     req.session.add(v)
     req.session.flush()
     return ok(service.present_value(v), status=201)
@@ -76,8 +97,14 @@ class ValuePatch(Closed):
     attributes: dict[str, Any] | None = None
 
 
-@api.route("PATCH", "/<category_code>/values/<value_id>", permission="lookup.manage", body=ValuePatch, if_match=True,
-           requirement="PLAT-009")
+@api.route(
+    "PATCH",
+    "/<category_code>/values/<value_id>",
+    permission="lookup.manage",
+    body=ValuePatch,
+    if_match=True,
+    requirement="PLAT-009",
+)
 def patch_value(req: Req, category_code: str, value_id: str):
     v = req.session.get(LookupValue, value_id)
     if v is None or not service.belongs_to(req.session, value_id, category_code):

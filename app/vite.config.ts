@@ -5,7 +5,7 @@ const api = process.env.VEDA_API_PROXY ?? 'http://127.0.0.1:5000';
 export default defineConfig({
   build: {
     target: 'es2020',
-    sourcemap: true,
+    sourcemap: false, // no source maps in the published bundle (IR-A21)
     chunkSizeWarningLimit: 200,
     rollupOptions: {
       output: {

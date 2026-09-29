@@ -14,10 +14,22 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 # Two environments over the same files: plain text is never HTML-escaped, HTML always is.
-_text_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=False, undefined=StrictUndefined,
-                        trim_blocks=True, lstrip_blocks=True)
-_html_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True, undefined=StrictUndefined,
-                        trim_blocks=True, lstrip_blocks=True)
+# Bandit B701 (autoescape off) is intended here: this environment renders only the subject and text/plain parts, which must not be HTML-escaped;
+# HTML is rendered by _html_env with autoescape on (tests/unit/test_email_templates.py, IR-29 for plain text).
+_text_env = Environment(  # nosec B701
+    loader=FileSystemLoader(str(TEMPLATE_DIR)),
+    autoescape=False,
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+_html_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATE_DIR)),
+    autoescape=True,
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 def _block(env: Environment, name: str, block: str, context: dict) -> str:

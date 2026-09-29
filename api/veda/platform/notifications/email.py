@@ -103,12 +103,16 @@ class SesEmailProvider(EmailProvider):  # pragma: no cover - requires AWS
         kwargs = {
             "FromEmailAddress": settings().email_sender,
             "Destination": {"ToAddresses": message.to},
-            "Content": {"Simple": {
-                "Subject": {"Data": message.subject, "Charset": "UTF-8"},
-                "Body": {"Text": {"Data": message.text, "Charset": "UTF-8"},
-                         "Html": {"Data": message.html, "Charset": "UTF-8"}},
-                "Headers": [{"Name": k, "Value": v} for k, v in message.headers.items()],
-            }},
+            "Content": {
+                "Simple": {
+                    "Subject": {"Data": message.subject, "Charset": "UTF-8"},
+                    "Body": {
+                        "Text": {"Data": message.text, "Charset": "UTF-8"},
+                        "Html": {"Data": message.html, "Charset": "UTF-8"},
+                    },
+                    "Headers": [{"Name": k, "Value": v} for k, v in message.headers.items()],
+                }
+            },
             "EmailTags": [{"Name": "template", "Value": message.template}],
         }
         if self._configuration_set:

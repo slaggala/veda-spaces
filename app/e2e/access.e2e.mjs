@@ -41,19 +41,21 @@ async function api(method, url, body, token, headers = {}) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 function drainOutbox() {
-  execFileSync(path.join(API_DIR, '.venv/bin/python'), ['-m', 'veda.cli', 'worker', '--once'], {
+  execFileSync(process.env.API_PYTHON ?? path.join(API_DIR, '.venv/bin/python'), ['-m', 'veda.cli', 'worker', '--once'], {
     cwd: API_DIR, env: { ...process.env, VEDA_DATABASE_URL: 'sqlite:///var/e2e.db', VEDA_EMAIL_CAPTURE_DIR: 'var/mail', VEDA_ENV: 'local' },
   });
 }
-function inviteLink(email) {
-  const files = fs.readdirSync(MAIL_DIR).filter((f) => f.endsWith('user_invited.eml')).map((f) => path.join(MAIL_DIR, f));
-  for (const f of files) {
+function mailLink(template, email, pathPrefix) {
+  const files = fs.readdirSync(MAIL_DIR).filter((f) => f.endsWith(`${template}.eml`)).map((f) => path.join(MAIL_DIR, f)).sort();
+  for (const f of files.reverse()) {
     // Captured .eml bodies are quoted-printable: undo soft line breaks and =XX escapes.
     const text = fs.readFileSync(f, 'utf8').replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-    if (text.includes(`To: ${email}`)) return text.match(/(http:\/\/localhost:5173\/accept-invite#token=[A-Za-z0-9_-]+)/)[1];
+    const m = text.match(new RegExp(`(http://localhost:5173${pathPrefix}#token=[A-Za-z0-9_-]+)`));
+    if (text.includes(`To: ${email}`) && m) return m[1];
   }
-  throw new Error('invite email not found');
+  throw new Error(`${template} email for ${email} not found`);
 }
+const inviteLink = (email) => mailLink('user_invited', email, '/accept-invite');
 
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -87,8 +89,26 @@ try {
   const navUsers = await page.getByRole('link', { name: 'Users' }).count();
   await page.goto(`${BASE}/admin/users`);
   await page.getByText("You don't have access").waitFor();
-  const apiDenied = await page.evaluate(async () => (await fetch('/api/v1/security-events')).status);
-  check('permission denial: no admin nav, no-access page, API 401/403', navUsers === 0 && [401, 403].includes(apiDenied), `nav=${navUsers} api=${apiDenied}`);
+  // IR-38: prove authorization (403 with a valid Sales token), not only authentication (401 without one).
+  const salesLogin = await api('POST', '/api/v1/auth/login', { email: SALES_EMAIL, password: SALES_PASSWORD });
+  const salesToken = salesLogin.body?.data?.access_token;
+  const denied = await api('GET', '/api/v1/security-events', null, salesToken);
+  const anonymous = await api('GET', '/api/v1/security-events');
+  check('permission denial: no admin nav, no-access page, API 403 with a Sales token, 401 without', navUsers === 0 &&
+    denied.status === 403 && denied.body?.code === 'PERMISSION_DENIED' && anonymous.status === 401,
+    `nav=${navUsers} bearer=${denied.status} anonymous=${anonymous.status}`);
+
+  // IR-19: every route sets its own title, and in-app navigation moves focus to the new page's heading.
+  await page.goto(`${BASE}/`);
+  await page.getByRole('link', { name: 'Leads' }).first().click();
+  await page.waitForURL(/\/leads$/);
+  await page.waitForFunction(() => document.title === 'Leads · Veda Workspace');
+  const focusOnHeading = await page.waitForFunction(() => {
+    let el = document.activeElement;
+    while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+    return el?.tagName === 'H1' || el?.id === 'outlet';
+  }, null, { timeout: 5000 }).then(() => true, () => false);
+  check('route change updates the title and moves focus to the page heading (WCAG 2.4.2)', focusOnHeading);
   await page.screenshot({ path: `${OUT}/sales-no-access.png` });
 
   // Forced session expiry: the founder revokes all of Sales' sessions; the next request signs Sales out.
@@ -97,14 +117,15 @@ try {
   r = await api('POST', `/api/v1/users/${salesId}/sessions/revoke`, { reason: 'E2E revoke' }, ft);
   check('admin revokes Sales sessions', r.status === 200, JSON.stringify(r.body?.data));
   // In-app navigation (no reload): the next API call gets 401 SESSION_INVALID (09 §4.1 banner).
-  await page.goto(`${BASE}/`);
-  await page.waitForURL(/\/login/);
-  const reloadSignedOut = true;
-  check('revoked session: a full reload lands on sign-in', reloadSignedOut);
+  await page.reload();
+  const reloadSignedOut = await page.waitForURL(/\/login/, { timeout: 10000 }).then(() => true, () => false);
+  check('revoked session: a full reload lands on sign-in', reloadSignedOut, page.url());
   await page.getByLabel('Email', { exact: true }).fill(SALES_EMAIL);
   await page.getByLabel('Password', { exact: true }).fill(SALES_PASSWORD);
   await page.getByRole('button', { name: /Sign in/ }).click();
   await page.waitForURL((u) => !u.pathname.startsWith('/login'));
+  await page.getByRole('link', { name: 'Dashboard' }).first().click();
+  await page.waitForURL(`${BASE}/`);
   r = await api('POST', `/api/v1/users/${salesId}/sessions/revoke`, { reason: 'E2E revoke 2' }, ft);
   await page.getByRole('link', { name: 'Leads' }).first().click();
   await page.waitForURL(/\/login/);
@@ -120,8 +141,12 @@ try {
   await page.getByRole('button', { name: /Sign out/ }).click();
   await page.waitForURL(/\/login/);
   await page.goto(`${BASE}/leads`);
-  await page.waitForURL(/\/login/);
-  check('logout ends the session; protected routes redirect to sign-in', true);
+  const redirected = await page.waitForURL(/\/login/, { timeout: 10000 }).then(() => true, () => false);
+  const refreshAfterLogout = await page.evaluate(async () => (await fetch('/api/v1/auth/refresh', {
+    method: 'POST', headers: { 'X-Requested-With': 'veda-workspace' } })).status);
+  check('logout ends the session; protected routes redirect to sign-in', redirected && refreshAfterLogout === 401,
+    `refresh=${refreshAfterLogout}`);
+
 
   // Website intake: duplicate phone, idempotent retry, invalid submission.
   const body = (msg) => ({ name: 'Farah Khan', phone: '99887 76655', message: msg, turnstile_token: 'dev-ok', company_website_url: '',
@@ -154,6 +179,48 @@ try {
   await fp.getByText('Farah Khan').first().waitFor();
   await fp.screenshot({ path: `${OUT}/duplicates-in-admin.png`, fullPage: true });
   check('duplicate leads visible in the admin list', (await fp.getByText('Farah Khan').count()) >= 2);
+
+  // IR-15 (TD-F step 4): another writer changes city and priority while the founder edits only the message;
+  // "Re-apply mine" must send the message alone and keep the other writer's changes.
+  const lead = list.body.data[0];
+  await fp.goto(`${BASE}/leads/${lead.id}`);
+  await fp.getByRole('button', { name: 'Edit', exact: true }).click();
+  await fp.locator('textarea[name="message"]').fill('Founder note: prefers a site visit on Saturday');
+  const fresh = await api('GET', `/api/v1/leads/${lead.id}`, null, ft);
+  const other = await api('PATCH', `/api/v1/leads/${lead.id}`, { city: 'Secunderabad', priority: 'HIGH' }, ft,
+    { 'If-Match': `"${fresh.body.data.version}"` });
+  await fp.getByRole('button', { name: 'Save', exact: true }).click();
+  await fp.getByRole('button', { name: 'Re-apply mine' }).click();
+  await fp.getByText('Lead saved').first().waitFor({ timeout: 10000 });
+  const after = (await api('GET', `/api/v1/leads/${lead.id}`, null, ft)).body.data;
+  check('conflict re-apply keeps the other writer\'s changes (no lost update)', other.status === 200 &&
+    after.city === 'Secunderabad' && after.priority === 'HIGH' && after.message === 'Founder note: prefers a site visit on Saturday',
+    `${after.city}/${after.priority}`);
+
+  // IR-07: a Founder cancels a break-glass request from the emailed link, on the SPA page.
+  const target = (await api('GET', '/api/v1/users?q=priya', null, ft)).body.data[0];
+  // A freshly MFA-verified Founder session (Founder actions need step-up within 10 minutes, G10).
+  let fl = await api('POST', '/api/v1/auth/login', { email: founder.email, password: founder.password });
+  fl = await api('POST', '/api/v1/auth/mfa/verify', { mfa_token: fl.body.data.mfa_token, code: await totp(founder.secret) });
+  const bg = await api('POST', '/api/v1/founder-actions', { action: 'GRANT_FOUNDER', target_user_id: target.id,
+    reason: 'E2E break-glass veto' }, fl.body.data.access_token);
+  drainOutbox();
+  const cancelLink = mailLink('break_glass_requested', founder.email, '/approvals/cancel');
+  await fp.goto(cancelLink);
+  await fp.getByRole('button', { name: 'Cancel the request' }).click();
+  await fp.getByText('Request cancelled').waitFor({ timeout: 10000 });
+  const approval = await api('GET', `/api/v1/approvals/${bg.body?.data?.approval_id}`, null, ft);
+  check('break-glass cancel link works end to end from the email', bg.status === 202 && bg.body.data.channel === 'BREAK_GLASS'
+    && approval.body?.data?.status === 'CANCELLED', `${bg.status} ${approval.body?.data?.status}`);
+
+  // IR-36: "Sign out everywhere" (Profile → Sessions) leaves the page for sign-in. Last: it ends every Founder session.
+  await fp.goto(`${BASE}/profile`);
+  await fp.getByRole('tab', { name: 'Sessions' }).click();
+  await fp.getByRole('button', { name: 'Sign out everywhere' }).click();
+  const everywhere = await fp.waitForURL(/\/login/, { timeout: 10000 }).then(() => true, () => false);
+  const stale = await api('GET', '/api/v1/auth/me', null, fl.body.data.access_token);
+  check('"Sign out everywhere" lands on sign-in and ends the other sessions', everywhere && stale.status === 401,
+    `${fp.url()} other=${stale.status}`);
 } catch (err) {
   check('journey aborted', false, String(err).split('\n')[0]);
   if (page) await page.screenshot({ path: `${OUT}/access-abort.png`, fullPage: true }).catch(() => {});

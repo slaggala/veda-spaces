@@ -7,7 +7,8 @@ Lit 3 + TypeScript + Vite single-page app for `app.vedaspaces.com`, built to the
 
 ```bash
 cd app
-npm install
+nvm use                # Node 22 LTS (.nvmrc; engines ^22.13.0, engine-strict)
+npm ci                 # from the public npm registry (.npmrc)
 npm run dev            # http://localhost:5173 — proxies /api and /health to http://127.0.0.1:5000
 ```
 
@@ -27,12 +28,15 @@ Start the Flask API (`api/`) on port 5000 first. The Vite proxy keeps the app sa
 | `npm run dev` | Vite dev server with API proxy |
 | `npm run build` | `tsc --noEmit` then production build to `dist/` (route-level code splitting) |
 | `npm run typecheck` | TypeScript strict type check |
+| `npm run lint` | ESLint (typescript-eslint, lit, wc; bans unsafeHTML/unsafeSVG, innerHTML-style sinks, eval) |
 | `npm test` | Web Test Runner in headless Chromium (Playwright launcher) |
 | `npm run lint:tokens` | Fails on raw colour values outside `src/design-system/tokens.css` (09 §2.5) |
 | `npm run test:contrast` | WCAG contrast of every on/background token pair in light and dark themes; fails < 4.5:1 text, < 3:1 non-text (AX-05, F-14) |
 
-Tooling note: the pinned majors (TypeScript 5.9, Vite 5, `@web/test-runner` 0.20) support Node 20.9. Newer
-majors (TS 7, Vite 8, WTR 1.x) require Node ≥ 20.19 / 22. First run of the tests needs `npx playwright install chromium`.
+Tooling: Node 22 LTS, TypeScript 5.9, Vite 7.3, `@web/test-runner` 1.0, ESLint 10. The first test run needs
+`npx playwright install chromium`. Browser journeys (workspace, access control, website intake under the production
+CSP, axe) run against a live local stack with `API_PYTHON=../api/.venv/bin/python e2e/run-all.sh`; CI runs the same
+script.
 
 ## Structure (02 §2.2)
 

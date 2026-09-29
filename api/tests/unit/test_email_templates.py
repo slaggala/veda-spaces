@@ -4,8 +4,9 @@ from veda.platform.notifications.templates import render
 
 
 def test_subject_cannot_carry_header_injection():
-    subject, text, html = render("approval", name="x", title="Hello\r\nBcc: attacker@example.com", message="m",
-                                 link="https://app.example/x")
+    subject, text, html = render(
+        "approval", name="x", title="Hello\r\nBcc: attacker@example.com", message="m", link="https://app.example/x"
+    )
     assert "\r" not in subject and "\n" not in subject
     assert subject == "Hello Bcc: attacker@example.com"
 

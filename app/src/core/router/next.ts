@@ -4,13 +4,14 @@
  */
 export function sanitizeNext(raw: string | null | undefined, fallback = '/'): string {
   if (!raw) return fallback;
-  let value = raw;
+  let value: string;
   try {
     value = decodeURIComponent(raw);
   } catch {
     return fallback;
   }
   if (!/^\/(?![/\\])/.test(value)) return fallback;
+  // eslint-disable-next-line no-control-regex -- rejecting control characters is the point of this check
   if (/[\u0000-\u001f]/.test(value)) return fallback;
   if (value.startsWith('/login')) return fallback;
   return value;

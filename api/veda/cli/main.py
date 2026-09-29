@@ -26,9 +26,9 @@ def _settings():
     from veda.kernel import db
 
     s = config.settings()  # an in-process caller (tests) may have configured settings already
-    problems = config.validate_production(s)
+    problems = config.validate_environment(s)
     if problems:
-        raise SystemExit("unsafe production configuration: " + "; ".join(problems))
+        raise SystemExit(f"unsafe {s.env} configuration: " + "; ".join(problems))
     try:
         db.engine()
     except RuntimeError:
@@ -47,7 +47,11 @@ def cmd_migrate(args) -> int:
 
     cfg = Config(str(ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(ROOT / "migrations"))
-    cfg.attributes["url"] = config.load_settings().database_url
+    s = config.load_settings()
+    problems = config.validate_environment(s)
+    if problems:  # migrations run with the same checks as the application (IR-09)
+        raise SystemExit(f"unsafe {s.env} configuration: " + "; ".join(problems))
+    cfg.attributes["url"] = s.database_url
     command.upgrade(cfg, "head")
     return 0
 
@@ -69,9 +73,12 @@ def cmd_bootstrap_founder(args) -> int:
     _settings()
     with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
         # Bootstrap mode: zero Founders have ever existed (06 §7.2.4) — soft-deleted Founders count as history.
-        existing = s.execute(sa.select(User.id).where(User.protection_level == "FOUNDER")
-                             .execution_options(include_deleted=True)).first()
-        prior = s.execute(sa.select(SecurityEventLog.id).where(SecurityEventLog.event_type == "BOOTSTRAP_FOUNDER")).first()
+        existing = s.execute(
+            sa.select(User.id).where(User.protection_level == "FOUNDER").execution_options(include_deleted=True)
+        ).first()
+        prior = s.execute(
+            sa.select(SecurityEventLog.id).where(SecurityEventLog.event_type == "BOOTSTRAP_FOUNDER")
+        ).first()
         if existing or prior:
             print("refused: a Founder exists or bootstrap already ran (06 §7.2.4)", file=sys.stderr)
             return 2
@@ -81,9 +88,19 @@ def cmd_bootstrap_founder(args) -> int:
             return 2
         now = db.tx_time(s)
         founder_role = s.execute(sa.select(Role).where(Role.grant_path == "FOUNDER_WORKFLOW_ONLY")).scalar_one()
-        user = User(email=args.email.strip(), email_normalized=email_norm, full_name=args.name, user_type="HUMAN",
-                    status="INVITED", status_changed_on=now, timezone="Asia/Kolkata", locale="en-IN",
-                    protection_level="FOUNDER", mfa_required=False, authz_version=1)
+        user = User(
+            email=args.email.strip(),
+            email_normalized=email_norm,
+            full_name=args.name,
+            user_type="HUMAN",
+            status="INVITED",
+            status_changed_on=now,
+            timezone="Asia/Kolkata",
+            locale="en-IN",
+            protection_level="FOUNDER",
+            mfa_required=False,
+            authz_version=1,
+        )
         s.add(user)
         s.flush()
         s.add(UserCredential(user_id=user.id, password_hash=None, must_change_password=False, failed_login_count=0))
@@ -93,8 +110,15 @@ def cmd_bootstrap_founder(args) -> int:
         security_events.record(s, "BOOTSTRAP_FOUNDER", "SUCCESS", subject_user_id=user.id, detail={"channel": "cli"})
         if args.email_link:
             outbox.enqueue(s, "user.invited", "app_user", user.id, user_id=user.id, token_id=tok.id)
-        print(json.dumps({"user_id": user.id, "invite_link": app_link(f"/accept-invite#token={raw}"),
-                          "expires_on": tok.expires_on.isoformat()}))
+        print(
+            json.dumps(
+                {
+                    "user_id": user.id,
+                    "invite_link": app_link(f"/accept-invite#token={raw}"),
+                    "expires_on": tok.expires_on.isoformat(),
+                }
+            )
+        )
     return 0
 
 
@@ -103,7 +127,8 @@ def cmd_sync_permissions(args) -> int:
 
     _settings()
     with db.engine().begin() as conn:
-        print(json.dumps(migration_support.sync_permissions(conn, audit=True)))
+        # Run by an operator, not by a migration: the audit rows say so (IR-A19).
+        print(json.dumps(migration_support.sync_permissions(conn, audit=True, via="CLI")))
     return 0
 
 
@@ -128,6 +153,9 @@ JOBS = {
     "archive-security-events": "archive_security_events",
     "expire-approvals": "expire_approvals",
     "break-glass-due": "execute_due_break_glass",
+    "snapshot": "snapshot",
+    "restore-verify": "restore_verify",
+    "disk-usage": "disk_usage",
     "follow-up-reminders": "follow_up_reminders",
     "spam-review": "spam_review",
 }
@@ -154,9 +182,17 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
     from zoneinfo import ZoneInfo
 
     _settings()
-    frequent = ["expire-approvals", "break-glass-due", "follow-up-reminders", "erasure-audit"]
-    daily = {"02:00": "invariants", "02:30": "verify-chain", "03:00": "anchor-chain", "03:30": "purge",
-             "04:00": "lead-retention", "09:00": "spam-review"}
+    frequent = ["expire-approvals", "break-glass-due", "follow-up-reminders", "erasure-audit", "disk-usage"]
+    daily = {
+        "01:30": "snapshot",
+        "02:00": "invariants",
+        "02:30": "verify-chain",
+        "03:00": "anchor-chain",
+        "03:30": "purge",
+        "04:00": "lead-retention",
+        "05:00": "restore-verify",
+        "09:00": "spam-review",
+    }
     ran: set[str] = set()
     while True:
         for job in frequent:
@@ -179,25 +215,48 @@ def cmd_break_glass(args) -> int:
     from veda.platform.rbac.models import AdminApprovalRequest
 
     _settings()
-    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
-        if args.action == "request":
-            target = s.get(User, args.target)
-            if target is None:
-                print("unknown target", file=sys.stderr)
-                return 2
-            payload = json.loads(args.payload) if args.payload else {}
-            req = governance.break_glass_request(s, action=args.founder_action, target=target, reason=args.reason,
-                                                 principal_arn=args.principal_arn, payload=payload)
-        else:
-            req = s.get(AdminApprovalRequest, args.request)
-            if req is None:
-                print("unknown request", file=sys.stderr)
-                return 2
-            if args.action == "approve":
-                governance.break_glass_approve(s, req, principal_arn=args.principal_arn)
-            elif args.action == "execute":
-                governance.break_glass_execute(s, req)
-        print(json.dumps({"approval_id": req.id, "status": req.status, "not_before": str(req.not_before)}))
+    from veda.kernel.errors import ApiError
+    from veda.platform.auth import security_events
+    from veda.platform.rbac import custodians
+
+    # Failure events are written after the unit of work closes (SEVT-011).
+    with security_events.deferred_scope():
+        try:
+            # The custodian is the caller's AWS identity, resolved before the write lock is taken (IR-06).
+            principal = (
+                custodians.resolve(args.principal_arn, action=args.action)
+                if args.action in ("request", "approve")
+                else ""
+            )
+            with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+                if args.action == "request":
+                    target = s.get(User, args.target)
+                    if target is None:
+                        print("unknown target", file=sys.stderr)
+                        return 2
+                    payload = json.loads(args.payload) if args.payload else {}
+                    req = governance.break_glass_request(
+                        s,
+                        action=args.founder_action,
+                        target=target,
+                        reason=args.reason,
+                        principal_arn=principal,
+                        payload=payload,
+                    )
+                else:
+                    found = s.get(AdminApprovalRequest, args.request)
+                    if found is None:
+                        print("unknown request", file=sys.stderr)
+                        return 2
+                    req = found
+                    if args.action == "approve":
+                        governance.break_glass_approve(s, req, principal_arn=principal)
+                    elif args.action == "execute":
+                        governance.break_glass_execute(s, req)
+                print(json.dumps({"approval_id": req.id, "status": req.status, "not_before": str(req.not_before)}))
+        except ApiError as err:
+            print(json.dumps({"error": err.code, "detail": err.detail}), file=sys.stderr)
+            return 3
     return 0
 
 
@@ -224,11 +283,29 @@ def cmd_openapi(args) -> int:
 
 
 def cmd_deploy_check(args) -> int:
-    """OPS-006 / OPS-010: exactly one gunicorn worker process."""
-    text = Path(args.gunicorn_conf).read_text()
-    ok = "workers = 1" in text and "worker_class = \"gthread\"" in text
-    print("deploy-check: OK" if ok else "deploy-check: gunicorn must run exactly one gthread worker")
-    return 0 if ok else 1
+    """OPS-006 / OPS-010: the effective gunicorn configuration (file, then GUNICORN_CMD_ARGS) runs exactly one
+    gthread worker (IR-35). The same check runs again at runtime in the on_starting hook."""
+    import runpy
+
+    from gunicorn.config import Config
+
+    from veda.kernel import single_instance
+
+    cfg = Config()
+    for key, value in runpy.run_path(args.gunicorn_conf).items():
+        if key in cfg.settings:
+            cfg.set(key, value)
+    env_args = cfg.parser().parse_args(cfg.get_cmd_args_from_env())
+    for key, value in vars(env_args).items():
+        if value is not None and key != "args" and key in cfg.settings:
+            cfg.set(key, value)
+    try:
+        single_instance.check_gunicorn(cfg)
+    except single_instance.SingleInstanceError as err:
+        print(f"deploy-check: {err}")
+        return 1
+    print("deploy-check: OK")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

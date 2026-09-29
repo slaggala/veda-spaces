@@ -14,16 +14,23 @@ from flask_limiter import Limiter
 
 
 def ip_key() -> str:
-    return request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
+    from veda.kernel import net
+
+    return net.limiter_key(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP")))
 
 
 def body_email_key() -> str:
+    """Per-email limits are keyed by (email, client network): a third party exhausting the limit from its own
+    network cannot lock the account holder out everywhere (IR-23; proposed amendment AM-7 to 08 §12)."""
+    from veda.kernel import net
+
     try:
         data = json.loads(request.get_data(cache=True) or b"{}")
         email = str(data.get("email", "")).strip().lower()
     except (ValueError, AttributeError):
         email = ""
-    return f"email:{email}"
+    network = net.network_of(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP")))
+    return f"email:{email}|{network}"
 
 
 limiter = Limiter(

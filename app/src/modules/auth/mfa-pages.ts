@@ -16,20 +16,40 @@ const formStyles = css`form { display: flex; flex-direction: column; gap: 16px; 
 
 /** Two-step verification at login (09 §4.10). Recovery codes are NOT accepted here (05 §11.4). */
 export class VsMfaChallengePage extends LitElement {
-  static override properties = { error: { state: true }, busy: { state: true }, expired: { state: true } };
+  static override properties = { error: { state: true }, busy: { state: true }, expired: { state: true }, warning: { state: true } };
   declare error: string;
   declare busy: boolean;
   declare expired: boolean;
+  declare warning: string;
+  private timers: number[] = [];
   static override styles = [...shared, formStyles];
   constructor() {
     super();
     this.error = '';
     this.busy = false;
     this.expired = false;
+    this.warning = '';
   }
   override connectedCallback() {
     super.connectedCallback();
-    if (!session.pendingMfa) queueMicrotask(() => navigate('/login'));
+    const pending = session.pendingMfa;
+    if (!pending) {
+      queueMicrotask(() => navigate('/login'));
+      return;
+    }
+    // AX-07 (IR-37): announce the time limit before it runs out, then say plainly that it has.
+    const left = pending.expiresAt - Date.now();
+    this.timers.push(window.setTimeout(() => { this.warning = 'This sign-in request expires in 1 minute.'; }, Math.max(0, left - 60_000)));
+    this.timers.push(window.setTimeout(() => {
+      this.expired = true;
+      this.warning = '';
+      this.error = 'This sign-in attempt expired. Please sign in again.';
+    }, Math.max(0, left)));
+  }
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this.timers.forEach((t) => clearTimeout(t));
+    this.timers = [];
   }
   private async submit(e: Event) {
     e.preventDefault();
@@ -67,6 +87,7 @@ export class VsMfaChallengePage extends LitElement {
       <form @submit=${this.submit} novalidate>
         <label class="field"><span class="label">Code</span>${codeInput(this.error)}</label>
         <p id="code-err" class="danger-text" role="alert" aria-live="assertive">${this.error ? html`⚠ ${this.error}` : nothing}</p>
+        <p class="muted" role="status" aria-live="polite">${this.warning}</p>
         ${this.expired
           ? html`<a class="btn primary block" href="/login">Sign in again</a>`
           : html`<button class="btn primary block" ?disabled=${this.busy}>${this.busy ? 'Verifying…' : 'Verify →'}</button>`}

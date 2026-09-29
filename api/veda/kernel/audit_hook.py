@@ -102,9 +102,17 @@ def _history_value(obj, key):
     return before, after
 
 
-def build_audit_row(session: Session, *, entity_type: str, entity_id: str, action: str,
-                    old_value=None, new_value=None, changed_fields=None,
-                    parent: tuple[str, str] | None = None):
+def build_audit_row(
+    session: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    action: str,
+    old_value=None,
+    new_value=None,
+    changed_fields=None,
+    parent: tuple[str, str] | None = None,
+):
     """Create an ``audit_log`` row stamped for this unit of work."""
     from veda.platform.audit.models import AuditLog
 
@@ -154,7 +162,9 @@ def _parent_of(obj, policy) -> tuple[str, str] | None:
 @event.listens_for(Session, "before_flush")
 def _before_flush(session: Session, flush_context, instances) -> None:
     new_objs = [o for o in session.new if isinstance(o, AuditedBase)]
-    dirty_objs = [o for o in session.dirty if isinstance(o, AuditedBase) and session.is_modified(o, include_collections=False)]
+    dirty_objs = [
+        o for o in session.dirty if isinstance(o, AuditedBase) and session.is_modified(o, include_collections=False)
+    ]
     deleted_objs = [o for o in session.deleted if isinstance(o, AuditedBase)]
     if not (new_objs or dirty_objs or deleted_objs):
         return
@@ -185,12 +195,18 @@ def _before_flush(session: Session, flush_context, instances) -> None:
         if policy is None:
             raise RuntimeError(f"table {obj.__tablename__} not registered in the audit policy registry")
         if policy.policy == FULL:
-            audit_rows.append(build_audit_row(
-                session, entity_type=obj.__tablename__, entity_id=obj.id, action="CREATE",
-                old_value=None, new_value=_snapshot(obj, policy),
-                changed_fields=sorted(k for k, v in _snapshot(obj, policy).items() if v is not None),
-                parent=_parent_of(obj, policy),
-            ))
+            audit_rows.append(
+                build_audit_row(
+                    session,
+                    entity_type=obj.__tablename__,
+                    entity_id=obj.id,
+                    action="CREATE",
+                    old_value=None,
+                    new_value=_snapshot(obj, policy),
+                    changed_fields=sorted(k for k, v in _snapshot(obj, policy).items() if v is not None),
+                    parent=_parent_of(obj, policy),
+                )
+            )
 
     for obj in dirty_objs:
         policy = policy_for(obj.__tablename__)
@@ -224,20 +240,41 @@ def _before_flush(session: Session, flush_context, instances) -> None:
         if policy.policy != FULL:
             continue
         if action == "DELETE":
-            audit_rows.append(build_audit_row(
-                session, entity_type=obj.__tablename__, entity_id=obj.id, action="DELETE",
-                old_value={"is_deleted": False, "deleted_on": None, "deleted_by": None, "_snapshot": _snapshot(obj, policy)},
-                new_value={"is_deleted": True, "deleted_on": serialize(obj.deleted_on), "deleted_by": obj.deleted_by},
-                changed_fields=list(_SOFT_DELETE_FIELDS), parent=_parent_of(obj, policy),
-            ))
+            audit_rows.append(
+                build_audit_row(
+                    session,
+                    entity_type=obj.__tablename__,
+                    entity_id=obj.id,
+                    action="DELETE",
+                    old_value={
+                        "is_deleted": False,
+                        "deleted_on": None,
+                        "deleted_by": None,
+                        "_snapshot": _snapshot(obj, policy),
+                    },
+                    new_value={
+                        "is_deleted": True,
+                        "deleted_on": serialize(obj.deleted_on),
+                        "deleted_by": obj.deleted_by,
+                    },
+                    changed_fields=list(_SOFT_DELETE_FIELDS),
+                    parent=_parent_of(obj, policy),
+                )
+            )
             continue
         if action == "RESTORE":
-            audit_rows.append(build_audit_row(
-                session, entity_type=obj.__tablename__, entity_id=obj.id, action="RESTORE",
-                old_value={"is_deleted": True},
-                new_value={"is_deleted": False, "deleted_on": None, "deleted_by": None},
-                changed_fields=list(_SOFT_DELETE_FIELDS), parent=_parent_of(obj, policy),
-            ))
+            audit_rows.append(
+                build_audit_row(
+                    session,
+                    entity_type=obj.__tablename__,
+                    entity_id=obj.id,
+                    action="RESTORE",
+                    old_value={"is_deleted": True},
+                    new_value={"is_deleted": False, "deleted_on": None, "deleted_by": None},
+                    changed_fields=list(_SOFT_DELETE_FIELDS),
+                    parent=_parent_of(obj, policy),
+                )
+            )
             continue
         old, new, changed = _changes(obj, policy)
         if not changed:
@@ -245,10 +282,18 @@ def _before_flush(session: Session, flush_context, instances) -> None:
         if obj.id in (session.info.get("erasure_entities") or ()):
             # Erasure: the UPDATE row records the change with the old PII values redacted (07 §8.2 step 1).
             old = {k: ("[ERASED]" if k in policy.pii and v is not None else v) for k, v in old.items()}
-        audit_rows.append(build_audit_row(
-            session, entity_type=obj.__tablename__, entity_id=obj.id, action="UPDATE",
-            old_value=old, new_value=new, changed_fields=changed, parent=_parent_of(obj, policy),
-        ))
+        audit_rows.append(
+            build_audit_row(
+                session,
+                entity_type=obj.__tablename__,
+                entity_id=obj.id,
+                action="UPDATE",
+                old_value=old,
+                new_value=new,
+                changed_fields=changed,
+                parent=_parent_of(obj, policy),
+            )
+        )
 
     for obj in deleted_objs:
         policy = policy_for(obj.__tablename__)
@@ -259,10 +304,18 @@ def _before_flush(session: Session, flush_context, instances) -> None:
         if policy.policy == FULL:
             if not policy.exceptions:
                 raise ImmutableRowError(f"hard delete of {obj.__tablename__} is not allowed (03 §2.4)")
-            audit_rows.append(build_audit_row(
-                session, entity_type=obj.__tablename__, entity_id=obj.id, action="HARD_DELETE",
-                old_value=_snapshot(obj, policy), new_value=None, changed_fields=None, parent=_parent_of(obj, policy),
-            ))
+            audit_rows.append(
+                build_audit_row(
+                    session,
+                    entity_type=obj.__tablename__,
+                    entity_id=obj.id,
+                    action="HARD_DELETE",
+                    old_value=_snapshot(obj, policy),
+                    new_value=None,
+                    changed_fields=None,
+                    parent=_parent_of(obj, policy),
+                )
+            )
 
     for row in audit_rows:
         session.add(row)
@@ -277,11 +330,30 @@ def restore(obj: AuditedBase) -> None:
     obj.is_deleted = False
 
 
-def write_explicit_audit(session: Session, *, entity_type: str, entity_id: str, action: str,
-                         new_value=None, old_value=None, changed_fields=None, parent=None) -> None:
+def write_explicit_audit(
+    session: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    action: str,
+    new_value=None,
+    old_value=None,
+    changed_fields=None,
+    parent=None,
+) -> None:
     """Explicit audit rows for EXPORT / ANONYMIZE / summary HARD_DELETE (07 §4)."""
-    session.add(build_audit_row(session, entity_type=entity_type, entity_id=entity_id, action=action,
-                                old_value=old_value, new_value=new_value, changed_fields=changed_fields, parent=parent))
+    session.add(
+        build_audit_row(
+            session,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            old_value=old_value,
+            new_value=new_value,
+            changed_fields=changed_fields,
+            parent=parent,
+        )
+    )
 
 
 def bulk_mutate(session: Session, statement: sa.Update | sa.Delete) -> None:  # pragma: no cover - guard

@@ -1,0 +1,19 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+E   AssertionError: assert 503 == 201
+     +  where 503 = <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': 'c3ea71ad71477f5d'}>.status
+<worktree-9236aa3>/api/tests/integration/test_intake_lock.py:32: AssertionError: assert 503 == 201
+E   AssertionError: assert 503 == 201
+     +  where 503 = <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': '4c8b38d1c90c62d2'}>.status
+     +    where <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': '4c8b38d1c90c62d2'}> = public_lead(<tests.support.api.ApiClient object at 0x10a128550>, key='replay-key-000000000001', name='Kiran Rao', phone='9812300001')
+     +      where public_lead = <tests.support.factory.Factory object at 0x10a128cd0>.public_lead
+<worktree-9236aa3>/api/tests/integration/test_intake_lock.py:38: AssertionError: assert 503 == 201
+E   AssertionError: <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': '07b4c06102e0f51b'}>
+    assert 503 == 200
+     +  where 503 = <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': '07b4c06102e0f51b'}>.status
+<worktree-9236aa3>/api/tests/integration/test_intake_lock.py:51: AssertionError: <Resp 503 {'type': 'https://api.vedaspaces.com/problems/service-unavailable', 'title': 'Service unavailable', 'status': 503, 'code': 'SERVICE_UNAVAILABLE', 'detail': 'The database is busy. Try again.', 'request_id': '07b4c06102e0f51b'}>
+=========================== short test summary info ============================
+FAILED tests/integration/test_intake_lock.py::test_IR02_Q5_intake_verifies_captcha_without_the_write_lock[sqlite]
+FAILED tests/integration/test_intake_lock.py::test_IR02_replay_needs_no_captcha_and_no_lock[sqlite]
+FAILED tests/integration/test_intake_lock.py::test_IR02_captcha_gated_login_verifies_without_the_write_lock[sqlite]
+3 failed in 16.67s

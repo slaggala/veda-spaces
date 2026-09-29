@@ -55,6 +55,7 @@ def new_recovery_code() -> str:
 
 # --- KMS providers ------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class DataKey:
     plaintext: bytes
@@ -103,8 +104,13 @@ def kms_provider():
     global _provider
     s = settings()
     if _provider is None or getattr(_provider, "key_arn", None) != s.kms_key_arn:
-        _provider = AwsKmsProvider(s.kms_key_arn, s.aws_region) if s.kms_provider == "aws" else LocalKmsProvider(
-            s.local_kms_master_key, s.kms_key_arn)
+        if s.kms_provider != "aws" and not s.dev_keys_allowed:
+            raise RuntimeError(f"the local KMS provider is not available in {s.env} (IR-09)")
+        _provider = (
+            AwsKmsProvider(s.kms_key_arn, s.aws_region)
+            if s.kms_provider == "aws"
+            else LocalKmsProvider(s.local_kms_master_key, s.kms_key_arn)
+        )
     return _provider
 
 

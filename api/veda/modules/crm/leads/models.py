@@ -19,7 +19,18 @@ SPAM_STATUSES = ("NONE", "SUSPECTED", "CONFIRMED_SPAM", "NOT_SPAM")
 CONSENT_CHANNELS = ("WEBSITE_FORM", "PHONE_VERBAL", "IN_PERSON", "WHATSAPP", "EMAIL")
 WITHDRAWAL_CHANNELS = ("PHONE_VERBAL", "IN_PERSON", "WHATSAPP", "EMAIL", "WEBSITE")
 
-ACTIVITY_TYPES = ("CALL", "WHATSAPP", "EMAIL", "MEETING", "SITE_VISIT", "QUOTATION", "FOLLOW_UP", "STATUS_CHANGE", "ASSIGNMENT", "SYSTEM")
+ACTIVITY_TYPES = (
+    "CALL",
+    "WHATSAPP",
+    "EMAIL",
+    "MEETING",
+    "SITE_VISIT",
+    "QUOTATION",
+    "FOLLOW_UP",
+    "STATUS_CHANGE",
+    "ASSIGNMENT",
+    "SYSTEM",
+)
 SYSTEM_ACTIVITY_TYPES = ("STATUS_CHANGE", "ASSIGNMENT", "SYSTEM")
 CONTACT_ACTIVITY_TYPES = ("CALL", "WHATSAPP", "EMAIL", "MEETING", "SITE_VISIT", "FOLLOW_UP")
 ACTIVITY_STATUSES = ("PLANNED", "COMPLETED", "CANCELLED")
@@ -94,7 +105,9 @@ class Lead(AuditedBase):
         in_check("lead", "spam_status", SPAM_STATUSES),
         in_check("lead", "consent_withdrawal_channel", WITHDRAWAL_CHANNELS, nullable=True),
         CheckConstraint("(status = 'WON') = (won_on IS NOT NULL)", name="ck_lead__won_consistency"),
-        CheckConstraint("(status = 'LOST') = (lost_on IS NOT NULL AND lost_reason_id IS NOT NULL)", name="ck_lead__lost_consistency"),
+        CheckConstraint(
+            "(status = 'LOST') = (lost_on IS NOT NULL AND lost_reason_id IS NOT NULL)", name="ck_lead__lost_consistency"
+        ),
         CheckConstraint("(assigned_to IS NULL) = (assigned_on IS NULL)", name="ck_lead__assigned_consistency"),
         CheckConstraint(
             "consent_contact = false OR (consent_policy_version IS NOT NULL AND consent_captured_on IS NOT NULL "
@@ -102,7 +115,9 @@ class Lead(AuditedBase):
             name="ck_lead__consent_complete",
         ),
         CheckConstraint("quoted_amount_minor IS NULL OR quoted_amount_minor >= 0", name="ck_lead__quoted_amount"),
-        CheckConstraint("duplicate_of_lead_id IS NULL OR duplicate_of_lead_id <> id", name="ck_lead__not_self_duplicate"),
+        CheckConstraint(
+            "duplicate_of_lead_id IS NULL OR duplicate_of_lead_id <> id", name="ck_lead__not_self_duplicate"
+        ),
         CheckConstraint(
             "consent_withdrawn_on IS NULL OR (consent_contact = false AND consent_withdrawal_channel IS NOT NULL)",
             name="ck_lead__withdrawal_consistency",
@@ -110,27 +125,40 @@ class Lead(AuditedBase):
         CheckConstraint("length(message) <= 4000", name="ck_lead__message_len"),
         Index("ux_lead__lead_number", "lead_number", unique=True, **live_where()),
         Index("ux_lead__public_reference", "public_reference", unique=True),
-        Index("ux_lead__intake_idempotency_key", "intake_idempotency_key", unique=True, **where("intake_idempotency_key IS NOT NULL")),
+        Index(
+            "ux_lead__intake_idempotency_key",
+            "intake_idempotency_key",
+            unique=True,
+            **where("intake_idempotency_key IS NOT NULL"),
+        ),
         Index("ix_lead__status_created", "status", sa.text("created_on DESC"), **live_where()),
         Index("ix_lead__assigned_status", "assigned_to", "status", sa.text("created_on DESC"), **live_where()),
         Index("ix_lead__created_by", "created_by", **live_where()),
         Index("ix_lead__phone", "phone", **live_where()),
         Index(
-            "ix_lead__email_normalized", "email_normalized",
-            **where("email_normalized IS NOT NULL AND is_deleted = 0", "email_normalized IS NOT NULL AND is_deleted = false"),
+            "ix_lead__email_normalized",
+            "email_normalized",
+            **where(
+                "email_normalized IS NOT NULL AND is_deleted = 0", "email_normalized IS NOT NULL AND is_deleted = false"
+            ),
         ),
         Index(
-            "ix_lead__next_follow_up", "next_follow_up_on",
+            "ix_lead__next_follow_up",
+            "next_follow_up_on",
             **where(f"{_OPEN_NOT_CLOSED} AND is_deleted = 0", f"{_OPEN_NOT_CLOSED} AND is_deleted = false"),
         ),
         Index("ix_lead__created_on", sa.text("created_on DESC")),
         Index("ix_lead__source", "source_id", sa.text("created_on DESC"), **live_where()),
         Index(
-            "ix_lead__spam_queue", "spam_status", sa.text("created_on DESC"),
+            "ix_lead__spam_queue",
+            "spam_status",
+            sa.text("created_on DESC"),
             **where("spam_status = 'SUSPECTED' AND is_deleted = 0", "spam_status = 'SUSPECTED' AND is_deleted = false"),
         ),
         Index(
-            "ix_lead__retention", "status", "status_changed_on",
+            "ix_lead__retention",
+            "status",
+            "status_changed_on",
             **where("status IN ('WON','LOST') AND anonymized_on IS NULL"),
         ),
     )
@@ -142,12 +170,20 @@ class LeadNote(AuditedBase):
     lead_id: Mapped[str] = mapped_column(GUID(), ForeignKey("lead.id", ondelete="RESTRICT"), nullable=False)
     body: Mapped[str] = mapped_column(sa.Text, nullable=False)
     is_pinned: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
-    visibility: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="INTERNAL", server_default="INTERNAL")
+    visibility: Mapped[str] = mapped_column(
+        sa.String(20), nullable=False, default="INTERNAL", server_default="INTERNAL"
+    )
 
     __table_args__ = (
         in_check("lead_note", "visibility", NOTE_VISIBILITIES),
         CheckConstraint("length(body) BETWEEN 1 AND 10000", name="ck_lead_note__body_len"),
-        Index("ix_lead_note__lead_created", "lead_id", sa.text("is_pinned DESC"), sa.text("created_on DESC"), **live_where()),
+        Index(
+            "ix_lead_note__lead_created",
+            "lead_id",
+            sa.text("is_pinned DESC"),
+            sa.text("created_on DESC"),
+            **live_where(),
+        ),
         Index("ix_lead_note__created_by", "created_by", **live_where()),
     )
 
@@ -158,7 +194,9 @@ class LeadActivity(AuditedBase):
     lead_id: Mapped[str] = mapped_column(GUID(), ForeignKey("lead.id", ondelete="RESTRICT"), nullable=False)
     activity_type: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     is_system_generated: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
-    activity_status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="COMPLETED", server_default="COMPLETED")
+    activity_status: Mapped[str] = mapped_column(
+        sa.String(12), nullable=False, default="COMPLETED", server_default="COMPLETED"
+    )
     subject: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(sa.Text)
     direction: Mapped[str | None] = mapped_column(sa.String(10))
@@ -179,21 +217,35 @@ class LeadActivity(AuditedBase):
         in_check("lead_activity", "direction", DIRECTIONS, nullable=True),
         in_check("lead_activity", "from_status", LEAD_STATUSES, nullable=True),
         in_check("lead_activity", "to_status", LEAD_STATUSES, nullable=True),
-        CheckConstraint("activity_status <> 'PLANNED' OR scheduled_on IS NOT NULL", name="ck_lead_activity__planned_has_schedule"),
-        CheckConstraint("activity_status <> 'COMPLETED' OR completed_on IS NOT NULL", name="ck_lead_activity__completed_has_time"),
+        CheckConstraint(
+            "activity_status <> 'PLANNED' OR scheduled_on IS NOT NULL", name="ck_lead_activity__planned_has_schedule"
+        ),
+        CheckConstraint(
+            "activity_status <> 'COMPLETED' OR completed_on IS NOT NULL", name="ck_lead_activity__completed_has_time"
+        ),
         CheckConstraint(
             "activity_type <> 'STATUS_CHANGE' OR (from_status IS NOT NULL AND to_status IS NOT NULL)",
             name="ck_lead_activity__status_change_fields",
         ),
-        CheckConstraint("duration_minutes IS NULL OR duration_minutes BETWEEN 0 AND 1440", name="ck_lead_activity__duration"),
+        CheckConstraint(
+            "duration_minutes IS NULL OR duration_minutes BETWEEN 0 AND 1440", name="ck_lead_activity__duration"
+        ),
         CheckConstraint("length(description) <= 4000", name="ck_lead_activity__description_len"),
         Index("ix_lead_activity__lead_timeline", "lead_id", sa.text("created_on DESC"), **live_where()),
         Index(
-            "ix_lead_activity__owner_planned", "owner_user_id", "scheduled_on",
-            **where("activity_status = 'PLANNED' AND is_deleted = 0", "activity_status = 'PLANNED' AND is_deleted = false"),
+            "ix_lead_activity__owner_planned",
+            "owner_user_id",
+            "scheduled_on",
+            **where(
+                "activity_status = 'PLANNED' AND is_deleted = 0", "activity_status = 'PLANNED' AND is_deleted = false"
+            ),
         ),
         Index(
-            "ix_lead_activity__lead_planned", "lead_id", "scheduled_on",
-            **where("activity_status = 'PLANNED' AND is_deleted = 0", "activity_status = 'PLANNED' AND is_deleted = false"),
+            "ix_lead_activity__lead_planned",
+            "lead_id",
+            "scheduled_on",
+            **where(
+                "activity_status = 'PLANNED' AND is_deleted = 0", "activity_status = 'PLANNED' AND is_deleted = false"
+            ),
         ),
     )

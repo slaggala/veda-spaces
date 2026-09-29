@@ -30,8 +30,9 @@ from .models import AuditLog
 
 api = Api("audit", "/api/v1", tags=("audit",))
 
-LOOKUP_FIELDS = frozenset({"project_type_id", "property_type_id", "budget_range_id", "source_id", "lost_reason_id",
-                           "outcome_id"})
+LOOKUP_FIELDS = frozenset(
+    {"project_type_id", "property_type_id", "budget_range_id", "source_id", "lost_reason_id", "outcome_id"}
+)
 
 # entity_type → fn(session, ctx, entity_id) -> (label | None, visible: bool)
 ENTITY_RESOLVERS: dict[str, Callable[[Session, Any, str], tuple[str | None, bool]]] = {}
@@ -80,7 +81,11 @@ def _mask(values: dict | None, pii: frozenset[str]) -> dict | None:
 def present_audit(s: Session, ctx, row: AuditLog, *, full: bool = False) -> dict:
     label, visible = None, True
     anchor_type, anchor_id = row.entity_type, row.entity_id
-    if row.parent_entity_type and row.parent_entity_type in ENTITY_RESOLVERS and row.entity_type not in ENTITY_RESOLVERS:
+    if (
+        row.parent_entity_type
+        and row.parent_entity_type in ENTITY_RESOLVERS
+        and row.entity_type not in ENTITY_RESOLVERS
+    ):
         anchor_type, anchor_id = row.parent_entity_type, row.parent_entity_id
     resolver_fn = ENTITY_RESOLVERS.get(row.entity_type) or ENTITY_RESOLVERS.get(anchor_type)
     if resolver_fn:
@@ -94,13 +99,24 @@ def present_audit(s: Session, ctx, row: AuditLog, *, full: bool = False) -> dict
             old = {**old, "_snapshot": _mask(old["_snapshot"], pii)}
         label = None
     data = {
-        "id": row.id, "entity_type": row.entity_type, "entity_id": row.entity_id,
-        "entity_label": label, "action": row.action, "changed_fields": row.changed_fields,
-        "old_value": _resolve_values(s, old), "new_value": _resolve_values(s, new),
-        "performed_by": _actor(s, row.performed_by), "performed_on": clock.to_rfc3339(row.performed_on),
-        "performed_via": row.performed_via, "parent_entity_type": row.parent_entity_type,
-        "parent_entity_id": row.parent_entity_id, "transaction_id": row.transaction_id, "request_id": row.request_id,
-        "ip_address": mask_ip(row.ip_address), "reason": row.reason, "payload_schema": row.payload_schema,
+        "id": row.id,
+        "entity_type": row.entity_type,
+        "entity_id": row.entity_id,
+        "entity_label": label,
+        "action": row.action,
+        "changed_fields": row.changed_fields,
+        "old_value": _resolve_values(s, old),
+        "new_value": _resolve_values(s, new),
+        "performed_by": _actor(s, row.performed_by),
+        "performed_on": clock.to_rfc3339(row.performed_on),
+        "performed_via": row.performed_via,
+        "parent_entity_type": row.parent_entity_type,
+        "parent_entity_id": row.parent_entity_id,
+        "transaction_id": row.transaction_id,
+        "request_id": row.request_id,
+        "ip_address": mask_ip(row.ip_address),
+        "reason": row.reason,
+        "payload_schema": row.payload_schema,
     }
     if full:
         data["user_agent"] = row.user_agent
@@ -146,8 +162,12 @@ def audit_query(q: AuditQuery):
             from veda.kernel.ids import is_valid_id
 
             if not is_valid_id(q.performed_by):
-                raise ApiError(422, "INVALID_ID", "performed_by is not a canonical id.",
-                               errors=[field_error("performed_by", "INVALID_ID", "Expected an id or 'system'.")])
+                raise ApiError(
+                    422,
+                    "INVALID_ID",
+                    "performed_by is not a canonical id.",
+                    errors=[field_error("performed_by", "INVALID_ID", "Expected an id or 'system'.")],
+                )
             stmt = stmt.where(AuditLog.performed_by == q.performed_by)
     if q.performed_via:
         stmt = stmt.where(AuditLog.performed_via.in_(csv(q.performed_via)))
@@ -190,6 +210,7 @@ def get_audit(req: Req, audit_id: str):
 
 # --- security events (SEVT-005, owner Decision 1) ----------------------------------------------
 
+
 class SecurityQuery(Query):
     subject_user_id: Id | None = None
     event_type: str | None = None
@@ -206,28 +227,53 @@ class SecurityQuery(Query):
 def present_event(s: Session, row: SecurityEventLog) -> dict:
     # email_attempted_hash, chain_seq, prev_hash, chain_key_label and row_hash are never returned (SEVT-005).
     return {
-        "id": row.id, "event_type": row.event_type, "event_category": row.event_category, "outcome": row.outcome,
-        "severity": row.severity, "subject_user": _actor(s, row.subject_user_id), "actor": _actor(s, row.created_by),
-        "failure_reason": row.failure_reason, "permission_code": row.permission_code,
-        "target_entity_type": row.target_entity_type, "target_entity_id": row.target_entity_id,
-        "occurred_on": clock.to_rfc3339(row.occurred_on), "ip_address": row.ip_address, "user_agent": row.user_agent,
-        "request_id": row.request_id, "session_id": row.session_id, "detail": row.detail,
+        "id": row.id,
+        "event_type": row.event_type,
+        "event_category": row.event_category,
+        "outcome": row.outcome,
+        "severity": row.severity,
+        "subject_user": _actor(s, row.subject_user_id),
+        "actor": _actor(s, row.created_by),
+        "failure_reason": row.failure_reason,
+        "permission_code": row.permission_code,
+        "target_entity_type": row.target_entity_type,
+        "target_entity_id": row.target_entity_id,
+        "occurred_on": clock.to_rfc3339(row.occurred_on),
+        "ip_address": row.ip_address,
+        "user_agent": row.user_agent,
+        "request_id": row.request_id,
+        "session_id": row.session_id,
+        "detail": row.detail,
     }
 
 
-@api.route("GET", "/security-events", permission="security_event.read", query=SecurityQuery, write=False,
-           requirement="SEVT-005")
+@api.route(
+    "GET",
+    "/security-events",
+    permission="security_event.read",
+    query=SecurityQuery,
+    write=False,
+    requirement="SEVT-005",
+)
 def list_security_events(req: Req):
     q = req.query
     filtered = any([q.subject_user_id, q.event_type, q.event_category, q.outcome, q.severity, q.ip])
     if not filtered and q.from_ and (q.to or clock.now()) - q.from_ > timedelta(days=31):
-        raise ApiError(422, "INVALID_QUERY_PARAM", "Unfiltered queries are limited to 31 days.",
-                       errors=[field_error("from", "INVALID_QUERY_PARAM", "Narrow the range or add a filter.")])
+        raise ApiError(
+            422,
+            "INVALID_QUERY_PARAM",
+            "Unfiltered queries are limited to 31 days.",
+            errors=[field_error("from", "INVALID_QUERY_PARAM", "Narrow the range or add a filter.")],
+        )
     stmt = sa.select(SecurityEventLog)
     if q.subject_user_id:
         stmt = stmt.where(SecurityEventLog.subject_user_id == q.subject_user_id)
-    for field, col in (("event_type", SecurityEventLog.event_type), ("event_category", SecurityEventLog.event_category),
-                       ("outcome", SecurityEventLog.outcome), ("severity", SecurityEventLog.severity)):
+    for field, col in (
+        ("event_type", SecurityEventLog.event_type),
+        ("event_category", SecurityEventLog.event_category),
+        ("outcome", SecurityEventLog.outcome),
+        ("severity", SecurityEventLog.severity),
+    ):
         value = getattr(q, field)
         if value:
             stmt = stmt.where(col.in_(csv(value)))
@@ -242,10 +288,19 @@ def list_security_events(req: Req):
     cur = decode_cursor(q.cursor)
     if cur:
         t = clock.parse_rfc3339(cur[0])
-        stmt = stmt.where(sa.or_(SecurityEventLog.occurred_on < t,
-                                 sa.and_(SecurityEventLog.occurred_on == t, SecurityEventLog.id < cur[1])))
-    rows = req.session.execute(stmt.order_by(SecurityEventLog.occurred_on.desc(), SecurityEventLog.id.desc())
-                               .limit(q.limit + 1)).scalars().all()
+        stmt = stmt.where(
+            sa.or_(
+                SecurityEventLog.occurred_on < t,
+                sa.and_(SecurityEventLog.occurred_on == t, SecurityEventLog.id < cur[1]),
+            )
+        )
+    rows = (
+        req.session.execute(
+            stmt.order_by(SecurityEventLog.occurred_on.desc(), SecurityEventLog.id.desc()).limit(q.limit + 1)
+        )
+        .scalars()
+        .all()
+    )
     rows, meta = cursor_page(rows, q.limit, "occurred_on")
     return ok([present_event(req.session, r) for r in rows], meta=meta)
 

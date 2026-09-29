@@ -14,6 +14,7 @@ LeadStatus = Literal["NEW", "CONTACTED", "SITE_VISIT", "QUOTATION_SENT", "NEGOTI
 
 # --- public intake: loose types, validated in the service after idempotency and CAPTCHA (04 §5.1) ---
 
+
 class PublicConsent(Closed):
     acknowledged: Any = None
     policy_version: Any = None
@@ -47,9 +48,19 @@ class PublicLeadIn(Closed):
 
 # --- staff ------------------------------------------------------------------------------------
 
+
 class ConsentCapture(Closed):
-    channel: Literal["PHONE_VERBAL", "IN_PERSON", "WHATSAPP", "EMAIL", "WEBSITE_FORM"]
+    """Consent captured by staff. WEBSITE_FORM is reserved for the public form, whose request context is the
+    evidence; staff cannot assert it (IR-16)."""
+
+    channel: Literal["PHONE_VERBAL", "IN_PERSON", "WHATSAPP", "EMAIL"]
     policy_version: Annotated[str, text(20, min_len=1)]
+
+
+class ConsentRecapture(ConsentCapture):
+    """Re-consent on an existing lead (04 §5.4, DEV-004 as corrected): how and when it was obtained."""
+
+    note: Annotated[str, text(500, min_len=1)]
 
 
 class LeadCreateIn(Closed):
@@ -72,13 +83,40 @@ class LeadCreateIn(Closed):
 
 
 class LeadPatchIn(Closed):
-    __not_updatable__ = frozenset({
-        "status", "assigned_to", "lead_number", "public_reference", "id", "created_on", "updated_on", "created_by",
-        "updated_by", "is_deleted", "deleted_on", "deleted_by", "version", "duplicate_status", "duplicate_of_lead_id",
-        "consent_contact", "consent_policy_version", "consent_captured_on", "consent_channel", "consent_source_page",
-        "consent_ip_address", "consent_withdrawn_on", "consent_withdrawal_channel", "consent_withdrawal_note",
-        "intake_idempotency_key", "intake_request_fingerprint", "spam_status", "won_on", "lost_on", "anonymized_on",
-    })
+    __not_updatable__ = frozenset(
+        {
+            "status",
+            "assigned_to",
+            "lead_number",
+            "public_reference",
+            "id",
+            "created_on",
+            "updated_on",
+            "created_by",
+            "updated_by",
+            "is_deleted",
+            "deleted_on",
+            "deleted_by",
+            "version",
+            "duplicate_status",
+            "duplicate_of_lead_id",
+            "consent_contact",
+            "consent_policy_version",
+            "consent_captured_on",
+            "consent_channel",
+            "consent_source_page",
+            "consent_ip_address",
+            "consent_withdrawn_on",
+            "consent_withdrawal_channel",
+            "consent_withdrawal_note",
+            "intake_idempotency_key",
+            "intake_request_fingerprint",
+            "spam_status",
+            "won_on",
+            "lost_on",
+            "anonymized_on",
+        }
+    )
     name: Annotated[str | None, text(150, min_len=1)] = None
     phone: Phone | None = None
     email: Email | None = None
@@ -92,7 +130,7 @@ class LeadPatchIn(Closed):
     source_code: Annotated[str | None, text(50, min_len=1)] = None
     source_detail: Annotated[str | None, optional_text(200)] = None
     expected_close_on: CalendarDate | None = None
-    consent: ConsentCapture | None = None  # re-consent capture (04 §5.4)
+    consent: ConsentRecapture | None = None  # re-consent capture (04 §5.4, DEV-004)
 
 
 class StatusChangeIn(Closed):
@@ -177,6 +215,7 @@ class CursorQuery(Query):
 
 # --- notes and activities -------------------------------------------------------------------------
 
+
 class NoteIn(Closed):
     body: Annotated[str, text(10000, min_len=1)]
     is_pinned: bool = False
@@ -193,8 +232,18 @@ class NotesQuery(Query):
     page_size: Annotated[int, Field(ge=1, le=100)] = 50
 
 
-ActivityType = Literal["CALL", "WHATSAPP", "EMAIL", "MEETING", "SITE_VISIT", "QUOTATION", "FOLLOW_UP", "STATUS_CHANGE",
-                       "ASSIGNMENT", "SYSTEM"]
+ActivityType = Literal[
+    "CALL",
+    "WHATSAPP",
+    "EMAIL",
+    "MEETING",
+    "SITE_VISIT",
+    "QUOTATION",
+    "FOLLOW_UP",
+    "STATUS_CHANGE",
+    "ASSIGNMENT",
+    "SYSTEM",
+]
 
 
 class ActivityIn(Closed):
@@ -212,8 +261,17 @@ class ActivityIn(Closed):
 
 
 class ActivityPatch(Closed):
-    __not_updatable__ = frozenset({"activity_type", "activity_status", "is_system_generated", "lead_id", "from_status",
-                                   "to_status", "completed_on"})
+    __not_updatable__ = frozenset(
+        {
+            "activity_type",
+            "activity_status",
+            "is_system_generated",
+            "lead_id",
+            "from_status",
+            "to_status",
+            "completed_on",
+        }
+    )
     subject: Annotated[str | None, text(200, min_len=1)] = None
     description: Annotated[str | None, optional_text(4000)] = None
     scheduled_on: Instant | None = None

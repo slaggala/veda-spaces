@@ -1,17 +1,361 @@
 # Veda Spaces P0 — Implementation Report
 
-> **Not certified, not merged, not deployed.** This report is the author's evidence for independent
-> implementation review. Nothing here approves the implementation or its deviations.
+> **Not certified, not merged, not deployed.** This report is the author's evidence for the targeted independent
+> re-review that follows the remediation of the independent implementation review. It approves nothing.
 
 | Item | Value |
 |---|---|
-| Architecture baseline SHA | `778aa8fdd918da48340319696ada3ff673e9fb8e` (certified architecture, unchanged) |
-| Implementation branch | `implementation/p0-foundation` (branch point = baseline) |
-| Authorization | Owner briefs `VEDA-SPACES-P0-IMPLEMENTATION-01` and `…-IMPLEMENTATION-FREEZE-01` |
-| Deviation register | [P0-implementation-deviations.md](P0-implementation-deviations.md) (4 entries, all PENDING INDEPENDENT REVIEW) |
-| Evidence | [evidence/](evidence/) — raw command output from the clean-environment run |
+| Certified architecture | `778aa8fdd918da48340319696ada3ff673e9fb8e` (existing documents unchanged; proposed amendments sit in `docs/architecture/amendments/`) |
+| Implementation branch | `implementation/p0-foundation` |
+| Reviewed implementation | `9236aa3ade38c33d03a57cf7a064ece29937b109` |
+| Independent review | review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4 — verdict **NOT CERTIFIED** ({'BLOCKER': 1, 'MAJOR': 18, 'MINOR': 20, 'ADVISORY': 25}) |
+| Remediation workstream | VEDA-SPACES-P0-IMPLEMENTATION-REMEDIATION-01 (one commit on top of `9236aa3`) |
+| Remediation matrix | [P0-review-remediation-matrix.md](P0-review-remediation-matrix.md) (+ `.json`) — all 39 findings, 25 advisories, 11 open issues |
+| Open issues | [P0-open-issues.md](P0-open-issues.md) (+ `.json`) — 106 entries incl. every gate |
+| Deviations | [P0-implementation-deviations.md](P0-implementation-deviations.md) — DEV-001…DEV-008, none approved |
+| Amendments | [docs/architecture/amendments](../architecture/amendments/README.md) — AM-1…AM-11, all PROPOSED, NOT APPROVED |
+| Runbooks | [docs/operations/api-runbooks.md](../operations/api-runbooks.md) |
+| Evidence | [evidence/remediation/](evidence/remediation/) — raw output of the clean-environment run below |
 
-## 1. Directory structure
+## 1. IR-01 (BLOCKER): MFA enrollment confirmation bound to its principal, session, factor and path
+
+**Root cause.** `enroll_confirm` picked the enrollment path from whether a bearer token was present (path A)
+instead of from the challenge. It never compared the caller with the challenge owner, and an unbound
+(path B/C) challenge accepted any bearer. So a victim's access token plus the attacker's own enrollment
+transaction marked the victim's session MFA-verified and freshly stepped-up (review probes P1, P1b).
+
+**Fix.**
+- Every ENROLLMENT challenge now records `enrollment_path` (INVITE_CONTEXT, PATH_A…PATH_D) and the `factor_id` it
+  may promote (migration `0009_mfa_challenge_binding`, DEV-006/AM-11).
+- Confirm derives everything from server state:
+  - paths A/D require caller user = challenge user, caller session = initiating session, and the right session type;
+  - paths B/C refuse any bearer;
+  - the factor must still be PENDING and owned by the challenge user;
+  - eligibility is re-checked (account state, live invitation, N-A1, no ACTIVE factor for path C).
+- A binding failure counts against the transaction, records a redacted event and answers like an unknown challenge.
+- Success elevates only the initiating session (with a fresh refresh token), and ends every other open enrollment
+  transaction and link. Concurrent confirmations serialise.
+- The step-up, login, recovery, password-reset, email-change, invitation, approval and break-glass flows were reviewed
+  for the same confusion; step-up was already bound, and the token flows take the principal from the token, not a
+  bearer.
+
+**Exploit regression evidence.** `tests/integration/test_mfa_binding.py`, 19 tests covering P1, P1b, a path-D
+variant, the attacker/victim bearer swap, another session of the same user, revoked or disabled sessions, stale
+eligibility, expiry, replay, a wrong factor, wrong-purpose tokens, the invitation context, recovery transactions,
+parallel confirms, failure half-way, a failed replacement, and refresh rotation.
+- **Before the fix** (`9236aa3`): 14 failed on SQLite and 15 on PostgreSQL, each exploit case answering
+  `200 AUTHENTICATED` ([ir01-prefix-sqlite.txt](evidence/remediation/ir01-prefix-sqlite.txt),
+  [ir01-prefix-postgresql.txt](evidence/remediation/ir01-prefix-postgresql.txt)).
+- **After the fix:** all pass on SQLite, PostgreSQL 16.4 and PostgreSQL 18.4
+  ([security-regressions-sqlite.txt](evidence/remediation/security-regressions-sqlite.txt),
+  [security-regressions-pg16.txt](evidence/remediation/security-regressions-pg16.txt)).
+- **Reviewed code against the new suites:** the lead/consent/MFA/intake regression files fail 29 of 39 on
+  `9236aa3` ([prefix-9236aa3-sqlite.txt](evidence/remediation/prefix-9236aa3-sqlite.txt)).
+
+## 2. Findings after remediation
+
+| Severity | Resolved | Resolved — amendment pending owner decision | Partially resolved | Open |
+|---|---|---|---|---|
+| BLOCKER | — | IR-01 | — | — |
+| MAJOR | IR-02, IR-04, IR-05, IR-08, IR-09, IR-13, IR-14, IR-15, IR-17, IR-18, IR-19 | IR-07, IR-10, IR-16 | IR-03, IR-06, IR-11, IR-12 | — |
+| MINOR | IR-20, IR-21, IR-22, IR-24, IR-25, IR-26, IR-27, IR-28, IR-29, IR-30, IR-31, IR-35, IR-36, IR-37, IR-39 | IR-23 | IR-32, IR-38 | IR-33, IR-34 |
+
+*Partially resolved* means every repository deliverable is complete, but a staging or production execution gate
+remains:
+- IR-03 and IR-06: real S3 and STS in staging;
+- IR-11: RG-1, RG-2 and RG-7 rehearsals;
+- IR-12: alarm routing and the RG-5 test-fire;
+- IR-32: Privacy Notice and Turnstile site key;
+- IR-38: Firefox and WebKit legs.
+
+The two *open* MINORs are gate-scoped exactly as the reviewer classified them:
+- IR-33: the PostgreSQL release gate;
+- IR-34: before the first registry change.
+
+Per-finding detail is in the matrix.
+
+## 3. What changed
+
+**Schema.**
+- One expand-only migration, `0009_mfa_challenge_binding`: two nullable columns on `mfa_challenge`, one FK and
+  CHECKs.
+- Totals: 24 tables, 10 revisions, one Alembic head.
+- No other table changed.
+- 105 API routes, the same count as `9236aa3`; the contract is frozen in `api/openapi.snapshot.json`.
+
+**Backend** (`api/veda`):
+- MFA transaction binding (IR-01, IR-20, IR-21).
+- Founder-governance fixes:
+  - execution-time G11/G9;
+  - promotion cancels STANDARD requests;
+  - approvals re-read after the governance lock;
+  - break-glass operating mode;
+  - STS custodian identity;
+  - consistent I3.
+- Fail-closed configuration for all four environments (IR-09).
+- Turnstile outside the write lock (IR-02).
+- Tamper evidence: external anchor store, archival boundary.
+- Readiness schema semantics (IR-10, IR-A17).
+- Snapshot and restore verification (IR-11).
+- EMF metrics (IR-12).
+- Logging:
+  - masked JSON for every record;
+  - exceptions without messages;
+  - `hide_parameters`;
+  - Sentry scrubbing (IR-27).
+- Lead and notification fixes (IR-16, IR-28, IR-29, IR-30).
+- Throttling and events:
+  - parsed /24 and /64 networks, and per-(email, network) limits;
+  - reauth throttle;
+  - the missing security events;
+  - trusted-proxy client IP;
+  - single-instance enforcement (IR-22…IR-25, IR-35).
+- Advisories: RBX register validation, Turnstile hostname check, CSRF origin, reset invalidation, CLI audit labels
+  (IR-A03, A04, A05, A13, A19).
+
+**Frontend** (`app/`):
+- Conflict re-apply sends only the user's edits (IR-15).
+- Route titles, focus and announcement (IR-19).
+- Sign-out-everywhere (IR-36).
+- Break-glass cancel page (IR-07).
+- The five accessibility items of IR-37.
+- CSSOM style binding, no production source maps (IR-A21).
+- Tooling: ESLint; Node 22 LTS; Vite 7.3; Web Test Runner 1.0; public-registry lockfile (IR-39).
+
+**Website** (`dist/`, intake still disabled):
+- Hidden-state CSS (IR-17).
+- Turnstile reset and token gate (IR-18).
+- Policy-version fallback (IR-31).
+- DOM-built error summary, `#form-note` contrast, site CSP (IR-32).
+- The consent/verification block and the Privacy Notice link appear only when intake is enabled.
+
+**Supply chain and CI:**
+- Hash-locked Python requirements and a digest-pinned base image (IR-13).
+- CI gates: dual engine including PostgreSQL 16, format, types, OpenAPI diff, secret scan, audits, image scan,
+  browser E2E + axe (IR-14).
+
+**Operations:** Litestream config, `deploy.sh`, runbooks (IR-11).
+
+**Documentation:**
+- remediation matrix;
+- open-issue register;
+- deviations DEV-001…DEV-008;
+- amendments AM-1…AM-11 (PROPOSED).
+
+## 4. Test and evidence reproduction (clean environment)
+
+**Environment.** A fresh copy of exactly the files to be committed (`git ls-files -co --exclude-standard`),
+byte-identical to the working tree ([clean-copy.txt](evidence/remediation/clean-copy.txt),
+[source-manifest.sha256](evidence/remediation/source-manifest.sha256)).
+- A new Python 3.13.7 venv installed with `pip install --require-hashes -r requirements-dev.txt`
+  ([api-pip-freeze.txt](evidence/remediation/api-pip-freeze.txt)).
+- Node BuildVersion:		25G83 with `npm ci` against registry.npmjs.org.
+- Databases: SQLite 3.50.4; PostgreSQL 16.4 (TCP server from the
+  `pixeltable-pgserver` 0.2.9 binaries); PostgreSQL 18.4 (embedded `pixeltable-pgserver` 0.6.0);
+  Playwright Chromium.
+- Host ([environment.txt](evidence/remediation/environment.txt)): Darwin <host> 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:36 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T
+
+| Step | Command | Exit | Time | Output |
+|---|---|---|---|---|
+| `api-venv` | `python3.13 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements-dev.txt` | 0 | 48s | [api-venv.txt](evidence/remediation/api-venv.txt) |
+| `api-pip-freeze` | `.venv/bin/pip freeze --all` | 0 | 1s | [api-pip-freeze.txt](evidence/remediation/api-pip-freeze.txt) |
+| `api-ruff-check` | `.venv/bin/ruff check veda tests migrations tools` | 0 | 0s | [api-ruff-check.txt](evidence/remediation/api-ruff-check.txt) |
+| `api-ruff-format` | `.venv/bin/ruff format --check veda tests migrations tools` | 0 | 1s | [api-ruff-format.txt](evidence/remediation/api-ruff-format.txt) |
+| `api-mypy-ratchet` | `/private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scratchpad/clean2/api/.venv/b` | 0 | 9s | [api-mypy-ratchet.txt](evidence/remediation/api-mypy-ratchet.txt) |
+| `api-openapi` | `/private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scratchpad/clean2/api/.venv/b` | 0 | 8s | [api-openapi.txt](evidence/remediation/api-openapi.txt) |
+| `api-deploy-check` | `VEDA_ENV=test /private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scratchpad/clea` | 0 | 0s | [api-deploy-check.txt](evidence/remediation/api-deploy-check.txt) |
+| `api-bandit` | `.venv/bin/bandit -q -r veda -ll -ii` | 0 | 2s | [api-bandit.txt](evidence/remediation/api-bandit.txt) |
+| `api-bandit-all` | `.venv/bin/bandit -q -r veda -f txt; true` | 0 | 1s | [api-bandit-all.txt](evidence/remediation/api-bandit-all.txt) |
+| `api-pip-audit` | `.venv/bin/pip-audit -r requirements.txt --require-hashes --disable-pip --strict --progress-spinner off` | 0 | 5s | [api-pip-audit.txt](evidence/remediation/api-pip-audit.txt) |
+| `secret-scan` | `git init -q . 2>/dev/null; git add -A >/dev/null 2>&1; PATH=/private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb` | 0 | 11s | [secret-scan.txt](evidence/remediation/secret-scan.txt) |
+| `pytest-sqlite` | `VEDA_TEST_ENGINES=sqlite /private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scra` | 0 | 28s | [pytest-sqlite.txt](evidence/remediation/pytest-sqlite.txt) |
+| `pytest-pg16` | `VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres /private/tmp/claude-501/-Users-srinivasu` | 0 | 82s | [pytest-pg16.txt](evidence/remediation/pytest-pg16.txt) |
+| `pytest-pg18` | `VEDA_TEST_ENGINES=postgresql /private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/` | 0 | 74s | [pytest-pg18.txt](evidence/remediation/pytest-pg18.txt) |
+| `security-regressions-sqlite` | `VEDA_TEST_ENGINES=sqlite /private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scra` | 0 | 7s | [security-regressions-sqlite.txt](evidence/remediation/security-regressions-sqlite.txt) |
+| `security-regressions-pg16` | `VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres /private/tmp/claude-501/-Users-srinivasu` | 0 | 23s | [security-regressions-pg16.txt](evidence/remediation/security-regressions-pg16.txt) |
+| `migrations-sqlite-pg18` | `ENGINES=sqlite,postgresql /private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scr` | 0 | 2s | [migrations-sqlite-pg18.txt](evidence/remediation/migrations-sqlite-pg18.txt) |
+| `migrations-pg16` | `ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres /private/tmp/claude-501/-Users-srinivasulu-laggala` | 0 | 2s | [migrations-pg16.txt](evidence/remediation/migrations-pg16.txt) |
+| `app-npm-ci` | `npm ci --no-fund` | 0 | 5s | [app-npm-ci.txt](evidence/remediation/app-npm-ci.txt) |
+| `app-lint` | `npm run lint` | 0 | 2s | [app-lint.txt](evidence/remediation/app-lint.txt) |
+| `app-typecheck` | `npm run typecheck` | 0 | 4s | [app-typecheck.txt](evidence/remediation/app-typecheck.txt) |
+| `app-lint-tokens` | `npm run lint:tokens` | 0 | 0s | [app-lint-tokens.txt](evidence/remediation/app-lint-tokens.txt) |
+| `app-contrast` | `npm run test:contrast` | 0 | 0s | [app-contrast.txt](evidence/remediation/app-contrast.txt) |
+| `app-test` | `npm test` | 0 | 6s | [app-test.txt](evidence/remediation/app-test.txt) |
+| `app-build` | `npm run build` | 0 | 3s | [app-build.txt](evidence/remediation/app-build.txt) |
+| `app-audit-runtime` | `npm audit --omit=dev` | 0 | 2s | [app-audit-runtime.txt](evidence/remediation/app-audit-runtime.txt) |
+| `app-audit-all` | `npm audit` | 0 | 4s | [app-audit-all.txt](evidence/remediation/app-audit-all.txt) |
+| `e2e` | `API_PYTHON=/private/tmp/claude-501/-Users-srinivasulu-laggala-Documents-veda-spaces-aws-source/a8fccb24-d8d1-42b6-801b-51ca021aba4a/scratchpad/clean2/` | 0 | 160s | [e2e.txt](evidence/remediation/e2e.txt) |
+
+**Backend test results**
+- SQLite: 435 passed in 25.71s
+- PostgreSQL 16.4: 427 passed, 8 skipped in 80.21s
+- PostgreSQL 18.4: 427 passed, 8 skipped in 72.50s
+
+On PostgreSQL the skips are the two SQLite-only schema checks and the six SQLite-only snapshot/restore tests. JUnit:
+[pytest-sqlite.xml](evidence/remediation/pytest-sqlite.xml), [pytest-pg16.xml](evidence/remediation/pytest-pg16.xml),
+[pytest-pg18.xml](evidence/remediation/pytest-pg18.xml).
+
+**Security regressions** (IR/DEV suites, verbose):
+- SQLite: 162 passed in 6.66s
+- PostgreSQL 16.4: 156 passed, 6 skipped in 22.27s
+
+Concurrency cases include parallel enrollment confirmations, a promotion racing a STANDARD approval, and the existing
+TD-F and G10 suites. Audit-chain cases are in `test_chain_integrity.py` and `test_audit_security.py`.
+
+**Migrations** ([migrations-sqlite-pg18.txt](evidence/remediation/migrations-sqlite-pg18.txt),
+[migrations-pg16.txt](evidence/remediation/migrations-pg16.txt)):
+
+| Check | SQLite 3.50.4 | PostgreSQL 16.4 | PostgreSQL 18.4 |
+|---|---|---|---|
+| Empty → head | 0009_mfa_challenge_binding | 0009_mfa_challenge_binding | 0009_mfa_challenge_binding |
+| Heads / revisions | ['0009_mfa_challenge_binding'] / 10 | ['0009_mfa_challenge_binding'] / 10 | same |
+| Tables / columns / indexes / FKs | 24 / 504 / 72 / 108 | 24 / 504 / 72 / 108 | 24 / 504 / 72 / 108 |
+| CHECK constraints | 498 | 164 | 164 |
+| Conformance (03 §2.7) / audit columns / guards | True / True / True | True / True / True | True / True / True |
+| Human users / password hashes seeded | 0 / 0 | 0 / 0 | 0 / 0 |
+| Seeds (roles, permissions, matrix, lookups, system users, sequence); deterministic | {'roles': 3, 'permissions': 45, 'matrix': 101, 'lookups': 47, 'system_users': 3, 'sequence': 1}; True | {'roles': 3, 'permissions': 45, 'matrix': 101, 'lookups': 47, 'system_users': 3, 'sequence': 1}; True | {'roles': 3, 'permissions': 45, 'matrix': 101, 'lookups': 47, 'system_users': 3, 'sequence': 1}; True |
+| Raw UUIDv4 insert rejected by the database | True | n/a (native uuid; version nibble validated by the kernel GUID type on bind) | same |
+| `downgrade -1` (0009 → 0100) | refused; schema stays at 0009_mfa_challenge_binding with ['enrollment_path', 'factor_id'] | refused; stays at 0009_mfa_challenge_binding | refused; stays at 0009_mfa_challenge_binding |
+
+**Rollback boundary** (IR-10, AM-6). Down-migrations do not exist and are refused. That is not rollback support in
+itself. The supported rollback is:
+- **Normal:** the N-1 image on the migrated, expand-only schema. Readiness accepts it only after the operator declares
+  the newer revision (`VEDA_SCHEMA_AHEAD_ACCEPTED`), and never when the database is behind.
+- **Disaster:** restore the pre-deploy snapshot, verified by `veda maintenance restore-verify`, and accept the reported
+  data-loss window (runbook §2–§3).
+
+`test_ops_remediation.py` exercises the boundary; `test_schema.py::test_migration_upgrade_with_data` upgrades data
+from N-1 to head on every engine. RG-7 (rehearsal on the host) is not executed.
+
+**Frontend** (clean `npm ci`, Node 22): ESLint, typecheck, token lint, contrast (58 pairs), unit/component tests
+(52 passed, 0 failed; the title test runs twice because `components.test` imports `router.test`), and the production build all
+exit 0. `npm audit --omit=dev` and a full `npm audit` both report 0 vulnerabilities
+on registry.npmjs.org.
+
+**Browser** ([e2e.txt](evidence/remediation/e2e.txt)). A live stack from the clean copy: Flask on SQLite, Vite, and the site served
+with its production `_headers` (intake on at :8000, flag off at :8001).
+- Workspace, 7/7 journeys passed:
+  - invitation with forced MFA enrollment;
+  - TOTP sign-in;
+  - lead from the website;
+  - status change;
+  - audit;
+  - mobile.
+- Access, 16/16 access checks passed:
+  - permission denial proven with a Sales token;
+  - route title and focus;
+  - session revocation on reload and in-app;
+  - logout with a refused refresh;
+  - repeated, duplicate and invalid submissions;
+  - TD-F step-4 re-apply;
+  - break-glass cancel from the real email;
+  - sign-out-everywhere.
+- Website, 14/14 site checks passed:
+  - server 422 → Turnstile reset → 201;
+  - form hidden after success and fallback;
+  - policy-version fallback;
+  - network fallback;
+  - flag off hides consent, verification and the link;
+  - 360 px;
+  - **0 CSP violations** under the production policy.
+- Axe, 10/10 screens without serious/critical violations:
+  - 8 workspace screens;
+  - the website form scope;
+  - 18 pre-existing marketing nodes tracked (OI-11).
+
+Not covered in the browser:
+- Chromium only (Firefox and WebKit are OI-RM-2);
+- recovery with a recovery code, which is covered at API level (`test_mfa.py`, `test_mfa_binding.py`).
+
+**Security**:
+- Secret scan: no candidates beyond the reviewed baseline ([secret-scan.txt](evidence/remediation/secret-scan.txt)); `founder.json`
+  and screenshots from the E2E run are not committed.
+- `pip-audit` on the hash lock: no known vulnerabilities ([api-pip-audit.txt](evidence/remediation/api-pip-audit.txt)).
+- Bandit: medium and above, 0 ([api-bandit.txt](evidence/remediation/api-bandit.txt)). The low findings are in
+  [api-bandit-all.txt](evidence/remediation/api-bandit-all.txt): message strings and subprocess use in the scheduler.
+- IR-01 exploit regressions: §1.
+- Route authorization inventory: startup RBX-register validation, plus `test_rbac.py` role × endpoint matrix.
+- IDOR, mass-assignment, token-replay, MFA-bypass and step-up-bypass probes: `test_rbac.py`, `test_api_contract.py`,
+  `test_mfa.py`, `test_mfa_binding.py`, `test_auth.py`, `test_governance_remediation.py`.
+
+Manual security review and DAST (PG-DAST) are still required. Automated checks are supporting evidence only.
+
+## 5. CI
+
+`.github/workflows/ci.yml` runs on this branch. Every job is mandatory, and the actions are pinned to commit SHAs:
+- **api** (SQLite, and PostgreSQL 16 service): ruff check and format, mypy ratchet, full pytest, OpenAPI diff,
+  deploy-check.
+- **security:** secret scan, pip-audit, bandit, npm audit, image build + Trivy.
+- **app:** ESLint, typecheck, tokens, contrast, tests, build.
+- **e2e:** journeys + axe.
+
+The first run is triggered by this push; its result is recorded in the final report of the remediation, not here.
+
+## 6. Deviations and amendments
+
+- DEV-001…DEV-003: acceptable with amendments per the reviewer. Their conditions are resolved: IR-20; IR-01, IR-21,
+  IR-25; IR-22, IR-09, IR-02.
+- DEV-004: corrected (IR-16).
+- DEV-005: the cancel link (IR-07).
+- DEV-006: binding columns (IR-01).
+- DEV-007: per-(email, network) limits (IR-23).
+- DEV-008: readiness semantics (IR-10, IR-A17).
+
+All await the Architecture Owner through AM-1…AM-11, which are PROPOSED, NOT APPROVED. The certified documents are
+byte-identical to `778aa8f`.
+
+## 7. Blockers by stage (after remediation)
+
+**Merge:**
+- Targeted independent re-review of this commit.
+- Architecture-Owner decisions on AM-1…AM-5, and on AM-6, AM-7 and AM-11, which back implemented behaviour.
+- Owner gates TG-01 and TG-08 recorded.
+- A green first CI run (OI-RM-1).
+
+**Staging** — everything above, plus:
+- developer machines and CI on Node ≥ 22.13;
+- staging verification of SES, KMS, S3 anchors and STS custodians (IR-03, IR-06, OI-6).
+
+**Production** — everything above, plus:
+- RG-1…RG-9;
+- PG-DAST, PG-BG, PG-RET and PG-EMAIL;
+- OWNER-INPUT-001…004;
+- alarm routing and the RG-5 test-fire (IR-12);
+- rehearsals (IR-11);
+- Firefox and WebKit legs (OI-RM-2);
+- the manual screen-reader script (OI-RM-5);
+- the open advisories the owner decides to require.
+
+**Public intake enablement:**
+- Privacy Notice v2026-09-v1 page;
+- Turnstile site key;
+- a run with the real Turnstile test keys (IR-32, IR-18 residual);
+- PG-PRIV.
+
+The API base stays empty in `dist/index.html`.
+
+**PostgreSQL release (PGM-1):** IR-33, IR-A01, IR-A16, the data-migration rehearsal.
+
+## 8. Corrections to earlier claims
+
+- **DEV-004 lead-drawer control.** The register claimed a lead-drawer re-consent control; none exists, and 09
+  specifies none (IR-A25). The register is corrected.
+- **Earlier `ruff format` and npm audit figures.** Superseded: the tree is now formatted, and the audits report 0.
+- **The eleven-item open-issue list.** Superseded by [P0-open-issues.md](P0-open-issues.md) (106 entries).
+- **The first report's test counts.** 273 on SQLite and 271 + 2 skipped on PostgreSQL 18.4 described `9236aa3`.
+  The counts above describe this commit.
+
+## 9. Status
+
+**The implementation is not certified, not merged and not deployed. The public lead API remains disabled.** No
+production gate was executed. The remediation is committed on `implementation/p0-foundation` for a targeted
+independent re-review.
+
+## Appendix A — P0 implementation reference (from the freeze report of 9236aa3, updated where the remediation changed it)
+
+### A.1 Directory structure
+
+As at the freeze commit. The remediation adds `docs/architecture/amendments/`, `docs/operations/` and `docs/implementation/evidence/remediation/`; its file-level changes are `git diff --stat 9236aa3 HEAD`.
 
 Directories added by the implementation (every directory containing a committed file):
 
@@ -68,7 +412,9 @@ Top-level roles: `api/` Flask backend (02 §3.2) · `app/` Lit + TypeScript work
 site (enquiry form only) · `.github/workflows/` CI definition (not run here) · `docs/implementation/` this report,
 deviation register and evidence.
 
-## 2. Files added, modified and removed
+### A.2 Files added, modified and removed
+
+As at the freeze commit (relative to the certified baseline).
 
 | Change | Files |
 |---|---|
@@ -77,7 +423,7 @@ deviation register and evidence.
 | Removed | None |
 | Unchanged | `docs/architecture/**` including review, remediation and validation documents (verified by `git diff --quiet 778aa8f -- docs/architecture`) |
 
-### dist/ changes (enquiry-form integration only, LEAD-001/019, 09 §4.11)
+#### dist/ changes (enquiry-form integration only, LEAD-001/019, 09 §4.11)
 
 - `dist/index.html`: three meta tags (`veda-api-base` — **empty, feature off**; `veda-turnstile-sitekey` — empty;
   `veda-policy-version`); the contact form replaced by the ADR-005 form (required name/phone/consent; optional email,
@@ -87,9 +433,9 @@ deviation register and evidence.
   original WhatsApp hand-off (verified by `e2e-site.txt` check 5). Navigation, modal and reveal code unchanged.
 - `dist/assets/enhancements.css`: styles appended for the new form states only.
 
-## 3. Database tables and migrations
+### A.3 Database tables and migrations
 
-24 tables, 9 revisions, one Alembic head (`0100_crm_leads`). Every table carries the nine audit-contract
+24 tables, 10 revisions (0009_mfa_challenge_binding added by the remediation), one Alembic head (`0009_mfa_challenge_binding`); counts at the freeze commit below, current counts in §4. Every table carries the nine audit-contract
 columns (ADR-003) with actor FKs to `app_user.id`; UUIDv7 32-hex ids (ADR-002); no table named `user` (ADR-001).
 
 | Revision | Tables | Audit policy |
@@ -103,6 +449,7 @@ columns (ADR-003) with actor FKs to `app_user.id`; UUIDv7 32-hex ids (ADR-002); 
 | 0007_notifications | outbox_event, notification | EVENT_ONLY |
 | 0008_account_security | admin_approval_request (+ app_user proposed-email, protection_level, cooling-off columns) | FULL |
 | 0100_crm_leads | lead, lead_note, lead_activity | FULL |
+| 0009_mfa_challenge_binding | mfa_challenge: factor_id, enrollment_path (IR-01, DEV-006/AM-11) | EVENT_ONLY (unchanged) |
 
 Migration evidence (`evidence/migration-evidence.json`, produced by `evidence/migration_evidence.py` on fresh databases):
 
@@ -127,7 +474,7 @@ the pre-migration snapshot. Additional migration tests: upgrade-with-data from 0
 (`test_migration_upgrade_with_data`, both engines), models-match-schema (`test_PLAT_005_…`), purge ordering with
 `foreign_keys=ON` (`test_DATA_017_…`), TD-H negative fixtures (12 cases). No migration requires manual data editing.
 
-## 4. API catalog
+### A.4 API catalog
 
 105 routes. Each declares a permission code or an RBX exception; startup fails otherwise (06 §8). 08 index row 75
 (`POST /leads/exports`, P1) is not built. `POST /api/v1/approvals/cancel-link` implements the 06 §7.5 signed
@@ -241,7 +588,7 @@ break-glass cancel link (see §13 OI-2).
 | 104 | POST | `/api/v1/users/{user_id}/unlock` | `user.status.manage` | AUTH-010 |
 | 105 | GET | `/api/v1/users/assignable` | `lead.assign` | LEAD-007 |
 
-## 5. UI screens (`app/`, 09 §4)
+### A.5 UI screens (`app/`, 09 §4)
 
 Login · MFA challenge · recovery · recovery-mode shell · enrollment (paths A–D) · recovery codes · forgot/reset password
 · accept invitation · verify/cancel email change · change password · dashboard · lead list (filters, spam-review queue,
@@ -249,9 +596,9 @@ mobile cards) · lead detail (stepper, transitions, assignment, timeline, notes,
 consent withdrawal, delete, erasure, history) · lead create/edit · follow-ups · users (invite; profile/access/security/
 sessions) · roles (matrix editor; FOUNDER locked) · permissions · audit log and security events · approvals · Founder
 actions · profile · notifications tray · command palette · step-up and version-conflict dialogs · no-access page.
-Website: enquiry-form states of 09 §4.11.
+Break-glass cancel page `/approvals/cancel` (DEV-005). Website: enquiry-form states of 09 §4.11.
 
-## 6. Permissions and role mappings (06 §6, code registry `api/veda/platform/rbac/registry.py`)
+### A.6 Permissions and role mappings (06 §6, code registry `api/veda/platform/rbac/registry.py`)
 
 45 permissions, 16 sensitive. ALL/OWN = scope; ✓ = granted without scope; — = not granted. SALES holds no sensitive
 permission; `user.founder.manage` exists only in FOUNDER (asserted by migration 0003 and unit tests).
@@ -304,213 +651,3 @@ permission; `user.founder.manage` exists only in FOUNDER (asserted by migration 
 | `lead_activity.update` | crm | — | STANDARD | ALL | ALL | OWN |
 | `lead_activity.delete` | crm | — | STANDARD | ALL | ALL | OWN |
 
-## 7. Test commands and results (clean environment)
-
-Environment: macOS (darwin 25.6, arm64) · Python 3.13.7 in a new venv from `api/requirements-dev.txt` · Node 20.9.0,
-npm 10.1.0 with `npm ci` · SQLite 3.50.4 (Python module) · PostgreSQL 18.4 (embedded via `pixeltable-pgserver`) ·
-Chromium (Playwright). The working tree's commit set was copied to an empty directory (`git ls-files -co
---exclude-standard`) and verified byte-identical before the final runs.
-
-| # | Command (from `api/` or `app/`) | Exit | Result |
-|---|---|---|---|
-| 1 | `ruff check veda tests migrations tools` | 0 | All checks passed |
-| 2 | `ruff format --check veda tests migrations tools` | 1 | 82 files would be reformatted — **no formatter is configured or enforced**; not applied (would be unrelated churn) |
-| 3 | static type analysis (mypy) | — | **Not configured** |
-| 4 | `VEDA_TEST_ENGINES=sqlite python -m pytest -o addopts="" -q -rs` | 0 | **273 passed, 0 failed, 0 skipped** |
-| 5 | `VEDA_TEST_ENGINES=postgresql python -m pytest -o addopts="" -q -rs` | 0 | **271 passed, 0 failed, 2 skipped** (SQLite-only checks) |
-| 6 | `python evidence/migration_evidence.py` | 0 | §3 |
-| 7 | `pip-audit -r requirements.txt` | 0 | No known vulnerabilities |
-| 8 | `bandit -q -r veda` | 1 | 1 High, 2 Medium, 18 Low — all triaged false positives (§12) |
-| 9 | `npm ci` | 0 | Installed; reports 195 advisories in **dev** tooling (runtime: see #15) |
-| 10 | `npm run typecheck` | 0 | tsc strict, no errors |
-| 11 | `npm run lint:tokens` | 0 | No raw colours outside tokens (the only frontend lint configured; no ESLint) |
-| 12 | `npm test` (Web Test Runner, Chromium) | 0 | **47 passed, 0 failed** |
-| 13 | `npm run build` | 0 | Initial JS 39.48 KB gzip (budget 200 KB) |
-| 14 | `npm run test:contrast` | 0 | 58 token pairs pass, light + dark |
-| 15 | `npm audit --omit=dev` | 0 | **0 vulnerabilities** in shipped dependencies |
-| 16 | `node e2e/workspace.e2e.mjs` | 0 | 7/7 |
-| 17 | `node e2e/access.e2e.mjs` | 0 | 12/12 |
-| 18 | `node e2e/site.e2e.mjs` | 0 | 7/7 |
-| 19 | `node e2e/axe.e2e.mjs` | 1 | Workspace 8/8 screens with 0 violations; website 19 serious contrast nodes, **all pre-existing at 778aa8f** (§10) |
-
-Per-suite breakdown (JUnit: `evidence/pytest-sqlite.xml`, `evidence/pytest-postgresql.xml`). Unit suites are
-engine-independent and ran in both invocations; each engine executed all 208 integration tests itself:
-
-| Suite file | SQLite pass/fail/skip | PostgreSQL pass/fail/skip |
-|---|---|---|
-| `tests/integration/test_api_contract` | 21/0/0 | 21/0/0 |
-| `tests/integration/test_audit_security` | 17/0/0 | 17/0/0 |
-| `tests/integration/test_auth` | 23/0/0 | 23/0/0 |
-| `tests/integration/test_founder_governance` | 16/0/0 | 16/0/0 |
-| `tests/integration/test_leads` | 53/0/0 | 53/0/0 |
-| `tests/integration/test_mfa` | 15/0/0 | 15/0/0 |
-| `tests/integration/test_rbac` | 33/0/0 | 33/0/0 |
-| `tests/integration/test_schema` | 28/0/0 | 26/0/2 |
-| `tests/integration/test_smoke` | 2/0/0 | 2/0/0 |
-| `tests/unit/test_email_templates` | 2/0/0 | 2/0/0 |
-| `tests/unit/test_ids_time_jcs` | 14/0/0 | 14/0/0 |
-| `tests/unit/test_lint` | 8/0/0 | 8/0/0 |
-| `tests/unit/test_registry_resolver` | 24/0/0 | 24/0/0 |
-| `tests/unit/test_totp_passwords` | 17/0/0 | 17/0/0 |
-| **Total** | **273/0/0** | **271/0/2** |
-
-Coverage by requested category: API (`test_api_contract`, `test_leads`), authentication (`test_auth`), MFA and recovery
-(`test_mfa`: TD-C, TD-D, TD-E), RBAC and DENY-over-GRANT (`test_rbac` incl. TD-A, `test_registry_resolver` 3×3×2 table),
-Founder governance (`test_founder_governance`, TD-G G1–G14), audit and security events (`test_audit_security`),
-migrations and schema (`test_schema` incl. TD-H), concurrency (TD-F two-writer, TD-G G10, sequence allocation).
-
-## 8. Browser-test evidence (live stack, from the clean copy)
-
-API: `flask --app wsgi run` on SQLite (`VEDA_COOKIE_SECURE=false`, capture email adapter); SPA: Vite dev server;
-site: static server with `veda-api-base` set (a copy; the committed site keeps it empty). Founder created with the real
-`bootstrap-founder` CLI. Browser runs used **SQLite only**; PostgreSQL browser runs were not executed.
-
-| Journey | Script | Result |
-|---|---|---|
-| Invitation + forced MFA enrollment (path B), recovery codes | workspace | PASS |
-| Dashboard | workspace | PASS |
-| Lead submitted from the website appears in the admin list | workspace, site | PASS |
-| Lead detail + status change | workspace | PASS |
-| Audit visibility | workspace | PASS |
-| Sign out (account menu) and sign in with authenticator code | workspace | PASS |
-| Mobile layout 360 px (lead list, website) | workspace, site | PASS |
-| Permission denial (Sales: no admin nav, no-access page, API 401/403) | access | PASS |
-| Session expiry by admin revoke (reload → sign-in; in-app → banner) | access | PASS |
-| Logout ends the session; protected routes redirect | access | PASS |
-| Repeated submission (same key) → original reference; different body → refused | access | PASS |
-| Invalid website submission → field errors only | access, site | PASS |
-| Duplicate submission stored and flagged, visible in admin | access | PASS |
-| Website: error summary focus, honeypot, WhatsApp fallback, flag-off hand-off | site | PASS |
-| Console/page errors | all | 0 |
-| Email-adapter failure | — | **Not browser-testable**; covered by API tests `test_TD_B_…` (step 6), `test_NOTIF_003_…` |
-| Re-consent (DEV-004) | — | Staff API only; covered by `test_DEV_004_…` |
-
-Defects found by these journeys during this freeze and fixed: account-menu and forced-password "Sign out" did not
-navigate to sign-in (`app/src/shell/app.ts`, `app/src/modules/auth/password-pages.ts`); two accessibility issues
-introduced by the enquiry form (optional-label contrast 4.06:1 → `#5d574f`; error-summary link target size).
-
-## 9. SQLite evidence
-
-Test run #4 (273/0/0), migration evidence §3, and all browser journeys §8. SQLite enforces UUIDv7 format, JSON validity,
-booleans and lengths with CHECK constraints; WAL, `foreign_keys=ON`, `busy_timeout=5000` verified at startup and in
-`test_DATA_010_…`.
-
-## 10. PostgreSQL evidence
-
-Test run #5 (271/0/2) executed independently against embedded PostgreSQL 18.4; migration evidence §3. The two skipped
-tests are SQLite-only by design (`PRAGMA` checks and SQLite format CHECK fixture). Not executed on PostgreSQL: browser
-journeys, the migration from an existing SQLite dataset to PostgreSQL (11 §3.4 release gate), PostgreSQL 16 (the
-architecture's stated target version; 18.4 was used).
-
-**Website accessibility.** axe (reduced motion, error state) finds 19 serious `color-contrast` nodes on the site; the
-same 19 exist at `778aa8f` (`evidence/axe-site-baseline-diff.txt`; the one "introduced" entry is the pre-existing
-`.form-note` paragraph whose selector changed because it gained an `id`). These are existing marketing-site styles
-outside this change and were not altered.
-
-## 11. Deviations
-
-See [P0-implementation-deviations.md](P0-implementation-deviations.md). DEV-001 MFA factor uniqueness · DEV-002 invitation
-enrollment step · DEV-003 optional login CAPTCHA token · DEV-004 staff re-consent object (the brief's description of
-DEV-004 is corrected in the register: public or repeated submissions accept **no** re-consent object). All PENDING
-INDEPENDENT REVIEW; none approved.
-
-## 12. Security-check evidence
-
-Automated checks are supporting evidence only; manual security review is still required.
-
-| Area | Evidence |
-|---|---|
-| Dependency vulnerabilities | pip-audit: none · npm runtime: none · npm dev tooling: 195 advisories (17 critical, 5 high, 173 low) (Vite 5 dev server, Web Test Runner) — §13 OI-10 |
-| Secret scanning | detect-secrets over the commit set: only test fixtures, fixed test UUIDs, alphabets, error titles, CI ephemeral Postgres credentials, and pre-existing architecture-doc samples; regex scan (AWS keys, private keys, tokens): none; no db/pem/key/env/eml files |
-| Static analysis | bandit: High B701 (plain-text email Jinja env; HTML env autoescapes — `test_NOTIF_009_…`, `test_email_templates`), Medium B608 (migration DDL from constants), Medium B310 (constant https Turnstile URL): false positives |
-| Unsafe Flask config / debug | No `debug=True`/`app.run`; production refuses dev secrets, insecure cookies, non-SES/KMS/Turnstile and weak Argon2 (`config.validate_production`) |
-| CORS | Exact allowlist; credentials only for the app origin; site origin only on public endpoints (`test_SEC_002_cors_allowlist`) |
-| Missing authorization | Startup route-declaration check; `test_RBAC_012_…`, `test_startup_fails_for_undeclared_route`, role × endpoint matrix |
-| Mass assignment | `test_RBAC_019_mass_assignment_rejected` (9 fields × 2 endpoints), closed DTOs (`test_SEC_004_…`) |
-| SQL injection | ORM parameterized queries; lint bans raw SQL/bulk mutation in services (`test_no_raw_sql_or_bulk_mutation_in_services`) |
-| Unsafe deserialization | No pickle/yaml/eval/exec (grep) |
-| Password hashing | Argon2id (`test_AUTH_002_…`), policy (`test_AUTH_003_…`), timing-equalized unknown users |
-| JWT validation | ES256, typ/kid/aud/iss, expiry via platform clock (`test_AUTH_004_…`), per-request uncached session check (`test_AUTH_006_…`) |
-| Refresh rotation | Rotation, 20 s grace, reuse → revoke (`test_AUTH_005_…` ×2), CSRF (`test_CSRF_…` ×3) |
-| MFA recovery | `test_MFA_013_…`, TD-C, TD-D, TD-E, replay (`test_MFA_009_…`) |
-| Authorization-cache invalidation | TD-A next-request propagation, `test_RBAC_013_…` |
-| Founder governance | TD-G G1–G14 |
-| Last privileged user | G11 LAST_FOUNDER, I2 LAST_ADMINISTRATOR, concurrent execution (G10) |
-| PII in logs | Masking processor; E2E API log: 0 emails, phone numbers or tokens in structured lines (Werkzeug dev-server access lines include search query strings; production gunicorn has `accesslog = None`) |
-| Tamper-evident chain | `test_SEVT_006_…` (tamper, wrong key, gap), anchor and archival (`test_SEVT_007_…`, `test_SEVT_004_…`), live DB verify |
-| Email header injection | Subjects are whitespace-collapsed (`test_subject_cannot_carry_header_injection`); SES receives subject as data |
-| CAPTCHA bypass | Idempotency before CAPTCHA only replays the original response (`test_TD_B_…`); `test_captcha_failure_blocks_and_records`; login captcha (`test_DEV_003_…`) |
-| Lead enumeration | Public response is exactly `{reference, message}`; no public read endpoint; duplicates undisclosed (`test_TD_B_…`, `test_LEAD_001_…`) |
-| Request throttling | `test_rate_limits_public_intake`, `test_AUTH_010_…` ×2, MFA attempt limits |
-
-## 13. Open issues
-
-| # | Issue |
-|---|---|
-| OI-1 | Deviations DEV-001…DEV-004 need an architecture decision (register). |
-| OI-2 | Break-glass cancel link `POST /api/v1/approvals/cancel-link` is not in the 08 index (capability from 06 §7.5). Not in the deviation register because the brief fixed the register at four entries; reviewer to classify. |
-| OI-3 | Single-use action tokens are derived as `HMAC(K_action, row id ‖ purpose)` so the worker can build email links without storing secrets (only SHA-256 stored). Implementation detail for review. |
-| OI-4 | `ERASURE_BLOCKED` has no legal-hold data model in P0; blocking is configured by `VEDA_ERASURE_BLOCKED_STATUSES` (empty). |
-| OI-5 | Website: Privacy Notice page `/privacy` (v2026-09-v1) does not exist; Turnstile site key and site CSP `connect-src` not configured. Intake stays off until they are. |
-| OI-6 | AWS adapters (SES, KMS, S3 Object Lock anchor) untested without AWS; security-event archival writes JSONL locally (no S3 upload). |
-| OI-7 | Alerts are structured CRITICAL/ERROR logs only; the "enrollment from an unseen network" High alert (05 §11.3) is not implemented. |
-| OI-8 | No formatter or type checker configured (`ruff format --check` → 82 files; mypy absent); no ESLint. |
-| OI-9 | Browser E2E scripts are standalone, need a running stack, and are not in CI; CI workflow was written but not executed. |
-| OI-10 | Dev tooling pinned to Vite 5 / Web Test Runner 0.20 (Node 20.9 on this machine); `npm audit` reports critical advisories in these dev-only packages. Upgrade requires Node ≥ 20.19. |
-| OI-11 | Pre-existing marketing-site contrast issues (19 nodes) outside this change. |
-
-## 14. Known limitations
-
-P1 items intentionally absent: time-bound grants (422), CSV export, quoted amount, HIBP breach check, compare-roles,
-reminder email digest. Scheduler is a simple loop spawning maintenance processes. In-process rate limits, throttles and
-authenticated idempotency are lost on restart (by design for the single-process deployment). PostgreSQL native `uuid`
-accepts non-v7 UUIDs from raw SQL (kernel-enforced only). Security-event chain key and HMAC keys come from environment
-variables; SSM wiring is deployment work.
-
-## 15. Risks
-
-| # | Risk | Likelihood | Impact | Mitigation / action |
-|---|---|---|---|---|
-| R1 | SQLite write contention at peak | Low | Medium | BEGIN IMMEDIATE, busy_timeout, 503 mapping; load test RG-4 |
-| R2 | More than one app process deployed | Medium | High | gunicorn 1 worker, `deploy-check`; enforce in deploy pipeline |
-| R3 | Host/chain-key compromise rewrites recent security events | Low | High | Keyed chain, nightly verify; configure S3 Object Lock anchor |
-| R4 | Retention values unset → unbounded growth | Certain until owner input | Low | Jobs refuse; OWNER-INPUT-002 |
-| R5 | No break-glass custodians → single-Founder actions blocked | Certain until owner input | High | OWNER-INPUT-004 |
-| R6 | Intake enabled without privacy notice / Turnstile | Medium | Medium | Flag off by default (OI-5) |
-| R7 | AWS adapters fail at first use | Medium | Medium | Staging verification (OI-6) |
-| R8 | Deviations rejected in review | Medium | Low–Medium | Each has a rollback path (register) |
-| R9 | Dev-tooling vulnerabilities on developer machines | Medium | Low | Upgrade Node/Vite/WTR (OI-10) |
-
-## 16. Production gates not executed
-
-From `docs/architecture/gate-registry.md` and 12 §4.9 — none were executed in this workstream:
-owner approvals TG-01 (and recording TG-08); OWNER-INPUT-001 (RPO/RTO, availability), -002 (retention values),
--003 (restore-rehearsal cadence), -004 (break-glass custodians); DAST and manual penetration test (PG-DAST); load and
-SQLite contention at ASM-007 sizes (RG-4); restore verification, rebuild and migration-runbook rehearsals (RG-1, RG-2,
-RG-7); alert test-fires (RG-5); volume/instance/worker-count checks on the real host (RG-3, RG-6); Litestream
-replication; PostgreSQL release gate (11 §3.3) including data migration; browser/device matrix (Firefox, WebKit,
-Android, iOS) and screen-reader scripts; staging deployment and SES production access.
-
-## 17. Manual actions still required
-
-1. Independent implementation review of the commit, this report and the deviation register.
-2. Architecture Owner decisions on DEV-001…DEV-004 and OI-2/OI-3 (architecture amendments if accepted).
-3. Owner inputs OWNER-INPUT-001…004; record TG-01/TG-08 in the gate registry.
-4. Publish the Privacy Notice (v2026-09-v1); provision Turnstile; then set `veda-api-base` and the site CSP.
-5. Provision production secrets in SSM (JWT ES256 key, HMAC keys, chain key, Turnstile secret), KMS key, SES identity,
-   S3 anchor bucket (Object Lock), Litestream bucket.
-6. Stand up staging; run the staging E2E, AWS adapter verification and all §16 gates.
-7. Decide on formatter/type-checker adoption and upgrade the frontend dev toolchain (OI-8, OI-10).
-
-## 18. Corrections to earlier claims
-
-- The first report's "473 passed" combined both engines in one run; the independently evidenced figures are SQLite
-  273/0/0 and PostgreSQL 271/0/2 (each includes the 65 engine-independent unit tests).
-- "Browser E2E 14 checks" is superseded by §8 (7 + 12 + 7 journeys/checks + axe).
-- The first report called the result "implementation complete"; the accurate status is below.
-
-## 19. Status
-
-**The implementation is not certified, not merged and not deployed.** It is committed on
-`implementation/p0-foundation` for independent implementation review. The certified architecture documents are
-unchanged, and all four deviations await review.

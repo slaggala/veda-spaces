@@ -18,7 +18,13 @@ SENSITIVITY_CLASSES = ("ACCOUNT_CONTROL", "ACCESS_CONTROL", "SECURITY_DATA", "BU
 
 APPROVAL_CLASSES = ("STANDARD", "FOUNDER")
 STANDARD_ACTIONS = ("MFA_RESET", "EMAIL_CHANGE")
-FOUNDER_ACTIONS = ("GRANT_FOUNDER", "REVOKE_FOUNDER", "FOUNDER_MFA_RESET", "FOUNDER_STATUS_CHANGE", "FOUNDER_EMAIL_CHANGE")
+FOUNDER_ACTIONS = (
+    "GRANT_FOUNDER",
+    "REVOKE_FOUNDER",
+    "FOUNDER_MFA_RESET",
+    "FOUNDER_STATUS_CHANGE",
+    "FOUNDER_EMAIL_CHANGE",
+)
 APPROVAL_CHANNELS = ("IN_APP", "BREAK_GLASS")
 APPROVAL_STATUSES = ("PENDING", "APPROVED", "DENIED", "EXPIRED", "CANCELLED", "EXECUTED", "FAILED")
 
@@ -32,7 +38,9 @@ class Role(AuditedBase):
     description: Mapped[str | None] = mapped_column(sa.String(500))
     is_system: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     is_assignable: Mapped[bool] = mapped_column(Bool(), nullable=False, default=True, server_default=sa.true())
-    grant_path: Mapped[str] = mapped_column(sa.String(25), nullable=False, default="STANDARD", server_default="STANDARD")
+    grant_path: Mapped[str] = mapped_column(
+        sa.String(25), nullable=False, default="STANDARD", server_default="STANDARD"
+    )
     mfa_required: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     sort_order: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=100, server_default=sa.text("100"))
 
@@ -60,7 +68,9 @@ class Permission(AuditedBase):
     supports_scope: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     is_sensitive: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     sensitivity_class: Mapped[str | None] = mapped_column(sa.String(20))
-    grant_path: Mapped[str] = mapped_column(sa.String(25), nullable=False, default="STANDARD", server_default="STANDARD")
+    grant_path: Mapped[str] = mapped_column(
+        sa.String(25), nullable=False, default="STANDARD", server_default="STANDARD"
+    )
     is_system: Mapped[bool] = mapped_column(Bool(), nullable=False, default=True, server_default=sa.true())
     requirement_ref: Mapped[str | None] = mapped_column(sa.String(50))
 
@@ -128,7 +138,8 @@ class UserPermission(AuditedBase):
         in_check("user_permission", "effect", EFFECTS),
         in_check("user_permission", "scope", SCOPES),
         CheckConstraint(
-            "valid_from IS NULL OR valid_until IS NULL OR valid_until > valid_from", name="ck_user_permission__validity_order"
+            "valid_from IS NULL OR valid_until IS NULL OR valid_until > valid_from",
+            name="ck_user_permission__validity_order",
         ),
         Index("ux_user_permission__user_perm", "user_id", "permission_id", unique=True, **live_where()),
         Index("ix_user_permission__permission_id", "permission_id", **live_where()),
@@ -187,11 +198,16 @@ class AdminApprovalRequest(AuditedBase):
         Index("ix_admin_approval_request__pending", "status", "expires_on", **where("status = 'PENDING'")),
         Index("ix_admin_approval_request__target", "target_user_id", sa.text("created_on DESC")),
         Index(
-            "ux_admin_approval_request__open_per_target_action", "target_user_id", "action_type", unique=True,
+            "ux_admin_approval_request__open_per_target_action",
+            "target_user_id",
+            "action_type",
+            unique=True,
             **where("status IN ('PENDING','APPROVED')"),
         ),
         Index(
-            "ux_admin_approval_request__open_founder_target", "target_user_id", unique=True,
+            "ux_admin_approval_request__open_founder_target",
+            "target_user_id",
+            unique=True,
             **where("action_class = 'FOUNDER' AND status IN ('PENDING','APPROVED')"),
         ),
     )

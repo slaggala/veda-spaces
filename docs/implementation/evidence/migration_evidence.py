@@ -1,5 +1,9 @@
-"""Phase 4 migration evidence: run from api/ in the clean environment."""
-import hashlib, json, sys, tempfile, uuid
+"""Migration evidence: run from api/ in a clean environment.
+
+    ENGINES=sqlite,postgresql python ../docs/implementation/evidence/migration_evidence.py
+PostgreSQL uses VEDA_TEST_DATABASE_URL_PG when set (e.g. a PostgreSQL 16 server), else the embedded server.
+"""
+import hashlib, json, os, sys, tempfile, uuid
 from pathlib import Path
 import sqlalchemy as sa
 from alembic import command
@@ -31,8 +35,10 @@ def seed_fingerprint(conn):
     data = {k: [[str(x).replace('-', '') if 'id' == k else str(x) for x in r] for r in conn.execute(sa.text(v))] for k, v in q.items()}
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest(), {k: len(v) for k, v in data.items()}
 
-out = {"alembic_heads": ScriptDirectory.from_config(cfg("sqlite://")).get_heads()}
-for engine in ("sqlite", "postgresql"):
+scripts = ScriptDirectory.from_config(cfg("sqlite://"))
+out = {"alembic_heads": scripts.get_heads(),
+       "revision_order": [r.revision for r in reversed(list(scripts.walk_revisions()))]}
+for engine in [e for e in os.environ.get("ENGINES", "sqlite,postgresql").split(",") if e]:
     r = {}
     url = fresh(engine); c = cfg(url)
     command.upgrade(c, "head")
@@ -40,8 +46,12 @@ for engine in ("sqlite", "postgresql"):
     with eng.connect() as conn:
         insp = sa.inspect(conn)
         tables = sorted(t for t in insp.get_table_names() if t != "alembic_version")
+        r["server_version"] = (conn.execute(sa.text("SHOW server_version")).scalar() if engine == "postgresql"
+                               else "SQLite " + conn.execute(sa.text("SELECT sqlite_version()")).scalar())
         r["version"] = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
         r["tables"] = len(tables)
+        r["columns"] = sum(len(insp.get_columns(t)) for t in tables)
+        r["mfa_challenge_binding_columns"] = sorted({"factor_id", "enrollment_path"} & {x["name"] for x in insp.get_columns("mfa_challenge")})
         r["indexes"] = sum(len(insp.get_indexes(t)) for t in tables)
         r["foreign_keys"] = sum(len(insp.get_foreign_keys(t)) for t in tables)
         r["check_constraints"] = sum(len(conformance._check_names(conn, insp, t)) for t in tables)
@@ -62,6 +72,11 @@ for engine in ("sqlite", "postgresql"):
         command.downgrade(c, "-1"); r["downgrade_-1"] = "succeeded (unexpected)"
     except NotImplementedError as exc:
         r["downgrade_-1"] = f"refused: NotImplementedError({exc}) — expand-only policy, 02 §12.4"
+    eng = db.create_engine(url)
+    with eng.connect() as conn:
+        r["version_after_refused_downgrade"] = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
+        r["binding_columns_after_refused_downgrade"] = sorted({"factor_id", "enrollment_path"} & {x["name"] for x in sa.inspect(conn).get_columns("mfa_challenge")})
+    eng.dispose()
     command.upgrade(c, "head")
     eng = db.create_engine(url)
     with eng.connect() as conn:

@@ -1,0 +1,56 @@
+== workspace.e2e.mjs
+PASS accept invitation (path B: forced MFA enrollment)
+PASS dashboard renders for the Founder
+PASS website enquiry reaches the lead list
+PASS lead detail and status change
+PASS audit viewer shows the change
+PASS sign out and sign back in with TOTP
+PASS mobile width lead list (360 px, no horizontal scroll)
+console errors: 0
+7/7 journeys passed
+== access.e2e.mjs
+PASS founder invites a Sales user — 201
+PASS Sales accepts invite (no MFA required) and signs in
+PASS permission denial: no admin nav, no-access page, API 403 with a Sales token, 401 without — nav=0 bearer=403 anonymous=401
+PASS route change updates the title and moves focus to the page heading (WCAG 2.4.2)
+PASS admin revokes Sales sessions — {"revoked":2}
+PASS revoked session: a full reload lands on sign-in — http://localhost:5173/login?next=%2Fleads
+PASS revoked session: next in-app request signs out with the expiry banner
+PASS logout ends the session; protected routes redirect to sign-in — refresh=401
+PASS repeated submission (same key) returns the original reference
+PASS same key with a different body is refused
+PASS invalid submission returns field errors only
+PASS duplicate submission is stored and flagged, never dropped — NONE,SUSPECTED
+PASS duplicate leads visible in the admin list
+PASS conflict re-apply keeps the other writer's changes (no lost update) — Secunderabad/HIGH
+PASS break-glass cancel link works end to end from the email — 202 CANCELLED
+PASS "Sign out everywhere" lands on sign-in and ends the other sessions — http://localhost:5173/login other=401
+16/16 access checks passed
+== site.e2e.mjs
+PASS error summary focused with invalid fields — 3 invalid
+PASS honeypot off-screen, aria-hidden, not tabbable
+PASS server 422 shows the field error and resets Turnstile — resets=1
+PASS corrected resubmission → 201 with reference, panel focused — K429-3WZ6
+PASS form hidden after success (IR-17) — none
+PASS UNKNOWN_POLICY_VERSION → fallback with reload prompt — This page is out of date — please reload it. Pleas
+PASS form hidden after fallback (IR-17)
+PASS network error offers prefilled WhatsApp
+PASS flag off hides consent, verification and the Privacy Notice link — {"consentShown":false,"privacyLinks":0,"turnstile":false}
+PASS flag off keeps the WhatsApp hand-off — https://api.whatsapp.com/send/?phone=919
+PASS 360 px without horizontal scroll (on) — 0px
+PASS 360 px without horizontal scroll (off) — 0px
+PASS no Content-Security-Policy violations under the production policy
+PASS no page errors
+14/14 site checks passed
+== axe.e2e.mjs
+PASS login: 0 serious/critical in scope
+PASS MFA challenge: 0 serious/critical in scope
+PASS dashboard: 0 serious/critical in scope
+PASS lead list: 0 serious/critical in scope
+PASS users: 0 serious/critical in scope
+PASS roles: 0 serious/critical in scope
+PASS audit log: 0 serious/critical in scope
+PASS lead detail: 0 serious/critical in scope
+PASS website (idle): 0 serious/critical in scope, 18 tracked outside the form (OI-11)
+PASS website form (error state): 0 serious/critical in scope, 18 tracked outside the form (OI-11)
+10/10 screens without serious/critical violations

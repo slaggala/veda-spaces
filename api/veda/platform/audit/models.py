@@ -41,7 +41,9 @@ class AuditLog(AuditedBase):
         in_check("audit_log", "action", AUDIT_ACTIONS),
         in_check("audit_log", "performed_via", PERFORMED_VIA),
         CheckConstraint("(parent_entity_type IS NULL) = (parent_entity_id IS NULL)", name="ck_audit_log__parent_pair"),
-        CheckConstraint("performed_by = created_by AND performed_on = created_on", name="ck_audit_log__performed_matches_contract"),
+        CheckConstraint(
+            "performed_by = created_by AND performed_on = created_on", name="ck_audit_log__performed_matches_contract"
+        ),
         CheckConstraint("is_deleted = false AND version = 1", name="ck_audit_log__immutable_contract"),
         sqlite_check(
             "length(entity_type) BETWEEN 2 AND 60 AND entity_type NOT GLOB '*[^a-z0-9_]*' "
@@ -53,7 +55,10 @@ class AuditLog(AuditedBase):
         ),
         Index("ix_audit_log__entity", "entity_type", "entity_id", sa.text("performed_on DESC")),
         Index(
-            "ix_audit_log__parent", "parent_entity_type", "parent_entity_id", sa.text("performed_on DESC"),
+            "ix_audit_log__parent",
+            "parent_entity_type",
+            "parent_entity_id",
+            sa.text("performed_on DESC"),
             **where("parent_entity_id IS NOT NULL"),
         ),
         Index("ix_audit_log__performed_by", "performed_by", sa.text("performed_on DESC")),

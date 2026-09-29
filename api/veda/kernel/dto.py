@@ -29,11 +29,19 @@ class Query(BaseModel):
 
 
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$")
+EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+)
 
 
 def strip_controls(value: str) -> str:
     return _CONTROL.sub("", value)
+
+
+def single_line(value: str) -> str:
+    """Single-line fields (names, places): controls removed and every whitespace run, line breaks included,
+    collapsed to one space, so they cannot start new lines in plain-text email (IR-29)."""
+    return " ".join(strip_controls(value).split())
 
 
 def _id(value: Any) -> str:
@@ -54,12 +62,16 @@ def _email(value: Any) -> str:
 def _instant(value: Any) -> datetime:
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            raise PydanticCustomError("INVALID_DATETIME", "Include a UTC offset, for example 2026-09-30T11:00:00+05:30.")
+            raise PydanticCustomError(
+                "INVALID_DATETIME", "Include a UTC offset, for example 2026-09-30T11:00:00+05:30."
+            )
         return clock.ensure_utc(value)
     try:
         return clock.parse_rfc3339(value)
     except (ValueError, TypeError):
-        raise PydanticCustomError("INVALID_DATETIME", "Include a UTC offset, for example 2026-09-30T11:00:00+05:30.") from None
+        raise PydanticCustomError(
+            "INVALID_DATETIME", "Include a UTC offset, for example 2026-09-30T11:00:00+05:30."
+        ) from None
 
 
 def _date(value: Any) -> date:

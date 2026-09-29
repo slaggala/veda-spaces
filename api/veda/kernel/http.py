@@ -26,7 +26,7 @@ from flask import Blueprint, Response, g, request
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
-from veda.kernel import clock, db
+from veda.kernel import clock, db, net
 from veda.kernel.context import ActorContext, reset_actor, set_actor
 from veda.kernel.errors import ApiError, field_error, problem_body, validation_failed
 from veda.kernel.ids import is_valid_id
@@ -64,6 +64,9 @@ class RouteSpec:
     tags: tuple[str, ...] = ()
     requirement: str | None = None
     response_description: str = ""
+    # Public routes only: work that must not hold the database write lock (network I/O such as Turnstile
+    # siteverify). Runs before the write transaction opens, with a read-only session (IR-02).
+    prepare: Callable | None = None
 
     @property
     def declared(self) -> bool:
@@ -91,6 +94,7 @@ class Req:
     headers: Any = None
     cookies: Any = None
     after_commit: list[Callable[[], None]] = field(default_factory=list)
+    prepared: Any = None  # what the route's prepare step returned
 
     def require_version(self, current: int) -> None:
         check_version(self.if_match, current)
@@ -109,8 +113,15 @@ class Result:
     raw_body: dict | None = None  # returned as-is (no envelope), e.g. JWKS
 
 
-def ok(data: Any = None, *, status: int = 200, meta: dict | None = None, links: dict | None = None,
-       etag: int | None = None, headers: dict | None = None) -> Result:
+def ok(
+    data: Any = None,
+    *,
+    status: int = 200,
+    meta: dict | None = None,
+    links: dict | None = None,
+    etag: int | None = None,
+    headers: dict | None = None,
+) -> Result:
     if etag is None and isinstance(data, dict) and isinstance(data.get("version"), int):
         etag = data["version"]
     return Result(data=data, status=status, meta=meta, links=links, etag=etag, headers=headers or {})
@@ -124,8 +135,12 @@ def check_version(if_match: int | None, current: int, *, conflict_extra: dict | 
     if if_match is None:
         raise ApiError(428, "PRECONDITION_REQUIRED", "Send If-Match with the version you edited.")
     if if_match != current:
-        raise ApiError(409, "VERSION_CONFLICT", "The record was changed after you loaded it.",
-                       extra={"current_version": current, **(conflict_extra or {})})
+        raise ApiError(
+            409,
+            "VERSION_CONFLICT",
+            "The record was changed after you loaded it.",
+            extra={"current_version": current, **(conflict_extra or {})},
+        )
 
 
 # --- request helpers -----------------------------------------------------------
@@ -138,34 +153,27 @@ def request_id() -> str:
     if rid:
         return rid
     incoming = request.headers.get("X-Request-ID") or request.headers.get("CF-Ray")
-    rid = incoming if incoming and _REQUEST_ID_RE.match(incoming) else binascii.hexlify(__import__("os").urandom(8)).decode()
+    rid = (
+        incoming
+        if incoming and _REQUEST_ID_RE.match(incoming)
+        else binascii.hexlify(__import__("os").urandom(8)).decode()
+    )
     g.request_id = rid
     return rid
 
 
 def client_ip() -> str | None:
-    # Cloudflare sets CF-Connecting-IP; the origin only accepts Cloudflare (02 §11).
-    ip = request.headers.get("CF-Connecting-IP") or request.remote_addr
-    return ip[:45] if ip else None
+    # CF-Connecting-IP is honoured only from a configured trusted proxy (IR-35, 02 §11).
+    return net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP"))
 
 
 def network_of(ip: str | None) -> str:
     """IPv4 /24 or IPv6 /64 (05 §4, A-01)."""
-    if not ip:
-        return "unknown"
-    if ":" in ip:
-        return ":".join(ip.split(":")[:4]) + "::/64"
-    parts = ip.split(".")
-    return ".".join(parts[:3]) + ".0/24" if len(parts) == 4 else ip
+    return net.network_of(ip)
 
 
 def mask_ip(ip: str | None) -> str | None:
-    if not ip:
-        return None
-    if ":" in ip:
-        return ":".join(ip.split(":")[:3]) + ":xxxx"
-    parts = ip.split(".")
-    return f"{parts[0]}.{parts[1]}.xxx.xxx" if len(parts) == 4 else ip
+    return net.mask(ip)
 
 
 def _parse_if_match(value: str | None) -> int | None:
@@ -176,8 +184,12 @@ def _parse_if_match(value: str | None) -> int | None:
         v = v[2:]
     v = v.strip('"')
     if not v.isdigit():
-        raise ApiError(422, "VALIDATION_FAILED", "If-Match must be a version number.",
-                       errors=[field_error("If-Match", "INVALID", "Expected a quoted version number.")])
+        raise ApiError(
+            422,
+            "VALIDATION_FAILED",
+            "If-Match must be a version number.",
+            errors=[field_error("If-Match", "INVALID", "Expected a quoted version number.")],
+        )
     return int(v)
 
 
@@ -221,8 +233,12 @@ def _load_json_body(spec: RouteSpec) -> dict | None:
     except (ValueError, UnicodeDecodeError) as exc:
         raise ApiError(400, "MALFORMED_JSON", "The body is not valid JSON.") from exc
     if not isinstance(data, dict):
-        raise ApiError(422, "VALIDATION_FAILED", "The body must be a JSON object.",
-                       errors=[field_error("body", "INVALID", "Expected an object.")])
+        raise ApiError(
+            422,
+            "VALIDATION_FAILED",
+            "The body must be a JSON object.",
+            errors=[field_error("body", "INVALID", "Expected an object.")],
+        )
     return data
 
 
@@ -233,19 +249,29 @@ def _validate_body(spec: RouteSpec, data: dict | None):
         return None
     immutable = [k for k in (data or {}) if k in getattr(spec.body, "__immutable__", frozenset())]
     if immutable:
-        raise ApiError(422, "IMMUTABLE_FIELD", "These fields are immutable.",
-                       errors=[field_error(k, "IMMUTABLE_FIELD", "This field cannot be changed.") for k in immutable])
+        raise ApiError(
+            422,
+            "IMMUTABLE_FIELD",
+            "These fields are immutable.",
+            errors=[field_error(k, "IMMUTABLE_FIELD", "This field cannot be changed.") for k in immutable],
+        )
     blocked = getattr(spec.body, "__not_updatable__", frozenset())
     hits = [k for k in (data or {}) if k in blocked]
     if hits:
-        raise ApiError(422, "FIELD_NOT_UPDATABLE", "These fields have their own workflow.",
-                       errors=[field_error(k, "FIELD_NOT_UPDATABLE", "This field cannot be changed here.") for k in hits])
+        raise ApiError(
+            422,
+            "FIELD_NOT_UPDATABLE",
+            "These fields have their own workflow.",
+            errors=[field_error(k, "FIELD_NOT_UPDATABLE", "This field cannot be changed here.") for k in hits],
+        )
     try:
         return spec.body.model_validate(data or {})
     except ValidationError as exc:
         errors = pydantic_errors(exc)
-        for code, message in (("INVALID_ID", "An identifier is not a canonical UUIDv7."),
-                              ("INVALID_DATETIME", "Datetimes need a UTC offset.")):
+        for code, message in (
+            ("INVALID_ID", "An identifier is not a canonical UUIDv7."),
+            ("INVALID_DATETIME", "Datetimes need a UTC offset."),
+        ):
             if any(e["code"] == code for e in errors):
                 raise ApiError(422, code, message, errors=errors) from exc
         top = getattr(spec.body, "__top_level_codes__", {})
@@ -262,8 +288,12 @@ def _validate_query(spec: RouteSpec):
         args[key] = ",".join(values) if len(values) > 1 else values[0]
     if spec.query is None:
         if args:
-            raise ApiError(422, "INVALID_QUERY_PARAM", "Unknown query parameters.",
-                           errors=[field_error(k, "INVALID_QUERY_PARAM", "Unknown parameter.") for k in args])
+            raise ApiError(
+                422,
+                "INVALID_QUERY_PARAM",
+                "Unknown query parameters.",
+                errors=[field_error(k, "INVALID_QUERY_PARAM", "Unknown parameter.") for k in args],
+            )
         return None
     try:
         return spec.query.model_validate(args)
@@ -281,14 +311,20 @@ def _validate_query(spec: RouteSpec):
 
 # --- response building ---------------------------------------------------------
 
+
 def json_response(body: Any, status: int, mimetype: str = JSON_MIME) -> Response:
-    return Response(json.dumps(body, ensure_ascii=False, separators=(",", ":"), default=str), status=status,
-                    mimetype=mimetype.split(";")[0], content_type=mimetype)
+    return Response(
+        json.dumps(body, ensure_ascii=False, separators=(",", ":"), default=str),
+        status=status,
+        mimetype=mimetype.split(";")[0],
+        content_type=mimetype,
+    )
 
 
 def problem_response(err: ApiError) -> Response:
-    resp = Response(json.dumps(problem_body(err, request_id()), ensure_ascii=False), status=err.status,
-                    content_type=PROBLEM_MIME)
+    resp = Response(
+        json.dumps(problem_body(err, request_id()), ensure_ascii=False), status=err.status, content_type=PROBLEM_MIME
+    )
     for k, v in err.headers.items():
         resp.headers[k] = v
     return resp
@@ -322,6 +358,7 @@ def build_response(result: Result | Response | None, spec: RouteSpec) -> Respons
 
 
 # --- pagination (08 §2.5) --------------------------------------------------------
+
 
 def offset_meta(page: int, page_size: int, total: int, path: str, params: dict[str, Any]) -> tuple[dict, dict]:
     total_pages = max(1, -(-total // page_size)) if total else 0
@@ -359,11 +396,16 @@ def decode_cursor(cursor: str | None) -> tuple[str, str] | None:
             raise ValueError
         return data["t"], data["id"]
     except Exception as exc:
-        raise ApiError(422, "INVALID_QUERY_PARAM", "Invalid cursor.",
-                       errors=[field_error("cursor", "INVALID_QUERY_PARAM", "Invalid cursor.")]) from exc
+        raise ApiError(
+            422,
+            "INVALID_QUERY_PARAM",
+            "Invalid cursor.",
+            errors=[field_error("cursor", "INVALID_QUERY_PARAM", "Invalid cursor.")],
+        ) from exc
 
 
 # --- authenticated idempotency store (08 §2.8) ---------------------------------------
+
 
 class _IdemStore:
     TTL = 24 * 3600
@@ -402,6 +444,7 @@ def body_fingerprint(data: dict | None, exclude: tuple[str, ...] = ()) -> str:
 
 # --- the Api blueprint wrapper ------------------------------------------------------
 
+
 class Api:
     def __init__(self, name: str, url_prefix: str = "", tags: tuple[str, ...] = ()):
         self.blueprint = Blueprint(name, __name__, url_prefix=url_prefix)
@@ -409,23 +452,58 @@ class Api:
         self.prefix = url_prefix
         self.tags = tags
 
-    def route(self, method: str, rule: str, *, permission: str | tuple[str, ...] | None = None,
-              any_of: tuple[str, ...] = (), rbx: str | None = None, auth: str = "bearer",
-              body: type[BaseModel] | None = None, query: type[BaseModel] | None = None, if_match: bool = False,
-              status: int = 200, write: bool | None = None, recovery_allowed: bool = False,
-              pwd_change_allowed: bool = False, max_body: int = DEFAULT_MAX_BODY, idempotent_create: bool = False,
-              summary: str = "", requirement: str | None = None, limits: list | None = None,
-              limit_key: Callable | None = None):
+    def route(
+        self,
+        method: str,
+        rule: str,
+        *,
+        permission: str | tuple[str, ...] | None = None,
+        any_of: tuple[str, ...] = (),
+        rbx: str | None = None,
+        auth: str = "bearer",
+        body: type[BaseModel] | None = None,
+        query: type[BaseModel] | None = None,
+        if_match: bool = False,
+        status: int = 200,
+        write: bool | None = None,
+        recovery_allowed: bool = False,
+        pwd_change_allowed: bool = False,
+        max_body: int = DEFAULT_MAX_BODY,
+        idempotent_create: bool = False,
+        summary: str = "",
+        requirement: str | None = None,
+        limits: list | None = None,
+        limit_key: Callable | None = None,
+        prepare: Callable | None = None,
+    ):
         perms = (permission,) if isinstance(permission, str) else tuple(permission or ())
+        if prepare is not None and auth != "public":
+            raise RuntimeError("prepare steps are for public routes only")
 
         def decorator(fn: Callable) -> Callable:
             spec = RouteSpec(
-                method=method, rule=self.prefix + rule, endpoint=f"{self.name}.{fn.__name__}", blueprint=self.name,
-                handler=fn, auth=auth, permission=perms, any_of=tuple(any_of), rbx=rbx, body=body, query=query,
-                if_match=if_match, status=status, write=(method != "GET") if write is None else write,
-                recovery_allowed=recovery_allowed, pwd_change_allowed=pwd_change_allowed, max_body=max_body,
-                idempotent_create=idempotent_create, summary=summary or (fn.__doc__ or "").strip().split("\n")[0],
-                tags=self.tags, requirement=requirement,
+                method=method,
+                rule=self.prefix + rule,
+                endpoint=f"{self.name}.{fn.__name__}",
+                blueprint=self.name,
+                handler=fn,
+                auth=auth,
+                permission=perms,
+                any_of=tuple(any_of),
+                rbx=rbx,
+                body=body,
+                query=query,
+                if_match=if_match,
+                status=status,
+                write=(method != "GET") if write is None else write,
+                recovery_allowed=recovery_allowed,
+                pwd_change_allowed=pwd_change_allowed,
+                max_body=max_body,
+                idempotent_create=idempotent_create,
+                summary=summary or (fn.__doc__ or "").strip().split("\n")[0],
+                tags=self.tags,
+                requirement=requirement,
+                prepare=prepare,
             )
             ROUTES.append(spec)
 
@@ -437,7 +515,7 @@ class Api:
                 from veda.kernel.ratelimit import limiter
 
                 for limit in limits:
-                    value, key = (limit if isinstance(limit, tuple) else (limit, limit_key))
+                    value, key = limit if isinstance(limit, tuple) else (limit, limit_key)
                     view = limiter.limit(value, key_func=key)(view) if key else limiter.limit(value)(view)
             self.blueprint.add_url_rule(rule, endpoint=fn.__name__, view_func=view, methods=[method])
             return fn
@@ -456,18 +534,55 @@ def dispatch(spec: RouteSpec, path_params: dict[str, Any]) -> Response:
     try:
         for name, value in path_params.items():
             if name.endswith("_id") and not is_valid_id(value):
-                raise ApiError(422, "INVALID_ID", f"{name} is not a canonical identifier.",
-                               errors=[field_error(name, "INVALID_ID", "Expected 32 lowercase hex characters (UUIDv7).")])
+                raise ApiError(
+                    422,
+                    "INVALID_ID",
+                    f"{name} is not a canonical identifier.",
+                    errors=[field_error(name, "INVALID_ID", "Expected 32 lowercase hex characters (UUIDv7).")],
+                )
         raw = _load_json_body(spec) if spec.method in ("POST", "PUT", "PATCH", "DELETE") else None
         if spec.method == "GET" and request.get_data(cache=True).strip():
             raise ApiError(422, "VALIDATION_FAILED", "GET requests take no body.")
+        prepared = None
+        if spec.prepare is not None:
+            pre_ctx = ActorContext(
+                actor_id=request_auth.anonymous_actor_id(),
+                via="API",
+                request_id=rid,
+                ip=client_ip(),
+                user_agent=(request.headers.get("User-Agent") or "")[:500] or None,
+            )
+            token = set_actor(pre_ctx)
+            with db.unit_of_work(write=False) as read_session:
+                pre = Req(
+                    session=read_session,
+                    ctx=None,
+                    body=_validate_body(spec, raw),
+                    query=None,
+                    raw=raw,
+                    if_match=None,
+                    request_id=rid,
+                    ip=pre_ctx.ip,
+                    user_agent=pre_ctx.user_agent,
+                    spec=spec,
+                    headers=request.headers,
+                    cookies=request.cookies,
+                )
+                prepared = spec.prepare(pre)
+            reset_actor(token)
+            token = None
+            if isinstance(prepared, Result):
+                return _finish(build_response(prepared, spec), None)
         session = db.new_session(write=spec.write)
         if spec.auth == "bearer" or (spec.auth == "optional" and request.headers.get("Authorization")):
             ctx = request_auth.authenticate(session, spec)
         actor_ctx = ActorContext(
             actor_id=ctx.user.id if ctx else request_auth.anonymous_actor_id(),
-            via="API", request_id=rid, session_id=ctx.session.id if ctx else None,
-            ip=client_ip(), user_agent=(request.headers.get("User-Agent") or "")[:500] or None,
+            via="API",
+            request_id=rid,
+            session_id=ctx.session.id if ctx else None,
+            ip=client_ip(),
+            user_agent=(request.headers.get("User-Agent") or "")[:500] or None,
         )
         token = set_actor(actor_ctx)
         if ctx is not None:
@@ -477,16 +592,32 @@ def dispatch(spec: RouteSpec, path_params: dict[str, Any]) -> Response:
         if_match = _parse_if_match(request.headers.get("If-Match"))
         if spec.if_match and if_match is None:
             raise ApiError(428, "PRECONDITION_REQUIRED", "Send If-Match with the version you edited.")
-        req = Req(session=session, ctx=ctx, body=body, query=query, raw=raw, if_match=if_match, request_id=rid,
-                  ip=actor_ctx.ip, user_agent=actor_ctx.user_agent, spec=spec, headers=request.headers,
-                  cookies=request.cookies)
+        req = Req(
+            session=session,
+            ctx=ctx,
+            body=body,
+            query=query,
+            raw=raw,
+            if_match=if_match,
+            request_id=rid,
+            ip=actor_ctx.ip,
+            user_agent=actor_ctx.user_agent,
+            spec=spec,
+            headers=request.headers,
+            cookies=request.cookies,
+            prepared=prepared,
+        )
 
         idem_key = None
         if spec.idempotent_create and ctx is not None and request.headers.get("Idempotency-Key"):
             key = request.headers["Idempotency-Key"]
             if not IDEMPOTENCY_KEY_RE.match(key):
-                raise ApiError(422, "VALIDATION_FAILED", "Invalid Idempotency-Key.",
-                               errors=[field_error("Idempotency-Key", "INVALID", "16–64 characters [A-Za-z0-9_-].")])
+                raise ApiError(
+                    422,
+                    "VALIDATION_FAILED",
+                    "Invalid Idempotency-Key.",
+                    errors=[field_error("Idempotency-Key", "INVALID", "16–64 characters [A-Za-z0-9_-].")],
+                )
             idem_key = (ctx.user.id, spec.endpoint, key)
             fp = body_fingerprint(raw)
             hit = idempotency_store.get(idem_key)

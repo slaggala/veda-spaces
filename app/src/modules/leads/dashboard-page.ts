@@ -112,7 +112,7 @@ export class VsDashboardPage extends LookupAwareElement {
       <vs-kpi-tile label="Follow-ups" .value=${String(s.follow_ups.due_today)} hint="due today"><a href="/follow-ups"> View →</a></vs-kpi-tile>
       <vs-kpi-tile label="Overdue" .value=${String(s.follow_ups.overdue)} tone=${s.follow_ups.overdue ? 'warning' : ''} hint=""><a href="/leads?follow_up=overdue">View →</a></vs-kpi-tile>
       <vs-kpi-tile label="Conversion" .value=${conv} .hint=${`${s.closed_in_period.WON} won · ${s.closed_in_period.LOST} lost`}></vs-kpi-tile>
-      <vs-kpi-tile label="First contact (median)" .value=${s.median_hours_to_first_contact == null ? '—' : `${s.median_hours_to_first_contact.toFixed(1)} h`} hint="target < 4 h"></vs-kpi-tile>
+      <vs-kpi-tile label="First contact (median)" .value=${s.median_hours_to_first_contact == null ? '—' : `${s.median_hours_to_first_contact.toFixed(1)} h`} hint="target under 4 h"></vs-kpi-tile>
     </div>`;
   }
 

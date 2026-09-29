@@ -65,7 +65,8 @@ class AuthContext:
 # --- post-request writes (own short transactions) ----------------------------------
 
 _post_writes: ContextVar[list[tuple[ActorContext | None, Callable[[Session], None]]] | None] = ContextVar(
-    "veda_post_writes", default=None)
+    "veda_post_writes", default=None
+)
 
 
 def schedule_write(fn: Callable[[Session], None]) -> None:
@@ -95,6 +96,7 @@ def anonymous_actor_id() -> str:
 
 # --- authentication -------------------------------------------------------------------
 
+
 def _bearer() -> str:
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
@@ -108,8 +110,9 @@ def _abandon_recovery(session_id: str, user_id: str) -> None:
 
     def write(s: Session) -> None:
         now = db.tx_time(s)
-        for factor in s.execute(sa.select(UserMfaFactor).where(
-                UserMfaFactor.user_id == user_id, UserMfaFactor.status == "PENDING")).scalars():
+        for factor in s.execute(
+            sa.select(UserMfaFactor).where(UserMfaFactor.user_id == user_id, UserMfaFactor.status == "PENDING")
+        ).scalars():
             factor.status = "REVOKED"
             factor.revoked_on = now
             factor.revoke_reason = "ENROLLMENT_ABANDONED"
@@ -120,8 +123,14 @@ def _abandon_recovery(session_id: str, user_id: str) -> None:
     with actor(ctx):
         schedule_write(write)
     with actor(ctx):
-        security_events.defer("MFA_RECOVERY_SESSION_EXPIRED", "FAILURE", subject_user_id=user_id,
-                              failure_reason="TOKEN_EXPIRED", dedupe_key=f"recexp:{session_id}", dedupe_seconds=60)
+        security_events.defer(
+            "MFA_RECOVERY_SESSION_EXPIRED",
+            "FAILURE",
+            subject_user_id=user_id,
+            failure_reason="TOKEN_EXPIRED",
+            dedupe_key=f"recexp:{session_id}",
+            dedupe_seconds=60,
+        )
 
 
 def _session_invalid(detail: str = "Your session has ended. Sign in again.") -> ApiError:
@@ -141,8 +150,10 @@ def authenticate(session: Session, spec) -> AuthContext:
 
     now = clock.now()
     row = session.execute(
-        sa.select(UserSession, User).join(User, User.id == UserSession.user_id)
-        .where(UserSession.id == claims["sid"]).execution_options(include_deleted=True)
+        sa.select(UserSession, User)
+        .join(User, User.id == UserSession.user_id)
+        .where(UserSession.id == claims["sid"])
+        .execution_options(include_deleted=True)
     ).first()
     if row is None:
         raise _session_invalid()
@@ -184,10 +195,16 @@ def authenticate(session: Session, spec) -> AuthContext:
 def deny(ctx: AuthContext, code: str, *, route: str | None = None) -> None:
     reason = ctx.res.suspended.get(code)
     security_events.defer(
-        "PERMISSION_DENIED", "BLOCKED", subject_user_id=ctx.user.id, permission_code=code,
-        failure_reason="MFA_REQUIRED" if reason == "MFA_REQUIRED" else ("COOLING_OFF" if reason == "COOLING_OFF" else None),
+        "PERMISSION_DENIED",
+        "BLOCKED",
+        subject_user_id=ctx.user.id,
+        permission_code=code,
+        failure_reason="MFA_REQUIRED"
+        if reason == "MFA_REQUIRED"
+        else ("COOLING_OFF" if reason == "COOLING_OFF" else None),
         detail={"route": (route or request.path)[:200]},
-        dedupe_key=f"pd:{ctx.user.id}:{code}", dedupe_seconds=60,
+        dedupe_key=f"pd:{ctx.user.id}:{code}",
+        dedupe_seconds=60,
     )
     extra = {"permission": code}
     if reason:
@@ -198,12 +215,22 @@ def deny(ctx: AuthContext, code: str, *, route: str | None = None) -> None:
 def enforce_gates(session: Session, ctx: AuthContext, spec) -> None:
     # Layer 0: RECOVERY sessions reach only the allow-list (05 §11.5).
     if ctx.is_recovery and not spec.recovery_allowed:
-        security_events.defer("RECOVERY_SESSION_BLOCKED", "BLOCKED", subject_user_id=ctx.user.id,
-                              detail={"route": request.path[:200]})
-        raise ApiError(403, "RECOVERY_SESSION_RESTRICTED",
-                       "Recovery mode only allows setting up a new authenticator.",
-                       extra={"allowed": ["GET /auth/me", "POST /auth/mfa/enroll/start",
-                                          "POST /auth/mfa/enroll/confirm", "POST /auth/logout"]})
+        security_events.defer(
+            "RECOVERY_SESSION_BLOCKED", "BLOCKED", subject_user_id=ctx.user.id, detail={"route": request.path[:200]}
+        )
+        raise ApiError(
+            403,
+            "RECOVERY_SESSION_RESTRICTED",
+            "Recovery mode only allows setting up a new authenticator.",
+            extra={
+                "allowed": [
+                    "GET /auth/me",
+                    "POST /auth/mfa/enroll/start",
+                    "POST /auth/mfa/enroll/confirm",
+                    "POST /auth/logout",
+                ]
+            },
+        )
     if ctx.claims.get("pwd_change") and not spec.pwd_change_allowed:
         raise ApiError(403, "PASSWORD_CHANGE_REQUIRED", "Change your password to continue.")
     if ctx.is_recovery:
@@ -220,13 +247,18 @@ def enforce_gates(session: Session, ctx: AuthContext, spec) -> None:
             klass = registry.sensitivity(code)
             if klass in registry.READ_RECORDED_CLASSES:
                 security_events.defer(
-                    "SENSITIVE_READ", "SUCCESS", subject_user_id=ctx.user.id, permission_code=code,
+                    "SENSITIVE_READ",
+                    "SUCCESS",
+                    subject_user_id=ctx.user.id,
+                    permission_code=code,
                     detail={"sensitivity_class": klass, "route": spec.rule[:200]},
-                    dedupe_key=f"sr:{ctx.user.id}:{code}", dedupe_seconds=900,
+                    dedupe_key=f"sr:{ctx.user.id}:{code}",
+                    dedupe_seconds=900,
                 )
 
 
 # --- step-up (G10, MFA-011) --------------------------------------------------------------
+
 
 def _issue_step_up_challenge(ctx: AuthContext) -> str:
     token = new_opaque_token()
@@ -235,8 +267,17 @@ def _issue_step_up_challenge(ctx: AuthContext) -> str:
 
     def write(s: Session) -> None:
         now = db.tx_time(s)
-        s.add(MfaChallenge(user_id=user_id, purpose="STEP_UP", token_hash=token_hash, session_id=session_id,
-                           expires_on=now + timedelta(minutes=5), failed_attempts=0, ip_address=current_actor().ip))
+        s.add(
+            MfaChallenge(
+                user_id=user_id,
+                purpose="STEP_UP",
+                token_hash=token_hash,
+                session_id=session_id,
+                expires_on=now + timedelta(minutes=5),
+                failed_attempts=0,
+                ip_address=current_actor().ip,
+            )
+        )
 
     schedule_write(write)
     return token
@@ -250,11 +291,21 @@ def require_step_up(ctx: AuthContext, *, allow_password: bool = False) -> None:
     if ctx.res.has_active_factor:
         if ctx.session.mfa_verified_on is not None and now - ctx.session.mfa_verified_on <= s.step_up_window:
             return
-        security_events.defer("MFA_CHALLENGE", "FAILURE", subject_user_id=ctx.user.id,
-                              failure_reason="STEP_UP_REQUIRED", detail={"stage": "step_up"},
-                              dedupe_key=f"su:{ctx.session.id}", dedupe_seconds=60)
-        raise ApiError(403, "STEP_UP_REQUIRED", "Confirm it's you with your authenticator.",
-                       extra={"kind": "mfa", "mfa_token": _issue_step_up_challenge(ctx), "expires_in": 300})
+        security_events.defer(
+            "MFA_CHALLENGE",
+            "FAILURE",
+            subject_user_id=ctx.user.id,
+            failure_reason="STEP_UP_REQUIRED",
+            detail={"stage": "step_up"},
+            dedupe_key=f"su:{ctx.session.id}",
+            dedupe_seconds=60,
+        )
+        raise ApiError(
+            403,
+            "STEP_UP_REQUIRED",
+            "Confirm it's you with your authenticator.",
+            extra={"kind": "mfa", "mfa_token": _issue_step_up_challenge(ctx), "expires_in": 300},
+        )
     if allow_password:
         if ctx.session.reauth_on is not None and now - ctx.session.reauth_on <= s.reauth_window:
             return
@@ -267,19 +318,36 @@ def require_step_up(ctx: AuthContext, *, allow_password: bool = False) -> None:
 def require_not_cooling_off(user: User) -> None:
     until = user.security_cooling_off_until
     if until is not None and until > clock.now():
-        raise ApiError(403, "COOLING_OFF", "This change is locked after a recent account recovery.",
-                       extra={"cooling_off_until": clock.to_rfc3339(until)})
+        raise ApiError(
+            403,
+            "COOLING_OFF",
+            "This change is locked after a recent account recovery.",
+            extra={"cooling_off_until": clock.to_rfc3339(until)},
+        )
 
 
-def record_sensitive_action(session: Session, ctx: AuthContext, code: str, *, action: str,
-                            target: tuple[str, str] | None = None, subject_user_id: str | None = None) -> None:
+def record_sensitive_action(
+    session: Session,
+    ctx: AuthContext,
+    code: str,
+    *,
+    action: str,
+    target: tuple[str, str] | None = None,
+    subject_user_id: str | None = None,
+) -> None:
     """Mutations using any sensitive permission write one SENSITIVE_ACTION event (06 §3.2)."""
     klass = registry.sensitivity(code)
     if not klass:
         return
-    security_events.record(session, "SENSITIVE_ACTION", "SUCCESS", subject_user_id=subject_user_id or ctx.user.id,
-                           permission_code=code, target=target,
-                           detail={"action": action[:200], "sensitivity_class": klass})
+    security_events.record(
+        session,
+        "SENSITIVE_ACTION",
+        "SUCCESS",
+        subject_user_id=subject_user_id or ctx.user.id,
+        permission_code=code,
+        target=target,
+        detail={"action": action[:200], "sensitivity_class": klass},
+    )
 
 
 def new_session_id() -> str:

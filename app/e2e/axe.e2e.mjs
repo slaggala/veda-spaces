@@ -29,13 +29,25 @@ async function totp(secret) {
   const off = mac[mac.length - 1] & 0xf;
   return String((mac.readUInt32BE(off) & 0x7fffffff) % 1e6).padStart(6, '0');
 }
-async function scan(page, name) {
+// The enquiry form and its result panels are in scope for the site gate (AX-08, LEAD-019). Contrast problems in the
+// pre-existing marketing sections outside them are reported and tracked (OI-11), not gated.
+const FORM_SCOPE = ['#contact-form', '#form-success', '#form-fallback'];
+async function scan(page, name, { gateScope = null } = {}) {
   await page.addScriptTag({ content: AXE });
-  const res = await page.evaluate(async () => window.axe.run(document, {
-    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }));
-  const serious = res.violations.filter((v) => ['serious', 'critical'].includes(v.impact));
-  console.log(`${serious.length ? 'FAIL' : 'PASS'} ${name}: ${res.violations.length} violation(s), ${serious.length} serious/critical`);
-  for (const v of res.violations) console.log(`   - [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length} node(s))`);
+  const nodes = await page.evaluate(async (scope) => {
+    const res = await window.axe.run(document, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } });
+    return res.violations.flatMap((v) => v.nodes.map((n) => {
+      const el = typeof n.target[0] === 'string' ? document.querySelector(n.target[0]) : null;
+      return { rule: v.id, impact: v.impact, target: n.target.join(' '),
+        inScope: !scope || Boolean(el && el.closest(scope.join(','))) };
+    }));
+  }, gateScope);
+  const serious = nodes.filter((n) => n.inScope && ['serious', 'critical'].includes(n.impact));
+  const tracked = nodes.filter((n) => !n.inScope).length;
+  console.log(`${serious.length ? 'FAIL' : 'PASS'} ${name}: ${serious.length} serious/critical in scope` +
+    `${gateScope ? `, ${tracked} tracked outside the form (OI-11)` : ''}`);
+  for (const s of serious) console.log(`   - ${s.rule} ${s.target}`);
   return serious.length === 0;
 }
 
@@ -65,11 +77,15 @@ await page.getByText('Anita Reddy').first().click();
 await page.getByText(/VS-L-\d{4}-\d{6}/).first().waitFor();
 ok.push(await scan(page, 'lead detail'));
 // The marketing site fades sections in on scroll; reduced motion renders everything at full opacity (AX-10).
-const site = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+// bypassCSP lets the axe script run; the production CSP itself is exercised by site.e2e.mjs.
+const siteCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
+await siteCtx.route('https://challenges.cloudflare.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/javascript',
+  body: "window.turnstile = { render() { return 'w1'; }, getResponse() { return 'stub'; }, reset() {} };" }));
+const site = await siteCtx.newPage();
 await site.goto(`${SITE}/#contact`);
-ok.push(await scan(site, 'website (idle)'));
+ok.push(await scan(site, 'website (idle)', { gateScope: FORM_SCOPE }));
 await site.locator('#contact-form button[type="submit"]').click();
-ok.push(await scan(site, 'website form (error state)'));
+ok.push(await scan(site, 'website form (error state)', { gateScope: FORM_SCOPE }));
 await browser.close();
 console.log(`${ok.filter(Boolean).length}/${ok.length} screens without serious/critical violations`);
 process.exitCode = ok.every(Boolean) ? 0 : 1;

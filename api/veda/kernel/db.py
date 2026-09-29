@@ -58,10 +58,11 @@ def create_engine(url: str, *, echo: bool = False) -> Engine:
             echo=echo,
             connect_args={"check_same_thread": False, "timeout": 5.0},
             pool_pre_ping=False,
+            hide_parameters=True,  # bound values (PII) never appear in exception messages or logs (IR-27)
         )
         _install_sqlite_hooks(engine)
     else:
-        engine = sa.create_engine(url, echo=echo, pool_pre_ping=True, future=True)
+        engine = sa.create_engine(url, echo=echo, pool_pre_ping=True, future=True, hide_parameters=True)
     return engine
 
 
@@ -153,4 +154,8 @@ def verify_sqlite_runtime(conn) -> dict[str, object]:
         raise RuntimeError(f"SQLite >= 3.35 required, found {sqlite3.sqlite_version}")
     fk = conn.exec_driver_sql("PRAGMA foreign_keys").scalar()
     journal = conn.exec_driver_sql("PRAGMA journal_mode").scalar()
-    return {"foreign_keys": int(fk or 0), "journal_mode": str(journal).lower(), "sqlite_version": sqlite3.sqlite_version}
+    return {
+        "foreign_keys": int(fk or 0),
+        "journal_mode": str(journal).lower(),
+        "sqlite_version": sqlite3.sqlite_version,
+    }

@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing';
+import { leadPatch, leadValues } from '../src/modules/leads/edits.js';
 import { emptyFilters, filtersToQuery, parseFilters } from '../src/modules/leads/filters.js';
 import { primaryTransition, transitionBody, transitionRules, validateTransition } from '../src/modules/leads/transitions.js';
 
@@ -65,5 +66,25 @@ describe('lead filters ↔ URL query (08 §8.2)', () => {
     const qs = '?q=anita&status=NEW&assigned_to=unassigned&sort=next_follow_up_on&page_size=50';
     expect(`?${filtersToQuery(parseFilters(qs)).toString()}`).to.equal(qs);
     expect(filtersToQuery(emptyFilters()).toString()).to.equal('');
+  });
+});
+
+describe('lead edit re-apply after a version conflict (IR-15, TD-F step 4)', () => {
+  const loaded = { ...leadValues(null), name: 'Anita Reddy', phone: '+919876543210', city: 'Hyderabad', priority: 'MEDIUM', message: 'old' };
+  it('sends only the fields the user changed against the loaded record', () => {
+    const mine = { ...loaded, message: 'Needs a site visit' };
+    expect(leadPatch(mine, loaded)).to.deep.equal({ message: 'Needs a site visit' });
+  });
+  it('never reverts fields another writer changed meanwhile', () => {
+    const theirs = { ...loaded, city: 'Pune', priority: 'HIGH' };
+    const mine = { ...loaded, message: 'Needs a site visit' };
+    const patch = leadPatch(mine, loaded);
+    expect(patch).to.not.have.property('city');
+    expect(patch).to.not.have.property('priority');
+    // Diffing the stale form against the fresh record (the defect) would have sent the old values back.
+    expect(leadPatch(mine, theirs)).to.include({ city: 'Hyderabad', priority: 'MEDIUM' });
+  });
+  it('sends a cleared optional field as null', () => {
+    expect(leadPatch({ ...loaded, city: '' }, loaded)).to.deep.equal({ city: null });
   });
 });

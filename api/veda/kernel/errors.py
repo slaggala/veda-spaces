@@ -85,8 +85,17 @@ TITLES: dict[str, str] = {
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, detail: str | None = None, *, errors: list[dict] | None = None,
-                 extra: dict[str, Any] | None = None, headers: dict[str, str] | None = None, title: str | None = None):
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        detail: str | None = None,
+        *,
+        errors: list[dict] | None = None,
+        extra: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        title: str | None = None,
+    ):
         super().__init__(f"{status} {code}: {detail or ''}")
         self.status = status
         self.code = code

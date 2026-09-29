@@ -110,22 +110,41 @@ def load_grants(session: Session, user_id: str, now: datetime | None = None) -> 
         return res
     res.user_mfa_required = bool(user.mfa_required)
     role_rows = session.execute(
-        sa.select(Permission.code, Permission.supports_scope, Permission.sensitivity_class, Permission.grant_path,
-                  RolePermission.scope, Role.code.label("role_code"), Role.id.label("role_id"), Role.mfa_required)
+        sa.select(
+            Permission.code,
+            Permission.supports_scope,
+            Permission.sensitivity_class,
+            Permission.grant_path,
+            RolePermission.scope,
+            Role.code.label("role_code"),
+            Role.id.label("role_id"),
+            Role.mfa_required,
+        )
         .select_from(UserRole)
         .join(Role, sa.and_(Role.id == UserRole.role_id, Role.is_deleted == sa.false()))
         .join(RolePermission, sa.and_(RolePermission.role_id == Role.id, RolePermission.is_deleted == sa.false()))
         .join(Permission, sa.and_(Permission.id == RolePermission.permission_id, Permission.is_deleted == sa.false()))
         .where(UserRole.user_id == user_id, _live(UserRole, now))
     ).all()
-    res.role_mfa_required = bool(session.execute(
-        sa.select(sa.func.count()).select_from(UserRole)
-        .join(Role, sa.and_(Role.id == UserRole.role_id, Role.is_deleted == sa.false()))
-        .where(UserRole.user_id == user_id, _live(UserRole, now), Role.mfa_required == sa.true())
-    ).scalar())
+    res.role_mfa_required = bool(
+        session.execute(
+            sa.select(sa.func.count())
+            .select_from(UserRole)
+            .join(Role, sa.and_(Role.id == UserRole.role_id, Role.is_deleted == sa.false()))
+            .where(UserRole.user_id == user_id, _live(UserRole, now), Role.mfa_required == sa.true())
+        ).scalar()
+    )
     direct_rows = session.execute(
-        sa.select(Permission.code, Permission.supports_scope, Permission.sensitivity_class, Permission.grant_path,
-                  UserPermission.scope, UserPermission.effect, UserPermission.id, UserPermission.reason)
+        sa.select(
+            Permission.code,
+            Permission.supports_scope,
+            Permission.sensitivity_class,
+            Permission.grant_path,
+            UserPermission.scope,
+            UserPermission.effect,
+            UserPermission.id,
+            UserPermission.reason,
+        )
         .join(Permission, sa.and_(Permission.id == UserPermission.permission_id, Permission.is_deleted == sa.false()))
         .where(UserPermission.user_id == user_id, _live(UserPermission, now))
     ).all()
@@ -133,7 +152,9 @@ def load_grants(session: Session, user_id: str, now: datetime | None = None) -> 
     for r in role_rows:
         res.meta[r.code] = PermissionMeta(r.code, r.supports_scope, r.sensitivity_class, r.grant_path)
         grants[r.code] = broader(grants.get(r.code), r.scope)
-        res.sources.setdefault(r.code, []).append({"type": "ROLE", "role_code": r.role_code, "role_id": r.role_id, "scope": r.scope})
+        res.sources.setdefault(r.code, []).append(
+            {"type": "ROLE", "role_code": r.role_code, "role_id": r.role_id, "scope": r.scope}
+        )
     denies: set[str] = set()
     for r in direct_rows:
         res.meta[r.code] = PermissionMeta(r.code, r.supports_scope, r.sensitivity_class, r.grant_path)
@@ -147,18 +168,27 @@ def load_grants(session: Session, user_id: str, now: datetime | None = None) -> 
         if code in denies:
             continue
         res.granted[code] = "ALL" if not res.meta[code].supports_scope else scope
-    res.has_active_factor = bool(session.execute(
-        sa.select(sa.func.count()).select_from(UserMfaFactor)
-        .where(UserMfaFactor.user_id == user_id, UserMfaFactor.status == "ACTIVE")
-    ).scalar())
+    res.has_active_factor = bool(
+        session.execute(
+            sa.select(sa.func.count())
+            .select_from(UserMfaFactor)
+            .where(UserMfaFactor.user_id == user_id, UserMfaFactor.status == "ACTIVE")
+        ).scalar()
+    )
     return res
 
 
 def apply_gate(base: Resolution, *, user: User, session_type: str, mfa_verified: bool, now: datetime) -> Resolution:
     res = Resolution(
-        user_id=base.user_id, authz_version=base.authz_version, granted=dict(base.granted), denied=base.denied,
-        sources=base.sources, meta=base.meta, role_mfa_required=base.role_mfa_required,
-        user_mfa_required=base.user_mfa_required, has_active_factor=base.has_active_factor,
+        user_id=base.user_id,
+        authz_version=base.authz_version,
+        granted=dict(base.granted),
+        denied=base.denied,
+        sources=base.sources,
+        meta=base.meta,
+        role_mfa_required=base.role_mfa_required,
+        user_mfa_required=base.user_mfa_required,
+        has_active_factor=base.has_active_factor,
     )
     if user.status != "ACTIVE" or user.is_deleted or user.user_type != "HUMAN":
         return res
@@ -207,7 +237,9 @@ def clear_cache() -> None:
     _cache.clear()
 
 
-def resolve(session: Session, user: User, *, session_type: str, mfa_verified: bool, now: datetime | None = None) -> Resolution:
+def resolve(
+    session: Session, user: User, *, session_type: str, mfa_verified: bool, now: datetime | None = None
+) -> Resolution:
     now = now or clock.now()
     cooling = user.security_cooling_off_until is not None and user.security_cooling_off_until > now
     key = (user.id, user.authz_version, user.status, session_type, mfa_verified, cooling)

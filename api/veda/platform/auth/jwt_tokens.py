@@ -54,8 +54,8 @@ def _load() -> _Keys:
     if s.jwt_private_key_pem:
         private = serialization.load_pem_private_key(s.jwt_private_key_pem.encode(), password=None)
     else:
-        if s.is_production:
-            raise RuntimeError("VEDA_JWT_PRIVATE_KEY_PEM is required in production")
+        if not s.dev_keys_allowed:
+            raise RuntimeError(f"VEDA_JWT_PRIVATE_KEY_PEM is required in {s.env}")
         seed = int.from_bytes(hashlib.sha256(b"veda-dev-jwt::" + s.env.encode()).digest(), "big")
         private = ec.derive_private_key(seed % (2**255), ec.SECP256R1())
     verify = {s.jwt_kid: private.public_key()}
@@ -66,16 +66,32 @@ def _load() -> _Keys:
     return _keys
 
 
-def issue(*, user_id: str, session_id: str, authz_version: int, amr: list[str], session_type: str,
-          pwd_change: bool = False, ttl_seconds: int | None = None) -> tuple[str, int]:
+def issue(
+    *,
+    user_id: str,
+    session_id: str,
+    authz_version: int,
+    amr: list[str],
+    session_type: str,
+    pwd_change: bool = False,
+    ttl_seconds: int | None = None,
+) -> tuple[str, int]:
     keys = _load()
     s = settings()
     now = clock.now()
     ttl = ttl_seconds or int(s.access_token_ttl.total_seconds())
     iat = int(now.timestamp())
     claims = {
-        "iss": s.jwt_issuer, "aud": s.jwt_audience, "sub": user_id, "sid": session_id, "jti": new_id(),
-        "iat": iat, "nbf": iat, "exp": iat + ttl, "av": authz_version, "amr": amr,
+        "iss": s.jwt_issuer,
+        "aud": s.jwt_audience,
+        "sub": user_id,
+        "sid": session_id,
+        "jti": new_id(),
+        "iat": iat,
+        "nbf": iat,
+        "exp": iat + ttl,
+        "av": authz_version,
+        "amr": amr,
         "stp": "recovery" if session_type == "RECOVERY" else "full",
     }
     if pwd_change:
@@ -99,9 +115,17 @@ def decode(token: str) -> dict:
         raise TokenInvalid("unknown kid")
     try:
         claims = jwt.decode(
-            token, key, algorithms=[ALGORITHM], audience=s.jwt_audience, issuer=s.jwt_issuer,
-            options={"verify_exp": False, "verify_nbf": False, "verify_iat": False,
-                     "require": ["iss", "aud", "sub", "sid", "jti", "iat", "nbf", "exp", "av", "amr", "stp"]},
+            token,
+            key,
+            algorithms=[ALGORITHM],
+            audience=s.jwt_audience,
+            issuer=s.jwt_issuer,
+            options={
+                "verify_exp": False,
+                "verify_nbf": False,
+                "verify_iat": False,
+                "require": ["iss", "aud", "sub", "sid", "jti", "iat", "nbf", "exp", "av", "amr", "stp"],
+            },
         )
     except jwt.PyJWTError as exc:
         raise TokenInvalid(str(exc)) from exc
@@ -122,8 +146,17 @@ def jwks() -> dict:
     out = []
     for kid, pub in keys.verify.items():
         nums = pub.public_numbers()
-        out.append({"kty": "EC", "crv": "P-256", "kid": kid, "use": "sig", "alg": ALGORITHM,
-                    "x": _b64(nums.x), "y": _b64(nums.y)})
+        out.append(
+            {
+                "kty": "EC",
+                "crv": "P-256",
+                "kid": kid,
+                "use": "sig",
+                "alg": ALGORITHM,
+                "x": _b64(nums.x),
+                "y": _b64(nums.y),
+            }
+        )
     return {"keys": out}
 
 

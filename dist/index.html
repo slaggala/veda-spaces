@@ -176,8 +176,8 @@
         <label class="full" for="cf-location">Project Location <span class="opt">(optional)</span><input id="cf-location" name="location" maxlength="100" autocomplete="address-level2" placeholder="Area, city"></label>
         <label class="full" for="cf-brief">Brief Description of Requirements <span class="opt">(optional)</span><textarea id="cf-brief" name="brief" rows="4" maxlength="4000" placeholder="Tell us about your home and what you have in mind"></textarea></label>
         <div class="hp-field" aria-hidden="true"><label for="cf-website">Company website<input id="cf-website" name="company_website_url" tabindex="-1" autocomplete="off"></label></div>
-        <label class="full consent" for="cf-consent"><input id="cf-consent" name="consent" type="checkbox" required aria-required="true" aria-describedby="cf-consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the <a href="/privacy">Privacy Notice</a> (v2026-09-v1). <span class="req">Required</span></span><span class="field-error" id="cf-consent-err"></span></label>
-        <div class="turnstile full" id="cf-turnstile"></div>
+        <label class="full consent" for="cf-consent" data-intake-only hidden><input id="cf-consent" name="consent" type="checkbox" required aria-required="true" aria-describedby="cf-consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the <a href="/privacy">Privacy Notice</a> (v2026-09-v1). <span class="req">Required</span></span><span class="field-error" id="cf-consent-err"></span></label>
+        <div class="turnstile full" id="cf-turnstile" data-intake-only hidden></div>
         <button class="button button-dark full" type="submit">Let’s Talk About Your Home →</button>
         <p class="form-note full" id="form-note">Submitting opens WhatsApp with your project details pre-filled for a faster response.</p>
       </form>

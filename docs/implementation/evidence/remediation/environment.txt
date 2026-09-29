@@ -1,0 +1,8 @@
+Darwin <host> 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:36 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6030 arm64
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+Python 3.13.7
+v22.23.3
+10.9.9
+9236aa3ade38c33d03a57cf7a064ece29937b109

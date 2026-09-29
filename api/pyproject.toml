@@ -20,9 +20,29 @@ filterwarnings = ["ignore::DeprecationWarning:flask_limiter.*"]
 line-length = 120
 target-version = "py312"
 
+[tool.ruff.format]
+# The formatter is enforced in CI (ruff format --check) with the version pinned in requirements-dev.txt (IR-39).
+quote-style = "double"
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 ignore = ["E501", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 "migrations/versions/*" = ["E501"]
+
+[tool.mypy]
+# Static type checking (12 §5 "types"; IR-39). Scope: the application package. Third-party modules without
+# type information are ignored individually below, never globally.
+python_version = "3.13"
+files = ["veda"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_any_generics = false
+
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore.*", "sentry_sdk", "sentry_sdk.*", "phonenumbers", "phonenumbers.*",
+          "argon2", "argon2.*", "flask_limiter", "flask_limiter.*", "gunicorn.*", "psycopg", "psycopg.*"]
+ignore_missing_imports = true

@@ -24,9 +24,17 @@ class NotificationsQuery(Query):
 
 
 def present(n: Notification) -> dict:
-    return {"id": n.id, "notification_type": n.notification_type, "title": n.title, "body": n.body,
-            "entity_type": n.entity_type, "entity_id": n.entity_id, "link_path": n.link_path,
-            "read_on": clock.to_rfc3339(n.read_on), "created_on": clock.to_rfc3339(n.created_on)}
+    return {
+        "id": n.id,
+        "notification_type": n.notification_type,
+        "title": n.title,
+        "body": n.body,
+        "entity_type": n.entity_type,
+        "entity_id": n.entity_id,
+        "link_path": n.link_path,
+        "read_on": clock.to_rfc3339(n.read_on),
+        "created_on": clock.to_rfc3339(n.created_on),
+    }
 
 
 @api.route("GET", "", permission="notification.read", query=NotificationsQuery, write=False, requirement="NOTIF-001")
@@ -38,16 +46,33 @@ def list_notifications(req: Req):
     cur = decode_cursor(req.query.cursor)
     if cur:
         t = clock.parse_rfc3339(cur[0])
-        q = q.where(sa.or_(Notification.created_on < t, sa.and_(Notification.created_on == t, Notification.id < cur[1])))
-    rows = req.session.execute(q.order_by(Notification.created_on.desc(), Notification.id.desc())
-                               .limit(req.query.limit + 1)).scalars().all()
+        q = q.where(
+            sa.or_(Notification.created_on < t, sa.and_(Notification.created_on == t, Notification.id < cur[1]))
+        )
+    rows = (
+        req.session.execute(
+            q.order_by(Notification.created_on.desc(), Notification.id.desc()).limit(req.query.limit + 1)
+        )
+        .scalars()
+        .all()
+    )
     has_more = len(rows) > req.query.limit
     rows = rows[: req.query.limit]
-    unread = req.session.execute(sa.select(sa.func.count()).select_from(Notification).where(
-        Notification.recipient_user_id == uid, Notification.read_on.is_(None))).scalar()
+    unread = req.session.execute(
+        sa.select(sa.func.count())
+        .select_from(Notification)
+        .where(Notification.recipient_user_id == uid, Notification.read_on.is_(None))
+    ).scalar()
     next_cursor = encode_cursor(clock.to_rfc3339(rows[-1].created_on, micros=True), rows[-1].id) if has_more else None
-    return ok([present(n) for n in rows],
-              meta={"limit": req.query.limit, "next_cursor": next_cursor, "has_more": has_more, "unread_count": int(unread or 0)})
+    return ok(
+        [present(n) for n in rows],
+        meta={
+            "limit": req.query.limit,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "unread_count": int(unread or 0),
+        },
+    )
 
 
 @api.route("POST", "/<notification_id>/read", permission="notification.read", requirement="NOTIF-001")
@@ -64,8 +89,9 @@ def mark_read(req: Req, notification_id: str):
 def mark_all_read(req: Req):
     now = db.tx_time(req.session)
     count = 0
-    for n in req.session.execute(sa.select(Notification).where(
-            Notification.recipient_user_id == req.ctx.user.id, Notification.read_on.is_(None))).scalars():
+    for n in req.session.execute(
+        sa.select(Notification).where(Notification.recipient_user_id == req.ctx.user.id, Notification.read_on.is_(None))
+    ).scalars():
         n.read_on = now
         count += 1
     return ok({"marked": count})

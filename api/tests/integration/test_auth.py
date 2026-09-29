@@ -26,9 +26,13 @@ def test_AUTH_009_uniform_login_failures(api, factory):
     active = factory.user("SALES")
     invited = factory.user("SALES", status="INVITED")
     disabled = factory.user("SALES", status="DISABLED")
-    cases = [(active.email, "wrong-password-123"), ("nobody@vedaspaces.test", "whatever-12345"),
-             (invited.email, invited.password), (disabled.email, disabled.password),
-             ("system@system.vedaspaces.invalid", "x" * 12)]
+    cases = [
+        (active.email, "wrong-password-123"),
+        ("nobody@vedaspaces.test", "whatever-12345"),
+        (invited.email, invited.password),
+        (disabled.email, disabled.password),
+        ("system@system.vedaspaces.invalid", "x" * 12),
+    ]
     for email, password in cases:
         r = api.post("/api/v1/auth/login", {"email": email, "password": password}, anonymous=True)
         assert r.status == 401 and r.code == "INVALID_CREDENTIALS", (email, r)
@@ -55,11 +59,17 @@ def test_AUTH_010_throttle_is_per_account_and_network(api, factory):
     net_a = {"CF-Connecting-IP": "49.205.10.1"}
     net_b = {"CF-Connecting-IP": "103.21.44.9"}
     for _ in range(5):
-        api.post("/api/v1/auth/login", {"email": sales.email, "password": "bad-password-000"}, anonymous=True, headers=net_a)
-    r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True, headers=net_a)
+        api.post(
+            "/api/v1/auth/login", {"email": sales.email, "password": "bad-password-000"}, anonymous=True, headers=net_a
+        )
+    r = api.post(
+        "/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True, headers=net_a
+    )
     assert r.status == 401 and r.json.get("captcha_required") is True
     # The same account from another network is not locked out (A-01).
-    r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True, headers=net_b)
+    r = api.post(
+        "/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True, headers=net_b
+    )
     assert r.status == 200 and r.data["status"] == "AUTHENTICATED"
 
 
@@ -68,14 +78,26 @@ def test_AUTH_010_distributed_guessing_throttles_account_but_not_mfa_holders(api
     admin = factory.user("ADMIN")
     for user in (sales, admin):
         for i in range(5):
-            api.post("/api/v1/auth/login", {"email": user.email, "password": "bad-password-000"}, anonymous=True,
-                     headers={"CF-Connecting-IP": f"10.{i}.0.1"})
-    r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True,
-                 headers={"CF-Connecting-IP": "172.16.9.9"})
+            api.post(
+                "/api/v1/auth/login",
+                {"email": user.email, "password": "bad-password-000"},
+                anonymous=True,
+                headers={"CF-Connecting-IP": f"10.{i}.0.1"},
+            )
+    r = api.post(
+        "/api/v1/auth/login",
+        {"email": sales.email, "password": sales.password},
+        anonymous=True,
+        headers={"CF-Connecting-IP": "172.16.9.9"},
+    )
     assert r.status == 401, "global throttle applies to a password-only account"
     assert events("ACCOUNT_THROTTLED", subject_user_id=sales.id)
-    r = api.post("/api/v1/auth/login", {"email": admin.email, "password": admin.password}, anonymous=True,
-                 headers={"CF-Connecting-IP": "172.16.9.9"})
+    r = api.post(
+        "/api/v1/auth/login",
+        {"email": admin.email, "password": admin.password},
+        anonymous=True,
+        headers={"CF-Connecting-IP": "172.16.9.9"},
+    )
     assert r.status == 200 and r.data["status"] == "MFA_REQUIRED", "password + TOTP still succeeds (A-01)"
 
 
@@ -131,11 +153,14 @@ def test_AUTH_005_reuse_after_grace_window_is_theft(api, factory, client):
     assert any(sales.email in m.to for m in CaptureEmailProvider.sent), "the user is emailed (AUTH-005)"
 
 
-@pytest.mark.parametrize("headers", [
-    {"Origin": "http://localhost:5173"},
-    {"X-Requested-With": "veda-workspace"},
-    {"Origin": "https://evil.example", "X-Requested-With": "veda-workspace"},
-])
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Origin": "http://localhost:5173"},
+        {"X-Requested-With": "veda-workspace"},
+        {"Origin": "https://evil.example", "X-Requested-With": "veda-workspace"},
+    ],
+)
 def test_CSRF_refresh_and_logout_require_origin_and_header(api, factory, headers):
     sales = factory.user("SALES")
     factory.login(api, sales)
@@ -167,11 +192,17 @@ def test_AUTH_008_forgot_is_enumeration_safe_and_reset_revokes_sessions(api, fac
     reset = link_token("set a new password", sales.email)
     r = api.post("/api/v1/auth/password/reset", {"token": reset, "new_password": "short"}, anonymous=True)
     assert r.status == 422 and r.code == "PASSWORD_POLICY"
-    r = api.post("/api/v1/auth/password/reset", {"token": reset, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/password/reset", {"token": reset, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True
+    )
     assert r.status == 204
     assert api.get("/api/v1/auth/me", token=token).code == "SESSION_INVALID"
-    assert api.post("/api/v1/auth/password/reset", {"token": reset, "new_password": "Another-Long-Phrase-99"},
-                    anonymous=True).code == "RESET_TOKEN_INVALID"
+    assert (
+        api.post(
+            "/api/v1/auth/password/reset", {"token": reset, "new_password": "Another-Long-Phrase-99"}, anonymous=True
+        ).code
+        == "RESET_TOKEN_INVALID"
+    )
     sales.password = "Mango-Monsoon-Courtyard-7"
     factory.login(api, sales)
     assert events("PASSWORD_RESET_COMPLETED", subject_user_id=sales.id)
@@ -181,7 +212,9 @@ def test_AUTH_008_reset_does_not_bypass_mfa(api, factory):
     admin = factory.user("ADMIN")
     api.post("/api/v1/auth/password/forgot", {"email": admin.email}, anonymous=True)
     token = link_token("set a new password", admin.email)
-    api.post("/api/v1/auth/password/reset", {"token": token, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True)
+    api.post(
+        "/api/v1/auth/password/reset", {"token": token, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True
+    )
     r = api.post("/api/v1/auth/login", {"email": admin.email, "password": "Mango-Monsoon-Courtyard-7"}, anonymous=True)
     assert r.data["status"] == "MFA_REQUIRED"
 
@@ -190,11 +223,16 @@ def test_AUTH_012_change_password_requires_current_and_revokes_others(api, facto
     sales = factory.user("SALES")
     other = factory.login(api, sales)
     token = factory.login(api, sales)
-    r = api.post("/api/v1/auth/password/change", {"current_password": "nope-nope-nope", "new_password": "Fresh-Jasmine-Terrace-4"})
+    r = api.post(
+        "/api/v1/auth/password/change",
+        {"current_password": "nope-nope-nope", "new_password": "Fresh-Jasmine-Terrace-4"},
+    )
     assert r.status == 401 and r.code == "INVALID_CREDENTIALS"
     r = api.post("/api/v1/auth/password/change", {"current_password": sales.password, "new_password": sales.password})
     assert r.code == "PASSWORD_REUSED"
-    r = api.post("/api/v1/auth/password/change", {"current_password": sales.password, "new_password": "Fresh-Jasmine-Terrace-4"})
+    r = api.post(
+        "/api/v1/auth/password/change", {"current_password": sales.password, "new_password": "Fresh-Jasmine-Terrace-4"}
+    )
     assert r.status == 204 and "vs_rt=" in r.headers.get("Set-Cookie", "")
     assert api.get("/api/v1/auth/me", token=other).code == "SESSION_INVALID"
     assert api.get("/api/v1/auth/me", token=token).status == 200
@@ -203,16 +241,26 @@ def test_AUTH_012_change_password_requires_current_and_revokes_others(api, facto
 def test_AUTH_011_invite_accept_without_mfa_requirement(api, factory):
     admin = factory.user("ADMIN")
     factory.login(api, admin)
-    r = api.post("/api/v1/users", {"email": "ravi@vedaspaces.test", "full_name": "Ravi Kumar",
-                                   "role_ids": [factory.role_id("SALES")]})
+    r = api.post(
+        "/api/v1/users",
+        {"email": "ravi@vedaspaces.test", "full_name": "Ravi Kumar", "role_ids": [factory.role_id("SALES")]},
+    )
     assert r.status == 201 and r.data["status"] == "INVITED"
     invite = link_token("invited to Veda Workspace", "ravi@vedaspaces.test")
-    r = api.post("/api/v1/auth/invite/accept", {"token": invite, "new_password": "Monsoon-Garden-Window-88"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/invite/accept", {"token": invite, "new_password": "Monsoon-Garden-Window-88"}, anonymous=True
+    )
     assert r.status == 204
-    r = api.post("/api/v1/auth/login", {"email": "ravi@vedaspaces.test", "password": "Monsoon-Garden-Window-88"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/login", {"email": "ravi@vedaspaces.test", "password": "Monsoon-Garden-Window-88"}, anonymous=True
+    )
     assert r.data["status"] == "AUTHENTICATED"
-    assert api.post("/api/v1/auth/invite/accept", {"token": invite, "new_password": "Monsoon-Garden-Window-88"},
-                    anonymous=True).code == "INVITE_TOKEN_INVALID"
+    assert (
+        api.post(
+            "/api/v1/auth/invite/accept", {"token": invite, "new_password": "Monsoon-Garden-Window-88"}, anonymous=True
+        ).code
+        == "INVITE_TOKEN_INVALID"
+    )
     assert events("INVITE_ACCEPTED")
 
 
@@ -236,8 +284,11 @@ def test_must_change_password_restricts_endpoints(api, factory):
     assert r.data["must_change_password"] is True
     assert api.get("/api/v1/auth/me", token=token).status == 200
     assert api.get("/api/v1/leads", token=token).code == "PASSWORD_CHANGE_REQUIRED"
-    r = api.post("/api/v1/auth/password/change", {"current_password": sales.password, "new_password": "Fresh-Jasmine-Terrace-4"},
-                 token=token)
+    r = api.post(
+        "/api/v1/auth/password/change",
+        {"current_password": sales.password, "new_password": "Fresh-Jasmine-Terrace-4"},
+        token=token,
+    )
     assert r.status == 204
 
 
@@ -284,7 +335,9 @@ def test_DATA_004_token_flows_are_attributed_to_the_user(api, factory):
     sales = factory.user("SALES")
     api.post("/api/v1/auth/password/forgot", {"email": sales.email}, anonymous=True)
     token = link_token("set a new password", sales.email)
-    api.post("/api/v1/auth/password/reset", {"token": token, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True)
+    api.post(
+        "/api/v1/auth/password/reset", {"token": token, "new_password": "Mango-Monsoon-Courtyard-7"}, anonymous=True
+    )
     update = [a for a in audits(entity_type="user_credential", parent_entity_id=sales.id) if a.action == "UPDATE"][-1]
     assert update.performed_by == sales.id
 
@@ -293,19 +346,33 @@ def test_DEV_003_optional_captcha_token_after_network_throttle(api, factory):
     """DEV-003: login accepts an optional turnstile_token; after 5 failures from one network it is required."""
     sales = factory.user("SALES")
     net = {"CF-Connecting-IP": "49.205.77.1"}
-    ok = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password, "turnstile_token": "unused"},
-                  anonymous=True, headers=net)
+    ok = api.post(
+        "/api/v1/auth/login",
+        {"email": sales.email, "password": sales.password, "turnstile_token": "unused"},
+        anonymous=True,
+        headers=net,
+    )
     assert ok.status == 200, "the optional token is accepted and ignored before throttling"
     for _ in range(5):
-        api.post("/api/v1/auth/login", {"email": sales.email, "password": "bad-password-000"}, anonymous=True, headers=net)
+        api.post(
+            "/api/v1/auth/login", {"email": sales.email, "password": "bad-password-000"}, anonymous=True, headers=net
+        )
     clock.advance(timedelta(minutes=16))  # past the escalating delay; the captcha requirement remains
     r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True, headers=net)
     assert r.status == 401 and r.json["captcha_required"] is True
-    r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password, "turnstile_token": "fail-x"},
-                 anonymous=True, headers=net)
+    r = api.post(
+        "/api/v1/auth/login",
+        {"email": sales.email, "password": sales.password, "turnstile_token": "fail-x"},
+        anonymous=True,
+        headers=net,
+    )
     assert r.status == 401 and r.json["captcha_required"] is True
-    r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password, "turnstile_token": "ok-token"},
-                 anonymous=True, headers=net)
+    r = api.post(
+        "/api/v1/auth/login",
+        {"email": sales.email, "password": sales.password, "turnstile_token": "ok-token"},
+        anonymous=True,
+        headers=net,
+    )
     assert r.status == 200 and r.data["status"] == "AUTHENTICATED"
     unknown = api.post("/api/v1/auth/login", {"email": "nobody@vedaspaces.test", "password": "x" * 12}, anonymous=True)
     assert "captcha_required" not in unknown.json, "no enumeration signal on a first failure"

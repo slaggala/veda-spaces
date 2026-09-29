@@ -17,13 +17,19 @@ def test_DATA_002_uuidv7_canonical_form():
     assert len(set(ids)) == len(ids)
 
 
-@pytest.mark.parametrize("value", [
-    "0192A4F1C3B27E8D9F10A2B3C4D5E6F7",          # uppercase
-    "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7",      # hyphenated
-    "0192a4f1c3b24e8d9f10a2b3c4d5e6f7",          # version 4
-    "0192a4f1c3b27e8d7f10a2b3c4d5e6f7",          # bad variant
-    "123", "", None, 42,
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "0192A4F1C3B27E8D9F10A2B3C4D5E6F7",  # uppercase
+        "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7",  # hyphenated
+        "0192a4f1c3b24e8d9f10a2b3c4d5e6f7",  # version 4
+        "0192a4f1c3b27e8d7f10a2b3c4d5e6f7",  # bad variant
+        "123",
+        "",
+        None,
+        42,
+    ],
+)
 def test_DATA_013_non_canonical_ids_rejected(value):
     assert not is_valid_id(value)
 
@@ -54,7 +60,7 @@ def test_rfc3339_rendering():
 def test_jcs_rfc8785_vectors():
     assert canonicalize({"b": 2, "a": [1, True, None, "x"]}) == '{"a":[1,true,null,"x"],"b":2}'
     # Keys sort by UTF-16 code units, not code points (RFC 8785 §3.2.3).
-    assert canonicalize({"\U0001F600": 1, "ﬁ": 2}) == '{"\U0001F600":1,"ﬁ":2}'
+    assert canonicalize({"\U0001f600": 1, "ﬁ": 2}) == '{"\U0001f600":1,"ﬁ":2}'
     assert canonicalize("line\nbreak\u0001") == '"line\\nbreak\\u0001"'
     with pytest.raises(TypeError):
         canonicalize(1.5)

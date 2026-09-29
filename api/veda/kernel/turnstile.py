@@ -35,10 +35,23 @@ def verify(token: str | None, remote_ip: str | None) -> bool:
         return False
     s = settings()
     if s.turnstile_mode != "cloudflare":
-        return not token.startswith("fail")
+        # The development verifier exists for local and test only; anywhere else it fails closed (IR-09).
+        return s.dev_keys_allowed and not token.startswith("fail")
     data = urllib.parse.urlencode({"secret": s.turnstile_secret or "", "response": token, "remoteip": remote_ip or ""})
     try:  # pragma: no cover - network
-        with urllib.request.urlopen(SITEVERIFY_URL, data=data.encode(), timeout=5) as resp:
-            return bool(json.loads(resp.read()).get("success"))
+        # Bandit B310 (url open) does not apply: SITEVERIFY_URL is a constant https URL.
+        with urllib.request.urlopen(SITEVERIFY_URL, data=data.encode(), timeout=5) as resp:  # nosec B310
+            return accept(json.loads(resp.read()))
     except Exception:  # pragma: no cover - network
         return False
+
+
+def expected_hostnames() -> set[str]:
+    s = settings()
+    return {urllib.parse.urlparse(o).hostname or "" for o in (*s.public_site_origins, s.app_origin)} - {""}
+
+
+def accept(result: dict) -> bool:
+    """A siteverify answer counts only when it succeeded for one of our own sites (IR-A13): a token solved on
+    another site that uses the same (leaked) site key is refused."""
+    return bool(result.get("success")) and result.get("hostname") in expected_hostnames()

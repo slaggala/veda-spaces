@@ -25,8 +25,9 @@ def assert_invariants():
 
 
 def request(api, action, target_id, **extra):
-    return api.post("/api/v1/founder-actions", {"action": action, "target_user_id": target_id, "reason": "governance test",
-                                                **extra})
+    return api.post(
+        "/api/v1/founder-actions", {"action": action, "target_user_id": target_id, "reason": "governance test", **extra}
+    )
 
 
 def test_G1_self_approval_refused(api, factory):
@@ -75,8 +76,13 @@ def test_G2_G12_single_founder_mode_break_glass(api, factory, app):
     assert get(AdminApprovalRequest, approval).status == "EXECUTED"
     target = get(User, s.id)
     assert target.protection_level == "FOUNDER"
-    assert {e.event_type for e in events()} >= {"BREAK_GLASS_REQUESTED", "BREAK_GLASS_APPROVED", "BREAK_GLASS_EXECUTED",
-                                                 "FOUNDER_ACTION_EXECUTED", "FOUNDER_TRANSITION"}
+    assert {e.event_type for e in events()} >= {
+        "BREAK_GLASS_REQUESTED",
+        "BREAK_GLASS_APPROVED",
+        "BREAK_GLASS_EXECUTED",
+        "FOUNDER_ACTION_EXECUTED",
+        "FOUNDER_TRANSITION",
+    }
     assert_invariants()
 
 
@@ -120,8 +126,10 @@ def test_G4_direct_founder_role_grant_blocked(api, factory):
     founder_role = factory.role_id("FOUNDER")
     for who in (f1, admin):
         factory.login(api, who)
-        r = api.put(f"/api/v1/users/{s.id}/roles", {"roles": [{"role_id": factory.role_id("SALES")},
-                                                               {"role_id": founder_role}], "reason": "bypass"})
+        r = api.put(
+            f"/api/v1/users/{s.id}/roles",
+            {"roles": [{"role_id": factory.role_id("SALES")}, {"role_id": founder_role}], "reason": "bypass"},
+        )
         assert r.status == 403 and r.code in ("FOUNDER_GOVERNANCE_REQUIRED",), r
     assert len(events("FOUNDER_GOVERNANCE_BYPASS_BLOCKED")) >= 2
     r = api.post("/api/v1/users", {"email": "new@vedaspaces.test", "full_name": "New", "role_ids": [founder_role]})
@@ -135,8 +143,10 @@ def test_G5_direct_founder_manage_grant_or_deny_blocked(api, factory):
     factory.login(api, f1)
     r = api.post(f"/api/v1/users/{s.id}/permissions", {"permission_code": "user.founder.manage", "reason": "bypass"})
     assert r.code == "FOUNDER_GOVERNANCE_REQUIRED"
-    r = api.post(f"/api/v1/users/{f2.id}/permissions", {"permission_code": "user.founder.manage", "effect": "DENY",
-                                                        "reason": "bypass"})
+    r = api.post(
+        f"/api/v1/users/{f2.id}/permissions",
+        {"permission_code": "user.founder.manage", "effect": "DENY", "reason": "bypass"},
+    )
     assert r.code == "FOUNDER_GOVERNANCE_REQUIRED"
     assert_invariants()
 
@@ -145,13 +155,19 @@ def test_G6_role_definition_bypass_blocked(api, factory):
     f1 = factory.user(founder=True)
     factory.login(api, f1)
     sales_role, founder_role = factory.role_id("SALES"), factory.role_id("FOUNDER")
-    r = api.put(f"/api/v1/roles/{sales_role}/permissions", {"permissions": [{"permission_code": "user.founder.manage"}],
-                                                            "reason": "bypass"})
+    r = api.put(
+        f"/api/v1/roles/{sales_role}/permissions",
+        {"permissions": [{"permission_code": "user.founder.manage"}], "reason": "bypass"},
+    )
     assert r.code == "FOUNDER_GOVERNANCE_REQUIRED"
-    assert api.post("/api/v1/roles", {"code": "FOUNDER_COPY", "name": "Copy", "copy_from_role_id": founder_role}).code == \
-        "FOUNDER_GOVERNANCE_REQUIRED"
+    assert (
+        api.post("/api/v1/roles", {"code": "FOUNDER_COPY", "name": "Copy", "copy_from_role_id": founder_role}).code
+        == "FOUNDER_GOVERNANCE_REQUIRED"
+    )
     v = api.get(f"/api/v1/roles/{founder_role}").data["version"]
-    assert api.patch(f"/api/v1/roles/{founder_role}", {"name": "Owner"}, if_match=v).code == "FOUNDER_GOVERNANCE_REQUIRED"
+    assert (
+        api.patch(f"/api/v1/roles/{founder_role}", {"name": "Owner"}, if_match=v).code == "FOUNDER_GOVERNANCE_REQUIRED"
+    )
     assert api.delete(f"/api/v1/roles/{founder_role}", if_match=v).code == "FOUNDER_GOVERNANCE_REQUIRED"
     assert_invariants()
 
@@ -208,9 +224,17 @@ def test_G10_concurrent_founder_requests_and_execution(api, factory, engine):
     ids = []
     with actor(system_context()), db.unit_of_work(write=True) as sess:
         for requester, target in ((f1, f1), (f2, f2)):
-            req = AdminApprovalRequest(action_class="FOUNDER", action_type="REVOKE_FOUNDER", channel="IN_APP",
-                                       target_user_id=target.id, requested_by=requester.id, request_payload={},
-                                       reason="step down", status="APPROVED", expires_on=db.tx_time(sess) + timedelta(hours=1))
+            req = AdminApprovalRequest(
+                action_class="FOUNDER",
+                action_type="REVOKE_FOUNDER",
+                channel="IN_APP",
+                target_user_id=target.id,
+                requested_by=requester.id,
+                request_payload={},
+                reason="step down",
+                status="APPROVED",
+                expires_on=db.tx_time(sess) + timedelta(hours=1),
+            )
             sess.add(req)
             sess.flush()
             ids.append(req.id)
@@ -263,7 +287,9 @@ def test_AUTH_014_bootstrap_creates_one_invited_founder(api, capsys):
     assert user.status == "INVITED" and user.protection_level == "FOUNDER"
     assert events("BOOTSTRAP_FOUNDER")[0].severity == "CRITICAL"
     token = out["invite_link"].split("#token=")[1]
-    r = api.post("/api/v1/auth/invite/accept", {"token": token, "new_password": "Studio-Evening-Lantern-5"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/invite/accept", {"token": token, "new_password": "Studio-Evening-Lantern-5"}, anonymous=True
+    )
     assert r.data["status"] == "MFA_ENROLLMENT_REQUIRED", "invite acceptance forces MFA enrollment"
     assert main(["bootstrap-founder", "--email", "x@vedaspaces.test", "--name", "X"]) == 2
     assert_invariants()

@@ -1,5 +1,4 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
-import { styleMap } from 'lit/directives/style-map.js';
 import { statusLabel } from '../core/i18n/strings.js';
 import type { ApiProblem } from '../core/api/problem.js';
 import { icon } from './icons.js';
@@ -28,6 +27,9 @@ export class VsStatusPill extends LitElement {
   }
 }
 
+/* Bar widths are set through the CSSOM (.style property), which the app CSP allows; a style attribute in
+   markup would be blocked by style-src (IR-A21). */
+
 /** Pipeline stepper exposed as an ordered list with aria-current (AX-09). */
 export class VsStatusStepper extends LitElement {
   static override properties = { status: { type: String } };
@@ -43,6 +45,14 @@ export class VsStatusStepper extends LitElement {
     li[aria-current='step'] .dot { border-color: var(--vs-copper); background: var(--vs-copper); }
     li.lost { color: var(--vs-danger); }
   `;
+  override connectedCallback() {
+    super.connectedCallback();
+    // The pipeline scrolls horizontally at 360 px: the region must be reachable by keyboard (axe
+    // scrollable-region-focusable, AX-03, IR-37).
+    if (!this.hasAttribute('tabindex')) this.setAttribute('tabindex', '0');
+    this.setAttribute('role', 'region');
+    this.setAttribute('aria-label', 'Pipeline status');
+  }
   override render() {
     const lost = this.status === 'LOST';
     const idx = PIPELINE.indexOf(this.status as (typeof PIPELINE)[number]);
@@ -130,6 +140,7 @@ export class VsToaster extends LitElement {
   private seq = 0;
   static override styles = css`
     :host { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .region { display: flex; flex-direction: column; gap: 8px; }
     div { background: var(--vs-sidebar); color: var(--vs-on-sidebar); padding: 12px 18px; border-radius: 8px; font: 500 14px/20px var(--vs-font-sans); box-shadow: var(--vs-shadow); max-width: min(480px, calc(100vw - 32px)); }
     .error { border-left: 3px solid var(--vs-danger); }
     .success { border-left: 3px solid var(--vs-success); }
@@ -144,17 +155,26 @@ export class VsToaster extends LitElement {
     setTimeout(() => (this.items = this.items.filter((t) => t.id !== id)), 4000);
   }
   override render() {
-    return html`<div role="status" aria-live="polite" hidden></div>${this.items.map((t) => html`<div class=${t.kind} role="status">${t.text}</div>`)}`;
+    // Two live regions that exist before any message is added, so screen readers announce every toast (AX-06).
+    return html`<section role="status" aria-live="polite" aria-atomic="false" class="region">
+        ${this.items.filter((t) => t.kind !== 'error').map((t) => html`<div class=${t.kind}>${t.text}</div>`)}</section>
+      <section role="alert" aria-live="assertive" aria-atomic="false" class="region">
+        ${this.items.filter((t) => t.kind === 'error').map((t) => html`<div class=${t.kind}>${t.text}</div>`)}</section>`;
   }
 }
 
-export function toast(text: string, kind: ToastKind = 'info'): void {
+/** Create the toaster (and its live regions) ahead of the first message; the shell calls it at start-up. */
+export function ensureToaster(): VsToaster {
   let el = document.querySelector('vs-toaster') as VsToaster | null;
   if (!el) {
     el = document.createElement('vs-toaster') as VsToaster;
     document.body.append(el);
   }
-  el.show(text, kind);
+  return el;
+}
+
+export function toast(text: string, kind: ToastKind = 'info'): void {
+  ensureToaster().show(text, kind);
 }
 
 /** Page-level problem banner with the request id and a copy button (09 §3.2). */
@@ -288,7 +308,7 @@ export class VsBarList extends LitElement {
     return html`<ul>${this.items.map(
       (i) => html`<li>
         ${i.href ? html`<a href=${i.href}>${i.label}</a>` : html`<span>${i.label}</span>`}
-        <span class="bar" aria-hidden="true"><span class="fill" style=${styleMap({ width: `${(i.value / max) * 100}%`, display: 'block' })}></span></span>
+        <span class="bar" aria-hidden="true"><span class="fill" .style=${`width: ${(i.value / max) * 100}%; display: block`}></span></span>
         <span class="n">${i.value}</span>
       </li>`,
     )}</ul>`;

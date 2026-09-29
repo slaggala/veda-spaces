@@ -11,6 +11,8 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
+HEAD = "0009_mfa_challenge_binding"
+
 
 def _connect():
     return db.engine().connect()
@@ -32,11 +34,22 @@ def test_PLAT_013_no_user_table_and_expected_inventory(app):
 def test_FKLESS_allow_list_is_exact():
     assert len(audit_registry.FKLESS_IDENTIFIERS) == 10
     assert {f.key for f in audit_registry.FKLESS_IDENTIFIERS} == {
-        "audit_log.session_id", "security_event_log.session_id", "refresh_token.replaced_by_id", "audit_log.entity_id",
-        "audit_log.parent_entity_id", "audit_log.transaction_id", "security_event_log.target_entity_id",
-        "outbox_event.aggregate_id", "notification.entity_id", "user_mfa_recovery_code.batch_id"}
+        "audit_log.session_id",
+        "security_event_log.session_id",
+        "refresh_token.replaced_by_id",
+        "audit_log.entity_id",
+        "audit_log.parent_entity_id",
+        "audit_log.transaction_id",
+        "security_event_log.target_entity_id",
+        "outbox_event.aggregate_id",
+        "notification.entity_id",
+        "user_mfa_recovery_code.batch_id",
+    }
     assert set(audit_registry.NON_ENTITY_STRING_IDENTIFIERS) == {
-        "audit_log.request_id", "security_event_log.request_id", "outbox_event.locked_by"}
+        "audit_log.request_id",
+        "security_event_log.request_id",
+        "outbox_event.locked_by",
+    }
 
 
 def test_exception_registry_unique_indexes_exact(app):
@@ -177,7 +190,7 @@ def test_migration_upgrade_with_data(tmp_path, engine):
     with eng.begin() as conn:
         assert conn.execute(sa.text("SELECT count(*) FROM permission")).scalar() == before
         assert conn.execute(sa.text("SELECT count(*) FROM app_user")).scalar() == users
-        assert conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar() == "0100_crm_leads"
+        assert conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar() == HEAD
         assert conformance.check(conn).ok
     eng.dispose()
     if engine != "sqlite":
@@ -193,23 +206,38 @@ def test_RBAC_001_migration_order():
     cfg = Config(str(ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(ROOT / "migrations"))
     order = [r.revision for r in reversed(list(ScriptDirectory.from_config(cfg).walk_revisions()))]
-    assert order == ["0001_kernel", "0002_identity", "0003_rbac", "0004_auth", "0005_audit", "0006_reference",
-                     "0007_notifications", "0008_account_security", "0100_crm_leads"]
+    assert order == [
+        "0001_kernel",
+        "0002_identity",
+        "0003_rbac",
+        "0004_auth",
+        "0005_audit",
+        "0006_reference",
+        "0007_notifications",
+        "0008_account_security",
+        "0100_crm_leads",
+        HEAD,
+    ]
 
 
 def test_seed_data(app):
     with _connect() as conn:
-        system = conn.execute(sa.text("SELECT user_type, created_by FROM app_user WHERE id = '00000000000070008000000000000001'")).one()
+        system = conn.execute(
+            sa.text("SELECT user_type, created_by FROM app_user WHERE id = '00000000000070008000000000000001'")
+        ).one()
         assert system[0] == "SYSTEM" and str(system[1]).replace("-", "") == "00000000000070008000000000000001"
         humans = conn.execute(sa.text("SELECT count(*) FROM app_user WHERE user_type = 'HUMAN'")).scalar()
         assert humans == 0, "no human users in any migration (AUTH-014)"
         cats = conn.execute(sa.text("SELECT count(*) FROM lookup_category")).scalar()
         assert cats == 6
-        seeded_audit = conn.execute(sa.text("SELECT count(*) FROM audit_log WHERE performed_via = 'MIGRATION'")).scalar()
+        seeded_audit = conn.execute(
+            sa.text("SELECT count(*) FROM audit_log WHERE performed_via = 'MIGRATION'")
+        ).scalar()
         assert seeded_audit > 0
 
 
 # --- TD-H negative fixtures --------------------------------------------------------------------------
+
 
 def _scratch_schema(mutator, engine, tmp_path):
     """Create a scratch schema from a mutated copy of the metadata and run the conformance check."""
@@ -247,11 +275,13 @@ def _scratch_schema(mutator, engine, tmp_path):
 def _add_column(table, column):
     def mutate(md):
         md.tables[table].append_column(column)
+
     return mutate
 
 
 def _rebuild_table(table, **overrides):
     """Replace one column definition (type change)."""
+
     def mutate(md):
         t = md.tables[table]
         for name, new_col in overrides.items():
@@ -261,6 +291,7 @@ def _rebuild_table(table, **overrides):
             for c in list(t.constraints):
                 if isinstance(c, sa.CheckConstraint) and c.name and name in (c.name or ""):
                     t.constraints.discard(c)
+
     return mutate
 
 
@@ -270,6 +301,7 @@ def _drop_constraint(table, name):
         for c in list(t.constraints):
             if c.name == name:
                 t.constraints.discard(c)
+
     return mutate
 
 
@@ -278,8 +310,23 @@ def test_TD_H1_real_schema_passes(engine, tmp_path):
     assert report.ok, report.problems
 
 
-@pytest.mark.parametrize("case", ["H2", "H3", "H5", "H6", "H10", "H11a", "H11b", "missing_version", "user_table",
-                                  "float_money", "unique_without_predicate", "cascade"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "H2",
+        "H3",
+        "H5",
+        "H6",
+        "H10",
+        "H11a",
+        "H11b",
+        "missing_version",
+        "user_table",
+        "float_money",
+        "unique_without_predicate",
+        "cascade",
+    ],
+)
 def test_TD_H_negative_fixtures_fail(engine, tmp_path, case):
     from veda.kernel.types import GUID, UTCDateTime
 
@@ -294,7 +341,9 @@ def test_TD_H_negative_fixtures_fail(engine, tmp_path, case):
         "missing_version": _rebuild_table("lead_note", version=sa.Column("version", sa.Integer, nullable=True)),
         "float_money": _add_column("lead", sa.Column("budget_amount", sa.Float)),
         "unique_without_predicate": lambda md: sa.Index("ux_lead__phone_all", md.tables["lead"].c.phone, unique=True),
-        "cascade": _add_column("lead_note", sa.Column("extra_id", GUID(), sa.ForeignKey("lead.id", ondelete="CASCADE"))),
+        "cascade": _add_column(
+            "lead_note", sa.Column("extra_id", GUID(), sa.ForeignKey("lead.id", ondelete="CASCADE"))
+        ),
     }
 
     def user_table(md):
@@ -313,19 +362,31 @@ def test_TD_H4_undocumented_registry_entry_fails(engine, tmp_path):
 
     with db.create_engine(f"sqlite:///{tmp_path / 'h4.db'}").connect() as conn:
         models.metadata.create_all(conn)
-        report = conformance.check(conn, fkless=(*audit_registry.FKLESS_IDENTIFIERS[:8], entry,
-                                                 audit_registry.FKLESS_IDENTIFIERS[9]))
+        report = conformance.check(
+            conn, fkless=(*audit_registry.FKLESS_IDENTIFIERS[:8], entry, audit_registry.FKLESS_IDENTIFIERS[9])
+        )
     assert not report.ok and any("documentation" in p for p in report.problems)
 
 
 def test_TD_H7_malformed_identifiers_rejected(app):
     from veda.platform.audit.models import AuditLog
 
-    for bad in ("0192A4F1C3B27E8D9F10A2B3C4D5E6F7", "0192a4f1c3b24e8d9f10a2b3c4d5e6f7", "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7"):
+    for bad in (
+        "0192A4F1C3B27E8D9F10A2B3C4D5E6F7",
+        "0192a4f1c3b24e8d9f10a2b3c4d5e6f7",
+        "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7",
+    ):
         with pytest.raises((ValueError, sa.exc.StatementError, sa.exc.IntegrityError)):
             with actor(system_context()), db.unit_of_work(write=True) as s:
-                row = AuditLog(entity_type="lead", entity_id=bad, action="CREATE", performed_by=system_context().actor_id,
-                               performed_on=db.tx_time(s), performed_via="SYSTEM_JOB", transaction_id=new_id())
+                row = AuditLog(
+                    entity_type="lead",
+                    entity_id=bad,
+                    action="CREATE",
+                    performed_by=system_context().actor_id,
+                    performed_on=db.tx_time(s),
+                    performed_via="SYSTEM_JOB",
+                    transaction_id=new_id(),
+                )
                 s.add(row)
         if db.is_sqlite():
             with pytest.raises(sa.exc.IntegrityError):
@@ -336,4 +397,5 @@ def test_TD_H7_malformed_identifiers_rejected(app):
                         f"payload_schema) VALUES ('{new_id()}', '2026-09-29T00:00:00.000000Z', '2026-09-29T00:00:00.000000Z', "
                         "'00000000000070008000000000000001', '00000000000070008000000000000001', 0, 1, 'lead', "
                         f"'{bad}', 'CREATE', '00000000000070008000000000000001', '2026-09-29T00:00:00.000000Z', 'SYSTEM_JOB', "
-                        f"'{new_id()}', 1)")
+                        f"'{new_id()}', 1)"
+                    )

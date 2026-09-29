@@ -30,7 +30,7 @@ def time_step(at: datetime) -> int:
 def hotp(secret: bytes, counter: int, digits: int = DIGITS) -> str:
     mac = hmac.new(secret, struct.pack(">Q", counter), hashlib.sha1).digest()
     offset = mac[-1] & 0x0F
-    code = (struct.unpack(">I", mac[offset:offset + 4])[0] & 0x7FFFFFFF) % (10**digits)
+    code = (struct.unpack(">I", mac[offset : offset + 4])[0] & 0x7FFFFFFF) % (10**digits)
     return f"{code:0{digits}d}"
 
 
@@ -55,8 +55,10 @@ def is_replay(secret: bytes, code: str, at: datetime, last_used_step: int | None
     if last_used_step is None or not code.isdigit():
         return False
     current = time_step(at)
-    return any(step <= last_used_step and hmac.compare_digest(hotp(secret, step), code)
-               for step in (current - 1, current, current + 1))
+    return any(
+        step <= last_used_step and hmac.compare_digest(hotp(secret, step), code)
+        for step in (current - 1, current, current + 1)
+    )
 
 
 def otpauth_uri(secret: bytes, account: str) -> str:

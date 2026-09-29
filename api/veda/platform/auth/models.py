@@ -13,16 +13,35 @@ from veda.kernel.types import GUID, JSONType, UTCDateTime
 
 SESSION_TYPES = ("FULL", "RECOVERY")
 REVOKE_REASONS = (
-    "LOGOUT", "LOGOUT_ALL", "ADMIN_REVOKE", "PASSWORD_CHANGED", "PASSWORD_RESET", "USER_DISABLED", "TOKEN_REUSE",
-    "MFA_RESET", "MFA_RECOVERY", "RECOVERY_COMPLETED", "EMAIL_CHANGED", "EXPIRED",
+    "LOGOUT",
+    "LOGOUT_ALL",
+    "ADMIN_REVOKE",
+    "PASSWORD_CHANGED",
+    "PASSWORD_RESET",
+    "USER_DISABLED",
+    "TOKEN_REUSE",
+    "MFA_RESET",
+    "MFA_RECOVERY",
+    "RECOVERY_COMPLETED",
+    "EMAIL_CHANGED",
+    "EXPIRED",
 )
 ACTION_TOKEN_PURPOSES = (
-    "PASSWORD_RESET", "INVITE", "MFA_ENROLLMENT", "EMAIL_VERIFICATION", "EMAIL_CHANGE_CANCEL", "APPROVAL_CANCEL",
+    "PASSWORD_RESET",
+    "INVITE",
+    "MFA_ENROLLMENT",
+    "EMAIL_VERIFICATION",
+    "EMAIL_CHANGE_CANCEL",
+    "APPROVAL_CANCEL",
 )
 FACTOR_TYPES = ("TOTP",)
 FACTOR_STATUSES = ("PENDING", "ACTIVE", "REVOKED")
 FACTOR_REVOKE_REASONS = ("USER_REMOVED", "ADMIN_RESET", "REPLACED", "ENROLLMENT_ABANDONED", "BREAK_GLASS")
 CHALLENGE_PURPOSES = ("LOGIN", "ENROLLMENT", "STEP_UP")
+# How an ENROLLMENT challenge was issued (05 §11.3). INVITE_CONTEXT is the path-B proof returned by invite
+# acceptance; it can start an enrollment but is never itself confirmable. PATH_A..PATH_D are confirmable
+# enrollment transactions bound to one factor (IR-01, 0009_mfa_challenge_binding).
+ENROLLMENT_PATHS = ("INVITE_CONTEXT", "PATH_A", "PATH_B", "PATH_C", "PATH_D")
 EVENT_CATEGORIES = ("AUTHENTICATION", "SESSION", "PASSWORD", "MFA", "ACCOUNT", "AUTHORIZATION", "PUBLIC_INTAKE")
 OUTCOMES = ("SUCCESS", "FAILURE", "BLOCKED")
 SEVERITIES = ("INFO", "WARNING", "CRITICAL")
@@ -96,7 +115,12 @@ class UserActionToken(AuditedBase):
         in_check("user_action_token", "purpose", ACTION_TOKEN_PURPOSES),
         CheckConstraint("is_deleted = false", name="ck_user_action_token__never_deleted"),
         Index("ux_user_action_token__token_hash", "token_hash", unique=True),
-        Index("ix_user_action_token__user_open", "user_id", "purpose", **where("used_on IS NULL AND invalidated_on IS NULL")),
+        Index(
+            "ix_user_action_token__user_open",
+            "user_id",
+            "purpose",
+            **where("used_on IS NULL AND invalidated_on IS NULL"),
+        ),
     )
 
 
@@ -124,8 +148,15 @@ class UserMfaFactor(AuditedBase):
         # At most one PENDING and one ACTIVE factor per user and type. `status` is part of the key so an
         # ACTIVE factor and its PENDING replacement can coexist during re-enrollment (05 §11.5, TD-E).
         Index(
-            "ux_user_mfa_factor__user_live", "user_id", "factor_type", "status", unique=True,
-            **where("status IN ('PENDING','ACTIVE') AND is_deleted = 0", "status IN ('PENDING','ACTIVE') AND is_deleted = false"),
+            "ux_user_mfa_factor__user_live",
+            "user_id",
+            "factor_type",
+            "status",
+            unique=True,
+            **where(
+                "status IN ('PENDING','ACTIVE') AND is_deleted = 0",
+                "status IN ('PENDING','ACTIVE') AND is_deleted = false",
+            ),
         ),
     )
 
@@ -158,9 +189,17 @@ class MfaChallenge(AuditedBase):
     failed_attempts: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=sa.text("0"))
     completed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     ip_address: Mapped[str | None] = mapped_column(sa.String(45))
+    factor_id: Mapped[str | None] = mapped_column(GUID(), ForeignKey("user_mfa_factor.id", ondelete="RESTRICT"))
+    enrollment_path: Mapped[str | None] = mapped_column(sa.String(14))
 
     __table_args__ = (
         in_check("mfa_challenge", "purpose", CHALLENGE_PURPOSES),
+        in_check("mfa_challenge", "enrollment_path", ENROLLMENT_PATHS, nullable=True),
+        CheckConstraint("enrollment_path IS NULL OR purpose = 'ENROLLMENT'", name="ck_mfa_challenge__path_purpose"),
+        CheckConstraint(
+            "factor_id IS NULL OR enrollment_path IN ('PATH_A', 'PATH_B', 'PATH_C', 'PATH_D')",
+            name="ck_mfa_challenge__factor_path",
+        ),
         CheckConstraint("failed_attempts BETWEEN 0 AND 5", name="ck_mfa_challenge__failed_attempts"),
         CheckConstraint("is_deleted = false", name="ck_mfa_challenge__never_deleted"),
         Index("ux_mfa_challenge__token_hash", "token_hash", unique=True),
@@ -196,7 +235,9 @@ class SecurityEventLog(AuditedBase):
         in_check("security_event_log", "event_category", EVENT_CATEGORIES),
         in_check("security_event_log", "outcome", OUTCOMES),
         in_check("security_event_log", "severity", SEVERITIES),
-        CheckConstraint("(target_entity_type IS NULL) = (target_entity_id IS NULL)", name="ck_security_event_log__target_pair"),
+        CheckConstraint(
+            "(target_entity_type IS NULL) = (target_entity_id IS NULL)", name="ck_security_event_log__target_pair"
+        ),
         CheckConstraint("chain_seq >= 1", name="ck_security_event_log__chain_seq_positive"),
         CheckConstraint("is_deleted = false AND version = 1", name="ck_security_event_log__immutable_contract"),
         Index("ux_security_event_log__chain_seq", "chain_seq", unique=True),
@@ -205,15 +246,27 @@ class SecurityEventLog(AuditedBase):
         Index("ix_security_event_log__type", "event_type", sa.text("occurred_on DESC")),
         Index("ix_security_event_log__ip", "ip_address", sa.text("occurred_on DESC")),
         Index(
-            "ix_security_event_log__target", "target_entity_type", "target_entity_id", sa.text("occurred_on DESC"),
+            "ix_security_event_log__target",
+            "target_entity_type",
+            "target_entity_id",
+            sa.text("occurred_on DESC"),
             **where("target_entity_id IS NOT NULL"),
         ),
-        Index("ix_security_event_log__outcome", "outcome", sa.text("occurred_on DESC"), **where("outcome <> 'SUCCESS'")),
+        Index(
+            "ix_security_event_log__outcome", "outcome", sa.text("occurred_on DESC"), **where("outcome <> 'SUCCESS'")
+        ),
     )
 
 
 # Re-exported for the conformance check (sqlite_check/live_where used above).
 __all__ = [
-    "MfaChallenge", "RefreshToken", "SecurityEventLog", "UserActionToken", "UserMfaFactor",
-    "UserMfaRecoveryCode", "UserSession", "live_where", "sqlite_check",
+    "MfaChallenge",
+    "RefreshToken",
+    "SecurityEventLog",
+    "UserActionToken",
+    "UserMfaFactor",
+    "UserMfaRecoveryCode",
+    "UserSession",
+    "live_where",
+    "sqlite_check",
 ]

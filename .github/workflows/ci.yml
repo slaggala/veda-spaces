@@ -1,14 +1,25 @@
-# CI gates (02 §12.5, 12 §5). Runs on every PR; deployment stages are not configured here.
+# CI gates (02 §12.5, 12 §5; IR-14). Every job is mandatory: any failing step fails the workflow.
+# Third-party actions are pinned to commit SHAs (supply chain, SEC-007). Deployment is not configured here.
 name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "implementation/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   api:
+    name: api (${{ matrix.engine }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         engine: [sqlite, postgresql]
     services:
@@ -17,33 +28,102 @@ jobs:
         env: { POSTGRES_PASSWORD: postgres }
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      VEDA_TEST_ENGINES: ${{ matrix.engine }}
+      VEDA_TEST_DATABASE_URL_PG: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
     defaults:
       run: { working-directory: api }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.13" }
-      - run: pip install -r requirements.txt pytest pytest-cov ruff
-      - run: ruff check veda tests migrations tools
-      - name: Tests (unit, integration, schema conformance, lint)
-        env:
-          VEDA_TEST_ENGINES: ${{ matrix.engine }}
-          VEDA_TEST_DATABASE_URL_PG: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
-        run: python -m pytest -q
-      - run: python -m veda.cli deploy-check
+      - name: Install the hash-locked toolchain
+        run: pip install --require-hashes -r requirements-dev.txt
+      - name: PostgreSQL server version (the architecture targets 16)
+        if: matrix.engine == 'postgresql'
+        run: python -c "import psycopg; print('PostgreSQL', psycopg.connect('postgresql://postgres:postgres@localhost:5432/postgres').info.server_version)"
+      - name: Lint (ruff)
+        run: ruff check veda tests migrations tools
+      - name: Format (ruff format --check)
+        run: ruff format --check veda tests migrations tools
+      - name: Types (mypy ratchet)
+        run: python tools/mypy_ratchet.py
+      - name: Tests (unit, integration, security regressions, migrations incl. N-1 upgrade, schema conformance)
+        run: python -m pytest -q -rs --junitxml=pytest-${{ matrix.engine }}.xml
+      - name: OpenAPI contract diff
+        run: python tools/openapi_check.py
+      - name: Single-process deployment check
+        run: python -m veda.cli deploy-check
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with: { name: "pytest-${{ matrix.engine }}", path: "api/pytest-${{ matrix.engine }}.xml" }
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version-file: app/.nvmrc }
+      - run: pip install --require-hashes -r api/requirements-dev.txt
+      - name: Secret scan (no candidates beyond the reviewed baseline)
+        run: api/tools/secret_scan.sh
+      - name: Python dependency audit (hash-locked runtime set)
+        working-directory: api
+        run: pip-audit -r requirements.txt --require-hashes --disable-pip --strict
+      - name: Static security analysis (bandit, medium and above)
+        working-directory: api
+        run: bandit -q -r veda -ll -ii
+      - name: Frontend dependency audit
+        working-directory: app
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev
+          npm audit --audit-level=high
+      - name: Build the API image
+        run: docker build -f api/deploy/Dockerfile -t veda-api:ci api
+      - name: Container image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: veda-api:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
 
   app:
     runs-on: ubuntu-latest
     defaults:
       run: { working-directory: app }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version-file: app/.nvmrc }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run lint:tokens
       - run: npm run test:contrast
       - run: npm test
       - run: npm run build
+
+  e2e:
+    name: browser e2e + axe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version-file: app/.nvmrc }
+      - run: pip install --require-hashes -r api/requirements.txt
+      - working-directory: app
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Workspace, access-control, website and accessibility journeys
+        run: API_PYTHON="$(command -v python)" app/e2e/run-all.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with: { name: e2e-artifacts, path: app/e2e-artifacts }

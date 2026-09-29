@@ -195,7 +195,7 @@ export class VsProfilePage extends SessionElement {
           <div class="small muted">${s.ip_city ?? s.ip_address ?? ''} · started ${formatRelative(s.started_on)} · last seen ${formatRelative(s.last_seen_on)}</div></div>
           <span class="spacer"></span>${s.current ? nothing : html`<button class="btn small" @click=${() => this.revoke(s.id)}>Revoke</button>`}</li>`,
       )}</ul>
-      <div><button class="btn" @click=${() => session.logout(true)}>Sign out everywhere</button></div>
+      <div><button class="btn" @click=${async () => { await session.logout(true); navigate('/login'); }}>Sign out everywhere</button></div>
     </div>`;
   }
 

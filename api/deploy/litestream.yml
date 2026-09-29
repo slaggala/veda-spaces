@@ -1,0 +1,15 @@
+# Continuous replication of the SQLite database to S3 (OPS-002, ADR-008; IR-11).
+# The bucket, region and retention come from the environment of the litestream service (/etc/veda/api.env):
+#   LITESTREAM_BUCKET, LITESTREAM_REGION, LITESTREAM_RETENTION (owner-approved RPO/retention, OWNER-INPUT-001/002)
+# Credentials come from the instance role; none are written here.
+addr: ":9090"   # Prometheus metrics (replication lag) for the CloudWatch agent (02 §9 backup alerts)
+dbs:
+  - path: /var/lib/veda/veda.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: veda
+        region: ${LITESTREAM_REGION}
+        retention: ${LITESTREAM_RETENTION}
+        snapshot-interval: 24h
+        sync-interval: 1s

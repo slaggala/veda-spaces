@@ -4,5 +4,6 @@ import './login-page.js';
 import './mfa-pages.js';
 import './password-pages.js';
 import './email-pages.js';
+import './approval-cancel-page.js';
 import './profile-page.js';
 import './misc-pages.js';

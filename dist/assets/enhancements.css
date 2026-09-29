@@ -165,3 +165,6 @@ footer nav a, footer p a { transition: color .2s ease; }
 .form-panel h3 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; font-size: 2.2rem; margin: 0 0 .6rem; }
 .form-panel .button { margin-top: 1rem; }
 .contact-form[aria-busy="true"] button[type="submit"] { opacity: .7; cursor: progress; }
+/* [hidden] must win over the base .contact-form { display: grid } (IR-17). */
+.contact-form[hidden], .form-panel[hidden], .contact-form [hidden] { display: none !important; }
+.contact-form .form-note { color: #5d574f; }

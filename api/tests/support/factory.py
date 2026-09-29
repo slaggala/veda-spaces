@@ -51,9 +51,17 @@ class Factory:
         with db.unit_of_work(write=False) as s:
             return s.execute(sa.select(Role.id).where(Role.code == code)).scalar_one()
 
-    def user(self, *roles: str, mfa: bool | None = None, founder: bool = False, password: str = DEFAULT_PASSWORD,
-             email: str | None = None, status: str = "ACTIVE", full_name: str | None = None,
-             mfa_required: bool = False) -> TestUser:
+    def user(
+        self,
+        *roles: str,
+        mfa: bool | None = None,
+        founder: bool = False,
+        password: str = DEFAULT_PASSWORD,
+        email: str | None = None,
+        status: str = "ACTIVE",
+        full_name: str | None = None,
+        mfa_required: bool = False,
+    ) -> TestUser:
         n = self._next()
         roles = tuple(roles) or (("FOUNDER",) if founder else ("SALES",))
         if founder and "FOUNDER" not in roles:
@@ -65,22 +73,49 @@ class Factory:
         secret = totp.new_secret() if mfa else None
         with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
             now = db.tx_time(s)
-            user = User(email=email, email_normalized=normalize_email(email), full_name=full_name,
-                        display_name=full_name.split()[0], user_type="HUMAN", status=status, status_changed_on=now,
-                        timezone="Asia/Kolkata", locale="en-IN", email_verified_on=now if status == "ACTIVE" else None,
-                        protection_level="FOUNDER" if "FOUNDER" in roles else "STANDARD", mfa_required=mfa_required,
-                        authz_version=1)
+            user = User(
+                email=email,
+                email_normalized=normalize_email(email),
+                full_name=full_name,
+                display_name=full_name.split()[0],
+                user_type="HUMAN",
+                status=status,
+                status_changed_on=now,
+                timezone="Asia/Kolkata",
+                locale="en-IN",
+                email_verified_on=now if status == "ACTIVE" else None,
+                protection_level="FOUNDER" if "FOUNDER" in roles else "STANDARD",
+                mfa_required=mfa_required,
+                authz_version=1,
+            )
             s.add(user)
             s.flush()
-            s.add(UserCredential(user_id=user.id, password_hash=passwords.hash_password(password),
-                                 password_changed_on=now, must_change_password=False, failed_login_count=0))
+            s.add(
+                UserCredential(
+                    user_id=user.id,
+                    password_hash=passwords.hash_password(password),
+                    password_changed_on=now,
+                    must_change_password=False,
+                    failed_login_count=0,
+                )
+            )
             for code in roles:
                 role_id = s.execute(sa.select(Role.id).where(Role.code == code)).scalar_one()
                 s.add(UserRole(user_id=user.id, role_id=role_id, reason="test fixture"))
             if secret is not None:
                 ciphertext, wrapped, arn = encrypt_secret(secret)
-                s.add(UserMfaFactor(user_id=user.id, factor_type="TOTP", status="ACTIVE", secret_ciphertext=ciphertext,
-                                    wrapped_data_key=wrapped, kms_key_arn=arn, confirmed_on=now, label="test phone"))
+                s.add(
+                    UserMfaFactor(
+                        user_id=user.id,
+                        factor_type="TOTP",
+                        status="ACTIVE",
+                        secret_ciphertext=ciphertext,
+                        wrapped_data_key=wrapped,
+                        kms_key_arn=arn,
+                        confirmed_on=now,
+                        label="test phone",
+                    )
+                )
             uid = user.id
         return TestUser(uid, email, password, secret, roles, full_name)
 
@@ -98,7 +133,9 @@ class Factory:
         r = api.post("/api/v1/auth/login", {"email": user.email, "password": user.password}, anonymous=True)
         assert r.status == 200, r
         if r.data["status"] == "MFA_REQUIRED":
-            r = api.post("/api/v1/auth/mfa/verify", {"mfa_token": r.data["mfa_token"], "code": user.code()}, anonymous=True)
+            r = api.post(
+                "/api/v1/auth/mfa/verify", {"mfa_token": r.data["mfa_token"], "code": user.code()}, anonymous=True
+            )
             assert r.status == 200, r
         assert r.data["status"] == "AUTHENTICATED", r
         user.token = r.data["access_token"]
@@ -119,8 +156,17 @@ class Factory:
         return r.data
 
     def public_lead(self, api, key: str | None = None, **fields) -> object:
-        body = {"name": "Kiran Rao", "phone": f"98{self._next():08d}",
-                "consent": {"acknowledged": True, "policy_version": "2026-09-v1"},
-                "turnstile_token": "ok-token", "company_website_url": "", **fields}
-        return api.post("/api/v1/public/leads", body, anonymous=True,
-                        headers={"Idempotency-Key": key or f"key-{new_id()}", "Origin": "http://localhost:8000"})
+        body = {
+            "name": "Kiran Rao",
+            "phone": f"98{self._next():08d}",
+            "consent": {"acknowledged": True, "policy_version": "2026-09-v1"},
+            "turnstile_token": "ok-token",
+            "company_website_url": "",
+            **fields,
+        }
+        return api.post(
+            "/api/v1/public/leads",
+            body,
+            anonymous=True,
+            headers={"Idempotency-Key": key or f"key-{new_id()}", "Origin": "http://localhost:8000"},
+        )

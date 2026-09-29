@@ -1,0 +1,28 @@
+api-venv	0	api	47s	python3.13 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements-dev.txt
+api-pip-freeze	0	api	1s	.venv/bin/pip freeze --all
+api-ruff-check	0	api	0s	.venv/bin/ruff check veda tests migrations tools
+api-ruff-format	1	api	1s	.venv/bin/ruff format --check veda tests migrations tools
+api-mypy-ratchet	0	api	7s	<clean-copy>/api/.venv/bin/python tools/mypy_ratchet.py
+api-openapi	0	api	4s	<clean-copy>/api/.venv/bin/python tools/openapi_check.py
+api-deploy-check	0	api	0s	VEDA_ENV=test <clean-copy>/api/.venv/bin/python -m veda.cli deploy-check
+api-bandit	0	api	2s	.venv/bin/bandit -q -r veda -ll -ii
+api-bandit-all	0	api	1s	.venv/bin/bandit -q -r veda -f txt; true
+api-pip-audit	0	api	10s	.venv/bin/pip-audit -r requirements.txt --require-hashes --disable-pip --strict --progress-spinner off
+secret-scan	1	<clean-copy>	11s	git init -q . 2>/dev/null; git add -A >/dev/null 2>&1; PATH=<clean-copy>/api/.venv/bin:$PATH api/tools/secret_scan.sh
+pytest-sqlite	0	api	24s	VEDA_TEST_ENGINES=sqlite <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -q -rs --junitxml=<scratch>/rem/evidence/clean/pytest-sqlite.xml
+pytest-pg16	1	api	89s	VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -q -rs --junitxml=<scratch>/rem/evidence/clean/pytest-pg16.xml
+pytest-pg18	0	api	77s	VEDA_TEST_ENGINES=postgresql <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -q -rs --junitxml=<scratch>/rem/evidence/clean/pytest-pg18.xml
+security-regressions-sqlite	0	api	8s	VEDA_TEST_ENGINES=sqlite <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -v -rA     tests/integration/test_mfa_binding.py tests/integration/test_governance_remediation.py     tests/integration/test_auth_remediation.py tests/integration/test_consent_dev004.py     tests/integration/test_chain_integrity.py tests/integration/test_intake_lock.py     tests/integration/test_leads_remediation.py tests/integration/test_ops_remediation.py     tests/integration/test_backups.py tests/unit/test_config_environments.py tests/unit/test_logging_pii.py     tests/unit/test_single_instance.py
+security-regressions-pg16	0	api	25s	VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -v -rA     tests/integration/test_mfa_binding.py tests/integration/test_governance_remediation.py     tests/integration/test_auth_remediation.py tests/integration/test_consent_dev004.py     tests/integration/test_chain_integrity.py tests/integration/test_intake_lock.py     tests/integration/test_leads_remediation.py tests/integration/test_ops_remediation.py     tests/integration/test_backups.py tests/unit/test_config_environments.py tests/unit/test_logging_pii.py     tests/unit/test_single_instance.py
+migrations-sqlite-pg18	0	api	2s	ENGINES=sqlite,postgresql <clean-copy>/api/.venv/bin/python ../docs/implementation/evidence/migration_evidence.py
+migrations-pg16	0	api	2s	ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres <clean-copy>/api/.venv/bin/python ../docs/implementation/evidence/migration_evidence.py
+app-npm-ci	0	app	3s	npm ci --no-fund
+app-lint	0	app	2s	npm run lint
+app-typecheck	0	app	2s	npm run typecheck
+app-lint-tokens	0	app	0s	npm run lint:tokens
+app-contrast	0	app	0s	npm run test:contrast
+app-test	0	app	3s	npm test
+app-build	0	app	3s	npm run build
+app-audit-runtime	0	app	1s	npm audit --omit=dev
+app-audit-all	0	app	1s	npm audit
+e2e	0	<clean-copy>	141s	API_PYTHON=<clean-copy>/api/.venv/bin/python app/e2e/run-all.sh

@@ -12,8 +12,17 @@ from veda.platform.notifications import worker
 from veda.platform.notifications.email import CaptureEmailProvider
 from veda.platform.rbac.models import UserPermission
 
-MASS_FIELDS = ["email", "proposed_email", "password", "status", "roles", "permissions", "mfa_required", "protection_level",
-               "is_founder"]
+MASS_FIELDS = [
+    "email",
+    "proposed_email",
+    "password",
+    "status",
+    "roles",
+    "permissions",
+    "mfa_required",
+    "protection_level",
+    "is_founder",
+]
 
 
 # --- matrix (RBAC-008) ---------------------------------------------------------------------
@@ -78,6 +87,7 @@ def test_admin_without_mfa_verified_session_has_security_read_suspended(api, fac
 
 # --- mass assignment (F-03) --------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("field", MASS_FIELDS)
 def test_RBAC_019_mass_assignment_rejected(api, factory, field):
     admin = factory.user("ADMIN")
@@ -97,22 +107,34 @@ def test_unknown_field_rejected_and_profile_update_allowed(api, factory):
     factory.login(api, admin)
     version = api.get(f"/api/v1/users/{sales.id}").data["version"]
     assert api.patch(f"/api/v1/users/{sales.id}", {"nickname": "x"}, if_match=version).code == "VALIDATION_FAILED"
-    r = api.patch(f"/api/v1/users/{sales.id}", {"display_name": "Priya S", "timezone": "Asia/Kolkata",
-                                                "phone": "98765 43210"}, if_match=version)
+    r = api.patch(
+        f"/api/v1/users/{sales.id}",
+        {"display_name": "Priya S", "timezone": "Asia/Kolkata", "phone": "98765 43210"},
+        if_match=version,
+    )
     assert r.status == 200 and r.data["display_name"] == "Priya S" and r.data["phone"] == "+919876543210"
-    assert api.patch(f"/api/v1/users/{admin.id}", {"display_name": "Me"},
-                     if_match=api.get(f"/api/v1/users/{admin.id}").data["version"]).code == "SELF_MODIFICATION_DENIED"
+    assert (
+        api.patch(
+            f"/api/v1/users/{admin.id}",
+            {"display_name": "Me"},
+            if_match=api.get(f"/api/v1/users/{admin.id}").data["version"],
+        ).code
+        == "SELF_MODIFICATION_DENIED"
+    )
 
 
 # --- guards --------------------------------------------------------------------------------------
+
 
 def test_G3_no_self_deactivation(api, factory):
     admin = factory.user("ADMIN")
     factory.user(founder=True)
     factory.login(api, admin)
     v = api.get(f"/api/v1/users/{admin.id}").data["version"]
-    assert api.post(f"/api/v1/users/{admin.id}/status", {"status": "DISABLED", "reason": "x"},
-                    if_match=v).code == "SELF_MODIFICATION_DENIED"
+    assert (
+        api.post(f"/api/v1/users/{admin.id}/status", {"status": "DISABLED", "reason": "x"}, if_match=v).code
+        == "SELF_MODIFICATION_DENIED"
+    )
 
 
 def test_G11_admin_cannot_act_on_founder(api, factory):
@@ -120,10 +142,12 @@ def test_G11_admin_cannot_act_on_founder(api, factory):
     admin = factory.user("ADMIN")
     factory.login(api, admin)
     v = api.get(f"/api/v1/users/{founder.id}").data["version"]
-    for path, body in ((f"/api/v1/users/{founder.id}/status", {"status": "DISABLED", "reason": "x"}),
-                       (f"/api/v1/users/{founder.id}/mfa/reset", {"reason": "x"}),
-                       (f"/api/v1/users/{founder.id}/email-change", {"new_email": "f2@vedaspaces.test", "reason": "x"}),
-                       (f"/api/v1/users/{founder.id}/sessions/revoke", {"reason": "x"})):
+    for path, body in (
+        (f"/api/v1/users/{founder.id}/status", {"status": "DISABLED", "reason": "x"}),
+        (f"/api/v1/users/{founder.id}/mfa/reset", {"reason": "x"}),
+        (f"/api/v1/users/{founder.id}/email-change", {"new_email": "f2@vedaspaces.test", "reason": "x"}),
+        (f"/api/v1/users/{founder.id}/sessions/revoke", {"reason": "x"}),
+    ):
         r = api.post(path, body, if_match=v)
         assert r.status == 403 and r.code in ("FOUNDER_PROTECTED", "ESCALATION_DENIED"), (path, r)
     r = api.delete(f"/api/v1/users/{founder.id}", {"reason": "x"}, if_match=v)
@@ -153,11 +177,15 @@ def test_G1_G2_no_escalation(api, factory):
     factory.login(api, founder)
     r = api.post("/api/v1/roles", {"code": "INTAKE", "name": "Intake"})
     role_id = r.data["id"]
-    api.put(f"/api/v1/roles/{role_id}/permissions", {"permissions": [{"permission_code": "lead.erase", "scope": "ALL"}],
-                                                     "reason": "test"})
+    api.put(
+        f"/api/v1/roles/{role_id}/permissions",
+        {"permissions": [{"permission_code": "lead.erase", "scope": "ALL"}], "reason": "test"},
+    )
     factory.login(api, admin)
-    r = api.put(f"/api/v1/users/{sales.id}/roles", {"roles": [{"role_id": factory.role_id("SALES")}, {"role_id": role_id}],
-                                                    "reason": "promote"})
+    r = api.put(
+        f"/api/v1/users/{sales.id}/roles",
+        {"roles": [{"role_id": factory.role_id("SALES")}, {"role_id": role_id}], "reason": "promote"},
+    )
     assert r.status == 403 and r.code == "ESCALATION_DENIED", "G2: role contains lead.erase"
     r = api.post("/api/v1/roles", {"code": "COPY_OF_INTAKE", "name": "Copy", "copy_from_role_id": role_id})
     assert r.code == "ESCALATION_DENIED", "A-06 copy-from-role escalation"
@@ -167,12 +195,18 @@ def test_G8_team_scope_and_time_bound_grants_rejected(api, factory):
     founder = factory.user(founder=True)
     sales = factory.user("SALES")
     factory.login(api, founder)
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "TEAM", "reason": "x"})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "TEAM", "reason": "x"}
+    )
     assert r.code == "SCOPE_NOT_SUPPORTED"
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "ALL", "reason": "x",
-                                                           "valid_until": "2026-12-31T00:00:00+05:30"})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions",
+        {"permission_code": "lead.read", "scope": "ALL", "reason": "x", "valid_until": "2026-12-31T00:00:00+05:30"},
+    )
     assert r.code == "TIME_BOUND_GRANTS_NOT_ENABLED"
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "ALL", "reason": " "})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "ALL", "reason": " "}
+    )
     assert r.code == "REASON_REQUIRED"
 
 
@@ -185,16 +219,22 @@ def test_TD_A_deny_over_grant_and_next_request_propagation(api, factory):
     sales_token = factory.login(api, sales, set_default=False)
     l1 = factory.lead(api, sales_token)
     api.token = founder.token
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "ALL", "reason": "cover"})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "scope": "ALL", "reason": "cover"}
+    )
     assert r.status == 201, r
     grant_id = r.data["id"]
     ids = {x["id"] for x in api.get("/api/v1/leads", token=sales_token).data}
     assert {l1["id"], l2["id"]} <= ids, "broadest scope wins"
     before = api.get("/api/v1/auth/me", token=sales_token).headers["X-Authz-Version"]
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "effect": "DENY", "reason": "policy"})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "effect": "DENY", "reason": "policy"}
+    )
     assert r.status == 409 and r.code == "DUPLICATE", "one direct row per permission"
     assert api.delete(f"/api/v1/users/{sales.id}/permissions/{grant_id}").status == 204
-    r = api.post(f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "effect": "DENY", "reason": "policy"})
+    r = api.post(
+        f"/api/v1/users/{sales.id}/permissions", {"permission_code": "lead.read", "effect": "DENY", "reason": "policy"}
+    )
     assert r.status == 201
     deny_id = r.data["id"]
     r1 = api.get("/api/v1/leads", token=sales_token)
@@ -214,13 +254,19 @@ def test_RBAC_020_last_recovery_administrator(api, factory):
     factory.login(api, founder)
     # The Founder is the only I2 holder; a DENY of user.role.manage would break I2.
     other = factory.user(founder=True)
-    r = api.post(f"/api/v1/users/{other.id}/permissions", {"permission_code": "user.role.manage", "effect": "DENY", "reason": "x"})
+    r = api.post(
+        f"/api/v1/users/{other.id}/permissions",
+        {"permission_code": "user.role.manage", "effect": "DENY", "reason": "x"},
+    )
     assert r.status == 403 and r.code == "FOUNDER_PROTECTED"
     admin = factory.user("ADMIN")
     admin2 = factory.user("ADMIN")
     factory.login(api, admin)
     v = api.get(f"/api/v1/users/{admin2.id}").data["version"]
-    assert api.post(f"/api/v1/users/{admin2.id}/status", {"status": "DISABLED", "reason": "leaving"}, if_match=v).status == 200
+    assert (
+        api.post(f"/api/v1/users/{admin2.id}/status", {"status": "DISABLED", "reason": "leaving"}, if_match=v).status
+        == 200
+    )
 
 
 def test_disable_revokes_sessions_and_enable_restores(api, factory):
@@ -273,10 +319,16 @@ def test_G12_dual_control_mfa_reset_of_privileged_user(api, factory):
     assert api.post(f"/api/v1/approvals/{approval}/approve", {"reason": "again"}).code == "INVALID_STATE"
     worker.drain_all()
     assert any(target.email in m.to and "two-step" in m.text for m in CaptureEmailProvider.sent)
-    assert not any(admin_a.email in m.to and "#token=" in m.text for m in CaptureEmailProvider.sent), \
+    assert not any(admin_a.email in m.to and "#token=" in m.text for m in CaptureEmailProvider.sent), (
         "the admin never receives an enrollment token"
+    )
     kinds = {e.event_type for e in events(subject_user_id=target.id)}
-    assert {"APPROVAL_REQUESTED", "ADMIN_MFA_RESET_REQUESTED", "ADMIN_MFA_RESET_APPROVED", "ADMIN_MFA_RESET_COMPLETED"} <= kinds
+    assert {
+        "APPROVAL_REQUESTED",
+        "ADMIN_MFA_RESET_REQUESTED",
+        "ADMIN_MFA_RESET_APPROVED",
+        "ADMIN_MFA_RESET_COMPLETED",
+    } <= kinds
 
 
 def test_G12_non_privileged_mfa_reset_executes_directly(api, factory):
@@ -285,8 +337,14 @@ def test_G12_non_privileged_mfa_reset_executes_directly(api, factory):
     factory.login(api, admin)
     v = api.get(f"/api/v1/users/{sales.id}").data["version"]
     assert api.post(f"/api/v1/users/{sales.id}/mfa/reset", {"reason": "Lost phone"}, if_match=v).status == 204
-    assert api.post(f"/api/v1/users/{admin.id}/mfa/reset", {"reason": "self"},
-                    if_match=api.get(f"/api/v1/users/{admin.id}").data["version"]).code == "SELF_MODIFICATION_DENIED"
+    assert (
+        api.post(
+            f"/api/v1/users/{admin.id}/mfa/reset",
+            {"reason": "self"},
+            if_match=api.get(f"/api/v1/users/{admin.id}").data["version"],
+        ).code
+        == "SELF_MODIFICATION_DENIED"
+    )
 
 
 def test_approval_expiry(api, factory):
@@ -309,12 +367,18 @@ def test_USER_007_admin_email_change_privileged_needs_approval(api, factory):
     sales = factory.user("SALES")
     factory.login(api, admin_a)
     v = api.get(f"/api/v1/users/{sales.id}").data["version"]
-    r = api.post(f"/api/v1/users/{sales.id}/email-change", {"new_email": "sales.new@vedaspaces.test", "reason": "rename"},
-                 if_match=v)
+    r = api.post(
+        f"/api/v1/users/{sales.id}/email-change",
+        {"new_email": "sales.new@vedaspaces.test", "reason": "rename"},
+        if_match=v,
+    )
     assert r.status == 202 and r.data["status"] == "VERIFICATION_SENT"
     v = api.get(f"/api/v1/users/{target_admin.id}").data["version"]
-    r = api.post(f"/api/v1/users/{target_admin.id}/email-change", {"new_email": "adm.new@vedaspaces.test", "reason": "rename"},
-                 if_match=v)
+    r = api.post(
+        f"/api/v1/users/{target_admin.id}/email-change",
+        {"new_email": "adm.new@vedaspaces.test", "reason": "rename"},
+        if_match=v,
+    )
     assert r.status == 202 and r.data["status"] == "APPROVAL_REQUIRED"
     factory.login(api, admin_b)
     r = api.post(f"/api/v1/approvals/{r.data['approval_id']}/approve", {"reason": "confirmed"})
@@ -331,7 +395,11 @@ def test_USER_007_self_email_change_workflow(api, factory):
     api.post("/api/v1/auth/reauth", {"password": sales.password})
     assert api.put("/api/v1/auth/me/email", {"new_email": sales.email}).code == "SAME_AS_CURRENT"
     r = api.put("/api/v1/auth/me/email", {"new_email": "fresh@vedaspaces.test"})
-    assert r.status == 202 and r.data["status"] == "VERIFICATION_SENT" and r.data["proposed_email"] == "f***@vedaspaces.test"
+    assert (
+        r.status == 202
+        and r.data["status"] == "VERIFICATION_SENT"
+        and r.data["proposed_email"] == "f***@vedaspaces.test"
+    )
     assert api.get("/api/v1/auth/me").data["email_change"]["proposed_email"] == "f***@vedaspaces.test"
     # Login and reset still use the current address.
     r = api.post("/api/v1/auth/login", {"email": "fresh@vedaspaces.test", "password": sales.password}, anonymous=True)
@@ -370,21 +438,44 @@ def test_USER_007_cancel_link(api, factory):
 def test_roles_crud_and_permission_catalog(api, factory):
     founder = factory.user(founder=True)
     factory.login(api, founder)
-    r = api.post("/api/v1/roles", {"code": "SALES_MANAGER", "name": "Sales Manager", "copy_from_role_id": factory.role_id("SALES")})
+    r = api.post(
+        "/api/v1/roles",
+        {"code": "SALES_MANAGER", "name": "Sales Manager", "copy_from_role_id": factory.role_id("SALES")},
+    )
     assert r.status == 201 and r.data["permission_count"] > 0
     role = r.data
-    assert api.post("/api/v1/roles", {"code": "OTHER", "name": "sales manager"}).code == "DUPLICATE", "case-insensitive name (A-04)"
+    assert api.post("/api/v1/roles", {"code": "OTHER", "name": "sales manager"}).code == "DUPLICATE", (
+        "case-insensitive name (A-04)"
+    )
     r = api.patch(f"/api/v1/roles/{role['id']}", {"code": "RENAMED"}, if_match=role["version"])
     assert r.code == "IMMUTABLE_FIELD"
-    r = api.put(f"/api/v1/roles/{role['id']}/permissions", {"permissions": [
-        {"permission_code": "lead.read", "scope": "ALL"}, {"permission_code": "lead.assign", "scope": "ALL"}],
-        "reason": "Create sales manager role"})
+    r = api.put(
+        f"/api/v1/roles/{role['id']}/permissions",
+        {
+            "permissions": [
+                {"permission_code": "lead.read", "scope": "ALL"},
+                {"permission_code": "lead.assign", "scope": "ALL"},
+            ],
+            "reason": "Create sales manager role",
+        },
+    )
     assert r.status == 200 and r.json["meta"]["diff"]["added"] >= 1
     sales = factory.user("SALES")
-    assert api.put(f"/api/v1/users/{sales.id}/roles", {"roles": [{"role_id": role["id"]}], "reason": "promote"}).status == 200
-    assert api.delete(f"/api/v1/roles/{role['id']}", if_match=api.get(f"/api/v1/roles/{role['id']}").data["version"]).code == "ROLE_IN_USE"
-    assert api.delete(f"/api/v1/roles/{factory.role_id('SALES')}",
-                      if_match=api.get(f"/api/v1/roles/{factory.role_id('SALES')}").data["version"]).code == "SYSTEM_OBJECT"
+    assert (
+        api.put(f"/api/v1/users/{sales.id}/roles", {"roles": [{"role_id": role["id"]}], "reason": "promote"}).status
+        == 200
+    )
+    assert (
+        api.delete(f"/api/v1/roles/{role['id']}", if_match=api.get(f"/api/v1/roles/{role['id']}").data["version"]).code
+        == "ROLE_IN_USE"
+    )
+    assert (
+        api.delete(
+            f"/api/v1/roles/{factory.role_id('SALES')}",
+            if_match=api.get(f"/api/v1/roles/{factory.role_id('SALES')}").data["version"],
+        ).code
+        == "SYSTEM_OBJECT"
+    )
     perms = api.get("/api/v1/permissions?module=crm&q=status").data
     assert perms and perms[0]["code"] == "lead.status.change" and perms[0]["granted_to_roles"]
     p = api.get("/api/v1/permissions?q=lead.read").data[0]
@@ -402,11 +493,15 @@ def test_RBAC_013_role_change_applies_on_next_request(api, factory):
     sales_token = factory.login(api, sales, set_default=False)
     factory.login(api, admin)
     assert api.get("/api/v1/users", token=sales_token).code == "PERMISSION_DENIED"
-    r = api.put(f"/api/v1/users/{sales.id}/roles", {"roles": [{"role_id": factory.role_id("SALES")},
-                                                               {"role_id": factory.role_id("ADMIN")}], "reason": "promote"})
+    r = api.put(
+        f"/api/v1/users/{sales.id}/roles",
+        {"roles": [{"role_id": factory.role_id("SALES")}, {"role_id": factory.role_id("ADMIN")}], "reason": "promote"},
+    )
     assert r.status == 200 and any(i["pending_mfa"] for i in r.data)
     me = api.get("/api/v1/auth/me", token=sales_token).data
-    assert me["permissions"]["user.read"] == "ALL" and any(s["code"] == "user.role.manage" for s in me["suspended_permissions"])
+    assert me["permissions"]["user.read"] == "ALL" and any(
+        s["code"] == "user.role.manage" for s in me["suspended_permissions"]
+    )
     assert events("PERMISSION_SUSPENDED", subject_user_id=sales.id)
 
 

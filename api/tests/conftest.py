@@ -92,10 +92,19 @@ def make_settings(database_url: str, **overrides):
     from veda import config
 
     base = dict(
-        env="test", database_url=database_url, argon2_memory_kib=1024, argon2_time_cost=1, argon2_parallelism=1,
-        cookie_secure=False, rate_limits_enabled=False, email_provider="capture", turnstile_mode="dev",
-        app_origin="http://localhost:5173", public_site_origins=["http://localhost:8000"],
-        anchor_dir=str(Path(tempfile.mkdtemp(prefix="veda-anchor-"))), testing=True,
+        env="test",
+        database_url=database_url,
+        argon2_memory_kib=1024,
+        argon2_time_cost=1,
+        argon2_parallelism=1,
+        cookie_secure=False,
+        rate_limits_enabled=False,
+        email_provider="capture",
+        turnstile_mode="dev",
+        app_origin="http://localhost:5173",
+        public_site_origins=["http://localhost:8000"],
+        anchor_dir=str(Path(tempfile.mkdtemp(prefix="veda-anchor-"))),
+        testing=True,
     )
     base.update(overrides)
     return config.load_settings(**base)

@@ -54,7 +54,9 @@ def _resolve(role_scope, direct_scope, deny):
     return apply_gate(base, user=_User(), session_type="FULL", mfa_verified=False, now=None)
 
 
-@pytest.mark.parametrize("role_scope, direct_scope, deny", list(itertools.product([None, "OWN", "ALL"], [None, "OWN", "ALL"], [False, True])))
+@pytest.mark.parametrize(
+    "role_scope, direct_scope, deny", list(itertools.product([None, "OWN", "ALL"], [None, "OWN", "ALL"], [False, True]))
+)
 def test_RBAC_006_deny_over_grant_resolution_table(role_scope, direct_scope, deny):
     res = _resolve(role_scope, direct_scope, deny)
     if deny or not (role_scope or direct_scope):
@@ -68,10 +70,17 @@ def test_MFA_012_sensitive_permission_suspended_without_mfa_or_in_cooling_off():
     from datetime import UTC, datetime, timedelta
 
     now = datetime(2026, 9, 29, tzinfo=UTC)
-    meta = {"user.role.manage": PermissionMeta("user.role.manage", False, "ACCESS_CONTROL", "STANDARD"),
-            "lead.read": PermissionMeta("lead.read", True, None, "STANDARD")}
-    base = Resolution(user_id="u", authz_version=1, meta=meta, granted={"user.role.manage": "ALL", "lead.read": "ALL"},
-                      has_active_factor=True)
+    meta = {
+        "user.role.manage": PermissionMeta("user.role.manage", False, "ACCESS_CONTROL", "STANDARD"),
+        "lead.read": PermissionMeta("lead.read", True, None, "STANDARD"),
+    }
+    base = Resolution(
+        user_id="u",
+        authz_version=1,
+        meta=meta,
+        granted={"user.role.manage": "ALL", "lead.read": "ALL"},
+        has_active_factor=True,
+    )
     r = apply_gate(base, user=_User(), session_type="FULL", mfa_verified=False, now=now)
     assert r.suspended == {"user.role.manage": "MFA_REQUIRED"} and "lead.read" in r.effective
     r = apply_gate(base, user=_User(), session_type="FULL", mfa_verified=True, now=now)

@@ -83,7 +83,9 @@ def system_context(via: str = "SYSTEM_JOB", request_id: str | None = None) -> Ac
 
 
 def web_intake_context(request_id: str | None, ip: str | None, user_agent: str | None) -> ActorContext:
-    return ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=user_agent)
+    return ActorContext(
+        actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=user_agent
+    )
 
 
 def anonymous_context(request_id: str | None, ip: str | None, user_agent: str | None) -> ActorContext:

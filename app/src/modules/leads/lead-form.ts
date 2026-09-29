@@ -9,20 +9,10 @@ import { toast } from '../../design-system/components.js';
 import { shared } from '../../design-system/styles.js';
 import { resolveConflict } from '../../shell/conflict-dialog.js';
 import { LookupAwareElement } from './base.js';
+import { EDITABLE, type Editable, leadPatch, leadValues } from './edits.js';
 
 interface DuplicateHit { id: string; lead_number: string; name: string; status: string; created_on?: string }
 
-const EDITABLE = ['name', 'phone', 'email', 'city', 'locality', 'project_type_code', 'property_type_code', 'budget_range_code', 'message', 'priority', 'source_code', 'source_detail', 'expected_close_on'] as const;
-type Editable = (typeof EDITABLE)[number];
-
-function leadValues(lead: Lead | null): Record<Editable, string> {
-  return {
-    name: lead?.name ?? '', phone: lead?.phone ?? '', email: lead?.email ?? '', city: lead?.city ?? '', locality: lead?.locality ?? '',
-    project_type_code: lead?.project_type?.code ?? '', property_type_code: lead?.property_type?.code ?? '', budget_range_code: lead?.budget_range?.code ?? '',
-    message: lead?.message ?? '', priority: lead?.priority ?? 'MEDIUM', source_code: lead?.source?.code ?? '', source_detail: lead?.source_detail ?? '',
-    expected_close_on: lead?.expected_close_on ?? '',
-  };
-}
 
 /** Lead create / edit drawer (09 §4.5). The duplicate check warns but never blocks. */
 export class VsLeadForm extends LookupAwareElement {
@@ -150,10 +140,11 @@ export class VsLeadForm extends LookupAwareElement {
     navigate(`/leads/${r.data.id}`);
   }
 
-  private async saveEdit(values: Record<Editable, string>, original: Lead, version = original.version): Promise<void> {
+  /** `patch` is the user's own edits, computed once against the record as loaded. A conflict re-apply sends exactly
+   *  those edits against the fresh version and never the rest of the stale form (IR-15, TD-F step 4). */
+  private async saveEdit(values: Record<Editable, string>, original: Lead, version = original.version,
+                         patch: Record<string, unknown> = leadPatch(values, leadValues(original))): Promise<void> {
     const before = leadValues(original);
-    const patch: Record<string, unknown> = {};
-    for (const k of EDITABLE) if (values[k] !== before[k]) patch[k] = values[k] === '' ? null : values[k];
     if (!Object.keys(patch).length) {
       await this.close(true);
       return;
@@ -177,7 +168,7 @@ export class VsLeadForm extends LookupAwareElement {
         this.dirty = false;
         this.requestUpdate();
       } else if (choice === 'reapply') {
-        await this.saveEdit(values, { ...original, ...fresh }, fresh.version);
+        await this.saveEdit(values, fresh, fresh.version, patch);
       }
     }
   }

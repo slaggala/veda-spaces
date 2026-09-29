@@ -80,16 +80,37 @@ def send(template: str, to: list[str], event: OutboxEvent, **context) -> None:
         queue.append(message)
 
 
-def notify_in_app(s: Session, event: OutboxEvent, recipients: list[str], *, notification_type: str, title: str,
-                  body: str | None = None, entity: tuple[str, str] | None = None, link_path: str | None = None) -> None:
+def notify_in_app(
+    s: Session,
+    event: OutboxEvent,
+    recipients: list[str],
+    *,
+    notification_type: str,
+    title: str,
+    body: str | None = None,
+    entity: tuple[str, str] | None = None,
+    link_path: str | None = None,
+) -> None:
     for rid in dict.fromkeys(recipients):
-        exists = s.execute(sa.select(Notification.id).where(Notification.source_event_id == event.id,
-                                                            Notification.recipient_user_id == rid)).first()
+        exists = s.execute(
+            sa.select(Notification.id).where(
+                Notification.source_event_id == event.id, Notification.recipient_user_id == rid
+            )
+        ).first()
         if exists:
             continue
-        s.add(Notification(recipient_user_id=rid, notification_type=notification_type, title=title[:200],
-                           body=(body or None) and body[:1000], entity_type=entity[0] if entity else None,
-                           entity_id=entity[1] if entity else None, link_path=link_path, source_event_id=event.id))
+        s.add(
+            Notification(
+                recipient_user_id=rid,
+                notification_type=notification_type,
+                title=title[:200],
+                body=(body or None) and body[:1000],
+                entity_type=entity[0] if entity else None,
+                entity_id=entity[1] if entity else None,
+                link_path=link_path,
+                source_event_id=event.id,
+            )
+        )
     s.flush()
 
 
@@ -109,6 +130,7 @@ def _usable(tok: UserActionToken | None) -> bool:
 
 
 # --- identity & security emails -----------------------------------------------------------
+
 
 @handler("user.invited")
 def _invited(s: Session, event: OutboxEvent) -> None:
@@ -142,34 +164,60 @@ def _enroll_link(s: Session, event: OutboxEvent) -> None:
         send("mfa_enrollment_link", [user.email], event, name=user.display_name or user.full_name, link=link)
 
 
-def _alert(s: Session, event: OutboxEvent, user: User, title: str, message: str, *, also_holders_of: str | None = None) -> None:
-    send("security_alert", [user.email], event, name=user.display_name or user.full_name, title=title, message=message,
-         when=when(user))
+def _alert(
+    s: Session, event: OutboxEvent, user: User, title: str, message: str, *, also_holders_of: str | None = None
+) -> None:
+    send(
+        "security_alert",
+        [user.email],
+        event,
+        name=user.display_name or user.full_name,
+        title=title,
+        message=message,
+        when=when(user),
+    )
     if also_holders_of:
         for hid in holders_of(s, also_holders_of, min_scope="ALL"):
             if hid == user.id:
                 continue
             h = _user(s, hid)
-            send("security_alert", [h.email], event, name=h.display_name or h.full_name, title=title,
-                 message=f"{message} (Account: {user.full_name}.)", when=when(h))
+            send(
+                "security_alert",
+                [h.email],
+                event,
+                name=h.display_name or h.full_name,
+                title=title,
+                message=f"{message} (Account: {user.full_name}.)",
+                when=when(h),
+            )
 
 
 @handler("auth.refresh_reuse_detected")
 def _reuse(s: Session, event: OutboxEvent) -> None:
     user = _user(s, event.payload["user_id"])
     if user:
-        _alert(s, event, user, "Suspicious sign-in activity",
-               "A stolen or replayed session token was detected and that session was signed out.",
-               also_holders_of="user.session.revoke")
+        _alert(
+            s,
+            event,
+            user,
+            "Suspicious sign-in activity",
+            "A stolen or replayed session token was detected and that session was signed out.",
+            also_holders_of="user.session.revoke",
+        )
 
 
 @handler("auth.mfa_recovery_completed")
 def _recovery(s: Session, event: OutboxEvent) -> None:
     user = _user(s, event.payload["user_id"])
     if user:
-        _alert(s, event, user, "Account recovery used",
-               "Your account was recovered with a recovery code. All other sessions were signed out.",
-               also_holders_of="user.mfa.reset")
+        _alert(
+            s,
+            event,
+            user,
+            "Account recovery used",
+            "Your account was recovered with a recovery code. All other sessions were signed out.",
+            also_holders_of="user.mfa.reset",
+        )
 
 
 @handler("auth.mfa_recovery_code_used")
@@ -183,17 +231,27 @@ def _code_used(s: Session, event: OutboxEvent) -> None:
 def _mfa_reset(s: Session, event: OutboxEvent) -> None:
     user = _user(s, event.payload["user_id"])
     if user:
-        _alert(s, event, user, "Two-step verification was reset",
-               "An administrator reset your two-step verification. Use the setup link we send to set it up again.",
-               also_holders_of="user.mfa.reset")
+        _alert(
+            s,
+            event,
+            user,
+            "Two-step verification was reset",
+            "An administrator reset your two-step verification. Use the setup link we send to set it up again.",
+            also_holders_of="user.mfa.reset",
+        )
 
 
 @handler("auth.account_throttled")
 def _throttled(s: Session, event: OutboxEvent) -> None:
     user = _user(s, event.payload["user_id"])
     if user:
-        _alert(s, event, user, "Sign-in temporarily paused",
-               "Repeated failed sign-ins from several networks paused password sign-in for 15 minutes.")
+        _alert(
+            s,
+            event,
+            user,
+            "Sign-in temporarily paused",
+            "Repeated failed sign-ins from several networks paused password sign-in for 15 minutes.",
+        )
 
 
 @handler("auth.email_change_requested")
@@ -207,11 +265,24 @@ def _email_requested(s: Session, event: OutboxEvent) -> None:
     if _usable(vtok):
         minutes = int((vtok.expires_on - vtok.created_on).total_seconds() // 60)
         # The proposed address receives only its verification link (05 §8.6).
-        send("email_change_verify", [user.proposed_email], event, name=user.display_name or user.full_name,
-             link=verify_link, expires_minutes=minutes)
+        send(
+            "email_change_verify",
+            [user.proposed_email],
+            event,
+            name=user.display_name or user.full_name,
+            link=verify_link,
+            expires_minutes=minutes,
+        )
     if _usable(ctok):
-        send("email_change_alert", [user.email], event, name=user.display_name or user.full_name,
-             proposed=mask_email(user.proposed_email), requester=requester, link=cancel_link)
+        send(
+            "email_change_alert",
+            [user.email],
+            event,
+            name=user.display_name or user.full_name,
+            proposed=mask_email(user.proposed_email),
+            requester=requester,
+            link=cancel_link,
+        )
 
 
 @handler("auth.email_change_completed")
@@ -227,8 +298,15 @@ def _email_completed(s: Session, event: OutboxEvent) -> None:
         old = ((row.old_value or {}).get("email")) if row else None
     recipients = [user.email] + ([old] if old and old != "[ERASED]" else [])
     for address in recipients:
-        send("email_change_completed", [address], event, name=user.display_name or user.full_name,
-             old=mask_email(old) or "your previous address", new=mask_email(user.email), when=when(user))
+        send(
+            "email_change_completed",
+            [address],
+            event,
+            name=user.display_name or user.full_name,
+            old=mask_email(old) or "your previous address",
+            new=mask_email(user.email),
+            when=when(user),
+        )
 
 
 @handler("invite.accepted")
@@ -238,10 +316,24 @@ def _invite_accepted(s: Session, event: OutboxEvent) -> None:
     if user is None or inviter is None or inviter.user_type != "HUMAN":
         return
     title = f"{user.full_name} accepted the invitation"
-    notify_in_app(s, event, [inviter.id], notification_type="INVITE_ACCEPTED", title=title,
-                  entity=("app_user", user.id), link_path=f"/admin/users/{user.id}")
-    send("digest", [inviter.email], event, name=inviter.display_name or inviter.full_name, title=title,
-         message=f"{user.full_name} has joined Veda Workspace.", link=app_link(f"/admin/users/{user.id}"))
+    notify_in_app(
+        s,
+        event,
+        [inviter.id],
+        notification_type="INVITE_ACCEPTED",
+        title=title,
+        entity=("app_user", user.id),
+        link_path=f"/admin/users/{user.id}",
+    )
+    send(
+        "digest",
+        [inviter.email],
+        event,
+        name=inviter.display_name or inviter.full_name,
+        title=title,
+        message=f"{user.full_name} has joined Veda Workspace.",
+        link=app_link(f"/admin/users/{user.id}"),
+    )
 
 
 @handler("rbac.sensitive_grant")
@@ -250,11 +342,19 @@ def _sensitive_grant(s: Session, event: OutboxEvent) -> None:
     what = f"{subject.full_name} received" if subject else "A role now grants"
     for hid in holders_of(s, "permission.manage", min_scope="ALL"):
         h = _user(s, hid)
-        send("security_alert", [h.email], event, name=h.display_name or h.full_name, title="Sensitive permission granted",
-             message=f"{what} a sensitive permission.", when=when(h))
+        send(
+            "security_alert",
+            [h.email],
+            event,
+            name=h.display_name or h.full_name,
+            title="Sensitive permission granted",
+            message=f"{what} a sensitive permission.",
+            when=when(h),
+        )
 
 
 # --- approvals -----------------------------------------------------------------------------------
+
 
 @handler("approval.requested")
 def _approval_requested(s: Session, event: OutboxEvent) -> None:
@@ -266,20 +366,42 @@ def _approval_requested(s: Session, event: OutboxEvent) -> None:
         return
     target = _user(s, req.target_user_id)
     code = governance.permission_for(req)
-    approvers = [] if req.channel == "BREAK_GLASS" else [
-        uid for uid in holders_of(s, code, min_scope="ALL") if uid not in (req.requested_by, req.target_user_id)]
+    approvers = (
+        []
+        if req.channel == "BREAK_GLASS"
+        else [uid for uid in holders_of(s, code, min_scope="ALL") if uid not in (req.requested_by, req.target_user_id)]
+    )
     title = f"Approval needed: {req.action_type.replace('_', ' ').title()} for {target.full_name}"
-    notify_in_app(s, event, approvers, notification_type="APPROVAL_REQUESTED", title=title,
-                  entity=("admin_approval_request", req.id), link_path="/approvals")
+    notify_in_app(
+        s,
+        event,
+        approvers,
+        notification_type="APPROVAL_REQUESTED",
+        title=title,
+        entity=("admin_approval_request", req.id),
+        link_path="/approvals",
+    )
     for uid in approvers:
         u = _user(s, uid)
-        send("approval", [u.email], event, name=u.display_name or u.full_name, title=title,
-             message=f"{title}. Reason: {req.reason}", link=app_link("/approvals"))
+        send(
+            "approval",
+            [u.email],
+            event,
+            name=u.display_name or u.full_name,
+            title=title,
+            message=f"{title}. Reason: {req.reason}",
+            link=app_link("/approvals"),
+        )
     if target and target.status == "ACTIVE":
-        send("security_alert", [target.email], event, name=target.display_name or target.full_name,
-             title="An account change was requested",
-             message=f"A {req.action_type.replace('_', ' ').lower()} was requested for your account and awaits approval.",
-             when=when(target))
+        send(
+            "security_alert",
+            [target.email],
+            event,
+            name=target.display_name or target.full_name,
+            title="An account change was requested",
+            message=f"A {req.action_type.replace('_', ' ').lower()} was requested for your account and awaits approval.",
+            when=when(target),
+        )
 
 
 @handler("approval.decided")
@@ -291,13 +413,29 @@ def _approval_decided(s: Session, event: OutboxEvent) -> None:
         return
     target = _user(s, req.target_user_id)
     title = f"Request {req.status.lower()}: {req.action_type.replace('_', ' ').title()}"
-    recipients = [uid for uid in (req.requested_by, req.target_user_id) if _user(s, uid) and _user(s, uid).user_type == "HUMAN"]
-    notify_in_app(s, event, recipients, notification_type="APPROVAL_DECIDED", title=title,
-                  entity=("admin_approval_request", req.id), link_path="/approvals")
+    recipients = [
+        uid for uid in (req.requested_by, req.target_user_id) if _user(s, uid) and _user(s, uid).user_type == "HUMAN"
+    ]
+    notify_in_app(
+        s,
+        event,
+        recipients,
+        notification_type="APPROVAL_DECIDED",
+        title=title,
+        entity=("admin_approval_request", req.id),
+        link_path="/approvals",
+    )
     for uid in recipients:
         u = _user(s, uid)
-        send("approval", [u.email], event, name=u.display_name or u.full_name, title=title,
-             message=f"{title} for {target.full_name if target else 'an account'}.", link=app_link("/approvals"))
+        send(
+            "approval",
+            [u.email],
+            event,
+            name=u.display_name or u.full_name,
+            title=title,
+            message=f"{title} for {target.full_name if target else 'an account'}.",
+            link=app_link("/approvals"),
+        )
 
 
 @handler("break_glass.requested")
@@ -310,9 +448,16 @@ def _break_glass(s: Session, event: OutboxEvent) -> None:
     if req is None or user is None or not _usable(tok):
         return
     target = _user(s, req.target_user_id)
-    send("break_glass_requested", [user.email], event, name=user.display_name or user.full_name,
-         action=req.action_type, target=target.full_name if target else "an account",
-         not_before=clock.to_rfc3339(req.not_before), link=link)
+    send(
+        "break_glass_requested",
+        [user.email],
+        event,
+        name=user.display_name or user.full_name,
+        action=req.action_type,
+        target=target.full_name if target else "an account",
+        not_before=clock.to_rfc3339(req.not_before),
+        link=link,
+    )
 
 
 def dispatch(s: Session, event: OutboxEvent) -> None:

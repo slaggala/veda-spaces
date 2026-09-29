@@ -18,15 +18,18 @@ target_metadata = metadata
 
 
 def _url() -> str:
-    url = config.attributes.get("url") or os.environ.get("VEDA_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    url = (
+        config.attributes.get("url") or os.environ.get("VEDA_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    )
     if not url:
         raise RuntimeError("set VEDA_DATABASE_URL")
     return url
 
 
 def run_migrations_offline() -> None:
-    context.configure(url=_url(), target_metadata=target_metadata, literal_binds=True,
-                      render_as_batch=_url().startswith("sqlite"))
+    context.configure(
+        url=_url(), target_metadata=target_metadata, literal_binds=True, render_as_batch=_url().startswith("sqlite")
+    )
     with context.begin_transaction():
         context.run_migrations()
 

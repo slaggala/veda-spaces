@@ -14,7 +14,7 @@ type Message = { type: 'login' } | { type: 'logout' } | { type: 'me-changed' };
 export class SessionController extends EventTarget {
   state: SessionState = { status: 'loading', me: null };
   /** Pending MFA challenge from the login step (kept in memory only, never persisted). */
-  pendingMfa: { token: string; email: string; recoveryAvailable: boolean } | null = null;
+  pendingMfa: { token: string; email: string; recoveryAvailable: boolean; expiresAt: number } | null = null;
   /** Banner shown on the login screen, e.g. after SESSION_INVALID or a completed reset. */
   flash: { kind: 'info' | 'warning'; text: string } | null = null;
   /** Set from the login response; only change-password, /auth/me and logout are usable (05 §3). */
@@ -85,7 +85,8 @@ export class SessionController extends EventTarget {
       await this.completeAuthentication(data);
     }
     else if (data.status === 'MFA_REQUIRED')
-      this.pendingMfa = { token: data.mfa_token, email, recoveryAvailable: data.recovery_available };
+      this.pendingMfa = { token: data.mfa_token, email, recoveryAvailable: data.recovery_available,
+        expiresAt: Date.now() + (data.expires_in ?? 300) * 1000 };
     return data;
   }
 

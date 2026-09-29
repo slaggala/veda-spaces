@@ -24,6 +24,7 @@ def founder(api, factory):
 
 # --- envelopes and errors (API-002, API-003) ---------------------------------------------------------
 
+
 def test_API_002_envelopes_and_headers(api, founder, factory):
     lead = factory.lead(api, founder.token)
     r = api.get(f"/api/v1/leads/{lead['id']}")
@@ -32,7 +33,12 @@ def test_API_002_envelopes_and_headers(api, founder, factory):
     assert r.headers["Cache-Control"] == "no-store" and r.headers["X-Content-Type-Options"] == "nosniff"
     assert "max-age" in r.headers["Strict-Transport-Security"]
     lst = api.get("/api/v1/leads?page=1&page_size=10")
-    assert set(lst.json) == {"data", "meta", "links"} and set(lst.json["meta"]) >= {"page", "page_size", "total", "total_pages"}
+    assert set(lst.json) == {"data", "meta", "links"} and set(lst.json["meta"]) >= {
+        "page",
+        "page_size",
+        "total",
+        "total_pages",
+    }
     echo = api.get("/api/v1/leads", headers={"X-Request-ID": "trace-abc-123"})
     assert echo.headers["X-Request-ID"] == "trace-abc-123"
 
@@ -42,12 +48,23 @@ def test_API_003_problem_details(api, founder):
     assert r.status == 404 and r.raw.content_type == "application/problem+json"
     assert set(r.json) >= {"type", "title", "status", "code", "request_id"} and r.json["type"].endswith("/not-found")
     assert api.call("POST", "/api/v1/leads", raw_body=b"{not json").code == "MALFORMED_JSON"
-    assert api.call("POST", "/api/v1/leads", raw_body=b"name=x", content_type="application/x-www-form-urlencoded").status == 415
+    assert (
+        api.call("POST", "/api/v1/leads", raw_body=b"name=x", content_type="application/x-www-form-urlencoded").status
+        == 415
+    )
     assert api.call("DELETE", "/api/v1/lookups").status == 405
 
 
-@pytest.mark.parametrize("bad", ["0192A4F1C3B27E8D9F10A2B3C4D5E6F7", "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7",
-                                 "0192a4f1c3b24e8d9f10a2b3c4d5e6f7", "123", "1"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "0192A4F1C3B27E8D9F10A2B3C4D5E6F7",
+        "0192a4f1-c3b2-7e8d-9f10-a2b3c4d5e6f7",
+        "0192a4f1c3b24e8d9f10a2b3c4d5e6f7",
+        "123",
+        "1",
+    ],
+)
 def test_DATA_013_invalid_ids_rejected_before_lookup(api, founder, bad):
     r = api.get(f"/api/v1/leads/{bad}")
     assert r.status == 422 and r.code == "INVALID_ID"
@@ -58,16 +75,28 @@ def test_DATA_013_invalid_ids_rejected_before_lookup(api, founder, bad):
 def test_API_006_if_match_required_and_checked(api, founder, factory):
     lead = factory.lead(api, founder.token)
     assert api.patch(f"/api/v1/leads/{lead['id']}", {"city": "Pune"}).code == "PRECONDITION_REQUIRED"
-    assert api.patch(f"/api/v1/leads/{lead['id']}", {"city": "Pune"}, if_match=lead["version"] + 5).code == "VERSION_CONFLICT"
-    assert api.patch(f"/api/v1/leads/{lead['id']}", {"city": "Pune"}, headers={"If-Match": f'W/"{lead["version"]}"'}).status == 200
+    assert (
+        api.patch(f"/api/v1/leads/{lead['id']}", {"city": "Pune"}, if_match=lead["version"] + 5).code
+        == "VERSION_CONFLICT"
+    )
+    assert (
+        api.patch(
+            f"/api/v1/leads/{lead['id']}", {"city": "Pune"}, headers={"If-Match": f'W/"{lead["version"]}"'}
+        ).status
+        == 200
+    )
 
 
 def test_SEC_004_closed_schemas_and_body_limits(api, founder):
     r = api.post("/api/v1/leads", {"name": "x y", "phone": "9876543210", "source_code": "PHONE", "is_admin": True})
     assert r.code == "VALIDATION_FAILED" and r.json["errors"][0]["code"] == "UNKNOWN_FIELD"
     big = b'{"name":"' + b"x" * (17 * 1024) + b'"}'
-    assert api.call("POST", "/api/v1/public/leads", raw_body=big, anonymous=True,
-                    headers={"Idempotency-Key": "k" * 20}).code == "PAYLOAD_TOO_LARGE"
+    assert (
+        api.call(
+            "POST", "/api/v1/public/leads", raw_body=big, anonymous=True, headers={"Idempotency-Key": "k" * 20}
+        ).code
+        == "PAYLOAD_TOO_LARGE"
+    )
 
 
 def test_API_007_authenticated_idempotency(api, founder):
@@ -81,15 +110,26 @@ def test_API_007_authenticated_idempotency(api, founder):
 
 
 def test_SEC_002_cors_allowlist(client):
-    r = client.options("/api/v1/auth/login", headers={"Origin": "http://localhost:5173",
-                                                      "Access-Control-Request-Method": "POST"})
+    r = client.options(
+        "/api/v1/auth/login", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "POST"}
+    )
     assert r.status_code == 204 and r.headers["Access-Control-Allow-Origin"] == "http://localhost:5173"
-    assert r.headers["Access-Control-Allow-Credentials"] == "true" if "Access-Control-Allow-Credentials" in r.headers else True
-    r = client.options("/api/v1/leads", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"})
+    assert (
+        r.headers["Access-Control-Allow-Credentials"] == "true"
+        if "Access-Control-Allow-Credentials" in r.headers
+        else True
+    )
+    r = client.options(
+        "/api/v1/leads", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"}
+    )
     assert "Access-Control-Allow-Origin" not in r.headers
-    r = client.options("/api/v1/public/leads", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "POST"})
+    r = client.options(
+        "/api/v1/public/leads", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "POST"}
+    )
     assert r.headers["Access-Control-Allow-Origin"] == "http://localhost:8000"
-    r = client.options("/api/v1/leads", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "GET"})
+    r = client.options(
+        "/api/v1/leads", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "GET"}
+    )
     assert "Access-Control-Allow-Origin" not in r.headers, "the public site origin reaches public endpoints only"
 
 
@@ -117,6 +157,7 @@ def test_rate_limits_public_intake(api, factory):
 
 # --- TD-F: optimistic concurrency (API-006, DATA-006) -----------------------------------------------
 
+
 def test_TD_F_two_writer_conflict(app, api, factory, founder):
     x, y = factory.user("ADMIN"), factory.user("ADMIN")
     lead = factory.lead(api, founder.token)
@@ -133,8 +174,10 @@ def test_TD_F_two_writer_conflict(app, api, factory, founder):
         barrier.wait()
         results[name] = c.patch(f"/api/v1/leads/{lead['id']}", body, token=token, if_match=version)
 
-    threads = [threading.Thread(target=writer, args=("x", tx, {"priority": "HIGH"})),
-               threading.Thread(target=writer, args=("y", ty, {"city": "Pune"}))]
+    threads = [
+        threading.Thread(target=writer, args=("x", tx, {"priority": "HIGH"})),
+        threading.Thread(target=writer, args=("y", ty, {"city": "Pune"})),
+    ]
     [t.start() for t in threads]
     [t.join() for t in threads]
     statuses = sorted(r.status for r in results.values())
@@ -143,8 +186,12 @@ def test_TD_F_two_writer_conflict(app, api, factory, founder):
     loser_name, loser = next((k, r) for k, r in results.items() if r.status == 409)
     assert loser.code == "VERSION_CONFLICT" and loser.json["current_version"] == winner.data["version"]
     retry_body = {"city": "Pune"} if loser_name == "y" else {"priority": "HIGH"}
-    retry = api.patch(f"/api/v1/leads/{lead['id']}", retry_body, token=ty if loser_name == "y" else tx,
-                      if_match=winner.data["version"])
+    retry = api.patch(
+        f"/api/v1/leads/{lead['id']}",
+        retry_body,
+        token=ty if loser_name == "y" else tx,
+        if_match=winner.data["version"],
+    )
     assert retry.status == 200 and retry.data["priority"] == "HIGH" and retry.data["city"] == "Pune"
     updates = audits(lead["id"], action="UPDATE")
     assert len(updates) == 2, "no audit row for the rejected write"
@@ -159,8 +206,11 @@ def test_PLAT_010_sequence_allocation_under_concurrency(app, api, factory, found
     def create(i):
         c = ApiClient(app.test_client())
         barrier.wait()
-        r = c.post("/api/v1/leads", {"name": f"Parallel {i}", "phone": f"98765{i:05d}", "source_code": "PHONE"},
-                   token=founder.token)
+        r = c.post(
+            "/api/v1/leads",
+            {"name": f"Parallel {i}", "phone": f"98765{i:05d}", "source_code": "PHONE"},
+            token=founder.token,
+        )
         numbers.append(r.data["lead_number"] if r.status == 201 else r.json)
 
     threads = [threading.Thread(target=create, args=(i,)) for i in range(4)]
@@ -171,6 +221,7 @@ def test_PLAT_010_sequence_allocation_under_concurrency(app, api, factory, found
 
 # --- notifications and outbox (NOTIF-*) -------------------------------------------------------------
 
+
 def test_NOTIF_003_outbox_retry_backoff_dead_and_idempotency(api, factory, founder):
     factory.public_lead(api)
     use_provider(FailingEmailProvider())
@@ -180,7 +231,7 @@ def test_NOTIF_003_outbox_retry_backoff_dead_and_idempotency(api, factory, found
         assert ev.attempts == attempt
         if attempt < 8:
             assert ev.status == "FAILED" and "RuntimeError" in ev.last_error
-            clock.advance(timedelta(seconds=2 ** attempt + 1))
+            clock.advance(timedelta(seconds=2**attempt + 1))
     assert ev.status == "DEAD"
     notes = rows(sa.select(Notification).where(Notification.source_event_id == ev.id))
     assert len(notes) == 1, "in-app handler is idempotent across retries"
@@ -222,13 +273,22 @@ def test_scheduler_jobs_follow_up_and_spam_digest(api, factory, founder):
     from veda.platform import maintenance
 
     lead = factory.lead(api, founder.token)
-    api.post(f"/api/v1/leads/{lead['id']}/activities", {"activity_type": "CALL", "activity_status": "PLANNED",
-                                                        "subject": "Call back", "scheduled_on": clock.to_rfc3339(clock.now() + timedelta(minutes=10))})
+    api.post(
+        f"/api/v1/leads/{lead['id']}/activities",
+        {
+            "activity_type": "CALL",
+            "activity_status": "PLANNED",
+            "subject": "Call back",
+            "scheduled_on": clock.to_rfc3339(clock.now() + timedelta(minutes=10)),
+        },
+    )
     assert maintenance.follow_up_reminders() == 1 and maintenance.follow_up_reminders() == 0
     factory.public_lead(api, company_website_url="bot")
     assert maintenance.spam_review()["suspected"] == 1
     worker.drain_all()
-    types = {n.notification_type for n in rows(sa.select(Notification).where(Notification.recipient_user_id == founder.id))}
+    types = {
+        n.notification_type for n in rows(sa.select(Notification).where(Notification.recipient_user_id == founder.id))
+    }
     assert {"FOLLOW_UP_DUE", "SPAM_REVIEW"} <= types
     with actor(system_context()), db.unit_of_work(write=True) as s:
         assert s.execute(sa.select(sa.func.count()).select_from(OutboxEvent)).scalar() >= 2

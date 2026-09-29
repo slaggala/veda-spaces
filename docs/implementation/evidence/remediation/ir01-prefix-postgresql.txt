@@ -1,0 +1,112 @@
+FFFFFF.FF..F.FFFFFF                                                      [100%]
+=================================== FAILURES ===================================
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59525f752aa8ce54959e5f5797', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59525f752aa8ce54959e5f5797', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59525f752aa8ce54959e5f5797', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5953bc707998a34330cee68bf4', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5953bc707998a34330cee68bf4', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5953bc707998a34330cee68bf4', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5955e1754095eb91942171c584', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5955e1754095eb91942171c584', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec5955e1754095eb91942171c584', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>'01a0ec595743744c855215d9debdb9a4', 'full_name': 'Invited Person', 'display_name': None, 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>'01a0ec595743744c855215d9debdb9a4', 'full_name': 'Invited Person', 'display_name': None, 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>'01a0ec595743744c855215d9debdb9a4', 'full_name': 'Invited Person', 'display_name': None, 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': 'f48bb0cbd2f087d4'}>
+    assert (401 == 401 and 'AUTH_REQUIRED' == 'MFA_CHALLENGE_INVALID'
+     +  where 401 = <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': 'f48bb0cbd2f087d4'}>.status
+      
+      - MFA_CHALLENGE_INVALID
+      + AUTH_REQUIRED)
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': 'f48bb0cbd2f087d4'}>
+E   AssertionError: <Resp 428 {'type': 'https://api.vedaspaces.com/problems/precondition-required', 'title': 'If-Match header required', '...e': 'PRECONDITION_REQUIRED', 'detail': 'Send If-Match with the version you edited.', 'request_id': '9c720d0fa7c35515'}>
+    assert 428 == 200
+     +  where 428 = <Resp 428 {'type': 'https://api.vedaspaces.com/problems/precondition-required', 'title': 'If-Match header required', '...e': 'PRECONDITION_REQUIRED', 'detail': 'Send If-Match with the version you edited.', 'request_id': '9c720d0fa7c35515'}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:211: AssertionError: <Resp 428 {'type': 'https://api.vedaspaces.com/problems/precondition-required', 'title': 'If-Match header required', '...e': 'PRECONDITION_REQUIRED', 'detail': 'Send If-Match with the version you edited.', 'request_id': '9c720d0fa7c35515'}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec595a7875c0b2e8edb875b8c116', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec595a7875c0b2e8edb875b8c116', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:225: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec595a7875c0b2e8edb875b8c116', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>', '<recovery-code>']}}>
+E   AssertionError: <Resp 200 {'data': {'otpauth_uri': 'otpauth://totp/Veda%20Spaces%3Aleela%40vedaspaces.test?secret=<totp-secret>...75OJ32KUAVFBCF3LS2Q7HOKI2BWLGT', 'challenge_token': '<token>', 'expires_in': 900}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'otpauth_uri': 'otpauth://totp/Veda%20Spaces%3Aleela%40vedaspaces.test?secret=<totp-secret>...75OJ32KUAVFBCF3LS2Q7HOKI2BWLGT', 'challenge_token': '<token>', 'expires_in': 900}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:289: AssertionError: <Resp 200 {'data': {'otpauth_uri': 'otpauth://totp/Veda%20Spaces%3Aleela%40vedaspaces.test?secret=<totp-secret>...75OJ32KUAVFBCF3LS2Q7HOKI2BWLGT', 'challenge_token': '<token>', 'expires_in': 900}}>
+E   AssertionError: <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': '4e2e1c28b7ccf0a6'}>
+    assert (401 == 401 and 'AUTH_REQUIRED' == 'MFA_CHALLENGE_INVALID'
+     +  where 401 = <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': '4e2e1c28b7ccf0a6'}>.status
+      
+      - MFA_CHALLENGE_INVALID
+      + AUTH_REQUIRED)
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 401 {'type': 'https://api.vedaspaces.com/problems/auth-required', 'title': 'Authentication required', 'status': 401, 'code': 'AUTH_REQUIRED', 'detail': 'Sign in to continue.', 'request_id': '4e2e1c28b7ccf0a6'}>
+E   AssertionError: [{'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', 'title': 'This record was changed by someone else', 'status': 409, 'code': 'VERSION_CONFLICT', ...}]
+    assert [200, 409] == [200, 401]
+      
+      At index 1 diff: 409 != 401
+      Use -v to get more diff
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:327: AssertionError: [{'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token>', 'title': 'This record was changed by someone else', 'status': 409, 'code': 'VERSION_CONFLICT', ...}]
+E   Failed: DID NOT RAISE RuntimeError
+------------------------------ Captured log call -------------------------------
+ERROR    veda.app:app.py:136 unhandled_error
+Traceback (most recent call last):
+  File "<scratch>/clean/api/.venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "<scratch>/clean/api/.venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "<scratch>/clean/api/.venv/lib/python3.13/site-packages/flask_limiter/_limits.py", line 326, in __inner
+    return cast(R, flask.current_app.ensure_sync(obj)(*a, **k))
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "~/Documents/veda-spaces-aws-source/api/veda/kernel/http.py", line 433, in view
+    return dispatch(spec, kwargs)
+  File "~/Documents/veda-spaces-aws-source/api/veda/kernel/http.py", line 499, in dispatch
+    result = spec.handler(req, **path_params)
+  File "~/Documents/veda-spaces-aws-source/api/veda/platform/auth/routes.py", line 292, in enroll_confirm
+    return _with_cookie(mfa.enroll_confirm(req.session, req.ctx, req.body.challenge_token, req.body.code, req.body.label))
+                        ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/Documents/veda-spaces-aws-source/api/veda/platform/auth/mfa.py", line 292, in enroll_confirm
+    codes = _issue_recovery_codes(s, user.id)
+  File "~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py", line 336, in boom
+    raise RuntimeError("injected failure after factor promotion")
+RuntimeError: injected failure after factor promotion
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:339: Failed: DID NOT RAISE RuntimeError
+E   AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59626674b1af850d0080f0dd73', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+    assert (200 == 401)
+     +  where 200 = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59626674b1af850d0080f0dd73', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.status
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:69: AssertionError: <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59626674b1af850d0080f0dd73', 'full_name': 'Test User 2', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>
+E   AssertionError: the elevated session gets a fresh refresh token
+    assert 'Set-Cookie' in Headers([('Content-Type', 'application/json; charset=utf-8'), ('Content-Length', '914'), ('Cache-Control', 'no-store')...niff'), ('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'"), ('Referrer-Policy', 'no-referrer')])
+     +  where Headers([('Content-Type', 'application/json; charset=utf-8'), ('Content-Length', '914'), ('Cache-Control', 'no-store')...niff'), ('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'"), ('Referrer-Policy', 'no-referrer')]) = <Resp 200 {'data': {'status': 'AUTHENTICATED', 'access_token': '<access-token> '01a0ec59631374be83b3a3533fee93fd', 'full_name': 'Test User 1', 'display_name': 'Test', 'timezone': 'Asia/Kolkata'}}}>.headers
+~/Documents/veda-spaces-aws-source/api/tests/integration/test_mfa_binding.py:375: AssertionError: the elevated session gets a fresh refresh token
+=========================== short test summary info ============================
+FAILED tests/integration/test_mfa_binding.py::test_IR01_P1_foreign_unbound_challenge_cannot_verify_victim_session[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_P1b_foreign_challenge_cannot_satisfy_step_up[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_path_D_recovery_session_with_foreign_challenge[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_attacker_bearer_with_victims_unbound_challenge[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_unbound_invitation_transaction_refuses_any_bearer[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_same_user_different_session_cannot_confirm[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_disabled_user_token_cannot_confirm[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_eligibility_rechecked_at_confirm_after_sensitive_grant[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_transaction_bound_to_its_own_factor[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_invitation_context_is_single_account_and_unauthenticated[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_recovery_transaction_needs_its_recovery_session[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_parallel_confirmations_activate_once[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_failure_halfway_commits_nothing[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_failed_replacement_keeps_active_factor_and_assurance[postgresql]
+FAILED tests/integration/test_mfa_binding.py::test_IR01_success_rotates_refresh_token_of_the_elevated_session[postgresql]
+PASSED tests/integration/test_mfa_binding.py::test_IR01_revoked_session_cannot_confirm[postgresql]
+PASSED tests/integration/test_mfa_binding.py::test_IR01_expired_transaction[postgresql]
+PASSED tests/integration/test_mfa_binding.py::test_IR01_replay_after_success[postgresql]
+PASSED tests/integration/test_mfa_binding.py::test_IR01_wrong_purpose_tokens_are_not_enrollment_transactions[postgresql]
+15 failed, 4 passed in 5.67s

@@ -50,10 +50,13 @@ modal.addEventListener('click', (event) => {
 modal.addEventListener('close', () => lastProjectTrigger?.focus());
 
 // --- Enquiry form (LEAD-001, LEAD-019, 04 §5.1, 09 §4.11) -------------------------------------
-// Progressive enhancement: with <meta name="veda-api-base"> empty the form keeps the WhatsApp hand-off.
+// Progressive enhancement: the form posts to the API only when both <meta name="veda-api-base"> and the
+// Turnstile site key are set. Otherwise it keeps the original WhatsApp hand-off, and the consent and
+// verification blocks stay hidden (fail safe; IR-18, IR-32).
 const contactForm = document.querySelector('#contact-form');
 const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.content?.trim() || '';
-const apiBase = meta('veda-api-base');
+const apiBase = meta('veda-api-base') && meta('veda-turnstile-sitekey') ? meta('veda-api-base') : '';
+if (meta('veda-api-base') && !apiBase) console.warn('veda: intake disabled — veda-turnstile-sitekey is not set');
 const WHATSAPP = 'https://wa.me/919515125153';
 const labels = { property: '#cf-property', service: '#cf-service', budget: '#cf-budget' };
 let idempotencyKey = null;
@@ -92,17 +95,26 @@ function clearErrors() {
 }
 
 function showErrors(errors) {
+  // Built with DOM nodes and textContent: server strings never reach innerHTML (IR-32).
   const summary = document.querySelector('#form-summary');
-  const items = [];
+  const list = document.createElement('ul');
   for (const err of errors) {
     const id = FIELD_IDS[err.field];
     if (!id) continue;
     const input = document.getElementById(id);
     input.setAttribute('aria-invalid', 'true');
     document.getElementById(`${id}-err`).textContent = err.message;
-    items.push(`<li><a href="#${id}">${err.message}</a></li>`);
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = `#${id}`;
+    link.textContent = err.message;
+    item.append(link);
+    list.append(item);
   }
-  summary.innerHTML = `<strong>Please fix ${items.length} thing${items.length === 1 ? '' : 's'}</strong><ul>${items.join('')}</ul>`;
+  const heading = document.createElement('strong');
+  const count = list.children.length;
+  heading.textContent = `Please fix ${count} thing${count === 1 ? '' : 's'}`;
+  summary.replaceChildren(heading, list);
   summary.hidden = false;
   summary.focus();
 }
@@ -132,17 +144,20 @@ function fallback(data, message) {
   showPanel('form-fallback');
 }
 
-const turnstileToken = () => document.querySelector('#cf-turnstile [name="cf-turnstile-response"]')?.value || '';
+let widgetId = null;
+const turnstileToken = () => (window.turnstile && widgetId !== null ? window.turnstile.getResponse(widgetId) : '') || '';
+// A Turnstile token is single use: after any response other than 201 the widget is reset for a new one (IR-18).
+const resetTurnstile = () => { if (window.turnstile && widgetId !== null) window.turnstile.reset(widgetId); };
 
-if (apiBase && meta('veda-turnstile-sitekey')) {
+if (apiBase) {
+  contactForm.querySelectorAll('[data-intake-only]').forEach((el) => { el.hidden = false; });
   const script = document.createElement('script');
   script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
   script.async = true;
-  script.onload = () => window.turnstile?.render('#cf-turnstile', { sitekey: meta('veda-turnstile-sitekey') });
+  script.onload = () => { widgetId = window.turnstile?.render('#cf-turnstile', { sitekey: meta('veda-turnstile-sitekey') }) ?? null; };
   document.head.appendChild(script);
+  document.querySelector('#form-note').textContent = 'We’ll call you within one working day. Prefer WhatsApp? Use the button on the left.';
 }
-
-if (apiBase) document.querySelector('#form-note').textContent = 'We’ll call you within one working day. Prefer WhatsApp? Use the button on the left.';
 
 contactForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -154,6 +169,12 @@ contactForm.addEventListener('submit', async (event) => {
   }
   const errors = clientValidate(data);
   if (errors.length) { showErrors(errors); return; }
+  const token = turnstileToken();
+  if (!token) {
+    // No verification token yet (widget still loading, or blocked): never submit without one.
+    fallback(data, 'We couldn’t verify this submission.');
+    return;
+  }
   idempotencyKey = idempotencyKey || newKey();
   const params = new URLSearchParams(window.location.search);
   const body = {
@@ -172,7 +193,7 @@ contactForm.addEventListener('submit', async (event) => {
       landing_page: window.location.pathname + window.location.search, referrer_url: document.referrer || null,
       form_page: `${window.location.pathname}#contact`,
     },
-    turnstile_token: turnstileToken() || 'no-widget',
+    turnstile_token: token,
     company_website_url: data.get('company_website_url') || '',
   };
   contactForm.setAttribute('aria-busy', 'true');
@@ -195,14 +216,20 @@ contactForm.addEventListener('submit', async (event) => {
       showPanel('form-success');
       return;
     }
-    const fieldLevel = res.status === 422 && ['VALIDATION_FAILED', 'CONSENT_REQUIRED', 'UNKNOWN_POLICY_VERSION'].includes(payload.code);
+    resetTurnstile();
+    // UNKNOWN_POLICY_VERSION is not the visitor's mistake: the page is out of date, so it is never a field error (IR-31).
+    const fieldLevel = res.status === 422 && ['VALIDATION_FAILED', 'CONSENT_REQUIRED'].includes(payload.code);
     if (fieldLevel && Array.isArray(payload.errors) && payload.errors.some((e) => FIELD_IDS[e.field])) {
       showErrors(payload.errors);
       return;
     }
-    const messages = { CAPTCHA_FAILED: 'We couldn’t verify this submission.', RATE_LIMITED: 'We’re receiving a lot of enquiries right now.' };
+    const messages = {
+      CAPTCHA_FAILED: 'We couldn’t verify this submission.', RATE_LIMITED: 'We’re receiving a lot of enquiries right now.',
+      UNKNOWN_POLICY_VERSION: 'This page is out of date — please reload it.',
+    };
     fallback(data, messages[payload.code] || 'Something went wrong on our side.');
   } catch (err) {
+    resetTurnstile();
     fallback(data, err.name === 'AbortError' ? 'This is taking longer than expected.' : 'You appear to be offline.');
   } finally {
     clearTimeout(timer);

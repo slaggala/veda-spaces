@@ -7,6 +7,7 @@ for UPDATE ... RETURNING (03 §12).
 Revision ID: 0001_kernel
 Revises:
 """
+
 from alembic import op
 
 from veda.kernel import migration_support as ms  # noqa: F401
@@ -29,4 +30,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Expand-only migrations; no down-migrations are relied on (02 §12.4).
     raise NotImplementedError("down-migrations are not supported")
-

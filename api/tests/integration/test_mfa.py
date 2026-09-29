@@ -55,6 +55,7 @@ def recovery_codes_for(api, factory, user) -> list[str]:
 
 # --- policy (05 §11.1) -----------------------------------------------------------------------
 
+
 def test_MFA_002_policy_sources(api, factory):
     sales = factory.user("SALES")
     factory.login(api, sales)
@@ -71,22 +72,36 @@ def test_MFA_002_policy_sources(api, factory):
 def test_MFA_014_required_without_factor_emails_link_and_never_issues_token(api, factory):
     flagged = factory.user("SALES", mfa_required=True)
     r = api.post("/api/v1/auth/login", {"email": flagged.email, "password": flagged.password}, anonymous=True)
-    assert r.status == 200 and r.data == {"status": "MFA_ENROLLMENT_EMAIL_SENT",
-                                          "message": "Check your email to set up two-step verification."}
+    assert r.status == 200 and r.data == {
+        "status": "MFA_ENROLLMENT_EMAIL_SENT",
+        "message": "Check your email to set up two-step verification.",
+    }
     assert "Set-Cookie" not in r.headers
     token = link_from(flagged.email, "two-step verification")
     # Path C needs the password too: the emailed token alone is not enough.
-    assert api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": token}, anonymous=True).code == "ENROLLMENT_PROOF_INVALID"
-    assert api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": "wrong-password-1"},
-                    anonymous=True).code == "ENROLLMENT_PROOF_INVALID"
+    assert (
+        api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": token}, anonymous=True).code
+        == "ENROLLMENT_PROOF_INVALID"
+    )
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": "wrong-password-1"}, anonymous=True
+        ).code
+        == "ENROLLMENT_PROOF_INVALID"
+    )
     token = link_from(flagged.email, "two-step verification")
     r = api.post("/api/v1/auth/login", {"email": flagged.email, "password": flagged.password}, anonymous=True)
     token = link_from(flagged.email, "two-step verification")
-    r = api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": flagged.password}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": flagged.password}, anonymous=True
+    )
     assert r.status == 200 and r.data["secret"] and r.data["otpauth_uri"].startswith("otpauth://totp/")
     secret = secret_from_uri(r.data["otpauth_uri"])
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": code_for(secret),
-                                                     "label": "Phone"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm",
+        {"challenge_token": r.data["challenge_token"], "code": code_for(secret), "label": "Phone"},
+        anonymous=True,
+    )
     assert r.status == 200 and r.data["status"] == "AUTHENTICATED" and len(r.data["recovery_codes"]) == 10
     assert events("MFA_ENROLLMENT_COMPLETED", subject_user_id=flagged.id)
     # Secret never returned again (MFA-010).
@@ -115,7 +130,9 @@ def test_MFA_014_path_a_voluntary_enrollment_needs_fresh_password(api, factory):
     secret = secret_from_uri(r.data["otpauth_uri"])
     bad = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": "000000"})
     assert bad.code == "MFA_CODE_INVALID"
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": code_for(secret)})
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": code_for(secret)}
+    )
     assert r.status == 200 and r.data["access_token"]
     # Voluntary enrollment is always challenged afterwards.
     r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True)
@@ -125,17 +142,24 @@ def test_MFA_014_path_a_voluntary_enrollment_needs_fresh_password(api, factory):
 def test_MFA_014_path_b_invitation_enrollment(api, factory):
     admin = factory.user("ADMIN")
     factory.login(api, admin)
-    r = api.post("/api/v1/users", {"email": "anand@vedaspaces.test", "full_name": "Anand Nair",
-                                   "role_ids": [factory.role_id("ADMIN")]})
+    r = api.post(
+        "/api/v1/users",
+        {"email": "anand@vedaspaces.test", "full_name": "Anand Nair", "role_ids": [factory.role_id("ADMIN")]},
+    )
     assert r.status == 201, r
     invite = link_from("anand@vedaspaces.test", "invited")
-    r = api.post("/api/v1/auth/invite/accept", {"token": invite, "new_password": "Harbour-Lights-Evening-3"}, anonymous=True)
+    r = api.post(
+        "/api/v1/auth/invite/accept", {"token": invite, "new_password": "Harbour-Lights-Evening-3"}, anonymous=True
+    )
     assert r.status == 200 and r.data["status"] == "MFA_ENROLLMENT_REQUIRED"
     r = api.post("/api/v1/auth/mfa/enroll/start", {"invite_context": r.data["invite_context"]}, anonymous=True)
     assert r.status == 200
     secret = secret_from_uri(r.data["otpauth_uri"])
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": code_for(secret)},
-                 anonymous=True)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm",
+        {"challenge_token": r.data["challenge_token"], "code": code_for(secret)},
+        anonymous=True,
+    )
     assert r.status == 200 and r.data["status"] == "AUTHENTICATED"
     me = api.get("/api/v1/auth/me", token=r.data["access_token"]).data
     assert me["status"] == "ACTIVE" and me["suspended_permissions"] == []
@@ -160,11 +184,15 @@ def test_MFA_012_sensitive_grant_without_factor_is_suspended_until_enrollment(ap
     r = api.post("/api/v1/auth/login", {"email": sales.email, "password": sales.password}, anonymous=True)
     assert r.data["status"] == "MFA_ENROLLMENT_EMAIL_SENT"
     token = link_from(sales.email, "two-step verification")
-    start = api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": sales.password},
-                     anonymous=True).data
+    start = api.post(
+        "/api/v1/auth/mfa/enroll/start", {"enrollment_token": token, "password": sales.password}, anonymous=True
+    ).data
     secret = secret_from_uri(start["otpauth_uri"])
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": start["challenge_token"], "code": code_for(secret)},
-                 anonymous=True)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm",
+        {"challenge_token": start["challenge_token"], "code": code_for(secret)},
+        anonymous=True,
+    )
     assert api.get("/api/v1/audit-logs", token=r.data["access_token"]).status == 200, "effective after enrollment"
     del founder
 
@@ -201,7 +229,10 @@ def test_MFA_011_step_up_flow(api, factory):
     user = factory.get_user(target.id)
     r = api.post(f"/api/v1/users/{target.id}/sessions/revoke", {"reason": "Lost phone"})
     assert r.status == 403 and r.code == "STEP_UP_REQUIRED" and r.json["kind"] == "mfa" and r.json["mfa_token"]
-    assert api.post("/api/v1/auth/mfa/step-up", {"mfa_token": r.json["mfa_token"], "code": "000000"}).code == "MFA_CODE_INVALID"
+    assert (
+        api.post("/api/v1/auth/mfa/step-up", {"mfa_token": r.json["mfa_token"], "code": "000000"}).code
+        == "MFA_CODE_INVALID"
+    )
     r2 = api.post(f"/api/v1/users/{target.id}/sessions/revoke", {"reason": "Lost phone"})
     assert api.post("/api/v1/auth/mfa/step-up", {"mfa_token": r2.json["mfa_token"], "code": admin.code()}).status == 204
     r = api.post(f"/api/v1/users/{target.id}/sessions/revoke", {"reason": "Lost phone"})
@@ -211,31 +242,46 @@ def test_MFA_011_step_up_flow(api, factory):
 
 # --- recovery (MFA-013) -------------------------------------------------------------------------
 
+
 def test_MFA_013_recovery_requires_password_and_code(api, factory, client):
     admin = factory.user("ADMIN")
     codes = recovery_codes_for(api, factory, admin)
     other_session = api.token
     token = login_challenge(api, admin)
-    for body in ({"password": admin.password, "recovery_code": "AAAAA-BBBBB"},
-                 {"password": "wrong-password-1", "recovery_code": codes[0]}):
+    for body in (
+        {"password": admin.password, "recovery_code": "AAAAA-BBBBB"},
+        {"password": "wrong-password-1", "recovery_code": codes[0]},
+    ):
         r = api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, **body}, anonymous=True)
         assert r.status == 401 and r.code == "MFA_RECOVERY_INVALID"
     client.delete_cookie("vs_rt", path="/api/v1/auth")
-    r = api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
-                 anonymous=True)
+    r = api.post(
+        "/api/v1/auth/mfa/recovery",
+        {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
+        anonymous=True,
+    )
     assert r.status == 200 and r.data["status"] == "RECOVERY_SESSION" and "Set-Cookie" not in r.headers
     rec = r.data["access_token"]
     assert api.get("/api/v1/auth/me", token=other_session).code == "SESSION_INVALID"
-    for method, path in (("GET", "/api/v1/users"), ("GET", "/api/v1/roles"), ("PUT", "/api/v1/auth/me/email"),
-                         ("POST", "/api/v1/auth/password/change"), ("GET", "/api/v1/leads"), ("GET", "/api/v1/security-events")):
+    for method, path in (
+        ("GET", "/api/v1/users"),
+        ("GET", "/api/v1/roles"),
+        ("PUT", "/api/v1/auth/me/email"),
+        ("POST", "/api/v1/auth/password/change"),
+        ("GET", "/api/v1/leads"),
+        ("GET", "/api/v1/security-events"),
+    ):
         r = api.call(method, path, {"new_email": "x@y.test"} if method == "PUT" else None, token=rec)
         assert r.status == 403 and r.code == "RECOVERY_SESSION_RESTRICTED", (path, r)
     assert api.get("/api/v1/auth/me", token=rec).data["session"]["type"] == "RECOVERY"
     r = api.post("/api/v1/auth/mfa/enroll/start", {}, token=rec)
     assert r.status == 200, r
     secret = secret_from_uri(r.data["otpauth_uri"])
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": r.data["challenge_token"], "code": code_for(secret)},
-                 token=rec)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm",
+        {"challenge_token": r.data["challenge_token"], "code": code_for(secret)},
+        token=rec,
+    )
     assert r.status == 200 and r.data["cooling_off_until"] and len(r.data["recovery_codes"]) == 10
     full = r.data["access_token"]
     assert api.get("/api/v1/auth/me", token=rec).code == "SESSION_INVALID"
@@ -244,16 +290,33 @@ def test_MFA_013_recovery_requires_password_and_code(api, factory, client):
     assert {s["reason"] for s in me["suspended_permissions"]} == {"COOLING_OFF"}
     # Old batch rejected; cooling-off blocks self-service security changes.
     token = login_challenge(api, admin)
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": codes[1]},
-                    anonymous=True).code == "MFA_RECOVERY_INVALID"
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": token, "password": admin.password, "recovery_code": codes[1]},
+            anonymous=True,
+        ).code
+        == "MFA_RECOVERY_INVALID"
+    )
     assert api.put("/api/v1/auth/me/email", {"new_email": "new@vedaspaces.test"}, token=full).code == "COOLING_OFF"
-    assert api.post("/api/v1/auth/password/change", {"current_password": admin.password, "new_password": "Brand-New-Phrase-77"},
-                    token=full).code == "COOLING_OFF"
+    assert (
+        api.post(
+            "/api/v1/auth/password/change",
+            {"current_password": admin.password, "new_password": "Brand-New-Phrase-77"},
+            token=full,
+        ).code
+        == "COOLING_OFF"
+    )
     assert api.post("/api/v1/auth/mfa/recovery-codes", {}, token=full).code == "COOLING_OFF"
     assert api.delete("/api/v1/auth/mfa/factor", token=full).code == "COOLING_OFF"
     kinds = {e.event_type for e in events(subject_user_id=admin.id)}
-    assert {"MFA_RECOVERY_CODE_CONSUMED", "MFA_RECOVERY_INITIATED", "MFA_RECOVERY_COMPLETED", "MFA_AUTHENTICATOR_RE_ENROLLED",
-            "SESSION_REVOKED"} <= kinds
+    assert {
+        "MFA_RECOVERY_CODE_CONSUMED",
+        "MFA_RECOVERY_INITIATED",
+        "MFA_RECOVERY_COMPLETED",
+        "MFA_AUTHENTICATOR_RE_ENROLLED",
+        "SESSION_REVOKED",
+    } <= kinds
     alerts = [m for m in emails_to(admin.email) if "recovery" in m.subject.lower()]
     assert alerts, "security notification to the verified email"
 
@@ -262,12 +325,19 @@ def test_TD_C_expired_recovery_session(api, factory):
     admin = factory.user("ADMIN")
     codes = recovery_codes_for(api, factory, admin)
     token = login_challenge(api, admin)
-    rec = api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
-                   anonymous=True).data["access_token"]
+    rec = api.post(
+        "/api/v1/auth/mfa/recovery",
+        {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
+        anonymous=True,
+    ).data["access_token"]
     api.post("/api/v1/auth/mfa/enroll/start", {}, token=rec)
     clock.advance(timedelta(minutes=15, seconds=1))
-    for method, path, body in (("POST", "/api/v1/auth/mfa/enroll/start", {}), ("GET", "/api/v1/auth/me", None),
-                               ("GET", "/api/v1/leads", None), ("PUT", "/api/v1/auth/me/email", {"new_email": "a@b.test"})):
+    for method, path, body in (
+        ("POST", "/api/v1/auth/mfa/enroll/start", {}),
+        ("GET", "/api/v1/auth/me", None),
+        ("GET", "/api/v1/leads", None),
+        ("PUT", "/api/v1/auth/me/email", {"new_email": "a@b.test"}),
+    ):
         r = api.call(method, path, body, token=rec)
         assert r.status == 401 and r.code == "SESSION_INVALID", (path, r)
     factors = rows(sa.select(UserMfaFactor).where(UserMfaFactor.user_id == admin.id))
@@ -275,11 +345,23 @@ def test_TD_C_expired_recovery_session(api, factory):
     assert any(f.revoke_reason == "ENROLLMENT_ABANDONED" for f in factors)
     assert sum(1 for f in factors if f.status == "ACTIVE") == 1, "old factor still ACTIVE"
     token = login_challenge(api, admin)
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
-                    anonymous=True).code == "MFA_RECOVERY_INVALID", "the consumed code stays consumed"
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": token, "password": admin.password, "recovery_code": codes[0]},
+            anonymous=True,
+        ).code
+        == "MFA_RECOVERY_INVALID"
+    ), "the consumed code stays consumed"
     token = login_challenge(api, admin)
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": codes[1]},
-                    anonymous=True).status == 200
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": token, "password": admin.password, "recovery_code": codes[1]},
+            anonymous=True,
+        ).status
+        == 200
+    )
     assert events("MFA_RECOVERY_SESSION_EXPIRED")
     assert len(events("MFA_RECOVERY_CODE_CONSUMED")) == 2
 
@@ -292,18 +374,38 @@ def test_TD_D_challenge_reuse_after_recovery(api, factory, client):
     s2_cookie = client.get_cookie("vs_rt", path="/api/v1/auth").value
     m1 = login_challenge(api, admin)
     m2 = login_challenge(api, admin)
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": m1, "password": admin.password, "recovery_code": codes[0]},
-                    anonymous=True).status == 200
-    assert api.post("/api/v1/auth/mfa/verify", {"mfa_token": m1, "code": admin.code()}, anonymous=True).code == "MFA_CHALLENGE_INVALID"
-    assert api.post("/api/v1/auth/mfa/verify", {"mfa_token": m2, "code": admin.code()}, anonymous=True).code == "MFA_CHALLENGE_INVALID"
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": m2, "password": admin.password, "recovery_code": codes[1]},
-                    anonymous=True).code == "MFA_CHALLENGE_INVALID"
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": m1, "password": admin.password, "recovery_code": codes[0]},
+            anonymous=True,
+        ).status
+        == 200
+    )
+    assert (
+        api.post("/api/v1/auth/mfa/verify", {"mfa_token": m1, "code": admin.code()}, anonymous=True).code
+        == "MFA_CHALLENGE_INVALID"
+    )
+    assert (
+        api.post("/api/v1/auth/mfa/verify", {"mfa_token": m2, "code": admin.code()}, anonymous=True).code
+        == "MFA_CHALLENGE_INVALID"
+    )
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": m2, "password": admin.password, "recovery_code": codes[1]},
+            anonymous=True,
+        ).code
+        == "MFA_CHALLENGE_INVALID"
+    )
     assert api.get("/api/v1/auth/me", token=s1).code == "SESSION_INVALID"
     client.set_cookie("vs_rt", s2_cookie, path="/api/v1/auth")
     assert api.post("/api/v1/auth/refresh", headers=api.csrf_headers(), anonymous=True).code == "SESSION_INVALID"
     del s2
     assert len(events("MFA_CHALLENGE_REPLAY_BLOCKED")) >= 3
-    revoked = rows(sa.select(UserSession).where(UserSession.user_id == admin.id, UserSession.revoke_reason == "MFA_RECOVERY"))
+    revoked = rows(
+        sa.select(UserSession).where(UserSession.user_id == admin.id, UserSession.revoke_reason == "MFA_RECOVERY")
+    )
     assert len(revoked) >= 2
     challenges = rows(sa.select(MfaChallenge).where(MfaChallenge.user_id == admin.id, MfaChallenge.purpose == "LOGIN"))
     assert any(c.completed_on for c in challenges)
@@ -313,29 +415,46 @@ def test_TD_E_failed_reenrollment_commits_nothing_that_grants_access(api, factor
     founder = factory.user(founder=True)
     codes = recovery_codes_for(api, factory, founder)
     token = login_challenge(api, founder)
-    rec = api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": founder.password, "recovery_code": codes[0]},
-                   anonymous=True).data["access_token"]
+    rec = api.post(
+        "/api/v1/auth/mfa/recovery",
+        {"mfa_token": token, "password": founder.password, "recovery_code": codes[0]},
+        anonymous=True,
+    ).data["access_token"]
     start = api.post("/api/v1/auth/mfa/enroll/start", {}, token=rec).data
     for _ in range(5):
-        assert api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": start["challenge_token"], "code": "000000"},
-                        token=rec).status == 401
+        assert (
+            api.post(
+                "/api/v1/auth/mfa/enroll/confirm",
+                {"challenge_token": start["challenge_token"], "code": "000000"},
+                token=rec,
+            ).status
+            == 401
+        )
     factors = rows(sa.select(UserMfaFactor).where(UserMfaFactor.user_id == founder.id))
     assert [f.status for f in factors].count("ACTIVE") == 1
     assert any(f.revoke_reason == "ENROLLMENT_ABANDONED" for f in factors), "F1 revoked after 5 failures"
     me = api.get("/api/v1/auth/me", token=rec).data
     assert me["session"]["type"] == "RECOVERY" and me["permissions"] == {}
     start = api.post("/api/v1/auth/mfa/enroll/start", {}, token=rec).data
-    pending = [f for f in rows(sa.select(UserMfaFactor).where(UserMfaFactor.user_id == founder.id)) if f.status == "PENDING"]
+    pending = [
+        f for f in rows(sa.select(UserMfaFactor).where(UserMfaFactor.user_id == founder.id)) if f.status == "PENDING"
+    ]
     assert len(pending) == 1
     secret = secret_from_uri(start["otpauth_uri"])
-    r = api.post("/api/v1/auth/mfa/enroll/confirm", {"challenge_token": start["challenge_token"], "code": code_for(secret)},
-                 token=rec)
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/confirm",
+        {"challenge_token": start["challenge_token"], "code": code_for(secret)},
+        token=rec,
+    )
     assert r.status == 200
     factors = rows(sa.select(UserMfaFactor).where(UserMfaFactor.user_id == founder.id))
     assert [f.status for f in factors].count("ACTIVE") == 1
     assert any(f.revoke_reason == "REPLACED" for f in factors)
-    old_batch = rows(sa.select(UserMfaRecoveryCode).where(UserMfaRecoveryCode.user_id == founder.id,
-                                                          UserMfaRecoveryCode.invalidated_on.is_not(None)))
+    old_batch = rows(
+        sa.select(UserMfaRecoveryCode).where(
+            UserMfaRecoveryCode.user_id == founder.id, UserMfaRecoveryCode.invalidated_on.is_not(None)
+        )
+    )
     assert len(old_batch) >= 9
     assert len(events("MFA_AUTHENTICATOR_RE_ENROLLED", subject_user_id=founder.id)) == 1
 
@@ -350,8 +469,14 @@ def test_MFA_005_regenerate_codes_needs_step_up_and_invalidates_old(api, factory
     second = api.post("/api/v1/auth/mfa/recovery-codes", {}).data["recovery_codes"]
     assert set(first).isdisjoint(second)
     token = login_challenge(api, admin)
-    assert api.post("/api/v1/auth/mfa/recovery", {"mfa_token": token, "password": admin.password, "recovery_code": first[0]},
-                    anonymous=True).code == "MFA_RECOVERY_INVALID"
+    assert (
+        api.post(
+            "/api/v1/auth/mfa/recovery",
+            {"mfa_token": token, "password": admin.password, "recovery_code": first[0]},
+            anonymous=True,
+        ).code
+        == "MFA_RECOVERY_INVALID"
+    )
     stored = rows(sa.select(UserMfaRecoveryCode).where(UserMfaRecoveryCode.user_id == admin.id))
     assert all(len(c.code_hash) == 64 for c in stored)
     assert not any(code.replace("-", "") in c.code_hash for c in stored for code in second), "only HMACs stored"

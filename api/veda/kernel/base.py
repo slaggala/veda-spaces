@@ -65,7 +65,9 @@ def where(sqlite: str, postgresql: str | None = None):
     return {"sqlite_where": sa.text(sqlite), "postgresql_where": sa.text(postgresql or sqlite)}
 
 
-def in_check(table: str, col: str, values: tuple[str, ...], *, nullable: bool = False, name: str | None = None) -> CheckConstraint:
+def in_check(
+    table: str, col: str, values: tuple[str, ...], *, nullable: bool = False, name: str | None = None
+) -> CheckConstraint:
     quoted = ", ".join(f"'{v}'" for v in values)
     expr = f"{col} IN ({quoted})"
     if nullable:
@@ -99,14 +101,18 @@ class AuditedBase(Base):
     def updated_by(cls) -> Mapped[str]:
         return mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=False, sort_order=-96)
 
-    is_deleted: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false(), sort_order=-95)
+    is_deleted: Mapped[bool] = mapped_column(
+        Bool(), nullable=False, default=False, server_default=sa.false(), sort_order=-95
+    )
     deleted_on: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True, sort_order=-94)
 
     @declared_attr
     def deleted_by(cls) -> Mapped[str | None]:
         return mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=True, sort_order=-93)
 
-    version: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=1, server_default=sa.text("1"), sort_order=-92)
+    version: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=1, server_default=sa.text("1"), sort_order=-92
+    )
 
     @declared_attr.directive
     def __mapper_args__(cls):

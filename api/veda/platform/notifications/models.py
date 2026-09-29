@@ -41,7 +41,9 @@ class OutboxEvent(AuditedBase):
 class Notification(AuditedBase):
     __tablename__ = "notification"
 
-    recipient_user_id: Mapped[str] = mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=False)
+    recipient_user_id: Mapped[str] = mapped_column(
+        GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=False
+    )
     notification_type: Mapped[str] = mapped_column(sa.String(60), nullable=False)
     title: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     body: Mapped[str | None] = mapped_column(sa.String(1000))
@@ -54,13 +56,18 @@ class Notification(AuditedBase):
     __table_args__ = (
         CheckConstraint("(entity_type IS NULL) = (entity_id IS NULL)", name="ck_notification__entity_pair"),
         Index(
-            "ix_notification__recipient_unread", "recipient_user_id", sa.text("created_on DESC"),
+            "ix_notification__recipient_unread",
+            "recipient_user_id",
+            sa.text("created_on DESC"),
             **where("read_on IS NULL AND is_deleted = 0", "read_on IS NULL AND is_deleted = false"),
         ),
         Index("ix_notification__recipient_all", "recipient_user_id", sa.text("created_on DESC")),
         Index("ix_notification__entity", "entity_type", "entity_id", **where("entity_id IS NOT NULL")),
         Index(
-            "ux_notification__event_recipient", "source_event_id", "recipient_user_id", unique=True,
+            "ux_notification__event_recipient",
+            "source_event_id",
+            "recipient_user_id",
+            unique=True,
             **where("source_event_id IS NOT NULL"),
         ),
     )

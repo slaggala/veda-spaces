@@ -1,0 +1,17 @@
+.....................................................................sss [ 16%]
+sss..................................................................... [ 33%]
+........................................................................ [ 49%]
+..........s..............................s.............................. [ 66%]
+........................................................................ [ 82%]
+........................................................................ [ 99%]
+...                                                                      [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/integration/test_backups.py:19: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:25: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:31: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:42: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:47: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:58: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_schema.py:93: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:354: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+427 passed, 8 skipped in 80.21s (0:01:20)

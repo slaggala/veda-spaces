@@ -64,7 +64,9 @@ def require_scope(ctx, lead: Lead, permission: str) -> None:
     if scope is None:
         deny(ctx, permission)
     if not in_scope(lead, scope, ctx.user.id):
-        raise ApiError(403, "PERMISSION_DENIED", f"Requires {permission} for this lead.", extra={"permission": permission})
+        raise ApiError(
+            403, "PERMISSION_DENIED", f"Requires {permission} for this lead.", extra={"permission": permission}
+        )
 
 
 def fold(value: str | None) -> str:
@@ -75,8 +77,17 @@ def build_search_text(lead: Lead) -> str:
     """Engine-independent search column (A-03)."""
     digits = "".join(ch for ch in (lead.phone or "") if ch.isdigit())
     raw_digits = "".join(ch for ch in (lead.phone_raw or "") if ch.isdigit())
-    parts = [lead.name, lead.email_normalized, digits, raw_digits, lead.lead_number, lead.public_reference,
-             (lead.public_reference or "").replace("-", ""), lead.city, lead.locality]
+    parts = [
+        lead.name,
+        lead.email_normalized,
+        digits,
+        raw_digits,
+        lead.lead_number,
+        lead.public_reference,
+        (lead.public_reference or "").replace("-", ""),
+        lead.city,
+        lead.locality,
+    ]
     return " ".join(fold(p) for p in parts if p)
 
 

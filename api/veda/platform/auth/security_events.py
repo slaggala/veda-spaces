@@ -11,10 +11,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import logging
 import threading
+from collections.abc import Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -33,7 +35,15 @@ from .models import SecurityEventLog
 
 log = logging.getLogger("veda.security_events")
 
-_A, _S, _P, _M, _AC, _Z, _PI = "AUTHENTICATION", "SESSION", "PASSWORD", "MFA", "ACCOUNT", "AUTHORIZATION", "PUBLIC_INTAKE"
+_A, _S, _P, _M, _AC, _Z, _PI = (
+    "AUTHENTICATION",
+    "SESSION",
+    "PASSWORD",
+    "MFA",
+    "ACCOUNT",
+    "AUTHORIZATION",
+    "PUBLIC_INTAKE",
+)
 
 # event_type → (category, severity on success, severity otherwise)
 CATALOG: dict[str, tuple[str, str, str]] = {
@@ -106,12 +116,34 @@ CATALOG: dict[str, tuple[str, str, str]] = {
     "GOVERNANCE_INVARIANT_FAILED": (_Z, "CRITICAL", "CRITICAL"),
 }
 
-FAILURE_REASONS = frozenset({
-    "BAD_PASSWORD", "UNKNOWN_USER", "THROTTLED", "DISABLED", "INVITED", "NOT_HUMAN", "RATE_LIMITED", "TOKEN_INVALID",
-    "TOKEN_EXPIRED", "TOKEN_REUSED", "SESSION_REVOKED", "CODE_INVALID", "CODE_REPLAYED", "RECOVERY_CODE_INVALID",
-    "CHALLENGE_EXPIRED", "CHALLENGE_EXHAUSTED", "POLICY", "CAPTCHA_FAILED", "ESCALATION_DENIED", "STEP_UP_REQUIRED",
-    "MFA_REQUIRED", "COOLING_OFF", "FOUNDER_PROTECTED", "APPROVAL_REQUIRED",
-})
+FAILURE_REASONS = frozenset(
+    {
+        "BAD_PASSWORD",
+        "UNKNOWN_USER",
+        "THROTTLED",
+        "DISABLED",
+        "INVITED",
+        "NOT_HUMAN",
+        "RATE_LIMITED",
+        "TOKEN_INVALID",
+        "TOKEN_EXPIRED",
+        "TOKEN_REUSED",
+        "SESSION_REVOKED",
+        "CODE_INVALID",
+        "CODE_REPLAYED",
+        "RECOVERY_CODE_INVALID",
+        "CHALLENGE_EXPIRED",
+        "CHALLENGE_EXHAUSTED",
+        "POLICY",
+        "CAPTCHA_FAILED",
+        "ESCALATION_DENIED",
+        "STEP_UP_REQUIRED",
+        "MFA_REQUIRED",
+        "COOLING_OFF",
+        "FOUNDER_PROTECTED",
+        "APPROVAL_REQUIRED",
+    }
+)
 
 _COMMON_KEYS = frozenset({"reason", "method", "stage", "scope", "count", "action", "channel", "status", "route"})
 DETAIL_KEYS: dict[str, frozenset[str]] = {
@@ -141,10 +173,23 @@ DETAIL_KEYS: dict[str, frozenset[str]] = {
 }
 
 _MAX_DETAIL_VALUE = 200
-PROHIBITED_DETAIL_KEYS = frozenset({
-    "password", "token", "access_token", "refresh_token", "code", "otp", "secret", "recovery_code", "cookie",
-    "authorization", "mfa_token", "hash", "body",
-})
+PROHIBITED_DETAIL_KEYS = frozenset(
+    {
+        "password",
+        "token",
+        "access_token",
+        "refresh_token",
+        "code",
+        "otp",
+        "secret",
+        "recovery_code",
+        "cookie",
+        "authorization",
+        "mfa_token",
+        "hash",
+        "body",
+    }
+)
 
 
 class SecurityEventError(RuntimeError):
@@ -203,7 +248,8 @@ def _chain_head(session: Session) -> tuple[int, str | None]:
         session.execute(sa.text("SELECT pg_advisory_xact_lock(7845120001)"))  # A-13
     head = session.execute(
         sa.select(SecurityEventLog.chain_seq, SecurityEventLog.row_hash)
-        .order_by(SecurityEventLog.chain_seq.desc()).limit(1)
+        .order_by(SecurityEventLog.chain_seq.desc())
+        .limit(1)
         .execution_options(include_deleted=True)
     ).first()
     if head is None:
@@ -211,8 +257,9 @@ def _chain_head(session: Session) -> tuple[int, str | None]:
     return int(head[0]), head[1]
 
 
-def _build(session: Session, event_type: str, outcome: str, ctx: ActorContext | None, occurred_on: datetime,
-           **fields: Any) -> SecurityEventLog:
+def _build(
+    session: Session, event_type: str, outcome: str, ctx: ActorContext | None, occurred_on: datetime, **fields: Any
+) -> SecurityEventLog:
     if event_type not in CATALOG:
         raise SecurityEventError(f"unknown event type {event_type}")
     if outcome not in ("SUCCESS", "FAILURE", "BLOCKED"):
@@ -236,14 +283,26 @@ def _build(session: Session, event_type: str, outcome: str, ctx: ActorContext | 
     seq, prev = _chain_head(session)
     label = settings().chain_key_label
     row = SecurityEventLog(
-        id=new_id(), event_type=event_type, event_category=category, outcome=outcome, severity=severity,
-        subject_user_id=subject_user_id, session_id=session_id or (ctx.session_id if ctx else None),
-        email_attempted_hash=email_hash, failure_reason=failure_reason, permission_code=permission_code,
-        target_entity_type=target[0] if target else None, target_entity_id=target[1] if target else None,
-        occurred_on=occurred_on, ip_address=ctx.ip if ctx else None,
+        id=new_id(),
+        event_type=event_type,
+        event_category=category,
+        outcome=outcome,
+        severity=severity,
+        subject_user_id=subject_user_id,
+        session_id=session_id or (ctx.session_id if ctx else None),
+        email_attempted_hash=email_hash,
+        failure_reason=failure_reason,
+        permission_code=permission_code,
+        target_entity_type=target[0] if target else None,
+        target_entity_id=target[1] if target else None,
+        occurred_on=occurred_on,
+        ip_address=ctx.ip if ctx else None,
         user_agent=(ctx.user_agent[:500] if ctx and ctx.user_agent else None),
-        request_id=(ctx.request_id[:64] if ctx and ctx.request_id else None), detail=detail,
-        chain_seq=seq + 1, prev_hash=prev, chain_key_label=label,
+        request_id=(ctx.request_id[:64] if ctx and ctx.request_id else None),
+        detail=detail,
+        chain_seq=seq + 1,
+        prev_hash=prev,
+        chain_key_label=label,
     )
     row.created_on = now
     row.updated_on = now
@@ -263,7 +322,15 @@ def record(session: Session, event_type: str, outcome: str = "SUCCESS", **fields
     row = _build(session, event_type, outcome, current_actor(), clock.now(), **fields)
     session.add(row)
     session.flush()
+    _count(event_type, outcome)
     return row
+
+
+def _count(event_type: str, outcome: str) -> None:
+    """Security-event counts by type and outcome (02 §9, 05 §9.8 alert rules)."""
+    from veda.kernel import metrics
+
+    metrics.emit("SecurityEvents", 1, dimensions={"EventType": event_type, "Outcome": outcome})
 
 
 # --- deferred (own-transaction) events ---------------------------------------
@@ -273,6 +340,20 @@ _pending: ContextVar[list[PendingEvent] | None] = ContextVar("veda_pending_event
 
 def begin_request_scope() -> None:
     _pending.set([])
+
+
+@contextlib.contextmanager
+def deferred_scope() -> Iterator[None]:
+    """Queue failure events raised inside the block and write them when it ends, after the caller's own
+    transaction has closed (CLI commands, which have no request scope)."""
+    token = _pending.set([])
+    try:
+        yield
+    finally:
+        try:
+            flush_deferred()
+        finally:
+            _pending.reset(token)
 
 
 def defer(event_type: str, outcome: str, **fields: Any) -> None:
@@ -307,8 +388,13 @@ def _write_now(events: list[PendingEvent]) -> None:
                 row = _build(session, ev.event_type, ev.outcome, ev.ctx or ctx, ev.occurred_on, **dict(ev.fields))
                 session.add(row)
                 session.flush()
+        for ev in events:
+            _count(ev.event_type, ev.outcome)
     except Exception:  # pragma: no cover - alerting path (SEVT-011)
         log.critical("security_event_writer_failed", exc_info=True)
+        from veda.kernel import metrics
+
+        metrics.emit("SecurityEventWriterFailures", len(events))
 
 
 # --- de-duplication (PERMISSION_DENIED per minute, SENSITIVE_READ per 15 min) --
@@ -335,13 +421,16 @@ def reset_dedupe() -> None:
         _dedupe_seen.clear()
 
 
-def record_deduped(session: Session, key: str, window_seconds: int, event_type: str, outcome: str = "SUCCESS", **fields):
+def record_deduped(
+    session: Session, key: str, window_seconds: int, event_type: str, outcome: str = "SUCCESS", **fields
+):
     if _dedupe(key, window_seconds):
         return record(session, event_type, outcome, **fields)
     return None
 
 
 # --- verification (SEVT-006) ---------------------------------------------------
+
 
 @dataclass
 class ChainReport:
@@ -353,12 +442,21 @@ class ChainReport:
     at_seq: int | None = None
 
 
-def verify_chain(session: Session, *, from_seq: int = 1, anchor_hash: str | None = None) -> ChainReport:
+def verify_chain(
+    session: Session,
+    *,
+    from_seq: int = 1,
+    anchor_hash: str | None = None,
+    from_genesis: bool = False,
+    to_seq: int | None = None,
+) -> ChainReport:
+    """Recompute the chain from ``from_seq``. ``anchor_hash`` is the hash the first row must link to; with
+    ``from_genesis`` the first row must have no predecessor (prev_hash NULL)."""
     keys = settings().chain_keys
-    rows = session.execute(
-        sa.select(SecurityEventLog).where(SecurityEventLog.chain_seq >= from_seq)
-        .order_by(SecurityEventLog.chain_seq).execution_options(include_deleted=True)
-    ).scalars()
+    q = sa.select(SecurityEventLog).where(SecurityEventLog.chain_seq >= from_seq)
+    if to_seq is not None:
+        q = q.where(SecurityEventLog.chain_seq <= to_seq)
+    rows = session.execute(q.order_by(SecurityEventLog.chain_seq).execution_options(include_deleted=True)).scalars()
     expected_seq = from_seq
     prev = anchor_hash
     checked = 0
@@ -366,8 +464,9 @@ def verify_chain(session: Session, *, from_seq: int = 1, anchor_hash: str | None
     for row in rows:
         if row.chain_seq != expected_seq:
             return ChainReport(False, checked, expected_seq - 1, prev, "gap", expected_seq)
-        # Without an anchor hash, a verification starting mid-chain trusts the first row's prev_hash.
-        if not (first and anchor_hash is None and from_seq > 1) and row.prev_hash != prev:
+        # Without an anchor hash or genesis, a verification starting mid-chain trusts the first row's prev_hash.
+        trust_first = first and anchor_hash is None and from_seq > 1 and not from_genesis
+        if not trust_first and row.prev_hash != prev:
             return ChainReport(False, checked, row.chain_seq - 1, prev, "prev_hash mismatch", row.chain_seq)
         key = keys.get(row.chain_key_label)
         if key is None:

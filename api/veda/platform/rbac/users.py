@@ -31,8 +31,9 @@ def load_target(s: Session, user_id: str, *, include_deleted: bool = False) -> U
     return user
 
 
-def _account_control_preamble(ctx: AuthContext, target: User, code: str, s: Session, *, step_up: bool = True,
-                              self_allowed: bool = False) -> None:
+def _account_control_preamble(
+    ctx: AuthContext, target: User, code: str, s: Session, *, step_up: bool = True, self_allowed: bool = False
+) -> None:
     if not self_allowed:
         guards.g3_not_self(ctx.user.id, target.id)
     guards.g11_not_founder(target)
@@ -43,11 +44,16 @@ def _account_control_preamble(ctx: AuthContext, target: User, code: str, s: Sess
 
 # --- invite (05 §8.4) -------------------------------------------------------------------------
 
+
 def invite(s: Session, ctx: AuthContext, body) -> User:
     email_norm = normalize_email(body.email)
     if auth_service.email_in_use(s, email_norm):
-        raise ApiError(409, "DUPLICATE", "A user with this email already exists.",
-                       errors=[field_error("email", "DUPLICATE", "A user with this email already exists.")])
+        raise ApiError(
+            409,
+            "DUPLICATE",
+            "A user with this email already exists.",
+            errors=[field_error("email", "DUPLICATE", "A user with this email already exists.")],
+        )
     role_ids = list(dict.fromkeys(body.role_ids or []))
     if role_ids and not ctx.has("user.role.manage"):
         from veda.platform.auth.request_auth import deny
@@ -57,11 +63,20 @@ def invite(s: Session, ctx: AuthContext, body) -> User:
     for rid in role_ids:
         role = s.get(Role, rid)
         if role is None:
-            raise ApiError(422, "VALIDATION_FAILED", "Unknown role.", errors=[field_error("role_ids", "INVALID_ID", "Unknown role.")])
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "Unknown role.",
+                errors=[field_error("role_ids", "INVALID_ID", "Unknown role.")],
+            )
         guards.g13_role(role, None)
         if not role.is_assignable:
-            raise ApiError(422, "VALIDATION_FAILED", "Role is not assignable.",
-                           errors=[field_error("role_ids", "NOT_ASSIGNABLE", "This role can't be assigned.")])
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "Role is not assignable.",
+                errors=[field_error("role_ids", "NOT_ASSIGNABLE", "This role can't be assigned.")],
+            )
         guards.g2_can_use_role(s, ctx.res, rid)
         roles.append(role)
     if roles and any(registry.sensitivity(c) for r in roles for c in guards.role_grants(s, r.id)):
@@ -72,12 +87,27 @@ def invite(s: Session, ctx: AuthContext, body) -> User:
         try:
             phone = parse_phone(body.phone)
         except ValueError:
-            raise ApiError(422, "VALIDATION_FAILED", "1 field is invalid.",
-                           errors=[field_error("phone", "INVALID_PHONE", "Enter a valid phone number.")]) from None
-    user = User(email=body.email.strip(), email_normalized=email_norm, full_name=body.full_name,
-                display_name=body.display_name, phone_e164=phone, user_type="HUMAN", status="INVITED",
-                status_changed_on=now, timezone=body.timezone or "Asia/Kolkata", locale="en-IN",
-                protection_level="STANDARD", mfa_required=False, authz_version=1)
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "1 field is invalid.",
+                errors=[field_error("phone", "INVALID_PHONE", "Enter a valid phone number.")],
+            ) from None
+    user = User(
+        email=body.email.strip(),
+        email_normalized=email_norm,
+        full_name=body.full_name,
+        display_name=body.display_name,
+        phone_e164=phone,
+        user_type="HUMAN",
+        status="INVITED",
+        status_changed_on=now,
+        timezone=body.timezone or "Asia/Kolkata",
+        locale="en-IN",
+        protection_level="STANDARD",
+        mfa_required=False,
+        authz_version=1,
+    )
     s.add(user)
     s.flush()
     s.add(UserCredential(user_id=user.id, password_hash=None, must_change_password=False, failed_login_count=0))
@@ -87,8 +117,9 @@ def invite(s: Session, ctx: AuthContext, body) -> User:
     _send_invite(s, user)
     for role in roles:
         if any(registry.sensitivity(c) for c in guards.role_grants(s, role.id)):
-            record_sensitive_action(s, ctx, "user.role.manage", action="invite_with_role", target=("role", role.id),
-                                    subject_user_id=user.id)
+            record_sensitive_action(
+                s, ctx, "user.role.manage", action="invite_with_role", target=("role", role.id), subject_user_id=user.id
+            )
     return user
 
 
@@ -96,6 +127,8 @@ def _send_invite(s: Session, user: User) -> None:
     sensitive = resolver.load_grants(s, user.id).holds_sensitive
     ttl = auth_service.TOKEN_TTLS["INVITE_SENSITIVE" if sensitive else "INVITE"]
     auth_service.invalidate_action_tokens(s, user.id, ("INVITE",))
+    # A new invitation supersedes every enrollment context minted from an earlier link (IR-21).
+    auth_service.invalidate_enrollment(s, user.id)
     tok, _ = auth_service.create_action_token(s, user, "INVITE", ttl=ttl)
     s.flush()
     outbox.enqueue(s, "user.invited", "app_user", user.id, user_id=user.id, token_id=tok.id)
@@ -111,6 +144,7 @@ def resend_invite(s: Session, ctx: AuthContext, target: User) -> None:
 
 # --- profile (RBAC-019) ---------------------------------------------------------------------------
 
+
 def update_profile(s: Session, ctx: AuthContext, target: User, body) -> None:
     from veda.platform.identity.service import apply_profile
 
@@ -121,15 +155,23 @@ def update_profile(s: Session, ctx: AuthContext, target: User, body) -> None:
 
 # --- status, unlock, delete, restore ----------------------------------------------------------------
 
+
 def _disable_effects(s: Session, target: User) -> None:
     auth_service.revoke_all_sessions(s, target.id, "USER_DISABLED")
     now = db.tx_time(s)
-    for tok in s.execute(sa.select(UserActionToken).where(
-            UserActionToken.user_id == target.id, UserActionToken.used_on.is_(None),
-            UserActionToken.invalidated_on.is_(None))).scalars():
+    for tok in s.execute(
+        sa.select(UserActionToken).where(
+            UserActionToken.user_id == target.id,
+            UserActionToken.used_on.is_(None),
+            UserActionToken.invalidated_on.is_(None),
+        )
+    ).scalars():
         tok.invalidated_on = now
-    for ch in s.execute(sa.select(MfaChallenge).where(
-            MfaChallenge.user_id == target.id, MfaChallenge.completed_on.is_(None), MfaChallenge.expires_on > now)).scalars():
+    for ch in s.execute(
+        sa.select(MfaChallenge).where(
+            MfaChallenge.user_id == target.id, MfaChallenge.completed_on.is_(None), MfaChallenge.expires_on > now
+        )
+    ).scalars():
         ch.expires_on = now
     if target.proposed_email:
         auth_service.clear_proposal(s, target)
@@ -178,15 +220,22 @@ def change_status(s: Session, ctx: AuthContext, target: User, status: str, reaso
     inv = guards.InvariantGuard(s)
     apply_status(s, target, status, reason=reason)
     inv.check()
-    record_sensitive_action(s, ctx, "user.status.manage", action=f"status:{status}", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s,
+        ctx,
+        "user.status.manage",
+        action=f"status:{status}",
+        target=("app_user", target.id),
+        subject_user_id=target.id,
+    )
 
 
 def unlock(s: Session, ctx: AuthContext, target: User) -> None:
     _account_control_preamble(ctx, target, "user.status.manage", s)
     unlock_effects(s, target)
-    record_sensitive_action(s, ctx, "user.status.manage", action="unlock", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s, ctx, "user.status.manage", action="unlock", target=("app_user", target.id), subject_user_id=target.id
+    )
 
 
 def delete_user(s: Session, ctx: AuthContext, target: User, reason: str) -> None:
@@ -196,7 +245,9 @@ def delete_user(s: Session, ctx: AuthContext, target: User, reason: str) -> None
     inv = guards.InvariantGuard(s)
     apply_status(s, target, "DELETE", reason=reason)
     inv.check()
-    record_sensitive_action(s, ctx, "user.delete", action="delete", target=("app_user", target.id), subject_user_id=target.id)
+    record_sensitive_action(
+        s, ctx, "user.delete", action="delete", target=("app_user", target.id), subject_user_id=target.id
+    )
 
 
 def restore_user(s: Session, ctx: AuthContext, target: User) -> None:
@@ -218,22 +269,32 @@ def send_password_reset(s: Session, ctx: AuthContext, target: User) -> None:
     if target.status != "ACTIVE":
         raise ApiError(409, "INVALID_STATE", "Only active users can be sent a reset link.")
     auth_service.invalidate_action_tokens(s, target.id, ("PASSWORD_RESET",))
-    tok, _ = auth_service.create_action_token(s, target, "PASSWORD_RESET", ttl=auth_service.TOKEN_TTLS["PASSWORD_RESET"])
+    tok, _ = auth_service.create_action_token(
+        s, target, "PASSWORD_RESET", ttl=auth_service.TOKEN_TTLS["PASSWORD_RESET"]
+    )
     s.flush()
     outbox.enqueue(s, "auth.password_reset_requested", "app_user", target.id, user_id=target.id, token_id=tok.id)
-    security_events.record(s, "PASSWORD_RESET_REQUESTED", "SUCCESS", subject_user_id=target.id,
-                           detail={"stage": "admin"})
+    security_events.record(
+        s, "PASSWORD_RESET_REQUESTED", "SUCCESS", subject_user_id=target.id, detail={"stage": "admin"}
+    )
 
 
 def revoke_sessions(s: Session, ctx: AuthContext, target: User, reason: str) -> int:
     _account_control_preamble(ctx, target, "user.session.revoke", s)
     count = auth_service.revoke_all_sessions(s, target.id, "ADMIN_REVOKE")
-    record_sensitive_action(s, ctx, "user.session.revoke", action="revoke_sessions", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s,
+        ctx,
+        "user.session.revoke",
+        action="revoke_sessions",
+        target=("app_user", target.id),
+        subject_user_id=target.id,
+    )
     return count
 
 
 # --- email change (USER-007) --------------------------------------------------------------------------
+
 
 def admin_email_change(s: Session, ctx: AuthContext, target: User, new_email: str, reason: str) -> dict:
     _account_control_preamble(ctx, target, "user.email.change", s)
@@ -242,21 +303,23 @@ def admin_email_change(s: Session, ctx: AuthContext, target: User, new_email: st
         raise ApiError(422, "SAME_AS_CURRENT", "That is already the sign-in email.")
     if auth_service.email_in_use(s, email_norm, exclude_user_id=target.id):
         raise ApiError(409, "DUPLICATE", "That email is in use.")
-    record_sensitive_action(s, ctx, "user.email.change", action="email_change", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s, ctx, "user.email.change", action="email_change", target=("app_user", target.id), subject_user_id=target.id
+    )
     if resolver.is_privileged(s, target.id):
-        req = governance.request_standard(s, ctx, target, "EMAIL_CHANGE", reason,
-                                          {"new_email": new_email.strip()})
+        req = governance.request_standard(s, ctx, target, "EMAIL_CHANGE", reason, {"new_email": new_email.strip()})
         return {"status": "APPROVAL_REQUIRED", "approval_id": req.id}
     return auth_service.start_email_change(s, target, new_email, requested_by=ctx.user.id)
 
 
 # --- MFA administration (05 §11.7) --------------------------------------------------------------------
 
+
 def mfa_reset(s: Session, ctx: AuthContext, target: User, reason: str) -> dict | None:
     _account_control_preamble(ctx, target, "user.mfa.reset", s)
-    record_sensitive_action(s, ctx, "user.mfa.reset", action="mfa_reset", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s, ctx, "user.mfa.reset", action="mfa_reset", target=("app_user", target.id), subject_user_id=target.id
+    )
     if resolver.is_privileged(s, target.id):
         req = governance.request_standard(s, ctx, target, "MFA_RESET", reason, {})
         return {"status": "APPROVAL_REQUIRED", "approval_id": req.id}
@@ -272,11 +335,18 @@ def set_mfa_requirement(s: Session, ctx: AuthContext, target: User, required: bo
     if target.mfa_required != required:
         target.mfa_required = required
         resolver.bump_authz_version(target)
-    record_sensitive_action(s, ctx, "user.mfa.require", action=f"mfa_required:{required}", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s,
+        ctx,
+        "user.mfa.require",
+        action=f"mfa_required:{required}",
+        target=("app_user", target.id),
+        subject_user_id=target.id,
+    )
 
 
 # --- roles on users (RBAC-009) ---------------------------------------------------------------------------
+
 
 def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: str) -> dict:
     guards.g3_not_self(ctx.user.id, target.id)
@@ -289,7 +359,9 @@ def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: s
     for rid in added + removed:
         role = s.get(Role, rid)
         if role is None:
-            raise ApiError(422, "VALIDATION_FAILED", "Unknown role.", errors=[field_error("roles", "INVALID_ID", "Unknown role.")])
+            raise ApiError(
+                422, "VALIDATION_FAILED", "Unknown role.", errors=[field_error("roles", "INVALID_ID", "Unknown role.")]
+            )
         guards.g13_role(role, target.id)
     if target.protection_level == "FOUNDER":
         guards.g13_block(target.id, target=("app_user", target.id))
@@ -297,8 +369,12 @@ def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: s
     for rid in added:
         role = s.get(Role, rid)
         if not role.is_assignable:
-            raise ApiError(422, "VALIDATION_FAILED", "Role is not assignable.",
-                           errors=[field_error("roles", "NOT_ASSIGNABLE", "This role can't be assigned.")])
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "Role is not assignable.",
+                errors=[field_error("roles", "NOT_ASSIGNABLE", "This role can't be assigned.")],
+            )
         guards.g2_can_use_role(s, ctx.res, rid)
     for rid in removed:
         guards.g2_can_use_role(s, ctx.res, rid)
@@ -311,43 +387,68 @@ def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: s
     if added or removed:
         resolver.bump_authz_version(target)
     inv.check()
-    record_sensitive_action(s, ctx, "user.role.manage", action="set_roles", target=("app_user", target.id),
-                            subject_user_id=target.id)
+    record_sensitive_action(
+        s, ctx, "user.role.manage", action="set_roles", target=("app_user", target.id), subject_user_id=target.id
+    )
     grants = resolver.load_grants(s, target.id)
     sensitive_added = [c for rid in added for c in guards.role_grants(s, rid) if registry.sensitivity(c)]
     if sensitive_added:
         outbox.enqueue(s, "rbac.sensitive_grant", "app_user", target.id, user_id=target.id)
         if not grants.has_active_factor:
-            security_events.record(s, "PERMISSION_SUSPENDED", "SUCCESS", subject_user_id=target.id,
-                                   detail={"reason": "MFA_REQUIRED", "codes": sorted(set(sensitive_added))})
+            security_events.record(
+                s,
+                "PERMISSION_SUSPENDED",
+                "SUCCESS",
+                subject_user_id=target.id,
+                detail={"reason": "MFA_REQUIRED", "codes": sorted(set(sensitive_added))},
+            )
     return present_roles(s, target, grants)
 
 
 def present_roles(s: Session, target: User, grants=None) -> dict:
     grants = grants or resolver.load_grants(s, target.id)
-    rows = s.execute(sa.select(UserRole, Role).join(Role, Role.id == UserRole.role_id)
-                     .where(UserRole.user_id == target.id).order_by(Role.sort_order)).all()
+    rows = s.execute(
+        sa.select(UserRole, Role)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(UserRole.user_id == target.id)
+        .order_by(Role.sort_order)
+    ).all()
     items = []
     for ur, role in rows:
         role_codes = guards.role_grants(s, role.id)
         pending = [c for c in role_codes if registry.sensitivity(c) and not grants.has_active_factor]
-        items.append({"id": ur.id, "role": {"id": role.id, "code": role.code, "name": role.name},
-                      "role_id": role.id, "since": clock.to_rfc3339(ur.created_on),
-                      "created_on": clock.to_rfc3339(ur.created_on), "reason": ur.reason,
-                      "valid_from": None, "valid_until": None, "pending_mfa": bool(pending),
-                      "pending_mfa_permissions": sorted(pending), "version": ur.version})
+        items.append(
+            {
+                "id": ur.id,
+                "role": {"id": role.id, "code": role.code, "name": role.name},
+                "role_id": role.id,
+                "since": clock.to_rfc3339(ur.created_on),
+                "created_on": clock.to_rfc3339(ur.created_on),
+                "reason": ur.reason,
+                "valid_from": None,
+                "valid_until": None,
+                "pending_mfa": bool(pending),
+                "pending_mfa_permissions": sorted(pending),
+                "version": ur.version,
+            }
+        )
     return {"items": items, "authz_version": target.authz_version}
 
 
 # --- direct permissions (RBAC-006) --------------------------------------------------------------------------
+
 
 def add_permission(s: Session, ctx: AuthContext, target: User, body) -> UserPermission:
     guards.reject_time_bound(body.valid_from, body.valid_until)
     guards.g3_not_self(ctx.user.id, target.id)
     perm = s.execute(sa.select(Permission).where(Permission.code == body.permission_code)).scalar_one_or_none()
     if perm is None:
-        raise ApiError(422, "VALIDATION_FAILED", "Unknown permission.",
-                       errors=[field_error("permission_code", "INVALID_LOOKUP", "Unknown permission.")])
+        raise ApiError(
+            422,
+            "VALIDATION_FAILED",
+            "Unknown permission.",
+            errors=[field_error("permission_code", "INVALID_LOOKUP", "Unknown permission.")],
+        )
     guards.g13_permission(perm, target.id)
     guards.g11_not_founder(target)
     scope = "ALL" if body.effect == "DENY" else body.scope
@@ -355,8 +456,9 @@ def add_permission(s: Session, ctx: AuthContext, target: User, body) -> UserPerm
     if body.effect == "GRANT":
         guards.g1_can_grant(ctx.res, perm.code, scope)
     guards.g9_not_stronger(s, ctx.res, target.id)
-    if s.execute(sa.select(UserPermission).where(UserPermission.user_id == target.id,
-                                                 UserPermission.permission_id == perm.id)).first():
+    if s.execute(
+        sa.select(UserPermission).where(UserPermission.user_id == target.id, UserPermission.permission_id == perm.id)
+    ).first():
         raise ApiError(409, "DUPLICATE", "A direct entry for this permission already exists.")
     require_step_up(ctx)
     inv = guards.InvariantGuard(s)
@@ -364,13 +466,24 @@ def add_permission(s: Session, ctx: AuthContext, target: User, body) -> UserPerm
     s.add(row)
     resolver.bump_authz_version(target)
     inv.check()
-    record_sensitive_action(s, ctx, "user.permission.manage", action=f"{body.effect.lower()}:{perm.code}",
-                            target=("app_user", target.id), subject_user_id=target.id)
+    record_sensitive_action(
+        s,
+        ctx,
+        "user.permission.manage",
+        action=f"{body.effect.lower()}:{perm.code}",
+        target=("app_user", target.id),
+        subject_user_id=target.id,
+    )
     if body.effect == "GRANT" and perm.sensitivity_class:
         outbox.enqueue(s, "rbac.sensitive_grant", "app_user", target.id, user_id=target.id)
         if not resolver.load_grants(s, target.id).has_active_factor:
-            security_events.record(s, "PERMISSION_SUSPENDED", "SUCCESS", subject_user_id=target.id,
-                                   detail={"reason": "MFA_REQUIRED", "codes": [perm.code]})
+            security_events.record(
+                s,
+                "PERMISSION_SUSPENDED",
+                "SUCCESS",
+                subject_user_id=target.id,
+                detail={"reason": "MFA_REQUIRED", "codes": [perm.code]},
+            )
     return row
 
 
@@ -393,16 +506,39 @@ def remove_permission(s: Session, ctx: AuthContext, target: User, grant_id: str)
             guards.g1_can_grant(ctx.res, perm.code, regained)
     resolver.bump_authz_version(target)
     inv.check()
-    record_sensitive_action(s, ctx, "user.permission.manage", action=f"remove:{perm.code}",
-                            target=("app_user", target.id), subject_user_id=target.id)
+    record_sensitive_action(
+        s,
+        ctx,
+        "user.permission.manage",
+        action=f"remove:{perm.code}",
+        target=("app_user", target.id),
+        subject_user_id=target.id,
+    )
 
 
 def present_permissions(s: Session, target: User) -> list[dict]:
-    rows = s.execute(sa.select(UserPermission, Permission).join(Permission, Permission.id == UserPermission.permission_id)
-                     .where(UserPermission.user_id == target.id).order_by(Permission.code)).all()
-    return [{"id": up.id, "permission_code": p.code, "permission_name": p.name, "effect": up.effect, "scope": up.scope,
-             "reason": up.reason, "valid_from": None, "valid_until": None, "created_on": clock.to_rfc3339(up.created_on),
-             "created_by": up.created_by, "version": up.version} for up, p in rows]
+    rows = s.execute(
+        sa.select(UserPermission, Permission)
+        .join(Permission, Permission.id == UserPermission.permission_id)
+        .where(UserPermission.user_id == target.id)
+        .order_by(Permission.code)
+    ).all()
+    return [
+        {
+            "id": up.id,
+            "permission_code": p.code,
+            "permission_name": p.name,
+            "effect": up.effect,
+            "scope": up.scope,
+            "reason": up.reason,
+            "valid_from": None,
+            "valid_until": None,
+            "created_on": clock.to_rfc3339(up.created_on),
+            "created_by": up.created_by,
+            "version": up.version,
+        }
+        for up, p in rows
+    ]
 
 
 def effective_permissions(s: Session, target: User) -> dict:
@@ -427,7 +563,12 @@ def effective_permissions(s: Session, target: User) -> dict:
         if meta:
             entry["is_sensitive"] = meta.sensitivity_class is not None
         out.append(entry)
-    return {"authz_version": target.authz_version,
-            "mfa": {"enrolled": grants.has_active_factor, "required": grants.mfa_required,
-                    "required_by": grants.mfa_required_by},
-            "permissions": out}
+    return {
+        "authz_version": target.authz_version,
+        "mfa": {
+            "enrolled": grants.has_active_factor,
+            "required": grants.mfa_required,
+            "required_by": grants.mfa_required_by,
+        },
+        "permissions": out,
+    }

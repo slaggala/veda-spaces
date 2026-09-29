@@ -1,8 +1,11 @@
-FROM python:3.13-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Base image pinned by digest (python:3.13-slim multi-arch index, resolved 2026-09-29); dependencies installed
+# only from the hash-locked requirements.txt, so the image is the tested set (IR-13, SEC-007).
+# To update: resolve the new digest, rebuild, rerun CI, and record the change in the release notes.
+FROM python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /srv/api
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --no-deps -r requirements.txt
 COPY . .
 RUN useradd --system --uid 10001 veda && chown -R veda /srv/api
 USER veda

@@ -9,6 +9,9 @@
   ACTIVE factor are exempt: password + TOTP still succeeds.
 * MFA: 10 MFA or recovery failures per account in 15 minutes throttle MFA
   for 15 minutes.
+* Password re-entry: 10 failed re-authentications or current-password checks
+  per account in 15 minutes throttle both for 15 minutes (IR-24), so a stolen
+  bearer token cannot be used to guess the password that satisfies step-up.
 
 The per-network state is in-process and authoritative because exactly one
 application process runs (OPS-010, F-09).
@@ -30,6 +33,9 @@ GLOBAL_THROTTLE = timedelta(minutes=15)
 MFA_FAILURES = 10
 MFA_WINDOW = timedelta(minutes=15)
 MFA_THROTTLE = timedelta(minutes=15)
+REAUTH_FAILURES = 10
+REAUTH_WINDOW = timedelta(minutes=15)
+REAUTH_THROTTLE = timedelta(minutes=15)
 
 
 @dataclass
@@ -43,6 +49,8 @@ class _Account:
     network_failures: dict[str, datetime] = field(default_factory=dict)
     mfa_failures: list[datetime] = field(default_factory=list)
     mfa_blocked_until: datetime | None = None
+    reauth_failures: list[datetime] = field(default_factory=list)
+    reauth_blocked_until: datetime | None = None
 
 
 _lock = threading.Lock()
@@ -67,7 +75,8 @@ def pair_state(account_key: str, network: str) -> tuple[bool, bool]:
         return blocked, pair.failures >= PAIR_THRESHOLD
 
 
-def record_password_failure(account_key: str, network: str) -> None:
+def record_password_failure(account_key: str, network: str) -> bool:
+    """Returns True when this failure starts the per-(account, network) throttle."""
     now = clock.now()
     with _lock:
         pair = _pairs.setdefault((account_key, network), _Pair())
@@ -75,6 +84,7 @@ def record_password_failure(account_key: str, network: str) -> None:
         if pair.failures >= PAIR_THRESHOLD:
             delay = min(MAX_PAIR_DELAY, timedelta(seconds=30 * 2 ** (pair.failures - PAIR_THRESHOLD)))
             pair.blocked_until = now + delay
+        return pair.failures == PAIR_THRESHOLD
 
 
 def record_password_success(account_key: str, network: str) -> None:
@@ -117,5 +127,27 @@ def record_mfa_failure(user_id: str) -> bool:
         if len(acct.mfa_failures) >= MFA_FAILURES:
             acct.mfa_blocked_until = now + MFA_THROTTLE
             acct.mfa_failures = []
+            return True
+        return False
+
+
+def reauth_blocked(user_id: str) -> datetime | None:
+    now = clock.now()
+    with _lock:
+        acct = _accounts.get(user_id)
+        if acct and acct.reauth_blocked_until and acct.reauth_blocked_until > now:
+            return acct.reauth_blocked_until
+        return None
+
+
+def record_reauth_failure(user_id: str) -> bool:
+    """Returns True when this failure starts a re-authentication throttle."""
+    now = clock.now()
+    with _lock:
+        acct = _accounts.setdefault(user_id, _Account())
+        acct.reauth_failures = [t for t in acct.reauth_failures if now - t <= REAUTH_WINDOW] + [now]
+        if len(acct.reauth_failures) >= REAUTH_FAILURES:
+            acct.reauth_blocked_until = now + REAUTH_THROTTLE
+            acct.reauth_failures = []
             return True
         return False

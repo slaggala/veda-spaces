@@ -3,7 +3,7 @@
   "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "branch": "implementation/p0-foundation",
   "approved": false,
-  "note": "No deviation is approved. All are pending independent implementation review.",
+  "note": "No deviation is approved. DEV-001..DEV-003 were found acceptable with amendments by the independent review; DEV-004 required an implementation change and is corrected; DEV-005 is registered as the review required; DEV-006..DEV-008 come from this remediation. All await the Architecture Owner's decision.",
   "deviations": [
     {
       "id": "DEV-001",
@@ -38,7 +38,13 @@
       ],
       "rollback": "Restore the certified two-column key in 0004_auth and the model, and change enroll/start to create the PENDING factor only after revoking the ACTIVE one. That reintroduces the TD-E conflict, so it needs an architecture decision first. No data migration: existing rows satisfy both definitions whenever no PENDING factor is open.",
       "decision_required": "Amend 03 §5.5 to key ux_user_mfa_factor__user_live on (user_id, factor_type, status), or resolve TD-E/05 §11.5 another way.",
-      "status": "PENDING INDEPENDENT REVIEW"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "reviewer_conditions": [
+        "IR-20"
+      ],
+      "amendment": "AM-1",
+      "conditions_resolution": "IR-20 resolved: path C refuses when an ACTIVE factor exists; every confirmation ends other open enrollment links and transactions."
     },
     {
       "id": "DEV-002",
@@ -73,7 +79,15 @@
       ],
       "rollback": "None available without an alternative design: the certified 204 cannot carry path B. Alternatives would be (a) emailing a separate enrollment link (path C) after acceptance, or (b) returning the context in a header. Either needs an architecture decision.",
       "decision_required": "Amend 08 §4.5 to document the 200 MFA_ENROLLMENT_REQUIRED response, or choose an alternative mechanism for path B.",
-      "status": "PENDING INDEPENDENT REVIEW"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "reviewer_conditions": [
+        "IR-01",
+        "IR-21",
+        "IR-25"
+      ],
+      "amendment": "AM-2",
+      "conditions_resolution": "IR-01 resolved (transaction binding, AM-11); IR-21 resolved (resend/repeat acceptance supersede contexts; path B requires a live invite); IR-25 resolved (INVITE_ACCEPTED stage password_set)."
     },
     {
       "id": "DEV-003",
@@ -106,12 +120,19 @@
       ],
       "rollback": "Remove turnstile_token from LoginIn and the captcha branch in veda/platform/auth/service.py::login; per-network throttling then relies on the escalating delay only. No data migration.",
       "decision_required": "Amend 08 §4.1 / §4.7 to document the optional fields.",
-      "status": "PENDING INDEPENDENT REVIEW"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "reviewer_conditions": [
+        "IR-22",
+        "IR-09",
+        "IR-02"
+      ],
+      "amendment": "AM-3",
+      "conditions_resolution": "IR-22 resolved (ipaddress-based /24 and /64); IR-09 resolved (dev verifier local/test only; staging validated); IR-02 resolved (siteverify outside the write lock)."
     },
     {
       "id": "DEV-004",
       "title": "Staff lead update accepts a re-consent object",
-      "description_correction": "The freeze brief describes DEV-004 as 'Duplicate/repeated lead submission may include a re-consent object'. That is not what was implemented. The public intake (POST /api/v1/public/leads), including duplicate or repeated submissions, accepts no re-consent object and rejects one with UNKNOWN_FIELD. The deviation is on the authenticated staff endpoint PATCH /api/v1/leads/{lead_id}.",
       "requirement_ids": [
         "LEAD-012",
         "LEAD-024",
@@ -125,21 +146,147 @@
         "08 §8.5 (consent_* → 422 FIELD_NOT_UPDATABLE)"
       ],
       "certified_behavior": "The certified documents conflict: 04 §5.4 records re-consent 'through PATCH of the consent_* fields, with the channel and policy version', while 08 §8.5 rejects consent_* in PATCH with 422 FIELD_NOT_UPDATABLE.",
-      "implemented_behavior": "PATCH /api/v1/leads/{lead_id} (lead.update, in scope, If-Match) accepts an optional object consent: {channel: PHONE_VERBAL|IN_PERSON|WHATSAPP|EMAIL|WEBSITE_FORM, policy_version}. The policy version must be published (else 422 UNKNOWN_POLICY_VERSION). It sets consent_contact = true, consent_policy_version, consent_captured_on = transaction time and consent_channel, and clears consent_withdrawn_on, consent_withdrawal_channel and consent_withdrawal_note. Raw consent_* columns remain rejected with FIELD_NOT_UPDATABLE, as in 08 §8.5.",
+      "implemented_behavior": "PATCH /api/v1/leads/{lead_id} (lead.update in scope, If-Match) accepts consent: {channel: PHONE_VERBAL|IN_PERSON|WHATSAPP|EMAIL, policy_version, note}. WEBSITE_FORM is refused (also on staff create). Accepted only when consent was withdrawn, never captured, or for a different published notice version (else 409 INVALID_STATE). Before the row changes, a read-only system activity records the superseded evidence (policy version, channel, captured on, source page, whether an IP was recorded, withdrawal time and channel) with the staff note; it is returned as consent_evidence in the timeline. The new capture sets consent_contact, policy version, captured on and channel, clears the withdrawal fields and sets consent_ip_address and consent_source_page to NULL. Raw consent_* fields stay FIELD_NOT_UPDATABLE; the public intake accepts no re-consent object.",
       "reason": "Satisfies 04 §5.4 without contradicting the 08 §8.5 rule that consent_* columns are not mass-assignable.",
       "security_impact": "Low. Requires lead.update within scope and optimistic concurrency. Every change is audited (UPDATE row with old and new consent values). Not reachable from the public endpoint.",
       "compatibility_impact": "Additive (API-009).",
-      "data_model_impact": "No schema change. The lead row holds the latest consent state; the prior consent capture and the prior withdrawal are overwritten in the row and retained as evidence in audit_log (UPDATE old_value). A reviewer should confirm this satisfies LEAD-027's 'retaining the original consent evidence'.",
+      "data_model_impact": "No schema change. Superseded consent evidence is kept append-only in a read-only system activity and in audit_log; the row holds the current consent.",
       "api_impact": "Optional consent object on PATCH /api/v1/leads/{lead_id}.",
-      "ui_impact": "The lead drawer can record a new consent capture; the Do-not-contact banner disappears after re-consent.",
+      "ui_impact": "No re-consent control exists in the SPA (09 specifies none); the superseded evidence is visible in the lead timeline. The earlier register text claiming a lead-drawer control was wrong (IR-A25).",
       "tests": [
-        "tests/integration/test_leads.py::test_DEV_004_reconsent_via_staff_patch_only",
-        "tests/integration/test_leads.py::test_LEAD_027_consent_withdrawal",
-        "tests/integration/test_leads.py::test_LEAD_024_patch_rules"
+        "api/tests/integration/test_consent_dev004.py (13 tests)"
       ],
       "rollback": "Remove the consent field from LeadPatchIn and the consent branch in veda/modules/crm/leads/service.py::_update. Re-consent then cannot be recorded until 04 §5.4 and 08 §8.5 are reconciled. No data migration.",
-      "decision_required": "Reconcile 04 §5.4 with 08 §8.5, and decide whether re-consent must keep prior consent and withdrawal values in the row rather than only in audit_log.",
-      "status": "PENDING INDEPENDENT REVIEW"
+      "decision_required": "AM-4: approve the corrected mechanism and choose in-row + timeline activity (implemented) or a dedicated append-only consent-event table.",
+      "status": "CORRECTED — PENDING RE-REVIEW AND ARCHITECTURE-OWNER DECISION",
+      "reviewer_decision": "REQUIRES IMPLEMENTATION CHANGE",
+      "reviewer_conditions": [
+        "IR-16"
+      ],
+      "amendment": "AM-4"
+    },
+    {
+      "id": "DEV-005",
+      "title": "Break-glass cancel link endpoint and page (06 §7.5 step 5)",
+      "requirement_ids": [
+        "RBAC-021"
+      ],
+      "adrs": [],
+      "architecture_references": [
+        "06 §7.5 step 5",
+        "06 §11 RBX-003",
+        "08 §1",
+        "12 TD-G G12"
+      ],
+      "certified_behavior": "The capability is required (06 §7.5, TD-G G12); 08 §1 and the RBX-003 register name no endpoint or page.",
+      "implemented_behavior": "POST /api/v1/approvals/cancel-link {token} (public, RBX-003) and the SPA page /approvals/cancel (explicit confirmation).",
+      "reason": "Makes the certified veto usable (IR-07).",
+      "security_impact": "Endpoint assessed secure by the reviewer; page scrubs the fragment and needs a click.",
+      "compatibility_impact": "Additive.",
+      "data_model_impact": "None.",
+      "api_impact": "One public endpoint.",
+      "ui_impact": "One public page.",
+      "tests": [
+        "api/tests/integration/test_founder_governance.py::test_G12_cancel_link_by_notified_party",
+        "app/e2e/access.e2e.mjs"
+      ],
+      "rollback": "Remove endpoint and page.",
+      "decision_required": "AM-5.",
+      "amendment": "AM-5",
+      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+    },
+    {
+      "id": "DEV-006",
+      "title": "mfa_challenge binds enrollment transactions to a factor and a path",
+      "requirement_ids": [
+        "MFA-011",
+        "MFA-012",
+        "MFA-014",
+        "AUTH-015"
+      ],
+      "adrs": [
+        "ADR-006"
+      ],
+      "architecture_references": [
+        "03 §5.7",
+        "05 §11.3"
+      ],
+      "certified_behavior": "mfa_challenge has no factor or path columns.",
+      "implemented_behavior": "Nullable factor_id and enrollment_path with CHECKs (migration 0009_mfa_challenge_binding).",
+      "reason": "IR-01 remediation.",
+      "security_impact": "Closes IR-01.",
+      "compatibility_impact": "Expand-only.",
+      "data_model_impact": "Two nullable columns on mfa_challenge.",
+      "api_impact": "None.",
+      "ui_impact": "None.",
+      "tests": [
+        "api/tests/integration/test_mfa_binding.py",
+        "api/tests/integration/test_schema.py"
+      ],
+      "rollback": "N-1 image ignores the columns.",
+      "decision_required": "AM-11.",
+      "amendment": "AM-11",
+      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+    },
+    {
+      "id": "DEV-007",
+      "title": "Per-email login and forgot-password limits keyed by (email, network)",
+      "requirement_ids": [
+        "AUTH-010",
+        "SEC-011"
+      ],
+      "adrs": [],
+      "architecture_references": [
+        "08 §12"
+      ],
+      "certified_behavior": "5/min and 3/hour per email.",
+      "implemented_behavior": "Same limits keyed on (email, client /24 or /64).",
+      "reason": "IR-23 victim lockout.",
+      "security_impact": "Account throttles still bound distributed guessing.",
+      "compatibility_impact": "None.",
+      "data_model_impact": "None.",
+      "api_impact": "None.",
+      "ui_impact": "None.",
+      "tests": [
+        "api/tests/integration/test_auth_remediation.py::test_IR23_P5_third_party_cannot_rate_limit_the_victim_from_elsewhere"
+      ],
+      "rollback": "Key on the email only.",
+      "decision_required": "AM-7.",
+      "amendment": "AM-7",
+      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+    },
+    {
+      "id": "DEV-008",
+      "title": "Readiness accepts a declared newer schema and hides details at the edge",
+      "requirement_ids": [
+        "LOG-005",
+        "OPS-004"
+      ],
+      "adrs": [
+        "ADR-008"
+      ],
+      "architecture_references": [
+        "08 §3",
+        "02 §12.4",
+        "LOG-005"
+      ],
+      "certified_behavior": "Ready only at head; body with checks returned to every caller.",
+      "implemented_behavior": "head/behind/ahead/ahead_undeclared; ahead is ready only when declared in VEDA_SCHEMA_AHEAD_ACCEPTED; checks returned only to direct local callers.",
+      "reason": "IR-10 (rollback) and IR-A17 (disclosure).",
+      "security_impact": "Less disclosure.",
+      "compatibility_impact": "Host deploy gate unchanged.",
+      "data_model_impact": "None.",
+      "api_impact": "Edge body {status}.",
+      "ui_impact": "None.",
+      "tests": [
+        "api/tests/integration/test_ops_remediation.py"
+      ],
+      "rollback": "Strict head equality.",
+      "decision_required": "AM-6.",
+      "amendment": "AM-6",
+      "status": "PENDING ARCHITECTURE-OWNER DECISION"
     }
-  ]
+  ],
+  "reviewed_sha": "9236aa3ade38c33d03a57cf7a064ece29937b109",
+  "review": "review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4"
 }
