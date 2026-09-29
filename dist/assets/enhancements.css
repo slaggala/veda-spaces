@@ -146,3 +146,22 @@ footer nav a, footer p a { transition: color .2s ease; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .js .reveal-target { opacity: 1; transform: none; }
 }
+
+/* Public enquiry form states (09 §4.11) */
+.contact-form .req, .contact-form .opt { text-transform: none; letter-spacing: 0; font-size: .72rem; color: #5d574f; margin-left: .35rem; }
+.contact-form .req { color: #8c5b37; font-weight: 600; }
+.contact-form .consent { display: grid; grid-template-columns: auto 1fr; gap: .75rem; align-items: start; text-transform: none; letter-spacing: 0; font-size: .82rem; line-height: 1.5; }
+.contact-form .consent input { width: 20px; min-height: 20px; margin-top: .15rem; accent-color: #8c5b37; }
+.contact-form .consent a { text-decoration: underline; }
+.contact-form .consent .field-error { grid-column: 1 / -1; }
+.field-error { display: block; min-height: 0; margin-top: .35rem; color: #a23b2a; font-size: .78rem; text-transform: none; letter-spacing: 0; }
+.field-error:not(:empty)::before { content: '⚠ '; }
+.contact-form [aria-invalid="true"] { border-bottom-color: #a23b2a; }
+.form-summary { border-left: 3px solid #a23b2a; padding: .8rem 1rem; background: #f6ece8; font-size: .88rem; }
+.form-summary ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+.form-summary a { text-decoration: underline; display: inline-block; min-height: 24px; padding: .15rem 0; }
+.hp-field { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+.form-panel { align-self: start; padding: 2rem; background: #f3f0e9; border: 1px solid rgba(30,29,26,.14); }
+.form-panel h3 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; font-size: 2.2rem; margin: 0 0 .6rem; }
+.form-panel .button { margin-top: 1rem; }
+.contact-form[aria-busy="true"] button[type="submit"] { opacity: .7; cursor: progress; }

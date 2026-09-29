@@ -1,0 +1,17 @@
+
+> veda-workspace@0.1.0 test
+> wtr
+
+
+Chromium: |██████████████████████████████| 0/6 test files | 0 passed, 0 failed
+
+Running tests...
+
+Running 6 test files...
+
+
+[2K[1A[2K[GChromium: |██████████████████████████████| 6/6 test files | 47 passed, 0 failed
+
+Finished running tests in 1.1s, all tests passed! 🎉
+
+

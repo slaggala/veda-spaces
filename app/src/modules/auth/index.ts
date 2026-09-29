@@ -1,0 +1,8 @@
+import './layout.js';
+import './widgets.js';
+import './login-page.js';
+import './mfa-pages.js';
+import './password-pages.js';
+import './email-pages.js';
+import './profile-page.js';
+import './misc-pages.js';

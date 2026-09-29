@@ -1,0 +1,14 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}Security alert: {{ title }}{% endblock %}
+{% block headline %}{{ title }}{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+{{ message }}
+
+When: {{ when }}
+If this wasn't expected, contact the Founder immediately.
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>{{ message }}</p><p style="color:#5D574F;font-size:13px">When: {{ when }}</p><p><strong>If this wasn't expected, contact the Founder immediately.</strong></p>
+{% endblock %}

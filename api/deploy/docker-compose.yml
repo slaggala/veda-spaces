@@ -1,0 +1,26 @@
+# Single host, single instance (ADR-008, OPS-006). Exactly one api, one worker,
+# one scheduler and one Litestream replicator.
+services:
+  api:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    ports: ["127.0.0.1:8000:8000"]
+    restart: unless-stopped
+  worker:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    command: ["python", "-m", "veda.cli", "worker"]
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    restart: unless-stopped
+  scheduler:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    command: ["python", "-m", "veda.cli", "scheduler"]
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    restart: unless-stopped
+  litestream:
+    image: litestream/litestream:0.3.13
+    command: ["replicate"]
+    volumes: ["/var/lib/veda:/var/lib/veda", "/etc/veda/litestream.yml:/etc/litestream.yml:ro"]
+    restart: unless-stopped

@@ -1,0 +1,12 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}Your sign-in email was changed{% endblock %}
+{% block headline %}Your sign-in email was changed{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+Your Veda Workspace sign-in email changed from {{ old }} to {{ new }} on {{ when }}.
+All sessions were signed out. If this wasn't you, contact the Founder immediately.
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>Your Veda Workspace sign-in email changed from {{ old }} to {{ new }} on {{ when }}. All sessions were signed out.</p><p><strong>If this wasn't you, contact the Founder immediately.</strong></p>
+{% endblock %}

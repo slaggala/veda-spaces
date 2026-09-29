@@ -1,0 +1,17 @@
+
+> veda-workspace@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 99 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.89 kB │ gzip:  0.46 kB
+dist/assets/index-LRFR2NAq.css    3.14 kB │ gzip:  1.11 kB
+dist/assets/audit-CysR2Eam.js    10.01 kB │ gzip:  3.47 kB │ map:  20.61 kB
+dist/assets/admin-DO5mqbhG.js    52.04 kB │ gzip: 13.62 kB │ map: 107.47 kB
+dist/assets/auth-06SKeBSo.js     62.61 kB │ gzip: 18.96 kB │ map: 181.25 kB
+dist/assets/leads-CUHjA9B1.js    76.06 kB │ gzip: 20.00 kB │ map: 166.33 kB
+dist/assets/index-N5RtHrC8.js   125.63 kB │ gzip: 39.48 kB │ map: 330.95 kB
+✓ built in 427ms

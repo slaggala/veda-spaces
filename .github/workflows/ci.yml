@@ -1,0 +1,49 @@
+# CI gates (02 §12.5, 12 §5). Runs on every PR; deployment stages are not configured here.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        engine: [sqlite, postgresql]
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    defaults:
+      run: { working-directory: api }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements.txt pytest pytest-cov ruff
+      - run: ruff check veda tests migrations tools
+      - name: Tests (unit, integration, schema conformance, lint)
+        env:
+          VEDA_TEST_ENGINES: ${{ matrix.engine }}
+          VEDA_TEST_DATABASE_URL_PG: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
+        run: python -m pytest -q
+      - run: python -m veda.cli deploy-check
+
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: app }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
+      - run: npm run lint:tokens
+      - run: npm run test:contrast
+      - run: npm test
+      - run: npm run build

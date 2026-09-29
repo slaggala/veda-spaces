@@ -1,0 +1,13 @@
+PASS founder invites a Sales user — 201
+PASS Sales accepts invite (no MFA required) and signs in
+PASS permission denial: no admin nav, no-access page, API 401/403 — nav=0 api=401
+PASS admin revokes Sales sessions — {"revoked":1}
+PASS revoked session: a full reload lands on sign-in
+PASS revoked session: next in-app request signs out with the expiry banner
+PASS logout ends the session; protected routes redirect to sign-in
+PASS repeated submission (same key) returns the original reference
+PASS same key with a different body is refused
+PASS invalid submission returns field errors only
+PASS duplicate submission is stored and flagged, never dropped — NONE,SUSPECTED
+PASS duplicate leads visible in the admin list
+12/12 access checks passed

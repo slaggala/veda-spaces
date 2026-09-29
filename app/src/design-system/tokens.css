@@ -1,0 +1,128 @@
+/*
+  Veda Workspace design tokens (09 §2). This is the ONLY file allowed to contain raw colour values
+  (enforced by `npm run lint:tokens`). Contrast of every on/background pair is checked in both themes
+  by `npm run test:contrast` (09 §2.5, AX-05).
+*/
+:root {
+  color-scheme: light;
+  --vs-paper: #FBF7EF;
+  --vs-surface: #FFFFFF;
+  --vs-cream: #F0E4D4;
+  --vs-ink: #1E1D1A;
+  --vs-ink-muted: #5D574F;
+  --vs-line: rgba(30, 29, 26, .14);
+  --vs-copper: #A46D42;
+  --vs-copper-text: #8C5B37;
+  --vs-copper-strong: #7A4E2E;
+  --vs-on-copper-strong: #FFFFFF;
+  --vs-on-danger: #FFFFFF;
+  --vs-focus-ring: #A46D42;
+  --vs-sidebar: #201F1C;
+  --vs-on-sidebar: #F0E4D4;
+  --vs-on-sidebar-muted: #B8B0A5;
+  --vs-danger: #A23B2A;
+  --vs-success: #3F6B4A;
+  --vs-warning: #8A5E0F;
+  --vs-scrim: rgba(23, 22, 20, .45);
+  --vs-shadow: 0 12px 32px rgba(30, 20, 12, .12);
+
+  /* Pipeline status chips (09 §2.2): self-contained pairs, identical in both themes (A11Y-T5). */
+  --vs-status-new-bg: #E8ECEF;            --vs-status-new-fg: #34495A;
+  --vs-status-contacted-bg: #E4EEEA;      --vs-status-contacted-fg: #2F5D50;
+  --vs-status-site_visit-bg: #F3EAD7;     --vs-status-site_visit-fg: #7A5A12;
+  --vs-status-quotation_sent-bg: #F2E3D8; --vs-status-quotation_sent-fg: #7A4E2E;
+  --vs-status-negotiation-bg: #EDE3EC;    --vs-status-negotiation-fg: #5E3D5B;
+  --vs-status-won-bg: #E2EFE5;            --vs-status-won-fg: #2E5A3A;
+  --vs-status-lost-bg: #EFE6E4;           --vs-status-lost-fg: #6E4A44;
+
+  /* Typography (09 §2.3) */
+  --vs-font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --vs-font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --vs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Space, shape, motion (09 §2.4) */
+  --vs-space-1: 4px; --vs-space-2: 8px; --vs-space-3: 12px; --vs-space-4: 16px;
+  --vs-space-5: 24px; --vs-space-6: 32px; --vs-space-7: 48px; --vs-space-8: 64px;
+  --vs-radius-control: 2px;
+  --vs-radius-card: 8px;
+  --vs-radius-pill: 999px;
+  --vs-motion-fast: 160ms;
+  --vs-motion-drawer: 240ms;
+  --vs-row-height: 44px;
+  --vs-target: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --vs-paper: #171614;
+    --vs-surface: #201F1C;
+    --vs-cream: #2A2723;
+    --vs-ink: #F3F0E9;
+    --vs-ink-muted: #B8B0A5;
+    --vs-line: rgba(243, 240, 233, .14);
+    --vs-copper: #C8906A;
+    --vs-copper-text: #D9A583;
+    --vs-copper-strong: #E0B394;
+    --vs-on-copper-strong: #171614;
+    --vs-on-danger: #171614;
+    --vs-focus-ring: #C8906A;
+    --vs-sidebar: #121110;
+    --vs-on-sidebar: #F0E4D4;
+    --vs-on-sidebar-muted: #B8B0A5;
+    --vs-danger: #E07A67;
+    --vs-success: #86B894;
+    --vs-warning: #E0B45C;
+    --vs-scrim: rgba(0, 0, 0, .6);
+    --vs-shadow: 0 12px 32px rgba(0, 0, 0, .4);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --vs-paper: #171614;
+  --vs-surface: #201F1C;
+  --vs-cream: #2A2723;
+  --vs-ink: #F3F0E9;
+  --vs-ink-muted: #B8B0A5;
+  --vs-line: rgba(243, 240, 233, .14);
+  --vs-copper: #C8906A;
+  --vs-copper-text: #D9A583;
+  --vs-copper-strong: #E0B394;
+  --vs-on-copper-strong: #171614;
+  --vs-on-danger: #171614;
+  --vs-focus-ring: #C8906A;
+  --vs-sidebar: #121110;
+  --vs-on-sidebar: #F0E4D4;
+  --vs-on-sidebar-muted: #B8B0A5;
+  --vs-danger: #E07A67;
+  --vs-success: #86B894;
+  --vs-warning: #E0B45C;
+  --vs-scrim: rgba(0, 0, 0, .6);
+  --vs-shadow: 0 12px 32px rgba(0, 0, 0, .4);
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--vs-paper);
+  color: var(--vs-ink);
+  font-family: var(--vs-font-sans);
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root {
+  /* Login photography overlay, from the site's dark gradient (09 §2.4 imagery). */
+  --vs-hero-overlay: linear-gradient(180deg, rgba(23, 22, 20, .25) 0%, rgba(23, 22, 20, .78) 100%);
+  --vs-on-hero: #F0E4D4;
+}

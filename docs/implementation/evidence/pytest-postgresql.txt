@@ -1,0 +1,8 @@
+........................................................................ [ 26%]
+.......................................................................s [ 52%]
+...........................s............................................ [ 79%]
+.........................................................                [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/integration/test_schema.py:80: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:305: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+271 passed, 2 skipped in 52.75s

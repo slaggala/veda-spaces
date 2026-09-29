@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=8
+pytest-cov>=5
+ruff>=0.5
+# Embedded PostgreSQL for the dual-engine integration suite (OPS-001)
+pixeltable-pgserver>=0.3

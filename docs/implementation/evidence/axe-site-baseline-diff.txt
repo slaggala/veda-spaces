@@ -1,0 +1,11 @@
+baseline 778aa8f (error state, reduced motion): 19 violating nodes
+current (error state, reduced motion): 19 violating nodes
+introduced by the enquiry-form change: 1
+   color-contrast #form-note
+pre-existing examples:
+   color-contrast .section-label
+   color-contrast .about-copy > .eyebrow
+   color-contrast .portfolio-head > div > .eyebrow
+   color-contrast .portfolio-head > p
+   color-contrast .case-study:nth-child(2) > .case-copy > .case-number
+   color-contrast .reverse > .case-copy > .case-number

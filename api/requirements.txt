@@ -1,0 +1,17 @@
+# Runtime (ADR-007, 02 §3.5)
+Flask>=3.1,<4
+SQLAlchemy>=2.0,<2.2
+alembic>=1.13,<2
+pydantic>=2.6,<3
+argon2-cffi>=23.1
+PyJWT[crypto]>=2.8
+cryptography>=42
+phonenumbers>=8.13
+structlog>=24.1
+Flask-Limiter>=3.5
+gunicorn>=22
+# Optional production adapters (imported lazily)
+boto3>=1.34
+sentry-sdk>=2.0
+# PostgreSQL driver (migration target, ADR-008)
+psycopg[binary]>=3.1

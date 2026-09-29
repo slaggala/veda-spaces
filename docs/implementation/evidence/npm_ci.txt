@@ -1,0 +1,20 @@
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: 'errorstacks@2.4.2',
+npm WARN EBADENGINE   required: { node: '>=24' },
+npm WARN EBADENGINE   current: { node: 'v20.9.0', npm: '10.1.0' }
+npm WARN EBADENGINE }
+
+added 378 packages, and audited 379 packages in 41s
+
+57 packages are looking for funding
+  run `npm fund` for details
+
+195 vulnerabilities (173 low, 5 high, 17 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.

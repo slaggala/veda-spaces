@@ -1,0 +1,145 @@
+{
+  "register": "P0 implementation deviations",
+  "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
+  "branch": "implementation/p0-foundation",
+  "approved": false,
+  "note": "No deviation is approved. All are pending independent implementation review.",
+  "deviations": [
+    {
+      "id": "DEV-001",
+      "title": "MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment",
+      "requirement_ids": [
+        "MFA-005",
+        "MFA-013",
+        "MFA-014"
+      ],
+      "adrs": [
+        "ADR-006"
+      ],
+      "architecture_references": [
+        "03 §5.5 (ux_user_mfa_factor__user_live)",
+        "05 §11.3, §11.5",
+        "12 §4.12 TD-E"
+      ],
+      "certified_behavior": "03 §5.5 defines ux_user_mfa_factor__user_live as UNIQUE (user_id, factor_type) WHERE status IN ('PENDING','ACTIVE') AND is_deleted = false, i.e. at most one live factor per user and type.",
+      "implemented_behavior": "The same index name is keyed on (user_id, factor_type, status) with the same predicate: at most one PENDING and at most one ACTIVE factor per user and type. enroll/start revokes any earlier PENDING factor first; enroll/confirm revokes the ACTIVE factor (REPLACED) and flushes before promoting the PENDING factor.",
+      "reason": "The certified index contradicts certified behaviour elsewhere: 05 §11.5 and TD-E require the old factor to stay ACTIVE while a PENDING replacement exists (failed or interrupted re-enrollment must leave the old authenticator working). With the certified key the first enroll/start by an enrolled user fails with a unique violation.",
+      "security_impact": "None negative. Only one ACTIVE factor can exist, so authentication semantics are unchanged; the PENDING factor is never accepted for login, step-up or recovery. Enrollment still requires the two-proof paths of 05 §11.3.",
+      "compatibility_impact": "None for clients. PostgreSQL migration: the index is recreated with the same name and predicate.",
+      "data_model_impact": "Index key gains the status column (migration 0004_auth; model veda/platform/auth/models.py). No column or table changes.",
+      "api_impact": "None.",
+      "ui_impact": "None.",
+      "tests": [
+        "tests/integration/test_mfa.py::test_TD_E_failed_reenrollment_commits_nothing_that_grants_access",
+        "tests/integration/test_mfa.py::test_MFA_013_recovery_requires_password_and_code",
+        "tests/integration/test_mfa.py::test_TD_C_expired_recovery_session",
+        "tests/integration/test_mfa.py::test_MFA_005_regenerate_codes_needs_step_up_and_invalidates_old",
+        "tests/integration/test_schema.py::test_DATA_011_conformance_passes_on_migrated_schema"
+      ],
+      "rollback": "Restore the certified two-column key in 0004_auth and the model, and change enroll/start to create the PENDING factor only after revoking the ACTIVE one. That reintroduces the TD-E conflict, so it needs an architecture decision first. No data migration: existing rows satisfy both definitions whenever no PENDING factor is open.",
+      "decision_required": "Amend 03 §5.5 to key ux_user_mfa_factor__user_live on (user_id, factor_type, status), or resolve TD-E/05 §11.5 another way.",
+      "status": "PENDING INDEPENDENT REVIEW"
+    },
+    {
+      "id": "DEV-002",
+      "title": "Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success",
+      "requirement_ids": [
+        "AUTH-011",
+        "MFA-014",
+        "UI-015"
+      ],
+      "adrs": [
+        "ADR-006",
+        "ADR-010"
+      ],
+      "architecture_references": [
+        "08 §4.5 (POST /auth/invite/accept → 204)",
+        "05 §8.4",
+        "05 §11.3 path B"
+      ],
+      "certified_behavior": "08 §4.5 lists POST /api/v1/auth/invite/accept → 204. 05 §8.4 and §11.3 path B require enrollment inside the same flow when policy requires MFA, with the account ACTIVE only after enrollment confirmation, but 08 defines no response carrying the enrollment context.",
+      "implemented_behavior": "No MFA required: 204 and the user becomes ACTIVE. MFA required: the password is set, the user stays INVITED and the response is 200 {\"data\": {\"status\": \"MFA_ENROLLMENT_REQUIRED\", \"invite_context\": \"<opaque>\", \"expires_in\": 900}}. invite_context is a single-use ENROLLMENT mfa_challenge token (hash stored). POST /auth/mfa/enroll/start {invite_context} and enroll/confirm complete path B, activate the user and issue a FULL session. The INVITE token is consumed at confirmation, so an abandoned acceptance can be restarted with the same link until it expires.",
+      "reason": "Path B needs a way to hand the client the enrollment continuation; a 204 cannot carry it.",
+      "security_impact": "Neutral to positive. Two proofs (emailed invite token + newly set password) precede enrollment; no session exists until confirmation; invite_context is short-lived (15 min), hashed and single-use; an INVITED user cannot sign in with the password alone.",
+      "compatibility_impact": "Additive within v1 (API-009): clients of the MFA-not-required path still receive 204.",
+      "data_model_impact": "None (uses existing mfa_challenge purpose ENROLLMENT).",
+      "api_impact": "New 200 response shape on POST /api/v1/auth/invite/accept; POST /auth/mfa/enroll/start accepts invite_context as documented in 08 §4.7.",
+      "ui_impact": "The accept-invite screen routes to the enrollment screen when it receives MFA_ENROLLMENT_REQUIRED.",
+      "tests": [
+        "tests/integration/test_mfa.py::test_MFA_014_path_b_invitation_enrollment",
+        "tests/integration/test_founder_governance.py::test_AUTH_014_bootstrap_creates_one_invited_founder",
+        "tests/integration/test_auth.py::test_AUTH_011_invite_accept_without_mfa_requirement",
+        "app/e2e/workspace.e2e.mjs: accept invitation (path B: forced MFA enrollment)"
+      ],
+      "rollback": "None available without an alternative design: the certified 204 cannot carry path B. Alternatives would be (a) emailing a separate enrollment link (path C) after acceptance, or (b) returning the context in a header. Either needs an architecture decision.",
+      "decision_required": "Amend 08 §4.5 to document the 200 MFA_ENROLLMENT_REQUIRED response, or choose an alternative mechanism for path B.",
+      "status": "PENDING INDEPENDENT REVIEW"
+    },
+    {
+      "id": "DEV-003",
+      "title": "Login accepts an optional CAPTCHA token",
+      "requirement_ids": [
+        "AUTH-010",
+        "SEC-011",
+        "MFA-009",
+        "UI-001"
+      ],
+      "adrs": [],
+      "architecture_references": [
+        "08 §4.1 (login request {email, password})",
+        "05 §4 (next attempt from a throttled pair requires a Turnstile token)",
+        "09 §4.1"
+      ],
+      "certified_behavior": "08 §4.1 defines the login body as {email, password}. 05 §4 and 09 §4.1 require a Turnstile challenge after repeated failures from one network, but 08 defines neither the field carrying the token nor the signal telling the client to show it.",
+      "implemented_behavior": "POST /api/v1/auth/login accepts an optional turnstile_token (≤ 2048 chars). After 5 consecutive failures for an (account, network) pair, the pair needs a valid token; 401 INVALID_CREDENTIALS then carries \"captcha_required\": true. Unknown emails use the same per-network state keyed by an HMAC of the email, so the signal does not reveal account existence. Related additive field: MFA 401 MFA_CODE_INVALID responses carry attempts_remaining (MFA-009, 09 §4.10).",
+      "reason": "05 §4 cannot be implemented with the closed request schema of 08 §4.1 (unknown fields are rejected with UNKNOWN_FIELD).",
+      "security_impact": "Implements the certified control. The token is verified server-side; a failed or missing token keeps the uniform 401. The response stays uniform across unknown, invited, disabled and wrong-password cases.",
+      "compatibility_impact": "Additive (API-009): the field is optional; existing clients are unaffected until a pair is throttled.",
+      "data_model_impact": "None (in-process per-network state, as designed in 05 §4 / OPS-010).",
+      "api_impact": "Optional request field turnstile_token on POST /api/v1/auth/login; optional response fields captcha_required (401) and attempts_remaining (MFA 401).",
+      "ui_impact": "The login screen renders the Turnstile widget when captcha_required is true; the MFA screen announces remaining attempts.",
+      "tests": [
+        "tests/integration/test_auth.py::test_DEV_003_optional_captcha_token_after_network_throttle",
+        "tests/integration/test_auth.py::test_AUTH_010_throttle_is_per_account_and_network",
+        "tests/integration/test_auth.py::test_AUTH_009_uniform_login_failures",
+        "tests/integration/test_mfa.py::test_MFA_001_login_challenge_attempt_limits"
+      ],
+      "rollback": "Remove turnstile_token from LoginIn and the captcha branch in veda/platform/auth/service.py::login; per-network throttling then relies on the escalating delay only. No data migration.",
+      "decision_required": "Amend 08 §4.1 / §4.7 to document the optional fields.",
+      "status": "PENDING INDEPENDENT REVIEW"
+    },
+    {
+      "id": "DEV-004",
+      "title": "Staff lead update accepts a re-consent object",
+      "description_correction": "The freeze brief describes DEV-004 as 'Duplicate/repeated lead submission may include a re-consent object'. That is not what was implemented. The public intake (POST /api/v1/public/leads), including duplicate or repeated submissions, accepts no re-consent object and rejects one with UNKNOWN_FIELD. The deviation is on the authenticated staff endpoint PATCH /api/v1/leads/{lead_id}.",
+      "requirement_ids": [
+        "LEAD-012",
+        "LEAD-024",
+        "LEAD-027"
+      ],
+      "adrs": [
+        "ADR-005"
+      ],
+      "architecture_references": [
+        "04 §5.4 (re-consent recorded through PATCH of the consent_* fields)",
+        "08 §8.5 (consent_* → 422 FIELD_NOT_UPDATABLE)"
+      ],
+      "certified_behavior": "The certified documents conflict: 04 §5.4 records re-consent 'through PATCH of the consent_* fields, with the channel and policy version', while 08 §8.5 rejects consent_* in PATCH with 422 FIELD_NOT_UPDATABLE.",
+      "implemented_behavior": "PATCH /api/v1/leads/{lead_id} (lead.update, in scope, If-Match) accepts an optional object consent: {channel: PHONE_VERBAL|IN_PERSON|WHATSAPP|EMAIL|WEBSITE_FORM, policy_version}. The policy version must be published (else 422 UNKNOWN_POLICY_VERSION). It sets consent_contact = true, consent_policy_version, consent_captured_on = transaction time and consent_channel, and clears consent_withdrawn_on, consent_withdrawal_channel and consent_withdrawal_note. Raw consent_* columns remain rejected with FIELD_NOT_UPDATABLE, as in 08 §8.5.",
+      "reason": "Satisfies 04 §5.4 without contradicting the 08 §8.5 rule that consent_* columns are not mass-assignable.",
+      "security_impact": "Low. Requires lead.update within scope and optimistic concurrency. Every change is audited (UPDATE row with old and new consent values). Not reachable from the public endpoint.",
+      "compatibility_impact": "Additive (API-009).",
+      "data_model_impact": "No schema change. The lead row holds the latest consent state; the prior consent capture and the prior withdrawal are overwritten in the row and retained as evidence in audit_log (UPDATE old_value). A reviewer should confirm this satisfies LEAD-027's 'retaining the original consent evidence'.",
+      "api_impact": "Optional consent object on PATCH /api/v1/leads/{lead_id}.",
+      "ui_impact": "The lead drawer can record a new consent capture; the Do-not-contact banner disappears after re-consent.",
+      "tests": [
+        "tests/integration/test_leads.py::test_DEV_004_reconsent_via_staff_patch_only",
+        "tests/integration/test_leads.py::test_LEAD_027_consent_withdrawal",
+        "tests/integration/test_leads.py::test_LEAD_024_patch_rules"
+      ],
+      "rollback": "Remove the consent field from LeadPatchIn and the consent branch in veda/modules/crm/leads/service.py::_update. Re-consent then cannot be recorded until 04 §5.4 and 08 §8.5 are reconciled. No data migration.",
+      "decision_required": "Reconcile 04 §5.4 with 08 §8.5, and decide whether re-consent must keep prior consent and withdrawal values in the row rather than only in audit_log.",
+      "status": "PENDING INDEPENDENT REVIEW"
+    }
+  ]
+}

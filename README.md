@@ -64,3 +64,12 @@ The enquiry form opens WhatsApp with the visitor's project details pre-filled. I
 - `dist/404.html` (`tel:` link and `wa.me` link)
 
 Don't change the MX, SPF or Google verification DNS records. They carry mail for `interiors@vedaspaces.com`.
+
+## Veda Spaces platform (P0)
+
+- `api/` — Flask API, SQLAlchemy, Alembic (see `api/README.md`)
+- `app/` — Veda Workspace staff app, Lit + TypeScript (see `app/README.md`)
+- `docs/architecture/` — certified architecture; `docs/implementation/P0-implementation-report.md` — implementation report
+
+The website enquiry form posts to the API only when `<meta name="veda-api-base">` in `dist/index.html` is set;
+otherwise it keeps the WhatsApp hand-off.
