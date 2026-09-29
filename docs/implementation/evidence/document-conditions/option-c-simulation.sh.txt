@@ -1,0 +1,22 @@
+set -eu
+SRC=~/Documents/veda-spaces-aws-source
+W=$1; rm -rf "$W"; git clone -q "$SRC" "$W"; cd "$W"
+git fetch -q "$SRC" 'refs/remotes/origin/main:refs/remotes/origin/main'
+APPROVED=3f5920b17d21214b39414d080d34246746c8c40d; MAIN=origin/main
+echo "APPROVED=$APPROVED MAIN=$(git rev-parse $MAIN)"
+echo "== C1"; git switch -q -c merge-prep/p0-foundation "$APPROVED"
+echo "== C2"; git restore --source="$MAIN" --staged --worktree -- dist; test ! -e dist/assets/404.css && echo "dist/assets/404.css removed"
+echo "== C3"; mkdir -p app/e2e/site-release && git archive "$APPROVED" dist | tar -x --strip-components=1 -C app/e2e/site-release
+sed -i '' 's|"$ROOT/dist" 8000|"$APP/e2e/site-release" 8000|; s|"$ROOT/dist" 8001|"$APP/e2e/site-release" 8001|' app/e2e/run-all.sh
+sed -i '' 's|(REPO / "dist/index.html")|(REPO / "app/e2e/site-release/index.html")|' api/tests/unit/test_governance_docs.py
+git add -A; git -c user.name=simulation -c user.email=sim@invalid commit -q -m "Keep live site unchanged for the implementation merge"; KEEP=$(git rev-parse HEAD); echo "KEEP=$KEEP"
+echo "== C4"; git diff --quiet "$MAIN" HEAD -- dist && echo "PASS dist identical to live main"
+git diff --quiet "$APPROVED:dist" "HEAD:app/e2e/site-release" && echo "PASS fixture identical to approved dist"
+echo "changed outside dist and fixture:"; git diff --name-only "$APPROVED" HEAD -- . ':!dist' ':!app/e2e/site-release'
+echo "== C6 (simulated merge into a local copy of main; nothing pushed)"; git switch -q -c sim-main "$MAIN"; git -c user.name=simulation -c user.email=sim@invalid merge -q --no-ff -m "Merge (simulation)" merge-prep/p0-foundation
+echo "== C7"; git diff --quiet "$MAIN" HEAD -- dist && echo "PASS merged main dist unchanged"
+echo "== C8"; git switch -q -c site/p0-release sim-main; git -c user.name=simulation -c user.email=sim@invalid revert --no-edit "$KEEP" >/dev/null
+git diff --quiet "$APPROVED" HEAD -- dist && echo "PASS site release dist equals approved"
+test ! -e app/e2e/site-release && echo "PASS fixture removed"
+git diff --quiet "$APPROVED" HEAD -- app/e2e/run-all.sh api/tests/unit/test_governance_docs.py && echo "PASS test harness restored"
+git diff --quiet "$APPROVED" HEAD && echo "PASS whole tree equals approved"

@@ -3,7 +3,7 @@
   "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "branch": "implementation/p0-foundation",
   "approved": false,
-  "note": "No deviation is approved. The targeted re-review decisions are recorded per deviation (rereview_decision). DEV-007 was reimplemented after RR-04; DEV-009 and DEV-010 implement owner decisions OD-2 and OD-3. All await the Architecture Owner's decision through the proposed amendments in docs/proposals/amendments.",
+  "note": "No deviation is approved. The targeted re-review decisions are recorded per deviation (rereview_decision). DEV-007 was reimplemented after RR-04; DEV-009 and DEV-010 implement the OD-2 and OD-3 brief instructions, which await formal owner confirmation. All await the Architecture Owner's decision through the proposed amendments in docs/proposals/amendments.",
   "deviations": [
     {
       "id": "DEV-001",
@@ -323,7 +323,7 @@
       ],
       "certified_behavior": "FOUNDER_STATUS_CHANGE statuses DISABLED/ACTIVE/UNLOCK/DELETE; restore of a deleted user through user.restore (USER-001).",
       "implemented_behavior": "POST /users/{id}/restore refuses Founders (403 FOUNDER_PROTECTED, FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE requested by one eligible Founder and approved in-app by another; refused on both break-glass channels (SECOND_FOUNDER_REQUIRED); re-validated at execution.",
-      "reason": "RR-02 and owner decision OD-2.",
+      "reason": "RR-02 and the OD-2 brief instruction (awaiting formal owner confirmation).",
       "security_impact": "Closes a G11 bypass.",
       "compatibility_impact": "Additive status value.",
       "data_model_impact": "None.",
@@ -334,8 +334,8 @@
       ],
       "rollback": "Remove RESTORE (deleted Founders unrestorable).",
       "decision_required": "AM-12.",
-      "status": "PROPOSED, NOT APPROVED — implements OD-2; pending Architecture-Owner decision",
-      "reviewer_decision": "n/a (owner decision OD-2)",
+      "status": "PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision",
+      "reviewer_decision": "n/a (OD-2 brief instruction; awaiting formal owner confirmation)",
       "reviewer_conditions": "",
       "amendment": "AM-12"
     },
@@ -355,7 +355,7 @@
       ],
       "certified_behavior": "G11/G9 re-evaluated when a STANDARD request is decided and executed; email verification completes with no further check.",
       "implemented_behavior": "Class escalation (GRANT_FOUNDER, roles, permissions) withdraws weaker-class work in the same transaction; verification recomputes the proposal's authorising class and fails closed when it is weaker than the target's current class or the account is disabled.",
-      "reason": "RR-03 (N17) and owner decision OD-3.",
+      "reason": "RR-03 (N17) and the OD-3 brief instruction (awaiting formal owner confirmation).",
       "security_impact": "Closes RR-03.",
       "compatibility_impact": "Behavioural tightening.",
       "data_model_impact": "None.",
@@ -366,8 +366,8 @@
       ],
       "rollback": "Remove the checks (RR-03 returns).",
       "decision_required": "AM-13.",
-      "status": "PROPOSED, NOT APPROVED — implements OD-3; pending Architecture-Owner decision",
-      "reviewer_decision": "n/a (owner decision OD-3)",
+      "status": "PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision",
+      "reviewer_decision": "n/a (OD-3 brief instruction; awaiting formal owner confirmation)",
       "reviewer_conditions": "",
       "amendment": "AM-13"
     }

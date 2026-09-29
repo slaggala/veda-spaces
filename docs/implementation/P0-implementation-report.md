@@ -17,6 +17,20 @@
 | Runbooks | [docs/operations/api-runbooks.md](../operations/api-runbooks.md) |
 | Evidence | [evidence/remediation/](evidence/remediation/) — raw output of the clean-environment run below |
 
+## 000. Document-conditions closure (after the document-level check)
+
+This section records the response to the document-level check, `review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04`. Its verdict was **READY WITH DOCUMENT CONDITIONS**, and it authorizes no merge or deployment. It reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`.
+
+This change touches documents, one validation test and the CI checkout depth only. No implementation, schema, security control, authentication, RBAC, governance, API, frontend or `dist/` file changed.
+
+| Condition | Result |
+|---|---|
+| DC-01 | Merge-safety option C is now an executable procedure. It covers the base commit, the exact `dist/` restore, and the CI treatment: a site-release fixture plus two reviewed test-harness lines. It also covers integrity checks, CI, the merge, verification, the later site release by reverting the keep-live commit, branch hygiene and rollback. The procedure was simulated end to end in a throwaway clone; nothing was pushed. |
+| DC-02 | AM-4 now matches the code: 409 INVALID_STATE, 422 for an unknown version, "different version" semantics, and the exact superseded snapshot. It proposes an ordering rule, an erasure exemption for either immutability option, the withdrawal note, and the tracked-deviation consequence of approval. |
+| DC-04 | The SHA check covers all governance documents, READMEs, `deployment.md` and `deploy.sh`, for both full and abbreviated SHAs. Every cited SHA must be a known commit with its recorded subject. Role-specific references are asserted, and planted invalid SHAs fail. CI checks out full history, and missing history fails in CI instead of skipping. |
+| DC-07 | Reviewer classifications are quoted verbatim, from both reviews. Implementation provenance now separates `6ec2e76` from `3f5920b`. OD-2 and OD-3 are described everywhere as brief instructions awaiting formal owner confirmation. TG-01 and TG-08 are PENDING. A test enforces all of this. |
+| Not in scope | DC-03 (before production), DC-05 (staging), DC-06 and DC-08 (PostgreSQL release gate). They are recorded in [P0-open-issues.md](P0-open-issues.md). |
+
 ## 00. Technical-conditions closure (after the final targeted check)
 
 This section records workstream VEDA-SPACES-P0-TECHNICAL-CONDITIONS-CLOSURE-01.
@@ -55,8 +69,8 @@ Workstream VEDA-SPACES-P0-FINAL-MERGE-BLOCKER-REMEDIATION-01. It responds to the
 | Finding | Result at this commit |
 |---|---|
 | RR-01 (404 CSP) | Styles moved to `/assets/404.css`. CSP unchanged. The browser checks the page under the production headers: HTTP 404, 0 CSP violations, no inline code, responsive, and axe-clean after an AA contrast fix. |
-| RR-02 (Founder restore) | Implements OD-2: `FOUNDER_STATUS_CHANGE` with status `RESTORE`, requested by one Founder and approved by a second. The generic restore returns 403 plus a bypass event. Both break-glass channels are refused. Proposed amendment AM-12. |
-| RR-03 (email change survives promotion) | Implements OD-3 with governance classes: escalation withdraws weaker-class work, and verification fails closed. Proposed amendment AM-13. |
+| RR-02 (Founder restore) | Implements the OD-2 brief instruction (awaiting formal owner confirmation): `FOUNDER_STATUS_CHANGE` with status `RESTORE`, requested by one Founder and approved by a second. The generic restore returns 403 plus a bypass event. Both break-glass channels are refused. Proposed amendment AM-12. |
+| RR-03 (email change survives promotion) | Implements the OD-3 brief instruction (awaiting formal owner confirmation) with governance classes: escalation withdraws weaker-class work, and verification fails closed. Proposed amendment AM-13. |
 | RR-04 (DEV-007) | Layered limiter covering account, aggregate, wide-network, reset-email and endpoint tiers. It never locks anyone out, and the challenge closes the MFA_REQUIRED oracle. AM-7 rewritten; the earlier text was rejected as written. |
 | RR-05, RR-06 (archive manifests) | Write-once exports. Verification requires finalised, contiguous, hash-checked, re-chained and announced manifests. Two-phase ordering with idempotent retry and repair. S3 Object Lock is **not** verified against real S3. |
 | RR-07 (CLI logging, scheduler) | Every CLI process configures logging. `MaintenanceJobFailed` and `ScheduledJobFailed` record job exit codes. |

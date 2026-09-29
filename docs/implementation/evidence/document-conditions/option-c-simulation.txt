@@ -1,0 +1,21 @@
+APPROVED=3f5920b17d21214b39414d080d34246746c8c40d MAIN=13276a017a137c4a86b15fea0306ea2e83ac2729
+== C1
+== C2
+dist/assets/404.css removed
+== C3
+KEEP=62f5c77d8aea33c119c756a99885810d9c2f8139
+== C4
+PASS dist identical to live main
+PASS fixture identical to approved dist
+changed outside dist and fixture:
+api/tests/unit/test_governance_docs.py
+app/e2e/run-all.sh
+== C6 (simulated merge into a local copy of main; nothing pushed)
+== C7
+PASS merged main dist unchanged
+== C8
+PASS site release dist equals approved
+PASS fixture removed
+PASS test harness restored
+PASS whole tree equals approved
+exit=0

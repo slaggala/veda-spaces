@@ -1,0 +1,30 @@
+$ git diff --stat 3f5920b -- api/veda api/migrations api/deploy app/src dist
+exit=0
+$ git diff --cached --name-only 3f5920b
+.github/workflows/ci.yml
+api/tests/unit/test_governance_docs.py
+docs/implementation/P0-final-merge-blocker-matrix.json
+docs/implementation/P0-final-merge-blocker-matrix.md
+docs/implementation/P0-implementation-deviations.json
+docs/implementation/P0-implementation-deviations.md
+docs/implementation/P0-implementation-report.md
+docs/implementation/P0-merge-safety-plan.md
+docs/implementation/P0-open-issues.json
+docs/implementation/P0-open-issues.md
+docs/implementation/P0-owner-decision-package.json
+docs/implementation/P0-owner-decision-package.md
+docs/proposals/amendments/AM-1.md
+docs/proposals/amendments/AM-10.md
+docs/proposals/amendments/AM-11.md
+docs/proposals/amendments/AM-12.md
+docs/proposals/amendments/AM-13.md
+docs/proposals/amendments/AM-2.md
+docs/proposals/amendments/AM-3.md
+docs/proposals/amendments/AM-4.md
+docs/proposals/amendments/AM-5.md
+docs/proposals/amendments/AM-6.md
+docs/proposals/amendments/AM-7.md
+docs/proposals/amendments/AM-8.md
+docs/proposals/amendments/AM-9.md
+docs/proposals/amendments/README.md
+docs/proposals/amendments/amendments.json

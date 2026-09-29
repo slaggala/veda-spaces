@@ -1,6 +1,6 @@
 # AM-1: proposed amendment to 03 §5.5
 
-> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; reviewed implementation `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; final targeted check review/p0-independent-implementation-review @ 56c20ba992b519daa79aa3802a28343aab8c0b41. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
+> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
 
 | Field | Value |
 |---|---|
@@ -10,11 +10,12 @@
 | Affected requirements | MFA-005, MFA-013, MFA-014 |
 | Related findings | DEV-001 (condition IR-20) |
 | Related deviation | DEV-001 |
-| Final targeted check classification | TECHNICALLY SOUND |
+| Final targeted check classification (56c20ba, verbatim) | TECHNICALLY SOUND |
+| Document-level check classification (093cfa6, verbatim) | TECHNICALLY SOUND |
 | Certified behavior | ux_user_mfa_factor__user_live UNIQUE (user_id, factor_type) WHERE status IN ('PENDING','ACTIVE') AND is_deleted = false. |
 | Proposed behavior | Key the index on (user_id, factor_type, status) with the same predicate: at most one PENDING and one ACTIVE factor per user and type. Path C never replaces an ACTIVE factor; any confirmation ends every other open enrollment transaction and link (IR-20). |
 | Reason | The certified key contradicts 05 §11.5 and TD-E, which keep the current factor ACTIVE while a replacement is PENDING. |
-| Implementation at the reviewed SHA and after | Implemented in migration 0004_auth and mfa.py exactly as proposed; unchanged by this workstream. |
+| Implementation (provenance) | Implemented in migration 0004_auth and mfa.py exactly as proposed; unchanged by this workstream. |
 | Security impact | No weakening: one ACTIVE factor per user; a PENDING factor never authenticates; IR-20 closes replacement without step-up. |
 | Data impact | Index key only; no column change. |
 | API impact | None. |

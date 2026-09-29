@@ -14,8 +14,8 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 | DEV-006 | mfa_challenge binds enrollment transactions to a factor and a path | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-11 | PENDING ARCHITECTURE-OWNER DECISION |
 | DEV-007 | Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds | n/a (remediation) | REQUIRES IMPLEMENTATION CHANGE | AM-7 | PROPOSED, NOT APPROVED — implementation changed per RR-04; pending final targeted check and Architecture-Owner decision |
 | DEV-008 | Readiness accepts a declared newer schema and hides details at the edge | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-6 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-009 | Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2) | n/a (owner decision OD-2) | n/a | AM-12 | PROPOSED, NOT APPROVED — implements OD-2; pending Architecture-Owner decision |
-| DEV-010 | Pending identity changes are re-validated against the target's current governance class (OD-3) | n/a (owner decision OD-3) | n/a | AM-13 | PROPOSED, NOT APPROVED — implements OD-3; pending Architecture-Owner decision |
+| DEV-009 | Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2) | n/a (OD-2 brief instruction; awaiting formal owner confirmation) | n/a | AM-12 | PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision |
+| DEV-010 | Pending identity changes are re-validated against the target's current governance class (OD-3) | n/a (OD-3 brief instruction; awaiting formal owner confirmation) | n/a | AM-13 | PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision |
 
 ## DEV-001: MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment
 
@@ -203,7 +203,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Architecture references:** 06 §7.2.2, 06 §7.1 G11, 08 §5.11
 - **Certified behavior:** FOUNDER_STATUS_CHANGE statuses DISABLED/ACTIVE/UNLOCK/DELETE; restore of a deleted user through user.restore (USER-001).
 - **Implemented behavior:** POST /users/{id}/restore refuses Founders (403 FOUNDER_PROTECTED, FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE requested by one eligible Founder and approved in-app by another; refused on both break-glass channels (SECOND_FOUNDER_REQUIRED); re-validated at execution.
-- **Reason:** RR-02 and owner decision OD-2.
+- **Reason:** RR-02 and the OD-2 brief instruction (awaiting formal owner confirmation).
 - **Security impact:** Closes a G11 bypass.
 - **Compatibility impact:** Additive status value.
 - **Data model impact:** None.
@@ -211,11 +211,11 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Ui impact:** Restore action on the Founder actions page.
 - **Tests:** api/tests/integration/test_final_merge_blockers.py::test_RR02_*
 - **Rollback:** Remove RESTORE (deleted Founders unrestorable).
-- **Reviewer decision:** n/a (owner decision OD-2)
+- **Reviewer decision:** n/a (OD-2 brief instruction; awaiting formal owner confirmation)
 - **Reviewer conditions:** 
 - **Decision required:** AM-12.
 - **Amendment:** AM-12
-- **Status:** PROPOSED, NOT APPROVED — implements OD-2; pending Architecture-Owner decision
+- **Status:** PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision
 
 ## DEV-010: Pending identity changes are re-validated against the target's current governance class (OD-3)
 
@@ -224,7 +224,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Architecture references:** 06 §7.4, 05 §8.6
 - **Certified behavior:** G11/G9 re-evaluated when a STANDARD request is decided and executed; email verification completes with no further check.
 - **Implemented behavior:** Class escalation (GRANT_FOUNDER, roles, permissions) withdraws weaker-class work in the same transaction; verification recomputes the proposal's authorising class and fails closed when it is weaker than the target's current class or the account is disabled.
-- **Reason:** RR-03 (N17) and owner decision OD-3.
+- **Reason:** RR-03 (N17) and the OD-3 brief instruction (awaiting formal owner confirmation).
 - **Security impact:** Closes RR-03.
 - **Compatibility impact:** Behavioural tightening.
 - **Data model impact:** None.
@@ -232,8 +232,8 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Ui impact:** None.
 - **Tests:** api/tests/integration/test_final_merge_blockers.py::test_RR03_*
 - **Rollback:** Remove the checks (RR-03 returns).
-- **Reviewer decision:** n/a (owner decision OD-3)
+- **Reviewer decision:** n/a (OD-3 brief instruction; awaiting formal owner confirmation)
 - **Reviewer conditions:** 
 - **Decision required:** AM-13.
 - **Amendment:** AM-13
-- **Status:** PROPOSED, NOT APPROVED — implements OD-3; pending Architecture-Owner decision
+- **Status:** PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision

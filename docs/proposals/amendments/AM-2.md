@@ -1,6 +1,6 @@
 # AM-2: proposed amendment to 08 §4.5, 05 §11.3
 
-> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; reviewed implementation `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; final targeted check review/p0-independent-implementation-review @ 56c20ba992b519daa79aa3802a28343aab8c0b41. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
+> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
 
 | Field | Value |
 |---|---|
@@ -10,11 +10,12 @@
 | Affected requirements | AUTH-011, MFA-014, UI-015 |
 | Related findings | DEV-002 (conditions IR-01, IR-21, IR-25) |
 | Related deviation | DEV-002 |
-| Final targeted check classification | TECHNICALLY SOUND WITH OWNER CONDITIONS (accept invite-link password-overwrite residual) |
+| Final targeted check classification (56c20ba, verbatim) | TECHNICALLY SOUND WITH OWNER CONDITIONS (accept invite-link password-overwrite residual) |
+| Document-level check classification (093cfa6, verbatim) | TECHNICALLY SOUND WITH OWNER CONDITIONS |
 | Certified behavior | POST /auth/invite/accept → 204. |
 | Proposed behavior | When MFA is required, POST /auth/invite/accept returns 200 {status: MFA_ENROLLMENT_REQUIRED, invite_context, expires_in} instead of 204. Precise state machine: (1) acceptance sets the password and leaves the account INVITED with no session; the invitation link stays live (72 h, 24 h for a sensitive invite) and is not marked used. (2) The context is an INVITE_CONTEXT enrollment challenge: single use, 15 minutes, confirmable only on PATH_B without a bearer token. (3) Replay: presenting the live link again sets a new password (replacing the earlier one), revokes every earlier context and PENDING factor, and issues a new context. (4) Abandonment: if the context expires unused, the account stays INVITED with the chosen password; a PENDING factor created by enroll/start remains inert (never authenticates, RR-A06) until the next acceptance or enrollment replaces it; sign-in is refused (INVITED) because the account is not active. (5) Activation happens only when the factor is confirmed; then the link is consumed. The two proofs of path B are possession of the invitation link and possession of the TOTP secret shown to whoever holds it; the password is chosen by the link holder. |
 | Reason | A 204 cannot carry the enrollment continuation required by 05 §11.3 path B. |
-| Implementation at the reviewed SHA and after | Implemented as proposed (service.accept_invite, mfa.enroll_start/confirm with PATH_B binding). Replay behaviour described above is the current code: api/veda/platform/auth/service.py accept_invite accepts the live INVITE token again while the user is INVITED. |
+| Implementation (provenance) | Implemented as proposed (service.accept_invite, mfa.enroll_start/confirm with PATH_B binding). Replay behaviour described above is the current code: api/veda/platform/auth/service.py accept_invite accepts the live INVITE token again while the user is INVITED. |
 | Security impact | Residual the owner must accept: anyone holding the invitation link before activation can set the password and enrol their own factor, and can replace an earlier acceptance. The invitation email is the trust anchor, as in the certified invite flow (05 §8.4). |
 | Data impact | None beyond AM-11. |
 | API impact | New 200 response shape on invite/accept. |
