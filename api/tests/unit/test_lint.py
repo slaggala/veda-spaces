@@ -93,6 +93,40 @@ def test_IRA05_rbx_exceptions_are_checked_against_the_register(app):
         http.ROUTES[:] = original
 
 
+def test_IRA05_optional_and_public_routes_cannot_hide_a_permission(app):
+    """Startup refuses optional-auth + permission, public + permission, and an unregistered public or optional
+    route; every current route passes and none became public (final merge-blocker remediation)."""
+    from dataclasses import replace
+
+    from veda.app import check_route_declarations
+    from veda.kernel import http
+
+    before_public = sorted((s.method, s.rule) for s in http.ROUTES if s.auth == "public")
+    check_route_declarations(app)
+    original = list(http.ROUTES)
+    optional = next(s for s in http.ROUTES if s.auth == "optional")
+    public = next(s for s in http.ROUTES if s.rule == "/api/v1/auth/login")
+    private = next(s for s in http.ROUTES if s.auth == "bearer" and s.permission and not s.rbx)
+    cases = [
+        (optional, {"permission": ("user.read",)}, "optional route .* cannot be enforced"),
+        (optional, {"any_of": ("user.read",)}, "optional route .* cannot be enforced"),
+        (public, {"permission": ("user.read",)}, "public route .* cannot be enforced"),
+        (public, {"rbx": None}, "no permission or RBX declaration|not an RBX-registered exception"),
+        (optional, {"rbx": None}, "no permission or RBX declaration|not an RBX-registered exception"),
+        (private, {"permission": None, "any_of": None}, "no permission or RBX declaration"),
+    ]
+    try:
+        for spec, change, message in cases:
+            http.ROUTES[:] = original
+            http.ROUTES[http.ROUTES.index(spec)] = replace(spec, **change)
+            with pytest.raises(RuntimeError, match=message):
+                check_route_declarations(app)
+    finally:
+        http.ROUTES[:] = original
+    check_route_declarations(app)  # valid private and public routes succeed
+    assert sorted((s.method, s.rule) for s in http.ROUTES if s.auth == "public") == before_public
+
+
 def test_PLAT_011_module_boundaries():
     """Modules import other modules' service interfaces only; the platform never imports module
     internals except the maintenance CLI jobs and the app factory's registration."""

@@ -788,7 +788,8 @@
                   "ACTIVE",
                   "UNLOCK",
                   "DELETE",
-                  "DELETED"
+                  "DELETED",
+                  "RESTORE"
                 ],
                 "type": "string"
               },
@@ -2528,7 +2529,7 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "204": {
             "description": "Success"
           },
           "default": {

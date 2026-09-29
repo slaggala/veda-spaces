@@ -356,6 +356,27 @@ def _login_failure(email_norm: str, network: str, user: User | None, reason: str
     security_events.defer("LOGIN", "FAILURE", **fields)
 
 
+def _captcha_now(account_key: str, network: str) -> bool:
+    """Whether the next attempt for this identifier from this network needs Turnstile (pair or budget)."""
+    return throttle.pair_state(account_key, network)[1] or throttle.account_state(account_key)[0]
+
+
+def _record_budget_failure(account_key: str, user: User | None, email_norm: str) -> None:
+    count = throttle.record_account_failure(account_key)
+    if count in (throttle.ACCOUNT_CAPTCHA_FAILURES, throttle.ACCOUNT_DELAY_FAILURES):
+        who = (
+            {"subject_user_id": user.id}
+            if user is not None
+            else {"email_attempted_hash": security_events.email_attempt_hash(email_norm)}
+        )
+        security_events.defer(
+            "ACCOUNT_THROTTLED",
+            "SUCCESS",
+            detail={"scope": "account_challenge" if count == throttle.ACCOUNT_CAPTCHA_FAILURES else "account_delay"},
+            **who,
+        )
+
+
 def verify_login_captcha(turnstile_token: str | None) -> bool | None:
     """Verify a presented Turnstile token (network I/O, called outside the write transaction). None when no
     token was sent; the throttle decides later whether one was required (DEV-003)."""
@@ -377,6 +398,14 @@ def login(
     user = find_user_by_email(s, email_norm)
     account_key = user.id if user else "unknown:" + security_events.email_attempt_hash(email_norm)
     blocked, captcha_required = throttle.pair_state(account_key, network)
+    # Layered bounds across networks (RR-04): the same for known and unknown identifiers, never a lock-out.
+    budget_captcha, retry_after = throttle.account_state(account_key)
+    if retry_after:
+        _login_failure(email_norm, network, user, "RATE_LIMITED")
+        raise ApiError(
+            429, "RATE_LIMITED", "Too many attempts. Try again later.", headers={"Retry-After": str(retry_after)}
+        )
+    captcha_required = captcha_required or budget_captcha
     if captcha_verified is _UNSET:  # direct callers without a prepare step
         captcha_verified = verify_login_captcha(turnstile_token) if captcha_required else None
     if captcha_required and captcha_verified is not True:
@@ -391,8 +420,9 @@ def login(
     if user is None or user.user_type != "HUMAN":
         passwords.verify_dummy(password)
         throttle.record_password_failure(account_key, network)
+        _record_budget_failure(account_key, user, email_norm)
         _login_failure(email_norm, network, user, "UNKNOWN_USER" if user is None else "NOT_HUMAN")
-        raise invalid_credentials(captcha_required=throttle.pair_state(account_key, network)[1])
+        raise invalid_credentials(captcha_required=_captcha_now(account_key, network))
 
     cred = credential_for(s, user.id)
     factor = active_factor(s, user.id)
@@ -414,6 +444,7 @@ def login(
             security_events.defer(
                 "ACCOUNT_THROTTLED", "SUCCESS", subject_user_id=user.id, detail={"scope": "network", "networks": 1}
             )
+        _record_budget_failure(account_key, user, email_norm)
         _login_failure(email_norm, network, user, reason)
         if reason == "BAD_PASSWORD" and user.status == "ACTIVE":
             distinct = throttle.record_network_failure(user.id, network)
@@ -450,7 +481,7 @@ def login(
                 ),
             ):
                 schedule_write(count_failure)
-        raise invalid_credentials(captcha_required=throttle.pair_state(account_key, network)[1])
+        raise invalid_credentials(captcha_required=_captcha_now(account_key, network))
 
     throttle.record_password_success(account_key, network)
     with acting(
@@ -660,6 +691,17 @@ def forgot_password(s: Session, email: str) -> None:
             subject_user_id=user.id if user else None,
         )
         return
+    if not throttle.reset_email_allowed(user.id):
+        # Answered like any other request; the account holder already has recent links (RR-04).
+        security_events.record(
+            s,
+            "PASSWORD_RESET_REQUESTED",
+            "FAILURE",
+            failure_reason="RATE_LIMITED",
+            subject_user_id=user.id,
+            detail={"scope": "account"},
+        )
+        return
     invalidate_action_tokens(s, user.id, ("PASSWORD_RESET",))
     tok, _ = create_action_token(s, user, "PASSWORD_RESET", ttl=TOKEN_TTLS["PASSWORD_RESET"])
     s.flush()
@@ -708,6 +750,30 @@ def _reauth_failed(user_id: str) -> None:
         )
 
 
+def rotate_session_refresh(s: Session, us: UserSession) -> str:
+    """Issue a new refresh token for this session and retire the live ones, each linked to the successor so a
+    concurrent refresh with the previous cookie gets the grace-window treatment of an ordinary rotation instead
+    of reuse detection (05 §6.1, RR-08). Only tokens of this session are touched."""
+    now = db.tx_time(s)
+    raw = new_opaque_token()
+    successor = RefreshToken(
+        session_id=us.id,
+        token_hash=sha256_hex(raw),
+        issued_on=now,
+        expires_on=min(now + settings().refresh_idle_ttl, us.absolute_expires_on),
+    )
+    s.add(successor)
+    s.flush()
+    for rt in s.execute(
+        sa.select(RefreshToken).where(
+            RefreshToken.session_id == us.id, RefreshToken.used_on.is_(None), RefreshToken.id != successor.id
+        )
+    ).scalars():
+        rt.used_on = now
+        rt.replaced_by_id = successor.id
+    return raw
+
+
 def change_password(s: Session, ctx: AuthContext, current: str, new_password: str) -> str:
     from .request_auth import require_not_cooling_off
 
@@ -725,20 +791,7 @@ def change_password(s: Session, ctx: AuthContext, current: str, new_password: st
     set_password(s, user, new_password)
     revoke_all_sessions(s, user.id, "PASSWORD_CHANGED", except_session_id=ctx.session.id)
     # Rotate the current session's refresh token (05 §8.5).
-    now = db.tx_time(s)
-    for rt in s.execute(
-        sa.select(RefreshToken).where(RefreshToken.session_id == ctx.session.id, RefreshToken.used_on.is_(None))
-    ).scalars():
-        rt.used_on = now
-    new_raw = new_opaque_token()
-    s.add(
-        RefreshToken(
-            session_id=ctx.session.id,
-            token_hash=sha256_hex(new_raw),
-            issued_on=now,
-            expires_on=min(now + settings().refresh_idle_ttl, ctx.session.absolute_expires_on),
-        )
-    )
+    new_raw = rotate_session_refresh(s, ctx.session)
     security_events.record(s, "PASSWORD_CHANGED", "SUCCESS", subject_user_id=user.id)
     outbox.enqueue(s, "auth.password_changed", "app_user", user.id, user_id=user.id)
     return new_raw
@@ -885,9 +938,36 @@ def start_email_change(s: Session, target: User, new_email: str, *, requested_by
 
 
 def verify_email_change(s: Session, raw: str) -> None:
+    from veda.platform.rbac import guards
+
+    # The governance-class check below must not interleave with a promotion or role change (OD-3): take the
+    # governance lock before any row is touched, in the same order as those changes (no deadlock on PostgreSQL).
+    guards.lock_governance(s)
     tok = consume_action_token(s, raw, "EMAIL_VERIFICATION", "EMAIL_TOKEN_INVALID")
     user = s.get(User, tok.user_id)
     if user is None or user.proposed_email_normalized != tok.sent_to_email_normalized:
+        raise ApiError(400, "EMAIL_TOKEN_INVALID", "This link has expired or was already used.")
+    from veda.platform.rbac import governance
+
+    # OD-3: a change authorised under a weaker governance class than the account now holds (for example an
+    # administrator's change to someone since promoted to Founder) never completes. The rollback leaves the
+    # proposal unusable; it expires or is cancelled, and the refusal is recorded (RR-03).
+    if user.status == "DISABLED" or not governance.proposal_still_authorised(s, user):
+        security_events.defer(
+            "EMAIL_CHANGE_VERIFIED",
+            "FAILURE",
+            subject_user_id=user.id,
+            failure_reason="FOUNDER_PROTECTED" if user.protection_level == "FOUNDER" else "POLICY",
+            detail={"reason": "ACCOUNT_DISABLED" if user.status == "DISABLED" else "GOVERNANCE_CLASS_CHANGED"},
+        )
+        if user.protection_level == "FOUNDER":
+            security_events.defer(
+                "FOUNDER_GOVERNANCE_BYPASS_BLOCKED",
+                "BLOCKED",
+                subject_user_id=user.id,
+                target=("app_user", user.id),
+                detail={"action": "email_verify"},
+            )
         raise ApiError(400, "EMAIL_TOKEN_INVALID", "This link has expired or was already used.")
     ctx = current_actor()
     with acting(

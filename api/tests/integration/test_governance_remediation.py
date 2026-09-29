@@ -123,7 +123,7 @@ def test_IR04_concurrent_promotion_and_standard_approval(app, api, factory):
     [t.start() for t in threads]
     [t.join() for t in threads]
     founder_row, standard_row = get(AdminApprovalRequest, founder_req), get(AdminApprovalRequest, standard)
-    assert founder_row.status == "EXECUTED"
+    assert founder_row.status == "EXECUTED", out
     # executed_on is each transaction's start time; the order in which the two committed is the order of their
     # chained security events (appended under the governance lock).
     promoted = next(e.chain_seq for e in events("FOUNDER_TRANSITION"))

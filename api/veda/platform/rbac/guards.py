@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from veda.kernel import clock, db
 from veda.kernel.errors import ApiError
 from veda.platform.auth import security_events
 from veda.platform.identity.models import User
@@ -216,6 +217,16 @@ def lock_governance(s: Session) -> None:
     PostgreSQL takes a transaction advisory lock (06 §7.2.5, §7.3)."""
     if s.get_bind().dialect.name == "postgresql":
         s.execute(sa.text("SELECT pg_advisory_xact_lock(7845120002)"))
+        # The unit of work may have waited for another governance transaction; rows that one committed can be
+        # newer than this unit's clock reading. If nothing has been written yet, take the unit's single clock
+        # reading now, so everything it writes is stamped after what it saw (03 §2.8 still holds: one reading
+        # per unit of work). SQLite serialises from BEGIN IMMEDIATE, before the reading.
+        if not s.info.get("governance_locked"):
+            s.info["governance_locked"] = True
+            if not s.info.get("veda_versioned") and not (s.new or s.dirty or s.deleted):
+                s.info["tx_time"] = max(db.tx_time(s), clock.now())
+            else:
+                s.info["governance_clock_kept"] = True
 
 
 class InvariantGuard:

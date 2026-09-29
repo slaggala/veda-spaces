@@ -1,10 +1,14 @@
 """External anchor store for the security-event chain (05 §9.6, SEVT-007).
 
-Two kinds of object are written, never overwritten:
+Objects are written once and never overwritten (an identical re-write is accepted, so retries are idempotent):
 
 * ``anchor``: the chain head (``chain_seq``, ``row_hash``, key label) written daily.
-* ``archive``: the manifest of an archived segment (first/last sequence, count, SHA-256 of the export and the
-  last archived row hash), written before the segment is deleted from the database.
+* ``export``: the archived segment itself (JSON lines), written before the segment is deleted.
+* ``pending``: the manifest of a segment about to be deleted (first/last sequence, count, SHA-256 of the export,
+  last archived row hash), written before the database transaction that deletes it.
+* ``archive``: the same manifest, written only after that transaction committed. Verification counts only
+  ``archive`` manifests, checks them against the ``export`` objects and the SECURITY_LOG_ARCHIVED events, and
+  treats a ``pending`` manifest whose rows are still online as an abandoned attempt (RR-05, RR-06).
 
 Production uses an S3 bucket with Object Lock in COMPLIANCE mode (write-only role for the writer, read-only
 role for verification). Local and test use a directory of JSON files with the same layout. Verification reads
@@ -24,8 +28,8 @@ PREFIX = "security-log"
 RETENTION = timedelta(days=3650)
 
 
-def _key(kind: str, seq: int) -> str:
-    return f"{PREFIX}/{kind}s/{seq:012d}.json"
+def _key(kind: str, seq: int, ext: str = "json") -> str:
+    return f"{PREFIX}/{kind}s/{seq:012d}.{ext}"
 
 
 class LocalAnchorStore:
@@ -41,6 +45,19 @@ class LocalAnchorStore:
                 return
             raise RuntimeError(f"anchor object {path.name} already exists")
         path.write_text(data)
+
+    def put_blob(self, kind: str, seq: int, data: bytes) -> None:
+        path = self.root / _key(kind, seq, "jsonl")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            if path.read_bytes() == data:
+                return
+            raise RuntimeError(f"anchor object {path.name} already exists")
+        path.write_bytes(data)
+
+    def get_blob(self, kind: str, seq: int) -> bytes | None:
+        path = self.root / _key(kind, seq, "jsonl")
+        return path.read_bytes() if path.exists() else None
 
     def _all(self, kind: str) -> list[dict]:
         folder = self.root / PREFIX / f"{kind}s"
@@ -75,7 +92,23 @@ class S3AnchorStore:
             ContentType="application/json",
         )
 
-    def _keys(self, kind: str) -> list[str]:
+    def put_blob(self, kind: str, seq: int, data: bytes) -> None:
+        self.client.put_object(
+            Bucket=self.bucket,
+            Key=_key(kind, seq, "jsonl"),
+            Body=data,
+            ObjectLockMode="COMPLIANCE",
+            ObjectLockRetainUntilDate=clock.now() + RETENTION,
+            ContentType="application/x-ndjson",
+        )
+
+    def get_blob(self, kind: str, seq: int) -> bytes | None:
+        key = _key(kind, seq, "jsonl")
+        if key not in self._keys(kind, ext="jsonl"):
+            return None
+        return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+
+    def _keys(self, kind: str, ext: str = "json") -> list[str]:
         keys: list[str] = []
         token = None
         while True:
@@ -83,7 +116,7 @@ class S3AnchorStore:
             if token:
                 kwargs["ContinuationToken"] = token
             page = self.client.list_objects_v2(**kwargs)
-            keys += [o["Key"] for o in page.get("Contents", [])]
+            keys += [o["Key"] for o in page.get("Contents", []) if o["Key"].endswith(f".{ext}")]
             if not page.get("IsTruncated"):
                 return sorted(keys)
             token = page.get("NextContinuationToken")

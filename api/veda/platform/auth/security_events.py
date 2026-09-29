@@ -239,7 +239,12 @@ def row_representation(row: SecurityEventLog) -> dict[str, Any]:
 
 
 def compute_row_hash(row: SecurityEventLog, key: bytes) -> str:
-    message = (row.prev_hash or "").encode("ascii") + canonical_bytes(row_representation(row))
+    return hash_representation(row_representation(row), row.prev_hash, key)
+
+
+def hash_representation(rep: dict[str, Any], prev_hash: str | None, key: bytes) -> str:
+    """Row hash from the representation, as exported by archival (RR-05)."""
+    message = (prev_hash or "").encode("ascii") + canonical_bytes(rep)
     return hmac.new(key, message, hashlib.sha256).hexdigest()
 
 

@@ -9,22 +9,34 @@ import base64
 import os
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from veda import config
 
 GOOD_KEY = base64.b64encode(os.urandom(32)).decode()
+KEYS = [base64.b64encode(os.urandom(32)).decode() for _ in range(4)]
+
+
+def _pem(key) -> str:
+    return key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    ).decode()
+
+
+ES256_PEM = _pem(ec.generate_private_key(ec.SECP256R1()))
 
 
 def deployed_env(monkeypatch, env="production", **overrides):
     values = {
         "VEDA_ENV": env,
-        "VEDA_JWT_PRIVATE_KEY_PEM": "test-placeholder-pem",
+        "VEDA_JWT_PRIVATE_KEY_PEM": ES256_PEM,
         "VEDA_JWT_KID": "prod-2026-09",
         "VEDA_CHAIN_KEY_LABEL": "prod-2026",
-        "VEDA_RECOVERY_CODE_HMAC_KEY": GOOD_KEY,
-        "VEDA_EMAIL_HASH_HMAC_KEY": GOOD_KEY,
-        "VEDA_ACTION_TOKEN_KEY": GOOD_KEY,
-        "VEDA_CHAIN_KEY": GOOD_KEY,
+        "VEDA_RECOVERY_CODE_HMAC_KEY": KEYS[0],
+        "VEDA_EMAIL_HASH_HMAC_KEY": KEYS[1],
+        "VEDA_ACTION_TOKEN_KEY": KEYS[2],
+        "VEDA_CHAIN_KEY": KEYS[3],
         "VEDA_TURNSTILE_SECRET": "0x-secret",
         "VEDA_TURNSTILE_MODE": "cloudflare",
         "VEDA_KMS_PROVIDER": "aws",
@@ -39,6 +51,7 @@ def deployed_env(monkeypatch, env="production", **overrides):
         "VEDA_ANCHOR_BUCKET": "veda-anchors",
         "VEDA_TRUSTED_PROXY_CIDRS": "172.18.0.1/32",
         "VEDA_SNAPSHOT_BUCKET": "veda-snapshots",
+        "VEDA_SNAPSHOT_DIR": "/var/lib/veda/snapshots",
     }
     values.update(overrides)
     for name in list(os.environ):
@@ -98,6 +111,28 @@ def test_IR09_deployed_environments_never_derive_development_keys(monkeypatch, e
         ({"VEDA_TRUSTED_PROXY_CIDRS": None}, "VEDA_TRUSTED_PROXY_CIDRS"),
         ({"VEDA_TRUSTED_PROXY_CIDRS": "not-a-network"}, "invalid network"),
         ({"VEDA_LEAD_RETENTION_ENABLED": "true"}, "LEAD_RETENTION_DAYS"),
+        # RR-10: broad proxy ranges, weak / development / duplicate keys, unparsable or wrong-type signing key.
+        ({"VEDA_TRUSTED_PROXY_CIDRS": "0.0.0.0/0"}, "broader than /24"),
+        ({"VEDA_TRUSTED_PROXY_CIDRS": "::/0"}, "broader than /24"),
+        ({"VEDA_TRUSTED_PROXY_CIDRS": "172.18.0.1/32,10.0.0.0/8"}, "broader than /24"),
+        ({"VEDA_CHAIN_KEY": base64.b64encode(bytes(32)).decode()}, "VEDA_CHAIN_KEY is not random"),
+        ({"VEDA_ACTION_TOKEN_KEY": base64.b64encode(b"\xff" * 32).decode()}, "VEDA_ACTION_TOKEN_KEY is not random"),
+        (
+            {
+                "VEDA_RECOVERY_CODE_HMAC_KEY": base64.b64encode(
+                    config._dev_key("recovery", "local-development-only")
+                ).decode()
+            },
+            "development-derived",
+        ),
+        ({"VEDA_EMAIL_HASH_HMAC_KEY": KEYS[0]}, "must differ from VEDA_RECOVERY_CODE_HMAC_KEY"),
+        ({"VEDA_JWT_PRIVATE_KEY_PEM": "not a pem"}, "P-256 (ES256)"),
+        ({"VEDA_JWT_PRIVATE_KEY_PEM": _pem(rsa.generate_private_key(65537, 2048))}, "P-256 (ES256)"),
+        ({"VEDA_JWT_PRIVATE_KEY_PEM": _pem(ec.generate_private_key(ec.SECP384R1()))}, "P-256 (ES256)"),
+        # RR-14: snapshots live on the persistent volume, not in the container's writable layer.
+        ({"VEDA_SNAPSHOT_DIR": None}, "VEDA_SNAPSHOT_DIR must be an absolute path"),
+        ({"VEDA_SNAPSHOT_DIR": "var/snapshots"}, "VEDA_SNAPSHOT_DIR must be an absolute path"),
+        ({"VEDA_SNAPSHOT_DIR": "/tmp/snapshots"}, "inside the database volume"),
     ],
 )
 def test_IR09_each_missing_or_weak_setting_is_reported(monkeypatch, env, override, fragment):

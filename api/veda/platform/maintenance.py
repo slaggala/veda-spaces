@@ -9,6 +9,7 @@ owner-approved values are configured (OWNER-INPUT-002).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 from datetime import timedelta
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import sqlalchemy as sa
+from sqlalchemy.orm import Session
 
 from veda.config import settings
 from veda.kernel import clock, db, metrics, migration_support, outbox
@@ -346,21 +348,104 @@ def _archived_through(archives: list[dict]) -> tuple[int, str | None]:
     return (last["last_seq"], last["last_row_hash"]) if last else (0, None)
 
 
+def _archived_events_online(s: Session) -> set[tuple[int, str]]:
+    found: set[tuple[int, str]] = set()
+    detail: dict[str, Any] | None
+    for detail in s.execute(
+        sa.select(SecurityEventLog.detail).where(
+            SecurityEventLog.event_type == "SECURITY_LOG_ARCHIVED", SecurityEventLog.outcome == "SUCCESS"
+        )
+    ).scalars():
+        if detail and "through_seq" in detail:
+            found.add((int(detail["through_seq"]), str(detail.get("anchor"))))
+    return found
+
+
+def _verify_archives(store, s: Session, anchor: dict | None) -> tuple[int, str | None, str | None, int, int | None]:
+    """Check the finalised archive manifests against the write-once exports (RR-05).
+
+    Manifests must be contiguous from sequence 1; each export must match its manifest's SHA-256, count and range,
+    and its rows must recompute to a chain that starts where the previous segment ended and ends at the
+    manifest's last row hash; each manifest must be announced by its SECURITY_LOG_ARCHIVED event; an anchor that
+    falls inside the archived range must match the exported row. Returns (through, through_hash, problem, at_seq,
+    unannounced_first_seq); the announcement is reported by the caller after the online checks, which name a
+    removed announcement row more precisely.
+    """
+    keys = settings().chain_keys
+    manifests = sorted(store.all("archive"), key=lambda m: m["first_seq"])
+    expected, prev_hash = 1, None
+    announced: set[tuple[int, str]] = set()
+    for m in manifests:
+        if m["first_seq"] != expected or m["last_seq"] < m["first_seq"]:
+            return expected - 1, prev_hash, "archive manifests not contiguous", expected, None
+        blob = store.get_blob("export", m["last_seq"])
+        if blob is None:
+            return expected - 1, prev_hash, "archive export missing", m["first_seq"], None
+        if hashlib.sha256(blob).hexdigest() != m["sha256"]:
+            return expected - 1, prev_hash, "archive export hash mismatch", m["first_seq"], None
+        lines = blob.decode().splitlines()
+        if len(lines) != m["count"] or m["count"] != m["last_seq"] - m["first_seq"] + 1:
+            return expected - 1, prev_hash, "archive export count mismatch", m["first_seq"], None
+        for offset, line in enumerate(lines):
+            row = json.loads(line)
+            seq = m["first_seq"] + offset
+            key = keys.get(row.get("chain_key_label"))
+            rep = {k: v for k, v in row.items() if k not in ("row_hash", "prev_hash")}
+            if row.get("chain_seq") != seq or row.get("prev_hash") != prev_hash or key is None:
+                return expected - 1, prev_hash, "archive export chain broken", seq, None
+            if not hmac.compare_digest(security_events.hash_representation(rep, prev_hash, key), row["row_hash"]):
+                return expected - 1, prev_hash, "archive export chain broken", seq, None
+            if anchor is not None and seq == anchor["chain_seq"] and row["row_hash"] != anchor["row_hash"]:
+                return expected - 1, prev_hash, "anchor mismatch", seq, None
+            if row.get("event_type") == "SECURITY_LOG_ARCHIVED" and row.get("outcome") == "SUCCESS":
+                detail = row.get("detail") or {}
+                announced.add((int(detail.get("through_seq", 0)), str(detail.get("anchor"))))
+            prev_hash = row["row_hash"]
+        if prev_hash != m["last_row_hash"]:
+            return expected - 1, prev_hash, "archive export chain broken", m["last_seq"], None
+        expected = m["last_seq"] + 1
+    announced |= _archived_events_online(s)
+    for m in manifests:
+        if (m["last_seq"], m["sha256"][:16]) not in announced:
+            return expected - 1, prev_hash, None, 0, m["first_seq"]
+    return expected - 1, prev_hash, None, 0, None
+
+
 def verify_chain() -> security_events.ChainReport:
-    """Verify the online chain against the external anchor store (IR-03).
+    """Verify the online chain against the external anchor store (IR-03, RR-05).
 
     Detects: a modified row (hash), a removed row (gap), removal of the oldest rows (the first online row must
-    follow the last archived segment and chain to its last hash), removal of the anchored row unless an archive
-    manifest covers it, and truncation below the latest anchor (head < anchored sequence)."""
+    follow the last archived segment and chain to its last hash), a forged, altered or unannounced archive
+    manifest or export, a deletion committed without its manifest being finalised, removal of the anchored row
+    unless a verified export covers it, and truncation below the latest anchor (head < anchored sequence). An
+    unreadable anchor store is itself a verification failure (RR-07)."""
     store = anchor_store.store()
-    anchor = store.latest("anchor")
-    through, through_hash = _archived_through(store.all("archive"))
     with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        report = None
+        try:
+            anchor = store.latest("anchor")
+            through, through_hash, problem, at_seq, unannounced = _verify_archives(store, s, anchor)
+            pending = {p["last_seq"]: p for p in store.all("pending")}
+        except Exception:
+            log.critical("security_log_anchor_store_unavailable", exc_info=True)
+            anchor, through, through_hash, pending = None, 0, None, {}
+            problem, at_seq, unannounced = "anchor store unavailable", 0, None
         first_seq, head_seq = s.execute(
             sa.select(sa.func.min(SecurityEventLog.chain_seq), sa.func.max(SecurityEventLog.chain_seq))
         ).one()
-        report = None
-        if first_seq is None:
+        # A pending manifest whose rows are gone was committed but never finalised: a durable failure that the next
+        # archival run repairs. One whose rows are still online is an abandoned attempt and is ignored (RR-06).
+        stranded = [
+            p for seq, p in pending.items() if seq > through and (first_seq is None or first_seq > p["last_seq"])
+        ]
+        if problem:
+            report = security_events.ChainReport(False, 0, through, through_hash, problem, at_seq)
+        elif stranded:
+            p = min(stranded, key=lambda m: m["first_seq"])
+            report = security_events.ChainReport(
+                False, 0, through, through_hash, "archive not finalised", p["first_seq"]
+            )
+        elif first_seq is None:
             if anchor is not None or through:
                 report = security_events.ChainReport(False, 0, 0, None, "online log empty below anchor", 1)
         elif first_seq != through + 1:
@@ -371,11 +456,11 @@ def verify_chain() -> security_events.ChainReport:
             report = security_events.verify_chain(
                 s, from_seq=first_seq, anchor_hash=through_hash, from_genesis=through == 0
             )
-            if report.ok and anchor is not None:
+            if report.ok and anchor is not None and anchor["chain_seq"] > through:
                 anchored = s.execute(
                     sa.select(SecurityEventLog.row_hash).where(SecurityEventLog.chain_seq == anchor["chain_seq"])
                 ).scalar()
-                if anchored is None and anchor["chain_seq"] > through:
+                if anchored is None:
                     report = security_events.ChainReport(
                         False,
                         report.checked,
@@ -384,10 +469,14 @@ def verify_chain() -> security_events.ChainReport:
                         "anchored row missing",
                         anchor["chain_seq"],
                     )
-                elif anchored is not None and anchored != anchor["row_hash"]:
+                elif anchored != anchor["row_hash"]:
                     report = security_events.ChainReport(
                         False, report.checked, report.head_seq, report.head_hash, "anchor mismatch", anchor["chain_seq"]
                     )
+        if unannounced is not None and (report is None or report.ok):
+            report = security_events.ChainReport(
+                False, 0, through, through_hash, "archive not announced by SECURITY_LOG_ARCHIVED", unannounced
+            )
         report = report or security_events.ChainReport(True, 0, 0, None)
         metrics.emit("ChainVerificationFailed", 0 if report.ok else 1)
         if not report.ok:
@@ -438,53 +527,79 @@ def anchor_chain() -> dict | None:
     return anchor
 
 
-def archive_security_events(export_dir: str | None = None) -> dict:
-    """Monthly archival (05 §9.4): export, verify, anchor, delete. Refuses without approved retention.
+def _finalise_committed_archives(store) -> int:
+    """Finalise pending manifests whose deletion committed (rows gone, SECURITY_LOG_ARCHIVED recorded): the
+    recovery step for a failure between the commit and the final write (RR-06). Idempotent."""
+    finalised = {m["last_seq"] for m in store.all("archive")}
+    done = 0
+    with db.unit_of_work(write=False) as s:
+        first_online = s.execute(sa.select(sa.func.min(SecurityEventLog.chain_seq))).scalar()
+        announced = _archived_events_online(s)
+    for p in sorted(store.all("pending"), key=lambda m: m["first_seq"]):
+        if p["last_seq"] in finalised:
+            continue
+        gone = first_online is None or first_online > p["last_seq"]
+        if gone and (p["last_seq"], p["sha256"][:16]) in announced:
+            store.put("archive", p["last_seq"], p)
+            done += 1
+    return done
 
-    The segment is the contiguous chain-sequence prefix whose rows are all older than the cutoff; exactly that
-    range is exported, recorded in the anchor store, and deleted, and the deleted count must equal the exported
-    count in the same transaction (IR-26)."""
+
+def archive_security_events(export_dir: str | None = None) -> dict:
+    """Monthly archival (05 §9.4): export, verify, record, delete, finalise. Refuses without approved retention.
+
+    The segment is the contiguous chain-sequence prefix whose rows are all older than the cutoff (IR-26). Ordering
+    (RR-06): the export and a *pending* manifest go to write-once storage, then one database transaction appends
+    SECURITY_LOG_ARCHIVED and deletes exactly the exported range, and only after it commits is the *archive*
+    manifest written. A failure before the commit leaves the rows online and the pending manifest is ignored; a
+    failure after it is repaired by the next run (``_finalise_committed_archives``). Retries of the same segment
+    re-write identical objects, so they are idempotent."""
     days = settings().security_event_online_retention_days
     if not days:
         raise RuntimeError("SECURITY_EVENT_ONLINE_RETENTION_DAYS is not configured (OWNER-INPUT-002); nothing archived")
     out_dir = Path(export_dir or "var/archive")
     out_dir.mkdir(parents=True, exist_ok=True)
     store = anchor_store.store()
-    through, through_hash = _archived_through(store.all("archive"))
-    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
-        cutoff = db.tx_time(s) - timedelta(days=days)
-        rows = []
-        for r in s.execute(sa.select(SecurityEventLog).order_by(SecurityEventLog.chain_seq)).scalars():
-            if r.occurred_on >= cutoff:
-                break
-            rows.append(r)
-        if not rows:
-            return {"archived": 0}
-        first, last = rows[0], rows[-1]
-        if first.chain_seq != through + 1 or last.chain_seq - first.chain_seq + 1 != len(rows):
-            raise RuntimeError("archive segment is not contiguous with the previous archive")
-        segment = security_events.verify_chain(
-            s, from_seq=first.chain_seq, anchor_hash=through_hash, from_genesis=through == 0, to_seq=last.chain_seq
-        )
-        if not segment.ok:
-            raise RuntimeError(f"refusing to archive a broken chain segment: {segment.problem} at {segment.at_seq}")
-        lines = [
-            json.dumps(
-                {**security_events.row_representation(r), "prev_hash": r.prev_hash, "row_hash": r.row_hash},
-                sort_keys=True,
+    try:
+        recovered = _finalise_committed_archives(store)
+        through, through_hash = _archived_through(store.all("archive"))
+        manifest: dict[str, Any] | None = None
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            cutoff = db.tx_time(s) - timedelta(days=days)
+            rows = []
+            for r in s.execute(sa.select(SecurityEventLog).order_by(SecurityEventLog.chain_seq)).scalars():
+                if r.occurred_on >= cutoff:
+                    break
+                rows.append(r)
+            if not rows:
+                metrics.emit_many(
+                    {"SecurityLogArchivedRows": (0.0, "Count"), "SecurityLogArchiveFailed": (0.0, "Count")}
+                )
+                return {"archived": 0, "recovered": recovered}
+            first, last = rows[0], rows[-1]
+            if first.chain_seq != through + 1 or last.chain_seq - first.chain_seq + 1 != len(rows):
+                raise RuntimeError("archive segment is not contiguous with the previous archive")
+            segment = security_events.verify_chain(
+                s, from_seq=first.chain_seq, anchor_hash=through_hash, from_genesis=through == 0, to_seq=last.chain_seq
             )
-            for r in rows
-        ]
-        blob = ("\n".join(lines) + "\n").encode()
-        checksum = hashlib.sha256(blob).hexdigest()
-        path = out_dir / f"security_event_log_{first.chain_seq}_{last.chain_seq}.jsonl"
-        path.write_bytes(blob)
-        if hashlib.sha256(path.read_bytes()).hexdigest() != checksum or len(path.read_text().splitlines()) != len(rows):
-            raise RuntimeError("archive verification failed")
-        store.put(
-            "archive",
-            last.chain_seq,
-            {
+            if not segment.ok:
+                raise RuntimeError(f"refusing to archive a broken chain segment: {segment.problem} at {segment.at_seq}")
+            lines = [
+                json.dumps(
+                    {**security_events.row_representation(r), "prev_hash": r.prev_hash, "row_hash": r.row_hash},
+                    sort_keys=True,
+                )
+                for r in rows
+            ]
+            blob = ("\n".join(lines) + "\n").encode()
+            checksum = hashlib.sha256(blob).hexdigest()
+            path = out_dir / f"security_event_log_{first.chain_seq}_{last.chain_seq}.jsonl"
+            path.write_bytes(blob)
+            if hashlib.sha256(path.read_bytes()).hexdigest() != checksum or len(path.read_text().splitlines()) != len(
+                rows
+            ):
+                raise RuntimeError("archive verification failed")
+            manifest = {
                 "kind": "archive",
                 "first_seq": first.chain_seq,
                 "last_seq": last.chain_seq,
@@ -493,25 +608,33 @@ def archive_security_events(export_dir: str | None = None) -> dict:
                 "last_row_hash": last.row_hash,
                 "chain_key_label": last.chain_key_label,
                 "file": path.name,
-                "archived_on": clock.to_rfc3339(clock.now(), micros=True),
-            },
-        )
-        # Append the summary event first so the chain continues past the archived segment.
-        security_events.record(
-            s,
-            "SECURITY_LOG_ARCHIVED",
-            "SUCCESS",
-            detail={"through_seq": last.chain_seq, "count": len(rows), "anchor": checksum[:16]},
-        )
-        conn = s.connection()
-        migration_support.drop_immutability_guards(conn, "security_event_log")
-        table = cast(sa.Table, SecurityEventLog.__table__)
-        result = s.execute(sa.delete(table).where(table.c.chain_seq.between(first.chain_seq, last.chain_seq)))
-        deleted = getattr(result, "rowcount", -1)
-        migration_support.restore_immutability_guards(conn, "security_event_log")
-        if deleted != len(rows):
-            raise RuntimeError(f"archival deleted {deleted} rows but exported {len(rows)}")
-    return {"archived": len(rows), "file": str(path), "sha256": checksum}
+            }
+            store.put_blob("export", last.chain_seq, blob)
+            store.put("pending", last.chain_seq, manifest)
+            # Append the summary event first so the chain continues past the archived segment.
+            security_events.record(
+                s,
+                "SECURITY_LOG_ARCHIVED",
+                "SUCCESS",
+                detail={"through_seq": last.chain_seq, "count": len(rows), "anchor": checksum[:16]},
+            )
+            conn = s.connection()
+            migration_support.drop_immutability_guards(conn, "security_event_log")
+            table = cast(sa.Table, SecurityEventLog.__table__)
+            result = s.execute(sa.delete(table).where(table.c.chain_seq.between(first.chain_seq, last.chain_seq)))
+            deleted = getattr(result, "rowcount", -1)
+            migration_support.restore_immutability_guards(conn, "security_event_log")
+            if deleted != len(rows):
+                raise RuntimeError(f"archival deleted {deleted} rows but exported {len(rows)}")
+        store.put("archive", manifest["last_seq"], manifest)
+    except Exception:
+        log.critical("security_log_archive_failed", exc_info=True)
+        metrics.emit("SecurityLogArchiveFailed", 1)
+        raise
+    metrics.emit_many(
+        {"SecurityLogArchivedRows": (float(manifest["count"]), "Count"), "SecurityLogArchiveFailed": (0.0, "Count")}
+    )
+    return {"archived": manifest["count"], "file": str(path), "sha256": manifest["sha256"], "recovered": recovered}
 
 
 # --- governance invariants (06 §7.3) ----------------------------------------------------------------

@@ -19,18 +19,30 @@ def ip_key() -> str:
     return net.limiter_key(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP")))
 
 
-def body_email_key() -> str:
-    """Per-email limits are keyed by (email, client network): a third party exhausting the limit from its own
-    network cannot lock the account holder out everywhere (IR-23; proposed amendment AM-7 to 08 §12)."""
+def wide_network_key() -> str:
+    """Coarse source bucket: IPv6 /48 (a site allocation, so rotating /64s inside it share one budget) and
+    IPv4 /24 (RR-04)."""
     from veda.kernel import net
+
+    return "wide:" + net.wide_network_of(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP")))
+
+
+def body_email_key() -> str:
+    """Per-(identifier, network) limits: a third party exhausting the limit from its own network cannot lock the
+    account holder out everywhere (IR-23). Cross-network bounds live in the account budget
+    (veda.platform.auth.throttle, RR-04). The identifier is an HMAC of the normalized email, so no address
+    reaches limiter state or its log lines."""
+    from veda.kernel import net
+    from veda.kernel.dto import normalize_email
+    from veda.platform.auth import security_events
 
     try:
         data = json.loads(request.get_data(cache=True) or b"{}")
-        email = str(data.get("email", "")).strip().lower()
+        email = normalize_email(str(data.get("email", "")))
     except (ValueError, AttributeError):
         email = ""
     network = net.network_of(net.client_ip(request.remote_addr, request.headers.get("CF-Connecting-IP")))
-    return f"email:{email}|{network}"
+    return f"email:{security_events.email_attempt_hash(email)[:32]}|{network}"
 
 
 limiter = Limiter(

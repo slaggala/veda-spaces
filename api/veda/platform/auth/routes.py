@@ -12,7 +12,7 @@ from veda.kernel import clock
 from veda.kernel.dto import Closed, Email, Id, Query, TimeZone, mask_email, optional_text, text
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, Result, mask_ip, no_content, ok
-from veda.kernel.ratelimit import body_email_key
+from veda.kernel.ratelimit import body_email_key, wide_network_key
 from veda.platform.identity import service as identity
 from veda.platform.identity.models import PROFILE_FIELDS
 
@@ -54,7 +54,7 @@ def _login_prepare(req: Req) -> dict:
     body=LoginIn,
     requirement="AUTH-001",
     prepare=_login_prepare,
-    limits=["10 per minute", ("5 per minute", body_email_key)],
+    limits=["10 per minute", ("30 per minute", wide_network_key), ("5 per minute", body_email_key)],
     summary="Sign in with email and password",
 )
 def login(req: Req):
@@ -205,13 +205,29 @@ class TokenIn(Closed):
     token: Annotated[str, Field(min_length=10, max_length=200)]
 
 
-@api.route("POST", "/email/verify", rbx="RBX-003", auth="public", body=TokenIn, requirement="USER-007")
+@api.route(
+    "POST",
+    "/email/verify",
+    rbx="RBX-003",
+    auth="public",
+    body=TokenIn,
+    requirement="USER-007",
+    limits=["10 per minute"],
+)
 def verify_email(req: Req):
     service.verify_email_change(req.session, req.body.token)
     return no_content()
 
 
-@api.route("POST", "/email/cancel", rbx="RBX-003", auth="public", body=TokenIn, requirement="USER-007")
+@api.route(
+    "POST",
+    "/email/cancel",
+    rbx="RBX-003",
+    auth="public",
+    body=TokenIn,
+    requirement="USER-007",
+    limits=["10 per minute"],
+)
 def cancel_email(req: Req):
     service.cancel_email_change(req.session, req.body.token)
     return no_content()
@@ -232,7 +248,7 @@ class ForgotIn(Closed):
     body=ForgotIn,
     status=202,
     requirement="AUTH-008",
-    limits=["5 per minute", ("3 per hour", body_email_key)],
+    limits=["5 per minute", ("20 per minute", wide_network_key), ("3 per hour", body_email_key)],
     max_body=PUBLIC_MAX_BODY,
 )
 def forgot(req: Req):
@@ -365,7 +381,7 @@ class MfaVerifyIn(Closed):
     auth="public",
     body=MfaVerifyIn,
     requirement="MFA-001",
-    limits=["10 per minute"],
+    limits=["10 per minute", ("30 per minute", wide_network_key)],
 )
 def mfa_verify(req: Req):
     return _with_cookie(mfa.verify_login(req.session, req.body.mfa_token, req.body.code))
@@ -384,7 +400,7 @@ class MfaRecoveryIn(Closed):
     auth="public",
     body=MfaRecoveryIn,
     requirement="MFA-013",
-    limits=["10 per minute"],
+    limits=["10 per minute", ("30 per minute", wide_network_key)],
 )
 def mfa_recovery(req: Req):
     result = ok(mfa.recover(req.session, req.body.mfa_token, req.body.password, req.body.recovery_code))

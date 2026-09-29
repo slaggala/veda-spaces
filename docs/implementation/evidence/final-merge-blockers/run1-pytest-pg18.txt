@@ -1,0 +1,428 @@
+.........................s.............................................. [ 13%]
+........ssssss.......................................F.................. [ 26%]
+.....F.................................................................. [ 40%]
+...........................................................s............ [ 53%]
+.....................s.s................................................ [ 67%]
+........................................................................ [ 80%]
+........................................................................ [ 94%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_________ test_RR03_concurrent_promotion_and_verification[postgresql] __________
+
+app = <Flask 'veda'>, api = <tests.support.api.ApiClient object at 0x114c3cc50>
+factory = <tests.support.factory.Factory object at 0x114c48280>
+
+    def test_RR03_concurrent_promotion_and_verification(app, api, factory):
+        f1, f2 = factory.user(founder=True), factory.user(founder=True)
+        admin_a, admin_b, a2 = factory.user("ADMIN"), factory.user("ADMIN"), factory.user("ADMIN")
+        link = _staged_admin_email_change(api, factory, admin_a, admin_b, a2, "race@evil.test")
+        factory.login(api, f1)
+        approval = request(api, "GRANT_FOUNDER", a2.id).data["approval_id"]
+        t2 = factory.login(api, f2, set_default=False)
+        barrier = threading.Barrier(2)
+        out = {}
+    
+        def run(name, fn):
+            c = ApiClient(app.test_client())
+            barrier.wait()
+            out[name] = fn(c)
+    
+        threads = [
+            threading.Thread(
+                target=run, args=("promote", lambda c: c.post(APPROVE.format(approval), {"reason": "p"}, token=t2))
+            ),
+            threading.Thread(
+                target=run,
+                args=("verify", lambda c: c.post("/api/v1/auth/email/verify", {"token": link}, anonymous=True)),
+            ),
+        ]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
+        assert out["promote"].data["status"] == "EXECUTED"
+        promoted = next(e.chain_seq for e in events("FOUNDER_TRANSITION", subject_user_id=a2.id))
+        final = factory.get_user(a2.id)
+        if out["verify"].status == 204:  # verification committed first, while a2 was still an ADMIN
+            completed = next(e.chain_seq for e in events("EMAIL_CHANGE_COMPLETED", subject_user_id=a2.id))
+            assert completed < promoted and final.email == "race@evil.test"
+        else:
+>           assert out["verify"].code == "EMAIL_TOKEN_INVALID" and final.email == a2.email
+E           AssertionError: assert ('SERVICE_UNAVAILABLE' == 'EMAIL_TOKEN_INVALID'
+E             
+E             - EMAIL_TOKEN_INVALID
+E             + SERVICE_UNAVAILABLE)
+
+tests/integration/test_final_merge_blockers.py:454: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"request_id": "252a68e4c7efa0a1", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 5.6, "_aws": {"Timestamp": 1790686723403, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 5.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.403350Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.410726Z", "_aws": {"Timestamp": 1790686723410, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.416125Z", "_aws": {"Timestamp": 1790686723416, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "6b245862f2293a23", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 12.8, "_aws": {"Timestamp": 1790686723416, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 12.8, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.416695Z"}
+{"request_id": "9c70ab91f4745a0f", "method": "GET", "route": "/api/v1/users/<user_id>", "status": 200, "duration_ms": 16.1, "_aws": {"Timestamp": 1790686723433, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/users/<user_id>", "StatusClass": "2xx", "Requests": 1, "Latency": 16.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.433254Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.438252Z", "_aws": {"Timestamp": 1790686723438, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.443372Z", "_aws": {"Timestamp": 1790686723443, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "APPROVAL_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "3cd89a63c5ea4573", "method": "POST", "route": "/api/v1/users/<user_id>/email-change", "status": 202, "duration_ms": 12.4, "_aws": {"Timestamp": 1790686723446, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/users/<user_id>/email-change", "StatusClass": "2xx", "Requests": 1, "Latency": 12.4, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.446096Z"}
+{"request_id": "b4442e709b571007", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.7, "_aws": {"Timestamp": 1790686723449, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.7, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.449145Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.451896Z", "_aws": {"Timestamp": 1790686723451, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.454138Z", "_aws": {"Timestamp": 1790686723454, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "40fe548e3b6b10a4", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 5.0, "_aws": {"Timestamp": 1790686723454, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 5.0, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.454481Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.467313Z", "_aws": {"Timestamp": 1790686723467, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "APPROVAL_APPROVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.468199Z", "_aws": {"Timestamp": 1790686723468, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.479606Z", "_aws": {"Timestamp": 1790686723479, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "EMAIL_CHANGE_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "0e24646648624898", "method": "POST", "route": "/api/v1/approvals/<approval_id>/approve", "status": 200, "duration_ms": 27.7, "_aws": {"Timestamp": 1790686723482, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/approvals/<approval_id>/approve", "StatusClass": "2xx", "Requests": 1, "Latency": 27.7, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.482588Z"}
+{"event": "email_captured template=approval to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.501786Z"}
+{"event": "email_captured template=approval to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.502955Z"}
+{"event": "email_captured template=approval to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.503869Z"}
+{"event": "email_captured template=security_alert to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.504714Z"}
+{"event": "email_captured template=email_change_verify to=['r***@evil.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.508607Z"}
+{"event": "email_captured template=email_change_alert to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.509403Z"}
+{"event": "email_captured template=approval to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.513328Z"}
+{"event": "email_captured template=approval to=['u***@vedaspaces.test']", "level": "info", "logger": "veda.email", "ts": "2026-09-29T12:58:43.513983Z"}
+{"request_id": "a55e9eb47ab3cd18", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.1, "_aws": {"Timestamp": 1790686723518, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.518284Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.520847Z", "_aws": {"Timestamp": 1790686723520, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.522983Z", "_aws": {"Timestamp": 1790686723522, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "76e345446a6342a7", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 4.6, "_aws": {"Timestamp": 1790686723523, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 4.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.523269Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.536520Z", "_aws": {"Timestamp": 1790686723536, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_ACTION_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.537518Z", "_aws": {"Timestamp": 1790686723537, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "b42cb31beb2353c9", "method": "POST", "route": "/api/v1/founder-actions", "status": 202, "duration_ms": 14.2, "_aws": {"Timestamp": 1790686723537, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/founder-actions", "StatusClass": "2xx", "Requests": 1, "Latency": 14.2, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.537819Z"}
+{"request_id": "88b6f5c4a04948f4", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.1, "_aws": {"Timestamp": 1790686723540, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.540315Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.542837Z", "_aws": {"Timestamp": 1790686723542, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.544922Z", "_aws": {"Timestamp": 1790686723544, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "204c32ca67ba71ab", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 4.5, "_aws": {"Timestamp": 1790686723545, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 4.5, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:43.545209Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.561739Z", "_aws": {"Timestamp": 1790686723561, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_ACTION_APPROVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:43.562483Z", "_aws": {"Timestamp": 1790686723562, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "63425b3f1169dae3", "method": "POST", "route": "/api/v1/auth/email/verify", "status": 503, "duration_ms": 1018.5, "_aws": {"Timestamp": 1790686724564, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/email/verify", "StatusClass": "5xx", "Requests": 1, "Latency": 1018.5, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:44.564223Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:44.569771Z", "_aws": {"Timestamp": 1790686724569, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "EMAIL_CHANGE_CANCELLED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:44.570713Z", "_aws": {"Timestamp": 1790686724570, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_TRANSITION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:44.582338Z", "_aws": {"Timestamp": 1790686724582, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_ACTION_EXECUTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "d378d37a76dd04da", "method": "POST", "route": "/api/v1/approvals/<approval_id>/approve", "status": 200, "duration_ms": 1037.5, "_aws": {"Timestamp": 1790686724583, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/approvals/<approval_id>/approve", "StatusClass": "2xx", "Requests": 1, "Latency": 1037.5, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:44.583379Z"}
+------------------------------ Captured log call -------------------------------
+INFO     veda.http:logging.py:173 {'request_id': '252a68e4c7efa0a1', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 5.6, '_aws': {'Timestamp': 1790686723403, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 5.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.403350Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '6b245862f2293a23', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 12.8, '_aws': {'Timestamp': 1790686723416, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 12.8, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.416695Z'}
+INFO     veda.http:logging.py:173 {'request_id': '9c70ab91f4745a0f', 'method': 'GET', 'route': '/api/v1/users/<user_id>', 'status': 200, 'duration_ms': 16.1, '_aws': {'Timestamp': 1790686723433, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/users/<user_id>', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 16.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.433254Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '3cd89a63c5ea4573', 'method': 'POST', 'route': '/api/v1/users/<user_id>/email-change', 'status': 202, 'duration_ms': 12.4, '_aws': {'Timestamp': 1790686723446, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/users/<user_id>/email-change', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 12.4, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.446096Z'}
+INFO     veda.http:logging.py:173 {'request_id': 'b4442e709b571007', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.7, '_aws': {'Timestamp': 1790686723449, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.7, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.449145Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '40fe548e3b6b10a4', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 5.0, '_aws': {'Timestamp': 1790686723454, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 5.0, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.454481Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '0e24646648624898', 'method': 'POST', 'route': '/api/v1/approvals/<approval_id>/approve', 'status': 200, 'duration_ms': 27.7, '_aws': {'Timestamp': 1790686723482, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/approvals/<approval_id>/approve', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 27.7, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.482588Z'}
+INFO     veda.email:email.py:67 email_captured template=approval to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=approval to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=approval to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=security_alert to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=email_change_verify to=['r***@evil.test']
+INFO     veda.email:email.py:67 email_captured template=email_change_alert to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=approval to=['u***@vedaspaces.test']
+INFO     veda.email:email.py:67 email_captured template=approval to=['u***@vedaspaces.test']
+INFO     veda.http:logging.py:173 {'request_id': 'a55e9eb47ab3cd18', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.1, '_aws': {'Timestamp': 1790686723518, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.518284Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '76e345446a6342a7', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 4.6, '_aws': {'Timestamp': 1790686723523, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.523269Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'b42cb31beb2353c9', 'method': 'POST', 'route': '/api/v1/founder-actions', 'status': 202, 'duration_ms': 14.2, '_aws': {'Timestamp': 1790686723537, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/founder-actions', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 14.2, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.537819Z'}
+INFO     veda.http:logging.py:173 {'request_id': '88b6f5c4a04948f4', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.1, '_aws': {'Timestamp': 1790686723540, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.540315Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '204c32ca67ba71ab', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 4.5, '_aws': {'Timestamp': 1790686723545, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.5, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:43.545209Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '63425b3f1169dae3', 'method': 'POST', 'route': '/api/v1/auth/email/verify', 'status': 503, 'duration_ms': 1018.5, '_aws': {'Timestamp': 1790686724564, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/email/verify', 'StatusClass': '5xx', 'Requests': 1, 'Latency': 1018.5, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:44.564223Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'd378d37a76dd04da', 'method': 'POST', 'route': '/api/v1/approvals/<approval_id>/approve', 'status': 200, 'duration_ms': 1037.5, '_aws': {'Timestamp': 1790686724583, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/approvals/<approval_id>/approve', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 1037.5, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:44.583379Z'}
+_______ test_IR04_concurrent_promotion_and_standard_approval[postgresql] _______
+
+app = <Flask 'veda'>, api = <tests.support.api.ApiClient object at 0x114025cd0>
+factory = <tests.support.factory.Factory object at 0x113e34500>
+
+    def test_IR04_concurrent_promotion_and_standard_approval(app, api, factory):
+        f1, f2 = factory.user(founder=True), factory.user(founder=True)
+        admin_a, admin_b, a2 = factory.user("ADMIN"), factory.user("ADMIN"), factory.user("ADMIN")
+        factory.login(api, admin_a)
+        standard = api.post(
+            f"/api/v1/users/{a2.id}/email-change",
+            {"new_email": "x@vedaspaces.test", "reason": "rename"},
+            if_match=_version(api, a2.id),
+        ).data["approval_id"]
+        factory.login(api, f1)
+        founder_req = request(api, "GRANT_FOUNDER", a2.id).data["approval_id"]
+        t_f2, t_b = factory.login(api, f2, set_default=False), factory.login(api, admin_b, set_default=False)
+        barrier = threading.Barrier(2)
+        out = {}
+    
+        def approve(name, approval, token):
+            c = ApiClient(app.test_client())
+            barrier.wait()
+            out[name] = c.post(f"/api/v1/approvals/{approval}/approve", {"reason": "go"}, token=token)
+    
+        threads = [
+            threading.Thread(target=approve, args=("founder", founder_req, t_f2)),
+            threading.Thread(target=approve, args=("standard", standard, t_b)),
+        ]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
+        founder_row, standard_row = get(AdminApprovalRequest, founder_req), get(AdminApprovalRequest, standard)
+>       assert founder_row.status == "EXECUTED"
+E       AssertionError: assert 'PENDING' == 'EXECUTED'
+E         
+E         - EXECUTED
+E         + PENDING
+
+tests/integration/test_governance_remediation.py:126: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"request_id": "9a0c5d7dd6cc3de9", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 7.4, "_aws": {"Timestamp": 1790686732006, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 7.4, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.006994Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.014641Z", "_aws": {"Timestamp": 1790686732014, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.020981Z", "_aws": {"Timestamp": 1790686732020, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "9baffebee62ce29a", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 13.9, "_aws": {"Timestamp": 1790686732021, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 13.9, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.021324Z"}
+{"request_id": "4bf38d0e50c72003", "method": "GET", "route": "/api/v1/users/<user_id>", "status": 200, "duration_ms": 15.5, "_aws": {"Timestamp": 1790686732037, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/users/<user_id>", "StatusClass": "2xx", "Requests": 1, "Latency": 15.5, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.037276Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.041929Z", "_aws": {"Timestamp": 1790686732041, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.047259Z", "_aws": {"Timestamp": 1790686732047, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "APPROVAL_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "7f952e5066164dae", "method": "POST", "route": "/api/v1/users/<user_id>/email-change", "status": 202, "duration_ms": 11.8, "_aws": {"Timestamp": 1790686732049, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/users/<user_id>/email-change", "StatusClass": "2xx", "Requests": 1, "Latency": 11.8, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.049525Z"}
+{"request_id": "6e0a31c053129e9d", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.3, "_aws": {"Timestamp": 1790686732052, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.3, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.052222Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.055043Z", "_aws": {"Timestamp": 1790686732054, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.057067Z", "_aws": {"Timestamp": 1790686732057, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "a85dedd4bd198d34", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 4.8, "_aws": {"Timestamp": 1790686732057, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 4.8, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.057380Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.070547Z", "_aws": {"Timestamp": 1790686732070, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_ACTION_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.071552Z", "_aws": {"Timestamp": 1790686732071, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "7e9fd4be03128ee6", "method": "POST", "route": "/api/v1/founder-actions", "status": 202, "duration_ms": 14.1, "_aws": {"Timestamp": 1790686732071, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/founder-actions", "StatusClass": "2xx", "Requests": 1, "Latency": 14.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.071827Z"}
+{"request_id": "f7de943823c059d7", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.1, "_aws": {"Timestamp": 1790686732074, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.074254Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.076643Z", "_aws": {"Timestamp": 1790686732076, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.078579Z", "_aws": {"Timestamp": 1790686732078, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "082e4189e9f42132", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 4.3, "_aws": {"Timestamp": 1790686732078, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 4.3, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.078907Z"}
+{"request_id": "16853dcc8c5dfe4e", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 2.3, "_aws": {"Timestamp": 1790686732081, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 2.3, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.081605Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.084050Z", "_aws": {"Timestamp": 1790686732084, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "MFA_CHALLENGE", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.085686Z", "_aws": {"Timestamp": 1790686732085, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "5fe6f87438657a7a", "method": "POST", "route": "/api/v1/auth/mfa/verify", "status": 200, "duration_ms": 4.0, "_aws": {"Timestamp": 1790686732085, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/mfa/verify", "StatusClass": "2xx", "Requests": 1, "Latency": 4.0, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.085980Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.100064Z", "_aws": {"Timestamp": 1790686732100, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "APPROVAL_APPROVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.100711Z", "_aws": {"Timestamp": 1790686732100, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.110989Z", "_aws": {"Timestamp": 1790686732110, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "EMAIL_CHANGE_REQUESTED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "9bcaf42acbfc9553", "method": "POST", "route": "/api/v1/approvals/<approval_id>/approve", "status": 200, "duration_ms": 26.6, "_aws": {"Timestamp": 1790686732113, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/approvals/<approval_id>/approve", "StatusClass": "2xx", "Requests": 1, "Latency": 26.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.113153Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.123993Z", "_aws": {"Timestamp": 1790686732123, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "FOUNDER_ACTION_APPROVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:58:52.124805Z", "_aws": {"Timestamp": 1790686732124, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SENSITIVE_ACTION", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "unhandled_error", "level": "error", "logger": "veda.app", "ts": "2026-09-29T12:58:52.164674Z", "error_type": "IntegrityError", "error_fingerprint": "421f3ed900427657", "stack": ["<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py:166 __exit__", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py:4640 _flush", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py:467 execute", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py:643 execute", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py:84 _save_obj", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py:889 _emit_update_statements", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1448 execute", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py:533 _execute_on_connection", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1668 _execute_clauseelement", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1822 _execute_context", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1962 _exec_single_context", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:2332 _handle_dbapi_exception", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1943 _exec_single_context", "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py:1180 do_execute", "<clean-copy>/api/.venv/lib/python3.13/site-packages/psycopg/cursor.py:117 execute"]}
+{"request_id": "357c8b489a4bd721", "method": "POST", "route": "/api/v1/approvals/<approval_id>/approve", "status": 500, "duration_ms": 79.1, "_aws": {"Timestamp": 1790686732165, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/approvals/<approval_id>/approve", "StatusClass": "5xx", "Requests": 1, "Latency": 79.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:58:52.165756Z"}
+------------------------------ Captured log call -------------------------------
+INFO     veda.http:logging.py:173 {'request_id': '9a0c5d7dd6cc3de9', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 7.4, '_aws': {'Timestamp': 1790686732006, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 7.4, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.006994Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '9baffebee62ce29a', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 13.9, '_aws': {'Timestamp': 1790686732021, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 13.9, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.021324Z'}
+INFO     veda.http:logging.py:173 {'request_id': '4bf38d0e50c72003', 'method': 'GET', 'route': '/api/v1/users/<user_id>', 'status': 200, 'duration_ms': 15.5, '_aws': {'Timestamp': 1790686732037, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/users/<user_id>', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 15.5, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.037276Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '7f952e5066164dae', 'method': 'POST', 'route': '/api/v1/users/<user_id>/email-change', 'status': 202, 'duration_ms': 11.8, '_aws': {'Timestamp': 1790686732049, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/users/<user_id>/email-change', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 11.8, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.049525Z'}
+INFO     veda.http:logging.py:173 {'request_id': '6e0a31c053129e9d', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.3, '_aws': {'Timestamp': 1790686732052, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.3, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.052222Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'a85dedd4bd198d34', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 4.8, '_aws': {'Timestamp': 1790686732057, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.8, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.057380Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '7e9fd4be03128ee6', 'method': 'POST', 'route': '/api/v1/founder-actions', 'status': 202, 'duration_ms': 14.1, '_aws': {'Timestamp': 1790686732071, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/founder-actions', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 14.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.071827Z'}
+INFO     veda.http:logging.py:173 {'request_id': 'f7de943823c059d7', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.1, '_aws': {'Timestamp': 1790686732074, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.074254Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '082e4189e9f42132', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 4.3, '_aws': {'Timestamp': 1790686732078, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.3, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.078907Z'}
+INFO     veda.http:logging.py:173 {'request_id': '16853dcc8c5dfe4e', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 2.3, '_aws': {'Timestamp': 1790686732081, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 2.3, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.081605Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '5fe6f87438657a7a', 'method': 'POST', 'route': '/api/v1/auth/mfa/verify', 'status': 200, 'duration_ms': 4.0, '_aws': {'Timestamp': 1790686732085, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/mfa/verify', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.0, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.085980Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '9bcaf42acbfc9553', 'method': 'POST', 'route': '/api/v1/approvals/<approval_id>/approve', 'status': 200, 'duration_ms': 26.6, '_aws': {'Timestamp': 1790686732113, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/approvals/<approval_id>/approve', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 26.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.113153Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+ERROR    veda.app:app.py:213 unhandled_error
+Traceback (most recent call last):
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 1180, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.CheckViolation: new row for relation "user_action_token" violates check constraint "ck_user_action_token__updated_after_created"
+DETAIL:  Failing row contains (01a0ed3f-1f4c-7761-8194-c93ca596a60e, 2026-09-29 18:30:56.086675+05:30, 2026-09-29 18:30:56.086627+05:30, 01a0ed3f-1ed9-7649-a16d-9e984ff087af, 01a0ed3f-1ed3-74df-9d49-6de208b6132b, f, null, null, 2, 01a0ed3f-1edc-7207-ad59-03cde9b63abd, EMAIL_VERIFICATION, 485d95012e9af19da167ff3efe9b40ff836ea78fbe5bd38c5160d453f598bad4, 2026-09-29 19:30:56.086675+05:30, x@vedaspaces.test, null, 2026-09-29 18:30:56.086627+05:30, 127.0.0.1).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "<clean-copy>/api/veda/kernel/http.py", line 511, in view
+    return dispatch(spec, kwargs)
+  File "<clean-copy>/api/veda/kernel/http.py", line 630, in dispatch
+    result = spec.handler(req, **path_params)
+  File "<clean-copy>/api/veda/platform/rbac/routes.py", line 442, in approve
+    governance.approve(req.session, req.ctx, r, req.body.reason)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<clean-copy>/api/veda/platform/rbac/governance.py", line 573, in approve
+    execute(s, req)
+    ~~~~~~~^^^^^^^^
+  File "<clean-copy>/api/veda/platform/rbac/governance.py", line 470, in execute
+    _execute_founder(s, req)
+    ~~~~~~~~~~~~~~~~^^^^^^^^
+  File "<clean-copy>/api/veda/platform/rbac/governance.py", line 414, in _execute_founder
+    revalidate_after_escalation(s, target, before, "TARGET_BECAME_FOUNDER")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<clean-copy>/api/veda/platform/rbac/governance.py", line 153, in revalidate_after_escalation
+    security_events.record(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        s,
+        ^^
+    ...<3 lines>...
+        detail={"proposed_email": mask_email(proposed), "reason": reason, "status": f"{before}->{after}"},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/veda/platform/auth/security_events.py", line 327, in record
+    row = _build(session, event_type, outcome, current_actor(), clock.now(), **fields)
+  File "<clean-copy>/api/veda/platform/auth/security_events.py", line 288, in _build
+    seq, prev = _chain_head(session)
+                ~~~~~~~~~~~^^^^^^^^^
+  File "<clean-copy>/api/veda/platform/auth/security_events.py", line 253, in _chain_head
+    session.execute(sa.text("SELECT pg_advisory_xact_lock(7845120001)"))  # A-13
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2473, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2346, in _execute_internal
+    self._autoflush()
+    ~~~~~~~~~~~~~~~^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 3200, in _autoflush
+    raise e.with_traceback(sys.exc_info()[2])
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 3189, in _autoflush
+    self.flush()
+    ~~~~~~~~~~^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4536, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "<sqlalchemy generated warned() wrapper for sqlalchemy.orm.session.Session._flush>", line 2, in _flush
+    return target(fn, self, objects=objects)
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4679, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py", line 166, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4640, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 467, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 643, in execute
+    util.preloaded.orm_persistence._save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 84, in _save_obj
+    _emit_update_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        update,
+        ^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 889, in _emit_update_statements
+    c = connection.execute(
+        statement, params, execution_options=execution_options
+    )
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1448, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py", line 533, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1668, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<9 lines>...
+        param_dict=param_dict,
+    )
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1822, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1962, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 2332, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1943, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 1180, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "<clean-copy>/api/.venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+sqlalchemy.exc.IntegrityError: (raised as a result of Query-invoked autoflush; consider using a session.no_autoflush block if this flush is occurring prematurely)
+(psycopg.errors.CheckViolation) new row for relation "user_action_token" violates check constraint "ck_user_action_token__updated_after_created"
+DETAIL:  Failing row contains (01a0ed3f-1f4c-7761-8194-c93ca596a60e, 2026-09-29 18:30:56.086675+05:30, 2026-09-29 18:30:56.086627+05:30, 01a0ed3f-1ed9-7649-a16d-9e984ff087af, 01a0ed3f-1ed3-74df-9d49-6de208b6132b, f, null, null, 2, 01a0ed3f-1edc-7207-ad59-03cde9b63abd, EMAIL_VERIFICATION, 485d95012e9af19da167ff3efe9b40ff836ea78fbe5bd38c5160d453f598bad4, 2026-09-29 19:30:56.086675+05:30, x@vedaspaces.test, null, 2026-09-29 18:30:56.086627+05:30, 127.0.0.1).
+[SQL: UPDATE user_action_token SET updated_on=%(updated_on)s::TIMESTAMP WITH TIME ZONE, updated_by=%(updated_by)s::UUID, version=%(version)s::INTEGER, invalidated_on=%(invalidated_on)s::TIMESTAMP WITH TIME ZONE WHERE user_action_token.id = %(user_action_token_id)s::UUID AND user_action_token.version = %(user_action_token_version)s::INTEGER]
+[SQL parameters hidden due to hide_parameters=True]
+(Background on this error at: https://sqlalche.me/e/21/gkpj)
+INFO     veda.http:logging.py:173 {'request_id': '357c8b489a4bd721', 'method': 'POST', 'route': '/api/v1/approvals/<approval_id>/approve', 'status': 500, 'duration_ms': 79.1, '_aws': {'Timestamp': 1790686732165, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/approvals/<approval_id>/approve', 'StatusClass': '5xx', 'Requests': 1, 'Latency': 79.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:58:52.165756Z'}
+=========================== short test summary info ============================
+SKIPPED [2] tests/integration/test_archive_ordering.py:266: snapshots and the database-volume check are SQLite-only (the P0 production engine)
+SKIPPED [1] tests/integration/test_backups.py:19: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:25: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:31: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:42: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:47: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:58: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_schema.py:93: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:354: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+2 failed, 523 passed, 10 skipped in 106.87s (0:01:46)
+{"event": "Exiting 76693 remaining pids=[76693]", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T12:59:51.942895Z"}
+{"event": "Cleaning last handle for server: <tmp>", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T12:59:51.942975Z"}

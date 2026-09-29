@@ -1,0 +1,296 @@
+FFFFFFFFFFFFFFFFF                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_mypy_missing_or_not_run_fails ______________________
+
+    def test_mypy_missing_or_not_run_fails():
+>       with pytest.raises(ratchet.RatchetError, match="no summary"):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:38: AttributeError
+___________________ test_mypy_crash_or_invalid_config_fails ____________________
+
+    def test_mypy_crash_or_invalid_config_fails():
+>       with pytest.raises(ratchet.RatchetError, match="exited 2"):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:47: AttributeError
+______________________ test_targets_that_do_not_load_fail ______________________
+
+    def test_targets_that_do_not_load_fail():
+>       with pytest.raises(ratchet.RatchetError, match="checked 0 source files"):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:52: AttributeError
+____________________ test_exit_code_and_findings_must_agree ____________________
+
+    def test_exit_code_and_findings_must_agree():
+>       with pytest.raises(ratchet.RatchetError, match="does not match"):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:59: AttributeError
+_________ test_malformed_or_grown_baseline_fails[{not json-unreadable] _________
+
+tree = PosixPath('<tmp>')
+data = '{not json', message = 'unreadable'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+__________ test_malformed_or_grown_baseline_fails[[1, 2]-JSON object] __________
+
+tree = PosixPath('<tmp>')
+data = '[1, 2]', message = 'JSON object'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+____ test_malformed_or_grown_baseline_fails[data2-not a veda/ source file] _____
+
+tree = PosixPath('<tmp>')
+data = {'other/a.py': 1}, message = 'not a veda/ source file'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+_________ test_malformed_or_grown_baseline_fails[data3-does not exist] _________
+
+tree = PosixPath('<tmp>')
+data = {'veda/gone.py': 1}, message = 'does not exist'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+________ test_malformed_or_grown_baseline_fails[data4-positive integer] ________
+
+tree = PosixPath('<tmp>')
+data = {'veda/a.py': 0}, message = 'positive integer'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+________ test_malformed_or_grown_baseline_fails[data5-positive integer] ________
+
+tree = PosixPath('<tmp>')
+data = {'veda/a.py': '3'}, message = 'positive integer'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+________ test_malformed_or_grown_baseline_fails[data6-positive integer] ________
+
+tree = PosixPath('<tmp>')
+data = {'veda/a.py': 1.5}, message = 'positive integer'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+__ test_malformed_or_grown_baseline_fails[data7-exceeds the reviewed ceiling] __
+
+tree = PosixPath('<tmp>')
+data = {'veda/a.py': 200}, message = 'exceeds the reviewed ceiling'
+
+    @pytest.mark.parametrize(
+        "data,message",
+        [
+            ("{not json", "unreadable"),
+            ("[1, 2]", "JSON object"),
+            ({"other/a.py": 1}, "not a veda/ source file"),
+            ({"veda/gone.py": 1}, "does not exist"),
+            ({"veda/a.py": 0}, "positive integer"),
+            ({"veda/a.py": "3"}, "positive integer"),
+            ({"veda/a.py": 1.5}, "positive integer"),
+            ({"veda/a.py": 200}, "exceeds the reviewed ceiling"),
+        ],
+    )
+    def test_malformed_or_grown_baseline_fails(tree, data, message):
+>       with pytest.raises(ratchet.RatchetError, match=message):
+                           ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'RatchetError'
+
+tests/unit/test_mypy_ratchet.py:80: AttributeError
+_____________________ test_new_renamed_or_worse_files_fail _____________________
+
+capsys = <_pytest.capture.CaptureFixture object at 0x10adbb380>
+
+    def test_new_renamed_or_worse_files_fail(capsys):
+        baseline = {"veda/a.py": 2}
+>       assert ratchet.check(Counter({"veda/a.py": 2}), baseline, []) == 0
+               ^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'check'
+
+tests/unit/test_mypy_ratchet.py:86: AttributeError
+_________________________ test_broad_suppressions_fail _________________________
+
+tree = PosixPath('<tmp>')
+
+    def test_broad_suppressions_fail(tree):
+>       assert ratchet.broad_suppressions(tree) == []
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'broad_suppressions'
+
+tests/unit/test_mypy_ratchet.py:96: AttributeError
+_________________ test_update_only_lowers_and_never_runs_in_ci _________________
+
+tmp_path = PosixPath('<tmp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ae6ce90>
+capsys = <_pytest.capture.CaptureFixture object at 0x10add2ad0>
+
+    def test_update_only_lowers_and_never_runs_in_ci(tmp_path, monkeypatch, capsys):
+        path = _baseline(tmp_path, {"veda/a.py": 3, "veda/b.py": 1})
+        monkeypatch.setenv("CI", "true")
+>       assert ratchet.update(Counter({"veda/a.py": 1}), {"veda/a.py": 3, "veda/b.py": 1}, path) == 2
+               ^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'update'
+
+tests/unit/test_mypy_ratchet.py:116: AttributeError
+______________________ test_unknown_arguments_are_refused ______________________
+
+    def test_unknown_arguments_are_refused():
+>       assert ratchet.main(["--updte"]) == 2
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: main() takes 0 positional arguments but 1 was given
+
+tests/unit/test_mypy_ratchet.py:128: TypeError
+_________________ test_the_repository_baseline_is_well_formed __________________
+
+    def test_the_repository_baseline_is_well_formed():
+>       baseline = ratchet.load_baseline()
+                   ^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'mypy_ratchet' has no attribute 'load_baseline'
+
+tests/unit/test_mypy_ratchet.py:132: AttributeError
+=========================== short test summary info ============================
+FAILED tests/unit/test_mypy_ratchet.py::test_mypy_missing_or_not_run_fails - ...
+FAILED tests/unit/test_mypy_ratchet.py::test_mypy_crash_or_invalid_config_fails
+FAILED tests/unit/test_mypy_ratchet.py::test_targets_that_do_not_load_fail - ...
+FAILED tests/unit/test_mypy_ratchet.py::test_exit_code_and_findings_must_agree
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[{not json-unreadable]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[[1, 2]-JSON object]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data2-not a veda/ source file]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data3-does not exist]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data4-positive integer]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data5-positive integer]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data6-positive integer]
+FAILED tests/unit/test_mypy_ratchet.py::test_malformed_or_grown_baseline_fails[data7-exceeds the reviewed ceiling]
+FAILED tests/unit/test_mypy_ratchet.py::test_new_renamed_or_worse_files_fail
+FAILED tests/unit/test_mypy_ratchet.py::test_broad_suppressions_fail - Attrib...
+FAILED tests/unit/test_mypy_ratchet.py::test_update_only_lowers_and_never_runs_in_ci
+FAILED tests/unit/test_mypy_ratchet.py::test_unknown_arguments_are_refused - ...
+FAILED tests/unit/test_mypy_ratchet.py::test_the_repository_baseline_is_well_formed
+17 failed in 0.12s

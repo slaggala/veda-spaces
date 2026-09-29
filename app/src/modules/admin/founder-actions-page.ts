@@ -14,6 +14,7 @@ const ACTIONS = [
   ['FOUNDER_MFA_RESET', "Reset a Founder's MFA"],
   ['FOUNDER_STATUS_CHANGE', 'Change a Founder account status'],
   ['FOUNDER_EMAIL_CHANGE', "Change a Founder's sign-in email"],
+  ['RESTORE_FOUNDER', 'Restore a deleted Founder (returns deactivated)'],
 ] as const;
 
 const ERR: Record<string, string> = {
@@ -21,13 +22,15 @@ const ERR: Record<string, string> = {
   SELF_MODIFICATION_DENIED: 'You can only target yourself for a Founder step-down.',
   REQUEST_ALREADY_OPEN: 'A Founder-level request for this person is already open.',
   LAST_FOUNDER: 'This would leave no active Founder.',
+  SECOND_FOUNDER_REQUIRED: 'Restoring a Founder needs a second eligible Founder to approve in the app.',
   REASON_REQUIRED: 'A reason is required.',
 };
 
 /** Founder-governance requests (06 §7.2, 08 §5.11). Approval happens in the Approvals inbox or by a custodian. */
 export class VsFounderActionsPage extends SessionElement {
-  static override properties = { users: { state: true }, roles: { state: true }, action: { state: true }, problem: { state: true }, result: { state: true }, busy: { state: true } };
+  static override properties = { users: { state: true }, deleted: { state: true }, roles: { state: true }, action: { state: true }, problem: { state: true }, result: { state: true }, busy: { state: true } };
   declare users: UserListItem[];
+  declare deleted: UserListItem[];
   declare roles: Role[];
   declare action: string;
   declare problem: ApiProblem | null;
@@ -38,6 +41,7 @@ export class VsFounderActionsPage extends SessionElement {
   constructor() {
     super();
     this.users = [];
+    this.deleted = [];
     this.roles = [];
     this.action = 'GRANT_FOUNDER';
     this.problem = null;
@@ -47,13 +51,23 @@ export class VsFounderActionsPage extends SessionElement {
   override connectedCallback() {
     super.connectedCallback();
     void fetchAll<UserListItem>('/api/v1/users').then((u) => (this.users = u)).catch((e) => (this.problem = e));
+    // Deleted Founders are restored only through this dual-control request, never the generic user restore (OD-2).
+    if (this.can('user.restore')) {
+      void fetchAll<UserListItem>('/api/v1/users', { include_deleted: 'true' })
+        .then((u) => (this.deleted = u.filter((x) => x.is_deleted && x.protection_level === 'FOUNDER')))
+        .catch(() => undefined);
+    }
     if (this.can('role.read')) void loadRoles().then((r) => (this.roles = r)).catch(() => undefined);
   }
   private async submit(e: Event) {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
     const v = (n: string) => ((f.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '').trim();
-    const body: Record<string, unknown> = { action: this.action, target_user_id: v('target_user_id'), reason: v('reason') };
+    const restore = this.action === 'RESTORE_FOUNDER';
+    const body: Record<string, unknown> = {
+      action: restore ? 'FOUNDER_STATUS_CHANGE' : this.action, target_user_id: v('target_user_id'), reason: v('reason'),
+    };
+    if (restore) body.status = 'RESTORE';
     if (this.action === 'FOUNDER_STATUS_CHANGE') body.status = v('status');
     if (this.action === 'FOUNDER_EMAIL_CHANGE') body.new_email = v('new_email');
     if (this.action === 'REVOKE_FOUNDER') {
@@ -76,7 +90,8 @@ export class VsFounderActionsPage extends SessionElement {
   }
   override render() {
     const founders = this.users.filter((u) => u.protection_level === 'FOUNDER');
-    const targets = this.action === 'GRANT_FOUNDER' ? this.users.filter((u) => u.protection_level !== 'FOUNDER' && u.status === 'ACTIVE') : founders;
+    const targets = this.action === 'GRANT_FOUNDER' ? this.users.filter((u) => u.protection_level !== 'FOUNDER' && u.status === 'ACTIVE')
+      : this.action === 'RESTORE_FOUNDER' ? this.deleted : founders;
     return html`<div class="page">
       <div class="page-head"><div><p class="eyebrow">Governance</p><h1 class="display">Founder actions</h1></div></div>
       <vs-banner kind="info">Founder-level changes always need a second person. With two or more eligible Founders another Founder approves in the app.

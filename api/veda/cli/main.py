@@ -14,21 +14,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from datetime import timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+log = logging.getLogger("veda.cli")
 
 
 def _settings():
     from veda import config
     from veda.kernel import db
+    from veda.kernel.logging import configure_logging
 
     s = config.settings()  # an in-process caller (tests) may have configured settings already
     problems = config.validate_environment(s)
     if problems:
         raise SystemExit(f"unsafe {s.env} configuration: " + "; ".join(problems))
+    # CLI, worker and scheduler processes emit the same JSON log lines and EMF metrics as the API (RR-07).
+    configure_logging(s.log_level)
     try:
         db.engine()
     except RuntimeError:
@@ -162,21 +167,52 @@ JOBS = {
 
 
 def cmd_maintenance(args) -> int:
+    from veda.kernel import metrics
     from veda.platform import maintenance
 
     _settings()
-    result = getattr(maintenance, JOBS[args.job])()
+    try:
+        result = getattr(maintenance, JOBS[args.job])()
+    except Exception:
+        # A job that raises is a durable failure: a CRITICAL line and a metric the alarm watches (RR-07).
+        log.critical("maintenance_job_failed job=%s", args.job, exc_info=True)
+        metrics.emit("MaintenanceJobFailed", 1, dimensions={"Job": args.job})
+        return 1
     if hasattr(result, "__dataclass_fields__"):
         result = result.__dict__
     print(json.dumps(result, default=str))
-    if args.job == "verify-chain" and not result.get("ok", True):
-        return 3
-    return 0
+    failed = args.job == "verify-chain" and not result.get("ok", True)
+    metrics.emit("MaintenanceJobFailed", 1 if failed else 0, dimensions={"Job": args.job})
+    return 3 if failed else 0
+
+
+JOB_TIMEOUT_SECONDS = 3600
+
+
+def run_scheduled_job(job: str) -> int:
+    """Run one maintenance job in its own process and record its exit status (RR-07): every run emits
+    ScheduledJobFailed (0 or 1) per job, and a non-zero exit or timeout is logged at ERROR with the code."""
+    import subprocess
+
+    from veda.kernel import metrics
+
+    try:
+        code = subprocess.run(
+            [sys.executable, "-m", "veda.cli", "maintenance", job], check=False, timeout=JOB_TIMEOUT_SECONDS
+        ).returncode
+    except subprocess.TimeoutExpired:
+        code = -1
+    except OSError:
+        log.critical("scheduled_job_not_started job=%s", job, exc_info=True)
+        code = -2
+    metrics.emit("ScheduledJobFailed", 0 if code == 0 else 1, dimensions={"Job": job})
+    if code != 0:
+        log.error("scheduled_job_failed job=%s exit_code=%s", job, code)
+    return code
 
 
 def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
     """Periodic jobs. Jobs that lift evidence-store guards run as separate short-lived processes (A-02)."""
-    import subprocess
     import time as _time
     from datetime import datetime
     from zoneinfo import ZoneInfo
@@ -196,14 +232,35 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
     ran: set[str] = set()
     while True:
         for job in frequent:
-            subprocess.run([sys.executable, "-m", "veda.cli", "maintenance", job], check=False)
+            run_scheduled_job(job)
         now = datetime.now(ZoneInfo("Asia/Kolkata"))
         for at, job in daily.items():
             key = f"{now.date()}:{job}"
             if now.strftime("%H:%M") >= at and key not in ran:
-                subprocess.run([sys.executable, "-m", "veda.cli", "maintenance", job], check=False)
+                run_scheduled_job(job)
                 ran.add(key)
         _time.sleep(300)
+
+
+def cmd_schema_status(args) -> int:
+    """Database revision against this image, run inside the container by deploy.sh (RR-17): the readiness detail
+    is not reachable from the host under the compose topology. ``--require-known REV`` exits 4 when this image
+    does not know REV — how deploy.sh refuses a rollback target older than the release's rollback floor."""
+    from veda.platform import health
+
+    _settings()
+    current = health.current_revision()
+    known = health.known_revisions()
+    out: dict[str, object] = {
+        "current": current,
+        "image_head": health.alembic_head(),
+        "state": health.schema_state(current),
+    }
+    if args.require_known:
+        out["floor"] = args.require_known
+        out["floor_known"] = args.require_known in known
+    print(json.dumps(out))
+    return 4 if args.require_known and args.require_known not in known else 0
 
 
 def cmd_break_glass(args) -> int:
@@ -325,6 +382,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("maintenance")
     p.add_argument("job", choices=sorted(JOBS))
     p.set_defaults(fn=cmd_maintenance)
+    p = sub.add_parser("schema-status")
+    p.add_argument("--require-known", default=None)
+    p.set_defaults(fn=cmd_schema_status)
     p = sub.add_parser("break-glass")
     p.add_argument("action", choices=["request", "approve", "execute"])
     p.add_argument("--principal-arn", default=None)

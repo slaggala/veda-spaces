@@ -1,0 +1,2188 @@
+{
+  "matrix": "P0 final merge-blocker remediation matrix",
+  "rereview": "review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305",
+  "previous_head": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
+  "branch": "implementation/p0-foundation",
+  "owner_decision_numbering": "Owner decisions use the numbering of the remediation brief: OD-1 = re-review OD-1 + OD-2 (amendments; AM-7 rejected as written), OD-2 = re-review OD-3 (deleted-Founder restore), OD-3 = execution-time revalidation (new, RR-03), OD-4 = re-review OD-4 (TG-01, TG-08), OD-5 = re-review OD-5 (merge = site deploy). Re-review OD-6…OD-8 are unchanged and not decided.",
+  "counts": {
+    "findings": 18,
+    "advisories": 25,
+    "reconciliation_residuals": 34,
+    "owner_decisions": 5
+  },
+  "items": [
+    {
+      "id": "RR-01",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "Site-wide CSP blocks the 404 page's inline stylesheet; because a push to main deploys dist/ to www.vedaspaces.com, merging ships a broken 404 page to production",
+      "evidence": [
+        "dist/_headers:2 — style-src 'self' https://fonts.googleapis.com (no 'unsafe-inline', no hash), applied to /*",
+        "dist/404.html:15-44 — inline <style> block, unchanged since 778aa8f; sha256-nsu5zW5KZLyHAh1E42iLcu9GL6H14jnCxGdJDe3Q5v4=",
+        "Chromium: style-src-elem violation on /404.html, /no-such-page and /privacy; page renders unstyled; 778aa8f renders correctly",
+        "README.md:43-45 and deployment.md:31 — a push to main deploys dist/ to production within a minute",
+        "site e2e checks CSP on index.html only (missed this)"
+      ],
+      "root_cause": "The 404 page kept an inline <style> block while the site CSP (style-src 'self' fonts) applies to every path; the site E2E checked only index.html.",
+      "files_changed": [
+        "dist/404.html",
+        "dist/assets/404.css (new)",
+        "app/e2e/site.e2e.mjs",
+        "app/e2e/axe.e2e.mjs"
+      ],
+      "requirements": [
+        "SEC-003",
+        "Public site availability",
+        "deployment.md release checklist"
+      ],
+      "remediation": "Styles moved verbatim to /assets/404.css; copper and footer text darkened to meet WCAG AA contrast (axe found 4 pre-existing contrast failures once the page rendered). No CSP directive changed; no unsafe-inline, hash or nonce added. Browser tests load /no-such-page (HTTP 404), /404.html and /privacy under the exact _headers and assert computed styles, zero inline style/script/handlers, 0 CSP violations, a single column at 360 px, keyboard focus ring, and that the homepage still loads its stylesheet; axe scans the 404 page.",
+      "regression_tests": [
+        "app/e2e/site.e2e.mjs (404 cases, homepage check)",
+        "app/e2e/axe.e2e.mjs ('404 page')"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "Cleared by the fix",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "merge (merge = production site deploy)",
+      "review_stages": [
+        "merge",
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED (verified locally; CI and final targeted check pending)",
+      "note": "Real Cloudflare Pages preview not exercised; the static server applies _headers the same way (merge-safety plan §2)."
+    },
+    {
+      "id": "RR-02",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "A single Founder can restore a Founder deleted through dual-Founder approval (G11 bypass; no governance record)",
+      "evidence": [
+        "api/veda/platform/rbac/users.py:253-262 — restore_user applies only G9 (passes Founder→Founder); no G3, no G11, no InvariantGuard, no security event",
+        "api/veda/platform/rbac/guards.py:176-192 — deleted Founder keeps FOUNDER user_role and protection_level",
+        "P11/N11: F1+F2 delete F3 (EXECUTED); F1 alone POST /users/{F3}/restore → 200; F3 back as DISABLED FOUNDER-protected account"
+      ],
+      "root_cause": "restore_user applied only G9, which passes Founder→Founder; deleted Founders keep FOUNDER protection and role, and no Founder-governed restore existed.",
+      "files_changed": [
+        "api/veda/platform/rbac/users.py",
+        "api/veda/platform/rbac/governance.py",
+        "api/veda/platform/rbac/routes.py",
+        "app/src/modules/admin/founder-actions-page.ts",
+        "app/src/modules/admin/user-drawer.ts",
+        "api/openapi.snapshot.json"
+      ],
+      "requirements": [
+        "RBAC-020",
+        "RBAC-021",
+        "06 §7.1 G9/G11",
+        "06 §7.2.2",
+        "06 §7.2.6"
+      ],
+      "remediation": "OD-2 implemented: generic restore applies G3 and G11 (403 FOUNDER_PROTECTED + FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE via the canonical workflow (requester ≠ approver ≠ target, one decision, eligibility at request/approval/execution, execution re-validates deleted state and address, invariants re-checked); refused on single-Founder and custodian break-glass (SECOND_FOUNDER_REQUIRED). Audited (approver as actor) and security-logged (REQUESTED/APPROVED/TRANSITION RESTORE/EXECUTED). Generic status/unlock/roles/permissions/Founder actions address only live accounts (404). SPA: restore action on the Founder actions page; drawer links there for Founders.",
+      "regression_tests": [
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_P11_single_founder_cannot_restore_a_deleted_founder",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_generic_endpoints_cannot_restore_a_founder",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_two_distinct_founders_restore_through_the_workflow",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_single_eligible_founder_cannot_use_break_glass_to_restore",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_custodian_break_glass_cannot_restore_a_founder",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_revoked_approver_or_requester_eligibility_blocks_execution",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_stale_restore_fails_closed",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_concurrent_restore_requests_and_approvals",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_standard_restore_unchanged_and_audited"
+      ],
+      "amendment": "AM-12 (06 §7.2.2)",
+      "owner_decision": "OD-2 given; AM-12 approval pending",
+      "merge_impact": "Cleared by the fix (OD-2 implemented); AM-12 decision pending",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "merge (Founder-governance invariant; same class as IR-04)",
+      "review_stages": [
+        "merge",
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED — AMENDMENT AM-12 PENDING OWNER DECISION",
+      "note": ""
+    },
+    {
+      "id": "RR-03",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "An executed STANDARD email change stays pending through GRANT_FOUNDER and can be verified on the new Founder",
+      "evidence": [
+        "api/veda/platform/rbac/governance.py:160-178,325 — only open STANDARD requests are cancelled on GRANT_FOUNDER; proposed_email is never cleared (no reference in governance.py)",
+        "api/veda/platform/auth/service.py:887-923 — verify_email_change has no protection-level check",
+        "N17: ADMIN email change of ADMIN a2 executed → a2 promoted → anonymous POST /auth/email/verify 204 → Founder email = attacker address"
+      ],
+      "root_cause": "Only open STANDARD requests were cancelled on promotion; an executed request's email proposal persisted and verification had no governance check.",
+      "files_changed": [
+        "api/veda/platform/rbac/governance.py",
+        "api/veda/platform/rbac/users.py",
+        "api/veda/platform/auth/service.py",
+        "api/veda/platform/rbac/guards.py",
+        "api/veda/kernel/db.py"
+      ],
+      "requirements": [
+        "RBAC-020",
+        "USER-007",
+        "06 §7.1 G11",
+        "06 §7.2.2 FOUNDER_EMAIL_CHANGE"
+      ],
+      "remediation": "OD-3 implemented: governance classes (STANDARD_CONTROL < DUAL_CONTROL < FOUNDER_GOVERNANCE); any class increase (GRANT_FOUNDER, roles, permissions) cancels open STANDARD requests (for Founders) and clears a pending non-self email proposal with its links, recording EMAIL_CHANGE_CANCELLED with reason and class transition; verification recomputes the proposal's authorising class (self / direct / EMAIL_CHANGE / FOUNDER_EMAIL_CHANGE) against the current class and refuses weaker authorisation or a disabled account (EMAIL_CHANGE_VERIFIED FAILURE, FOUNDER_GOVERNANCE_BYPASS_BLOCKED). Founder-level and break-glass requests re-validate the target at execution (existing, now tested for status and post-approval changes). Password reset and invitation acceptance already re-check account status; MFA reset executes atomically at approval under standard_still_permitted. Concurrency: verification takes the governance lock before touching rows, and on PostgreSQL a unit of work that has written nothing takes its single clock reading when it acquires the governance lock, so rows it updates are never stamped before rows committed by the transaction it waited for (found by the clean PostgreSQL run: a CheckViolation on user_action_token and a deadlock-driven 503 under concurrent promotion; fixed and looped 20× clean).",
+      "regression_tests": [
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_N17_executed_standard_email_change_cannot_complete_after_promotion",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_verify_fails_closed_even_without_the_cleanup",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_standard_change_withdrawn_when_target_becomes_privileged",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_privilege_via_role_definition_is_caught_at_verification",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_self_and_founder_workflow_changes_still_complete",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_mfa_reset_request_before_promotion_fails_closed",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_founder_status_request_recalculated_when_target_changes",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_approved_break_glass_recalculated_at_execution",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_concurrent_promotion_and_verification",
+        "api/tests/integration/test_governance_remediation.py::test_IR04_*"
+      ],
+      "amendment": "AM-13 (06 §7.4, 05 §8.6)",
+      "owner_decision": "OD-3 given; AM-13 approval pending",
+      "merge_impact": "Cleared by the fix (OD-3 implemented); AM-13 decision pending",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "merge (Founder-governance invariant)",
+      "review_stages": [
+        "merge",
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED — AMENDMENT AM-13 PENDING OWNER DECISION",
+      "note": ""
+    },
+    {
+      "id": "RR-04",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "DEV-007 keys per-email login/forgot limits by (email, network), removing the only cross-network bound on password guessing for MFA holders and multiplying reset-email volume",
+      "evidence": [
+        "api/veda/kernel/ratelimit.py:22-33 — key email|network",
+        "api/veda/platform/auth/service.py:407 — global lock applies only when the user has no factor (throttle.py:6-9)",
+        "api/veda/platform/auth/service.py:464-473 — a correct password returns MFA_REQUIRED (password oracle)",
+        "Probe: 40 guesses in one minute from 8 IPv6 /64s all evaluated (baseline: 5 then 429); 18 reset emails delivered vs 3"
+      ],
+      "root_cause": "DEV-007 keyed the only per-email limits by network, and the certified global lock exempts MFA holders; nothing bounded cross-network guessing or reset-email volume.",
+      "files_changed": [
+        "api/veda/platform/auth/throttle.py",
+        "api/veda/platform/auth/service.py",
+        "api/veda/kernel/ratelimit.py",
+        "api/veda/kernel/net.py",
+        "api/veda/platform/auth/routes.py",
+        "api/veda/config.py"
+      ],
+      "requirements": [
+        "AUTH-010",
+        "SEC-011",
+        "05 §4",
+        "08 §12"
+      ],
+      "remediation": "Layered limiter (AM-7 rewritten): source IP and wide-network (/24, /48) limits; per-(email HMAC, network) limits kept (IR-23); account budget across networks (10 failures → Turnstile on every attempt, 20 → escalating spacing to 30 s, 429), not reset by success; aggregate escalation (200/5 min); ≤ 3 reset emails per account per hour; endpoint limits on MFA verify/recovery, enroll confirm, email verify/cancel; trusted proxies ≤ /24 or /64; tables capped at 50 000 keys; hashed identifiers only. Provider failure fails closed for escalated identifiers.",
+      "regression_tests": [
+        "api/tests/integration/test_layered_limiter.py",
+        "api/tests/integration/test_auth_remediation.py::test_IR23_P5_third_party_cannot_rate_limit_the_victim_from_elsewhere",
+        "api/tests/unit/test_config_environments.py"
+      ],
+      "amendment": "AM-7 (rewritten), DEV-007",
+      "owner_decision": "OD-1: AM-7 rejected as written; new AM-7 PROPOSED",
+      "merge_impact": "Cleared by the fix; AM-7 decision pending",
+      "staging_impact": "Real Turnstile keys and deployed proxy CIDR to be verified",
+      "production_impact": "Alarm on escalation to be configured (RG-5)",
+      "review_blocking": "merge (unapproved deviation that weakens authentication) / production",
+      "review_stages": [
+        "merge",
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED — AMENDMENT AM-7 (REWRITTEN) PENDING OWNER DECISION",
+      "note": ""
+    },
+    {
+      "id": "RR-05",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "A forged archive manifest written with the host credential hides deletion of any prefix of the security-event chain, including anchored rows",
+      "evidence": [
+        "api/veda/platform/maintenance.py:339-438 — verification trusts any manifest; no contiguity check, no export-file hash check, no SECURITY_LOG_ARCHIVED event correlation",
+        "Probe C11: manifest first_seq=1,last_seq=anchor+1 with dummy hash and nonexistent file, then delete rows → verify ok=True",
+        "Export file stays on local disk, not in Object Lock storage"
+      ],
+      "root_cause": "Verification trusted any archive manifest: no contiguity, export-hash or announcement check; exports lived only on the host.",
+      "files_changed": [
+        "api/veda/platform/maintenance.py",
+        "api/veda/platform/anchor_store.py",
+        "api/veda/platform/auth/security_events.py"
+      ],
+      "requirements": [
+        "SEVT-006",
+        "SEVT-007",
+        "05 §9.6"
+      ],
+      "remediation": "Exports are written to the write-once store; verification accepts only finalised manifests that are contiguous from 1, match their export (SHA-256, count, range), whose exported rows recompute (HMAC chain from the previous segment to last_row_hash), that match any anchor inside the archived range, and that are announced by a SECURITY_LOG_ARCHIVED event (online or in a later export). An unreadable store is a verification failure.",
+      "regression_tests": [
+        "api/tests/integration/test_archive_ordering.py::test_RR05_C11_forged_manifest_without_export_is_detected",
+        "api/tests/integration/test_archive_ordering.py::test_RR05_forged_export_that_drops_rows_is_detected",
+        "api/tests/integration/test_archive_ordering.py::test_RR05_unannounced_manifest_is_detected",
+        "api/tests/integration/test_archive_ordering.py::test_RR05_forgery_through_the_s3_store_is_detected",
+        "api/tests/integration/test_archive_ordering.py::test_RR05_genuine_archives_verify_through_the_s3_store",
+        "api/tests/integration/test_chain_integrity.py"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Real S3 Object Lock and role separation to be evidenced",
+      "production_impact": "Blocks until staging evidence",
+      "review_blocking": "production (SEVT-006/007 claim)",
+      "review_stages": [
+        "production"
+      ],
+      "status": "RESOLVED IN CODE — STAGING EVIDENCE (S3 OBJECT LOCK, WRITER/VERIFIER ROLES) REQUIRED",
+      "note": "A host attacker holding the chain key can still recompute exports for rows after the latest anchor; anchoring cadence bounds this window (documented)."
+    },
+    {
+      "id": "RR-06",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "Archival writes the write-once manifest before the database commit; any later failure produces a permanent false 'prefix removed' alarm and blocks archival forever",
+      "evidence": [
+        "api/veda/platform/maintenance.py:441-514 — manifest stored before DB delete/commit",
+        "Probe C12: simulated DB failure after manifest → verify reports prefix removed; re-archive refused"
+      ],
+      "root_cause": "The write-once manifest was written before the database transaction; a later failure left a manifest for rows still online.",
+      "files_changed": [
+        "api/veda/platform/maintenance.py",
+        "api/veda/platform/anchor_store.py"
+      ],
+      "requirements": [
+        "SEVT-004",
+        "SEVT-006",
+        "AUDIT-009"
+      ],
+      "remediation": "Two-phase ordering: export + pending manifest (idempotent writes) → DB transaction (announcement + delete) → final manifest. Pending manifests whose rows are online are ignored (no false alarm); committed-but-unfinalised shows as 'archive not finalised' (alarmed) and is repaired by the next run. SecurityLogArchivedRows / SecurityLogArchiveFailed metrics.",
+      "regression_tests": [
+        "api/tests/integration/test_archive_ordering.py::test_RR06_C12_database_failure_after_the_pending_manifest_is_not_an_alarm",
+        "api/tests/integration/test_archive_ordering.py::test_RR06_failure_after_commit_is_alarmed_and_repaired",
+        "api/tests/integration/test_archive_ordering.py::test_RR06_anchor_store_outage_during_verification_is_a_failure"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Archival stays disabled until OWNER-INPUT-002",
+      "production_impact": "Staging archival run required",
+      "review_blocking": "production (before archival is enabled; archival refuses without OWNER-INPUT-002)",
+      "review_stages": [
+        "production"
+      ],
+      "status": "RESOLVED IN CODE — STAGING EVIDENCE REQUIRED BEFORE ARCHIVAL IS ENABLED",
+      "note": ""
+    },
+    {
+      "id": "RR-07",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "CLI, scheduler and worker processes never configure logging, so every maintenance/worker metric (backup, chain, anchor, invariants, dead outbox) is dropped and the scheduler ignores job exit codes",
+      "evidence": [
+        "api/veda/app.py:111 — configure_logging is called only from create_app; no CLI path calls it",
+        "api/veda/cli/main.py (cmd_scheduler) — subprocess.run([...maintenance, job], check=False); exit codes discarded",
+        "Probe: disk-usage, snapshot, restore-verify, verify-chain, invariants → 0 EMF metric lines; anchor-store outage → verify raises with no event, metric or CRITICAL",
+        "Tests pass only because they run in-process with logging configured"
+      ],
+      "root_cause": "configure_logging was called only by create_app; CLI processes dropped EMF lines, and the scheduler discarded exit codes.",
+      "files_changed": [
+        "api/veda/cli/main.py",
+        "api/veda/platform/maintenance.py"
+      ],
+      "requirements": [
+        "LOG-006",
+        "OPS-009",
+        "SEVT-009",
+        "RG-5"
+      ],
+      "remediation": "_settings() configures JSON logging for every CLI subcommand (worker, scheduler, maintenance, break-glass); maintenance jobs catch exceptions → CRITICAL + MaintenanceJobFailed{Job}=1, exit 1, and emit MaintenanceJobFailed=0 on success; the scheduler runs jobs through run_scheduled_job (timeout 1 h) and emits ScheduledJobFailed{Job} with the exit code logged; verify-chain turns store errors into a recorded failure. Runbook §9 alarms updated.",
+      "regression_tests": [
+        "api/tests/integration/test_archive_ordering.py::test_RR07_cli_jobs_emit_their_metrics",
+        "api/tests/integration/test_archive_ordering.py::test_RR07_failing_job_exits_non_zero_with_an_alarm_metric",
+        "api/tests/integration/test_archive_ordering.py::test_RR07_scheduler_records_exit_codes"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Alarm acceptance (RG-5)",
+      "production_impact": "RG-5",
+      "review_blocking": "staging (alarm acceptance) / production (RG-5)",
+      "review_stages": [
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED IN CODE — ALARM WIRING (RG-5) REQUIRED IN STAGING",
+      "note": ""
+    },
+    {
+      "id": "RR-08",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "Path A enrollment confirm retires the session's refresh tokens without a successor link, so a benign concurrent refresh is treated as token theft and revokes the just-elevated session",
+      "evidence": [
+        "api/veda/platform/auth/mfa.py:447-463 — _rotate_refresh sets used_on, never replaced_by_id",
+        "api/veda/platform/auth/service.py:588-610 — the 20 s grace window requires a linked successor",
+        "api/veda/platform/auth/service.py:728-741 — change_password has the same pattern"
+      ],
+      "root_cause": "Path-A confirm and change_password retired refresh tokens with used_on only; the grace window requires replaced_by_id.",
+      "files_changed": [
+        "api/veda/platform/auth/service.py",
+        "api/veda/platform/auth/mfa.py"
+      ],
+      "requirements": [
+        "AUTH-005",
+        "05 §6.1"
+      ],
+      "remediation": "auth.service.rotate_session_refresh issues the successor first and links every retired live token of that session to it; used by path-A confirm and change_password. Only the rotating session is touched; no token material in events.",
+      "regression_tests": [
+        "api/tests/integration/test_final_merge_blockers.py::test_RR08_path_a_enrollment_keeps_the_grace_window",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR08_reuse_after_the_window_is_still_theft",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR08_rotation_only_touches_the_rotating_session",
+        "api/tests/integration/test_final_merge_blockers.py::test_RR08_concurrent_refresh_yields_a_single_successor",
+        "api/tests/integration/test_auth.py::test_AUTH_005_*"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "production",
+      "review_stages": [
+        "production"
+      ],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-09",
+      "kind": "finding",
+      "severity": "MAJOR",
+      "title": "Break-glass STS identity check sees the host instance role, not the custodian, when the CLI runs via docker compose as the runbook prescribes; with no credentials it crashes without a failure event",
+      "evidence": [
+        "api/veda/platform/rbac/custodians.py:22-25 — default boto3 credential chain",
+        "api/deploy/deploy.sh:24-35 and docs/operations/api-runbooks.md:94-95 — CLI run inside the api container",
+        "N06: instance-role ARN → 403 not a registered custodian; no credentials → uncaught NoCredentialsError"
+      ],
+      "root_cause": "Default boto3 credential chain inside the container sees the instance role; NoCredentialsError uncaught.",
+      "files_changed": [],
+      "requirements": [
+        "RBAC-021",
+        "06 §7.5 items 2 and 4",
+        "PG-BG"
+      ],
+      "remediation": "Not changed in this workstream: needs the custodian credential model (re-review OD-6 / OWNER-INPUT-004) and a staging rehearsal with CloudTrail.",
+      "regression_tests": [],
+      "amendment": "06 §7.5 wording (minor)",
+      "owner_decision": "Re-review OD-6 (not decided)",
+      "merge_impact": "None",
+      "staging_impact": "Rehearsal",
+      "production_impact": "Blocks (PG-BG)",
+      "review_blocking": "production (PG-BG)",
+      "review_stages": [
+        "production"
+      ],
+      "status": "OPEN — PRODUCTION BLOCKER (OWNER DECISION OD-6)",
+      "note": ""
+    },
+    {
+      "id": "RR-10",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Environment validation accepts trusted-proxy CIDR 0.0.0.0/0 or ::/0, all-zero / dev-derived / duplicate 32-byte keys, and an unparsable JWT PEM",
+      "evidence": [
+        "api/veda/config.py:288-292, 332-341"
+      ],
+      "root_cause": "Environment validation parsed CIDRs and key lengths only.",
+      "files_changed": [
+        "api/veda/config.py",
+        "api/tests/unit/test_config_environments.py"
+      ],
+      "requirements": [
+        "SEC-005",
+        "SEC-006",
+        "AUTH-010"
+      ],
+      "remediation": "Staging/production refuse trusted-proxy entries broader than /24 or /64, keys that are constant or two-symbol fillers, development-derived keys, duplicate keys, and a JWT key that is not an unencrypted P-256 private key.",
+      "regression_tests": [
+        "api/tests/unit/test_config_environments.py::test_IR09_each_missing_or_weak_setting_is_reported"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "staging",
+      "review_stages": [
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-11",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "With intake disabled the enquiry form is novalidate and skips client validation, so an empty submit opens WhatsApp with a blank enquiry (baseline 778aa8f blocked it)",
+      "evidence": [
+        "dist/index.html:168 (novalidate), :173-174 (required removed); dist/assets/app.js:166-169"
+      ],
+      "root_cause": "Flag-off submit skipped clientValidate and opened WhatsApp directly.",
+      "files_changed": [
+        "dist/assets/app.js",
+        "app/e2e/site.e2e.mjs",
+        "app/e2e/axe.e2e.mjs"
+      ],
+      "requirements": [
+        "LEAD-019",
+        "Public site behaviour"
+      ],
+      "remediation": "Validation runs before every hand-off (consent only when intake is enabled): name ≥ 2 characters; phone of digits and + ( ) - . space with 10–15 digits; optional email format. Errors: aria-invalid fields, per-field messages and a focused role=alert summary; values preserved. The WhatsApp text uses only trimmed visitor fields and option labels, URL-encoded; no honeypot, consent or API configuration.",
+      "regression_tests": [
+        "app/e2e/site.e2e.mjs (flag-off: empty, missing name, missing phone, invalid phone, too-short phone, valid with special characters, keyboard Enter, mobile 360 px, no API call)",
+        "app/e2e/axe.e2e.mjs ('website form, intake off (error state)')"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "Cleared by the fix",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "merge (ships to the live site on merge; cheap fix)",
+      "review_stages": [
+        "merge",
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED (verified locally; CI and final targeted check pending)",
+      "note": ""
+    },
+    {
+      "id": "RR-12",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "DEV-004 residuals: alternating between published policy versions is accepted without withdrawal; consent history activity is mutable at DB level; staff create-time consent needs no note and writes no consent activity",
+      "evidence": [
+        "api/veda/modules/crm/leads/service.py:837, 552-556"
+      ],
+      "root_cause": "DEV-004 residuals.",
+      "files_changed": [],
+      "requirements": [
+        "LEAD-012",
+        "LEAD-027"
+      ],
+      "remediation": "Not changed; AM-4 now states the target behaviour and the gap explicitly.",
+      "regression_tests": [],
+      "amendment": "AM-4",
+      "owner_decision": "AM-4 option (a)/(b)",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Blocks",
+      "review_blocking": "production",
+      "review_stages": [
+        "production"
+      ],
+      "status": "OPEN — PRODUCTION BLOCKER",
+      "note": ""
+    },
+    {
+      "id": "RR-13",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Residual PII paths: Sentry transaction events carry request query strings (e.g. lead search by email); outbox_event.last_error stores provider errors containing recipient emails",
+      "evidence": [
+        "api/veda/app.py:117-125 (traces_sample_rate with before_send only)",
+        "api/veda/platform/notifications/worker.py:119"
+      ],
+      "root_cause": "Sentry transactions and outbox last_error carry PII.",
+      "files_changed": [],
+      "requirements": [
+        "LOG-003",
+        "SEC-009"
+      ],
+      "remediation": "Not changed; folded into AM-10 decision scope.",
+      "regression_tests": [],
+      "amendment": "AM-10",
+      "owner_decision": "Re-review OD-7",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Blocks",
+      "review_blocking": "production",
+      "review_stages": [
+        "production"
+      ],
+      "status": "OPEN — PRODUCTION BLOCKER",
+      "note": ""
+    },
+    {
+      "id": "RR-14",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Snapshot directory defaults to container storage and is not required in staging/production, so deploy.sh's pre-deploy snapshot in a --rm container is lost",
+      "evidence": [
+        "api/deploy/deploy.sh",
+        "api/veda/config.py (snapshot dir)"
+      ],
+      "root_cause": "Snapshot dir defaulted to container storage.",
+      "files_changed": [
+        "api/veda/config.py",
+        "docs/operations/api-runbooks.md"
+      ],
+      "requirements": [
+        "OPS-002",
+        "OPS-004"
+      ],
+      "remediation": "Staging/production require an absolute VEDA_SNAPSHOT_DIR inside the SQLite database volume; the pre-deploy snapshot therefore lands on the persistent volume.",
+      "regression_tests": [
+        "api/tests/unit/test_config_environments.py (VEDA_SNAPSHOT_DIR cases)"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Staging deploy evidence",
+      "production_impact": "Cleared after staging",
+      "review_blocking": "staging",
+      "review_stages": [
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED IN CODE — STAGING DEPLOY EVIDENCE REQUIRED",
+      "note": ""
+    },
+    {
+      "id": "RR-15",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Disaster-restore runbook does not work as written: restore-verify fails on a Litestream-restored file, Litestream is not stopped before the swap, one failure path emits no metric, the off-host replica is never verified",
+      "evidence": [
+        "docs/operations/api-runbooks.md §3",
+        "api/veda/platform/backups.py"
+      ],
+      "root_cause": "Disaster-restore runbook gaps.",
+      "files_changed": [
+        "docs/operations/api-runbooks.md"
+      ],
+      "requirements": [
+        "OPS-005",
+        "OPS-009",
+        "RG-1",
+        "RG-2"
+      ],
+      "remediation": "Runbook §3 references the gaps; restore-verify for Litestream files, stopping replication before the swap and replica verification are not implemented.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Blocks (RG-1, RG-2)",
+      "production_impact": "Blocks",
+      "review_blocking": "staging",
+      "review_stages": [
+        "production",
+        "staging"
+      ],
+      "status": "OPEN — STAGING BLOCKER",
+      "note": ""
+    },
+    {
+      "id": "RR-16",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "mypy ratchet fails open: reports '0 errors OK' when mypy is missing or its config is broken; --update silently admits errors from new or renamed files",
+      "evidence": [
+        "api/tools/mypy_ratchet.py",
+        "api/tools/mypy-baseline.json (24 files, 157 errors)"
+      ],
+      "root_cause": "The ratchet counted errors from stdout without checking that mypy ran, and --update rewrote the baseline from current counts.",
+      "files_changed": [
+        "api/tools/mypy_ratchet.py",
+        "api/tests/unit/test_mypy_ratchet.py"
+      ],
+      "requirements": [
+        "12 §5 types gate"
+      ],
+      "remediation": "Fails closed (exit 2) when mypy is missing, crashes or rejects its config, when fewer source files are checked than the package holds, when the exit code and findings disagree, or when the baseline is malformed or exceeds the reviewed CEILING (157); fails on new/renamed/worse files and on broad suppressions (bare type: ignore, mypy: ignore-errors, ignore_errors / disable_error_code). --update refuses in CI, never admits or raises entries, and prints every change.",
+      "regression_tests": [
+        "api/tests/unit/test_mypy_ratchet.py"
+      ],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared",
+      "review_blocking": "staging (CI gate integrity)",
+      "review_stages": [
+        "production",
+        "staging"
+      ],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-17",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Rollback documentation gaps: rollback of this release to 9236aa3 is never ready (and would reintroduce IR-01); readiness details are unreachable from the host under the compose topology; deploy.sh only checks the declaration line",
+      "evidence": [
+        "api/veda/platform/health.py:60-66",
+        "api/deploy/docker-compose.yml:10",
+        "api/deploy/deploy.sh:38",
+        "AM-6, AM-11 text"
+      ],
+      "root_cause": "Runbook and AM-6/AM-11 described an N-1 rollback that cannot pass readiness and would reintroduce IR-01; deploy.sh read readiness from the host and only checked that a declaration existed.",
+      "files_changed": [
+        "docs/operations/api-runbooks.md",
+        "api/deploy/deploy.sh",
+        "api/veda/cli/main.py",
+        "api/veda/platform/health.py",
+        "docs/proposals/amendments/AM-6.md",
+        "docs/proposals/amendments/AM-11.md"
+      ],
+      "requirements": [
+        "OPS-004",
+        "LOG-005"
+      ],
+      "remediation": "Rollback floor (0009_mfa_challenge_binding) enforced by deploy.sh through `veda schema-status --require-known`; revision and readiness read inside the container; the declared VEDA_SCHEMA_AHEAD_ACCEPTED value must equal the current revision. Runbook §2 defines the boundary, forward-fix criteria, DB compatibility, maintenance mode, snapshot dependency, post-rollback validation, owner category and evidence; rollback to 9236aa3 prohibited. No rehearsal claimed.",
+      "regression_tests": [
+        "api/tests/integration/test_archive_ordering.py::test_RR17_schema_status_and_rollback_floor",
+        "api/tests/integration/test_archive_ordering.py::test_RR17_deploy_script_rollback_floor_is_the_ir01_revision"
+      ],
+      "amendment": "AM-6, AM-11",
+      "owner_decision": "OD-1 (AM-6, AM-11)",
+      "merge_impact": "None",
+      "staging_impact": "RG-7 rehearsal",
+      "production_impact": "Blocks until RG-7",
+      "review_blocking": "production (RG-7)",
+      "review_stages": [
+        "production"
+      ],
+      "status": "RESOLVED IN CODE AND DOCUMENTATION — RG-7 REHEARSAL REQUIRED",
+      "note": ""
+    },
+    {
+      "id": "RR-18",
+      "kind": "finding",
+      "severity": "MINOR",
+      "title": "Accessibility remnants: step-up dialog has no pre-expiry warning; command palette listbox/option semantics and vs-tabs tabpanel wiring unchanged; account menu stays open on outside click",
+      "evidence": [
+        "app/src/modules/auth/step-up-dialog.ts:71",
+        "command-palette.ts:79-80",
+        "design-system/components.ts:375-380",
+        "shell/app.ts:200-208"
+      ],
+      "root_cause": "Accessibility remnants in the SPA.",
+      "files_changed": [],
+      "requirements": [
+        "UI-011",
+        "UI-016 (AX-06, AX-07, AX-09)"
+      ],
+      "remediation": "Not changed.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Blocks",
+      "review_blocking": "production",
+      "review_stages": [
+        "production"
+      ],
+      "status": "OPEN — PRODUCTION BLOCKER",
+      "note": ""
+    },
+    {
+      "id": "RR-A01",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "IR-20 link invalidation written on the 409 path is rolled back with the error (mfa.py:330-334); no effect because confirm re-checks.",
+      "evidence": [
+        "IR-20 link invalidation written on the 409 path is rolled back with the error (mfa.py:330-334); no effect because confirm re-checks."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A02",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "PostgreSQL answers 409 VERSION_CONFLICT on concurrent auth writes where SQLite answers 401; PostgreSQL gate.",
+      "evidence": [
+        "PostgreSQL answers 409 VERSION_CONFLICT on concurrent auth writes where SQLite answers 401; PostgreSQL gate."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A03",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "tests/unit/test_totp_passwords.py fails 2 tests when run alone without VEDA_ENV=test (test isolation).",
+      "evidence": [
+        "tests/unit/test_totp_passwords.py fails 2 tests when run alone without VEDA_ENV=test (test isolation)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A04",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Path C start password re-entry is not counted by any throttle (mfa.py:318-329).",
+      "evidence": [
+        "Path C start password re-entry is not counted by any throttle (mfa.py:318-329)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A05",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "VEDA_ENV=local on a deployed host silently derives public development keys; nothing in gunicorn on_starting refuses local/test in the production image (config.py:190).",
+      "evidence": [
+        "VEDA_ENV=local on a deployed host silently derives public development keys; nothing in gunicorn on_starting refuses local/test in the production image (config.py:190)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A06",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "An expired ENROLLMENT challenge leaves an inert PENDING factor (pre-existing).",
+      "evidence": [
+        "An expired ENROLLMENT challenge leaves an inert PENDING factor (pre-existing)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A07",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Break-glass CLI lets botocore exceptions escape without a FAILURE event.",
+      "evidence": [
+        "Break-glass CLI lets botocore exceptions escape without a FAILURE event."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Folded into RR-09 (production).",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN",
+      "note": ""
+    },
+    {
+      "id": "RR-A08",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "PostgreSQL: break_glass_execute racing a cancel-link raises StaleDataError and aborts the remaining due items that cycle (maintenance.py:588-591).",
+      "evidence": [
+        "PostgreSQL: break_glass_execute racing a cancel-link raises StaleDataError and aborts the remaining due items that cycle (maintenance.py:588-591)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A09",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "OpenAPI snapshot documents 200 for cancel-link; the handler returns 204.",
+      "evidence": [
+        "OpenAPI snapshot documents 200 for cancel-link; the handler returns 204."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "api/veda/platform/rbac/routes.py",
+        "api/openapi.snapshot.json"
+      ],
+      "requirements": [],
+      "remediation": "cancel-link route declares status=204; OpenAPI snapshot updated.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-A10",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Stale approver with suspended user.founder.manage gets 403 PERMISSION_DENIED where TD-G G7 expects APPROVER_NOT_ELIGIBLE (pre-existing).",
+      "evidence": [
+        "Stale approver with suspended user.founder.manage gets 403 PERMISSION_DENIED where TD-G G7 expects APPROVER_NOT_ELIGIBLE (pre-existing)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A11",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Eligible Founders can deny PENDING custodian break-glass in-app but cannot cancel APPROVED ones except via the link; undocumented (fold into AM-5/AM-9).",
+      "evidence": [
+        "Eligible Founders can deny PENDING custodian break-glass in-app but cannot cancel APPROVED ones except via the link; undocumented (fold into AM-5/AM-9)."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "docs/proposals/amendments/AM-5.md"
+      ],
+      "requirements": [],
+      "remediation": "Veto semantics stated in AM-5.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "DOCUMENTED",
+      "note": ""
+    },
+    {
+      "id": "RR-A12",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "cancel_open_standard_requests records an event but sends no approval.decided notification.",
+      "evidence": [
+        "cancel_open_standard_requests records an event but sends no approval.decided notification."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A13",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Anchor store: no writer/reader role separation; staging silently uses a same-host local store; verify_chain holds a write transaction for the whole recompute.",
+      "evidence": [
+        "Anchor store: no writer/reader role separation; staging silently uses a same-host local store; verify_chain holds a write transaction for the whole recompute."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "docs/operations/api-runbooks.md"
+      ],
+      "requirements": [],
+      "remediation": "Role separation documented as a staging requirement (runbook §5); staging local-store fallback and verify_chain write transaction unchanged.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "PARTIALLY ADDRESSED",
+      "note": ""
+    },
+    {
+      "id": "RR-A14",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Restore-verify chain check trusts the first online row (backups.py:146), so a prefix-deleted snapshot passes.",
+      "evidence": [
+        "Restore-verify chain check trusts the first online row (backups.py:146), so a prefix-deleted snapshot passes."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A15",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "CI residuals: postgres:16 service image not digest-pinned; built image never smoke-run; e2e uses Flask dev server; Trivy ignore-unfixed without recorded risk acceptance; 104 secrets-baseline entries none audited. (CI execution itself is now evidenced: run 36559966718.)",
+      "evidence": [
+        "CI residuals: postgres:16 service image not digest-pinned; built image never smoke-run; e2e uses Flask dev server; Trivy ignore-unfixed without recorded risk acceptance; 104 secrets-baseline entries none audited. (CI execution itself is now evidenced: run 36559966718.)"
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A16",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Open-issue registry omits 9 advisories (IR-A03, A04, A05, A09, A13, A17, A19, A21, A25) contrary to its own note; IR-39 text mischaracterises the mypy backlog.",
+      "evidence": [
+        "Open-issue registry omits 9 advisories (IR-A03, A04, A05, A09, A13, A17, A19, A21, A25) contrary to its own note; IR-39 text mischaracterises the mypy backlog."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "docs/implementation/P0-open-issues.{md,json}"
+      ],
+      "requirements": [],
+      "remediation": "Open-issue register now lists IR-A03, A04, A05, A09, A13, A17, A19, A21, A25 and every RR item.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-A17",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Migration 0009 is chained after 0100_crm_leads, contradicting 02 §8.3 numbering; AM-11 does not amend 02 §8.3.",
+      "evidence": [
+        "Migration 0009 is chained after 0100_crm_leads, contradicting 02 §8.3 numbering; AM-11 does not amend 02 §8.3."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "docs/proposals/amendments/AM-11.md"
+      ],
+      "requirements": [],
+      "remediation": "AM-11 now amends 02 §8.3 migration placement.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "DOCUMENTED",
+      "note": ""
+    },
+    {
+      "id": "RR-A18",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "ESLint sink bans miss lit-html unsafe-html path, unsafe-mathml, .innerHTML=${} bindings, createContextualFragment, setHTMLUnsafe; site JS (dist/assets/app.js) is not linted.",
+      "evidence": [
+        "ESLint sink bans miss lit-html unsafe-html path, unsafe-mathml, .innerHTML=${} bindings, createContextualFragment, setHTMLUnsafe; site JS (dist/assets/app.js) is not linted."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A19",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "E2E remnants: axe site scan uses bypassCSP; focus assertion also passes on #outlet; test servers bind to all interfaces.",
+      "evidence": [
+        "E2E remnants: axe site scan uses bypassCSP; focus assertion also passes on #outlet; test servers bind to all interfaces."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A20",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "DEV-004 register says superseded consent evidence is visible in the lead timeline; the SPA renders only subject and note.",
+      "evidence": [
+        "DEV-004 register says superseded consent evidence is visible in the lead timeline; the SPA renders only subject and note."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A21",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Route-focus hook moves focus to the MFA heading after sign-in instead of the code field.",
+      "evidence": [
+        "Route-focus hook moves focus to the MFA heading after sign-in instead of the code field."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A22",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "engines ^22 with engine-strict rejects Node 24 LTS; Node 22 EOL 2027-04-30.",
+      "evidence": [
+        "engines ^22 with engine-strict rejects Node 24 LTS; Node 22 EOL 2027-04-30."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "OPEN — TRACKED",
+      "note": ""
+    },
+    {
+      "id": "RR-A23",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Proposed amendments are stored inside docs/architecture/amendments/ on the implementation branch. Certified files are unchanged and every proposal is marked PROPOSED, NOT APPROVED, but merging would place unapproved text inside the certified tree; consider docs/proposals/ or merge only after decisions.",
+      "evidence": [
+        "Proposed amendments are stored inside docs/architecture/amendments/ on the implementation branch. Certified files are unchanged and every proposal is marked PROPOSED, NOT APPROVED, but merging would place unapproved text inside the certified tree; consider docs/proposals/ or merge only after decisions."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        "docs/proposals/amendments/*"
+      ],
+      "requirements": [],
+      "remediation": "Amendments moved to docs/proposals/amendments (git mv); references updated.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "RR-A24",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "Remediation evidence was generated from an uncommitted tree on top of 9236aa3 before 2f6b59a (per evidence README); CI logs are not publicly readable, so step-level conclusions (API) are the independent CI evidence.",
+      "evidence": [
+        "Remediation evidence was generated from an uncommitted tree on top of 9236aa3 before 2f6b59a (per evidence README); CI logs are not publicly readable, so step-level conclusions (API) are the independent CI evidence."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "This workstream's evidence is generated from a clean copy of the exact committed tree.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "ADDRESSED BY PROCESS",
+      "note": ""
+    },
+    {
+      "id": "RR-A25",
+      "kind": "advisory",
+      "severity": "ADVISORY",
+      "title": "On e2e failure CI uploads e2e artefacts including founder.json (throwaway DB password and TOTP secret); harmless for ephemeral data but should be excluded.",
+      "evidence": [
+        "On e2e failure CI uploads e2e artefacts including founder.json (throwaway DB password and TOTP secret); harmless for ephemeral data but should be excluded."
+      ],
+      "root_cause": "See re-review.",
+      "files_changed": [
+        ".github/workflows/ci.yml"
+      ],
+      "requirements": [],
+      "remediation": "CI e2e artifact upload excludes founder.json.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "No",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "review_blocking": "non-blocking",
+      "review_stages": [],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "IR-03",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "See RR-05, RR-06, RR-07; S3 behaviour unexecuted",
+      "evidence": [
+        "Q4 cases (prefix delete, tail truncation, middle gap, modification) now detected on both engines; forged manifest (C11) and manifest-before-commit (C12) fail; CLI alarms absent"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (SEVT-006/007 claim); S3 Object Lock staging evidence",
+      "production_impact": "Production (SEVT-006/007 claim); S3 Object Lock staging evidence",
+      "review_blocking": "Production (SEVT-006/007 claim); S3 Object Lock staging evidence",
+      "review_stages": [],
+      "status": "CODE RESOLVED (RR-05/06/07); STAGING S3 EVIDENCE REQUIRED",
+      "note": ""
+    },
+    {
+      "id": "IR-06",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "Self-assertion closed; but in the deployed container topology STS sees the instance role (RR-09)",
+      "evidence": [
+        "N06, N07; STS stubbed in tests"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "Clarify 06 §7.5 mechanism (minor)",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "Production (PG-BG); staging rehearsal",
+      "production_impact": "Production (PG-BG); staging rehearsal",
+      "review_blocking": "Production (PG-BG); staging rehearsal",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR STAGING (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-08",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "IR-08 itself fixed; deleted Founders keep role/protection and one Founder can restore them (RR-02)",
+      "evidence": [
+        "P11, P16 on both engines: Founder DELETE executes"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Deleted Founders are restored only by the dual-control workflow.",
+      "regression_tests": [],
+      "amendment": "No (unless workflow-restore chosen)",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Merge (via RR-02)",
+      "production_impact": "Merge (via RR-02)",
+      "review_blocking": "Merge (via RR-02)",
+      "review_stages": [],
+      "status": "RESOLVED BY RR-02",
+      "note": ""
+    },
+    {
+      "id": "IR-11",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "Artefacts exist; off-host replica never verified; snapshot dir ephemeral",
+      "evidence": [
+        "Pip-less CLI snapshot / restore-verify / disk-usage rc 0; runbook defects reproduced; no rehearsal"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Staging (RR-14, RR-15); production RG-1/RG-2/RG-7",
+      "production_impact": "Staging (RR-14, RR-15); production RG-1/RG-2/RG-7",
+      "review_blocking": "Staging (RR-14, RR-15); production RG-1/RG-2/RG-7",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (RR-14 fixed; RR-15 open)",
+      "note": ""
+    },
+    {
+      "id": "IR-12",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "See RR-07",
+      "evidence": [
+        "API process emits EMF; every CLI/scheduler/worker metric dropped (0 EMF lines)"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Staging alarm acceptance (RR-07); production RG-5",
+      "production_impact": "Staging alarm acceptance (RR-07); production RG-5",
+      "review_blocking": "Staging alarm acceptance (RR-07); production RG-5",
+      "review_stages": [],
+      "status": "CODE RESOLVED (RR-07); RG-5 REQUIRED",
+      "note": ""
+    },
+    {
+      "id": "IR-18",
+      "kind": "reconciliation residual",
+      "severity": "MAJOR",
+      "title": "Real-key run is an enablement step",
+      "evidence": [
+        "Stub E2E reset→201; real Turnstile script + public test key under production CSP: 0 violations; real-key 422→reset→201 not run"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "Feature: public-intake enablement",
+      "production_impact": "Feature: public-intake enablement",
+      "review_blocking": "Feature: public-intake enablement",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR PRODUCTION (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-23",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "See RR-04",
+      "evidence": [
+        "Victim in another network 200 while attacker 429 — but 40 guesses/min from 8 /64s all evaluated; 18 vs 3 reset emails"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Layered limiter; AM-7 rewritten.",
+      "regression_tests": [],
+      "amendment": "AM-7 must be revised",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Merge (DEV-007 requires implementation change) / production",
+      "production_impact": "Merge (DEV-007 requires implementation change) / production",
+      "review_blocking": "Merge (DEV-007 requires implementation change) / production",
+      "review_stages": [],
+      "status": "RESOLVED BY RR-04",
+      "note": ""
+    },
+    {
+      "id": "IR-26",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "Boundary loss fixed; the new manifest-before-commit ordering wedges archival (RR-06)",
+      "evidence": [
+        "Original Q3 + C10: nothing unexported deleted; verify ok"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Two-phase archival ordering.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (before archival is enabled)",
+      "production_impact": "Production (before archival is enabled)",
+      "review_blocking": "Production (before archival is enabled)",
+      "review_stages": [],
+      "status": "RESOLVED BY RR-06",
+      "note": ""
+    },
+    {
+      "id": "IR-27",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "See RR-13",
+      "evidence": [
+        "Q6: no name/email/message in structured stdout; Sentry transaction events carry query strings; outbox_event.last_error stores recipient emails"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production logging",
+      "production_impact": "Production logging",
+      "review_blocking": "Production logging",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-32",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "CSP sub-item regressed the live 404 page",
+      "evidence": [
+        "innerHTML and contrast fixed; /privacy absent (gated); site CSP blocks inline <style> of dist/404.html"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "404 styles external; site CSP unchanged.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Merge (merge to main deploys dist/ to production; RR-01)",
+      "production_impact": "Merge (merge to main deploys dist/ to production; RR-01)",
+      "review_blocking": "Merge (merge to main deploys dist/ to production; RR-01)",
+      "review_stages": [],
+      "status": "RESOLVED BY RR-01",
+      "note": ""
+    },
+    {
+      "id": "IR-33",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "Tracked",
+      "evidence": [
+        "PG16.4: TRUNCATE, GUC bypass and non-owner GUC bypass still succeed"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "PostgreSQL release gate (PGM-1); SQLite is the P0 production engine",
+      "production_impact": "PostgreSQL release gate (PGM-1); SQLite is the P0 production engine",
+      "review_blocking": "PostgreSQL release gate (PGM-1); SQLite is the P0 production engine",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR PRODUCTION (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-34",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "Tracked, non-blocking",
+      "evidence": [
+        "No drift today"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Before the first registry change (post-production follow-up)",
+      "production_impact": "Before the first registry change (post-production follow-up)",
+      "review_blocking": "Before the first registry change (post-production follow-up)",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-37",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "Author matrix overstates as RESOLVED (RR-18)",
+      "evidence": [
+        "Stepper, toasts, prompt fixed; step-up dialog has no expiry warning; command palette and vs-tabs semantics unchanged"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production",
+      "production_impact": "Production",
+      "review_blocking": "Production",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-38",
+      "kind": "reconciliation residual",
+      "severity": "MINOR",
+      "title": "RR-A19",
+      "evidence": [
+        "47/47 reproduced; Chromium only; focus assertion accepts #outlet; site CSP check covers index only; axe site scan bypasses CSP"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (browser matrix)",
+      "production_impact": "Production (browser matrix)",
+      "review_blocking": "Production (browser matrix)",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A01",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "—",
+      "evidence": [
+        "PG: refresh / recovery-code double use → 409 (version column); per-challenge attempts exceeded (9 of 9 parallel guesses vs limit 5)"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "PostgreSQL cut-over",
+      "production_impact": "PostgreSQL cut-over",
+      "review_blocking": "PostgreSQL cut-over",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR PRODUCTION (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A02",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Accepted residual",
+      "evidence": [
+        "Timing delta 0.93 ms (head) vs 0.79 ms (baseline)"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A04",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "No practical impact",
+      "evidence": [
+        "Challenges end on reset; MFA_ENROLLMENT link survives (usable only with the new password)"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A05",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Latent",
+      "evidence": [
+        "auth='optional' + permission still starts and runs unchecked for anonymous callers (probe); no current route affected"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Startup refuses optional-auth or public routes that declare a permission, and unregistered public/optional routes (api/tests/unit/test_lint.py::test_IRA05_optional_and_public_routes_cannot_hide_a_permission).",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "RESOLVED",
+      "note": ""
+    },
+    {
+      "id": "IR-A06",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Owner decision",
+      "evidence": [
+        "ADMIN PATCH own role mfa_required=false → 200"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "Possibly (08 §6.1)",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A07",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Decision: KEEP 403/404 DIFFERENCE (§9)",
+      "evidence": [
+        "N16; events added; sensitive-grant email on invite not added"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A08",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "—",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production traffic hardening",
+      "production_impact": "Production traffic hardening",
+      "review_blocking": "Production traffic hardening",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A10",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "—",
+      "evidence": [
+        "Retention unset ⇒ nothing purged"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "Text in AM-5",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "Production: config check retention ≥ 3× break-glass delay",
+      "production_impact": "Production: config check retention ≥ 3× break-glass delay",
+      "review_blocking": "Production: config check retention ≥ 3× break-glass delay",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR STAGING (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A11",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Owner decision",
+      "evidence": [
+        "P14 [204, 204]"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "AM-9 (incomplete)",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (PG-BG policy)",
+      "production_impact": "Production (PG-BG policy)",
+      "review_blocking": "Production (PG-BG policy)",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A12",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Accepted as correlation-only",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A13",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "action not checked",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A14",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "—",
+      "evidence": [
+        "Worker metric dropped (RR-07); erasure-audit per-event handling unchanged"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production alerting",
+      "production_impact": "Production alerting",
+      "review_blocking": "Production alerting",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A15",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Owner decision",
+      "evidence": [
+        "—"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "AM-10",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (DPDP erasure completeness)",
+      "production_impact": "Production (DPDP erasure completeness)",
+      "review_blocking": "Production (DPDP erasure completeness)",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A16",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "—",
+      "evidence": [
+        "PG: 201 + 409 DUPLICATE, 1 lead"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "See blocking scope",
+      "staging_impact": "PostgreSQL release gate",
+      "production_impact": "PostgreSQL release gate",
+      "review_blocking": "PostgreSQL release gate",
+      "review_stages": [],
+      "status": "ACCEPTABLY GATED FOR PRODUCTION (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A18",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Tracked",
+      "evidence": [
+        "Bad datetime inserts succeed on SQLite; no enum CHECKs on 3 columns"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Post-production",
+      "production_impact": "Post-production",
+      "review_blocking": "Post-production",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A20",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Tracked",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Post-production",
+      "production_impact": "Post-production",
+      "review_blocking": "Post-production",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A22",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Owner decision",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "AM-8",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A23",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Owner/legal decision",
+      "evidence": [
+        "Source"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "Production (Privacy Notice)",
+      "production_impact": "Production (Privacy Notice)",
+      "review_blocking": "Production (Privacy Notice)",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A24",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "Tracked non-blocker",
+      "evidence": [
+        "axe: 18 pre-existing nodes outside the form"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "NOT RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "IR-A25",
+      "kind": "reconciliation residual",
+      "severity": "ADVISORY",
+      "title": "RR-A16, RR-A20",
+      "evidence": [
+        "New inaccuracies: IR-37 and the site-CSP '0 violations' claim overstated; registry omits 9 advisories; DEV-004 'visible in timeline' overstated"
+      ],
+      "root_cause": "See original review.",
+      "files_changed": [],
+      "requirements": [],
+      "remediation": "Not changed in this workstream.",
+      "regression_tests": [],
+      "amendment": "No",
+      "owner_decision": "See OD table",
+      "merge_impact": "None",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "—",
+      "review_stages": [],
+      "status": "PARTIALLY RESOLVED (unchanged)",
+      "note": ""
+    },
+    {
+      "id": "OD-1",
+      "kind": "owner decision",
+      "severity": "—",
+      "title": "Amendments: AM-1/6/11 may be submitted only when complete, matching, explicit and reviewer-confirmed; correct AM-2/4/5/6/10/11; AM-7 rejected as written and replaced; AM-8/9/10 remain production amendments.",
+      "remediation": "All amendments rewritten in docs/proposals/amendments; every one PROPOSED, NOT APPROVED; AM-7 replaced by the layered proposal; 'Approval readiness' field states which are ready for submission after the reviewer's confirmation (none marked approved).",
+      "status": "APPLIED — NO AMENDMENT APPROVED",
+      "merge_impact": "Owner approval still required for merge (re-review OD-1)",
+      "evidence": [],
+      "root_cause": "—",
+      "files_changed": [],
+      "requirements": [],
+      "regression_tests": [],
+      "amendment": "—",
+      "owner_decision": "OD-1",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "merge",
+      "review_stages": [
+        "merge"
+      ],
+      "note": ""
+    },
+    {
+      "id": "OD-2",
+      "kind": "owner decision",
+      "severity": "—",
+      "title": "Deleted Founder restored only through the canonical Founder workflow with two distinct eligible humans.",
+      "remediation": "Implemented (RR-02, AM-12, DEV-009).",
+      "status": "IMPLEMENTED — AM-12 PENDING",
+      "merge_impact": "AM-12 decision",
+      "evidence": [],
+      "root_cause": "—",
+      "files_changed": [],
+      "requirements": [],
+      "regression_tests": [],
+      "amendment": "—",
+      "owner_decision": "OD-2",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "merge",
+      "review_stages": [
+        "merge"
+      ],
+      "note": ""
+    },
+    {
+      "id": "OD-3",
+      "kind": "owner decision",
+      "severity": "—",
+      "title": "Execution-time revalidation of identity/security requests against the target's current governance class.",
+      "remediation": "Implemented (RR-03, AM-13, DEV-010).",
+      "status": "IMPLEMENTED — AM-13 PENDING",
+      "merge_impact": "AM-13 decision",
+      "evidence": [],
+      "root_cause": "—",
+      "files_changed": [],
+      "requirements": [],
+      "regression_tests": [],
+      "amendment": "—",
+      "owner_decision": "OD-3",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "merge",
+      "review_stages": [
+        "merge"
+      ],
+      "note": ""
+    },
+    {
+      "id": "OD-4",
+      "kind": "owner decision",
+      "severity": "—",
+      "title": "TG-01 and TG-08 remain PENDING.",
+      "remediation": "Not touched; no approval or authorization claimed.",
+      "status": "PENDING (UNCHANGED)",
+      "merge_impact": "Blocks merge",
+      "evidence": [],
+      "root_cause": "—",
+      "files_changed": [],
+      "requirements": [],
+      "regression_tests": [],
+      "amendment": "—",
+      "owner_decision": "OD-4",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "merge",
+      "review_stages": [
+        "merge"
+      ],
+      "note": ""
+    },
+    {
+      "id": "OD-5",
+      "kind": "owner decision",
+      "severity": "—",
+      "title": "Merge deploys dist/ to the live site: no merge, no push to main, intake disabled, no DNS/Cloudflare change.",
+      "remediation": "Complied; merge-safety plan written (docs/implementation/P0-merge-safety-plan.md), not executed; intake metas verified empty.",
+      "status": "COMPLIED — PLAN AWAITS OWNER CHOICE",
+      "merge_impact": "Blocks merge until a plan option is approved",
+      "evidence": [],
+      "root_cause": "—",
+      "files_changed": [],
+      "requirements": [],
+      "regression_tests": [],
+      "amendment": "—",
+      "owner_decision": "OD-5",
+      "staging_impact": "—",
+      "production_impact": "—",
+      "review_blocking": "merge",
+      "review_stages": [
+        "merge"
+      ],
+      "note": ""
+    }
+  ]
+}

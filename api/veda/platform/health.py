@@ -47,6 +47,11 @@ def known_revisions() -> set[str]:
     return {r.revision for r in _scripts().walk_revisions()}
 
 
+def current_revision() -> str | None:
+    with db.engine().connect() as conn:
+        return conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
+
+
 def schema_state(current: str | None) -> str:
     if current is not None and current == alembic_head():
         return "head"

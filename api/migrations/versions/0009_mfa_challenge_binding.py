@@ -10,7 +10,7 @@ and the N image refuses an ENROLLMENT challenge without a binding (fail closed),
 started just before the upgrade has to be restarted.
 
 The revision follows 0100_crm_leads because the chain is linear; it depends only on platform tables.
-Proposed amendment: docs/architecture/amendments/AM-11 (deviation DEV-006).
+Proposed amendment: docs/proposals/amendments/AM-11 (deviation DEV-006).
 
 Revision ID: 0009_mfa_challenge_binding
 Revises: 0100_crm_leads

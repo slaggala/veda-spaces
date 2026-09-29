@@ -283,7 +283,8 @@ export class VsUserDrawer extends SessionElement {
         ${this.can('user.password.reset') && u.status === 'ACTIVE' ? html`<button class="btn small" ?disabled=${disabled} @click=${() => this.run('Reset link sent to their verified email', () => api.post(`/api/v1/users/${u.id}/password-reset`, {}))}>Send password reset</button>` : nothing}
         ${this.can('user.create') && u.status === 'INVITED' ? html`<button class="btn small" ?disabled=${disabled} @click=${() => this.run('Invitation resent', () => api.post(`/api/v1/users/${u.id}/invite/resend`, {}))}>Resend invite</button>` : nothing}
         ${this.can('user.delete') && !u.is_deleted ? html`<button class="btn small danger" ?disabled=${disabled} @click=${() => (this.action = 'delete')}>Delete…</button>` : nothing}
-        ${this.can('user.restore') && u.is_deleted ? html`<button class="btn small" @click=${() => this.run('User restored (disabled)', () => api.post(`/api/v1/users/${u.id}/restore`, {}, { ifMatch: u.version }))}>Restore</button>` : nothing}
+        ${this.can('user.restore') && u.is_deleted && u.protection_level === 'FOUNDER' ? html`<a class="btn small" href="/admin/founder-actions">Restore via Founder actions</a>` : nothing}
+        ${this.can('user.restore') && u.is_deleted && u.protection_level !== 'FOUNDER' ? html`<button class="btn small" @click=${() => this.run('User restored (disabled)', () => api.post(`/api/v1/users/${u.id}/restore`, {}, { ifMatch: u.version }))}>Restore</button>` : nothing}
       </div>
         ${this.action === 'delete' ? html`<div class="card stack"><p>Delete ${u.full_name}? They are signed out everywhere. Someone with restore permission can bring the account back as disabled.</p>${reasonField('delete_reason')}
           <div class="row"><span class="spacer"></span><button class="btn" @click=${() => (this.action = '')}>Cancel</button>

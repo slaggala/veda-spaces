@@ -88,7 +88,8 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
 
 def check_route_declarations(app: Flask) -> None:
     """Startup fails if a route lacks a permission or RBX declaration, uses an RBX exception it is not registered
-    for, or is public yet declares a permission that would never be enforced (06 §8 Layer 1, 06 §11; IR-A05)."""
+    for, or is public or optional-auth yet declares a permission that would never be enforced or has no RBX
+    registration (06 §8 Layer 1, 06 §11; IR-A05)."""
     declared = {spec.endpoint: spec for spec in http.ROUTES}
     for rule in app.url_map.iter_rules():
         if rule.endpoint in ("static", "openapi"):
@@ -98,8 +99,14 @@ def check_route_declarations(app: Flask) -> None:
             raise RuntimeError(f"route {rule.rule} ({rule.endpoint}) has no permission or RBX declaration")
         if spec.rbx and (spec.method, spec.rule) not in RBX_REGISTER.get(spec.rbx, frozenset()):
             raise RuntimeError(f"route {spec.method} {spec.rule} is not in the {spec.rbx} register (06 §11)")
-        if spec.auth == "public" and (spec.permission or spec.any_of):
-            raise RuntimeError(f"public route {spec.method} {spec.rule} declares a permission that cannot be enforced")
+        # Without a signed-in principal (public, or optional auth used anonymously) no permission is ever checked,
+        # so such a route must not declare one and must be a registered RBX exception (IR-A05).
+        if spec.auth in ("public", "optional") and (spec.permission or spec.any_of):
+            raise RuntimeError(
+                f"{spec.auth} route {spec.method} {spec.rule} declares a permission that cannot be enforced"
+            )
+        if spec.auth in ("public", "optional") and not spec.rbx:
+            raise RuntimeError(f"{spec.auth} route {spec.method} {spec.rule} is not an RBX-registered exception")
 
 
 def create_app(settings: config_mod.Settings | None = None) -> Flask:

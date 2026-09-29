@@ -1,0 +1,21 @@
+.........................s.............................................. [ 13%]
+........ssssss.......................................................... [ 26%]
+........................................................................ [ 40%]
+...........................................................s............ [ 53%]
+.....................s.s................................................ [ 67%]
+........................................................................ [ 80%]
+........................................................................ [ 94%]
+...............................                                          [100%]
+=========================== short test summary info ============================
+SKIPPED [2] tests/integration/test_archive_ordering.py:266: snapshots and the database-volume check are SQLite-only (the P0 production engine)
+SKIPPED [1] tests/integration/test_backups.py:19: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:25: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:31: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:42: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:47: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:58: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_schema.py:93: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:354: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+525 passed, 10 skipped in 89.73s (0:01:29)
+{"event": "Exiting 35268 remaining pids=[35268]", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T13:16:17.061243Z"}
+{"event": "Cleaning last handle for server: <tmp>", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T13:16:17.061311Z"}

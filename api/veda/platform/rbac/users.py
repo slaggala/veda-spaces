@@ -251,9 +251,30 @@ def delete_user(s: Session, ctx: AuthContext, target: User, reason: str) -> None
 
 
 def restore_user(s: Session, ctx: AuthContext, target: User) -> None:
+    """Restore a deleted STANDARD account (returns DISABLED). A deleted Founder keeps FOUNDER protection and is
+    restored only through FOUNDER_STATUS_CHANGE status=RESTORE with a second eligible Founder (OD-2, RR-02)."""
     if not target.is_deleted:
         raise ApiError(409, "INVALID_STATE", "The user is not deleted.")
+    guards.g3_not_self(ctx.user.id, target.id)
+    if target.protection_level == "FOUNDER":
+        security_events.defer(
+            "FOUNDER_GOVERNANCE_BYPASS_BLOCKED",
+            "BLOCKED",
+            subject_user_id=target.id,
+            permission_code="user.restore",
+            target=("app_user", target.id),
+            detail={"action": "restore"},
+        )
+    guards.g11_not_founder(target)
     guards.g9_not_stronger(s, ctx.res, target.id)
+    restore_effects(s, target)
+    record_sensitive_action(
+        s, ctx, "user.restore", action="restore", target=("app_user", target.id), subject_user_id=target.id
+    )
+
+
+def restore_effects(s: Session, target: User) -> None:
+    """Shared with FOUNDER_STATUS_CHANGE status=RESTORE: the account returns DISABLED and must be reactivated."""
     if auth_service.email_in_use(s, target.email_normalized, exclude_user_id=target.id):
         raise ApiError(409, "DUPLICATE", "Another live user has this email.")
     target.is_deleted = False
@@ -380,6 +401,7 @@ def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: s
         guards.g2_can_use_role(s, ctx.res, rid)
     require_step_up(ctx)
     inv = guards.InvariantGuard(s)
+    before = governance.governance_class(s, target)
     for rid in added:
         s.add(UserRole(user_id=target.id, role_id=rid, reason=reason))
     for rid in removed:
@@ -387,6 +409,7 @@ def set_roles(s: Session, ctx: AuthContext, target: User, items: list, reason: s
     if added or removed:
         resolver.bump_authz_version(target)
     inv.check()
+    governance.revalidate_after_escalation(s, target, before, "TARGET_BECAME_PRIVILEGED")
     record_sensitive_action(
         s, ctx, "user.role.manage", action="set_roles", target=("app_user", target.id), subject_user_id=target.id
     )
@@ -462,10 +485,12 @@ def add_permission(s: Session, ctx: AuthContext, target: User, body) -> UserPerm
         raise ApiError(409, "DUPLICATE", "A direct entry for this permission already exists.")
     require_step_up(ctx)
     inv = guards.InvariantGuard(s)
+    before = governance.governance_class(s, target)
     row = UserPermission(user_id=target.id, permission_id=perm.id, effect=body.effect, scope=scope, reason=body.reason)
     s.add(row)
     resolver.bump_authz_version(target)
     inv.check()
+    governance.revalidate_after_escalation(s, target, before, "TARGET_BECAME_PRIVILEGED")
     record_sensitive_action(
         s,
         ctx,
@@ -498,6 +523,7 @@ def remove_permission(s: Session, ctx: AuthContext, target: User, grant_id: str)
     guards.g9_not_stronger(s, ctx.res, target.id)
     require_step_up(ctx)
     inv = guards.InvariantGuard(s)
+    before = governance.governance_class(s, target)
     row.is_deleted = True
     s.flush()
     if row.effect == "DENY":
@@ -514,6 +540,7 @@ def remove_permission(s: Session, ctx: AuthContext, target: User, grant_id: str)
         target=("app_user", target.id),
         subject_user_id=target.id,
     )
+    governance.revalidate_after_escalation(s, target, before, "TARGET_BECAME_PRIVILEGED")  # removing a DENY
 
 
 def present_permissions(s: Session, target: User) -> list[dict]:

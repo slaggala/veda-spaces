@@ -86,6 +86,13 @@ await site.goto(`${SITE}/#contact`);
 ok.push(await scan(site, 'website (idle)', { gateScope: FORM_SCOPE }));
 await site.locator('#contact-form button[type="submit"]').click();
 ok.push(await scan(site, 'website form (error state)', { gateScope: FORM_SCOPE }));
+// Flag-off (the live configuration) validation state, and the 404 page (RR-01, RR-11).
+const OFF = process.env.SITE_OFF ?? 'http://localhost:8001';
+await site.goto(`${OFF}/?axe=off#contact`);
+await site.locator('#contact-form button[type="submit"]').click();
+ok.push(await scan(site, 'website form, intake off (error state)', { gateScope: FORM_SCOPE }));
+await site.goto(`${OFF}/no-such-page`);
+ok.push(await scan(site, '404 page'));
 await browser.close();
 console.log(`${ok.filter(Boolean).length}/${ok.length} screens without serious/critical violations`);
 process.exitCode = ok.every(Boolean) ? 0 : 1;

@@ -5,7 +5,7 @@
 
 | Item | Value |
 |---|---|
-| Certified architecture | `778aa8fdd918da48340319696ada3ff673e9fb8e` (existing documents unchanged; proposed amendments sit in `docs/architecture/amendments/`) |
+| Certified architecture | `778aa8fdd918da48340319696ada3ff673e9fb8e` (certified documents unchanged; proposed amendments moved to `docs/proposals/amendments/`, RR-A23) |
 | Implementation branch | `implementation/p0-foundation` |
 | Reviewed implementation | `9236aa3ade38c33d03a57cf7a064ece29937b109` |
 | Independent review | review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4 — verdict **NOT CERTIFIED** ({'BLOCKER': 1, 'MAJOR': 18, 'MINOR': 20, 'ADVISORY': 25}) |
@@ -13,9 +13,67 @@
 | Remediation matrix | [P0-review-remediation-matrix.md](P0-review-remediation-matrix.md) (+ `.json`) — all 39 findings, 25 advisories, 11 open issues |
 | Open issues | [P0-open-issues.md](P0-open-issues.md) (+ `.json`) — 106 entries incl. every gate |
 | Deviations | [P0-implementation-deviations.md](P0-implementation-deviations.md) — DEV-001…DEV-008, none approved |
-| Amendments | [docs/architecture/amendments](../architecture/amendments/README.md) — AM-1…AM-11, all PROPOSED, NOT APPROVED |
+| Amendments | [docs/proposals/amendments](../proposals/amendments/README.md) — AM-1…AM-13, all PROPOSED, NOT APPROVED |
 | Runbooks | [docs/operations/api-runbooks.md](../operations/api-runbooks.md) |
 | Evidence | [evidence/remediation/](evidence/remediation/) — raw output of the clean-environment run below |
+
+## 0. Final merge-blocker remediation (targeted re-review)
+
+Workstream VEDA-SPACES-P0-FINAL-MERGE-BLOCKER-REMEDIATION-01. It responds to the targeted re-review
+`review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305`, whose verdict was
+**NOT CERTIFIED**, with IR-01 RESOLVED and no BLOCKER.
+
+- **Previous head:** `2f6b59a`.
+- **Matrix:** [P0-final-merge-blocker-matrix.md](P0-final-merge-blocker-matrix.md) (+ `.json`). It covers:
+  - RR-01…RR-18;
+  - RR-A01…RR-A25;
+  - the 34 reconciliation items the re-review did not resolve;
+  - OD-1…OD-5.
+- **Merge-safety plan:** [P0-merge-safety-plan.md](P0-merge-safety-plan.md). It is a plan only and has not been executed.
+- **Evidence:** [evidence/final-merge-blockers/](evidence/final-merge-blockers/).
+
+| Finding | Result at this commit |
+|---|---|
+| RR-01 (404 CSP) | Styles moved to `/assets/404.css`. CSP unchanged. The browser checks the page under the production headers: HTTP 404, 0 CSP violations, no inline code, responsive, and axe-clean after an AA contrast fix. |
+| RR-02 (Founder restore) | Implements OD-2: `FOUNDER_STATUS_CHANGE` with status `RESTORE`, requested by one Founder and approved by a second. The generic restore returns 403 plus a bypass event. Both break-glass channels are refused. Proposed amendment AM-12. |
+| RR-03 (email change survives promotion) | Implements OD-3 with governance classes: escalation withdraws weaker-class work, and verification fails closed. Proposed amendment AM-13. |
+| RR-04 (DEV-007) | Layered limiter covering account, aggregate, wide-network, reset-email and endpoint tiers. It never locks anyone out, and the challenge closes the MFA_REQUIRED oracle. AM-7 rewritten; the earlier text was rejected as written. |
+| RR-05, RR-06 (archive manifests) | Write-once exports. Verification requires finalised, contiguous, hash-checked, re-chained and announced manifests. Two-phase ordering with idempotent retry and repair. S3 Object Lock is **not** verified against real S3. |
+| RR-07 (CLI logging, scheduler) | Every CLI process configures logging. `MaintenanceJobFailed` and `ScheduledJobFailed` record job exit codes. |
+| RR-08 (refresh successor) | `rotate_session_refresh` links successors after path-A confirmation and after a password change. |
+| RR-10, RR-14 | Staging and production refuse broad proxy CIDRs, weak, development, duplicate or invalid keys, and a snapshot directory outside the database volume. |
+| RR-11 (flag-off form) | Validates before the WhatsApp hand-off. Errors are accessible, entered values are kept, and the message is built only from validated fields. |
+| RR-16 (mypy ratchet) | Fails closed (exit 2) if mypy is absent, mis-configured, only partly run, or its baseline is malformed or has grown. Update mode is explicit and never admits new errors. |
+| RR-17 (rollback) | Rollback floor `0009_mfa_challenge_binding` enforced by `deploy.sh`, which reads readiness inside the container. The runbook prohibits rollback to `9236aa3`. No rehearsal is claimed. |
+| IR-A05 | Startup refuses an optional-auth or public route that declares a permission. |
+| Still open | RR-09, RR-12, RR-13, RR-15 and RR-18 (production or staging blockers), plus the other re-review advisories; see the matrix. |
+
+**Reviewer reproducers against the previous head (`2f6b59a`):** the new suites fail there.
+
+- `test_final_merge_blockers`: 15 failed.
+- `test_layered_limiter`: 12 failed.
+- `test_archive_ordering`: 15 failed.
+- `test_mypy_ratchet`: 17 failed.
+
+These outputs are in `evidence/final-merge-blockers/prefix-2f6b59a-*.txt`.
+
+**Clean-environment run at this tree:** 29 steps, every exit code 0. The first run found a PostgreSQL concurrency defect in the new OD-3 code, since fixed; `evidence/final-merge-blockers/README.md` has the details.
+
+- **pytest, SQLite:** 535 passed in 32.04s.
+- **pytest, PostgreSQL 16.4:** 525 passed, 10 skipped in 96.93s (0:01:36).
+- **pytest, PostgreSQL 18.4:** 525 passed, 10 skipped in 89.73s (0:01:29).
+- **Browser:** 7/7 workspace journeys, 16/16 access checks, 31/31 site checks, and 12/12 screens without serious or critical axe violations.
+
+**Not covered in the browser:** Founder restore, the email-change privilege transition and MFA recovery. These are covered by API integration tests on both engines only.
+
+**Unchanged:**
+
+- The certified architecture.
+- The review artifacts.
+- The intake metas, which stay empty, so the public API remains disabled.
+- TG-01 and TG-08, which stay **PENDING**.
+- No amendment is approved.
+- Nothing has been merged or deployed.
 
 ## 1. IR-01 (BLOCKER): MFA enrollment confirmation bound to its principal, session, factor and path
 

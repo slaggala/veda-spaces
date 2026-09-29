@@ -35,6 +35,15 @@ def network_of(ip: str | None) -> str:
     return str(ipaddress.ip_network(f"{addr}/{prefix}", strict=False))
 
 
+def wide_network_of(ip: str | None) -> str:
+    """IPv4 /24 or IPv6 /48: the coarse source bucket for rotation inside one allocation (RR-04)."""
+    addr = parse(ip)
+    if addr is None:
+        return "unknown"
+    prefix = 24 if addr.version == 4 else 48
+    return str(ipaddress.ip_network(f"{addr}/{prefix}", strict=False))
+
+
 def limiter_key(ip: str | None) -> str:
     """Per-IP limits count an IPv6 client by its /64, which one subscriber controls entirely."""
     addr = parse(ip)

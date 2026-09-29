@@ -482,6 +482,7 @@ class CancelLinkIn(Closed):
     rbx="RBX-003",
     auth="public",
     body=CancelLinkIn,
+    status=204,
     requirement="RBAC-021",
     summary="Cancel a break-glass request via its signed link (06 §7.5)",
 )
@@ -496,7 +497,7 @@ class FounderActionIn(Closed):
     ]
     target_user_id: Id
     reason: Reason
-    status: Literal["DISABLED", "ACTIVE", "UNLOCK", "DELETE", "DELETED"] | None = None
+    status: Literal["DISABLED", "ACTIVE", "UNLOCK", "DELETE", "DELETED", "RESTORE"] | None = None
     new_email: Email | None = None
     post_roles: list[Id] | None = None
 
@@ -514,7 +515,9 @@ class FounderActionIn(Closed):
 def founder_action(req: Req):
     from veda.platform.auth.request_auth import record_sensitive_action, require_step_up
 
-    target = users.load_target(req.session, req.body.target_user_id)
+    # Only FOUNDER_STATUS_CHANGE status=RESTORE addresses a deleted account (OD-2).
+    restore = req.body.action == "FOUNDER_STATUS_CHANGE" and req.body.status == "RESTORE"
+    target = users.load_target(req.session, req.body.target_user_id, include_deleted=restore)
     require_step_up(req.ctx)
     status = "DELETE" if req.body.status == "DELETED" else req.body.status
     payload = {

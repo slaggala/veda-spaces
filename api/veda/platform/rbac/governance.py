@@ -96,6 +96,69 @@ def _open_request_guard(s: Session, target_id: str, action_type: str, *, founder
         raise ApiError(409, "REQUEST_ALREADY_OPEN", "A request for this account is already open.")
 
 
+# --- governance class (OD-3) -----------------------------------------------------------------
+#
+# STANDARD_CONTROL < DUAL_CONTROL (holds a sensitive permission, 06 §7.4) < FOUNDER_GOVERNANCE (06 §7.2). Anything
+# authorised under a weaker class than the target now holds fails closed when it is executed or completed.
+
+STANDARD_CONTROL, DUAL_CONTROL, FOUNDER_GOVERNANCE = "STANDARD_CONTROL", "DUAL_CONTROL", "FOUNDER_GOVERNANCE"
+GOVERNANCE_RANK = {STANDARD_CONTROL: 0, DUAL_CONTROL: 1, FOUNDER_GOVERNANCE: 2}
+
+
+def governance_class(s: Session, user: User) -> str:
+    if user.protection_level == "FOUNDER":
+        return FOUNDER_GOVERNANCE
+    return DUAL_CONTROL if resolver.is_privileged(s, user.id) else STANDARD_CONTROL
+
+
+def proposal_authorised_class(s: Session, user: User) -> str | None:
+    """The class under which the pending email proposal was authorised; None when self-requested.
+
+    An approved request starts the change in the transaction that executes it, so the proposal's
+    requested_on equals that request's executed_on."""
+    if user.proposed_email_requested_by == user.id:
+        return None
+    kinds = set(
+        s.execute(
+            sa.select(AdminApprovalRequest.action_type).where(
+                AdminApprovalRequest.target_user_id == user.id,
+                AdminApprovalRequest.status == "EXECUTED",
+                AdminApprovalRequest.action_type.in_(("EMAIL_CHANGE", "FOUNDER_EMAIL_CHANGE")),
+                AdminApprovalRequest.requested_by == user.proposed_email_requested_by,
+                AdminApprovalRequest.executed_on == user.proposed_email_requested_on,
+            )
+        ).scalars()
+    )
+    if "FOUNDER_EMAIL_CHANGE" in kinds:
+        return FOUNDER_GOVERNANCE
+    return DUAL_CONTROL if "EMAIL_CHANGE" in kinds else STANDARD_CONTROL
+
+
+def proposal_still_authorised(s: Session, user: User) -> bool:
+    authorised = proposal_authorised_class(s, user)
+    return authorised is None or GOVERNANCE_RANK[authorised] >= GOVERNANCE_RANK[governance_class(s, user)]
+
+
+def revalidate_after_escalation(s: Session, user: User, before: str, reason: str) -> None:
+    """Called after any change that can raise the target's governance class (promotion, roles, permissions):
+    work authorised under the weaker class is withdrawn in the same transaction (OD-3, RR-03)."""
+    after = governance_class(s, user)
+    if GOVERNANCE_RANK[after] <= GOVERNANCE_RANK[before]:
+        return
+    if after == FOUNDER_GOVERNANCE:
+        cancel_open_standard_requests(s, user.id, reason)
+    if user.proposed_email and not proposal_still_authorised(s, user):
+        proposed = user.proposed_email
+        auth_service.clear_proposal(s, user)
+        security_events.record(
+            s,
+            "EMAIL_CHANGE_CANCELLED",
+            "SUCCESS",
+            subject_user_id=user.id,
+            detail={"proposed_email": mask_email(proposed), "reason": reason, "status": f"{before}->{after}"},
+        )
+
+
 # --- standard dual control (06 §7.4) ----------------------------------------------------------
 
 
@@ -197,9 +260,29 @@ def _execute_standard(s: Session, req: AdminApprovalRequest) -> None:
 # --- Founder-level requests (06 §7.2) ----------------------------------------------------------
 
 
+def is_restore(action: str, payload: dict | None) -> bool:
+    return action == "FOUNDER_STATUS_CHANGE" and (payload or {}).get("status") == "RESTORE"
+
+
+def _refuse_break_glass_restore(action: str, payload: dict) -> None:
+    """OD-2: restoring a deleted Founder needs two distinct eligible Founders in-app. The approved break-glass
+    policy (06 §7.5) does not cover restoration, so neither break-glass channel may carry it (RR-02)."""
+    if is_restore(action, payload):
+        raise ApiError(
+            409, "SECOND_FOUNDER_REQUIRED", "Restoring a Founder needs a second eligible Founder to approve in-app."
+        )
+
+
 def _validate_founder_action(s: Session, action: str, target: User, payload: dict) -> None:
     founders = guards.active_founders(s)
     is_target_founder = guards.is_founder(s, target)
+    # Only a restore acts on a deleted account; every other action requires a live one (OD-2, OD-3).
+    if target.is_deleted != is_restore(action, payload):
+        raise ApiError(
+            409,
+            "INVALID_STATE",
+            "The target account no longer exists." if target.is_deleted else "The target account is not deleted.",
+        )
     if action == "GRANT_FOUNDER":
         if is_target_founder:
             raise ApiError(409, "INVALID_STATE", "This user is already a Founder.")
@@ -213,8 +296,8 @@ def _validate_founder_action(s: Session, action: str, target: User, payload: dic
         raise ApiError(409, "LAST_FOUNDER", "The last Founder cannot be removed.")
     if action == "FOUNDER_STATUS_CHANGE":
         status = payload.get("status")
-        if status not in ("DISABLED", "ACTIVE", "UNLOCK", "DELETE"):
-            raise ApiError(422, "VALIDATION_FAILED", "status must be DISABLED, ACTIVE, UNLOCK or DELETE.")
+        if status not in ("DISABLED", "ACTIVE", "UNLOCK", "DELETE", "RESTORE"):
+            raise ApiError(422, "VALIDATION_FAILED", "status must be DISABLED, ACTIVE, UNLOCK, DELETE or RESTORE.")
         if status in ("DISABLED", "DELETE") and last:
             raise ApiError(409, "LAST_FOUNDER", "The last Founder cannot be deactivated or deleted.")
     if action == "FOUNDER_EMAIL_CHANGE" and not payload.get("new_email"):
@@ -236,6 +319,8 @@ def request_founder_action(
     now = db.tx_time(s)
     approvers = eligible_founders(s, exclude={ctx.user.id, target.id})
     channel = "IN_APP" if approvers else "BREAK_GLASS"
+    if channel == "BREAK_GLASS":
+        _refuse_break_glass_restore(action, payload)
     req = AdminApprovalRequest(
         action_class="FOUNDER",
         action_type=action,
@@ -307,14 +392,17 @@ def _execute_founder(s: Session, req: AdminApprovalRequest) -> None:
     payload = req.request_payload or {}
     now = db.tx_time(s)
     inv = guards.InvariantGuard(s)
-    if target is None or target.is_deleted:
+    if target is None:
         raise ApiError(409, "INVALID_STATE", "The target account no longer exists.")
     # The action must still make sense against the current state, not the state when it was requested.
     _validate_founder_action(s, req.action_type, target, payload)
+    if req.channel == "BREAK_GLASS":
+        _refuse_break_glass_restore(req.action_type, payload)
     if req.channel == "BREAK_GLASS" and req.requested_by == SYSTEM_USER_ID:
         require_break_glass_mode(s, target.id)
     founder_roles = s.execute(sa.select(Role).where(Role.grant_path == registry.FOUNDER_WORKFLOW_ONLY)).scalars().all()
     if req.action_type == "GRANT_FOUNDER":
+        before = governance_class(s, target)
         target.protection_level = "FOUNDER"
         for role in founder_roles:
             if not s.execute(
@@ -322,7 +410,8 @@ def _execute_founder(s: Session, req: AdminApprovalRequest) -> None:
             ).first():
                 s.add(UserRole(user_id=target.id, role_id=role.id, reason=req.reason[:500]))
         resolver.bump_authz_version(target)
-        cancel_open_standard_requests(s, target.id, "TARGET_BECAME_FOUNDER")
+        s.flush()
+        revalidate_after_escalation(s, target, before, "TARGET_BECAME_FOUNDER")
         security_events.record(
             s, "FOUNDER_TRANSITION", "SUCCESS", subject_user_id=target.id, detail={"action": "GRANT"}
         )
@@ -350,9 +439,20 @@ def _execute_founder(s: Session, req: AdminApprovalRequest) -> None:
         mfa_flows.admin_reset(s, target)
         outbox.enqueue(s, "auth.mfa_reset_completed", "app_user", target.id, user_id=target.id)
     elif req.action_type == "FOUNDER_STATUS_CHANGE":
-        from .users import apply_status
+        from .users import apply_status, restore_effects
 
-        apply_status(s, target, payload["status"], reason=req.reason)
+        if payload["status"] == "RESTORE":
+            restore_effects(s, target)
+            security_events.record(
+                s,
+                "FOUNDER_TRANSITION",
+                "SUCCESS",
+                subject_user_id=target.id,
+                target=("admin_approval_request", req.id),
+                detail={"action": "RESTORE"},
+            )
+        else:
+            apply_status(s, target, payload["status"], reason=req.reason)
     elif req.action_type == "FOUNDER_EMAIL_CHANGE":
         auth_service.start_email_change(s, target, payload["new_email"], requested_by=req.requested_by)
     inv.check()
@@ -661,6 +761,7 @@ def break_glass_request(
         )
         raise
     _validate_founder_action(s, action, target, payload)
+    _refuse_break_glass_restore(action, payload)
     _open_request_guard(s, target.id, action, founder=True)
     now = db.tx_time(s)
     req = AdminApprovalRequest(

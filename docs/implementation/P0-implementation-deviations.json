@@ -3,7 +3,7 @@
   "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "branch": "implementation/p0-foundation",
   "approved": false,
-  "note": "No deviation is approved. DEV-001..DEV-003 were found acceptable with amendments by the independent review; DEV-004 required an implementation change and is corrected; DEV-005 is registered as the review required; DEV-006..DEV-008 come from this remediation. All await the Architecture Owner's decision.",
+  "note": "No deviation is approved. The targeted re-review decisions are recorded per deviation (rereview_decision). DEV-007 was reimplemented after RR-04; DEV-009 and DEV-010 implement owner decisions OD-2 and OD-3. All await the Architecture Owner's decision through the proposed amendments in docs/proposals/amendments.",
   "deviations": [
     {
       "id": "DEV-001",
@@ -44,7 +44,9 @@
         "IR-20"
       ],
       "amendment": "AM-1",
-      "conditions_resolution": "IR-20 resolved: path C refuses when an ACTIVE factor exists; every confirmation ends other open enrollment links and transactions."
+      "conditions_resolution": "IR-20 resolved: path C refuses when an ACTIVE factor exists; every confirmation ends other open enrollment links and transactions.",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "IR-20 condition met; only one ACTIVE factor; PENDING never authenticates"
     },
     {
       "id": "DEV-002",
@@ -87,7 +89,9 @@
         "IR-25"
       ],
       "amendment": "AM-2",
-      "conditions_resolution": "IR-01 resolved (transaction binding, AM-11); IR-21 resolved (resend/repeat acceptance supersede contexts; path B requires a live invite); IR-25 resolved (INVITE_ACCEPTED stage password_set)."
+      "conditions_resolution": "IR-01 resolved (transaction binding, AM-11); IR-21 resolved (resend/repeat acceptance supersede contexts; path B requires a live invite); IR-25 resolved (INVITE_ACCEPTED stage password_set).",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Conditions IR-01, IR-21, IR-25 met; AM-2 must state that link replay before activation overwrites the password"
     },
     {
       "id": "DEV-003",
@@ -128,7 +132,9 @@
         "IR-02"
       ],
       "amendment": "AM-3",
-      "conditions_resolution": "IR-22 resolved (ipaddress-based /24 and /64); IR-09 resolved (dev verifier local/test only; staging validated); IR-02 resolved (siteverify outside the write lock)."
+      "conditions_resolution": "IR-22 resolved (ipaddress-based /24 and /64); IR-09 resolved (dev verifier local/test only; staging validated); IR-02 resolved (siteverify outside the write lock).",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Conditions IR-22, IR-09, IR-02 met"
     },
     {
       "id": "DEV-004",
@@ -163,7 +169,9 @@
       "reviewer_conditions": [
         "IR-16"
       ],
-      "amendment": "AM-4"
+      "amendment": "AM-4",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Corrected behaviour verified on both engines; residuals RR-12"
     },
     {
       "id": "DEV-005",
@@ -193,7 +201,9 @@
       "rollback": "Remove endpoint and page.",
       "decision_required": "AM-5.",
       "amendment": "AM-5",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Endpoint, page, authorization, replay prevention, events, RBX registration verified; OpenAPI status code RR-A09"
     },
     {
       "id": "DEV-006",
@@ -226,34 +236,41 @@
       "rollback": "N-1 image ignores the columns.",
       "decision_required": "AM-11.",
       "amendment": "AM-11",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Expand-only; no schema/authz/replay/migration regression; AM-11 incomplete (rollback reintroduces IR-01; 02 §8.3 placement)"
     },
     {
       "id": "DEV-007",
-      "title": "Per-email login and forgot-password limits keyed by (email, network)",
+      "title": "Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds",
       "requirement_ids": [
         "AUTH-010",
-        "SEC-011"
+        "SEC-011",
+        "AUTH-008"
       ],
       "adrs": [],
       "architecture_references": [
-        "08 §12"
+        "08 §12",
+        "05 §4"
       ],
-      "certified_behavior": "5/min and 3/hour per email.",
-      "implemented_behavior": "Same limits keyed on (email, client /24 or /64).",
-      "reason": "IR-23 victim lockout.",
-      "security_impact": "Account throttles still bound distributed guessing.",
-      "compatibility_impact": "None.",
+      "certified_behavior": "08 §12: login 5/min per email, forgot 3/hour per email; 05 §4 per-(account, network) throttle and a 5-network global lock for accounts without a factor.",
+      "implemented_behavior": "Per-(email HMAC, /24 or /64) limits kept for IR-23 fairness, plus: wide-network limits (IPv4 /24, IPv6 /48); an account budget across networks (10 failures/15 min → Turnstile on every attempt; 20 → escalating spacing up to 30 s, 429); an aggregate bound (200 failures/5 min → Turnstile for every sign-in); at most 3 reset emails per account per hour; endpoint limits on MFA, recovery, enroll confirm and email verify/cancel; trusted-proxy entries at most /24 or /64; bounded in-process state; no raw email in keys or events. Nothing locks out an account except the certified 05 §4 lock for accounts without a factor.",
+      "reason": "RR-04: the earlier (email, network) keying removed the only cross-network bound for MFA holders and multiplied reset-email volume.",
+      "security_impact": "Distributed guessing per account: 10 unchallenged attempts per 15 min, then one solved challenge per attempt, then ≤ 1 per 30 s; the MFA_REQUIRED oracle needs a challenge. Victim DoS bounded to a challenge plus ≤ 30 s. Turnstile failure under escalation fails closed for that identifier (≤ 15 min).",
+      "compatibility_impact": "Additive: 429 on the delay tier; captcha_required on the challenge tier.",
       "data_model_impact": "None.",
-      "api_impact": "None.",
+      "api_impact": "429 RATE_LIMITED with Retry-After from login under the delay tier.",
       "ui_impact": "None.",
       "tests": [
+        "api/tests/integration/test_layered_limiter.py",
         "api/tests/integration/test_auth_remediation.py::test_IR23_P5_third_party_cannot_rate_limit_the_victim_from_elsewhere"
       ],
-      "rollback": "Key on the email only.",
-      "decision_required": "AM-7.",
+      "rollback": "Remove the account, aggregate and reset tiers (reintroduces RR-04). Not recommended.",
+      "decision_required": "AM-7 (rewritten; the earlier AM-7 was rejected as written, OD-1).",
       "amendment": "AM-7",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "PROPOSED, NOT APPROVED — implementation changed per RR-04; pending final targeted check and Architecture-Owner decision",
+      "rereview_decision": "REQUIRES IMPLEMENTATION CHANGE",
+      "rereview_basis": "Removes cross-network guessing bound for MFA holders and reset-email cap (RR-04)"
     },
     {
       "id": "DEV-008",
@@ -284,9 +301,78 @@
       "rollback": "Strict head equality.",
       "decision_required": "AM-6.",
       "amendment": "AM-6",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
+      "rereview_basis": "Safe; no secrets; AM-6 must state that rollback of this release is snapshot restore (RR-17)"
+    },
+    {
+      "id": "DEV-009",
+      "title": "Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2)",
+      "requirement_ids": [
+        "RBAC-020",
+        "RBAC-021",
+        "USER-001"
+      ],
+      "adrs": [
+        "ADR-010"
+      ],
+      "architecture_references": [
+        "06 §7.2.2",
+        "06 §7.1 G11",
+        "08 §5.11"
+      ],
+      "certified_behavior": "FOUNDER_STATUS_CHANGE statuses DISABLED/ACTIVE/UNLOCK/DELETE; restore of a deleted user through user.restore (USER-001).",
+      "implemented_behavior": "POST /users/{id}/restore refuses Founders (403 FOUNDER_PROTECTED, FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE requested by one eligible Founder and approved in-app by another; refused on both break-glass channels (SECOND_FOUNDER_REQUIRED); re-validated at execution.",
+      "reason": "RR-02 and owner decision OD-2.",
+      "security_impact": "Closes a G11 bypass.",
+      "compatibility_impact": "Additive status value.",
+      "data_model_impact": "None.",
+      "api_impact": "status RESTORE; 403 on the generic restore for Founders.",
+      "ui_impact": "Restore action on the Founder actions page.",
+      "tests": [
+        "api/tests/integration/test_final_merge_blockers.py::test_RR02_*"
+      ],
+      "rollback": "Remove RESTORE (deleted Founders unrestorable).",
+      "decision_required": "AM-12.",
+      "status": "PROPOSED, NOT APPROVED — implements OD-2; pending Architecture-Owner decision",
+      "reviewer_decision": "n/a (owner decision OD-2)",
+      "reviewer_conditions": "",
+      "amendment": "AM-12"
+    },
+    {
+      "id": "DEV-010",
+      "title": "Pending identity changes are re-validated against the target's current governance class (OD-3)",
+      "requirement_ids": [
+        "RBAC-020",
+        "USER-007"
+      ],
+      "adrs": [
+        "ADR-010"
+      ],
+      "architecture_references": [
+        "06 §7.4",
+        "05 §8.6"
+      ],
+      "certified_behavior": "G11/G9 re-evaluated when a STANDARD request is decided and executed; email verification completes with no further check.",
+      "implemented_behavior": "Class escalation (GRANT_FOUNDER, roles, permissions) withdraws weaker-class work in the same transaction; verification recomputes the proposal's authorising class and fails closed when it is weaker than the target's current class or the account is disabled.",
+      "reason": "RR-03 (N17) and owner decision OD-3.",
+      "security_impact": "Closes RR-03.",
+      "compatibility_impact": "Behavioural tightening.",
+      "data_model_impact": "None.",
+      "api_impact": "Verification can return EMAIL_TOKEN_INVALID for a live link.",
+      "ui_impact": "None.",
+      "tests": [
+        "api/tests/integration/test_final_merge_blockers.py::test_RR03_*"
+      ],
+      "rollback": "Remove the checks (RR-03 returns).",
+      "decision_required": "AM-13.",
+      "status": "PROPOSED, NOT APPROVED — implements OD-3; pending Architecture-Owner decision",
+      "reviewer_decision": "n/a (owner decision OD-3)",
+      "reviewer_conditions": "",
+      "amendment": "AM-13"
     }
   ],
   "reviewed_sha": "9236aa3ade38c33d03a57cf7a064ece29937b109",
-  "review": "review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4"
+  "review": "review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4",
+  "rereview": "review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305"
 }

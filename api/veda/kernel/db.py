@@ -111,6 +111,7 @@ def begin_unit_of_work(session: Session, *, write: bool) -> None:
     session.info["transaction_id"] = new_id()
     session.info["write"] = write
     session.info["veda_versioned"] = set()
+    session.info["governance_locked"] = False
     # Bind the connection now so BEGIN IMMEDIATE is issued before any read.
     session.connection(execution_options={"veda_write": write})
 

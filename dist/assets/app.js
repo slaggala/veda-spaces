@@ -66,17 +66,20 @@ const optionText = (sel) => {
   return el && el.value ? el.options[el.selectedIndex].text : 'Not provided';
 };
 
+// Built only from visitor-entered fields (trimmed) and the selected option labels; the honeypot, consent and any
+// API configuration never enter the message. encodeURIComponent below makes every value safe in the URL (RR-11).
+const field = (data, name) => (data.get(name) || '').trim();
 const whatsappText = (data) => [
   'Hello Veda Spaces, I would like to discuss my home interiors.',
   '',
-  `Name: ${data.get('name')}`,
-  `Phone: ${data.get('phone')}`,
-  `Email: ${data.get('email') || 'Not provided'}`,
+  `Name: ${field(data, 'name')}`,
+  `Phone: ${field(data, 'phone')}`,
+  `Email: ${field(data, 'email') || 'Not provided'}`,
   `Property: ${optionText(labels.property)}`,
   `Service: ${optionText(labels.service)}`,
   `Budget: ${optionText(labels.budget)}`,
-  `Location: ${data.get('location') || 'Not provided'}`,
-  `Requirements: ${data.get('brief') || 'Not provided'}`,
+  `Location: ${field(data, 'location') || 'Not provided'}`,
+  `Requirements: ${field(data, 'brief') || 'Not provided'}`,
 ].join('\n');
 
 const whatsappUrl = (data) => `${WHATSAPP}?text=${encodeURIComponent(whatsappText(data))}`;
@@ -119,15 +122,19 @@ function showErrors(errors) {
   summary.focus();
 }
 
-function clientValidate(data) {
+// Runs before every hand-off. The consent checkbox exists only when intake is enabled, so it is checked only then:
+// the WhatsApp fallback never asks for, records or claims consent (RR-11).
+function clientValidate(data, { consent }) {
   const errors = [];
-  const name = (data.get('name') || '').trim();
-  if (name.length < 2) errors.push({ field: 'name', message: 'Enter your name.' });
-  const digits = (data.get('phone') || '').replace(/\D/g, '');
-  if (digits.length < 10) errors.push({ field: 'phone', message: 'Enter a valid phone number.' });
-  const email = (data.get('email') || '').trim();
+  if (field(data, 'name').length < 2) errors.push({ field: 'name', message: 'Enter your name.' });
+  const phone = field(data, 'phone');
+  const digits = phone.replace(/\D/g, '');
+  if (!/^\+?[\d\s().-]+$/.test(phone) || digits.length < 10 || digits.length > 15) {
+    errors.push({ field: 'phone', message: 'Enter a valid phone number.' });
+  }
+  const email = field(data, 'email');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ field: 'email', message: 'Enter a valid email address.' });
-  if (!data.get('consent')) errors.push({ field: 'consent.acknowledged', message: 'Please agree to be contacted.' });
+  if (consent && !data.get('consent')) errors.push({ field: 'consent.acknowledged', message: 'Please agree to be contacted.' });
   return errors;
 }
 
@@ -163,12 +170,12 @@ contactForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const data = new FormData(contactForm);
   clearErrors();
+  const errors = clientValidate(data, { consent: Boolean(apiBase) });
+  if (errors.length) { showErrors(errors); return; }
   if (!apiBase) {
     window.open(whatsappUrl(data), '_blank', 'noopener');
     return;
   }
-  const errors = clientValidate(data);
-  if (errors.length) { showErrors(errors); return; }
   const token = turnstileToken();
   if (!token) {
     // No verification token yet (widget still loading, or blocked): never submit without one.

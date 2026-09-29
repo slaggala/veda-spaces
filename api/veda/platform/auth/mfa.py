@@ -25,8 +25,8 @@ from veda.platform.identity.models import User
 from veda.platform.rbac import resolver
 
 from . import passwords, security_events, service, throttle, totp
-from .crypto import decrypt_secret, encrypt_secret, new_opaque_token, new_recovery_code, recovery_code_hash, sha256_hex
-from .models import MfaChallenge, RefreshToken, UserActionToken, UserMfaFactor, UserMfaRecoveryCode, UserSession
+from .crypto import decrypt_secret, encrypt_secret, new_recovery_code, recovery_code_hash, sha256_hex
+from .models import MfaChallenge, UserActionToken, UserMfaFactor, UserMfaRecoveryCode, UserSession
 from .request_auth import AuthContext, require_not_cooling_off, require_step_up, schedule_write
 
 RECOVERY_ALLOWED = ["GET /auth/me", "POST /auth/mfa/enroll/start", "POST /auth/mfa/enroll/confirm", "POST /auth/logout"]
@@ -446,21 +446,7 @@ def _require_eligible(s: Session, user: User | None, path: str) -> User:
 
 def _rotate_refresh(s: Session, us: UserSession) -> str:
     """The session's assurance changed: retire its refresh tokens and issue a new one (05 §6)."""
-    now = db.tx_time(s)
-    for rt in s.execute(
-        sa.select(RefreshToken).where(RefreshToken.session_id == us.id, RefreshToken.used_on.is_(None))
-    ).scalars():
-        rt.used_on = now
-    raw = new_opaque_token()
-    s.add(
-        RefreshToken(
-            session_id=us.id,
-            token_hash=sha256_hex(raw),
-            issued_on=now,
-            expires_on=min(now + settings().refresh_idle_ttl, us.absolute_expires_on),
-        )
-    )
-    return raw
+    return service.rotate_session_refresh(s, us)
 
 
 def enroll_confirm(s: Session, ctx: AuthContext | None, challenge_token: str, code: str, label: str | None) -> dict:

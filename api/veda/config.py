@@ -66,6 +66,18 @@ def _dev_key(label: str, secret: str) -> bytes:
     return hashlib.sha256(f"veda-dev::{label}::{secret}".encode()).digest()
 
 
+def _es256_key(pem: str) -> bool:
+    """The signing key is parsed at startup so a malformed or wrong-curve key fails closed before serving."""
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        key = serialization.load_pem_private_key(pem.encode(), password=None)
+    except (ValueError, TypeError):
+        return False
+    return isinstance(key, ec.EllipticCurvePrivateKey) and key.curve.name == "secp256r1"
+
+
 @dataclass
 class Settings:
     env: str = "local"  # local | test | staging | production
@@ -295,9 +307,24 @@ def validate_environment(settings: Settings) -> list[str]:
         "VEDA_ACTION_TOKEN_KEY": settings.action_token_key,
         "VEDA_CHAIN_KEY": settings.chain_keys.get(settings.chain_key_label, b""),
     }
+    dev_labels = {"chain", "recovery", "email-hash", "action-token", "local-kms"}
+    dev_values = {_dev_key(label, _str("VEDA_DEV_SECRET", "local-development-only")) for label in dev_labels}
+    dev_values |= {_dev_key(label, "local-development-only") for label in dev_labels}
+    seen: dict[bytes, str] = {}
     for name, value in keys.items():
-        if len(value or b"") < MIN_KEY_BYTES:
+        value = value or b""
+        if len(value) < MIN_KEY_BYTES:
             problems.append(f"{name} must be at least {MIN_KEY_BYTES} random bytes in {env}")
+            continue
+        if len(set(value)) <= 2:  # all-zero, all-0xFF and other constant or two-symbol fillers (RR-10)
+            problems.append(f"{name} is not random in {env}")
+        if value in dev_values:
+            problems.append(f"{name} is a development-derived key in {env}")
+        if value in seen:
+            problems.append(f"{name} must differ from {seen[value]} in {env}")
+        seen.setdefault(value, name)
+    if settings.jwt_private_key_pem and not _es256_key(settings.jwt_private_key_pem):
+        problems.append(f"VEDA_JWT_PRIVATE_KEY_PEM must be an unencrypted P-256 (ES256) private key in {env}")
     if settings.jwt_kid in ("", "dev-1") or settings.chain_key_label.startswith("dev-"):
         problems.append(f"VEDA_JWT_KID and VEDA_CHAIN_KEY_LABEL must not be development labels in {env}")
     if settings.kms_provider != "aws":
@@ -335,9 +362,22 @@ def validate_environment(settings: Settings) -> list[str]:
         import ipaddress
 
         for cidr in settings.trusted_proxy_cidrs:
-            ipaddress.ip_network(cidr, strict=False)
+            network = ipaddress.ip_network(cidr, strict=False)
+            # A trusted proxy is a specific peer (the tunnel or the Docker bridge gateway); a broad range would let
+            # any client in it choose its own address and so its limits and IP evidence (RR-10).
+            if network.prefixlen < (24 if network.version == 4 else 64):
+                problems.append(f"VEDA_TRUSTED_PROXY_CIDRS entry {cidr} is broader than /24 (IPv4) or /64 (IPv6)")
     except ValueError:
         problems.append("VEDA_TRUSTED_PROXY_CIDRS contains an invalid network")
+    snap = settings.snapshot_dir or ""
+    if not snap.startswith("/"):
+        problems.append(f"VEDA_SNAPSHOT_DIR must be an absolute path on the persistent volume in {env} (RR-14)")
+    elif db_url.startswith("sqlite:////"):
+        from pathlib import PurePosixPath
+
+        volume = PurePosixPath(db_url.removeprefix("sqlite:///")).parent
+        if not PurePosixPath(snap).is_relative_to(volume):
+            problems.append(f"VEDA_SNAPSHOT_DIR must be inside the database volume {volume} in {env} (RR-14)")
     if settings.break_glass_identity != "sts":
         problems.append(f"VEDA_BREAK_GLASS_IDENTITY must be sts in {env}")
     if settings.lead_retention_enabled and not settings.lead_retention_days:
