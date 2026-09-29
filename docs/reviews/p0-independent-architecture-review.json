@@ -1,0 +1,3614 @@
+{
+ "review_id": "VEDA-SPACES-P0-INDEPENDENT-ARCHITECTURE-REVIEW-01",
+ "date": "2026-09-29",
+ "repository": "git@github.com:slaggala/veda-spaces.git",
+ "reviewed_branch": "architecture/p0-foundation-freeze",
+ "reviewed_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "parent_commit": "13276a017a137c4a86b15fea0306ea2e83ac2729",
+ "review_branch": "review/p0-foundation-independent-review",
+ "review_commit": "see git log of the review branch (a file cannot contain its own commit id)",
+ "verdict": "NOT CERTIFIED",
+ "verdict_basis": "3 MAJOR findings (F-01, F-02, F-03); an owner decision (F-01) is required before authentication and RBAC implementation.",
+ "scope_verification": {
+  "commands": [
+   {
+    "command": "git fetch origin",
+    "result": "remote reachable; no new refs"
+   },
+   {
+    "command": "git rev-parse origin/architecture/p0-foundation-freeze",
+    "result": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e"
+   },
+   {
+    "command": "git cat-file -t 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+    "result": "commit"
+   },
+   {
+    "command": "git merge-base --is-ancestor 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e origin/architecture/p0-foundation-freeze",
+    "result": "exit 0 (reachable)"
+   },
+   {
+    "command": "git log --oneline 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e..origin/architecture/p0-foundation-freeze",
+    "result": "(empty): no later commits on the branch"
+   },
+   {
+    "command": "git status --porcelain (before review)",
+    "result": "(empty): clean working tree"
+   },
+   {
+    "command": "git log -1 --format=%P 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+    "result": "13276a017a137c4a86b15fea0306ea2e83ac2729"
+   },
+   {
+    "command": "git diff --name-status 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e^ 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e | grep -v '^A\\sdocs/architecture/'",
+    "result": "(empty): all 26 changes are additions under docs/architecture/"
+   },
+   {
+    "command": "git diff --quiet 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e^ 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e -- dist",
+    "result": "exit 0: dist identical to parent"
+   },
+   {
+    "command": "git ls-tree 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e^ dist ; git ls-tree 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e dist",
+    "result": "both tree d1d3efced8aa4ee67c2d832aae075d0f3f136cf9"
+   },
+   {
+    "command": "dist content SHA-256 (sha256 of sorted 'sha256  path' lines over git ls-files dist, LC_ALL=C)",
+    "result": "8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8 at parent, frozen commit and working tree"
+   },
+   {
+    "command": "git diff --numstat 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e^ 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e | awk '$1==\"-\"'",
+    "result": "(empty): no binary files added"
+   },
+   {
+    "command": "git grep -I -E 'AKIA[0-9A-Z]{16}|-----BEGIN|otpauth://|[a-z]+://[^ ]*:[^ @]+@' 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+    "result": "only documentation otpauth examples with an elided or example secret (A-10)"
+   },
+   {
+    "command": "git ls-tree -r --name-only 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e | grep -iE '\\.env|\\.pem|\\.key|\\.p12|credentials'",
+    "result": "(empty)"
+   },
+   {
+    "command": "python3 -m json.tool validation-report.json / requirements.json",
+    "result": "both valid JSON"
+   }
+  ],
+  "architecture_files_modified_by_review": false,
+  "dist_modified": false,
+  "dist_content_sha256": "8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8",
+  "dist_tree": "d1d3efced8aa4ee67c2d832aae075d0f3f136cf9",
+  "author_dist_sha_note": "The author's SHA-256 statement is not recorded in the repository, so its value could not be compared. Byte identity with the parent commit was verified directly."
+ },
+ "inventory": [
+  {
+   "path": "docs/architecture/README.md",
+   "lines": 77,
+   "bytes": 6283
+  },
+  {
+   "path": "docs/architecture/01-requirements-traceability.md",
+   "lines": 378,
+   "bytes": 38113
+  },
+  {
+   "path": "docs/architecture/02-platform-architecture.md",
+   "lines": 522,
+   "bytes": 34450
+  },
+  {
+   "path": "docs/architecture/03-database-schema.md",
+   "lines": 738,
+   "bytes": 47073
+  },
+  {
+   "path": "docs/architecture/04-lead-management.md",
+   "lines": 387,
+   "bytes": 23091
+  },
+  {
+   "path": "docs/architecture/05-authentication.md",
+   "lines": 429,
+   "bytes": 25657
+  },
+  {
+   "path": "docs/architecture/06-rbac.md",
+   "lines": 254,
+   "bytes": 18817
+  },
+  {
+   "path": "docs/architecture/07-audit.md",
+   "lines": 205,
+   "bytes": 10173
+  },
+  {
+   "path": "docs/architecture/08-api-design.md",
+   "lines": 980,
+   "bytes": 48341
+  },
+  {
+   "path": "docs/architecture/09-ui-ux-design.md",
+   "lines": 573,
+   "bytes": 51332
+  },
+  {
+   "path": "docs/architecture/10-future-roadmap.md",
+   "lines": 221,
+   "bytes": 15900
+  },
+  {
+   "path": "docs/architecture/11-production-readiness.md",
+   "lines": 256,
+   "bytes": 17857
+  },
+  {
+   "path": "docs/architecture/12-test-strategy.md",
+   "lines": 234,
+   "bytes": 17154
+  },
+  {
+   "path": "docs/architecture/coverage-gate.md",
+   "lines": 117,
+   "bytes": 6243
+  },
+  {
+   "path": "docs/architecture/requirements.json",
+   "lines": 3260,
+   "bytes": 75392
+  },
+  {
+   "path": "docs/architecture/validation-report.json",
+   "lines": 419,
+   "bytes": 13361
+  },
+  {
+   "path": "docs/architecture/validation-report.md",
+   "lines": 64,
+   "bytes": 6776
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-001-app-user-table.md",
+   "lines": 54,
+   "bytes": 2461
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-002-uuidv7-identifiers.md",
+   "lines": 80,
+   "bytes": 3213
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-003-audit-contract.md",
+   "lines": 71,
+   "bytes": 3648
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-004-security-event-log.md",
+   "lines": 74,
+   "bytes": 3853
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-005-lead-required-fields.md",
+   "lines": 67,
+   "bytes": 3372
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-006-mfa-policy.md",
+   "lines": 73,
+   "bytes": 3066
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-007-technology-stack.md",
+   "lines": 54,
+   "bytes": 2390
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-008-aws-hosting.md",
+   "lines": 55,
+   "bytes": 2723
+  },
+  {
+   "path": "docs/architecture/decisions/ADR-009-p0-scope.md",
+   "lines": 70,
+   "bytes": 1937
+  }
+ ],
+ "requirement_recount": {
+  "total": 203,
+  "unique": 203,
+  "by_priority": {
+   "P0": 186,
+   "P1": 14,
+   "P2": 3
+  },
+  "matches_author_claim": true,
+  "test_dimension_applicable": 199,
+  "test_refs_to_method_or_ci_sections_only": [
+   "PLAT-001",
+   "PLAT-002",
+   "PLAT-004",
+   "PLAT-006",
+   "MFA-008",
+   "SEC-007",
+   "SEC-009",
+   "SEC-010",
+   "OPS-001",
+   "OPS-003",
+   "OPS-008"
+  ]
+ },
+ "p0_coverage_summary": {
+  "Fully covered": 158,
+  "Partially covered": 22,
+  "Contradictory": 4,
+  "Not testable": 2,
+  "Referenced but not substantively covered": 0,
+  "Not covered": 0,
+  "Ambiguous": 0
+ },
+ "p0_coverage_matrix": [
+  {
+   "id": "PLAT-001",
+   "title": "Backend is a Python Flask modular monolith exposing a versioned REST API.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §3.1",
+    "test": "12 §2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-002",
+   "title": "Internal application frontend is built with Lit and TypeScript and deployed separately from the marketing site.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §2.1",
+    "test": "12 §2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-003",
+   "title": "Backend API is deployed on AWS, independently of Cloudflare Pages.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.2",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-004",
+   "title": "All data access goes through SQLAlchemy; business code contains no engine-specific SQL, so SQLite to PostgreSQL requires no application changes.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §8.2",
+    "schema": "03 §12",
+    "test": "12 §5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-005",
+   "title": "All schema changes are versioned Alembic migrations; no manual DDL in any environment.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §8.3",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-006",
+   "title": "Every module, PR and test references requirement IDs.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "01 §1",
+    "test": "12 §1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-007",
+   "title": "Timestamps are stored in UTC and displayed in the user's timezone (default Asia/Kolkata).",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "03 §2.2",
+    "schema": "03 §4.1",
+    "ui": "09 §3.2",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-008",
+   "title": "Configuration comes from the environment; no secrets in the repository.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §11.4",
+    "security": "02 §11.4",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-009",
+   "title": "Business reference lists are configurable lookup data, not code enums.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §6",
+    "schema": "03 §6.2",
+    "api": "08 §7",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-010",
+   "title": "Human-readable record numbers are allocated from a central sequence table and are internal display values only.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §6.3",
+    "schema": "03 §6.3",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-011",
+   "title": "A module accesses another module only through its service interface, never its tables or repositories.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §3.3",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-012",
+   "title": "Roadmap modules (vendor, inventory, payroll, procurement, full project management and others in doc 10) are not authorized for implementation in P0.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "10 §3.2",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-013",
+   "title": "The User entity's physical table is app_user; no physical table named user may exist.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §4.1",
+    "schema": "03 §11",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-001",
+   "title": "Every persisted table includes the nine audit-contract columns; deviations are behavioral only and registered.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §2.1",
+    "schema": "03 §2.1",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-002",
+   "title": "id is UUIDv7 as 32 lowercase hex characters, generated in the service layer, immutable.",
+   "verification": "SL, UT",
+   "author_refs": {
+    "architecture": "03 §2.2",
+    "schema": "03 §2.2",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-003",
+   "title": "created_on and updated_on are NOT NULL UTC values set by the platform from one transaction clock reading.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "03 §2.8",
+    "schema": "03 §2.1",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-004",
+   "title": "created_by and updated_by are NOT NULL foreign keys to app_user.id; non-human writes use seeded system users.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §2.3",
+    "schema": "03 §2.1",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-005",
+   "title": "Soft delete via is_deleted, deleted_on, deleted_by with a consistency constraint.",
+   "verification": "SL, IT",
+   "author_refs": {
+    "architecture": "03 §2.4",
+    "schema": "03 §2.1",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-006",
+   "title": "Optimistic concurrency via version; stale updates are rejected.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.5",
+    "schema": "03 §2.1",
+    "api": "08 §2.7",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-007",
+   "title": "Business-key uniqueness applies only among non-deleted rows (partial unique indexes).",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.6",
+    "schema": "03 §2.6",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-008",
+   "title": "Default reads exclude soft-deleted rows; including them requires explicit opt-in and permission.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.4",
+    "api": "08 §2.6",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-009",
+   "title": "Business records are never hard-deleted outside retention, erasure or registered exceptions.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "03 §2.4",
+    "test": "12 §4.1"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-07"
+   ],
+   "note": "Purge rules conflict with RESTRICT FKs; session retention is undefined."
+  },
+  {
+   "id": "DATA-010",
+   "title": "Foreign keys are enforced by the database on every engine.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §1",
+    "schema": "03 §12",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-011",
+   "title": "A schema conformance check on SQLite and PostgreSQL fails CI on any contract violation.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §2.7",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-012",
+   "title": "GUID maps to CHAR(32) on SQLite and native uuid on PostgreSQL; every foreign key uses the GUID type; all type mappings are explicit.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §12",
+    "schema": "03 §12",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-013",
+   "title": "Malformed ids are rejected with 422 INVALID_ID; integer ids and sequence values are never exposed as identifiers.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.2",
+    "api": "08 §2.2",
+    "security": "11 §5",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-014",
+   "title": "Behavioral exceptions to the contract are listed in an exception registry; unregistered deviations fail CI.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §2.9",
+    "schema": "03 §2.9",
+    "test": "12 §4.1"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-08",
+    "F-07"
+   ],
+   "note": "The registry omits three unique indexes and the purge/FK conflicts."
+  },
+  {
+   "id": "DATA-015",
+   "title": "Contract fields, audit rows and outbox rows are written in the same database transaction as the business change.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.8",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-016",
+   "title": "Money is stored as integer minor units with an ISO currency code.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "03 §1",
+    "schema": "03 §12",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-001",
+   "title": "Every create, update, soft-delete, restore and hard-delete of an audited entity writes an audit_log row in the same transaction.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "07 §3",
+    "schema": "03 §7",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-002",
+   "title": "Audit rows capture entity_type, entity_id, action, old_value, new_value, performed_by, performed_on.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "07 §4",
+    "schema": "03 §7",
+    "api": "08 §10",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-003",
+   "title": "Audit rows also capture changed_fields, request_id, transaction_id, performed_via, ip_address, user_agent.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "07 §4",
+    "schema": "03 §7",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-004",
+   "title": "audit_log is append-only, enforced by the database.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "07 §6",
+    "schema": "03 §2.9",
+    "security": "07 §6.2",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-005",
+   "title": "Secret fields are never written to audit payloads.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "07 §5",
+    "security": "07 §5",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-006",
+   "title": "Child-entity changes record their parent so parent history includes children.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "07 §4.2",
+    "schema": "03 §7",
+    "api": "08 §8.8",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-008",
+   "title": "Audit Log Viewer with filters by entity, actor, action, date, gated by audit.read.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "07 §7",
+    "api": "08 §10",
+    "ui": "09 §4.9",
+    "security": "06 §6.2",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-010",
+   "title": "A write without an actor context fails (fail closed).",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "07 §3",
+    "test": "12 §4.2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-012",
+   "title": "Authentication and security events are recorded in security_event_log, never in audit_log.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9",
+    "schema": "03 §5.4",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-001",
+   "title": "Users sign in with email and password.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "05 §3",
+    "api": "08 §4.1",
+    "ui": "09 §4.1",
+    "security": "05 §3",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-002",
+   "title": "Passwords are hashed with Argon2id and rehashed when parameters strengthen.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "05 §2.1",
+    "schema": "03 §4.2",
+    "security": "05 §2.1",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-003",
+   "title": "Password policy: 12 to 128 characters, blocklist, no composition rules.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "05 §2.3",
+    "api": "08 §4.5",
+    "ui": "09 §4.2",
+    "security": "05 §2.3",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-004",
+   "title": "Access token is a 15-minute ES256 JWT held in memory only.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §5",
+    "api": "08 §4.1",
+    "security": "05 §5",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-005",
+   "title": "Opaque refresh token rotated on every use in an HttpOnly SameSite=Strict cookie; reuse revokes the session.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §6",
+    "schema": "03 §5.2",
+    "api": "08 §4.2",
+    "security": "05 §6",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-10"
+   ],
+   "note": "Grace-window behavior is unspecified."
+  },
+  {
+   "id": "AUTH-006",
+   "title": "Sessions are persisted server-side and revocable immediately.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §6",
+    "schema": "03 §5.1",
+    "security": "05 §7",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-10"
+   ],
+   "note": "'Immediately' versus a ≤ 30 s per-process cache."
+  },
+  {
+   "id": "AUTH-007",
+   "title": "Logout ends the current session; logout-all ends every session.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §7",
+    "api": "08 §4.3",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-008",
+   "title": "Forgot and reset password with a single-use, 30-minute, hashed token delivered by email.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §8.1",
+    "schema": "03 §5.3",
+    "api": "08 §4.5",
+    "ui": "09 §4.2",
+    "security": "05 §8.1",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-009",
+   "title": "Login and forgot-password responses do not reveal account existence.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §3",
+    "api": "08 §4.5",
+    "security": "05 §2.2",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-010",
+   "title": "Brute-force protection: account lockout, per-IP and edge rate limits.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §4",
+    "schema": "03 §4.2",
+    "security": "05 §4",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-09"
+   ],
+   "note": "The per-IP limiter is per worker process."
+  },
+  {
+   "id": "AUTH-011",
+   "title": "No self-registration; staff accounts are invited.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §8.4",
+    "api": "08 §5.2",
+    "ui": "09 §4.2",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-012",
+   "title": "Users can change their password; other sessions are revoked.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §8.5",
+    "api": "08 §4.5",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-013",
+   "title": "All authentication events, including every token refresh, are recorded in security_event_log.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.1",
+    "schema": "03 §5.4",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-014",
+   "title": "The first Founder is created by a one-time CLI bootstrap; no default credentials exist.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "05 §10",
+    "security": "05 §10",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-015",
+   "title": "MFA is enforced according to the MFA policy (ADR-006).",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "05 §11",
+    "ui": "09 §4.10",
+    "security": "05 §11",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-01",
+    "F-02"
+   ],
+   "note": "Enforcement is designed; the policy is contradictory and post-reset enrollment is password-only."
+  },
+  {
+   "id": "AUTH-017",
+   "title": "Deactivating or deleting a user revokes all their sessions immediately.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §7",
+    "api": "08 §5.5",
+    "test": "12 §4.11"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-10"
+   ],
+   "note": "Same cache latency as AUTH-006."
+  },
+  {
+   "id": "AUTH-018",
+   "title": "Initial personas Founder, Admin and Sales are supported.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §12",
+    "test": "12 §4.4"
+   },
+   "classification": "Contradictory",
+   "findings": [
+    "F-01"
+   ],
+   "note": "Sales persona 'configurable MFA' is contradicted by the seeded matrix."
+  },
+  {
+   "id": "SEVT-001",
+   "title": "A dedicated append-only security_event_log exists, separate from audit_log.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.2",
+    "schema": "03 §5.4",
+    "security": "07 §6.2",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-002",
+   "title": "The event catalog covers login, refresh, logout, session revocation, password reset, MFA enrollment and challenges, lockout, permission-sensitive actions and blocked intake.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.1",
+    "schema": "03 §5.4",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-003",
+   "title": "No raw or hashed tokens, passwords, OTP secrets or codes, recovery codes or request bodies are stored; detail keys are allow-listed.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "05 §9.3",
+    "schema": "03 §5.4",
+    "security": "05 §9.3",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-004",
+   "title": "Retention is configurable, and rows are archived with verification before deletion.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "05 §9.4",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-005",
+   "title": "Access is controlled by security_event.read with ALL and OWN scope; there is no write API.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.5",
+    "api": "08 §10.1",
+    "ui": "09 §4.9",
+    "security": "06 §6.2",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-006",
+   "title": "Tamper evidence: DB immutability, hash chain and nightly verification.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "05 §9.6",
+    "schema": "03 §5.4",
+    "security": "07 §6.3",
+    "test": "12 §4.3"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-11"
+   ],
+   "note": "The chain is unkeyed; the anchor is in the DB; canonicalization is undefined."
+  },
+  {
+   "id": "SEVT-008",
+   "title": "Indexed, cursor-paginated queries by time, subject, type, IP and outcome.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.7",
+    "schema": "03 §5.4",
+    "api": "08 §10.1",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-009",
+   "title": "Monitoring and alerting rules for security events.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "05 §9.8",
+    "security": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-010",
+   "title": "Capacity figures are assumptions until measured; review after 30 days of production traffic.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "05 §9.9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-011",
+   "title": "Failure and denial events persist even when the triggering request rolls back.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.2",
+    "schema": "03 §2.8",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-001",
+   "title": "TOTP authenticator-app MFA with enrollment and login challenge.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "05 §11.2",
+    "schema": "03 §5.5",
+    "api": "08 §4.7",
+    "ui": "09 §4.10",
+    "security": "05 §11.2",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-002",
+   "title": "MFA is mandatory for Founder and Admin through data-driven policy (role.mfa_required), never role-name checks.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.1",
+    "schema": "03 §4.3",
+    "security": "06 §2",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-003",
+   "title": "MFA is configurable for Sales per user (app_user.mfa_required) or per role.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.1",
+    "schema": "03 §4.1",
+    "api": "08 §5.9",
+    "ui": "09 §4.6",
+    "test": "12 §4.5"
+   },
+   "classification": "Contradictory",
+   "findings": [
+    "F-01"
+   ],
+   "note": "Sales holds sensitive security_event.read (OWN), so MFA is mandatory, not configurable."
+  },
+  {
+   "id": "MFA-004",
+   "title": "Holders of any sensitive permission must use MFA.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.1",
+    "schema": "03 §4.4",
+    "security": "06 §3",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-005",
+   "title": "Ten one-time recovery codes, shown once, stored only as keyed hashes.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.5",
+    "schema": "03 §5.6",
+    "api": "08 §4.7",
+    "ui": "09 §4.10",
+    "security": "05 §11.5",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-006",
+   "title": "MFA enrollment, challenges, recovery-code use, regeneration and resets are security events.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §9.1",
+    "schema": "03 §5.4",
+    "test": "12 §4.3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-007",
+   "title": "MFA reset only through a privileged, step-up, reason-required, audited workflow with no self-reset and no stronger target.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.7",
+    "api": "08 §5.9",
+    "ui": "09 §4.6",
+    "security": "06 §7",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-02"
+   ],
+   "note": "The reset workflow is sound; re-enrollment after reset is not bound to an out-of-band proof."
+  },
+  {
+   "id": "MFA-008",
+   "title": "No security questions, SMS/email OTP factors or device-remember bypass.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "05 §11.8",
+    "security": "05 §11.8",
+    "test": "12 §2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-009",
+   "title": "TOTP replay protection and attempt limits.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "05 §11.2",
+    "schema": "03 §5.5",
+    "security": "05 §4",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-010",
+   "title": "TOTP secrets are KMS-envelope-encrypted and never returned after enrollment.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.2",
+    "schema": "03 §5.5",
+    "security": "02 §11.4",
+    "test": "12 §4.5"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-13"
+   ],
+   "note": "Envelope encryption is sound; the key-reference column is likely undersized."
+  },
+  {
+   "id": "MFA-011",
+   "title": "Step-up MFA within 10 minutes for sensitive operations.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "05 §11.6",
+    "schema": "03 §5.1",
+    "api": "08 §4.7",
+    "security": "06 §7",
+    "test": "12 §4.5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-001",
+   "title": "Tables app_user, role, permission, user_role, role_permission, user_permission exist before any business module.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "02 §8.3",
+    "schema": "03 §4",
+    "test": "12 §4.1"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-002",
+   "title": "Authorization checks permission codes only; no role-name, is-admin or user-id checks.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "06 §2",
+    "security": "06 §2",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-003",
+   "title": "Permission codes follow the resource.action convention.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "06 §3",
+    "schema": "03 §4.4",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-004",
+   "title": "Permissions are declared in a code registry and synchronized by migration.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §3",
+    "schema": "03 §4.4",
+    "api": "08 §6.2",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-005",
+   "title": "Each grant carries a data scope: ALL, TEAM (reserved) or OWN.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §4",
+    "schema": "03 §4.6",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-006",
+   "title": "Direct user GRANT and DENY; DENY always wins.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "06 §5",
+    "schema": "03 §4.7",
+    "api": "08 §5.7",
+    "ui": "09 §4.6",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-008",
+   "title": "Founder, Admin and Sales roles are seeded with the default matrix.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §6",
+    "schema": "03 §10",
+    "api": "08 §6.1",
+    "ui": "09 §4.7",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-009",
+   "title": "Anti-escalation: an actor cannot grant permissions or scopes they do not hold.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §7",
+    "security": "06 §7",
+    "test": "12 §4.4"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-03"
+   ],
+   "note": "Grant escalation is covered (G1/G2); account-control escalation (email change, deactivate) is not."
+  },
+  {
+   "id": "RBAC-010",
+   "title": "Users cannot modify their own roles or permissions.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §7",
+    "security": "06 §7",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-011",
+   "title": "Changes that would leave no active administrator are refused.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §7",
+    "security": "06 §7",
+    "test": "12 §4.4"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-03",
+    "F-16"
+   ],
+   "note": "G4 is transactional only; time-bound expiry and disabling co-admins are not covered."
+  },
+  {
+   "id": "RBAC-012",
+   "title": "Enforcement at route, service and query layers; UI checks are cosmetic.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §8",
+    "ui": "09 §3.4",
+    "security": "06 §8",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-013",
+   "title": "Authorization changes take effect on the next request via authz_version.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §9",
+    "schema": "03 §4.1",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-014",
+   "title": "A record outside the actor's scope returns 404.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §8",
+    "api": "08 §11",
+    "security": "11 §5",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-015",
+   "title": "System roles and permissions cannot be deleted; their codes are immutable.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §3",
+    "schema": "03 §4.3",
+    "api": "08 §6.1",
+    "test": "12 §4.4"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-017",
+   "title": "Sensitive permissions need a reason and step-up to grant, emit SENSITIVE_ACTION events on use and require MFA of holders.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §3",
+    "schema": "03 §4.4",
+    "security": "06 §7",
+    "test": "12 §4.4"
+   },
+   "classification": "Contradictory",
+   "findings": [
+    "F-06"
+   ],
+   "note": "'Every use emits SENSITIVE_ACTION' conflicts with 05 §9.5 for reads."
+  },
+  {
+   "id": "USER-001",
+   "title": "Authorized users can invite, read, update, deactivate and soft-delete users.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §4.1",
+    "schema": "03 §4.1",
+    "api": "08 §5",
+    "ui": "09 §4.6",
+    "test": "12 §4.11"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-03"
+   ],
+   "note": "User administration lacks stronger-target and step-up controls for email change and deactivate."
+  },
+  {
+   "id": "USER-002",
+   "title": "User status lifecycle INVITED, ACTIVE, LOCKED, DISABLED.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "03 §4.1",
+    "schema": "03 §4.1",
+    "api": "08 §5.5",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-003",
+   "title": "Email is unique case-insensitively among non-deleted users.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §4.1",
+    "schema": "03 §4.1",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-004",
+   "title": "Users can view and edit their own profile.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "06 §6.1",
+    "api": "08 §4.4",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-005",
+   "title": "Seeded non-login system users SYSTEM, WEB_INTAKE and ANONYMOUS exist.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "03 §2.3",
+    "schema": "03 §10",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-006",
+   "title": "User management shows MFA status and offers MFA administration.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "05 §11.7",
+    "api": "08 §5.9",
+    "ui": "09 §4.6",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-001",
+   "title": "The website enquiry form creates leads through a public API endpoint.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "04 §5.1",
+    "api": "08 §8.4",
+    "ui": "09 §4.11",
+    "security": "04 §5.1",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-002",
+   "title": "A lead holds name, phone, email, city, project_type, budget_range and message plus the audit contract.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "04 §2",
+    "schema": "04 §2",
+    "api": "08 §8.1",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-003",
+   "title": "Authorized staff can create leads manually.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "04 §5.2",
+    "api": "08 §8.3",
+    "ui": "09 §4.5",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-004",
+   "title": "Lead status is NEW, CONTACTED, SITE_VISIT, QUOTATION_SENT, NEGOTIATION, WON or LOST.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "04 §3",
+    "schema": "04 §2",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-005",
+   "title": "Status changes follow the state machine; illegal transitions are rejected.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "04 §3",
+    "api": "08 §8.6",
+    "ui": "09 §4.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-006",
+   "title": "LOST requires a lost reason; WON records won_on.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §3",
+    "schema": "04 §2",
+    "api": "08 §8.6",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-007",
+   "title": "Leads can be assigned to users who hold lead.read.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §6",
+    "schema": "04 §2",
+    "api": "08 §8.7",
+    "ui": "09 §4.4",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-008",
+   "title": "Each lead has a unique internal number VS-L-YYYY-NNNNNN, never shown publicly.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §2",
+    "schema": "03 §6.3",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-009",
+   "title": "Phone numbers are validated and normalized to E.164 with India as the default region, accepting international numbers with a country code.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "04 §13",
+    "schema": "04 §2",
+    "api": "08 §8.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-010",
+   "title": "Likely duplicates are flagged and never rejected or silently discarded.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §7",
+    "schema": "04 §2",
+    "api": "08 §8.8",
+    "ui": "09 §4.5",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-011",
+   "title": "Source and campaign attribution are captured.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §2",
+    "schema": "04 §2",
+    "api": "08 §8.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-012",
+   "title": "Consent records policy version, timestamp and source context.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §2",
+    "schema": "04 §2",
+    "api": "08 §8.4",
+    "ui": "09 §4.11",
+    "security": "11 §5.6",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-013",
+   "title": "Lead list supports search, filter, sort and pagination.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §8.2",
+    "api": "08 §8.2",
+    "ui": "09 §4.3",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-014",
+   "title": "Dashboard shows pipeline, new leads, follow-ups, conversion and sources.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "04 §11",
+    "api": "08 §8.9",
+    "ui": "09 §4.3",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-015",
+   "title": "next_follow_up_on is maintained from planned activities; overdue is highlighted.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §8",
+    "schema": "04 §2",
+    "ui": "09 §4.3",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-016",
+   "title": "Leads can be soft-deleted and restored by authorized users.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §12",
+    "api": "08 §8.8",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-018",
+   "title": "Public intake requires CAPTCHA (Turnstile) and rate limiting, plus a honeypot; blocks are security events.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §5.1",
+    "api": "08 §8.4",
+    "security": "02 §11.1",
+    "test": "12 §4.7"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-05",
+    "F-04"
+   ],
+   "note": "Honeypot false-positive risk; Turnstile checked before idempotency."
+  },
+  {
+   "id": "LEAD-019",
+   "title": "If the API is unavailable, the website preserves the existing WhatsApp hand-off.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "02 §2.4",
+    "ui": "09 §4.11",
+    "test": "12 §4.8"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-05"
+   ],
+   "note": "02 §2.4 fallback triggers omit 429 and CAPTCHA; inconsistent with 09 §4.11."
+  },
+  {
+   "id": "LEAD-020",
+   "title": "New and assigned leads notify permission-resolved recipients in-app and by email.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.3",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-023",
+   "title": "Public form requires name, phone and consent; email, city, project_type, budget_range and message are optional.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §2",
+    "schema": "04 §2",
+    "api": "08 §8.4",
+    "ui": "09 §4.11",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-024",
+   "title": "Staff can enrich optional fields after capture.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §5.3",
+    "api": "08 §8.5",
+    "ui": "09 §4.4",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-025",
+   "title": "The public API returns only a random public reference and a message; no lead id, number, status or internal field is exposed.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §5.1",
+    "schema": "04 §2",
+    "api": "08 §8.4",
+    "security": "11 §5",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-026",
+   "title": "The public form has an accessible error state.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.11",
+    "ui": "09 §4.11",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTE-001",
+   "title": "Users with access to a lead can add notes.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §9",
+    "schema": "04 §9",
+    "api": "08 §9.1",
+    "ui": "09 §4.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTE-002",
+   "title": "Authors edit and delete their own notes; ALL scope allows others.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §9",
+    "api": "08 §9.1",
+    "security": "06 §6.3",
+    "test": "12 §4.7"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-20"
+   ],
+   "note": "The UI Undo needs a nonexistent restore endpoint."
+  },
+  {
+   "id": "NOTE-004",
+   "title": "Notes are INTERNAL; CUSTOMER_VISIBLE is reserved and rejected in P0.",
+   "verification": "SL",
+   "author_refs": {
+    "architecture": "04 §9",
+    "schema": "04 §9",
+    "api": "08 §9.1",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-001",
+   "title": "Activities of type CALL, WHATSAPP, EMAIL, MEETING, SITE_VISIT, QUOTATION, FOLLOW_UP can be recorded.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §10",
+    "schema": "04 §10",
+    "api": "08 §9.2",
+    "ui": "09 §4.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-002",
+   "title": "Activities can be planned, completed or cancelled.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §10",
+    "schema": "04 §10",
+    "api": "08 §9.2",
+    "ui": "09 §4.4",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-003",
+   "title": "Completing an activity records outcome and time.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §10",
+    "api": "08 §9.2",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-004",
+   "title": "Status changes and assignments generate immutable system activities.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §10",
+    "schema": "04 §10",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-001",
+   "title": "In-app notifications with unread count and mark-as-read.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.2",
+    "schema": "03 §8.2",
+    "api": "08 §7",
+    "ui": "09 §3.1",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-002",
+   "title": "Transactional email through a pluggable provider adapter.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.2",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-003",
+   "title": "Side effects go through a transactional outbox.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.1",
+    "schema": "03 §8.1",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-004",
+   "title": "Outbox retries with backoff and dead-letters with alerting.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.1",
+    "schema": "03 §8.1",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-005",
+   "title": "Email templates are versioned, branded, with plain-text alternatives.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §10.3",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-008",
+   "title": "Email delivery failures never roll back or block a persisted lead.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.3",
+    "test": "12 §4.7"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-009",
+   "title": "Amazon SES in production; a development/test adapter elsewhere until SES production access exists.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §10.2",
+    "test": "12 §4.10"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-001",
+   "title": "Structured JSON application logs.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-002",
+   "title": "Every request has a request_id returned in headers and error bodies and present in logs, audit and security events.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §9",
+    "api": "08 §2.4",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-003",
+   "title": "Logs never contain passwords, tokens or unmasked personal data.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "02 §9",
+    "security": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-004",
+   "title": "Unhandled exceptions are reported to an error tracker.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-005",
+   "title": "Health and readiness endpoints.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §9",
+    "api": "08 §3",
+    "test": "12 §4.6"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-12"
+   ],
+   "note": "Readiness is coupled to outbox lag, which reflects email-provider health."
+  },
+  {
+   "id": "LOG-006",
+   "title": "Metrics and alerting are mandatory in P0.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §9",
+    "security": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-001",
+   "title": "TLS end to end and HSTS.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §11.1",
+    "security": "02 §11.2",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-002",
+   "title": "CORS allow-list with credentials only for the app origin.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §11.3",
+    "security": "02 §11.3",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-003",
+   "title": "Strict security headers and CSP.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §11.2",
+    "security": "02 §11.2",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-004",
+   "title": "All input validated against closed schemas with length limits.",
+   "verification": "UT",
+   "author_refs": {
+    "architecture": "08 §2.2",
+    "api": "08 §2.2",
+    "security": "11 §5",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-005",
+   "title": "Secrets in AWS SSM, Secrets Manager or KMS with documented rotation.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §11.4",
+    "security": "02 §11.4",
+    "test": "12 §4.11"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-006",
+   "title": "The origin accepts traffic only from Cloudflare.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §11.1",
+    "security": "02 §11.1",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-007",
+   "title": "Dependency and container vulnerability scanning in CI.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.4",
+    "security": "11 §5",
+    "test": "12 §5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-008",
+   "title": "Backups are encrypted and restore is verified automatically.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.3",
+    "security": "02 §11.1",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-009",
+   "title": "DPDP Act 2023 alignment.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "11 §5.6",
+    "security": "11 §5.6",
+    "test": "12 §2"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-15"
+   ],
+   "note": "No P0 retention, withdrawal or erasure procedure."
+  },
+  {
+   "id": "SEC-011",
+   "title": "Rate limiting at edge and application for auth, MFA and public endpoints.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §11.1",
+    "api": "08 §12",
+    "security": "05 §4",
+    "test": "12 §4.9"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-09"
+   ],
+   "note": "Application limits are per worker process."
+  },
+  {
+   "id": "API-001",
+   "title": "REST over HTTPS with JSON under /api/v1.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "02 §4",
+    "api": "08 §2",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-002",
+   "title": "Standard success envelope.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.3",
+    "api": "08 §2.3",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-003",
+   "title": "Errors use RFC 9457 problem details with stable codes.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.4",
+    "api": "08 §2.4",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-004",
+   "title": "Offset pagination for admin lists and cursor pagination for streams.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.5",
+    "api": "08 §2.5",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-005",
+   "title": "Filtering, search and allow-listed sorting.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.6",
+    "api": "08 §2.6",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-006",
+   "title": "Updates require If-Match; stale versions return 409.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.7",
+    "api": "08 §2.7",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-007",
+   "title": "Idempotency-Key on creates, required for public intake.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "08 §2.8",
+    "api": "08 §2.8",
+    "test": "12 §4.6"
+   },
+   "classification": "Contradictory",
+   "findings": [
+    "F-04"
+   ],
+   "note": "04 §5.1 and 08 §2.8 disagree; the schema cannot detect body mismatch."
+  },
+  {
+   "id": "API-008",
+   "title": "OpenAPI 3.1 is the contract source of truth.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "08 §2.1",
+    "api": "08 §2.1",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-009",
+   "title": "Only additive changes within v1; breaking changes require v2.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "08 §2.9",
+    "api": "08 §2.9",
+    "test": "12 §4.6"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-001",
+   "title": "Login screen.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.1",
+    "ui": "09 §4.1",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-002",
+   "title": "Forgot password and reset screens.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.2",
+    "ui": "09 §4.2",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-003",
+   "title": "Lead dashboard.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.3",
+    "ui": "09 §4.3",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-004",
+   "title": "Lead details.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.4",
+    "ui": "09 §4.4",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-005",
+   "title": "Lead create and edit.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.5",
+    "ui": "09 §4.5",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-006",
+   "title": "User management.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.6",
+    "ui": "09 §4.6",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-007",
+   "title": "Role management.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.7",
+    "ui": "09 §4.7",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-008",
+   "title": "Permission management.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.8",
+    "ui": "09 §4.8",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-009",
+   "title": "Audit log viewer, including security events.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.9",
+    "ui": "09 §4.9",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-010",
+   "title": "Visual language derives from Veda Spaces brand tokens.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "09 §2",
+    "ui": "09 §2",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-011",
+   "title": "WCAG 2.2 AA conformance.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §5",
+    "ui": "09 §5",
+    "test": "12 §4.8"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-14"
+   ],
+   "note": "Dark-mode primary button fails contrast."
+  },
+  {
+   "id": "UI-012",
+   "title": "Lead screens are fully usable at 360 px width.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §3.1",
+    "ui": "09 §3.1",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-013",
+   "title": "UI hides or disables actions the user lacks permission for (cosmetic).",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §3.4",
+    "ui": "09 §3.4",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-014",
+   "title": "Accessibility corrections are encoded as design-system tokens.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "09 §2.5",
+    "ui": "09 §2.5",
+    "test": "12 §4.8"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-14"
+   ],
+   "note": "No on-color token; the dark theme is not verified."
+  },
+  {
+   "id": "UI-015",
+   "title": "MFA challenge, enrollment, recovery-code and step-up screens.",
+   "verification": "E2E",
+   "author_refs": {
+    "architecture": "09 §4.10",
+    "ui": "09 §4.10",
+    "test": "12 §4.8"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-001",
+   "title": "CI runs the full suite on SQLite and PostgreSQL.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.4",
+    "test": "12 §5"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-002",
+   "title": "Continuous SQLite replication to S3 plus nightly snapshots.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.3",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-003",
+   "title": "Local, staging and production environments; staging uses synthetic or anonymized data.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "02 §12.1",
+    "test": "12 §3"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-004",
+   "title": "Migration runbook with pre-migration backup and rollback.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "11 §3.4",
+    "test": "12 §4.9"
+   },
+   "classification": "Partially covered",
+   "findings": [
+    "F-12"
+   ],
+   "note": "02 §12.2 and 11 §2 B3 describe different rollback procedures."
+  },
+  {
+   "id": "OPS-005",
+   "title": "RPO and RTO are owner-approved values, measured in rehearsal.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.3",
+    "test": "12 §4.9"
+   },
+   "classification": "Not testable",
+   "findings": [
+    "F-19"
+   ],
+   "note": "RPO/RTO are pending OWNER-INPUT-001; the mechanism is designed."
+  },
+  {
+   "id": "OPS-006",
+   "title": "Exactly one active application instance while SQLite is authoritative.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.2",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-007",
+   "title": "SQLite lives on a dedicated, persistent, encrypted volume, never only in a container layer.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.2",
+    "security": "02 §11.1",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-008",
+   "title": "PostgreSQL migration is a release gate before procurement, inventory, finance or multi-instance scale.",
+   "verification": "RV",
+   "author_refs": {
+    "architecture": "11 §3.3",
+    "test": "12 §2"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-009",
+   "title": "Automated restore verification with alerting.",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §12.3",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NFR-001",
+   "title": "p95 API latency below 300 ms for list and detail endpoints at the load-test fixture sizes (ASM-007).",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "11 §1",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NFR-002",
+   "title": "API availability meets the owner-approved target (OWNER-INPUT-001).",
+   "verification": "OP",
+   "author_refs": {
+    "architecture": "02 §9",
+    "test": "12 §4.9"
+   },
+   "classification": "Not testable",
+   "findings": [
+    "F-19"
+   ],
+   "note": "The availability target is pending OWNER-INPUT-001."
+  },
+  {
+   "id": "NFR-003",
+   "title": "Public intake p95 below 800 ms including CAPTCHA verification.",
+   "verification": "IT",
+   "author_refs": {
+    "architecture": "04 §5.1",
+    "test": "12 §4.9"
+   },
+   "classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  }
+ ],
+ "dimension_assessment": [
+  {
+   "dimension": "Architecture",
+   "rating": "Substantive",
+   "note": "Modular monolith, layering, module rules and outbox are coherent (02 §3, §10)."
+  },
+  {
+   "dimension": "Data model",
+   "rating": "Substantive, with defects",
+   "note": "Contract, GUID mapping and constraints are strong. Registry gaps (F-08), purge/FK conflicts and missing session retention (F-07), and a column size (F-13)."
+  },
+  {
+   "dimension": "APIs",
+   "rating": "Substantive, with defects",
+   "note": "85 endpoint rows, closed schemas, RFC 9457, If-Match. Idempotency contradiction (F-04); account-control guard gap (F-03)."
+  },
+  {
+   "dimension": "UI/UX",
+   "rating": "Substantive, with defects",
+   "note": "Every in-scope screen has empty, loading, error and permission states. Dark-mode contrast (F-14), missing note restore (F-20), no staff-facing security-event self view beyond the admin drawer and Profile › Security."
+  },
+  {
+   "dimension": "Authentication",
+   "rating": "Substantive, with MAJOR defects",
+   "note": "Argon2id, ES256, rotation, enumeration safety. MFA-policy contradiction (F-01), password-only re-enrollment (F-02), revocation latency (F-10)."
+  },
+  {
+   "dimension": "Authorization",
+   "rating": "Substantive, with a MAJOR defect",
+   "note": "Permission-only checks, DENY precedence, scopes, guards G1–G10. G9 does not cover email change or deactivate (F-03); expiry bypasses G4 (F-16)."
+  },
+  {
+   "dimension": "Security",
+   "rating": "Substantive",
+   "note": "Edge, origin lock, CSP, CORS, secrets and KMS are well designed. Findings F-01–F-03, F-05, F-09, F-11."
+  },
+  {
+   "dimension": "Auditability",
+   "rating": "Substantive",
+   "note": "Atomic unit-of-work audit, parent linkage, redaction, immutable stores. The SENSITIVE_ACTION read contradiction (F-06)."
+  },
+  {
+   "dimension": "Observability",
+   "rating": "Substantive",
+   "note": "Structured logs, masking, request-id correlation, metrics and alerts. Readiness coupling (F-12)."
+  },
+  {
+   "dimension": "Operations",
+   "rating": "Substantive, gated",
+   "note": "Single-instance SQLite on encrypted EBS, Litestream, restore verification. Owner inputs are pending; rollback procedures are inconsistent (F-12)."
+  },
+  {
+   "dimension": "Test strategy",
+   "rating": "Broad but shallow in places",
+   "note": "Verification methods for all P0 IDs, but 11 map to method, environment or CI sections, and several security suites are missing (F-19)."
+  },
+  {
+   "dimension": "Migration",
+   "rating": "Substantive",
+   "note": "Type mapping, dual-engine CI, rehearsal and checksum runbook. Chain canonicalization is undefined (F-11)."
+  },
+  {
+   "dimension": "Recovery",
+   "rating": "Substantive, owner-gated",
+   "note": "Mechanisms are designed. RPO/RTO/availability are not approved (OWNER-INPUT-001)."
+  }
+ ],
+ "adr_assessment": [
+  {
+   "adr": "ADR-001",
+   "result": "Consistent",
+   "note": "No physical `user` table in any table section, inventory or DDL. All 23 tables carry actor FKs to `app_user.id`. API and permission terminology remain User. The approval record it cites is absent (F-18)."
+  },
+  {
+   "adr": "ADR-002",
+   "result": "Consistent",
+   "note": "UUIDv7, 32 lowercase hex, pattern `^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$`. SQLite CHAR(32) plus CHECK and PostgreSQL native uuid are explicit (03 §12). The seeded ids `…7000800…0001-3` validate against the pattern. No integer domain ids exist; `chain_seq`, `next_value` and counters are internal. UUIDv7 timestamps are visible to staff only."
+  },
+  {
+   "adr": "ADR-003",
+   "result": "Consistent, with defects",
+   "note": "Nine columns on all 23 tables. NOT NULL actor FKs are operationally possible through seeded SYSTEM, WEB_INTAKE and ANONYMOUS users (SYSTEM self-references at bootstrap). Optimistic concurrency is implementable. Immutable evidence tables keep contract columns with fixed semantics (EXC-001), and the documents prohibit mutation; see §6.1. Registry gaps F-07 and F-08."
+  },
+  {
+   "adr": "ADR-004",
+   "result": "Consistent, with defects",
+   "note": "Append-only, prohibited-content list, allow-listed detail, retention, archival, indexes, alerts and access are designed. Responsibilities are separated from audit_log (entity changes versus access telemetry). SENSITIVE_ACTION overlaps by design but reads are contradictory (F-06). Tamper evidence is overstated for P0 (F-11). Its access model triggers F-01."
+  },
+  {
+   "adr": "ADR-005",
+   "result": "Consistent, with defects",
+   "note": "Required and optional fields, E.164 with IN default, duplicates flagged not rejected, Turnstile, rate limits and honeypot, accessible errors, WhatsApp fallback, non-disclosure. Defects: idempotency (F-04), silent-drop paths (F-05), live-form mapping (F-17)."
+  },
+  {
+   "adr": "ADR-006",
+   "result": "NOT consistent",
+   "note": "Custom roles cannot bypass MFA for sensitive permissions (rule 3 is independent of role flags). TOTP, keyed recovery-code hashes, audited privileged reset and step-up are sound. However, 'configurable for Sales' contradicts the seeded matrix (F-01), and account recovery weakens MFA (F-02). Note that a custom role with broad data access (`lead.read`=ALL) and no sensitive permission needs no MFA; this is consistent with the policy as written, but the owner should confirm it."
+  },
+  {
+   "adr": "ADR-007",
+   "result": "Consistent",
+   "note": "Lit + TypeScript, Flask, SQLAlchemy and Alembic with service and repository layers, /api/v1, RFC 9457, Pydantic, OpenAPI. Email is sent after commit from the outbox, so it cannot undo a lead (02 §10.3, 12 §4.7)."
+  },
+  {
+   "adr": "ADR-008",
+   "result": "Consistent, owner-gated",
+   "note": "Single active instance, dedicated KMS-encrypted EBS (`DeleteOnTermination=false`), Litestream, snapshots, automated restore verification, SSM/Secrets Manager/KMS, health, logs, metrics and alerts. No horizontal-scaling claim. The PostgreSQL gate is explicit. RPO/RTO and region are not yet decided."
+  },
+  {
+   "adr": "ADR-009",
+   "result": "Consistent, with a defect",
+   "note": "No roadmap-module table, endpoint, permission or migration in P0 (verified against 03 §11, 02 §8.3, 08 §1 and 06 §6). Deferred P1 features leak into P0 surfaces (F-16)."
+  }
+ ],
+ "findings": [
+  {
+   "id": "F-01",
+   "severity": "MAJOR",
+   "title": "MFA policy contradiction: every Sales user is forced into mandatory MFA",
+   "evidence": [
+    "06 §6.2: `security_event.read` is marked 🔒 (is_sensitive) and granted to Sales at scope O (OWN).",
+    "05 §9.5 and ADR-004 (Access control): OWN-scope `security_event.read` is granted to 'all roles'.",
+    "05 §11.1 rule 3, ADR-006 rule 3, 03 §4.4 and 11 §6 R9: holding ANY sensitive permission at ANY scope makes MFA mandatory.",
+    "ADR-006 Decision table, MFA-003, 05 §12 and 11 §7 state Sales MFA is 'Configurable'.",
+    "08 §4.4 example `/auth/me` for a Sales user omits `security_event.read`, so the documents disagree with the seeded matrix.",
+    "12 §4.5 requires a test 'Sales without a source doesn't [require MFA]', which cannot pass against the seeded matrix."
+   ],
+   "reqs": [
+    "MFA-003",
+    "MFA-004",
+    "AUTH-015",
+    "AUTH-018",
+    "RBAC-008",
+    "SEVT-005",
+    "RBAC-017"
+   ],
+   "risk": "The seeded matrix and ADR-006 cannot both be implemented. Implementers will either force every Sales user through MFA enrollment, contrary to an accepted owner decision, or add a special case that breaks the 'no role-name logic' rule (RBAC-002, MFA-002). Every Sales read of their own sign-in history would also emit SENSITIVE_ACTION events (see F-07).",
+   "remediation": "Choose one and propagate it through ADR-006, 05 §11.1, 06 §6.2, 08 §4.4, 11 §6/§7 and 12 §4.5. (a) Split the permission into a non-sensitive `security_event.read_own` (profile self-service) and a sensitive `security_event.read` (ALL), or (b) define sensitivity per (permission, scope) and state that OWN-scope self-service reads never trigger the MFA policy, or (c) amend ADR-006 with owner approval so that MFA is mandatory for every staff user. Add a registry test asserting that the seeded SALES role holds no sensitive permission unless ADR-006 says otherwise.",
+   "rereview": true
+  },
+  {
+   "id": "F-02",
+   "severity": "MAJOR",
+   "title": "Account recovery weakens MFA: password-only enrollment after an MFA reset or a policy change",
+   "evidence": [
+    "05 §11.7 (Effect): after a privileged MFA reset, 'The next login forces enrollment if policy requires it'.",
+    "05 §3: 'MFA required but no active factor → mfa_challenge(ENROLLMENT) → MFA_ENROLLMENT_REQUIRED'. The only proof required is the password.",
+    "05 §11.3 / 08 §4.7: `enroll/start` and `enroll/confirm` need only the `mfa_token` from the password step. `enroll/confirm` creates a full session.",
+    "05 §11.1 ('Policy becomes required later'): a user newly subject to MFA re-authenticates with the password and enrolls on the next login.",
+    "05 §11.7 break-glass CLI has the same effect for a sole Founder.",
+    "11 §5 X14 claims MFA-reset takeover is mitigated, but the mitigation covers only who may perform the reset, not who may enroll afterwards."
+   ],
+   "reqs": [
+    "MFA-007",
+    "AUTH-015",
+    "MFA-002",
+    "MFA-004",
+    "USER-006"
+   ],
+   "risk": "The most common reason for an MFA reset is a lost device, and resets often follow a suspected compromise. Anyone who holds or phishes the password in the window between the reset and the legitimate user's next login can enroll their own authenticator and obtain a fully MFA-verified session on a Founder or Admin account. The same applies when a role with `mfa_required` is newly assigned. This defeats the purpose of mandatory MFA for privileged roles (ADR-006).",
+   "remediation": "Bind post-reset and first-time enrollment to a second, out-of-band proof. For example, the reset produces a single-use, short-lived enrollment token delivered to the identity-verified person (email plus the admin-verified channel), and ENROLLMENT challenges require it. Alternatively, an MFA reset also forces a password reset through the emailed token, and enrollment is allowed only inside that reset flow. Treat 'policy becomes required' the same way, or allow enrollment only from an existing session with fresh password re-authentication. Emit a CRITICAL event if enrollment completes from a new IP or device after a reset. Update 05 §3, §11.1, §11.3, §11.7, 08 §4.7, 11 §5 X14 and 12 §4.5, and add a negative test.",
+   "rereview": true
+  },
+  {
+   "id": "F-03",
+   "severity": "MAJOR",
+   "title": "Stronger accounts can be taken over or disabled through non-sensitive user-administration endpoints",
+   "evidence": [
+    "08 §5.4: `PATCH /users/{id}` (permission `user.update`, not sensitive per 06 §6.2) accepts `email`. 'Changing email re-sends verification in P1', so there is no verification in P0.",
+    "05 §8.1: forgot-password sends the reset link to the account's current email.",
+    "06 §7 G9 ('No takeover of stronger accounts') covers only MFA reset, admin password-reset link and admin session revocation. It does not cover email change, deactivate/activate (08 §5.5, `user.deactivate`), unlock or invite resend.",
+    "06 §7 G4 counts only holders of `role.manage` + `user.role.assign`. An Admin satisfies G4, so an Admin can deactivate the Founder.",
+    "06 §6.4 invites custom roles. A custom role can hold `lead.read`=ALL (all customer PII) without any sensitive permission, so it has no MFA (05 §11.1)."
+   ],
+   "reqs": [
+    "RBAC-009",
+    "USER-001",
+    "USER-002",
+    "AUTH-008",
+    "MFA-007",
+    "RBAC-011"
+   ],
+   "risk": "Horizontal or vertical privilege abuse. (1) A holder of `user.update` changes a stronger user's email to a mailbox they control, then triggers a password reset. For targets without MFA, including custom roles with broad data access, this is a full account takeover. For MFA-protected targets it compromises the password and locks out the owner. (2) An Admin can disable the Founder and every other Admin, which is an organizational takeover with no step-up and no stronger-target check. Neither action is sensitive, so neither emits SENSITIVE_ACTION or requires step-up.",
+   "remediation": "Extend G9 to email change, deactivate/activate, unlock and invite-resend. Make email change of another user a sensitive action (step-up, reason, notification to the old address, and revocation of sessions and outstanding reset/invite tokens), and either verify the new address in P0 or block password reset to an unverified address. Update 06 §6.2/§7, 08 §5.4/§5.5 and 12 §4.4 (guard tests).",
+   "rereview": true
+  },
+  {
+   "id": "F-04",
+   "severity": "MINOR",
+   "title": "Public-intake idempotency contract is contradictory and not implementable as specified",
+   "evidence": [
+    "04 §5.1 step 6: a stored key → 'return the ORIGINAL 201 body (no new lead)', regardless of body.",
+    "08 §2.8: 'Same key with a different body → 422 IDEMPOTENCY_KEY_REUSED' and 'key plus actor plus route'. But 04 §2 stores only `lead.intake_idempotency_key` with a UNIQUE index on the key alone. No request fingerprint is stored, so a body mismatch cannot be detected.",
+    "04 §5.1 orders Turnstile verification (step 4) before the idempotency lookup (step 6). Turnstile tokens are single-use, so a genuine retry or double-submit carries a spent token and receives 422 CAPTCHA_FAILED even though the first request created the lead."
+   ],
+   "reqs": [
+    "API-007",
+    "LEAD-001",
+    "LEAD-025",
+    "LEAD-018"
+   ],
+   "risk": "Retries and double-submits get a CAPTCHA error for a lead that was stored, which confuses enquirers and prompts duplicate submissions. The implementation will diverge from one of the two documents.",
+   "remediation": "Store a request fingerprint (hash of the canonical body) with the key, look the key up before Turnstile verification (after cheap rate limiting), and make 04 §5.1 and 08 §2.8 state one behavior.",
+   "rereview": false
+  },
+  {
+   "id": "F-05",
+   "severity": "MINOR",
+   "title": "Public-intake non-success paths can silently drop or misreport genuine enquiries",
+   "evidence": [
+    "04 §5.1 step 3 / 08 §8.4: a non-empty honeypot field (`website`) returns `202 {message:'Thank you.'}` and creates no lead. No markup rule prevents browser or password-manager autofill of a field named 'website' (no `autocomplete=off`, `tabindex=-1` or `aria-hidden` requirement in 09 §4.11).",
+    "02 §2.4 treats every 2xx as success and shows 'the random public reference'. A honeypot 202 has no reference, and genuine senders get a false 'thank you'.",
+    "02 §2.4 falls back to WhatsApp only on network error, 5xx or timeout. It does not mention 429, 422 CAPTCHA_FAILED, 428 or 413. 09 §4.11 does cover 429 and CAPTCHA with a WhatsApp link, so the two documents are inconsistent.",
+    "08 §12 limits public intake to 5/min and 30/hour per IP, which is aggressive for carrier-grade NAT on Indian mobile networks."
+   ],
+   "reqs": [
+    "LEAD-018",
+    "LEAD-019",
+    "LEAD-010",
+    "LEAD-001"
+   ],
+   "risk": "Genuine enquiries lost or misreported: the brief requires that valid submissions are never silently suppressed.",
+   "remediation": "Specify honeypot markup (off-screen, `tabindex=-1`, `autocomplete=off`, `aria-hidden`, a non-autofillable name). Record honeypot hits with enough detail to review false positives. Align 02 §2.4 with 09 §4.11 so every non-2xx other than field-level 422 offers the WhatsApp path. Make 2xx without a reference distinguishable. Revisit per-IP limits and rely on Turnstile for bot control.",
+   "rereview": false
+  },
+  {
+   "id": "F-06",
+   "severity": "MINOR",
+   "title": "SENSITIVE_ACTION on reads is self-contradictory",
+   "evidence": [
+    "06 §3, 07 §4.3, 05 §9.1: 'Every use' of an `is_sensitive` permission writes a `SENSITIVE_ACTION` security event. `audit.read` and `security_event.read` are sensitive (06 §6.2).",
+    "05 §9.5: 'Reading the log is itself a normal API request: it is logged in the application logs, not in security_event_log, to avoid feedback loops.'"
+   ],
+   "reqs": [
+    "RBAC-017",
+    "SEVT-005",
+    "AUDIT-008"
+   ],
+   "risk": "Implementers must guess. One reading produces a SENSITIVE_ACTION row for every audit or security page view (volume, alert noise, feedback loops). The other leaves privileged reads unrecorded in the security log.",
+   "remediation": "Define 'use' per permission (for example, mutations only, or reads recorded as a de-duplicated `SENSITIVE_READ`) and align 05 §9.1/§9.5, 06 §3 and 07 §4.3.",
+   "rereview": false
+  },
+  {
+   "id": "F-07",
+   "severity": "MINOR",
+   "title": "Purge and retention rules conflict with ON DELETE RESTRICT foreign keys; session retention undefined",
+   "evidence": [
+    "03 §1: every FK is `ON DELETE RESTRICT`.",
+    "`notification.source_event_id` → `outbox_event.id` (03 §8.2). EXC-004 hard-deletes DONE outbox rows, but EXC-005 purges notifications only 'once read'. An unread notification blocks the outbox purge.",
+    "`audit_log.session_id` and `security_event_log.session_id` → `user_session.id` (03 §5.4, §7), and `refresh_token.session_id` → `user_session.id`. EXC-006 says sessions are never soft-deleted, but no hard-delete or retention rule exists for `user_session`. Sessions therefore accumulate forever and cannot be purged while evidence rows reference them.",
+    "`refresh_token.replaced_by_id` self-FK (RESTRICT) makes the expiry purge (EXC-003) order-dependent."
+   ],
+   "reqs": [
+    "DATA-009",
+    "DATA-014",
+    "SEVT-004",
+    "NOTIF-004"
+   ],
+   "risk": "Purge jobs fail at runtime and session and PII growth is unbounded. This is session cleanup and retention, which the brief lists explicitly.",
+   "remediation": "Define `user_session` retention (for example, purge N days after revocation or expiry once evidence rows are archived). Make evidence-to-session references non-FK correlation columns, or archive in dependency order. Set `source_event_id` to NULL on outbox purge (a registered exception), or purge notifications first. Document purge ordering for refresh-token chains.",
+   "rereview": false
+  },
+  {
+   "id": "F-08",
+   "severity": "MINOR",
+   "title": "Exception registry is incomplete: unique indexes without the soft-delete predicate are not registered",
+   "evidence": [
+    "03 §2.7 rule 5 fails CI on any unique index on business columns without `is_deleted = false`, unless it is allow-listed in §2.9.",
+    "`ux_lead__public_reference` (04 §2, no predicate), `ux_lead__intake_idempotency_key` (predicate `IS NOT NULL` only) and `ux_notification__event_recipient` (03 §8.2) are not listed in EXC-007.",
+    "The validation report's C03 'PASS' did not detect this."
+   ],
+   "reqs": [
+    "DATA-014",
+    "DATA-011",
+    "DATA-007"
+   ],
+   "risk": "The conformance check will fail on the first migration, or the check will be weakened ad hoc. It also shows that automated validation C03 did not inspect index predicates.",
+   "remediation": "Add these indexes to EXC-007 with a justification (global uniqueness of public references and idempotency keys is intended), or add the predicate.",
+   "rereview": false
+  },
+  {
+   "id": "F-09",
+   "severity": "MINOR",
+   "title": "In-process rate-limit and idempotency stores are per gunicorn worker",
+   "evidence": [
+    "02 §3.5: gunicorn sync workers '2×CPU+1' (multiple processes) and 'Flask-Limiter with an in-memory store (single host)'.",
+    "08 §2.8: idempotency for authenticated creates uses an 'in-process TTL store'.",
+    "11 §1.2 S2 assumes one instance means one cache. With several worker processes, each has its own store."
+   ],
+   "reqs": [
+    "SEC-011",
+    "AUTH-010",
+    "API-007",
+    "MFA-009"
+   ],
+   "risk": "Effective per-IP and per-email limits are multiplied by the worker count and are inconsistent. Idempotent replays that land on another worker create duplicates. Account lockout (database counters) is unaffected.",
+   "remediation": "Use a shared store even on one host (SQLite table, file-backed limiter storage or local Redis), or state and test the multiplied effective limits.",
+   "rereview": false
+  },
+  {
+   "id": "F-10",
+   "severity": "MINOR",
+   "title": "Revocation latency and the refresh-reuse grace window are under-specified",
+   "evidence": [
+    "AUTH-006 and AUTH-017 require immediate revocation, but 05 §5 and 06 §9 cache session and user status for up to 30 s per process. With multiple workers, a revoked session remains usable for up to 30 s on other workers.",
+    "05 §6: a 'used token outside the 20 s multi-tab grace window revokes the session'. The behavior inside the window (return the successor? issue another?) is unspecified in 05 and 08 §4.2. Issuing new tokens inside the window allows replay.",
+    "12 §4.5 has no test for token use after revocation or for the grace window."
+   ],
+   "reqs": [
+    "AUTH-005",
+    "AUTH-006",
+    "AUTH-017",
+    "RBAC-013"
+   ],
+   "risk": "Token replay window and stale authorization after disable, logout or password change.",
+   "remediation": "Specify grace behavior (for example, return the same successor, bound to the same session and client, at most once). Either make the session check uncached (a single indexed read on local SQLite) or reword the requirement to '≤ 30 s'. Add tests for both.",
+   "rereview": false
+  },
+  {
+   "id": "F-11",
+   "severity": "MINOR",
+   "title": "P0 tamper evidence of security_event_log is overstated",
+   "evidence": [
+    "05 §9.6: `row_hash = SHA-256(prev_hash ‖ canonical_json(...))` is unkeyed. The external anchor (SEVT-007) is deferred to P1. The archival anchor (05 §9.4 step 4) is recorded in the database.",
+    "11 §4 A2 claims 'The security-event hash chain detects tampering' by someone with direct file access. That attacker can recompute the whole chain.",
+    "'Canonical JSON' is not defined (key order, number and datetime formatting, SQLite microsecond text versus PostgreSQL `timestamptz`, GUID form), yet 11 §3.4 requires the chain to recompute identically after the PostgreSQL migration."
+   ],
+   "reqs": [
+    "SEVT-006",
+    "SEVT-004",
+    "OPS-004"
+   ],
+   "risk": "False assurance. Cross-engine chain verification may fail spuriously during the PostgreSQL migration.",
+   "remediation": "Use an HMAC keyed from SSM or KMS (or promote the daily S3 Object Lock anchor to P0). Store archival anchors outside the database. Specify the canonicalization (for example, RFC 8785 JCS over application-level representations, with a fixed datetime precision).",
+   "rereview": false
+  },
+  {
+   "id": "F-12",
+   "severity": "MINOR",
+   "title": "Operational coupling and inconsistent rollback procedures",
+   "evidence": [
+    "02 §9 and 08 §3: `/health/ready` fails when outbox lag exceeds 5 min. An SES outage therefore fails readiness, and 02 §12.2 rolls back a deploy whose readiness check fails.",
+    "02 §12.2: deploy runs `alembic upgrade head` and then 'rollback to the previous image on failure'. The previous image runs against an already-migrated schema, and there is no down-migration policy.",
+    "11 §2 B3: 'Pause the worker → snapshot → migrate → … Rollback by snapshot restore'. This differs from 02 and does not state data-loss implications for writes after the snapshot."
+   ],
+   "reqs": [
+    "LOG-005",
+    "OPS-004",
+    "NOTIF-008",
+    "NOTIF-004"
+   ],
+   "risk": "Email-provider outages cause spurious rollbacks and alerting. A failed deploy rollback can leave code and schema out of step.",
+   "remediation": "Report outbox lag as a separate degraded signal, not readiness. Define one deploy/migration runbook: maintenance mode for the public API, snapshot, expand-only migrations compatible with N-1 code, and explicit rollback semantics.",
+   "rereview": false
+  },
+  {
+   "id": "F-13",
+   "severity": "MINOR",
+   "title": "`user_mfa_factor.secret_key_ref` VARCHAR(200) is likely too small",
+   "evidence": [
+    "03 §5.5: `secret_key_ref` VARCHAR(200) holds 'wrapped data key and KMS key id'. A KMS `GenerateDataKey` ciphertext blob for a symmetric key is typically about 184 bytes, which is about 248 base64 characters before the key ARN is added. 03 §12 generates a length CHECK on SQLite, and PostgreSQL enforces varchar(n)."
+   ],
+   "reqs": [
+    "MFA-010",
+    "MFA-001"
+   ],
+   "risk": "MFA enrollment fails at insert time in production.",
+   "remediation": "Store the wrapped key as TEXT (or a separate column sized from measured KMS output) and the key ARN separately. Add a test with a real KMS blob.",
+   "rereview": false
+  },
+  {
+   "id": "F-14",
+   "severity": "MINOR",
+   "title": "Dark-mode primary button fails contrast; no on-color token",
+   "evidence": [
+    "09 §2.1: `--vs-copper-strong` dark value `#E0B394` is the primary button background with 'white text'. White on `#E0B394` is 1.90:1 (independently recomputed). The light-mode ratios claimed in 09 §2.1/§2.5 were recomputed and match within ±0.1. The dark ink `#171614` on `#E0B394` is 9.51:1."
+   ],
+   "reqs": [
+    "UI-011",
+    "UI-014",
+    "UI-010"
+   ],
+   "risk": "WCAG 2.2 AA failure on the most prominent control in dark mode.",
+   "remediation": "Add `--vs-on-copper-strong` (light: white; dark: `--vs-ink`) and extend the automated token contrast check (12 §4.8) to dark mode.",
+   "rereview": false
+  },
+  {
+   "id": "F-15",
+   "severity": "MINOR",
+   "title": "No P0 design for lead retention, erasure or consent withdrawal (DPDP)",
+   "evidence": [
+    "11 §5.6: closed-lead anonymization is a proposed default (3 y, ASM-006) with no job, requirement ID or test.",
+    "07 §8.2 describes erasure, but it is AUDIT-011 (P1). 11 §5.6 says data-principal rights are 'a manual process'.",
+    "No consent-withdrawal flow or state exists in 04 §2 (`consent_contact` only)."
+   ],
+   "reqs": [
+    "SEC-009",
+    "LEAD-012",
+    "AUDIT-011"
+   ],
+   "risk": "Lead PII has no enforced lifecycle in P0. Manual erasure against immutable audit rows has no P0-approved procedure.",
+   "remediation": "Either add P0 requirements (retention job, withdrawal recording, erasure procedure) or record an explicit owner decision deferring them, with a go-live condition.",
+   "rereview": false
+  },
+  {
+   "id": "F-16",
+   "severity": "MINOR",
+   "title": "Deferred P1 capabilities are embedded in P0 surfaces (scope ambiguity)",
+   "evidence": [
+    "AUTH-016 is P1, yet endpoints 13, 14 and 27 (08 §1), permissions `session.read`, `session.revoke` and `user.session.revoke` (06 §6.1–6.2) and the UI Sessions tab (09 §4.6) are specified without a P1 marker.",
+    "RBAC-007 (time-bound grants) is P1, yet `valid_from` and `valid_until`, the resolver `live(now)` (06 §5), the worked example, 08 §5.6/§5.7 payloads and the UI ⏱ indicator are in P0 designs.",
+    "RBAC-016 is P1, yet endpoint 33 and the 'EFFECTIVE PERMISSIONS (explain)' UI are unmarked.",
+    "Time-bound expiry can remove the last administrator without any transaction, so G4 (06 §7) cannot fire."
+   ],
+   "reqs": [
+    "PLAT-012",
+    "RBAC-011",
+    "AUTH-016",
+    "RBAC-007",
+    "RBAC-016"
+   ],
+   "risk": "Unplanned P0 scope. The last-administrator safeguard can be bypassed by expiry.",
+   "remediation": "Mark each deferred surface as P1 in 06, 08 and 09, or promote the requirements to P0. Forbid `valid_until` on any grant that G4 depends on, or evaluate G4 at expiry.",
+   "rereview": false
+  },
+  {
+   "id": "F-17",
+   "severity": "MINOR",
+   "title": "Website form mapping drops live data (ASM-005)",
+   "evidence": [
+    "Live form (`dist/index.html:168–169`): 'Property Type' is a **required** select with Apartment / Flat, Independent House / Villa, **Home Renovation** and Other. 'Service Required' is also required.",
+    "03 §6.2 seeds PROPERTY_TYPE as `APARTMENT`, `VILLA`, `OTHER`. 'Home Renovation' exists only as PROJECT_TYPE `RENOVATION`.",
+    "04 §5.1: Property Type is 'not accepted by the public API', so a field users are required to answer today is discarded."
+   ],
+   "reqs": [
+    "LEAD-023",
+    "LEAD-001",
+    "LEAD-002"
+   ],
+   "risk": "Loss of data the business captures today. Lookup semantics are inconsistent with the live site.",
+   "remediation": "The owner decides ASM-005 (see §13 recommendation). Either way, reconcile the lookup codes with the live options before LEAD-001 is implemented.",
+   "rereview": false
+  },
+  {
+   "id": "F-18",
+   "severity": "MINOR",
+   "title": "ADR acceptance evidence is not in the repository",
+   "evidence": [
+    "ADR-001: 'owner approval recorded in the architecture sign-off'. No sign-off artifact exists in the frozen tree.",
+    "ADR-002…009 are 'Accepted' with no decision owner, approver or approval reference."
+   ],
+   "reqs": [
+    "PLAT-006"
+   ],
+   "risk": "Governance: owner acceptance of nine binding decisions cannot be independently verified.",
+   "remediation": "Record approver, date and approval reference in each ADR, or add a signed decision log.",
+   "rereview": false
+  },
+  {
+   "id": "F-19",
+   "severity": "MINOR",
+   "title": "Test-strategy gaps behind the reported 199-requirement coverage",
+   "evidence": [
+    "11 requirements map their 'test' dimension only to method, environment or CI sections (12 §1, §2, §3, §5): PLAT-001, PLAT-002, PLAT-004, PLAT-006, MFA-008, SEC-007, SEC-009, SEC-010, OPS-001, OPS-003, OPS-008. These are review checklists or CI gates, not tests.",
+    "Not designed: Alembic upgrade-with-data and downgrade/rollback tests per revision; explicit CSRF negative tests for `/auth/refresh` and `/auth/logout`; access-token use after revocation or logout; refresh grace-window replay; SQLite write-contention (`SQLITE_BUSY`, `BEGIN IMMEDIATE`) tests; a browser and device matrix (only 360 px is specified); DAST or penetration testing before go-live (ASVS is P1, and the OWASP review is only a checklist item in 11 §8).",
+    "NFR-002 and OPS-005 cannot be tested until OWNER-INPUT-001 exists."
+   ],
+   "reqs": [
+    "PLAT-006",
+    "OPS-001",
+    "OPS-004",
+    "AUTH-005",
+    "AUTH-006",
+    "SEC-002",
+    "SEC-010",
+    "NFR-002",
+    "OPS-005"
+   ],
+   "risk": "Coverage by reference overstates verification depth in exactly the areas where the findings above sit.",
+   "remediation": "Add the missing suites to 12 §4, and report RV/OP-only requirements separately from tested ones in the coverage gate.",
+   "rereview": false
+  },
+  {
+   "id": "F-20",
+   "severity": "MINOR",
+   "title": "Note 'Undo' depends on a restore endpoint that does not exist",
+   "evidence": [
+    "09 §3.2: 'Note deleted · Undo within 8 s, which calls restore'. 08 §9.1 has no note-restore endpoint, and 06 §6.3 has no `lead_note.restore` permission."
+   ],
+   "reqs": [
+    "NOTE-002",
+    "UI-004"
+   ],
+   "risk": "The UI cannot be built as designed without inventing an API and permission.",
+   "remediation": "Add endpoint and permission, or drop Undo for notes.",
+   "rereview": false
+  },
+  {
+   "id": "F-21",
+   "severity": "MINOR",
+   "title": "Validation and coverage evidence is largely self-referential",
+   "evidence": [
+    "validation-report.md: 'Section-level Traces: lines were generated from the reviewed registry mapping'. Coverage = the section 'explicitly cites the ID', which the injected Traces lines guarantee.",
+    "coverage-gate.md: natively cited before injection is Schema 27/79, API 16/75 and UI 22/53.",
+    "Independent substantive assessment (§5) finds 28 P0 requirements that are not fully covered, against the claimed 100%."
+   ],
+   "reqs": [],
+   "risk": "Coverage percentages cannot be used as certification evidence.",
+   "remediation": "Report semantic coverage separately from citation coverage in future gates, and keep the independent matrix (§5) as the baseline.",
+   "rereview": false
+  },
+  {
+   "id": "A-01",
+   "severity": "ADVISORY",
+   "title": "Account-lockout denial of service against privileged users",
+   "evidence": [
+    "05 §4: 5 password failures lock the account (escalating to 24 h). Anyone who knows a Founder's email can lock it repeatedly."
+   ],
+   "reqs": [
+    "AUTH-010"
+   ],
+   "risk": "Availability of privileged accounts.",
+   "remediation": "Prefer progressive delays or Turnstile challenges per account and IP over hard locks, or allow password + MFA to succeed during lock.",
+   "rereview": false
+  },
+  {
+   "id": "A-02",
+   "severity": "ADVISORY",
+   "title": "SQLite immutability is convention-level",
+   "evidence": [
+    "07 §6.2: the retention procedure drops and recreates the DELETE trigger. The application's connection can therefore drop triggers. 11 §3.3 acknowledges 'No DB roles or grants'."
+   ],
+   "reqs": [
+    "AUDIT-004",
+    "SEVT-001"
+   ],
+   "risk": "Accepted MVP risk; honestly documented.",
+   "remediation": "Run retention from a separate CLI process and alert on trigger DDL, or verify trigger presence in `/health/ready`.",
+   "rereview": false
+  },
+  {
+   "id": "A-03",
+   "severity": "ADVISORY",
+   "title": "Case-insensitive search differs between engines for non-ASCII text",
+   "evidence": [
+    "03 §12 uses `lower(col) LIKE lower(:q)`. SQLite `lower()` and `LIKE` fold ASCII only (without ICU). PostgreSQL folds Unicode."
+   ],
+   "reqs": [
+    "PLAT-004",
+    "LEAD-013"
+   ],
+   "risk": "Different search results after migration.",
+   "remediation": "Normalize searchable shadow columns in the application (casefold), or add non-ASCII dual-engine tests.",
+   "rereview": false
+  },
+  {
+   "id": "A-04",
+   "severity": "ADVISORY",
+   "title": "Case-sensitive uniqueness of role names and lookup codes",
+   "evidence": [
+    "`ux_role__name` (03 §4.3) is on the raw name, so 'Sales' and 'sales' can coexist."
+   ],
+   "reqs": [
+    "RBAC-015"
+   ],
+   "risk": "Confusable roles.",
+   "remediation": "Unique on a normalized name.",
+   "rereview": false
+  },
+  {
+   "id": "A-05",
+   "severity": "ADVISORY",
+   "title": "Invite-link interception yields password and MFA enrollment",
+   "evidence": [
+    "05 §8.4 and §10: the invite token alone sets the password, and the first login then enrolls MFA with that password."
+   ],
+   "reqs": [
+    "AUTH-011",
+    "AUTH-014"
+   ],
+   "risk": "Inherent to email invites; relevant to F-02.",
+   "remediation": "Short invite expiry for privileged roles, and confirmation to the inviter on acceptance.",
+   "rereview": false
+  },
+  {
+   "id": "A-06",
+   "severity": "ADVISORY",
+   "title": "State that G2 applies to `copy_from_role_id`",
+   "evidence": [
+    "08 §6.1: `POST /roles` with `copy_from_role_id` lists only `409 DUPLICATE`. Assignment-time G2 prevents escalation, but copy-time behavior is unstated."
+   ],
+   "reqs": [
+    "RBAC-009"
+   ],
+   "risk": "Low.",
+   "remediation": "Document ESCALATION_DENIED on copy.",
+   "rereview": false
+  },
+  {
+   "id": "A-07",
+   "severity": "ADVISORY",
+   "title": "Duplicate-resolution target must be scope-checked",
+   "evidence": [
+    "08 §8.8: `duplicate_of_lead_id` is client-supplied. Existence outside scope could leak through error differences."
+   ],
+   "reqs": [
+    "RBAC-014",
+    "LEAD-010"
+   ],
+   "risk": "Existence oracle.",
+   "remediation": "Resolve through the scoped repository (404).",
+   "rereview": false
+  },
+  {
+   "id": "A-08",
+   "severity": "ADVISORY",
+   "title": "`?next=` redirect validation",
+   "evidence": [
+    "09 §4.1: 'only relative paths allowed'. Implementations commonly miss `//host` and `/\\host`."
+   ],
+   "reqs": [
+    "UI-001"
+   ],
+   "risk": "Open redirect.",
+   "remediation": "Allow only `^/[^/\\\\]` paths, and test.",
+   "rereview": false
+  },
+  {
+   "id": "A-09",
+   "severity": "ADVISORY",
+   "title": "Order app-level rate limiting before server-to-server Turnstile verification",
+   "evidence": [
+    "04 §5.1 steps 4–5 call Turnstile before the application rate limit."
+   ],
+   "reqs": [
+    "LEAD-018",
+    "NFR-003"
+   ],
+   "risk": "Unnecessary outbound calls under abuse.",
+   "remediation": "Swap steps 4 and 5.",
+   "rereview": false
+  },
+  {
+   "id": "A-10",
+   "severity": "ADVISORY",
+   "title": "Example TOTP secret in docs",
+   "evidence": [
+    "08 §4.7 and 09 §4.10 show `JBSWY3DPEHPK3PXP`, the widely published documentation example key. It is not a real secret."
+   ],
+   "reqs": [],
+   "risk": "Secret-scanner noise only.",
+   "remediation": "Replace with an obvious placeholder.",
+   "rereview": false
+  },
+  {
+   "id": "A-11",
+   "severity": "ADVISORY",
+   "title": "Litestream operational constraints",
+   "evidence": [
+    "02 §12.3 relies on Litestream but does not state its constraints (single replicating process, no external `wal_checkpoint(TRUNCATE)`, version pinning, restore-tooling version compatibility)."
+   ],
+   "reqs": [
+    "OPS-002",
+    "OPS-009"
+   ],
+   "risk": "Silent replication gaps.",
+   "remediation": "Document and monitor the constraints in the restore runbook.",
+   "rereview": false
+  },
+  {
+   "id": "A-12",
+   "severity": "ADVISORY",
+   "title": "`audit.read` exposes lead PII regardless of lead scope",
+   "evidence": [
+    "08 §10 masks only entity labels outside `lead.read` scope. `old_value` and `new_value` still carry PII."
+   ],
+   "reqs": [
+    "AUDIT-008"
+   ],
+   "risk": "Relevant for future custom roles.",
+   "remediation": "Document, or mask `pii_fields` for out-of-scope entities.",
+   "rereview": false
+  },
+  {
+   "id": "A-13",
+   "severity": "ADVISORY",
+   "title": "PostgreSQL chain advisory lock is held for the whole business transaction",
+   "evidence": [
+    "05 §9.6 and 03 §2.8: SUCCESS events share the business transaction, so the transaction-scoped lock serializes all such writes."
+   ],
+   "reqs": [
+    "SEVT-006",
+    "NFR-001"
+   ],
+   "risk": "Throughput after migration.",
+   "remediation": "Measure in rehearsal (already listed as A8), and consider a sequence plus deferred chaining.",
+   "rereview": false
+  },
+  {
+   "id": "A-14",
+   "severity": "ADVISORY",
+   "title": "Honeypot response status differs from success",
+   "evidence": [
+    "08 §8.4: honeypot returns 202 while success returns 201."
+   ],
+   "reqs": [
+    "LEAD-018"
+   ],
+   "risk": "Lets bots detect the trap.",
+   "remediation": "Return an indistinguishable shape; see F-05.",
+   "rereview": false
+  }
+ ],
+ "findings_by_severity": {
+  "MAJOR": 3,
+  "MINOR": 18,
+  "ADVISORY": 14
+ },
+ "assumptions": [
+  {
+   "id": "ASM-001",
+   "classification": "Acceptable for P0",
+   "note": "Validate by monitoring; there is a re-evaluation trigger at the PostgreSQL gate."
+  },
+  {
+   "id": "ASM-002",
+   "classification": "Acceptable for P0",
+   "note": "Must be validated by a load test before production (release gate RG-4)."
+  },
+  {
+   "id": "ASM-003",
+   "classification": "Acceptable for P0",
+   "note": "Qualitative; replace after 30 days."
+  },
+  {
+   "id": "ASM-004",
+   "classification": "Acceptable for P0",
+   "note": "Thresholds are configuration values; review after 30 days."
+  },
+  {
+   "id": "ASM-005",
+   "classification": "Requires owner decision before implementation",
+   "note": "Needed before LEAD-001 (website form) is implemented; see the recommendation below and F-17."
+  },
+  {
+   "id": "ASM-006",
+   "classification": "Requires owner decision before production",
+   "note": "Legal confirmation of retention (OWNER-INPUT-002). Defaults are configurable, so implementation can proceed."
+  },
+  {
+   "id": "ASM-007",
+   "classification": "Acceptable for P0",
+   "note": "Test fixtures only."
+  },
+  {
+   "id": "ASM-008",
+   "classification": "Acceptable for P0",
+   "note": "The origin lock depends on it; a change of edge provider triggers re-review."
+  },
+  {
+   "id": "ASM-009",
+   "classification": "Requires owner decision before production",
+   "note": "Go-live without outbound email must be explicitly accepted (11 §8)."
+  },
+  {
+   "id": "ASM-010",
+   "classification": "Acceptable for P0",
+   "note": "Validate by benchmark on the chosen instance before production."
+  },
+  {
+   "id": "ASM-011",
+   "classification": "Requires owner decision before production",
+   "note": "A versioned privacy notice must exist before public intake goes live; development can use a placeholder version."
+  },
+  {
+   "id": "ASM-012",
+   "classification": "Requires owner decision before implementation",
+   "note": "Needed before any AWS infrastructure (KMS keys, SES region, S3 buckets, data residency) is provisioned. Application code is not blocked."
+  }
+ ],
+ "owner_inputs": [
+  {
+   "id": "OWNER-INPUT-001",
+   "input": "Approved RPO, RTO and API availability target",
+   "needed": "Before production. Recommended before infrastructure build, because an RPO or RTO that Litestream on a single host cannot meet would reopen ADR-008. NFR-002 and OPS-005 are untestable until provided. No values are proposed here."
+  },
+  {
+   "id": "OWNER-INPUT-002",
+   "input": "Retention durations (audit, security events, closed-lead anonymization)",
+   "needed": "Before production. Also decide whether lead retention and erasure are P0 (F-15)."
+  },
+  {
+   "id": "OWNER-INPUT-003",
+   "input": "Restore-rehearsal cadence",
+   "needed": "Before production."
+  },
+  {
+   "id": "OWNER-DECISION (new)",
+   "input": "Resolve F-01: whether Sales MFA is configurable (split or rescope `security_event.read`) or mandatory (amend ADR-006)",
+   "needed": "Before implementation of authentication and RBAC."
+  },
+  {
+   "id": "OWNER-DECISION (new)",
+   "input": "ASM-005: property_type on the public form",
+   "needed": "Before LEAD-001 implementation."
+  },
+  {
+   "id": "OWNER-DECISION (new)",
+   "input": "ASM-012: AWS region",
+   "needed": "Before infrastructure provisioning."
+  }
+ ],
+ "sqlite_release_gates": [
+  "RG-1 OWNER-INPUT-001 approved, and the measured RPO/RTO from the full rebuild rehearsal meet it.",
+  "RG-2 Automated restore verification green on consecutive scheduled runs, with the alert test-fired.",
+  "RG-3 Exactly one application instance (and one Litestream replicator) enforced by deployment configuration and checked in CI/OP.",
+  "RG-4 Load test at ASM-007 fixture sizes meets NFR-001 and NFR-003 with no sustained SQLITE_BUSY; chain-append latency measured.",
+  "RG-5 Litestream lag, snapshot-missing and disk-usage alerts wired and test-fired.",
+  "RG-6 Database path verified on the dedicated KMS-encrypted volume; `DeleteOnTermination=false` verified.",
+  "RG-7 Migration runbook rehearsed, including rollback (F-12).",
+  "RG-8 PostgreSQL release gate (OPS-008) recorded as a hard precondition for procurement, inventory, finance and multi-instance scale.",
+  "RG-9 No gated module, second instance or BI direct-DB access introduced while SQLite is authoritative."
+ ],
+ "next_authorized_action": "The architecture author corrects F-01, F-02 and F-03 (and records tracking for every MINOR finding) in a new commit on architecture/p0-foundation-freeze, with owner decisions on F-01, ASM-005 and ASM-012, and then requests a targeted independent re-review of that new SHA. No implementation, merge or deployment is authorized."
+}
