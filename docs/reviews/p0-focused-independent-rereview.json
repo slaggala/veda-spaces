@@ -1,0 +1,2745 @@
+{
+ "review_id": "VEDA-SPACES-P0-FOCUSED-INDEPENDENT-REVIEW-02",
+ "date": "2026-09-29",
+ "repository": "git@github.com:slaggala/veda-spaces.git",
+ "reviewed_commit": "c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+ "original_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "original_review_commit": "7515b232e7407c0bb20afc5abd9656da2c246d0b",
+ "review_branch": "review/p0-foundation-independent-review",
+ "rereview_commit": "see git log of the review branch",
+ "verdict": "CERTIFIED WITH MINOR CONDITIONS",
+ "verdict_basis": "All three original MAJOR findings are substantively resolved. There are no BLOCKER or MAJOR findings. Four new MINOR findings (one regression) and TG-01 are enforceable conditions C-1…C-5, each with an owner, gate, acceptance, evidence and failure behavior. Implementation still requires explicit owner authorization.",
+ "diff_verification": [
+  {
+   "command": "git fetch origin",
+   "result": "no new refs"
+  },
+  {
+   "command": "git cat-file -t c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+   "result": "commit"
+  },
+  {
+   "command": "git rev-parse origin/architecture/p0-foundation-freeze",
+   "result": "c3aae47a7d9b12fc0cb1491865991fde28abcf55 (the remediation commit is the branch head)"
+  },
+  {
+   "command": "git merge-base --is-ancestor 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+   "result": "exit 0 (the original commit is an ancestor)"
+  },
+  {
+   "command": "git log --format='%H %P' 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e..origin/architecture/p0-foundation-freeze",
+   "result": "c3aae47a7d9b12fc0cb1491865991fde28abcf55 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e — exactly one commit, whose parent is the frozen SHA; nothing later"
+  },
+  {
+   "command": "git rev-parse origin/review/p0-foundation-independent-review",
+   "result": "7515b232e7407c0bb20afc5abd9656da2c246d0b (the original review branch is unchanged)"
+  },
+  {
+   "command": "git status --porcelain",
+   "result": "(empty) — clean working tree"
+  },
+  {
+   "command": "git diff --name-status 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55 | grep -vE '^[AM]\\s+docs/architecture/'",
+   "result": "(empty) — all 30 paths (3 added, 27 modified) are .md/.json under docs/architecture/"
+  },
+  {
+   "command": "git diff --quiet 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55 -- dist ; git ls-tree c3aae47a7d9b12fc0cb1491865991fde28abcf55 dist",
+   "result": "exit 0; tree d1d3efced8aa4ee67c2d832aae075d0f3f136cf9 (unchanged)"
+  },
+  {
+   "command": "git diff --numstat 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55 | awk '$1==\"-\"'",
+   "result": "(empty) — no binaries"
+  },
+  {
+   "command": "git diff --name-only 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55 | grep -iE '\\.env|\\.pem|\\.key|credential|\\.(py|js|ts|sh)$'",
+   "result": "(empty) — no environment, key or code files"
+  },
+  {
+   "command": "git diff 4dce177745a2b8f0b9fdb21de2e563ccd022fb0e c3aae47a7d9b12fc0cb1491865991fde28abcf55 | grep '^+' | grep -cE 'AKIA[0-9A-Z]{16}|-----BEGIN|eyJ…\\.…\\.|JBSWY3DP'",
+   "result": "0 — the only otpauth string uses the placeholder <BASE32-SECRET-SHOWN-ONCE>"
+  },
+  {
+   "command": "git worktree add --detach <scratch> c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+   "result": "all reading was done at the exact remediation SHA"
+  }
+ ],
+ "reconciliation": [
+  {
+   "id": "F-01",
+   "original_severity": "MAJOR",
+   "disposition": "RESOLVED",
+   "evidence": "Sales column in 06 §6.2 is blank for `security_event.read`, which is `supports_scope=false` (ALL-only, 06 §4). An independent parse of 06 §6 found that the Sales grants include none of the 16 🔒 codes. Classification is one mechanism (`sensitivity_class`, with `is_sensitive` derived by CHECK, 03 §4.4, 06 §3.1). Activation requires an ACTIVE factor plus an MFA-verified FULL session (06 §5 step 8). MFA reset or factor removal suspends it through `authz_version` and an uncached per-request read (06 §9, 05 §5). Negative tests: 12 §4.3 'Access' and 06 §10. ADR-006, ADR-004, 05 §9.5/§12, 08 §4.4/§10.1 and 09 §4.10 agree."
+  },
+  {
+   "id": "F-02",
+   "original_severity": "MAJOR",
+   "disposition": "RESOLVED",
+   "evidence": "Password-only enrollment is removed. Login with MFA required and no factor returns no token and emails an enrollment link (05 §3). There are four two-proof paths (05 §11.3). Recovery requires password re-entry plus a code and creates a RECOVERY session with a 15-minute limit, no refresh token, an allow-list and a Layer 0 gate (05 §11.5, 06 §8). Other sessions are revoked, the verified email is notified, codes are rotated and cooling-off applies. Admin reset uses separate `user.mfa.reset`, G3/G9/G11, dual control for privileged targets, and delivers the enrollment link to the target's verified email. Residual test gaps are in N-03. Note: the re-review brief paraphrases F-02 as 'a recovery code could enable…'. The original finding was password-only enrollment after an MFA reset or policy change. Both readings were verified."
+  },
+  {
+   "id": "F-03",
+   "original_severity": "MAJOR",
+   "disposition": "RESOLVED",
+   "evidence": "`user.update` is retired. `user.profile.update` has a closed DTO, and security fields return 422 FIELD_NOT_UPDATABLE (08 §5.4, 06 §10 mass-assignment tests). Email change uses the proposed-email workflow: step-up, verification of the new address, cancel alert to the current one, hashed single-use tokens, sessions revoked, and the verified email stays the reset destination (05 §8.6, 08 §4.8/§5.5). G9 covers all account-control actions. G3 covers self-deactivation. `protection_level` backs G11. I1/I2 are enforced under the write lock (06 §7.3). An Admin cannot deactivate or modify the Founder (G9 + G11). The dual-control **eligibility** text is inconsistent; that is recorded as a new finding (N-01), not a failure of F-03's core defect."
+  },
+  {
+   "id": "F-04",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "A fingerprint is stored (`intake_request_fingerprint`). Lookup happens before Turnstile. One behavior is specified in 04 §5.1 and 08 §2.8. Tests are in 12 §4.6."
+  },
+  {
+   "id": "F-05",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "A honeypot hit is stored as SUSPECTED with an identical 201. Markup is specified. 02 §2.4, 04 §5.1 and 09 §4.11 are aligned, and every non-field-422 offers WhatsApp. Limits are relaxed. Advisory N-A3 covers spam-queue ageing."
+  },
+  {
+   "id": "F-06",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "Mutations produce `SENSITIVE_ACTION`. Reads produce `SENSITIVE_READ`, de-duplicated per 15 minutes. 05, 06, 07 and ADR-004 agree."
+  },
+  {
+   "id": "F-07",
+   "original_severity": "MINOR",
+   "disposition": "REGRESSION INTRODUCED",
+   "evidence": "The original defect is fixed: session retention, EXC-009 correlation ids and purge order (03 §2.10). However, the remediation broadened conformance rule 3 to reject any FK-less `*_id` outside EXC-009, which now conflicts with seven unregistered polymorphic or correlation columns (N-02)."
+  },
+  {
+   "id": "F-08",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "The three indexes are in EXC-007 with a justification, and the conformance allow-list is exact."
+  },
+  {
+   "id": "F-09",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "There is one gunicorn gthread worker process (OPS-010), with a deployment check (RG-3). Throughput is validated by ASM-013 and RG-4."
+  },
+  {
+   "id": "F-10",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "The per-request read is uncached. Grace-window semantics are exact (access token only, once, `grace_used_on`). Tests are in 12 §4.5."
+  },
+  {
+   "id": "F-11",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "The chain uses HMAC with a key held in SSM. RFC 8785 canonicalization is fully specified. The Object Lock anchor is promoted to P0 (SEVT-007). Residual root-on-host risk is documented."
+  },
+  {
+   "id": "F-12",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "Readiness excludes outbox and email health. There is one runbook (02 §12.4) with expand-only N-1 migrations and both rollback paths."
+  },
+  {
+   "id": "F-13",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "The key reference is split into `wrapped_data_key` TEXT and `kms_key_arn` VARCHAR(2048). Runtime proof is tracked as TG-02."
+  },
+  {
+   "id": "F-14",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "`--vs-on-copper-strong` is added. Independently recomputed: 7.10:1 (light) and 9.51:1 (dark). AX-05 checks both themes."
+  },
+  {
+   "id": "F-15",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "LEAD-027/028/029 and AUDIT-011 are now P0 with designs (04 §5.4, §14; 07 §8.2). The retention job ships disabled until OWNER-INPUT-002."
+  },
+  {
+   "id": "F-16",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "AUTH-016 and RBAC-016 are promoted. Time-bound grants return 422 in P0 and can never carry sensitive permissions. P1 rows are marked in 08."
+  },
+  {
+   "id": "F-17",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "`property_type` is optional on the public form (owner Decision 4). 'Home Renovation' maps to PROJECT_TYPE RENOVATION. Unknown codes go to `intake_unmapped`."
+  },
+  {
+   "id": "F-18",
+   "original_severity": "MINOR",
+   "disposition": "ACCEPTABLY TRACKED",
+   "evidence": "The decision log and ADR approval records exist and explicitly state they are not signatures. TG-01 (owner PR approval before implementation) is a valid gate and does **not** claim approval exists. It is correctly **not** marked resolved."
+  },
+  {
+   "id": "F-19",
+   "original_severity": "MINOR",
+   "disposition": "PARTIALLY RESOLVED",
+   "evidence": "Most requested suites were added: upgrade-with-data and N-1, CSRF, token-after-revocation, grace window, contention, browser matrix, DAST gate. However, two earlier test designs were dropped and some recovery cases are missing (N-03)."
+  },
+  {
+   "id": "F-20",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "Undo is removed. No note-restore endpoint exists, and 04/08/09 are consistent."
+  },
+  {
+   "id": "F-21",
+   "original_severity": "MINOR",
+   "disposition": "RESOLVED",
+   "evidence": "0 `Traces:` lines remain (independently verified). The coverage model is substantive, and author upgrades are explicitly flagged for re-review."
+  },
+  {
+   "id": "A-01",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Per-(account, network) throttling. MFA-enrolled users are never globally blocked."
+  },
+  {
+   "id": "A-02",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "No DDL from application processes; maintenance CLI only; readiness checks triggers."
+  },
+  {
+   "id": "A-03",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Casefolded `search_text` with a dual-engine test."
+  },
+  {
+   "id": "A-04",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "`role.name_normalized` unique index."
+  },
+  {
+   "id": "A-05",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "24-hour invite expiry for sensitive roles; enrollment inside the invite flow; inviter notified."
+  },
+  {
+   "id": "A-06",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "G2 applies to `copy_from_role_id`."
+  },
+  {
+   "id": "A-07",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Scoped repository lookup, with 404 for out-of-scope targets."
+  },
+  {
+   "id": "A-08",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Regex `^/(?![/\\\\])` plus tests."
+  },
+  {
+   "id": "A-09",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Rate limit, then idempotency, then Turnstile."
+  },
+  {
+   "id": "A-10",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Placeholder secret; independently confirmed that no published example key remains."
+  },
+  {
+   "id": "A-11",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Constraints documented and monitored (02 §12.3)."
+  },
+  {
+   "id": "A-12",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "PII masked for out-of-scope leads."
+  },
+  {
+   "id": "A-13",
+   "original_severity": "ADVISORY",
+   "disposition": "ACCEPTED (rationale documented; gate not measurable)",
+   "evidence": "The rationale is sound: atomicity of SUCCESS events. But 'measured in rehearsal (RG-4)' has no pass/fail threshold, and RG-4 is a SQLite pre-production test, while the lock applies only to PostgreSQL. No P0 correctness or security gap is concealed, because PostgreSQL is post-P0. The acceptance criterion belongs in the PostgreSQL migration rehearsal (11 §3.4) and is folded into N-04."
+  },
+  {
+   "id": "A-14",
+   "original_severity": "ADVISORY",
+   "disposition": "RESOLVED",
+   "evidence": "Identical 201 with a real reference."
+  }
+ ],
+ "disposition_counts": {
+  "RESOLVED": 31,
+  "REGRESSION INTRODUCED": 1,
+  "ACCEPTABLY TRACKED": 1,
+  "PARTIALLY RESOLVED": 1,
+  "ACCEPTED (rationale documented; gate not measurable)": 1
+ },
+ "new_findings": [
+  {
+   "id": "N-01",
+   "severity": "MINOR",
+   "title": "Founder dual-control approver eligibility is contradictory, and Founder powers can be granted outside the Founder workflow",
+   "evidence": [
+    "06 §7.2 'Approver eligibility': '…both FOUNDER-protected **(or both holding `user.founder.manage` and satisfying G9 against the target)**'.",
+    "ADR-010 §3.5, 06 §7.4 ('for Founder actions, is FOUNDER-protected') and 08 §5.11 (`APPROVER_NOT_ELIGIBLE` when 'not FOUNDER-protected for Founder actions') require FOUNDER-protected approvers. The documents disagree.",
+    "No rule restricts assigning the FOUNDER role, or granting `user.founder.manage` through a custom role (`role.manage`) or a direct grant (`user.permission.manage`), to the GRANT_FOUNDER workflow. G2 lets a Founder do it single-handedly (step-up only). Such a grantee is `protection_level = STANDARD` but holds Founder powers.",
+    "Under the permissive 06 §7.2 reading, one Founder can create an eligible 'second approver' and then satisfy dual control alone, for example DEACTIVATE_FOUNDER against a co-Founder."
+   ],
+   "reqs": [
+    "RBAC-021",
+    "MFA-015",
+    "RBAC-020"
+   ],
+   "risk": "Separation of duties for Founder-level changes (owner Decision 3) can be defeated by a single compromised or malicious Founder, if the permissive reading is implemented.",
+   "remediation": "Remove the parenthetical from 06 §7.2 so that Founder actions require FOUNDER-protected requester and approver. Make the FOUNDER role `is_assignable=false`, and make `user.founder.manage` grantable only by the GRANT_FOUNDER workflow (reject it in `PUT /users/{id}/roles`, `POST /users/{id}/permissions` and `PUT /roles/{id}/permissions` with 409 SYSTEM_OBJECT or 403 FOUNDER_PROTECTED). Add negative tests: a non-FOUNDER-protected holder of `user.founder.manage` cannot approve; FOUNDER role direct assignment is rejected.",
+   "rereview": "Targeted: 06 §6.2/§7.2/§7.4, 08 §5.7/§5.8/§5.11, 12 §4.4",
+   "blocks": "Blocks implementation of the Founder workflow and approvals stories (RBAC-021, MFA-015) until corrected. Does not block other work."
+  },
+  {
+   "id": "N-02",
+   "severity": "MINOR",
+   "title": "Regression: broadened conformance rule 3 rejects unregistered FK-less GUID columns",
+   "evidence": [
+    "03 §2.7 rule 3 now fails any table that 'has an `*_id` column without a FK other than the EXC-009 correlation columns'. The 12 §4.1 negative fixture asserts the same.",
+    "EXC-009 lists only `audit_log.session_id`, `security_event_log.session_id` and `refresh_token.replaced_by_id`.",
+    "FK-less `*_id` GUID columns that are **not** registered: `audit_log.entity_id`, `audit_log.parent_entity_id`, `audit_log.transaction_id`, `security_event_log.target_entity_id`, `outbox_event.aggregate_id`, `notification.entity_id` and `user_mfa_recovery_code.batch_id`. These are polymorphic references or group ids by design (03 §5.4, §5.6, §7, §8).",
+    "Validation V18 reports PASS, so the author's check did not evaluate rule 3 against these columns."
+   ],
+   "reqs": [
+    "DATA-011",
+    "DATA-014",
+    "DATA-012"
+   ],
+   "risk": "The first migration fails the conformance gate, or the gate is weakened ad hoc during implementation. This is the same class of defect as original F-08.",
+   "remediation": "Register these columns (for example in EXC-009, or a new EXC-011 'polymorphic references and group ids') with a justification, and state that the conformance allow-list is exactly that set.",
+   "rereview": "Targeted: 03 §2.7, §2.9",
+   "blocks": "Blocks implementation of the conformance check (DATA-011) until corrected."
+  },
+  {
+   "id": "N-03",
+   "severity": "MINOR",
+   "title": "Test-design regressions and gaps in recovery, direct grants and duplicate detection",
+   "evidence": [
+    "The frozen 12 §4.4 'Resolution' test (DENY beats GRANT; broadest scope wins; validity windows) was removed. RBAC-006 now has no concrete test row beyond the generic matrix.",
+    "The frozen 12 §4.7 'duplicate submissions stored and flagged, never dropped' was removed. LEAD-010 (180-day match, flag only, scope-limited display) has no concrete test design in the remediated 12 §4.7.",
+    "12 §4.5 'Recovery' has no case for: an expired RECOVERY session (15 min); reuse of the login `mfa_token` after a successful recovery (05 does not state that the LOGIN challenge is completed on recovery); `enroll/confirm` failure inside a recovery session (wrong code, retry limits, expiry, and the user's state afterwards).",
+    "Optimistic concurrency is a single line (12 §4.6 'If-Match 428/409') with no concurrent-writer scenario."
+   ],
+   "reqs": [
+    "RBAC-006",
+    "LEAD-010",
+    "MFA-013",
+    "MFA-014",
+    "API-006",
+    "DATA-006"
+   ],
+   "risk": "Security-relevant paths pass CI without evidence. The coverage gate reports 166 'automated' designs that include these thin or missing rows.",
+   "remediation": "Restore the resolution and duplicate tests with preconditions, action and assertions. Add the recovery-expiry, `mfa_token` single-use (and state it in 05 §11.5) and re-enrollment-failure cases. Add a two-writer If-Match conflict test on both engines.",
+   "rereview": "Targeted: 12 §4.4–§4.7 and 05 §11.5 wording",
+   "blocks": "Blocks the corresponding stories (recovery, RBAC resolver, duplicate detection) until the test designs exist. Does not block other work."
+  },
+  {
+   "id": "N-04",
+   "severity": "MINOR",
+   "title": "Production and tracked gates lack required attributes",
+   "evidence": [
+    "11 §7.3 RG-1…RG-9 and PG-DAST/PG-RET/PG-BG/PG-EMAIL/PG-PRIV give a condition and a source only. They name no owner, evidence artifact or failure behavior.",
+    "11 §11 TG-01…TG-06 give an owner, phase, acceptance and evidence, but no failure behavior.",
+    "The A-13 acceptance ('measured') has no pass/fail threshold, and is attached to RG-4 (SQLite) although it concerns PostgreSQL."
+   ],
+   "reqs": [
+    "OPS-005",
+    "OPS-008",
+    "NFR-002",
+    "SEC-007"
+   ],
+   "risk": "Gates can be declared met without agreed evidence, or bypassed without a defined consequence.",
+   "remediation": "Add owner, trigger, acceptance, evidence, failure behavior and phase to every gate, using the table in §11 of this re-review as a template. Move the A-13 criterion into the PostgreSQL migration rehearsal with an explicit threshold (for example, NFR-001 p95 met with chain appends enabled).",
+   "rereview": "None (verify at the pre-production readiness review)",
+   "blocks": "Does not block implementation. Must be completed before production readiness sign-off."
+  }
+ ],
+ "new_advisories": [
+  {
+   "id": "N-A1",
+   "title": "Path A enrollment after a new sensitive grant relies on a password-derived session",
+   "evidence": "05 §11.1 / §11.3 A: a FULL session obtained with password only (MFA not required at the time) plus password re-entry can enroll after a sensitive grant. Both proofs derive from the password.",
+   "remediation": "When enrollment is triggered by a new sensitive grant, prefer path C (emailed link) or require the grant's approver to confirm.",
+   "reqs": [
+    "MFA-014",
+    "MFA-012"
+   ]
+  },
+  {
+   "id": "N-A2",
+   "title": "Cooling-off does not suspend SECURITY_DATA, DESTRUCTIVE or BULK_DATA",
+   "evidence": "05 §11.5 and 06 §5 step 8 suspend only ACCOUNT_CONTROL and ACCESS_CONTROL. `lead.erase`, `lead.delete` and `audit.read` stay usable right after recovery.",
+   "remediation": "Consider extending cooling-off to DESTRUCTIVE and BULK_DATA.",
+   "reqs": [
+    "MFA-013",
+    "MFA-012"
+   ]
+  },
+  {
+   "id": "N-A3",
+   "title": "The spam queue has no ageing alert",
+   "evidence": "04 §5.5 and 09 §4.3: quarantined leads raise no notification. A false positive waits until someone opens the chip.",
+   "remediation": "Add a daily count or an age alert for SUSPECTED leads.",
+   "reqs": [
+    "LEAD-018",
+    "LEAD-019"
+   ]
+  },
+  {
+   "id": "N-A4",
+   "title": "Invariant I2 counts suspended holders",
+   "evidence": "06 §7.3: I2 ignores suspension, so the only 'recovery administrator' may lack MFA and have no effective permissions. Recovery then depends on break-glass.",
+   "remediation": "Have the nightly job also report whether at least one **effective** recovery administrator exists (High alert).",
+   "reqs": [
+    "RBAC-020"
+   ]
+  },
+  {
+   "id": "N-A5",
+   "title": "Endpoint index omits step-up and G11 on two rows",
+   "evidence": "08 §1 row 31 / §5.6 `unlock` (ACCOUNT_CONTROL, so G10 applies per 06 §7.1) shows no step-up. Row 43 `mfa-requirement` omits G11. The general guard rules in 06 still apply.",
+   "remediation": "Align the rows with 06 §7.1.",
+   "reqs": [
+    "RBAC-019",
+    "RBAC-021"
+   ]
+  },
+  {
+   "id": "N-A6",
+   "title": "Break-glass ARN columns are VARCHAR(200)",
+   "evidence": "03 §5.8 `external_requester_ref` and `external_approver_ref` are VARCHAR(200), while `kms_key_arn` uses 2048. IAM role paths can make ARNs longer.",
+   "remediation": "Size to 2048.",
+   "reqs": [
+    "RBAC-021"
+   ]
+  },
+  {
+   "id": "N-A7",
+   "title": "Overlapping new requirements",
+   "evidence": "RBAC-020 overlaps RBAC-010 and RBAC-011. MFA-015 overlaps RBAC-021 and MFA-007. These are refinements, not duplicates.",
+   "remediation": "Cross-reference, or mark the parent/child relationship in requirements.json.",
+   "reqs": [
+    "RBAC-020",
+    "MFA-015"
+   ]
+  },
+  {
+   "id": "N-A8",
+   "title": "Architecture validation automation is not committed",
+   "evidence": "validation-report.md: the scripts are 'intentionally not committed'. The 26 checks are not reproducible from the repository. This review reproduced the key ones independently (§12).",
+   "remediation": "Implementation CI (12 §5) supersedes this for code. For future architecture changes, commit the checks or keep independent reproduction as the gate.",
+   "reqs": [
+    "PLAT-006"
+   ]
+  },
+  {
+   "id": "N-A9",
+   "title": "Some RV and OP classifications understate automation",
+   "evidence": "RBAC-002 (lint), PLAT-008 (secret scan), PLAT-011 (import lint), SEVT-004 and SEVT-007 (IT rows in 12 §4.3) are listed as RV or OP.",
+   "remediation": "Reclassify after implementation. This is conservative, not misleading.",
+   "reqs": [
+    "RBAC-002",
+    "PLAT-008",
+    "PLAT-011"
+   ]
+  }
+ ],
+ "requirement_recount": {
+  "total": 221,
+  "p0": 208,
+  "p1": 10,
+  "p2": 3,
+  "added": [
+   "DATA-017",
+   "LEAD-027",
+   "LEAD-028",
+   "LEAD-029",
+   "LEAD-030",
+   "MFA-012",
+   "MFA-013",
+   "MFA-014",
+   "MFA-015",
+   "OPS-010",
+   "OPS-011",
+   "RBAC-018",
+   "RBAC-019",
+   "RBAC-020",
+   "RBAC-021",
+   "UI-016",
+   "UI-017",
+   "USER-007"
+  ],
+  "promoted": [
+   "AUDIT-011",
+   "AUTH-016",
+   "SEVT-007",
+   "RBAC-016"
+  ],
+  "removed": [],
+  "matches_author_claim": true
+ },
+ "coverage_summary": {
+  "Fully covered": 202,
+  "Partially covered": 3,
+  "Not testable pending owner input": 2,
+  "Contradictory": 1,
+  "Referenced but not substantively covered": 0,
+  "Not covered": 0,
+  "Deferred": 0
+ },
+ "coverage_disagreements_with_author": [
+  "DATA-011",
+  "DATA-014",
+  "MFA-015",
+  "RBAC-021"
+ ],
+ "coverage_matrix": [
+  {
+   "id": "ACT-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "ACT-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-005",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-006",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [
+    "N-03"
+   ],
+   "note": "Design sufficient; test design gap (N-03)"
+  },
+  {
+   "id": "API-007",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-008",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "API-009",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-005",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-006",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-008",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-010",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-011",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUDIT-012",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-001",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-002",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-003",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-005",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-006",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-007",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-009",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-010",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-011",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-012",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-013",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-014",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-015",
+   "group": "previously partial/contradictory",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-016",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-017",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "AUTH-018",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-001",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-002",
+   "group": "baseline",
+   "verification": "SL, UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-003",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-004",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-005",
+   "group": "baseline",
+   "verification": "SL, IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-006",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [
+    "N-03"
+   ],
+   "note": "Design sufficient; test design gap (N-03)"
+  },
+  {
+   "id": "DATA-007",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-009",
+   "group": "previously partial/contradictory",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-010",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-011",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Partially covered",
+   "findings": [
+    "N-02"
+   ],
+   "note": "Rule 3 conflicts with unregistered polymorphic columns"
+  },
+  {
+   "id": "DATA-012",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-013",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-014",
+   "group": "previously partial/contradictory",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Partially covered",
+   "findings": [
+    "N-02"
+   ],
+   "note": "Registry incomplete for FK-less GUID columns"
+  },
+  {
+   "id": "DATA-015",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-016",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "DATA-017",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-001",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-002",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-003",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-004",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-005",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-006",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-007",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-009",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-010",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [
+    "N-03"
+   ],
+   "note": "Design sufficient; test design gap (N-03)"
+  },
+  {
+   "id": "LEAD-011",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-012",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-013",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-014",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-015",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-016",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-018",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-019",
+   "group": "previously partial/contradictory",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-020",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-023",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-024",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-025",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-026",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-027",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-028",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-029",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LEAD-030",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-001",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-003",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-004",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-005",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "LOG-006",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-001",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-003",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-005",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-006",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-007",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-008",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-009",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-010",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-011",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-012",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-013",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [
+    "N-03"
+   ],
+   "note": "Design sufficient; test design gap (N-03)"
+  },
+  {
+   "id": "MFA-014",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "MFA-015",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Partially covered",
+   "findings": [
+    "N-01"
+   ],
+   "note": "Founder MFA reset depends on the eligibility rule in N-01"
+  },
+  {
+   "id": "NFR-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NFR-002",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Not testable pending owner input",
+   "reviewer_classification": "Not testable pending owner input",
+   "findings": [],
+   "note": "OWNER-INPUT-001"
+  },
+  {
+   "id": "NFR-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTE-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTE-002",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTE-004",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-005",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "NOTIF-009",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-001",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-002",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-003",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-004",
+   "group": "previously partial/contradictory",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-005",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Not testable pending owner input",
+   "reviewer_classification": "Not testable pending owner input",
+   "findings": [],
+   "note": "OWNER-INPUT-001"
+  },
+  {
+   "id": "OPS-006",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-007",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-008",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-009",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-010",
+   "group": "new or promoted",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "OPS-011",
+   "group": "new or promoted",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-001",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-002",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-003",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-005",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-006",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-007",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-008",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-009",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-010",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-011",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-012",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "PLAT-013",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-001",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-002",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-003",
+   "group": "baseline",
+   "verification": "SL",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-005",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-006",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [
+    "N-03"
+   ],
+   "note": "Design sufficient; test design gap (N-03)"
+  },
+  {
+   "id": "RBAC-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-009",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-010",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-011",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-012",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-013",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-014",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-015",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-016",
+   "group": "new or promoted",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-017",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-018",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-019",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-020",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "RBAC-021",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Contradictory",
+   "findings": [
+    "N-01"
+   ],
+   "note": "Approver eligibility contradicts itself between 06 §7.2 and ADR-010, 06 §7.4 and 08 §5.11"
+  },
+  {
+   "id": "SEC-001",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-004",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-005",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-006",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-007",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-008",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-009",
+   "group": "previously partial/contradictory",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEC-011",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-001",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-002",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-003",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-004",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-005",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-006",
+   "group": "previously partial/contradictory",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-007",
+   "group": "new or promoted",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-008",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-009",
+   "group": "baseline",
+   "verification": "OP",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-010",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "SEVT-011",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-001",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-002",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-003",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-004",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-005",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-006",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-007",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-008",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-009",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-010",
+   "group": "baseline",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-011",
+   "group": "previously partial/contradictory",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-012",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-013",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-014",
+   "group": "previously partial/contradictory",
+   "verification": "RV",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-015",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-016",
+   "group": "new or promoted",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "UI-017",
+   "group": "new or promoted",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-001",
+   "group": "previously partial/contradictory",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-002",
+   "group": "baseline",
+   "verification": "UT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-003",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-004",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-005",
+   "group": "baseline",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-006",
+   "group": "baseline",
+   "verification": "E2E",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  },
+  {
+   "id": "USER-007",
+   "group": "new or promoted",
+   "verification": "IT",
+   "author_classification": "Fully covered",
+   "reviewer_classification": "Fully covered",
+   "findings": [],
+   "note": ""
+  }
+ ],
+ "deferred": [
+  "ACT-005",
+  "AUDIT-007",
+  "AUDIT-009",
+  "AUDIT-013",
+  "LEAD-017",
+  "LEAD-021",
+  "LEAD-022",
+  "NFR-004",
+  "NOTE-003",
+  "NOTIF-006",
+  "NOTIF-007",
+  "RBAC-007",
+  "SEC-010"
+ ],
+ "test_depth": [
+  {
+   "area": "Authentication",
+   "rating": "Concrete",
+   "note": "12 §4.5 login outcomes, throttling, tokens after revocation, CSRF negatives"
+  },
+  {
+   "area": "MFA",
+   "rating": "Concrete",
+   "note": "Policy sources, TOTP vectors, drift, replay, enrollment proofs A–D, including negatives"
+  },
+  {
+   "area": "Recovery",
+   "rating": "Mostly concrete; gaps",
+   "note": "Password/code matrix, restricted-session denials, rotation, cooling-off. Missing: session expiry, `mfa_token` single use, re-enrollment failure (N-03)"
+  },
+  {
+   "area": "Refresh-token rotation",
+   "rating": "Concrete",
+   "note": "Grace window, third use, and post-20 s theft path"
+  },
+  {
+   "area": "Replay resistance",
+   "rating": "Concrete",
+   "note": "TOTP `last_used_step`, used recovery code, email and verification token reuse, refresh reuse"
+  },
+  {
+   "area": "RBAC",
+   "rating": "Concrete",
+   "note": "Generated matrix test plus scope tests"
+  },
+  {
+   "area": "Sensitive-permission enforcement",
+   "rating": "Concrete",
+   "note": "Registry rules, activation, suspension on reset, cooling-off"
+  },
+  {
+   "area": "Direct grants",
+   "rating": "Gap",
+   "note": "The DENY-precedence and broadest-scope resolution test was removed (N-03). Only reason, time-bound 422 and mass assignment remain."
+  },
+  {
+   "area": "Permission-cache invalidation",
+   "rating": "Concrete",
+   "note": "'Propagation': next request, no cache window"
+  },
+  {
+   "area": "Email change",
+   "rating": "Concrete",
+   "note": "Full workflow, including expired and reused tokens, old-email reset destination, approvals"
+  },
+  {
+   "area": "Founder protection",
+   "rating": "Concrete; eligibility gap",
+   "note": "Admin-versus-Founder negatives, pool-insufficient, break-glass same-principal. Missing: non-FOUNDER approver negative (N-01)"
+  },
+  {
+   "area": "Last-administrator protection",
+   "rating": "Concrete",
+   "note": "I1/I2 plus a two-writer concurrency test on both engines"
+  },
+  {
+   "area": "Lead submission",
+   "rating": "Concrete",
+   "note": "Required and optional fields, unmapped codes, consent, phone rules, public response property test"
+  },
+  {
+   "area": "Duplicate detection",
+   "rating": "Gap",
+   "note": "No concrete row after remediation (N-03)"
+  },
+  {
+   "area": "CAPTCHA",
+   "rating": "Concrete",
+   "note": "Lookup before Turnstile (mock call count), spent-token replay"
+  },
+  {
+   "area": "WhatsApp fallback",
+   "rating": "Concrete",
+   "note": "E2E for CAPTCHA failure, 429 and API blocked"
+  },
+  {
+   "area": "Notification failure",
+   "rating": "Concrete",
+   "note": "Adapter forced to fail: lead committed, 201"
+  },
+  {
+   "area": "Audit atomicity",
+   "rating": "Concrete",
+   "note": "Forced exception after flush: no business, audit or outbox row"
+  },
+  {
+   "area": "Security-event integrity",
+   "rating": "Concrete",
+   "note": "Keyed chain, wrong key, gap and tamper detection, cross-engine JCS bytes, anchor role"
+  },
+  {
+   "area": "Retention and deletion",
+   "rating": "Concrete",
+   "note": "Purge ordering with FKs on, retention job with test configuration, erasure PENDING→COMPLETED, audit PII scan"
+  },
+  {
+   "area": "Restore testing",
+   "rating": "Operational (appropriate)",
+   "note": "OPS-009 scheduled restore plus rebuild rehearsal"
+  },
+  {
+   "area": "Accessibility",
+   "rating": "Concrete",
+   "note": "AX-01…AX-10, including dual-theme token contrast failing the build"
+  },
+  {
+   "area": "SQLite/PostgreSQL compatibility",
+   "rating": "Concrete",
+   "note": "Dual-engine IT/SL, non-ASCII search, cross-engine JCS"
+  },
+  {
+   "area": "Optimistic concurrency",
+   "rating": "Thin",
+   "note": "'If-Match 428/409' only (N-03)"
+  }
+ ],
+ "verification_kind_counts_p0": {
+  "automated": 166,
+  "review": 21,
+  "operational": 21
+ },
+ "gates": [
+  {
+   "gate": "OWNER-INPUT-001",
+   "owner": "Owner",
+   "trigger": "Before production",
+   "acceptance": "Approved values recorded",
+   "evidence": "Decision log entry",
+   "failure_behavior": "Production release blocked",
+   "phase": "Production",
+   "completeness": "Complete (11 §7.2)"
+  },
+  {
+   "gate": "OWNER-INPUT-002",
+   "owner": "Owner",
+   "trigger": "Before enabling any purge/archival/anonymization",
+   "acceptance": "Approved values",
+   "evidence": "Configuration record",
+   "failure_behavior": "Jobs refuse to run",
+   "phase": "Production",
+   "completeness": "Complete"
+  },
+  {
+   "gate": "OWNER-INPUT-003",
+   "owner": "Owner",
+   "trigger": "Before production",
+   "acceptance": "Cadence approved",
+   "evidence": "Decision log",
+   "failure_behavior": "Production release blocked",
+   "phase": "Production",
+   "completeness": "Complete"
+  },
+  {
+   "gate": "OWNER-INPUT-004",
+   "owner": "Owner",
+   "trigger": "Before production",
+   "acceptance": "Two IAM custodians named",
+   "evidence": "IAM group membership plus decision log",
+   "failure_behavior": "Production release blocked; Founder recovery unavailable",
+   "phase": "Production",
+   "completeness": "Complete"
+  },
+  {
+   "gate": "RG-1…RG-9",
+   "owner": "Not named",
+   "trigger": "Before production (implied)",
+   "acceptance": "Stated",
+   "evidence": "Not stated",
+   "failure_behavior": "Not stated",
+   "phase": "Production",
+   "completeness": "Incomplete (N-04)"
+  },
+  {
+   "gate": "PG-DAST, PG-RET, PG-BG, PG-EMAIL, PG-PRIV",
+   "owner": "Not named (PG-RET/PG-BG implied owner)",
+   "trigger": "Before production",
+   "acceptance": "Stated",
+   "evidence": "Partly (via TG-03/TG-04)",
+   "failure_behavior": "Not stated",
+   "phase": "Production",
+   "completeness": "Incomplete (N-04)"
+  },
+  {
+   "gate": "TG-01",
+   "owner": "Owner",
+   "trigger": "Before implementation",
+   "acceptance": "Owner PR approval or signed decision log",
+   "evidence": "Link recorded in decision log",
+   "failure_behavior": "Not stated (implicitly: implementation must not start)",
+   "phase": "Implementation",
+   "completeness": "Mostly complete"
+  },
+  {
+   "gate": "TG-02…TG-06",
+   "owner": "Named",
+   "trigger": "Stated",
+   "acceptance": "Stated",
+   "evidence": "Stated",
+   "failure_behavior": "Not stated",
+   "phase": "Implementation or production",
+   "completeness": "Mostly complete"
+  }
+ ],
+ "validation_reproduction": [
+  {
+   "check": "Requirement ID integrity",
+   "result": "Reproduced",
+   "detail": "221 unique IDs; 0 unresolved references across all .md files; no ID removed from the frozen set"
+  },
+  {
+   "check": "Cross-document links",
+   "result": "Reproduced",
+   "detail": "1,244 `NN §x.y` references and all relative links resolve (0 broken)"
+  },
+  {
+   "check": "JSON validity",
+   "result": "Reproduced",
+   "detail": "requirements.json, validation-report.json, review-remediation-matrix.json parse"
+  },
+  {
+   "check": "Traces removal",
+   "result": "Reproduced",
+   "detail": "0 `Traces:` lines"
+  },
+  {
+   "check": "Default Sales permissions / sensitivity",
+   "result": "Reproduced",
+   "detail": "16 sensitive codes; Sales grants ∩ sensitive = ∅"
+  },
+  {
+   "check": "Remediation matrix completeness",
+   "result": "Reproduced",
+   "detail": "35/35 findings; severity, title and affected requirements identical to the original review JSON"
+  },
+  {
+   "check": "Audit contract / ID types",
+   "result": "Reproduced, with a defect",
+   "detail": "Rule 3 versus FK-less columns fails (N-02); V18 did not detect it"
+  },
+  {
+   "check": "Recovery restrictions",
+   "result": "Manual",
+   "detail": "05 §11.5, 06 §8 Layer 0, 08 §4.7 consistent"
+  },
+  {
+   "check": "Email-change restrictions",
+   "result": "Manual",
+   "detail": "05 §8.6, 08 §4.8/§5.4/§5.5, ADR-010 consistent"
+  },
+  {
+   "check": "Founder / last-admin protection",
+   "result": "Manual, with a defect",
+   "detail": "Invariants consistent; approver eligibility inconsistent (N-01)"
+  },
+  {
+   "check": "Architecture-only diff",
+   "result": "Reproduced",
+   "detail": "30 paths, all .md/.json under docs/architecture/"
+  },
+  {
+   "check": "dist/ immutability",
+   "result": "Reproduced",
+   "detail": "Tree d1d3efc… identical"
+  },
+  {
+   "check": "Secret scanning",
+   "result": "Reproduced",
+   "detail": "0 matches in added lines"
+  },
+  {
+   "check": "Contrast",
+   "result": "Reproduced",
+   "detail": "on-copper-strong 7.10 (light) / 9.51 (dark)"
+  }
+ ],
+ "conditions": [
+  {
+   "id": "C-1",
+   "source": "TG-01 (F-18)",
+   "owner": "Veda Spaces owner",
+   "gate": "Before any implementation begins",
+   "acceptance": "The owner approves the architecture PR (or signs the decision log) from the owner's account",
+   "evidence": "Link recorded in docs/architecture/decisions/decision-log.md",
+   "failure": "Implementation must not start"
+  },
+  {
+   "id": "C-2",
+   "source": "N-01",
+   "owner": "Architecture author",
+   "gate": "Before implementing RBAC-021 / MFA-015 (Founder workflow, approvals)",
+   "acceptance": "06 §7.2 requires FOUNDER-protected requester and approver; FOUNDER role and `user.founder.manage` are grantable only through GRANT_FOUNDER; negative tests added in 12 §4.4",
+   "evidence": "Architecture commit plus targeted independent verification",
+   "failure": "Those stories stay blocked"
+  },
+  {
+   "id": "C-3",
+   "source": "N-02",
+   "owner": "Architecture author",
+   "gate": "Before implementing the schema conformance check (DATA-011)",
+   "acceptance": "All FK-less GUID `*_id` columns registered, with the allow-list stated exactly",
+   "evidence": "Architecture commit plus targeted independent verification",
+   "failure": "Conformance-check story blocked; the check must not be weakened ad hoc"
+  },
+  {
+   "id": "C-4",
+   "source": "N-03",
+   "owner": "Architecture author (test strategy)",
+   "gate": "Before implementing recovery, RBAC resolver, duplicate-detection and concurrency stories",
+   "acceptance": "Concrete test designs (preconditions, action, assertion, negative) for the listed gaps; 05 §11.5 states that the LOGIN challenge is completed on recovery",
+   "evidence": "12 and 05 diff reviewed",
+   "failure": "Those stories are not Done"
+  },
+  {
+   "id": "C-5",
+   "source": "N-04",
+   "owner": "Architecture author plus owner",
+   "gate": "Before production readiness sign-off",
+   "acceptance": "Every RG/PG/TG gate lists owner, trigger, acceptance, evidence, failure behavior and phase; A-13 has a threshold in the PostgreSQL rehearsal",
+   "evidence": "11 §7.3/§11 diff",
+   "failure": "Production release blocked"
+  }
+ ],
+ "next_authorized_action": "The owner completes C-1 (TG-01) and, separately, explicitly authorizes an implementation workstream. The architecture author corrects N-01…N-03 (C-2…C-4) in a new commit before the affected stories start, and a targeted independent verification confirms them. No implementation, merge or deployment is authorized by this review."
+}
