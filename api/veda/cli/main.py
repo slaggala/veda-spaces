@@ -251,10 +251,13 @@ def cmd_schema_status(args) -> int:
     _settings()
     current = health.current_revision()
     known = health.known_revisions()
+    from veda.release import RELEASE_SEQUENCE
+
     out: dict[str, object] = {
         "current": current,
         "image_head": health.alembic_head(),
         "state": health.schema_state(current),
+        "release": RELEASE_SEQUENCE,
     }
     if args.require_known:
         out["floor"] = args.require_known

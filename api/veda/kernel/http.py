@@ -40,6 +40,11 @@ PUBLIC_MAX_BODY = 16 * 1024
 ROUTES: list[RouteSpec] = []
 
 
+# bearer: authentication required; public: never authenticated (RBX-registered); optional: authenticated when an
+# Authorization header is sent, otherwise anonymous (RBX-registered, no permission). Nothing else is valid (FC-06).
+AUTH_MODES = frozenset({"bearer", "public", "optional"})
+
+
 @dataclass
 class RouteSpec:
     method: str
@@ -47,7 +52,7 @@ class RouteSpec:
     endpoint: str
     blueprint: str
     handler: Callable
-    auth: str  # bearer | public | cookie
+    auth: str  # one of AUTH_MODES
     permission: tuple[str, ...] = ()  # all required
     any_of: tuple[str, ...] = ()
     rbx: str | None = None
@@ -477,6 +482,8 @@ class Api:
         prepare: Callable | None = None,
     ):
         perms = (permission,) if isinstance(permission, str) else tuple(permission or ())
+        if auth not in AUTH_MODES:  # exact, case-sensitive: an unknown mode never falls through to anonymous (FC-06)
+            raise RuntimeError(f"route {method} {rule}: unknown auth mode {auth!r}; allowed: {sorted(AUTH_MODES)}")
         if prepare is not None and auth != "public":
             raise RuntimeError("prepare steps are for public routes only")
 
@@ -573,6 +580,8 @@ def dispatch(spec: RouteSpec, path_params: dict[str, Any]) -> Response:
             token = None
             if isinstance(prepared, Result):
                 return _finish(build_response(prepared, spec), None)
+        if spec.auth not in AUTH_MODES:  # defence in depth for a spec built outside route()
+            raise RuntimeError(f"unknown auth mode {spec.auth!r}")
         session = db.new_session(write=spec.write)
         if spec.auth == "bearer" or (spec.auth == "optional" and request.headers.get("Authorization")):
             ctx = request_auth.authenticate(session, spec)

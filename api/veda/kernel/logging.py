@@ -31,8 +31,11 @@ _SAFE_KEYS = frozenset({"ts", "request_id", "session_id", "user_id", "route", "m
 
 
 def _scrub(_, __, event_dict):
+    from veda.kernel.metrics import exempt_metric_keys
+
+    metric_keys = exempt_metric_keys(event_dict)  # approved numeric metric values only (FC-02)
     for key in list(event_dict):
-        if key in _SAFE_KEYS:
+        if key in _SAFE_KEYS or key in metric_keys:
             continue
         if any(d in key.lower() for d in DENYLIST):
             event_dict[key] = "[REDACTED]"
@@ -108,7 +111,7 @@ def configure_logging(level: str = "INFO") -> None:
             ],
         )
     )
-    handler._veda = True  # type: ignore[attr-defined]
+    handler._veda = True  # type: ignore[attr-defined]  # marker attribute on a stdlib handler
     root = logging.getLogger()
     for existing in list(root.handlers):
         if getattr(existing, "_veda", False):  # replace our own handler only (re-configuration, tests)

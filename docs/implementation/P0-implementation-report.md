@@ -17,6 +17,26 @@
 | Runbooks | [docs/operations/api-runbooks.md](../operations/api-runbooks.md) |
 | Evidence | [evidence/remediation/](evidence/remediation/) — raw output of the clean-environment run below |
 
+## 00. Technical-conditions closure (after the final targeted check)
+
+This section records workstream VEDA-SPACES-P0-TECHNICAL-CONDITIONS-CLOSURE-01.
+
+- **Final targeted check:** `review/p0-independent-implementation-review @ 56c20ba992b519daa79aa3802a28343aab8c0b41`. Verdict: **CERTIFIED WITH TECHNICAL CONDITIONS**. It authorizes no merge or deployment.
+- **Reviewed implementation:** `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`. The SHA quoted in the brief, `6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41`, does not exist (FC-A01). No repository document cited it.
+- **Owner decision package:** [P0-owner-decision-package.md](P0-owner-decision-package.md). It records no decision.
+- **Merge-safety plan:** [P0-merge-safety-plan.md](P0-merge-safety-plan.md). It recommends option C and has not been executed.
+- **Evidence:** [evidence/technical-conditions/](evidence/technical-conditions/).
+
+| Condition | Result |
+|---|---|
+| Amendment text (AM-2, 4, 6, 7, 9, 10, 11, 12, 13) | Corrected per the final check (FC-05, FC-08, FC-12, FC-A05, FC-A06, FC-A08, FC-A09, FC-A10, FC-A11, FC-A12). Every amendment now carries the required fields. All remain PROPOSED, NOT APPROVED, and `test_governance_docs.py` checks this. |
+| FC-02 | Approved EMF metric names with numeric values are exempt from key-based redaction. Everything else, including every recovery field, is still redacted. `NoEffectiveRecoveryAdmin` is emitted unredacted by the CLI, and a subprocess test checks it. |
+| FC-06 | Auth modes are allow-listed (`bearer`, `public`, `optional`) at declaration, at startup and at dispatch. |
+| FC-11 | The ratchet now refuses: inline `# mypy:` comments; `[tool.mypy]` keys or values outside the reviewed set; per-module overrides beyond third-party `ignore_missing_imports`; shadow `mypy.ini`, `.mypy.ini` or `setup.cfg`; and coded ignores with no justification. mypy runs isolated (`-I`) with an explicit config file, and a local `mypy` package cannot shadow the installed one. |
+| FC-12 | `deploy.sh` enforces `RELEASE_FLOOR=3` (from `veda/release.py`) and the schema floor in every mode, with no override. `9236aa3`, `2f6b59a`, unversioned images and malformed output are all refused before any change. Tested with stubbed docker; no rehearsal is claimed. |
+| FC-04 | The clock is read after the connection or write lock is acquired. An update is never stamped before the row's creation. Deterministic and concurrent tests run on SQLite and PostgreSQL. |
+| Still open | FC-01, FC-03, FC-07, FC-09, FC-10, FC-13, FC-14, FC-15 and the advisories, as recorded in [P0-open-issues.md](P0-open-issues.md). FC-05 and FC-08 are disclosed and wait on owner decisions. |
+
 ## 0. Final merge-blocker remediation (targeted re-review)
 
 Workstream VEDA-SPACES-P0-FINAL-MERGE-BLOCKER-REMEDIATION-01. It responds to the targeted re-review

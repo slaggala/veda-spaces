@@ -19,6 +19,32 @@ UNITS = {"Count", "Milliseconds", "Seconds", "Percent", "Bytes", "None"}
 
 log = logging.getLogger("veda.metrics")
 
+# Metric names the log scrubber may leave unredacted (FC-02). Names are structural, not data: several contain
+# denylisted words ("Recovery"), and redacting their values silences the alarm that consumes them. Only these
+# names, and only with numeric values, are exempt; any other key keeps key-based redaction.
+APPROVED_METRICS = frozenset(
+    {
+        "Requests", "Latency", "SecurityEvents", "SecurityEventWriterFailures", "ChainVerificationFailed",
+        "ChainAnchorFailed", "SecurityLogArchivedRows", "SecurityLogArchiveFailed", "GovernanceInvariantFailures",
+        "NoEffectiveRecoveryAdmin", "OutboxDepth", "OutboxOldestAge", "OutboxDead", "SnapshotCompleted",
+        "SnapshotBytes", "RestoreVerified", "DiskUsed", "MaintenanceJobFailed", "ScheduledJobFailed",
+    }
+)  # fmt: skip
+
+
+def exempt_metric_keys(event_dict: dict[str, Any]) -> set[str]:
+    """Top-level keys of an EMF line that hold an approved metric's numeric value."""
+    try:
+        declared = event_dict["_aws"]["CloudWatchMetrics"][0]["Metrics"]
+    except (KeyError, IndexError, TypeError):
+        return set()
+    names: set[str] = {str(m.get("Name")) for m in declared if isinstance(m, dict)}
+    return {
+        n
+        for n in names & APPROVED_METRICS
+        if isinstance(event_dict.get(n), int | float) and not isinstance(event_dict.get(n), bool)
+    }
+
 
 def emf(metrics: dict[str, tuple[float, str]], dimensions: dict[str, str] | None = None) -> dict[str, Any]:
     """The EMF document for one or more metrics sharing a dimension set."""

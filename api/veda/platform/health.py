@@ -48,8 +48,12 @@ def known_revisions() -> set[str]:
 
 
 def current_revision() -> str | None:
-    with db.engine().connect() as conn:
-        return conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
+    """The database revision, or None for a database that has never been migrated (first deployment)."""
+    try:
+        with db.engine().connect() as conn:
+            return conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
+    except sa.exc.DBAPIError:
+        return None
 
 
 def schema_state(current: str | None) -> str:

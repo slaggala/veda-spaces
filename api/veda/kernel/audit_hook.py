@@ -231,7 +231,10 @@ def _before_flush(session: Session, flush_context, instances) -> None:
             action = "RESTORE"
             obj.deleted_on = None
             obj.deleted_by = None
-        obj.updated_on = now
+        # A row committed by a transaction that started later than this unit of work (PostgreSQL has no global
+        # write lock) can carry a created_on after this unit's clock reading; the update is stamped no earlier
+        # than the row's creation so updated_on >= created_on always holds (FC-04).
+        obj.updated_on = max(now, obj.created_on) if obj.created_on is not None else now
         obj.updated_by = ctx.actor_id
         key = (obj.__tablename__, obj.id)
         if key not in versioned:  # exactly one increment per object per unit of work

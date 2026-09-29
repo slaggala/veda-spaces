@@ -45,7 +45,7 @@ def _get() -> tuple[PasswordHasher, threading.BoundedSemaphore]:
         _hasher_params = params
         _semaphore = threading.BoundedSemaphore(params[3])
         _dummy_hash = _hasher.hash("veda-timing-equalization-dummy")
-    return _hasher, _semaphore  # type: ignore[return-value]
+    return _hasher, _semaphore  # type: ignore[return-value]  # both globals are set just above; mypy sees Optional
 
 
 def normalize(password: str) -> str:

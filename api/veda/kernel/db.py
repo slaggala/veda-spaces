@@ -107,13 +107,15 @@ def new_session(*, write: bool) -> Session:
 
 def begin_unit_of_work(session: Session, *, write: bool) -> None:
     """One clock reading and one transaction id per unit of work (03 §2.8)."""
-    session.info["tx_time"] = clock.now()
     session.info["transaction_id"] = new_id()
     session.info["write"] = write
     session.info["veda_versioned"] = set()
     session.info["governance_locked"] = False
-    # Bind the connection now so BEGIN IMMEDIATE is issued before any read.
+    # Bind the connection now so BEGIN IMMEDIATE is issued before any read, and read the clock only after it: on
+    # SQLite the write lock is held from here, so no transaction that commits before this one has a later clock
+    # reading (FC-04; the busy handler is not FIFO).
     session.connection(execution_options={"veda_write": write})
+    session.info["tx_time"] = clock.now()
 
 
 @contextlib.contextmanager

@@ -1,0 +1,23 @@
+repo-checks	0	~/Documents/veda-spaces-aws-source	0s	git diff --quiet 778aa8f HEAD -- docs/architecture ':!docs/architecture/amendments' && git diff --quiet -- docs/architecture && echo CERTIFIED-ARCHITECTURE-UNCHANGED && git rev-parse origin/review/p0-independent-implementation-review && git diff --quiet 56c20ba992b519daa79aa3802a28343aab8c0b41 origin/review/p0-independent-implementation-review -- docs/reviews && echo REVIEW-ARTIFACTS-UNCHANGED && ! git ls-files docs/reviews | grep . && echo NO-REVIEW-FILES-ON-IMPLEMENTATION-BRANCH && grep -c 'content=""' dist/index.html
+api-venv	0	api	23s	python3.13 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements-dev.txt
+api-versions	0	api	1s	.venv/bin/pip freeze --all | grep -iE '^(mypy|ruff|pytest|sqlalchemy|flask|bandit|pip-audit|detect-secrets|psycopg)=='
+api-ruff-check	0	api	0s	.venv/bin/ruff check veda tests migrations tools
+api-ruff-format	0	api	0s	.venv/bin/ruff format --check veda tests migrations tools
+api-mypy-ratchet	0	api	8s	<clean-copy>/api/.venv/bin/python tools/mypy_ratchet.py
+api-mypy-ratchet-without-mypy	0	api	0s	<scratch>/tools-venv/bin/python tools/mypy_ratchet.py; test $? -eq 2
+api-openapi	0	api	7s	<clean-copy>/api/.venv/bin/python tools/openapi_check.py
+api-deploy-check	0	api	0s	VEDA_ENV=test <clean-copy>/api/.venv/bin/python -m veda.cli deploy-check
+api-bandit	0	api	2s	.venv/bin/bandit -q -r veda -ll -ii
+api-pip-audit	0	api	8s	.venv/bin/pip-audit -r requirements.txt --require-hashes --disable-pip --strict --progress-spinner off
+secret-scan	1	<clean-copy>	24s	git init -q . 2>/dev/null; git add -A >/dev/null 2>&1; PATH=<clean-copy>/api/.venv/bin:$PATH api/tools/secret_scan.sh
+focused-sqlite	1	api	23s	VEDA_TEST_ENGINES=sqlite <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -v -rA tests/unit/test_metric_redaction.py tests/unit/test_logging_pii.py tests/unit/test_lint.py tests/unit/test_mypy_ratchet.py tests/unit/test_deploy_floor.py tests/unit/test_governance_docs.py tests/unit/test_config_environments.py tests/integration/test_timestamp_race.py tests/integration/test_archive_ordering.py tests/integration/test_final_merge_blockers.py tests/integration/test_layered_limiter.py tests/integration/test_governance_remediation.py
+focused-pg16	1	api	40s	VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -v -rA tests/unit/test_metric_redaction.py tests/unit/test_logging_pii.py tests/unit/test_lint.py tests/unit/test_mypy_ratchet.py tests/unit/test_deploy_floor.py tests/unit/test_governance_docs.py tests/unit/test_config_environments.py tests/integration/test_timestamp_race.py tests/integration/test_archive_ordering.py tests/integration/test_final_merge_blockers.py tests/integration/test_layered_limiter.py tests/integration/test_governance_remediation.py
+pytest-sqlite	1	api	47s	VEDA_TEST_ENGINES=sqlite <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -q -rs
+pytest-pg16	1	api	119s	VEDA_TEST_ENGINES=postgresql VEDA_TEST_DATABASE_URL_PG=postgresql+psycopg://postgres@127.0.0.1:55432/postgres <clean-copy>/api/.venv/bin/python -m pytest -o addopts='' -p no:cacheprovider -q -rs
+app-npm-ci	0	app	3s	npm ci --no-fund
+app-lint	0	app	2s	npm run lint
+app-typecheck	0	app	1s	npm run typecheck
+app-test	0	app	2s	npm test
+app-build	0	app	2s	npm run build
+app-audit-runtime	0	app	2s	npm audit --omit=dev
+e2e	0	<clean-copy>	172s	API_PYTHON=<clean-copy>/api/.venv/bin/python app/e2e/run-all.sh

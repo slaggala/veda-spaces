@@ -97,6 +97,8 @@ def check_route_declarations(app: Flask) -> None:
         spec = declared.get(rule.endpoint)
         if spec is None or not spec.declared:
             raise RuntimeError(f"route {rule.rule} ({rule.endpoint}) has no permission or RBX declaration")
+        if spec.auth not in http.AUTH_MODES:
+            raise RuntimeError(f"route {spec.method} {spec.rule} has an unknown auth mode {spec.auth!r}")
         if spec.rbx and (spec.method, spec.rule) not in RBX_REGISTER.get(spec.rbx, frozenset()):
             raise RuntimeError(f"route {spec.method} {spec.rule} is not in the {spec.rbx} register (06 §11)")
         # Without a signed-in principal (public, or optional auth used anonymously) no permission is ever checked,

@@ -1,70 +1,145 @@
 # Merge-safety plan: implementation branch vs. the live site (OD-5)
 
-> **Status: PLAN ONLY. Nothing in this document has been executed.** It asks the owner to choose and approve one
-> option. No merge, deployment, DNS change, Cloudflare change, or intake activation has happened.
+> **Status: PLAN ONLY. The owner's merge-safety decision is PENDING.**
+> - Nothing in this document has been executed: no merge, no deployment, and no DNS or Cloudflare change.
+> - Intake has not been enabled.
+> - Reviewed implementation: `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`. Live site: `main` at `13276a0`.
 
 ## 1. The hazard
 
-- Cloudflare Pages publishes `dist/` from `main` to `https://www.vedaspaces.com` within about a minute of any push
-  or merge. The details are in `README.md` "Deploy with Cloudflare Pages" and `deployment.md`.
-- The Pages build command is `exit 0`. There is no gate between a merge and production.
-- The implementation branch `implementation/p0-foundation` changes `dist/`:
-  - `dist/index.html`: form markup, intake metas (empty), and the consent and verification blocks (hidden while intake is off);
-  - `dist/assets/app.js`: progressive-enhancement intake, and the flag-off validation added by RR-11;
-  - `dist/assets/enhancements.css`;
-  - `dist/_headers`: the site-wide CSP;
-  - `dist/404.html` and `dist/assets/404.css` (RR-01).
-- **Merging the implementation branch is therefore a production site release.** The API and the SPA are not deployed
-  by a merge: they have no deployment pipeline yet (TG gates pending).
+- **A merge to `main` is a production site release.**
+  - Cloudflare Pages publishes `dist/` from `main` to `https://www.vedaspaces.com` about a minute after any push or merge (`README.md` "Deploy with Cloudflare Pages", `deployment.md`).
+  - The build command is `exit 0`, so no gate sits between a merge and production.
+- **What the branch changes in `dist/` compared with the live site** (`git diff --stat origin/main -- dist/`):
 
-## 2. What must hold before any merge
+  | File | Change |
+  |---|---|
+  | `dist/_headers` | Adds a site-wide **Content-Security-Policy**. The live site sends **no CSP today**; its other security headers are unchanged. |
+  | `dist/index.html` | Enquiry-form markup, empty intake metas, and hidden consent and verification blocks. |
+  | `dist/assets/app.js` | Progressive-enhancement intake, plus the flag-off validation from RR-11. |
+  | `dist/assets/enhancements.css` | Form styles. |
+  | `dist/404.html` and the new `dist/assets/404.css` | 404 styles moved to a stylesheet (RR-01). |
 
-1. Final targeted independent check passed. The owner records its outcome.
-2. The site diff (`git diff main...implementation/p0-foundation -- dist/`) has been reviewed as a site release.
-3. The site release checklist in `deployment.md` has been run against a **preview deployment** of the branch.
-   Record:
-   - 0 CSP violations on `/`, `/404.html` and a missing path;
-   - an HTTP 404 status for a missing path;
-   - the flag-off WhatsApp validation;
-   - a phone check.
-4. The intake metas `veda-api-base` and `veda-turnstile-sitekey` are **empty** in `dist/index.html`. This keeps the
-   public enquiry API disabled. `connect-src` still names `https://api.vedaspaces.com`, which is harmless while
-   nothing calls it.
-5. No privacy or consent behaviour is visible while intake is off. The consent block and the Privacy Notice link are
-   hidden; the browser test `site.e2e.mjs` asserts this. Publishing either one needs owner approval (Privacy Notice, IR-17).
-6. TG-01 and TG-08 remain **PENDING**. A merge does not complete or imply either gate.
+- The API and the SPA are **not** deployed by a merge: no pipeline exists for them.
 
-## 3. Options (choose one; none executed)
+## 2. Preconditions for any merge (all options)
 
-| Option | How | Effect | Trade-offs |
-|---|---|---|---|
-| **A. Separate site release first (recommended)** | Cherry-pick only the `dist/` changes to a short `site/*` branch. Check its preview. Merge it to `main` as a deliberate site release. Then merge the implementation branch. At that point `dist/` is identical on both sides, so the site deploys nothing new. | The site change is reviewed and released on its own. The implementation merge becomes a no-op for the site. | Two merges. The site release must happen first. |
-| **B. Pause production auto-deploy** | In Cloudflare Pages → Settings → Builds & deployments, set production branch deployments to *paused* (or disable automatic production deployments). Merge. Promote the chosen deployment manually after a preview check. Then re-enable. | No merge can reach production unattended. | It is a Cloudflare setting change, which needs owner approval and is not made here. Someone must remember to re-enable it. |
-| **C. Merge without the site changes** | Before merging, revert the `dist/` changes on a merge-prep branch, so `git diff main -- dist/` is empty. Merge. Release the site later with option A. | The implementation lands; the live site is unchanged. | The site fixes (RR-01, RR-11, CSP) ship later. The API-side intake code still expects the new form, but intake is off. |
-| **D. Move the site to its own deploy branch** | Set the Pages production branch to a dedicated `site-production` branch. `main` then only produces previews. | Code merges never deploy the site. | A permanent workflow change. It needs owner approval, and `README.md` and `deployment.md` must be updated. |
+All of these must hold before any merge. None holds yet unless it says so.
 
-**Recommendation:** Option A. It needs no infrastructure change, gives the site change its own review and rollback
-point, and makes the implementation merge a no-op for production. Combine it with option B for the implementation
-merge if the owner wants a second safeguard.
+1. The final targeted check verdict is recorded: CERTIFIED WITH TECHNICAL CONDITIONS, at `56c20ba`. **This holds.**
+2. The document-level check of this closure increment has passed.
+3. **TG-01 is PASS.** The gate registry marks it as blocking the merge (FC-A03).
+4. **TG-08** is PASS, as the owner requires.
+5. The owner has decided every amendment required before merge (see the owner decision package): AM-1…AM-7 and AM-11…AM-13, including acceptance of AM-4's labelled gaps. OD-2 and OD-3 are confirmed in a decision record.
+6. The owner has chosen and approved an option below.
+7. The intake metas `veda-api-base` and `veda-turnstile-sitekey` are empty in the merged `dist/index.html`.
+8. The public enquiry API stays disabled. The WhatsApp fallback keeps working.
+9. The custom domains, DNS and redirect rules are untouched.
 
-## 4. Safe sequence for option A (for the owner's approval; not executed)
+## 3. Options (none executed)
 
-1. Final targeted independent check of this branch → pass recorded.
-2. `git switch -c site/p0-csp-404-form-validation origin/main`
-3. `git checkout implementation/p0-foundation -- dist/`
-4. Check that the only changes are the reviewed site changes: `git diff --stat origin/main`.
-5. Push the branch. Cloudflare builds a preview.
-6. Run `app/e2e/site.e2e.mjs` against the preview. Run the `deployment.md` checklist and do a phone check.
-7. Owner approves the site release. Merge to `main`. Run post-deployment validation. Rollback is the Cloudflare
-   "Rollback to this deployment" step in `deployment.md`.
-8. Later, and only when authorised: merge `implementation/p0-foundation`. Before merging, `git diff main -- dist/`
-   must be empty.
-9. None of these steps enables intake. Enabling it is a separate, gated change:
-   - Turnstile keys, API origin, CORS and CSP connect-src review;
-   - the Privacy Notice, and staging verification of IR-18 and IR-31;
-   - production approval.
+### Option A: release the site change first, then merge
 
-## 5. Rollback
+The site change goes out as its own reviewed release. The later implementation merge then carries no `dist/` change.
 
-- **Site:** follow `deployment.md` → Rollback procedure. Rollback is instant, to the previous Pages deployment. Then revert the commit on `main`.
-- **API:** there is no deployed API, so nothing to roll back. When one exists, follow `docs/operations/api-runbooks.md` §2. Rollback floor: `0009_mfa_challenge_binding`. Rolling back to `9236aa3` is prohibited.
+- **Preconditions:** §2, plus owner approval to change the live site. This includes the new CSP and the new form behaviour.
+- **Repository changes:**
+  1. Create a `site/p0-csp-404-form-validation` branch from `origin/main`.
+  2. Run `git checkout <reviewed-sha> -- dist/` on it and commit.
+  3. Merge that branch to `main` as the site release.
+  4. Later, merge the implementation. `git diff main -- dist/` must be empty at that point.
+- **Cloudflare:** the first merge deploys the new `dist/` to production. That deployment is intended. No settings change.
+- **Verification:**
+  - On the preview deployment:
+    - `app/e2e/site.e2e.mjs`;
+    - 0 CSP violations on `/`, `/404.html` and a missing path;
+    - HTTP 404 for the missing path;
+    - the flag-off form validation;
+    - WhatsApp opens;
+    - a phone check.
+  - After the site release:
+    - the `deployment.md` post-deployment checks;
+    - `git diff main -- dist/` is empty before the second merge.
+- **Rollback:** Cloudflare "Rollback to this deployment", then `git revert` the site commit on `main`.
+- **Risks:** the live site's behaviour changes: a CSP is added for the first time, and the form now validates. A CSP mistake would break the live site; the preview check mitigates this.
+- **Owner action:** approve a production site release.
+- **Evidence required:**
+  - the preview URL and E2E output;
+  - the post-deployment validation;
+  - the Pages deployment id.
+
+### Option B: pause production auto-deployment around the merge
+
+- **Preconditions:** §2, plus owner approval of a Cloudflare setting change and someone responsible for re-enabling it.
+- **Repository changes:** none before the merge.
+- **Cloudflare:**
+  1. Pages → Settings → Builds & deployments. Pause automatic production deployments for the `main` branch.
+  2. Merge.
+  3. Either promote the merged deployment manually after a preview check, or keep the previous deployment live.
+  4. Re-enable automatic deployments.
+- **Verification:**
+  - Pages shows no new production deployment after the merge.
+  - The live site's response headers and `404.html` are unchanged.
+  - The setting is recorded as re-enabled.
+- **Rollback:** re-enable the setting. The live deployment is untouched unless someone promotes the new one.
+- **Risks:**
+  - If nobody re-enables the setting, later fixes to `main` never reach production.
+  - Anyone who can promote could ship the untested site.
+  - The approach depends on Cloudflare UI behaviour that has not been checked here.
+- **Owner action:** approve and perform the setting change; decide separately whether to promote.
+- **Evidence required:**
+  - screenshots or an audit-log entry of the setting before, during and after;
+  - the Pages deployment list showing no unintended production deployment.
+
+### Option C: merge without the branch's `dist/` changes (recommended)
+
+- **Preconditions:** §2.
+- **Repository changes:**
+  1. Create a `merge-prep/p0-foundation` branch from the reviewed implementation commit.
+  2. Run `git checkout origin/main -- dist/` so `dist/` is byte-identical to the live site.
+  3. Commit "Keep live site unchanged for the implementation merge".
+  4. Check that `git diff origin/main -- dist/` is **empty**.
+  5. Merge `merge-prep` to `main`.
+  6. Release the site changes (RR-01, RR-11 and the CSP) later, with option A, as a separate owner-approved release.
+- **Cloudflare:**
+  - The merge triggers a Pages deployment whose `dist/` is identical to the live one.
+  - This is the only Cloudflare activity; no setting changes.
+- **Verification:**
+  - Before the merge:
+    - `git diff origin/main -- dist/` is empty;
+    - the checksums of `dist/` match `origin/main`;
+    - CI passes on `merge-prep`.
+  - After the merge, the live responses are unchanged:
+    - `/` returns the same body hash;
+    - `/404.html` still uses the inline style, as live today;
+    - the headers still have no CSP;
+    - the form still hands off to WhatsApp.
+- **Rollback:** `git revert` the merge. The site is unaffected either way.
+- **Risks:**
+  - The site fixes (RR-01, RR-11) and the CSP wait for their own release.
+  - The browser tests of the implementation branch describe the new site, not the live one. They must run against the site release when it happens.
+  - **Integrity:** the tree that is merged is no longer byte-identical to the reviewed tree. The only difference is `dist/`, restored to `main`'s content, so the check is that `git diff 6ec2e76 merge-prep -- ':!dist'` is empty, plus the closure commit.
+- **Owner action:** approve option C and, later, the separate site release.
+- **Evidence required:**
+  - the empty `dist/` diff;
+  - the CI run on `merge-prep`;
+  - the before and after comparison of the live site.
+
+## 4. Recommendation
+
+**Option C.** It is the only option that meets all of these at once:
+- the current public website stays exactly as it is, with no header change;
+- the lead API stays disabled;
+- the WhatsApp fallback keeps working;
+- the custom domain is untouched;
+- there is no production release by accident;
+- no Cloudflare setting changes.
+
+The site improvements then follow as a deliberate option A release that the owner approves on its own merits.
+
+I recommend option C but have not executed it. The merge-safety decision is **PENDING**.
+
+## 5. Rollback reference
+
+- **Site:** `deployment.md` → Rollback procedure. It is instant, to the previous Pages deployment. Then revert the commit on `main`.
+- **API:** nothing is deployed. When it is, follow `docs/operations/api-runbooks.md` §2. The floors are `RELEASE_FLOOR=3` and `0009_mfa_challenge_binding`, enforced in every mode. `9236aa3` and `2f6b59a` can never be deployed.

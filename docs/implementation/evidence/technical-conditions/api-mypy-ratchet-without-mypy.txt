@@ -1,0 +1,6 @@
+mypy ratchet: FAIL (check not performed): mypy is not installed for <scratch>/tools-venv/bin/python: Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import mypy, sys; print(mypy.__file__)
+    ^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'mypy'
+

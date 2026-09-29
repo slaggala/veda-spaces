@@ -4,13 +4,17 @@
 #   ./deploy.sh --rollback <n-1-tag>       normal rollback: N-1 image on the migrated (expand-only) schema
 # Disaster rollback (restore a snapshot) is a manual runbook step: docs/operations/api-runbooks.md §3.
 #
-# ROLLBACK_FLOOR is the oldest schema revision a rollback target image must know (runbook §2.1, RR-17). Images
-# that predate it lack a security fix whose absence the schema cannot compensate for: for this release,
-# 0009_mfa_challenge_binding (IR-01), so the 9236aa3 image is never a valid rollback target. Raise the floor when a
-# release ships a fix that must not be rolled back; never lower it.
+# Floors (runbook §2.1; RR-17, FC-12), enforced in EVERY mode — a normal deploy of an old image is refused too:
+# - RELEASE_FLOOR: the oldest release sequence (veda/release.py, reported by `veda schema-status`) an image may
+#   have. Images below it lack a security fix that no schema check can detect (3 excludes 9236aa3 and 2f6b59a).
+# - ROLLBACK_FLOOR: the oldest schema revision an image must know (0009_mfa_challenge_binding, IR-01).
+# Both are fixed here and read from nothing else: there is no flag, environment variable or override. Raise them
+# when a release ships a fix that must not be undone; never lower them. An emergency exception would be a
+# reviewed change to this file, not a runtime switch.
 set -euo pipefail
 cd "$(dirname "$0")"
-ROLLBACK_FLOOR="0009_mfa_challenge_binding"
+readonly RELEASE_FLOOR=3
+readonly ROLLBACK_FLOOR="0009_mfa_challenge_binding"
 
 ROLLBACK=0
 if [[ "${1:-}" == "--rollback" ]]; then ROLLBACK=1; shift; fi
@@ -39,6 +43,24 @@ except Exception as e:
   return 1
 }
 
+echo "0. Floors: image $TAG must report release >= $RELEASE_FLOOR and know schema $ROLLBACK_FLOOR"
+# Read inside a container of the target image. An image too old to answer (no schema-status command, no release
+# field, malformed output) is refused like one that answers below the floor.
+if ! STATUS=$("${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli schema-status --require-known "$ROLLBACK_FLOOR"); then
+  echo "Refusing: image $TAG does not know schema floor $ROLLBACK_FLOOR or cannot report its release (runbook §2.1)"
+  exit 1
+fi
+RELEASE=$(printf '%s' "$STATUS" | python3 -c 'import json,sys
+try:
+    r = json.loads(sys.stdin.read().strip().splitlines()[-1]).get("release")
+except Exception:
+    r = None
+print(r if type(r) is int else "invalid")')
+if [[ "$RELEASE" == "invalid" ]] || (( RELEASE < RELEASE_FLOOR )); then
+  echo "Refusing: image $TAG reports release '$RELEASE', below release floor $RELEASE_FLOOR (runbook §2.1: forward-fix)"
+  exit 1
+fi
+
 echo "1. Pre-flight: single-worker configuration and replication"
 "${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli deploy-check
 curl -fsS http://127.0.0.1:9090/metrics | grep -q litestream_ || { echo "litestream metrics unavailable"; exit 1; }
@@ -53,12 +75,7 @@ if [[ $ROLLBACK -eq 0 ]]; then
   echo "4. Migrate: expand-only, safe while the N-1 image serves (the same configuration checks run first)"
   "${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli migrate
 else
-  echo "4. Rollback: no migration. The target image must know the rollback floor and the current revision must be declared"
-  # Both read inside a container of the *target* image: the revision in the database and what that image knows.
-  if ! "${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli schema-status --require-known "$ROLLBACK_FLOOR"; then
-    echo "Refusing: image $TAG predates rollback floor $ROLLBACK_FLOOR (runbook §2.1: forward-fix or snapshot restore)"
-    exit 1
-  fi
+  echo "4. Rollback: no migration (floors checked in step 0). The current revision must be declared if newer"
   REV=$("${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli schema-status | python3 -c 'import json,sys; print(json.load(sys.stdin)["current"])')
   STATE=$("${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli schema-status | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])')
   if [[ "$STATE" == "ahead_undeclared" || "$STATE" == "ahead" ]]; then

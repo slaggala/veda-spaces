@@ -10,8 +10,15 @@ mypy with the configuration in pyproject.toml and fails when:
   ``CEILING`` — the reviewed maximum, which may only be lowered;
 * any file has more errors than recorded, or a file not in the baseline has any (new and renamed files start
   at zero);
-* the source uses a broad suppression: a bare ``# type: ignore`` without an error code, ``# mypy: ignore-errors``,
-  or ``ignore_errors`` / ``disable_error_code`` in the mypy configuration.
+* the source uses a broad or unreviewed suppression (FC-11): a ``# type: ignore`` without an error code or without
+  a justification comment after it, any inline ``# mypy:`` configuration comment, a shadow configuration file
+  (``mypy.ini``, ``.mypy.ini``, ``setup.cfg [mypy]``), a ``[tool.mypy]`` key outside the reviewed set (for example
+  ``exclude``, ``strict_optional``, ``follow_imports``, ``ignore_errors``, ``disable_error_code``) or a value that
+  differs from it, or a per-module override other than ``ignore_missing_imports`` for a third-party module;
+* the mypy that would run is not the installed package (a local ``mypy`` module shadowing it).
+
+mypy runs isolated (``python -I``, so the working directory cannot shadow the package) with the configuration
+file named explicitly.
 
 ``--update`` is the only way to rewrite the baseline. It refuses to run in CI, never adds a file or raises a
 count (it fails instead, listing them), and prints every change for review:
@@ -36,8 +43,20 @@ BASELINE = ROOT / "tools" / "mypy-baseline.json"
 PACKAGE = "veda"
 CEILING = 157  # total recorded at IR-39; lower it together with the baseline, never raise it
 _SUMMARY = re.compile(r"(?:Found \d+ errors? in \d+ files? \(checked|Success: no issues found in) (\d+) source files?")
-_BARE_IGNORE = re.compile(r"#\s*type:\s*ignore(?!\[)")
-_FILE_IGNORE = re.compile(r"#\s*mypy:\s*ignore-errors")
+_TYPE_IGNORE = re.compile(r"#\s*type:\s*ignore(?P<codes>\[[a-z0-9_, -]+\])?(?P<rest>.*)$")
+_INLINE_CONFIG = re.compile(r"#\s*mypy\s*:", re.IGNORECASE)
+# The reviewed [tool.mypy] configuration: every key and value is fixed; anything else is a suppression.
+REVIEWED_CONFIG = {
+    "python_version": "3.13",
+    "files": ["veda"],
+    "warn_unused_ignores": True,
+    "warn_redundant_casts": True,
+    "no_implicit_optional": True,
+    "check_untyped_defs": True,
+    "disallow_any_generics": False,
+}
+OVERRIDE_KEYS = {"module", "ignore_missing_imports"}
+SHADOW_CONFIGS = ("mypy.ini", ".mypy.ini")
 
 
 class RatchetError(Exception):
@@ -48,10 +67,31 @@ def source_files(root: Path = ROOT) -> list[Path]:
     return sorted(p for p in (root / PACKAGE).rglob("*.py") if "__pycache__" not in p.parts)
 
 
+def mypy_origin(root: Path = ROOT, python: str = sys.executable) -> Path:
+    """Where the isolated interpreter imports mypy from; it must not be inside the checked tree."""
+    try:
+        out = subprocess.run(
+            [python, "-I", "-c", "import mypy, sys; print(mypy.__file__)"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RatchetError(f"mypy could not run: {exc}") from exc
+    if out.returncode != 0 or not out.stdout.strip():
+        raise RatchetError(f"mypy is not installed for {python}: {(out.stderr or out.stdout)[-300:]}")
+    origin = Path(out.stdout.strip()).resolve()
+    if origin.is_relative_to(root.resolve()) and ".venv" not in origin.parts and "site-packages" not in origin.parts:
+        raise RatchetError(f"mypy resolves to {origin}, inside the checked tree (shadowed package)")
+    return origin
+
+
 def run_mypy(root: Path = ROOT, python: str = sys.executable) -> tuple[int, str, str]:
+    mypy_origin(root, python)
     try:
         proc = subprocess.run(
-            [python, "-m", "mypy", "--no-color-output", "--show-error-codes"],
+            [python, "-I", "-m", "mypy", "--config-file", "pyproject.toml", "--no-color-output", "--show-error-codes"],
             cwd=root,
             capture_output=True,
             text=True,
@@ -101,14 +141,36 @@ def broad_suppressions(root: Path = ROOT) -> list[str]:
     found = []
     for path in source_files(root):
         for n, line in enumerate(path.read_text().splitlines(), start=1):
-            if _BARE_IGNORE.search(line) or _FILE_IGNORE.search(line):
-                found.append(f"{path.relative_to(root)}:{n}: {line.strip()}")
+            where = f"{path.relative_to(root)}:{n}: {line.strip()}"
+            if _INLINE_CONFIG.search(line):
+                found.append(f"{where} (inline mypy configuration)")
+            m = _TYPE_IGNORE.search(line)
+            if m and not m.group("codes"):
+                found.append(f"{where} (type: ignore without an error code)")
+            elif m and not re.match(r"\s+#\s*\S", m.group("rest")):
+                found.append(f"{where} (type: ignore without a justification comment)")
+    for name in SHADOW_CONFIGS:
+        if (root / name).exists():
+            found.append(f"{name} (shadow mypy configuration)")
+    setup_cfg = root / "setup.cfg"
+    if setup_cfg.exists() and re.search(r"^\[mypy", setup_cfg.read_text(), re.MULTILINE):
+        found.append("setup.cfg [mypy] (shadow mypy configuration)")
     config = tomllib.loads((root / "pyproject.toml").read_text()).get("tool", {}).get("mypy", {})
-    sections = [config, *config.get("overrides", [])]
-    for section in sections:
-        for key in ("ignore_errors", "disable_error_code"):
-            if section.get(key):
-                found.append(f"pyproject.toml [tool.mypy] {key} = {section[key]!r}")
+    for key, value in config.items():
+        if key == "overrides":
+            continue
+        if key not in REVIEWED_CONFIG or value != REVIEWED_CONFIG[key]:
+            found.append(f"pyproject.toml [tool.mypy] {key} = {value!r} (outside the reviewed configuration)")
+    for key in REVIEWED_CONFIG.keys() - config.keys():
+        found.append(f"pyproject.toml [tool.mypy] {key} missing from the reviewed configuration")
+    for override in config.get("overrides", []):
+        modules = override.get("module", [])
+        modules = [modules] if isinstance(modules, str) else modules
+        extra = set(override) - OVERRIDE_KEYS
+        if extra or any(m == PACKAGE or m.startswith(f"{PACKAGE}.") for m in modules):
+            found.append(
+                f"pyproject.toml [[tool.mypy.overrides]] {modules} {sorted(extra) or ''} (only third-party ignore_missing_imports)"
+            )
     return found
 
 

@@ -127,6 +127,39 @@ def test_IRA05_optional_and_public_routes_cannot_hide_a_permission(app):
     assert sorted((s.method, s.rule) for s in http.ROUTES if s.auth == "public") == before_public
 
 
+@pytest.mark.parametrize("mode", ["Bearer", "PUBLIC", "optional ", "", "none", "anonymous", None, "cookie"])
+def test_FC06_unknown_auth_modes_are_rejected(app, mode):
+    """Only bearer, public and optional exist; anything else (case variants, blanks, unknown words) is refused at
+    declaration and at startup, so no route can become anonymous by a typo."""
+    from dataclasses import replace
+
+    from veda.app import check_route_declarations
+    from veda.kernel import http
+
+    with pytest.raises(RuntimeError, match="unknown auth mode"):
+        http.Api("probe", "/api/v1/probe").route("GET", "/x", permission="user.read", auth=mode)(lambda req: None)
+    original = list(http.ROUTES)
+    spec = next(s for s in http.ROUTES if s.auth == "bearer" and s.permission)
+    try:
+        http.ROUTES[http.ROUTES.index(spec)] = replace(spec, auth=mode)
+        with pytest.raises(RuntimeError, match="unknown auth mode"):
+            check_route_declarations(app)
+    finally:
+        http.ROUTES[:] = original
+
+
+def test_FC06_known_auth_modes_are_accepted_and_nothing_new_is_public(app):
+    from veda.app import check_route_declarations
+    from veda.kernel import http
+
+    check_route_declarations(app)
+    modes = {s.auth for s in http.ROUTES}
+    assert modes <= http.AUTH_MODES and modes == {"bearer", "public", "optional"}
+    optional = sorted((s.method, s.rule) for s in http.ROUTES if s.auth == "optional")
+    assert optional == [("POST", "/api/v1/auth/mfa/enroll/confirm"), ("POST", "/api/v1/auth/mfa/enroll/start")]
+    assert all(s.rbx and not (s.permission or s.any_of) for s in http.ROUTES if s.auth != "bearer")
+
+
 def test_PLAT_011_module_boundaries():
     """Modules import other modules' service interfaces only; the platform never imports module
     internals except the maintenance CLI jobs and the app factory's registration."""

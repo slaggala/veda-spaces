@@ -258,6 +258,7 @@ def _metric_lines(stdout):
         ("disk-usage", "DiskUsed"),
         ("verify-chain", "ChainVerificationFailed"),
         ("invariants", "GovernanceInvariantFailures"),
+        ("invariants", "NoEffectiveRecoveryAdmin"),  # FC-02: not redacted by the "recovery" denylist word
         ("snapshot", "MaintenanceJobFailed"),
     ],
 )
@@ -267,6 +268,7 @@ def test_RR07_cli_jobs_emit_their_metrics(app, database_url, engine, job, metric
     r = _cli(database_url, "maintenance", job)
     metrics = _metric_lines(r.stdout)
     assert metric in metrics, (r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+    assert isinstance(metrics[metric], int | float), f"{metric} value redacted: {metrics[metric]!r}"
     assert "MaintenanceJobFailed" in metrics
 
 
@@ -310,6 +312,9 @@ def test_RR17_schema_status_and_rollback_floor(app, capsys):
     assert main(["schema-status", "--require-known", "0009_mfa_challenge_binding"]) == 0
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert out["state"] == "head" and out["current"] == out["image_head"] and out["floor_known"] is True
+    from veda.release import RELEASE_SEQUENCE
+
+    assert out["release"] == RELEASE_SEQUENCE  # FC-12: deploy.sh compares it with RELEASE_FLOOR in every mode
     # An image that does not know the floor (e.g. one built before IR-01) is refused as a rollback target.
     assert main(["schema-status", "--require-known", "0009_not_in_this_image"]) == 4
     assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["floor_known"] is False
@@ -319,4 +324,5 @@ def test_RR17_deploy_script_rollback_floor_is_the_ir01_revision():
     script = (ROOT / "deploy" / "deploy.sh").read_text()
     assert 'ROLLBACK_FLOOR="0009_mfa_challenge_binding"' in script
     assert "schema-status --require-known" in script and "exec -T api python" in script
+    assert "readonly RELEASE_FLOOR=3" in script
     assert "grep -q '^VEDA_SCHEMA_AHEAD_ACCEPTED=' /etc/veda/api.env" not in script, "the declared value is checked"

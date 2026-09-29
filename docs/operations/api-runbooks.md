@@ -31,11 +31,17 @@ and the schema stays where it is.
 
 ### 2.1 Rollback boundary
 
-- Every release declares a **rollback floor**: the oldest schema revision that a rollback target image must know.
-  `deploy.sh` holds it as `ROLLBACK_FLOOR` and refuses any target image that does not know it.
-- **This release's floor is `0009_mfa_challenge_binding`.** The previous image (commit `9236aa3`) does not know it:
-  it cannot pass readiness on the migrated schema, and it would reintroduce IR-01 (a BLOCKER). **Rollback to
-  `9236aa3` is prohibited.** Until a later release exists, there is no valid N-1 image for this release.
+- Every release declares two floors, which `deploy.sh` enforces **in every mode**, normal deploy and `--rollback` alike (FC-12):
+  - **`RELEASE_FLOOR`:** the oldest release sequence an image may report (`veda/release.py`, printed by `veda schema-status`). Images that cannot report one are refused.
+  - **`ROLLBACK_FLOOR`:** the oldest schema revision the image must know.
+
+  Both checks run inside the target image before anything is stopped, migrated or started. They are `readonly` in the
+  script, with no flag or environment override. An emergency exception is a reviewed change to `deploy.sh`, not a runtime switch.
+- **This release's floors are `RELEASE_FLOOR=3` and `0009_mfa_challenge_binding`.** Neither earlier image can be deployed, in any mode:
+  - `9236aa3` would reintroduce IR-01, a BLOCKER.
+  - `2f6b59a` knows 0009 but lacks the RR-02 and RR-03 fixes.
+
+  Until a later release exists, there is no valid N-1 image.
 - Raise the floor whenever a release ships a security fix that must not be undone. Never lower it.
 
 ### 2.2 When a forward fix is required
@@ -195,6 +201,7 @@ and SMS) and are test-fired once each (RG-5).
 | `SecurityEvents` (EventType, Outcome) | the 05 §9.8 rules (e.g. `REFRESH_REUSE_DETECTED` ≥ 1; `LOGIN`/FAILURE spikes; `MFA_CHALLENGE`/FAILURE spikes) |
 | `SecurityEventWriterFailures` | ≥ 1 |
 | `ChainVerificationFailed`, `ChainAnchorFailed`, `SecurityLogArchiveFailed` | ≥ 1 |
+| Metric names are structural and are never redacted as data (FC-02): the scrubber exempts only the approved names in `veda.kernel.metrics.APPROVED_METRICS`, and only their numeric values. `NoEffectiveRecoveryAdmin` is therefore emitted unredacted. Alarm routing and test-fire remain RG-5. | — |
 | `MaintenanceJobFailed` (Job), `ScheduledJobFailed` (Job) | ≥ 1 for any job; missing data for 26 h (the scheduler stopped). CLI, worker and scheduler processes configure the same JSON logging as the API (RR-07). |
 | `GovernanceInvariantFailures` / `NoEffectiveRecoveryAdmin` | ≥ 1 (CRITICAL / High) |
 | `OutboxDead` / `OutboxOldestAge` | any dead event / age above threshold (degraded, never readiness) |

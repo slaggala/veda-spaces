@@ -15,6 +15,11 @@ ratchet = importlib.util.module_from_spec(_spec)
 sys.modules["mypy_ratchet"] = ratchet
 _spec.loader.exec_module(ratchet)
 
+REVIEWED = (
+    '[tool.mypy]\npython_version = "3.13"\nfiles = ["veda"]\nwarn_unused_ignores = true\nwarn_redundant_casts = true\n'
+    "no_implicit_optional = true\ncheck_untyped_defs = true\ndisallow_any_generics = false\n\n"
+    '[[tool.mypy.overrides]]\nmodule = ["boto3", "boto3.*"]\nignore_missing_imports = true\n'
+)
 OK_OUT = "veda/a.py:3: error: Bad  [arg-type]\nFound 1 error in 1 file (checked 5 source files)\n"
 CLEAN_OUT = "Success: no issues found in 5 source files\n"
 
@@ -24,7 +29,7 @@ def tree(tmp_path):
     (tmp_path / "veda").mkdir()
     for name in ("a.py", "b.py"):
         (tmp_path / "veda" / name).write_text("x = 1\n")
-    (tmp_path / "pyproject.toml").write_text('[tool.mypy]\nfiles = ["veda"]\n')
+    (tmp_path / "pyproject.toml").write_text(REVIEWED)
     return tmp_path
 
 
@@ -94,20 +99,85 @@ def test_new_renamed_or_worse_files_fail(capsys):
 
 def test_broad_suppressions_fail(tree):
     assert ratchet.broad_suppressions(tree) == []
+    (tree / "veda" / "a.py").write_text("x = 1  # type: ignore[attr-defined]  # stdlib stub gap\n")
+    assert ratchet.broad_suppressions(tree) == [], "a coded, justified ignore is allowed"
     (tree / "veda" / "a.py").write_text("x = 1  # type: ignore[attr-defined]\n")
-    assert ratchet.broad_suppressions(tree) == [], "a coded ignore is allowed"
+    assert any("justification" in s for s in ratchet.broad_suppressions(tree))
+    (tree / "veda" / "a.py").write_text("x = 1\n")
     (tree / "veda" / "b.py").write_text("y = 1  # type: ignore\n")
-    assert any("b.py:1" in s for s in ratchet.broad_suppressions(tree))
-    (tree / "veda" / "b.py").write_text("# mypy: ignore-errors\n")
-    assert ratchet.broad_suppressions(tree)
-    (tree / "veda" / "b.py").write_text("y = 1\n")
-    (tree / "pyproject.toml").write_text(
-        '[tool.mypy]\n[[tool.mypy.overrides]]\nmodule = ["veda.*"]\nignore_errors = true\n'
-    )
-    assert any("ignore_errors" in s for s in ratchet.broad_suppressions(tree))
-    (tree / "pyproject.toml").write_text('[tool.mypy]\ndisable_error_code = ["union-attr"]\n')
-    assert any("disable_error_code" in s for s in ratchet.broad_suppressions(tree))
+    assert any("b.py:1" in s and "error code" in s for s in ratchet.broad_suppressions(tree))
     assert ratchet.check(Counter(), {}, ["x"]) == 1
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "# mypy: ignore-errors",
+        "# mypy: ignore_errors",
+        '# mypy: disable-error-code="union-attr"',
+        "# mypy: strict-optional=False",
+        "#MYPY: allow-untyped-defs",
+    ],
+)
+def test_FC11_inline_mypy_configuration_is_refused(tree, line):
+    (tree / "veda" / "b.py").write_text(f"{line}\ny = 1\n")
+    assert any("inline mypy configuration" in s for s in ratchet.broad_suppressions(tree))
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        'exclude = ["veda/b.py"]\n',
+        "strict_optional = false\n",
+        'follow_imports = "skip"\n',
+        "ignore_errors = true\n",
+        'disable_error_code = ["union-attr"]\n',
+    ],
+)
+def test_FC11_config_outside_the_reviewed_set_is_refused(tree, extra):
+    text = (tree / "pyproject.toml").read_text().replace("[[tool.mypy.overrides]]", extra + "\n[[tool.mypy.overrides]]")
+    (tree / "pyproject.toml").write_text(text)
+    assert any("outside the reviewed configuration" in s for s in ratchet.broad_suppressions(tree))
+
+
+def test_FC11_files_padding_and_changed_values_are_refused(tree):
+    text = (tree / "pyproject.toml").read_text().replace('files = ["veda"]', 'files = ["veda", "migrations"]')
+    (tree / "pyproject.toml").write_text(text)
+    assert any("files" in s for s in ratchet.broad_suppressions(tree))
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        '[[tool.mypy.overrides]]\nmodule = ["veda.platform.auth.service"]\nstrict_optional = false\n',
+        '[[tool.mypy.overrides]]\nmodule = ["veda.*"]\nignore_missing_imports = true\n',
+        '[[tool.mypy.overrides]]\nmodule = ["boto3"]\nignore_errors = true\n',
+    ],
+)
+def test_FC11_per_module_overrides_are_refused(tree, override):
+    (tree / "pyproject.toml").write_text((tree / "pyproject.toml").read_text() + "\n" + override)
+    assert any("overrides" in s for s in ratchet.broad_suppressions(tree))
+
+
+@pytest.mark.parametrize(
+    "name,content",
+    [
+        ("mypy.ini", "[mypy]\nignore_errors = True\n"),
+        (".mypy.ini", "[mypy]\n"),
+        ("setup.cfg", "[mypy]\nignore_errors = True\n"),
+    ],
+)
+def test_FC11_shadow_configuration_files_are_refused(tree, name, content):
+    (tree / name).write_text(content)
+    assert any("shadow mypy configuration" in s for s in ratchet.broad_suppressions(tree))
+
+
+def test_FC11_a_local_mypy_package_cannot_shadow_the_installed_one(tree):
+    (tree / "mypy").mkdir()
+    (tree / "mypy" / "__init__.py").write_text("")
+    (tree / "mypy" / "__main__.py").write_text('print("Success: no issues found in 999 source files")\n')
+    origin = ratchet.mypy_origin(tree)
+    assert not origin.is_relative_to(tree), "python -I ignores the working directory"
 
 
 def test_update_only_lowers_and_never_runs_in_ci(tmp_path, monkeypatch, capsys):
