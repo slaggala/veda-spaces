@@ -123,7 +123,9 @@ A CI job migrates an empty database on **both** SQLite and PostgreSQL, introspec
    - it lacks its required index;
    - its registry entry is missing any documentation field.
 
-   The allow-list is the 10 columns in §2.11, no more (N-02). This rule is **not** relaxed globally;
+   The allow-list is the 10 columns in §2.11, no more (N-02). This rule is **not** relaxed globally.
+
+   The only columns that match the name pattern but are **not** treated as ID-like are the three non-entity string identifiers listed in §2.11.1 (R-01). Each must have exactly its documented non-GUID string type. Any other string column whose name matches the pattern fails;
 4. has a column ending in `_id`, or an actor column, whose type is not the GUID type (checked for every FK, DATA-012);
 5. has a unique index on business columns without the `is_deleted = false` predicate, unless allow-listed in §2.9;
 6. has an FK with a cascade action, or uses a native ENUM type;
@@ -205,6 +207,16 @@ These **ten** columns are the complete allow-list for rule 3 of §2.7: three cor
 | 10 | `user_mfa_recovery_code.batch_id` (EXC-011) | Groups codes issued together | Group id: there is no batch table | — (group id) | Format CHECK. UUIDv7 generated per issuance. | `ix_user_mfa_recovery_code__batch` (`user_id`, `batch_id`) | With the codes | MFA-005 | 03 §5.6, 05 §11.5 |
 
 The conformance check reads this table as its allow-list. Adding an eleventh FK-less identifier requires a new row with every column filled, and an ADR or architecture amendment.
+
+#### 2.11.1 Non-entity string identifiers (R-01)
+
+These three columns match the ID-like name pattern of rule 3 but are **not entity references**. They hold opaque strings that never contain a row id. They are the complete exemption list: the conformance check requires each to exist with exactly this type, and fails any other undocumented string column matching the pattern.
+
+| Table.column | Type | Purpose | Why not an entity reference / no FK | Validation | Index | Retention |
+|---|---|---|---|---|---|---|
+| `audit_log.request_id` | VARCHAR(64) | HTTP request correlation id (02 §9) | Opaque per-request string. No table stores requests. | Length CHECK. Set only by the kernel from the request context. | Not required | With `audit_log` |
+| `security_event_log.request_id` | VARCHAR(64) | HTTP request correlation id | Same | Same | Not required | With `security_event_log` |
+| `outbox_event.locked_by` | VARCHAR(64) | Identifier of the worker process holding the claim (02 §10.1) | A process label, not a user or row | Length CHECK. Set only by the outbox worker. | Not required | With `outbox_event` |
 
 ### 2.10 Purge ordering and referential integrity (DATA-017, F-07)
 
