@@ -5,7 +5,10 @@ FROM python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /srv/api
 COPY requirements.txt .
-RUN pip install --no-cache-dir --require-hashes --no-deps -r requirements.txt
+# pip is removed once the locked set is installed: the runtime never installs packages, and pip's vendored
+# libraries (msgpack, setuptools' pkg_resources) carry advisories the image scan rejects.
+RUN pip install --no-cache-dir --require-hashes --no-deps -r requirements.txt \
+ && python -m pip uninstall -y pip
 COPY . .
 RUN useradd --system --uid 10001 veda && chown -R veda /srv/api
 USER veda
