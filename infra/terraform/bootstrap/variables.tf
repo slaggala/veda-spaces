@@ -6,6 +6,19 @@ variable "expected_account_id" {
     condition     = can(regex("^[0-9]{12}$", var.expected_account_id))
     error_message = "expected_account_id must be a 12-digit AWS account ID."
   }
+
+  # F3: the account is approved in code (infra/config/staging-account.json, changed only by a reviewed pull
+  # request), not by whatever is typed at run time.
+  validation {
+    condition     = var.expected_account_id == local.approved_account_id
+    error_message = "expected_account_id is not the approved staging account in infra/config/staging-account.json. Commit the account there in a reviewed change first."
+  }
+}
+
+variable "account_manifest_path" {
+  description = "Path of the approved-account manifest. Empty means infra/config/staging-account.json; only the offline tests override it."
+  type        = string
+  default     = ""
 }
 
 variable "aws_region" {
@@ -73,12 +86,6 @@ variable "existing_github_oidc_provider_arn" {
   default     = ""
 }
 
-variable "enable_account_guardrails" {
-  description = "Account-wide defaults: S3/EBS-snapshot/AMI public-access blocks, EBS encryption by default, IMDSv2 by default, IAM Access Analyzer."
-  type        = bool
-  default     = true
-}
-
 variable "state_noncurrent_version_days" {
   description = "Days a superseded state version is kept."
   type        = number
@@ -89,4 +96,9 @@ variable "role_max_session_seconds" {
   description = "Maximum session length of the GitHub roles."
   type        = number
   default     = 3600
+
+  validation {
+    condition     = var.role_max_session_seconds >= 900 && var.role_max_session_seconds <= 3600
+    error_message = "GitHub role sessions must last between 15 minutes and one hour."
+  }
 }

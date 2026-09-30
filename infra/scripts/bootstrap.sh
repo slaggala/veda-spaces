@@ -2,16 +2,20 @@
 # One-time bootstrap of the dedicated Veda staging AWS account (plan §8, AUT-003).
 #
 #   infra/scripts/bootstrap.sh --expected-account-id 123456789012                # plan only (default)
-#   infra/scripts/bootstrap.sh --expected-account-id 123456789012 --mode apply   # asks to type the account ID
-#   ... --mode apply --yes                                                        # non-interactive (00-bootstrap)
+#   infra/scripts/bootstrap.sh --expected-account-id 123456789012 --mode apply   # plan, show, type the ID, apply
+#   ... --mode apply --plan-file F --plan-meta M [--yes]                          # apply a reviewed plan (00-bootstrap)
 #
-# Options: --repo owner/repo (default: discovered) · --skip-guardrails (account already manages them)
+# Options: --repo owner/repo (default: discovered)
 #
 # Credentials: a temporary owner session in the Veda account (AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN or a
-# profile). The session must be for --expected-account-id; the Terraform provider refuses any other account too.
+# profile). The account must be the one approved in infra/config/staging-account.json, and the session must
+# be in it; discovery also checks its name, alias and emptiness (F3). The Terraform provider refuses any other account.
 #
-# plan  : discovery + terraform plan. Read-only; nothing is created.
-# apply : applies that plan, then moves the state into the bucket it created (first run) and writes
+# plan  : discovery + terraform plan + plan guard (no destroy, bounded roles, no external trust). Writes the plan,
+#         its text and its metadata (commit, account, SHA-256) to infra/generated/. Nothing is created.
+# apply : applies exactly a reviewed plan (F4): either the one just made and shown here, confirmed by typing the
+#         account ID, or --plan-file/--plan-meta from an earlier plan run of the same commit. --yes (no prompt) is
+#         accepted only with --plan-file. Then moves the state into the bucket it created (first run) and writes
 #         infra/generated/bootstrap-outputs.json for github-setup.sh.
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -21,41 +25,63 @@ MODE="plan"
 EXPECTED=""
 REPO_ARG=""
 YES=0
-SKIP_GUARDRAILS=0
+REVIEWED_PLAN=""
+REVIEWED_META=""
 while (($#)); do
   case "$1" in
     --mode) MODE="${2:-}"; shift 2 ;;
     --expected-account-id) EXPECTED="${2:-}"; shift 2 ;;
     --repo) REPO_ARG="${2:-}"; shift 2 ;;
     --yes) YES=1; shift ;;
-    --skip-guardrails) SKIP_GUARDRAILS=1; shift ;;
-    -h | --help) sed -n '2,17p' "$0"; exit 0 ;;
+    --plan-file) REVIEWED_PLAN="${2:-}"; shift 2 ;;
+    --plan-meta) REVIEWED_META="${2:-}"; shift 2 ;;
+    --skip-guardrails) die "--skip-guardrails was removed: set manage_account_guardrails in infra/config/staging-account.json in a reviewed change (F5)" ;;
+    -h | --help) sed -n '2,20p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
 
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || die "--mode must be plan or apply"
+if [[ -n "$REVIEWED_PLAN" || -n "$REVIEWED_META" ]]; then
+  [[ "$MODE" == "apply" ]] || die "--plan-file and --plan-meta are for --mode apply"
+  [[ -n "$REVIEWED_PLAN" && -n "$REVIEWED_META" ]] || die "--plan-file and --plan-meta go together"
+fi
+((!YES)) || [[ -n "$REVIEWED_PLAN" ]] ||
+  die "--yes applies without a prompt, so it needs a reviewed plan: pass --plan-file and --plan-meta from a plan run"
 require_tools aws jq terraform curl git
 require_account_id "$EXPECTED"
 require_region
 require_expected_account "$EXPECTED"
 export TF_IN_AUTOMATION=1 TF_INPUT=0
+mkdir -p "$GENERATED_DIR"
 
-discover_args=(--expected-account-id "$EXPECTED")
-[[ -n "$REPO_ARG" ]] && discover_args+=(--repo "$REPO_ARG")
-"$INFRA_DIR/scripts/discover.sh" "${discover_args[@]}"
-DISCOVERED="$GENERATED_DIR/discovered.json"
-
-if ((SKIP_GUARDRAILS)); then
-  jq '. + {enable_account_guardrails: false}' "$BOOTSTRAP_DIR/generated.auto.tfvars.json" >"$BOOTSTRAP_DIR/tmp.json"
-  mv "$BOOTSTRAP_DIR/tmp.json" "$BOOTSTRAP_DIR/generated.auto.tfvars.json"
-fi
-
-BUCKET="$(jq -r .aws.state_bucket "$DISCOVERED")"
-STATE_EXISTS="$(jq -r .aws.state_bucket_exists "$DISCOVERED")"
 STATE_KEY="bootstrap/terraform.tfstate"
 BACKEND_FILE="$BOOTSTRAP_DIR/backend_s3.tf"
 PLAN_FILE="$GENERATED_DIR/bootstrap.tfplan"
+META_FILE="$GENERATED_DIR/bootstrap-plan.meta.json"
+BUCKET="$(state_bucket_name "$EXPECTED")"
+COMMIT="$(current_commit)"
+
+# F4: a reviewed plan must be byte-identical to what was reviewed, for this commit and this account, and made as
+# a plan. Checked before Terraform runs at all.
+verify_reviewed_plan() {
+  local sum
+  [[ -f "$REVIEWED_PLAN" ]] || die "reviewed plan not found: $REVIEWED_PLAN"
+  [[ -f "$REVIEWED_META" ]] || die "reviewed plan metadata not found: $REVIEWED_META"
+  REVIEWED_PLAN="$(cd "$(dirname "$REVIEWED_PLAN")" && pwd)/$(basename "$REVIEWED_PLAN")"
+  REVIEWED_META="$(cd "$(dirname "$REVIEWED_META")" && pwd)/$(basename "$REVIEWED_META")"
+  sum="$(sha256_of "$REVIEWED_PLAN")"
+  [[ "$sum" == "$(jq -r '.plan_sha256 // empty' "$REVIEWED_META")" ]] ||
+    die "reviewed plan checksum mismatch: the plan file is not the one that was reviewed"
+  [[ "$(jq -r '.mode // empty' "$REVIEWED_META")" == "plan" ]] || die "reviewed plan metadata is not from a plan run"
+  [[ "$(jq -r '.account_id // empty' "$REVIEWED_META")" == "$EXPECTED" ]] ||
+    die "reviewed plan was made for account $(jq -r .account_id "$REVIEWED_META"), not $EXPECTED"
+  [[ "$(jq -r '.commit // empty' "$REVIEWED_META")" == "$COMMIT" ]] ||
+    die "reviewed plan was made from commit $(jq -r .commit "$REVIEWED_META"), this run is $COMMIT; plan again"
+  [[ "$(jq -r '.dirty' "$REVIEWED_META")" == "false" ]] ||
+    die "reviewed plan was made from a working tree with uncommitted infra changes; plan again from a clean commit"
+  log "reviewed plan verified: sha256 $sum, commit $COMMIT, account $EXPECTED"
+}
 
 write_backend() {
   cat >"$BACKEND_FILE" <<'EOF'
@@ -73,9 +99,38 @@ backend_args() {
     "-backend-config=kms_key_id=$1" "-backend-config=use_lockfile=true")
 }
 
+# Plan guard over a saved plan (destroys, boundaries, external trust).
+guard_plan() {
+  terraform show -json "$1" >"$GENERATED_DIR/bootstrap-plan.json"
+  "$INFRA_DIR/scripts/check-plan.sh" --plan-json "$GENERATED_DIR/bootstrap-plan.json" --account "$EXPECTED" \
+    --repo "$REPO" --prefix "$VEDA_PREFIX"
+}
+
+if [[ -n "$REVIEWED_PLAN" ]]; then
+  verify_reviewed_plan
+  verify_account_identity "$EXPECTED"
+  REPO="$(jq -r '.repository // empty' "$REVIEWED_META")"
+  [[ -n "$REPO" ]] || die "reviewed plan metadata has no repository"
+else
+  discover_args=(--expected-account-id "$EXPECTED")
+  [[ -n "$REPO_ARG" ]] && discover_args+=(--repo "$REPO_ARG")
+  "$INFRA_DIR/scripts/discover.sh" "${discover_args[@]}"
+  REPO="$(jq -r .github.repository "$GENERATED_DIR/discovered.json")"
+fi
+
+# Assigned before comparing: a failed lookup must stop the run, not read as "absent".
+BUCKET_STATUS="$(state_bucket_status "$BUCKET" "$EXPECTED")"
+STATE_EXISTS=false
+[[ "$BUCKET_STATUS" == exists ]] && STATE_EXISTS=true
+if [[ -n "$REVIEWED_PLAN" ]]; then
+  [[ "$(jq -r .state_exists "$REVIEWED_META")" == "$STATE_EXISTS" ]] ||
+    die "the state bucket appeared or disappeared since the plan was made; plan again"
+fi
+
 cd "$BOOTSTRAP_DIR"
 if [[ "$STATE_EXISTS" == "true" ]]; then
-  KEY_ARN="$(jq -r .aws.state_kms_key_arn "$DISCOVERED")"
+  KEY_ARN="$(aws kms describe-key --key-id "alias/${VEDA_PREFIX}-tfstate" --output json | jq -r '.KeyMetadata.Arn // empty')" ||
+    die "cannot read alias/${VEDA_PREFIX}-tfstate"
   [[ -n "$KEY_ARN" ]] || die "state bucket $BUCKET exists but alias/${VEDA_PREFIX}-tfstate does not"
   [[ -f terraform.tfstate ]] && die "local terraform.tfstate present while $BUCKET exists: resolve manually (docs/operations/staging-bootstrap.md §6)"
   log "remote state: s3://$BUCKET/$STATE_KEY"
@@ -88,22 +143,41 @@ else
   terraform init -reconfigure -input=false >/dev/null
 fi
 
-terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE"
-terraform show -no-color "$PLAN_FILE" >"$GENERATED_DIR/bootstrap-plan.txt"
-log "plan written to $GENERATED_DIR/bootstrap-plan.txt"
+if [[ -n "$REVIEWED_PLAN" ]]; then
+  PLAN_FILE="$REVIEWED_PLAN"
+else
+  dirty=false
+  [[ -z "$(git -C "$REPO_ROOT" status --porcelain -- infra/terraform/bootstrap infra/config infra/scripts)" ]] || dirty=true
+  terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE"
+  terraform show -no-color "$PLAN_FILE" >"$GENERATED_DIR/bootstrap-plan.txt"
+  jq -n --arg commit "$COMMIT" --arg account "$EXPECTED" --arg repo "$REPO" --arg sum "$(sha256_of "$PLAN_FILE")" \
+    --argjson state_exists "$STATE_EXISTS" --argjson dirty "$dirty" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg run "${GITHUB_RUN_ID:-local}" \
+    '{mode: "plan", commit: $commit, dirty: $dirty, account_id: $account, repository: $repo, plan_sha256: $sum,
+      state_exists: $state_exists, created_at: $at, run_id: $run}' >"$META_FILE"
+  log "plan written to $GENERATED_DIR/bootstrap-plan.txt (metadata: $META_FILE)"
+fi
+
+guard_plan "$PLAN_FILE"
 
 if [[ "$MODE" == "plan" ]]; then
   log "plan mode: nothing was created"
   exit 0
 fi
 
-if ((!YES)); then
-  read -r -p "Apply the bootstrap plan to AWS account $EXPECTED? Type the account ID to confirm: " answer
+if [[ -z "$REVIEWED_PLAN" ]]; then
+  terraform show -no-color "$PLAN_FILE" >&2
+  read -r -p "Apply the plan above to AWS account $EXPECTED? Type the account ID to confirm: " answer
+  [[ "$answer" == "$EXPECTED" ]] || die "not confirmed"
+elif ((!YES)); then
+  terraform show -no-color "$PLAN_FILE" >&2
+  read -r -p "Apply the reviewed plan above to AWS account $EXPECTED? Type the account ID to confirm: " answer
   [[ "$answer" == "$EXPECTED" ]] || die "not confirmed"
 fi
 
+# Terraform itself refuses a saved plan whose state has changed since it was made ("stale plan").
 terraform apply -input=false -lock-timeout=5m "$PLAN_FILE"
-rm -f "$PLAN_FILE"
+[[ -n "$REVIEWED_PLAN" ]] || rm -f "$PLAN_FILE"
 
 if [[ "$STATE_EXISTS" != "true" ]]; then
   KEY_ARN="$(terraform output -raw state_kms_key_arn)"
@@ -111,7 +185,7 @@ if [[ "$STATE_EXISTS" != "true" ]]; then
   write_backend
   backend_args "$KEY_ARN"
   terraform init -migrate-state -force-copy -input=false "${BARGS[@]}" >/dev/null
-  aws s3api head-object --bucket "$BUCKET" --key "$STATE_KEY" >/dev/null ||
+  aws s3api head-object --bucket "$BUCKET" --key "$STATE_KEY" --expected-bucket-owner "$EXPECTED" >/dev/null ||
     die "state migration could not be verified; keep terraform.tfstate and see the runbook §6"
   rm -f terraform.tfstate terraform.tfstate.backup
   log "state migrated and verified; local copy removed"

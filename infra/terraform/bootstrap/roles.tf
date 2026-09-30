@@ -1,9 +1,11 @@
 # GitHub OIDC roles (plan §6). Each is trusted by exactly one GitHub environment, carries the boundary, and
-# lives at most one hour. No role can read application data (Litestream/snapshot/anchor objects) or the
-# seeded application secrets (/veda/staging/app/*): only the host role will (AUT-106).
+# lives at most one hour. The plan, deploy and evidence roles cannot read application data (Litestream,
+# snapshot and anchor objects) or the seeded application secrets (/veda/staging/app/*). The apply role carries
+# the same explicit denies, but it administers the staging account (SSM commands, EC2, Lambda and PassRole of
+# veda-* roles), so it could reach that data through the host role: it is controlled by the staging-infra
+# approval, not by these denies (review package R1).
 
 locals {
-  state_bucket_arn = "arn:${local.partition}:s3:::${local.state_bucket_name}"
   param_arn_prefix = "arn:${local.partition}:ssm:${local.region}:${local.account_id}:parameter/${local.prefix}/staging"
   instance_arns    = "arn:${local.partition}:ec2:${local.region}:${local.account_id}:instance/*"
   document_arn     = "arn:${local.partition}:ssm:${local.region}:${local.account_id}:document"
@@ -13,13 +15,14 @@ locals {
 resource "aws_iam_role" "github" {
   for_each = local.role_names
 
-  name                 = each.value
-  description          = "GitHub Actions (${var.github_environments[each.key]} environment) for ${var.github_owner}/${var.github_repo}"
-  assume_role_policy   = data.aws_iam_policy_document.github_trust[each.key].json
-  permissions_boundary = aws_iam_policy.boundary.arn
+  name               = each.value
+  description        = "GitHub Actions (${var.github_environments[each.key]} environment) for ${var.github_owner}/${var.github_repo}"
+  assume_role_policy = data.aws_iam_policy_document.github_trust[each.key].json
+  # Built from the name so the plan shows it (the plan guard refuses a role whose boundary is unknown).
+  permissions_boundary = local.boundary_arn
   max_session_duration = var.role_max_session_seconds
 
-  depends_on = [aws_iam_openid_connect_provider.github]
+  depends_on = [aws_iam_openid_connect_provider.github, aws_iam_policy.boundary]
 }
 
 # --- shared statements ---------------------------------------------------------------------------------------
@@ -52,17 +55,32 @@ data "aws_iam_policy_document" "state_rw" {
     sid       = "StateList"
     actions   = ["s3:ListBucket"]
     resources = [local.state_bucket_arn]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   statement {
     sid       = "StateRead"
     actions   = ["s3:GetObject"]
     resources = ["${local.state_bucket_arn}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   # Workflows write only the staging stacks' state; bootstrap/ stays writable by the owner session alone.
   statement {
     sid       = "StagingStateWrite"
     actions   = ["s3:PutObject", "s3:DeleteObject"]
     resources = ["${local.state_bucket_arn}/staging/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   statement {
     sid       = "StateKey"
@@ -81,16 +99,31 @@ data "aws_iam_policy_document" "state_read_lock" {
     sid       = "StateList"
     actions   = ["s3:ListBucket"]
     resources = [local.state_bucket_arn]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   statement {
     sid       = "StateRead"
     actions   = ["s3:GetObject"]
     resources = ["${local.state_bucket_arn}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   statement {
     sid       = "StateLockFileOnly"
     actions   = ["s3:PutObject", "s3:DeleteObject"]
     resources = ["${local.state_bucket_arn}/staging/*.tflock"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
   statement {
     sid       = "StateKey"
@@ -106,11 +139,46 @@ data "aws_iam_policy_document" "state_read_lock" {
 
 # --- plan: read-only view of the account plus state read and lock ------------------------------------------
 
+# ReadOnlyAccess is what terraform plan needs to refresh every staging resource, but it also reads data. The
+# plan role runs from the staging-plan environment (reviewer required, F9) and is further denied:
+#   - parameter values outside /veda/staging/config (so every SecureString, including /edge/*);
+#   - object reads in every bucket except Terraform state;
+#   - log contents, console output, command output and data-plane reads.
 data "aws_iam_policy_document" "plan" {
   source_policy_documents = [
     data.aws_iam_policy_document.state_read_lock.json,
     data.aws_iam_policy_document.deny_data_reads.json,
   ]
+
+  statement {
+    sid     = "DenyParameterValuesOutsideConfig"
+    effect  = "Deny"
+    actions = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath", "ssm:GetParameterHistory"]
+    not_resources = [
+      "${local.param_arn_prefix}/config",
+      "${local.param_arn_prefix}/config/*",
+      "arn:${local.partition}:ssm:${local.region}::parameter/aws/*",
+    ]
+  }
+
+  statement {
+    sid           = "DenyObjectReadsOutsideState"
+    effect        = "Deny"
+    actions       = ["s3:GetObject", "s3:GetObjectVersion", "s3:GetObjectAttributes", "s3:GetObjectTorrent"]
+    not_resources = ["${local.state_bucket_arn}/*"]
+  }
+
+  statement {
+    sid    = "DenyLogAndDataPlaneReads"
+    effect = "Deny"
+    actions = [
+      "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults", "logs:StartLiveTail",
+      "logs:GetLogRecord", "ec2:GetConsoleOutput", "ec2:GetConsoleScreenshot", "ec2:GetPasswordData",
+      "ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "dynamodb:GetItem", "dynamodb:BatchGetItem",
+      "dynamodb:Query", "dynamodb:Scan", "sqs:ReceiveMessage", "kinesis:GetRecords", "athena:GetQueryResults",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_policy" "plan" {
@@ -180,23 +248,6 @@ data "aws_iam_policy_document" "apply_iam" {
       "iam:AttachRolePolicy", "iam:DetachRolePolicy",
     ]
     resources = ["arn:${local.partition}:iam::${local.account_id}:role/${local.prefix}-*"]
-  }
-
-  statement {
-    sid       = "DenyPrivilegedManagedPolicies"
-    effect    = "Deny"
-    actions   = ["iam:AttachRolePolicy"]
-    resources = ["*"]
-    condition {
-      test     = "ArnEquals"
-      variable = "iam:PolicyARN"
-      values = [
-        "arn:${local.partition}:iam::aws:policy/AdministratorAccess",
-        "arn:${local.partition}:iam::aws:policy/PowerUserAccess",
-        "arn:${local.partition}:iam::aws:policy/IAMFullAccess",
-        "arn:${local.partition}:iam::aws:policy/AWSOrganizationsFullAccess",
-      ]
-    }
   }
 
   statement {
@@ -291,12 +342,22 @@ data "aws_iam_policy_document" "deploy" {
     sid       = "ArtifactsBundle"
     actions   = ["s3:PutObject", "s3:GetObject"]
     resources = ["arn:${local.partition}:s3:::${local.artifacts_bucket_name}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
 
   statement {
     sid       = "ArtifactsList"
     actions   = ["s3:ListBucket"]
     resources = ["arn:${local.partition}:s3:::${local.artifacts_bucket_name}"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
 
   statement {
@@ -417,12 +478,22 @@ data "aws_iam_policy_document" "evidence" {
     sid       = "FileEvidence"
     actions   = ["s3:PutObject", "s3:GetObject"]
     resources = ["arn:${local.partition}:s3:::${local.evidence_bucket_name}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
 
   statement {
     sid       = "ListEvidence"
     actions   = ["s3:ListBucket"]
     resources = ["arn:${local.partition}:s3:::${local.evidence_bucket_name}"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceAccount"
+      values   = [local.account_id]
+    }
   }
 }
 

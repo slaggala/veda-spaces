@@ -2,6 +2,9 @@
 # Auto-discovery for the staging bootstrap (plan §13, AUT-003). READ-ONLY: every AWS, Cloudflare and GitHub
 # call below is a Get/List/Describe/Head. Nothing is created or changed.
 #
+# It first proves the session is in the approved staging account (F3: manifest, account name and alias, no
+# production/Aurion name, no foreign resources) and stops otherwise. Lookups the plan depends on fail closed.
+#
 #   infra/scripts/discover.sh --expected-account-id 123456789012 [--repo owner/repo]
 #
 # Optional environment: CF_API_TOKEN (Cloudflare discovery), VEDA_ZONE (default vedaspaces.com),
@@ -28,7 +31,7 @@ done
 require_tools aws jq curl git
 require_account_id "$EXPECTED"
 require_region
-require_expected_account "$EXPECTED"
+verify_account_identity "$EXPECTED"
 mkdir -p "$GENERATED_DIR"
 
 REPO="$(resolve_repo "$REPO_ARG")"
@@ -55,18 +58,18 @@ ses="$(aws sesv2 get-account --output json 2>/dev/null |
 oidc_arn="$(aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn' --output json |
   jq -r '.[] | select(endswith("/token.actions.githubusercontent.com"))' | head -n1)"
 # A provider this bootstrap created (default tags stack=bootstrap, project=veda-spaces) stays managed by it;
-# only a provider that predates the bootstrap is passed in as "existing" (passing ours would plan its removal).
+# only a provider that predates the bootstrap is passed in as "existing" (passing ours would plan its removal,
+# which prevent_destroy and the plan guard also refuse). A failed tag lookup stops discovery (F4).
 oidc_managed=false
-if [[ -n "$oidc_arn" ]] &&
-  aws iam list-open-id-connect-provider-tags --open-id-connect-provider-arn "$oidc_arn" --output json |
-  jq -e '[.Tags[] | "\(.Key)=\(.Value)"] | (index("stack=bootstrap") != null and index("project=veda-spaces") != null)' >/dev/null; then
-  oidc_managed=true
-fi
+[[ -z "$oidc_arn" ]] || oidc_managed="$(oidc_provider_managed "$oidc_arn")"
 oidc_existing_input="$oidc_arn"
 [[ "$oidc_managed" == true ]] && oidc_existing_input=""
 
 bucket="$(state_bucket_name "$EXPECTED")"
-if aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then state_exists=true; else state_exists=false; fi
+# Assigned before comparing: a failed lookup must stop the run, not read as "absent".
+bucket_status="$(state_bucket_status "$bucket" "$EXPECTED")"
+state_exists=false
+[[ "$bucket_status" == exists ]] && state_exists=true
 
 state_key_arn="$(aws kms describe-key --key-id "alias/${VEDA_PREFIX}-tfstate" --query KeyMetadata.Arn \
   --output text 2>/dev/null || echo "")"
@@ -89,7 +92,15 @@ if [[ -n "${CF_API_TOKEN:-}" ]]; then
   cf_get() { curl -fsS -H "Authorization: Bearer $CF_API_TOKEN" "https://api.cloudflare.com/client/v4$1"; }
   if zone="$(cf_get "/zones?name=${VEDA_ZONE}" | jq -c '.result[0] // empty')" && [[ -n "$zone" ]]; then
     zone_id="$(jq -r .id <<<"$zone")"
-    records="$(cf_get "/zones/${zone_id}/dns_records?per_page=1000" | jq -c '[.result[] | {name, type}]')"
+    # Every page, so a large zone cannot hide a collision (F13).
+    records='[]'
+    page=1
+    while :; do
+      resp="$(cf_get "/zones/${zone_id}/dns_records?per_page=100&page=${page}")"
+      records="$(jq -c --argjson acc "$records" '$acc + [.result[] | {name, type}]' <<<"$resp")"
+      (("$(jq -r '.result_info.total_pages // 1' <<<"$resp")" > page)) || break
+      page=$((page + 1))
+    done
     # Names the staging stacks will create must not exist yet; the live-site names must.
     planned='["api-staging","app-staging","staging","bounce.staging","_dmarc.staging"]'
     cf="$(jq -n --argjson z "$zone" --argjson r "$records" --argjson p "$planned" --arg zone "$VEDA_ZONE" '

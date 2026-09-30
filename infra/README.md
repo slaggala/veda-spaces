@@ -13,7 +13,7 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | Item | State |
 |---|---|
 | AUT-001 repository structure | this directory |
-| AUT-002 Terraform bootstrap | `terraform/bootstrap/`: written and tested offline, **not applied** |
+| AUT-002 Terraform bootstrap | `terraform/bootstrap/`: written and tested offline, remediated after independent review, **not applied** |
 | AUT-003 bootstrap workflow | `.github/workflows/00-bootstrap.yml` + `scripts/`: **not run** |
 | AUT-101 onward | not started (see `terraform/modules/README.md`) |
 
@@ -23,14 +23,18 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 infra/
   Makefile                 make -C infra help
   .tflint.hcl              tflint + AWS ruleset (pinned)
+  config/
+    staging-account.json   the approved staging account (reviewed change only; null until the owner commits it)
   scripts/
-    lib.sh                 shared guards (region, account, repository)
+    lib.sh                 shared guards (region, approved account, account identity, fail-closed lookups)
     discover.sh            read-only auto-discovery → generated/discovered.json
-    bootstrap.sh           plan | apply of terraform/bootstrap, state migration, outputs
-    github-setup.sh        GitHub environments and variables (dry run by default)
+    check-plan.sh          plan guard: no destroy, bounded roles, no external trust or resource policies
+    bootstrap.sh           plan | apply of a reviewed plan, state migration, outputs
+    github-setup.sh        GitHub environments, main protection, --verify, variables (dry run by default)
+  tests/                   offline script/workflow tests with stub aws, gh, terraform (make test-scripts)
   terraform/
     bootstrap/             state bucket + KMS, GitHub OIDC, 4 roles, permissions boundary, account guardrails
-      tests/               offline `terraform test` suite
+      tests/               offline `terraform test` suite, IAM policy evaluator, negative tests
     modules/               AUT-101 … AUT-112, AUT-201 … AUT-205
     envs/staging-core/     AWS root (AUT-1xx)
     envs/staging-edge/     Cloudflare root (AUT-2xx)
@@ -53,21 +57,30 @@ infra/
 ## Commands
 
 ```sh
-make -C infra check                                             # offline: fmt, validate, test, tflint, checkov, shellcheck, actionlint
-make -C infra bootstrap-plan  EXPECTED_ACCOUNT_ID=123456789012   # read-only against the Veda account
-make -C infra bootstrap-apply EXPECTED_ACCOUNT_ID=123456789012   # one time; asks to type the account ID
-make -C infra github-environments                                # dry run; APPLY=1 to create
+make -C infra check                                             # offline: fmt, validate, test, test-scripts, tflint, checkov, shellcheck, actionlint
+make -C infra bootstrap-plan  EXPECTED_ACCOUNT_ID=123456789012   # read-only against the approved Veda account
+make -C infra bootstrap-apply EXPECTED_ACCOUNT_ID=123456789012 PLAN_FILE=generated/bootstrap.tfplan
+                                                                 # applies that reviewed plan; asks to type the account ID
+make -C infra github-environments                                # dry run; APPLY=1 to create (and protect main)
+make -C infra github-verify                                      # read back; fails on drift
 make -C infra github-variables                                   # dry run; APPLY=1 to set
 ```
 
 ## Safety rules
 
-- **One account, one region:** every script checks the session's account against `EXPECTED_ACCOUNT_ID`, the
-  provider pins `allowed_account_ids`, and the boundary refuses any region except ap-south-1.
+- **One approved account, one region:** the account is committed in `config/staging-account.json` and changed only
+  by a reviewed pull request. Every script, the workflow and the Terraform validation check it. Discovery also checks
+  the live account name and alias and refuses foreign resources. The provider pins `allowed_account_ids`, and the
+  boundary refuses any region except ap-south-1.
 - **No long-lived AWS keys in GitHub:** only the one-time bootstrap uses owner credentials, and it accepts
-  temporary STS credentials only. Everything after it uses OIDC roles pinned to one repository and one GitHub environment.
-- **Plan before apply:** `00-bootstrap` defaults to `plan`; apply needs the `bootstrap` environment reviewers.
-- **No application data or secrets for CI roles:** every GitHub role is denied Litestream/snapshot/anchor
-  object reads and `/veda/staging/app/*` parameters.
-- **Data-bearing resources** (`prevent_destroy`): state bucket, state KMS key; later the data volume and the
-  Object Lock buckets.
+  temporary STS credentials only (`ASIA…` key with a session token). Everything after it uses OIDC roles pinned to
+  one repository and one GitHub environment.
+- **Apply only what was reviewed:** `00-bootstrap` defaults to `plan`. Apply takes the plan file of a named plan run of
+  the same commit and verifies its checksum, commit, account and state layout. The plan guard refuses every destroy.
+- **The boundary cannot be escaped:** every Veda role, and every role they create, carries `veda-boundary`; IAM
+  writes outside `veda-*` are refused.
+- **Application data and secrets:** the plan, deploy and evidence roles cannot read Litestream/snapshot/anchor
+  objects or `/veda/staging/app/*`. The apply role administers the account and is controlled by its approval, not by
+  those denies (runbook §7).
+- **Data-bearing and protective resources** (`prevent_destroy`): state bucket, state KMS key, account guardrails,
+  OIDC provider; later the data volume and the Object Lock buckets.

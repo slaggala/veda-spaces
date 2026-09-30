@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Offline stand-in for terraform in the bootstrap.sh tests (infra/tests only). Logs every call to
+# $TF_STUB_DIR/calls.log; "show -json" prints $TF_STUB_DIR/plan.json, "output -json" prints
+# $TF_STUB_DIR/outputs.json, "plan -out=F" writes F. init/apply succeed without doing anything.
+set -euo pipefail
+: "${TF_STUB_DIR:?TF_STUB_DIR must be set}"
+printf '%s\n' "$*" >>"$TF_STUB_DIR/calls.log"
+case "${1:-}" in
+  init | apply) exit 0 ;;
+  plan)
+    for a in "$@"; do [[ "$a" == -out=* ]] && echo "stub plan" >"${a#-out=}"; done
+    exit 0
+    ;;
+  show)
+    if [[ " $* " == *" -json "* ]]; then cat "$TF_STUB_DIR/plan.json"; else echo "stub plan text"; fi
+    ;;
+  output)
+    if [[ "${2:-}" == -json ]]; then cat "$TF_STUB_DIR/outputs.json"; else echo "arn:aws:kms:ap-south-1:111122223333:key/k"; fi
+    ;;
+  *) echo "terraform stub: unsupported '$*'" >&2; exit 1 ;;
+esac

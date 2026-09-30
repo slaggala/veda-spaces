@@ -19,13 +19,13 @@ WORKFLOWS  := $(wildcard ../.github/workflows/0*.yml)
 OFFLINE_ENV := AWS_PROFILE= AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= AWS_SESSION_TOKEN= \
                AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true
 
-.PHONY: help check fmt fmt-check validate test lint tflint checkov shellcheck actionlint \
-        discover bootstrap-plan bootstrap-apply github-environments github-variables clean
+.PHONY: help check fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
+        discover bootstrap-plan bootstrap-apply github-environments github-verify github-variables clean
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-22s %s\n", $$1, $$2}'
 
-check: fmt-check validate test lint ## All offline checks (no AWS access)
+check: fmt-check validate test test-scripts lint ## All offline checks (no AWS access)
 
 fmt: ## Format Terraform
 	$(TERRAFORM) fmt -recursive terraform
@@ -45,6 +45,9 @@ test: ## terraform test (offline, overridden provider values; creates nothing)
 	  (cd $$r && $(OFFLINE_ENV) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(TERRAFORM) test) || exit 1; \
 	done
 
+test-scripts: ## Script, plan-guard, workflow and negative Terraform tests (offline; stubbed aws/gh)
+	$(OFFLINE_ENV) TERRAFORM=$(TERRAFORM) tests/run.sh
+
 lint: tflint checkov shellcheck actionlint ## All linters
 
 tflint: ## tflint with the AWS ruleset
@@ -54,8 +57,8 @@ tflint: ## tflint with the AWS ruleset
 checkov: ## checkov (every skip is inline and justified)
 	@for r in $(ROOTS); do $(CHECKOV) -d $$r --framework terraform --compact --quiet --skip-download || exit 1; done
 
-shellcheck: ## shellcheck the scripts
-	$(SHELLCHECK) $(SCRIPTS)
+shellcheck: ## shellcheck the scripts and their tests
+	$(SHELLCHECK) $(SCRIPTS) tests/run.sh tests/stubs/aws tests/stubs/gh tests/stubs/terraform
 
 actionlint: ## actionlint the infra workflows
 	$(ACTIONLINT) $(WORKFLOWS)
@@ -66,11 +69,15 @@ discover: ## Read-only discovery (needs EXPECTED_ACCOUNT_ID and a session in tha
 bootstrap-plan: ## Bootstrap plan: read-only (needs EXPECTED_ACCOUNT_ID)
 	scripts/bootstrap.sh --mode plan --expected-account-id "$(EXPECTED_ACCOUNT_ID)"
 
-bootstrap-apply: ## Bootstrap apply: creates the bootstrap resources (asks to type the account ID)
-	scripts/bootstrap.sh --mode apply --expected-account-id "$(EXPECTED_ACCOUNT_ID)"
+bootstrap-apply: ## Bootstrap apply of the plan it shows, or of a reviewed PLAN_FILE (asks to type the account ID)
+	scripts/bootstrap.sh --mode apply --expected-account-id "$(EXPECTED_ACCOUNT_ID)" \
+	  $(if $(PLAN_FILE),--plan-file $(PLAN_FILE) --plan-meta $(or $(PLAN_META),generated/bootstrap-plan.meta.json))
 
-github-environments: ## Dry run of the GitHub environments (APPLY=1 to create them; REVIEWERS=a,b)
+github-environments: ## Dry run of the GitHub environments and main protection (APPLY=1 to apply; REVIEWERS=a,b)
 	scripts/github-setup.sh $(if $(REVIEWERS),--reviewers $(REVIEWERS)) $(if $(APPLY),--apply)
+
+github-verify: ## Read back environments and main protection; fail on drift
+	scripts/github-setup.sh --verify
 
 github-variables: ## Dry run of the GitHub variables from bootstrap outputs (APPLY=1 to set them)
 	scripts/github-setup.sh --outputs generated/bootstrap-outputs.json --variables-only $(if $(APPLY),--apply)

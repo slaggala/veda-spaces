@@ -2,12 +2,19 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
+  # Approved account and account-wide choices, from the reviewed manifest (F3, F5).
+  manifest_path       = var.account_manifest_path != "" ? var.account_manifest_path : "${path.module}/../../config/staging-account.json"
+  manifest            = jsondecode(file(local.manifest_path))
+  approved_account_id = try(regex("^[0-9]{12}$", local.manifest.account_id), "")
+  manage_guardrails   = try(local.manifest.manage_account_guardrails, true) == true
+
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
   region     = var.aws_region
   prefix     = var.name_prefix
 
   state_bucket_name = "${local.prefix}-tfstate-${local.account_id}"
+  state_bucket_arn  = "arn:${local.partition}:s3:::${local.state_bucket_name}"
 
   # Names the later stacks will create (AUT-103/105/107/108); the deploy and evidence roles are scoped to
   # them now so that no later stack has to widen a bootstrap role.
@@ -26,6 +33,8 @@ locals {
     deploy   = "${local.prefix}-gh-deploy"
     evidence = "${local.prefix}-gh-evidence"
   }
+
+  veda_role_arn_pattern = "arn:${local.partition}:iam::${local.account_id}:role/${local.prefix}-*"
 
   boundary_name = "${local.prefix}-boundary"
   boundary_arn  = "arn:${local.partition}:iam::${local.account_id}:policy/${local.boundary_name}"

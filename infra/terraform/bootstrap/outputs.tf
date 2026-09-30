@@ -46,3 +46,17 @@ output "backend_config" {
     }
   }
 }
+
+# Rendered policies, for review and for the offline policy evaluator in tests/ (no secrets).
+output "policy_documents" {
+  description = "Boundary, role and state-bucket policy JSON exactly as applied."
+  value = {
+    boundary       = data.aws_iam_policy_document.boundary.json
+    plan           = data.aws_iam_policy_document.plan.json
+    apply_services = data.aws_iam_policy_document.apply_services.json
+    apply_iam      = data.aws_iam_policy_document.apply_iam.json
+    deploy         = data.aws_iam_policy_document.deploy.json
+    evidence       = data.aws_iam_policy_document.evidence.json
+    state_bucket   = data.aws_iam_policy_document.state_bucket.json
+  }
+}

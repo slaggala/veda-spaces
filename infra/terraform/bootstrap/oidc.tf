@@ -5,6 +5,12 @@ resource "aws_iam_openid_connect_provider" "github" {
 
   url            = "https://${local.oidc_host}"
   client_id_list = ["sts.amazonaws.com"]
+
+  # A discovery mistake that passes our own provider in as "existing" must fail the plan, not delete the
+  # provider every workflow federates through (F4).
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # One trust policy per role: the exact repository AND the exact GitHub environment. Branch, pull-request

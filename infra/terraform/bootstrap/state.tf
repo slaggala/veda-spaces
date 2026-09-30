@@ -97,14 +97,16 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
   depends_on = [aws_s3_bucket_versioning.state]
 }
 
+# Resource-side controls that hold even for a role outside veda-boundary (F2): every veda-* role is refused
+# bootstrap state writes and any bucket configuration change. Only the owner session maintains the bucket.
 data "aws_iam_policy_document" "state_bucket" {
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [
-      aws_s3_bucket.state.arn,
-      "${aws_s3_bucket.state.arn}/*",
+      local.state_bucket_arn,
+      "${local.state_bucket_arn}/*",
     ]
     principals {
       type        = "*"
@@ -117,19 +119,57 @@ data "aws_iam_policy_document" "state_bucket" {
     }
   }
 
+  # Keys outside this account and region are refused. The pattern (not the exact key ARN, which exists only after
+  # apply) keeps the whole bucket policy known at plan time, so the reviewer and the plan guard see it on the
+  # first run too. Default encryption still uses the state key.
   statement {
     sid       = "DenyWrongKmsKey"
     effect    = "Deny"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.state.arn}/*"]
+    resources = ["${local.state_bucket_arn}/*"]
     principals {
       type        = "*"
       identifiers = ["*"]
     }
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotLikeIfExists"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
-      values   = [aws_kms_key.state.arn]
+      values   = ["arn:${local.partition}:kms:${local.region}:${local.account_id}:key/*"]
+    }
+  }
+
+  statement {
+    sid       = "DenyVedaRolesBootstrapStateWrites"
+    effect    = "Deny"
+    actions   = ["s3:PutObject", "s3:DeleteObject", "s3:PutObjectTagging", "s3:DeleteObjectTagging"]
+    resources = ["${local.state_bucket_arn}/bootstrap/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:PrincipalArn"
+      values   = [local.veda_role_arn_pattern]
+    }
+  }
+
+  statement {
+    sid    = "DenyVedaRolesBucketChanges"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteBucket*", "s3:PutBucket*", "s3:Put*Configuration", "s3:PutObjectAcl", "s3:PutObjectVersionAcl",
+      "s3:PutObjectRetention", "s3:PutObjectLegalHold", "s3:DeleteObjectVersion*",
+    ]
+    resources = [local.state_bucket_arn, "${local.state_bucket_arn}/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:PrincipalArn"
+      values   = [local.veda_role_arn_pattern]
     }
   }
 }

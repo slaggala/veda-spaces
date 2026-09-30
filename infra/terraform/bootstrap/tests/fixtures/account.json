@@ -1,0 +1,17 @@
+{
+  "description": "Offline test fixture.",
+  "account_id": "111122223333",
+  "account_name": "veda-staging",
+  "account_alias": "veda-staging",
+  "region": "ap-south-1",
+  "manage_account_guardrails": true,
+  "allowed_foreign_resources": {
+    "iam_roles": [
+      "OrganizationAccountAccessRole"
+    ],
+    "iam_users": [],
+    "s3_buckets": [],
+    "ec2_instances": [],
+    "lambda_functions": []
+  }
+}
