@@ -1,0 +1,45 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SessionCeiling",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyOutsideMumbai",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:*",
+        "sts:*",
+        "budgets:*",
+        "ce:*",
+        "cur:*",
+        "health:*",
+        "support:*",
+        "trustedadvisor:*",
+        "organizations:Describe*",
+        "organizations:List*",
+        "account:Get*",
+        "account:List*",
+        "ec2:DescribeRegions",
+        "ec2:DescribeInstances",
+        "ec2:DescribeVpcs",
+        "lambda:ListFunctions",
+        "rds:DescribeDBInstances",
+        "ecs:ListClusters",
+        "kms:ListKeys",
+        "kms:ListAliases",
+        "kms:DescribeKey",
+        "secretsmanager:ListSecrets"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "ap-south-1"
+        }
+      }
+    }
+  ]
+}

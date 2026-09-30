@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Offline stand-in for the GitHub CLI (infra/tests only). "gh api [-X METHOD] <path> [--jq EXPR]" answers GET from
+# $GH_STUB_DIR/<path with / replaced by _>.json (missing file: HTTP 404, exit 1), applying --jq like gh does.
+# Writes (-X other than GET) and every call are logged to $GH_STUB_DIR/calls.log. Nothing reaches GitHub.
+set -euo pipefail
+: "${GH_STUB_DIR:?GH_STUB_DIR must be set}"
+printf '%s\n' "$*" >>"$GH_STUB_DIR/calls.log"
+[[ "${1:-}" == api ]] || { echo "gh stub: only 'gh api' is supported (got: $*)" >&2; exit 1; }
+shift
+method=GET path="" jq_expr=""
+while (($#)); do
+  case "$1" in
+    -X) method="$2"; shift 2 ;;
+    --jq) jq_expr="$2"; shift 2 ;;
+    --input | -f) shift 2 ;;
+    *) path="$1"; shift ;;
+  esac
+done
+[[ "$method" == GET ]] || { cat >/dev/null; exit 0; }
+file="$GH_STUB_DIR/$(tr '/' '_' <<<"$path").json"
+[[ -f "$file" ]] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+if [[ -n "$jq_expr" ]]; then jq -r "$jq_expr" "$file"; else cat "$file"; fi

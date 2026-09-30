@@ -1,0 +1,22 @@
+{
+  "description": "Approved Veda staging AWS account (F3), the owner principals of its bootstrap state (RR-01/RR-02) and the owner decisions the scripts enforce (PB-01). Bootstrap refuses to run until account_id, account_name, account_alias and bootstrap_principal_arns are committed here through a reviewed pull request; infra/scripts/check-manifest.sh --complete must pass. See docs/operations/staging-bootstrap.md section 2.",
+  "schema_version": 2,
+  "account_id": null,
+  "account_name": null,
+  "account_alias": null,
+  "region": "ap-south-1",
+  "organizations_mode": "standalone",
+  "repository": "slaggala/veda-spaces",
+  "repository_id": 1392733148,
+  "max_owner_session_seconds": 3600,
+  "manage_account_guardrails": true,
+  "bootstrap_principal_arns": [],
+  "allowed_foreign_resources": {
+    "iam_roles": [],
+    "iam_users": [],
+    "saml_providers": [],
+    "s3_buckets": [],
+    "ec2_instances": [],
+    "lambda_functions": []
+  }
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Offline stand-in for terraform in the bootstrap.sh tests (infra/tests only). Logs every call to
+# $TF_STUB_DIR/calls.log; "show -json" prints $TF_STUB_DIR/plan.json, "show" prints $TF_STUB_DIR/plan.txt (default
+# "stub plan text"), "output -json" prints $TF_STUB_DIR/outputs.json, "version -json" reports 1.16.4 (or
+# $TF_STUB_DIR/version), "plan -out=F" writes F. init/apply succeed without doing anything.
+set -euo pipefail
+: "${TF_STUB_DIR:?TF_STUB_DIR must be set}"
+printf '%s\n' "$*" >>"$TF_STUB_DIR/calls.log"
+case "${1:-}" in
+  init | apply) exit 0 ;;
+  plan)
+    for a in "$@"; do [[ "$a" == -out=* ]] && echo "stub plan" >"${a#-out=}"; done
+    exit 0
+    ;;
+  show)
+    if [[ " $* " == *" -json "* ]]; then
+      cat "$TF_STUB_DIR/plan.json"
+    elif [[ -f "$TF_STUB_DIR/plan.txt" ]]; then
+      cat "$TF_STUB_DIR/plan.txt"
+    else
+      echo "stub plan text"
+    fi
+    ;;
+  version)
+    printf '{"terraform_version":"%s"}\n' "$(cat "$TF_STUB_DIR/version" 2>/dev/null || echo 1.16.4)"
+    ;;
+  output)
+    if [[ "${2:-}" == -json ]]; then cat "$TF_STUB_DIR/outputs.json"; else echo "arn:aws:kms:ap-south-1:111122223333:key/k"; fi
+    ;;
+  *) echo "terraform stub: unsupported '$*'" >&2; exit 1 ;;
+esac

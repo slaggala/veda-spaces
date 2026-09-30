@@ -1,0 +1,13 @@
+# Reference only. infra/scripts/bootstrap.sh writes generated.auto.tfvars.json from discovery; set values here
+# (copied to terraform.tfvars, which is gitignored) only to override a discovered or default value.
+#
+# The account itself, and whether the bootstrap manages the account guardrails, are NOT set here: they come from
+# infra/config/staging-account.json, which changes only through a reviewed pull request (F3, F5).
+
+expected_account_id = "123456789012" # must equal account_id in infra/config/staging-account.json
+github_owner        = "example-org"
+github_repo         = "veda-spaces"
+
+# aws_region                        = "ap-south-1"   # fixed by ADR-008
+# existing_github_oidc_provider_arn = ""             # discovered when the account already has one
+# role_max_session_seconds          = 3600           # 900–3600

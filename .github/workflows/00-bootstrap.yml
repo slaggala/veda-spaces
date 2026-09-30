@@ -1,0 +1,259 @@
+# One-time bootstrap of the dedicated Veda staging AWS account (AUT-003; runbook docs/operations/staging-bootstrap.md).
+# The only workflow that uses owner credentials: a TEMPORARY STS session stored in the "bootstrap" environment,
+# which expires by itself. Everything after this runs through GitHub OIDC with no stored AWS keys.
+#
+# 1. mode=plan: discovery, terraform plan, plan guard. Uploads the plan, its text and its metadata; the job summary
+#    shows the plan's SHA-256.
+# 2. Review the plan text and the job summary of that run.
+# 3. mode=apply with plan_run_id=<that run> and plan_sha256=<the reviewed digest>. The run name shows both, so the
+#    bootstrap-environment reviewer approves that exact digest (RR-05). The apply accepts only a successful plan run
+#    of this workflow file on main for the same commit, only the artifact whose bytes match the digest GitHub
+#    recorded at upload, and only the plan file whose SHA-256 is the approved digest and whose re-rendered text is
+#    the reviewed text. Terraform refuses the plan if the state changed since.
+#
+# Runs only from a PRIVATE repository (N-04): the plan artifact and the job summary are readable by everyone who can
+# read the repository. A public repository uses the local procedure (runbook §4, owner decision: controlled local
+# first run). The repository must also be the one the manifest approves, by name and numeric ID (PB-01).
+#
+# Fails closed on environment protection (RR-07): the "preflight" job, which holds no secret, verifies that every
+# environment exists with required reviewers, no admin bypass and the main-only branch policy, and that main is
+# protected, BEFORE the "bootstrap" job can even request the environment (a missing environment is never
+# auto-created unprotected). The bootstrap job then proves it was approved by a reviewer before touching a secret.
+name: 00-bootstrap
+run-name: "00-bootstrap (${{ inputs.mode }}${{ inputs.mode == 'apply' && format(' of plan run {0}, plan sha256 {1}', inputs.plan_run_id, inputs.plan_sha256) || '' }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan (read-only) or apply (of a reviewed plan run)"
+        type: choice
+        options: [plan, apply]
+        default: plan
+      expected_account_id:
+        description: "Dedicated Veda staging AWS account ID (must match infra/config/staging-account.json)"
+        type: string
+        required: true
+      plan_run_id:
+        description: "apply only: run ID of the reviewed 00-bootstrap plan run for this same commit"
+        type: string
+        required: false
+        default: ""
+      plan_sha256:
+        description: "apply only: the reviewed plan's SHA-256, from the plan run's summary (the digest you approve)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read # read runs, approvals, environments and the reviewed plan artifact
+
+concurrency:
+  group: veda-bootstrap
+  cancel-in-progress: false
+
+env:
+  MODE: ${{ inputs.mode }}
+  EXPECTED_ACCOUNT_ID: ${{ inputs.expected_account_id }}
+  PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+  PLAN_SHA256: ${{ inputs.plan_sha256 }}
+  AWS_REGION: ap-south-1
+  AWS_DEFAULT_REGION: ap-south-1
+  TF_IN_AUTOMATION: "1"
+  TF_INPUT: "0"
+
+jobs:
+  # No environment and no secret: nothing here can expose credentials, and it gates the job that can.
+  preflight:
+    name: preflight (no credentials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Inputs, approved account and repository, this workflow on protected main
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "::error::mode must be plan or apply"; exit 1; }
+          [[ "$EXPECTED_ACCOUNT_ID" =~ ^[0-9]{12}$ ]] || { echo "::error::expected_account_id must be 12 digits"; exit 1; }
+          # F3: the account must be the one committed in the reviewed manifest.
+          approved="$(jq -r '.account_id // empty' infra/config/staging-account.json)"
+          [[ -n "$approved" ]] || { echo "::error::no approved account in infra/config/staging-account.json"; exit 1; }
+          [[ "$EXPECTED_ACCOUNT_ID" == "$approved" ]] || { echo "::error::$EXPECTED_ACCOUNT_ID is not the approved account"; exit 1; }
+          infra/scripts/check-manifest.sh --complete
+          # PB-01: the approved repository, by name and by ID (a re-registered name has another ID).
+          [[ "$GITHUB_REPOSITORY" == "$(jq -r .repository infra/config/staging-account.json)" &&
+             "$GITHUB_REPOSITORY_ID" == "$(jq -r .repository_id infra/config/staging-account.json)" ]] ||
+            { echo "::error::$GITHUB_REPOSITORY ($GITHUB_REPOSITORY_ID) is not the repository the manifest approves"; exit 1; }
+          # N-04: artifacts and summaries of a public repository are readable by anyone.
+          [[ "$REPOSITORY_PRIVATE" == "true" ]] ||
+            { echo "::error::00-bootstrap runs only from a private repository; use the local procedure (runbook §4)"; exit 1; }
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::00-bootstrap runs from main only"; exit 1; }
+          [[ "$GITHUB_WORKFLOW_REF" == "$GITHUB_REPOSITORY/.github/workflows/00-bootstrap.yml@refs/heads/main" ]] ||
+            { echo "::error::this is $GITHUB_WORKFLOW_REF, not 00-bootstrap.yml on main"; exit 1; }
+          if [[ "$MODE" == "apply" ]]; then
+            [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::apply needs plan_run_id (the reviewed plan run)"; exit 1; }
+            [[ "$PLAN_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::apply needs plan_sha256 (the reviewed plan digest)"; exit 1; }
+          else
+            [[ -z "$PLAN_RUN_ID" && -z "$PLAN_SHA256" ]] || { echo "::error::plan_run_id and plan_sha256 are for apply only"; exit 1; }
+          fi
+
+      - name: Environment protection (RR-07, before any environment or secret is used)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+
+      - name: Approved plan binding (RR-05)
+        if: inputs.mode == 'apply'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh plan-run --repo "$GITHUB_REPOSITORY" --run-id "$PLAN_RUN_ID" \
+            --this-run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA" --plan-sha256 "$PLAN_SHA256" --out infra/generated/reviewed
+
+  bootstrap:
+    name: bootstrap (${{ inputs.mode }})
+    needs: preflight
+    runs-on: ubuntu-24.04
+    environment: bootstrap
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.4
+          terraform_wrapper: false
+
+      # RR-07: proof that this job ran behind a required reviewer, and that the protection is still in place.
+      - name: Approved deployment and environment protection (RR-07)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment bootstrap
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .protected)" == "true" ]] ||
+            { echo "::error::main is not a protected branch: run 'make -C infra github-environments APPLY=1'"; exit 1; }
+
+      - name: Credential type (temporary STS session only)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BOOTSTRAP_AWS_ACCESS_KEY_ID }}
+          AWS_SESSION_TOKEN: ${{ secrets.BOOTSTRAP_AWS_SESSION_TOKEN }}
+        run: |
+          # Long-lived access keys are refused: only a temporary STS session (ASIA… key with a session token).
+          [[ -n "$AWS_SESSION_TOKEN" ]] || { echo "::error::BOOTSTRAP_AWS_SESSION_TOKEN is empty: provide temporary STS credentials"; exit 1; }
+          [[ "$AWS_ACCESS_KEY_ID" == ASIA* ]] || { echo "::error::BOOTSTRAP_AWS_ACCESS_KEY_ID is not a temporary (ASIA) key"; exit 1; }
+
+      # Downloaded again here (jobs share no files) and verified again: same run, same artifact digest, same plan digest.
+      - name: Fetch the approved plan (RR-05)
+        if: inputs.mode == 'apply'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh plan-run --repo "$GITHUB_REPOSITORY" --run-id "$PLAN_RUN_ID" \
+            --this-run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA" --plan-sha256 "$PLAN_SHA256" --out infra/generated/reviewed
+          ls -l infra/generated/reviewed
+
+      - name: Bootstrap (${{ inputs.mode }})
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BOOTSTRAP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BOOTSTRAP_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.BOOTSTRAP_AWS_SESSION_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_READ_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$MODE" == "plan" ]]; then
+            infra/scripts/bootstrap.sh --mode plan --expected-account-id "$EXPECTED_ACCOUNT_ID" --repo "$GITHUB_REPOSITORY"
+          else
+            infra/scripts/bootstrap.sh --mode apply --expected-account-id "$EXPECTED_ACCOUNT_ID" \
+              --plan-file infra/generated/reviewed/bootstrap.tfplan \
+              --plan-meta infra/generated/reviewed/bootstrap-plan.meta.json \
+              --plan-sha256 "$PLAN_SHA256" --plan-run-id "$PLAN_RUN_ID" --yes
+          fi
+
+      - name: Publish role ARNs and IDs as repository variables
+        if: inputs.mode == 'apply'
+        env:
+          # Fine-grained token with "Variables: write" on this repository only (F10).
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::GH_ADMIN_TOKEN not set: run 'make -C infra github-variables' locally with the bootstrap-outputs artifact"
+            exit 0
+          fi
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" \
+            --outputs infra/generated/bootstrap-outputs.json --variables-only --apply
+
+      # The plan artifact is what a later apply run applies; its name is fixed so that run can find it. Discovery
+      # output (caller ARN, runner IP, Cloudflare IDs) stays on the runner (N-04).
+      - name: Upload the plan for review and apply (no secrets)
+        id: upload
+        if: inputs.mode == 'plan'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bootstrap-plan-${{ github.run_id }}
+          path: |
+            infra/generated/bootstrap.tfplan
+            infra/generated/bootstrap-plan.meta.json
+            infra/generated/bootstrap-plan.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        env:
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          {
+            echo "## 00-bootstrap ($MODE) for account $EXPECTED_ACCOUNT_ID"
+            [[ -z "$PLAN_RUN_ID" ]] || echo "Applied the plan of run $PLAN_RUN_ID with the approved plan sha256 \`$PLAN_SHA256\`."
+            if [[ "$MODE" == plan && -f infra/generated/bootstrap-plan.meta.json ]]; then
+              echo '### To apply this plan'
+              echo "Review \`bootstrap-plan.txt\` (sha256 \`$(jq -r .plan_text_sha256 infra/generated/bootstrap-plan.meta.json)\`), then run"
+              echo "00-bootstrap with mode \`apply\`, plan_run_id \`$GITHUB_RUN_ID\` and plan_sha256:"
+              echo '```'
+              jq -r .plan_sha256 infra/generated/bootstrap-plan.meta.json
+              echo '```'
+              [[ -z "$ARTIFACT_DIGEST" ]] || echo "Artifact digest recorded at upload: \`$ARTIFACT_DIGEST\`."
+            fi
+            for meta in infra/generated/bootstrap-plan.meta.json infra/generated/reviewed/bootstrap-plan.meta.json; do
+              if [[ -f "$meta" ]]; then
+                echo '### Plan metadata'
+                echo '```json'
+                jq . "$meta"
+                echo '```'
+              fi
+            done
+            if [[ -f infra/generated/bootstrap-plan.txt ]]; then
+              echo '```'
+              grep -E '^Plan:|No changes' infra/generated/bootstrap-plan.txt || true
+              echo '```'
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload apply outputs (no secrets)
+        if: always() && inputs.mode == 'apply'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bootstrap-apply-${{ github.run_id }}
+          path: |
+            infra/generated/bootstrap-outputs.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # The bootstrap state holds no secrets. If a first apply fails before the state reaches S3, keep it so
+      # the next run can resume instead of recreating resources (runbook §6).
+      - name: Preserve unmigrated local state
+        if: failure() && inputs.mode == 'apply'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bootstrap-local-state-${{ github.run_id }}
+          path: infra/terraform/bootstrap/terraform.tfstate
+          if-no-files-found: ignore
+          retention-days: 30

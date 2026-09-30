@@ -1,0 +1,27 @@
+{
+  "description": "Offline test fixture (RR-01 owner allow-list).",
+  "schema_version": 2,
+  "account_id": "111122223333",
+  "account_name": "veda-staging",
+  "account_alias": "veda-staging",
+  "region": "ap-south-1",
+  "organizations_mode": "standalone",
+  "repository": "example-org/veda-spaces",
+  "repository_id": 424242,
+  "max_owner_session_seconds": 3600,
+  "manage_account_guardrails": true,
+  "bootstrap_principal_arns": [
+    "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole",
+    "arn:aws:iam::111122223333:role/veda-gh-apply"
+  ],
+  "allowed_foreign_resources": {
+    "iam_roles": [
+      "OrganizationAccountAccessRole"
+    ],
+    "iam_users": [],
+    "s3_buckets": [],
+    "ec2_instances": [],
+    "lambda_functions": [],
+    "saml_providers": []
+  }
+}

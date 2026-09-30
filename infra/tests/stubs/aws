@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Offline stand-in for the AWS CLI (infra/tests only). Answers "aws <service> <operation> ..." from
+# $AWS_STUB_DIR/<service>_<operation>@<region>.json if present, else $AWS_STUB_DIR/<service>_<operation>.json; a <service>_<operation>.fail file makes the call fail with its content
+# on stderr. Every call is appended to $AWS_STUB_DIR/calls.log. Nothing reaches AWS.
+set -euo pipefail
+: "${AWS_STUB_DIR:?AWS_STUB_DIR must be set}"
+printf '%s\n' "$*" >>"$AWS_STUB_DIR/calls.log"
+key="${1:-}_${2:-}"
+# A region-specific answer ($key@<region>.json/.fail, region from --region or AWS_REGION) wins over the default one.
+region="${AWS_REGION:-}"
+prev=""
+for a in "$@"; do
+  [[ "$prev" == --region ]] && region="$a"
+  prev="$a"
+done
+# An executable $key.cmd answers from the arguments (for calls whose answer depends on them).
+if [[ -x "$AWS_STUB_DIR/$key.cmd" ]]; then
+  exec "$AWS_STUB_DIR/$key.cmd" "$@"
+fi
+if [[ -n "$region" && -f "$AWS_STUB_DIR/$key@$region.fail" ]]; then
+  cat "$AWS_STUB_DIR/$key@$region.fail" >&2
+  exit 254
+fi
+if [[ -n "$region" && -f "$AWS_STUB_DIR/$key@$region.json" ]]; then
+  cat "$AWS_STUB_DIR/$key@$region.json"
+  exit 0
+fi
+if [[ -f "$AWS_STUB_DIR/$key.fail" ]]; then
+  cat "$AWS_STUB_DIR/$key.fail" >&2
+  exit 254
+fi
+if [[ -f "$AWS_STUB_DIR/$key.json" ]]; then
+  cat "$AWS_STUB_DIR/$key.json"
+  exit 0
+fi
+echo "aws stub: no response for '${1:-} ${2:-}'" >&2
+exit 255

@@ -127,6 +127,10 @@ KNOWN_COMMITS = {
     "ca9845c0dd60280fd19cdc9d41843d8567191801": ("Close P0 document conditions", "head when the owner decisions were recorded"),
     "1be68c2": ("Record P0 consolidated owner decisions", "head when the owner confirmation was synchronized"),
     "13276a017a137c4a86b15fea0306ea2e83ac2729": ("Prepare Veda Spaces for Cloudflare Pages", "live site (main)"),
+    "c29690326e11e1cc6a995989f103c33c95118031": ("Merge pull request #1 from slaggala/merge-prep/p0-foundation", "main before the staging bootstrap (AUT-001..003 base)"),
+    "fca56da706aa2ad3528d71f8c30dfa46f693cfb7": ("Add staging bootstrap infrastructure as code (AUT-001..003)", "staging bootstrap implementation"),
+    "74d0724e1de923ce81db2952bc1a7567cc79b315": ("Remediate AUT-001..003 independent review findings F1-F10", "staging bootstrap first remediation"),
+    "e8157f31a9e6df23d79c2b4d79bed896a7b65cb0": ("Close AUT-001..003 final-certification blockers RR-01/02/03/05/07", "staging bootstrap certified with pre-bootstrap conditions"),
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",
