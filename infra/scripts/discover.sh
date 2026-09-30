@@ -71,8 +71,9 @@ bucket_status="$(state_bucket_status "$bucket" "$EXPECTED")"
 state_exists=false
 [[ "$bucket_status" == exists ]] && state_exists=true
 
-state_key_arn="$(aws kms describe-key --key-id "alias/${VEDA_PREFIX}-tfstate" --query KeyMetadata.Arn \
-  --output text 2>/dev/null || echo "")"
+# RR-02: the state key is the one the bucket encrypts with (the alias must agree); a failed lookup stops discovery.
+state_key_arn=""
+[[ "$state_exists" == true ]] && state_key_arn="$(state_key_from_bucket "$bucket" "$EXPECTED")"
 
 if aws iam get-role --role-name "${VEDA_PREFIX}-gh-apply" >/dev/null 2>&1; then bootstrapped=true; else bootstrapped=false; fi
 

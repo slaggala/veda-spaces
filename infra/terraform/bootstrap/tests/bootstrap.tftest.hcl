@@ -32,6 +32,13 @@ override_data {
   values          = { partition = "aws" }
 }
 
+# The owner session runs as OrganizationAccountAccessRole, which the fixture manifest lists as a bootstrap principal.
+override_data {
+  target          = data.aws_iam_session_context.current
+  override_during = plan
+  values          = { issuer_arn = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }
+}
+
 override_resource {
   target          = aws_kms_key.state
   override_during = plan
@@ -110,6 +117,12 @@ run "defaults" {
     error_message = "A managed policy exceeds the 6,144-character IAM limit."
   }
 
+  # Bucket policies may be 20 KB and key policies 32 KB.
+  assert {
+    condition     = length(data.aws_iam_policy_document.state_bucket.json) < 20480 && length(data.aws_iam_policy_document.state_key.json) < 32768
+    error_message = "The state bucket or state key policy exceeds its size limit."
+  }
+
   assert {
     condition     = strcontains(data.aws_iam_policy_document.boundary.json, "\"aws:RequestedRegion\"") && strcontains(data.aws_iam_policy_document.boundary.json, "\"ap-south-1\"")
     error_message = "Boundary must refuse regions other than ap-south-1."
@@ -141,6 +154,28 @@ run "defaults" {
   assert {
     condition     = length(aws_accessanalyzer_analyzer.account) == 1 && aws_ec2_instance_metadata_defaults.this[0].http_tokens == "required"
     error_message = "Account guardrails are on by default."
+  }
+
+  # RR-01/RR-02: the owners are the manifest's principals plus the account root, nothing else.
+  assert {
+    condition     = jsonencode(output.owner_principal_arns) == jsonencode(["arn:aws:iam::111122223333:root", "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole"])
+    error_message = "Owner principals must be exactly the account root and the manifest's bootstrap_principal_arns."
+  }
+
+  # RR-02: no protection depends on an alias, and every KMS call for state carries the object ARN.
+  assert {
+    condition     = alltrue([for k, p in output.policy_documents : !strcontains(p, "kms:ResourceAliases")])
+    error_message = "No policy may rely on kms:ResourceAliases (RR-02)."
+  }
+
+  assert {
+    condition     = alltrue([for r in aws_s3_bucket_server_side_encryption_configuration.state.rule : r.bucket_key_enabled == false])
+    error_message = "S3 Bucket Keys must stay off: the key policy binds each use to one object ARN (RR-02)."
+  }
+
+  assert {
+    condition     = aws_kms_key.state.policy == output.policy_documents.state_key
+    error_message = "The state key must carry the reviewed key policy."
   }
 }
 
@@ -259,7 +294,7 @@ run "f1_apply_role_cannot_escape_boundary" {
   variables {
     identity_policies = [run.defaults.policy_documents.apply_services, run.defaults.policy_documents.apply_iam]
     boundary_policy   = run.defaults.policy_documents.boundary
-    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333" }
+    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }
     probes = [
       { name = "create bounded veda role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-host", context = { "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary" }, expect = "allow" },
       { name = "create veda role without boundary", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-host", expect = "deny" },
@@ -292,7 +327,7 @@ run "f1_escalated_role_stays_inside_boundary" {
   variables {
     identity_policies = [jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "*", Resource = "*" }] })]
     boundary_policy   = run.defaults.policy_documents.boundary
-    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333" }
+    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }
     probes = [
       { name = "unbounded admin role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/admin", expect = "deny" },
       { name = "bounded non-veda role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/admin", context = { "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary" }, expect = "deny" },
@@ -313,7 +348,8 @@ run "f1_escalated_role_stays_inside_boundary" {
       { name = "other region", action = "ec2:RunInstances", resource = "*", context = { "aws:RequestedRegion" = "us-east-1" }, expect = "deny" },
       { name = "read GitHub role (SecurityAudit evidence)", action = "iam:GetRole", resource = "arn:aws:iam::111122223333:role/veda-gh-apply", expect = "allow" },
       { name = "read OIDC provider", action = "iam:GetOpenIDConnectProvider", resource = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com", expect = "allow" },
-      { name = "bounded veda role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary" }, expect = "allow" },
+      { name = "RR-03 bounded veda role, created by a workload role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary" }, expect = "deny" },
+      { name = "bounded veda role, created by the apply role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }, expect = "allow" },
     ]
   }
 
@@ -335,6 +371,7 @@ run "f2_apply_role_cannot_touch_bootstrap_state" {
     identity_policies = [run.defaults.policy_documents.apply_services, run.defaults.policy_documents.apply_iam]
     boundary_policy   = run.defaults.policy_documents.boundary
     resource_policies = [run.defaults.policy_documents.state_bucket]
+    key_policies      = [run.defaults.policy_documents.state_key]
     default_context = {
       "aws:RequestedRegion"                            = "ap-south-1"
       "aws:ResourceAccount"                            = "111122223333"
@@ -356,9 +393,10 @@ run "f2_apply_role_cannot_touch_bootstrap_state" {
       { name = "lifecycle", action = "s3:PutLifecycleConfiguration", resource = "arn:aws:s3:::veda-tfstate-111122223333", expect = "deny" },
       { name = "encryption", action = "s3:PutEncryptionConfiguration", resource = "arn:aws:s3:::veda-tfstate-111122223333", expect = "deny" },
       { name = "delete bucket", action = "s3:DeleteBucket", resource = "arn:aws:s3:::veda-tfstate-111122223333", expect = "deny" },
-      { name = "state key deletion", action = "kms:ScheduleKeyDeletion", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ResourceAliases" = "alias/veda-tfstate" }, expect = "deny" },
+      { name = "state key deletion (no alias in the request)", action = "kms:ScheduleKeyDeletion", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:CallerAccount" = "111122223333" }, expect = "deny" },
       { name = "write staging state", action = "s3:PutObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", expect = "allow" },
-      { name = "read bootstrap state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", expect = "allow" },
+      { name = "RR-01 read bootstrap state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", expect = "deny" },
+      { name = "read staging state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", expect = "allow" },
       { name = "object lock on anchor bucket (AUT-103)", action = "s3:PutBucketObjectLockConfiguration", resource = "arn:aws:s3:::veda-stg-anchor-111122223333", expect = "allow" },
     ]
   }
@@ -506,4 +544,320 @@ run "f9_plan_role_cannot_read_secrets_or_data" {
     condition     = length(output.failures) == 0
     error_message = "F9 plan role: ${join("; ", output.failures)}"
   }
+}
+
+# --- RR-01: bootstrap state is the owner's alone, whoever else asks ----------------------------------------------
+# Worst case for the resource side: every non-owner principal holds Allow *:* and no boundary (a role outside
+# veda-boundary, a veda-* role under a path, a role named without the prefix, an SSO role, a user, a service). Only
+# the state bucket policy stands between it and bootstrap state.
+
+run "rr01_bucket_policy_bootstrap_state_owner_only" {
+  command = plan
+  module {
+    source = "./tests/policy_eval"
+  }
+
+  variables {
+    identity_policies = [jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "*", Resource = "*" }] })]
+    resource_policies = [run.defaults.policy_documents.state_bucket]
+    default_context = {
+      "aws:SecureTransport"                            = "true"
+      "s3:x-amz-server-side-encryption-aws-kms-key-id" = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000"
+    }
+    probes = concat(
+      # Object actions on bootstrap state: read, export, copy out, overwrite, copy in, multipart, replicate in,
+      # restore, retag, re-ACL, delete, roll back to an older version.
+      flatten([for who, arn in {
+        "veda-gh-apply"          = "arn:aws:iam::111122223333:role/veda-gh-apply"
+        "veda-rogue"             = "arn:aws:iam::111122223333:role/veda-rogue"
+        "path role x/veda-rogue" = "arn:aws:iam::111122223333:role/x/veda-rogue"
+        "path role veda-x/rogue" = "arn:aws:iam::111122223333:role/veda-x/rogue"
+        "non-veda legacy-admin"  = "arn:aws:iam::111122223333:role/legacy-admin"
+        "SSO admin"              = "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/ap-south-1/AWSReservedSSO_Admin_0123"
+        "IAM user"               = "arn:aws:iam::111122223333:user/alice"
+        "other account"          = "arn:aws:iam::999999999999:role/OrganizationAccountAccessRole"
+        } : [for a in [
+          "s3:GetObject", "s3:GetObjectVersion", "s3:GetObjectAttributes", "s3:GetObjectTorrent", "s3:PutObject",
+          "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags",
+          "s3:RestoreObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging", "s3:PutObjectAcl",
+          "s3:ObjectOwnerOverrideToBucketOwner", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts",
+          ] : {
+          name     = "${who}: ${a} bootstrap/terraform.tfstate"
+          action   = a
+          resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate"
+          context  = { "aws:PrincipalArn" = arn }
+          expect   = "deny"
+      }]]),
+      # Any other path out or in: bucket configuration, replication, inventory, logging, notifications, versioning,
+      # ownership, deletion; replication into any key.
+      flatten([for who, arn in {
+        "veda-gh-apply"          = "arn:aws:iam::111122223333:role/veda-gh-apply"
+        "path role x/veda-rogue" = "arn:aws:iam::111122223333:role/x/veda-rogue"
+        "non-veda legacy-admin"  = "arn:aws:iam::111122223333:role/legacy-admin"
+        } : [for a in [
+          "s3:PutReplicationConfiguration", "s3:PutInventoryConfiguration", "s3:PutBucketLogging",
+          "s3:PutBucketNotification", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutBucketVersioning",
+          "s3:PutLifecycleConfiguration", "s3:PutEncryptionConfiguration", "s3:PutBucketOwnershipControls",
+          "s3:PutBucketObjectLockConfiguration", "s3:PutBucketAcl", "s3:DeleteBucket",
+          ] : {
+          name     = "${who}: ${a}"
+          action   = a
+          resource = "arn:aws:s3:::veda-tfstate-111122223333"
+          context  = { "aws:PrincipalArn" = arn }
+          expect   = "deny"
+      }]]),
+      [
+        { name = "veda role replicates into staging state", action = "s3:ReplicateObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-replicator" }, expect = "deny" },
+        { name = "veda role deletes a staging state version", action = "s3:DeleteObjectVersion", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }, expect = "deny" },
+        { name = "a service principal (no principal ARN) reads bootstrap state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", expect = "deny" },
+        { name = "owner via an access point", action = "s3:PutObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole", "s3:DataAccessPointArn" = "arn:aws:s3:ap-south-1:111122223333:accesspoint/state" }, expect = "deny" },
+        { name = "veda role via an access point", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-plan", "s3:DataAccessPointArn" = "arn:aws:s3:ap-south-1:111122223333:accesspoint/state" }, expect = "deny" },
+        { name = "owner writes bootstrap state", action = "s3:PutObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }, expect = "allow" },
+        { name = "owner reads bootstrap state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }, expect = "allow" },
+        { name = "owner changes the bucket policy", action = "s3:PutBucketPolicy", resource = "arn:aws:s3:::veda-tfstate-111122223333", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }, expect = "allow" },
+        { name = "account root recovers the bucket policy", action = "s3:DeleteBucketPolicy", resource = "arn:aws:s3:::veda-tfstate-111122223333", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:root" }, expect = "allow" },
+        { name = "apply role writes staging state", action = "s3:PutObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }, expect = "allow" },
+        { name = "plan role reads staging state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-plan" }, expect = "allow" },
+      ],
+    )
+  }
+
+  assert {
+    condition     = length(output.failures) == 0
+    error_message = "RR-01 bucket policy: ${join("; ", output.failures)}"
+  }
+}
+
+# Identity side, independently of the bucket policy: any bounded role, even with *:*, is refused bootstrap state
+# and every movement path.
+run "rr01_boundary_alone_protects_bootstrap_state" {
+  command = plan
+  module {
+    source = "./tests/policy_eval"
+  }
+
+  variables {
+    identity_policies = [jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "*", Resource = "*" }] })]
+    boundary_policy   = run.defaults.policy_documents.boundary
+    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }
+    probes = concat(
+      [for a in ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:ReplicateObject", "s3:ReplicateDelete", "s3:RestoreObject", "s3:PutObjectTagging"] : {
+        name     = "bounded role: ${a} bootstrap/terraform.tfstate"
+        action   = a
+        resource = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate"
+        expect   = "deny"
+      }],
+      [
+        { name = "bounded role: replicate into staging state", action = "s3:ReplicateObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", expect = "deny" },
+        { name = "bounded role: replication configuration", action = "s3:PutReplicationConfiguration", resource = "arn:aws:s3:::veda-tfstate-111122223333", expect = "deny" },
+        { name = "bounded role: write staging state", action = "s3:PutObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", expect = "allow" },
+      ],
+    )
+  }
+
+  assert {
+    condition     = length(output.failures) == 0
+    error_message = "RR-01 boundary: ${join("; ", output.failures)}"
+  }
+}
+
+# The owner allow-list itself is checked at plan time, so a mistake fails the plan instead of locking out the owner
+# or admitting a Veda role.
+run "rr01_owner_list_required" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-empty.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "rr01_owner_list_rejects_veda_role" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-veda.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "rr01_owner_list_rejects_veda_role_under_a_path" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-veda-path.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "rr01_owner_list_rejects_wildcards" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-wildcard.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "rr01_owner_list_rejects_other_account" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-other-account.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "rr01_owner_session_must_be_listed" {
+  command = plan
+  override_data {
+    target = data.aws_iam_session_context.current
+    values = { issuer_arn = "arn:aws:iam::111122223333:role/SomeOtherAdmin" }
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+# --- RR-02: the state key's own policy decides, not an alias -----------------------------------------------------
+# The apply role's real policies (kms:* on *) with NO boundary, so every refusal below comes from the key policy.
+# No request carries kms:ResourceAliases; one carries a foreign alias to show it changes nothing.
+
+run "rr02_key_policy_enforces_state_key_protection" {
+  command = plan
+  module {
+    source = "./tests/policy_eval"
+  }
+
+  variables {
+    identity_policies = [run.defaults.policy_documents.apply_services, run.defaults.policy_documents.apply_iam]
+    key_policies      = [run.defaults.policy_documents.state_key]
+    default_context   = { "aws:ResourceAccount" = "111122223333", "kms:CallerAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply" }
+    probes = concat(
+      flatten([for who, arn in {
+        "veda-gh-apply"          = "arn:aws:iam::111122223333:role/veda-gh-apply"
+        "path role x/veda-rogue" = "arn:aws:iam::111122223333:role/x/veda-rogue"
+        "non-veda legacy-admin"  = "arn:aws:iam::111122223333:role/legacy-admin"
+        } : [for a in [
+          "kms:PutKeyPolicy", "kms:ScheduleKeyDeletion", "kms:DisableKey", "kms:DisableKeyRotation", "kms:CreateGrant",
+          "kms:RetireGrant", "kms:RevokeGrant", "kms:CreateAlias", "kms:UpdateAlias", "kms:DeleteAlias", "kms:TagResource",
+          "kms:UntagResource", "kms:UpdateKeyDescription", "kms:ImportKeyMaterial", "kms:DeleteImportedKeyMaterial",
+          "kms:ReplicateKey", "kms:UpdatePrimaryRegion", "kms:ReEncryptFrom", "kms:GenerateDataKeyWithoutPlaintext",
+          ] : {
+          name     = "${who}: ${a}"
+          action   = a
+          resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000"
+          context  = { "aws:PrincipalArn" = arn }
+          expect   = "deny"
+      }]]),
+      [
+        { name = "key deletion with a foreign alias in the request", action = "kms:ScheduleKeyDeletion", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ResourceAliases" = "alias/something-else" }, expect = "deny" },
+        { name = "decrypt bootstrap state through S3", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate" }, expect = "deny" },
+        { name = "encrypt bootstrap state through S3", action = "kms:GenerateDataKey", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate" }, expect = "deny" },
+        { name = "decrypt directly (not through S3)", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "deny" },
+        { name = "decrypt through another service", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "ec2.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "deny" },
+        { name = "bucket-level context (S3 Bucket Key requested per object)", action = "kms:GenerateDataKey", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333" }, expect = "deny" },
+        { name = "another bucket's object", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-stg-artifacts-111122223333/x" }, expect = "deny" },
+        { name = "no encryption context", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com" }, expect = "deny" },
+        { name = "another account through S3", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:CallerAccount" = "999999999999", "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "deny" },
+        { name = "apply role decrypts staging state through S3", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "allow" },
+        { name = "apply role encrypts staging state through S3", action = "kms:GenerateDataKey", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "allow" },
+        { name = "evidence reads the key policy", action = "kms:GetKeyPolicy", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", expect = "allow" },
+        { name = "describe the key", action = "kms:DescribeKey", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", expect = "allow" },
+        { name = "owner changes the key policy", action = "kms:PutKeyPolicy", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }, expect = "allow" },
+        { name = "owner decrypts bootstrap state through S3", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole", "kms:ViaService" = "s3.ap-south-1.amazonaws.com", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate" }, expect = "allow" },
+        { name = "owner decrypts directly", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole", "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate" }, expect = "deny" },
+        { name = "account root schedules deletion (recovery)", action = "kms:ScheduleKeyDeletion", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:root" }, expect = "allow" },
+      ],
+    )
+  }
+
+  assert {
+    condition     = length(output.failures) == 0
+    error_message = "RR-02 key policy: ${join("; ", output.failures)}"
+  }
+}
+
+# The plan role's own key permission, under the boundary and the key policy: staging state only.
+run "rr02_plan_role_uses_the_key_for_staging_state_only" {
+  command = plan
+  module {
+    source = "./tests/policy_eval"
+  }
+
+  variables {
+    identity_policies = [run.defaults.policy_documents.plan]
+    boundary_policy   = run.defaults.policy_documents.boundary
+    key_policies      = [run.defaults.policy_documents.state_key]
+    default_context   = { "aws:RequestedRegion" = "ap-south-1", "kms:CallerAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-plan", "kms:ViaService" = "s3.ap-south-1.amazonaws.com" }
+    probes = [
+      { name = "decrypt staging state", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate" }, expect = "allow" },
+      { name = "encrypt the staging lock", action = "kms:GenerateDataKey", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate.tflock" }, expect = "allow" },
+      { name = "decrypt bootstrap state", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-tfstate-111122223333/bootstrap/terraform.tfstate" }, expect = "deny" },
+      { name = "decrypt another bucket's object", action = "kms:Decrypt", resource = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000", context = { "kms:EncryptionContext:aws:s3:arn" = "arn:aws:s3:::veda-stg-artifacts-111122223333/x" }, expect = "deny" },
+    ]
+  }
+
+  assert {
+    condition     = length(output.failures) == 0
+    error_message = "RR-02 plan role: ${join("; ", output.failures)}"
+  }
+}
+
+# --- RR-03: IAM paths and trust policies ------------------------------------------------------------------------
+# A bounded principal holding *:* (the review's escalation), as the apply role (the only one allowed to write trust)
+# unless a probe says otherwise.
+
+run "rr03_boundary_closes_path_and_trust_bypass" {
+  command = plan
+  module {
+    source = "./tests/policy_eval"
+  }
+
+  variables {
+    identity_policies = [jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "*", Resource = "*" }] })]
+    boundary_policy   = run.defaults.policy_documents.boundary
+    default_context   = { "aws:RequestedRegion" = "ap-south-1", "aws:ResourceAccount" = "111122223333", "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-apply", "iam:PermissionsBoundary" = "arn:aws:iam::111122223333:policy/veda-boundary" }
+    probes = [
+      # IAM path bypass: role/veda-* matches role/veda-x/admin; nothing under a path is created, passed or changed.
+      { name = "path: create role/veda-x/admin", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-x/admin", expect = "deny" },
+      { name = "path: create role/veda-gh-x/plan", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-gh-x/plan", expect = "deny" },
+      { name = "path: create role/x/veda-host", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/x/veda-host", expect = "deny" },
+      { name = "path: create policy/veda-x/admin", action = "iam:CreatePolicy", resource = "arn:aws:iam::111122223333:policy/veda-x/admin", expect = "deny" },
+      { name = "path: new version of policy/veda-x/admin", action = "iam:CreatePolicyVersion", resource = "arn:aws:iam::111122223333:policy/veda-x/admin", expect = "deny" },
+      { name = "path: create instance-profile/veda-x/p", action = "iam:CreateInstanceProfile", resource = "arn:aws:iam::111122223333:instance-profile/veda-x/p", expect = "deny" },
+      { name = "path: add a role to instance-profile/veda-x/p", action = "iam:AddRoleToInstanceProfile", resource = "arn:aws:iam::111122223333:instance-profile/veda-x/p", expect = "deny" },
+      { name = "path: pass role/veda-x/admin", action = "iam:PassRole", resource = "arn:aws:iam::111122223333:role/veda-x/admin", expect = "deny" },
+      { name = "path: inline policy on role/veda-x/admin", action = "iam:PutRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-x/admin", expect = "deny" },
+      { name = "path: attach to role/veda-x/admin", action = "iam:AttachRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-x/admin", expect = "deny" },
+      { name = "path: re-trust role/veda-x/admin", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-x/admin", expect = "deny" },
+      { name = "no path: create role/veda-host", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-host", expect = "allow" },
+      { name = "no path: pass role/veda-host", action = "iam:PassRole", resource = "arn:aws:iam::111122223333:role/veda-host", expect = "allow" },
+      { name = "service-linked role (AWS path) still created", action = "iam:CreateServiceLinkedRole", resource = "arn:aws:iam::111122223333:role/aws-service-role/ssm.amazonaws.com/AWSServiceRoleForAmazonSSM", expect = "allow" },
+      # Trust bypass: only veda-gh-apply writes trust.
+      { name = "trust: apply role re-trusts a workload role", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-host", expect = "allow" },
+      { name = "trust: workload role re-trusts itself", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-host", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }, expect = "deny" },
+      { name = "trust: workload role re-trusts another", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }, expect = "deny" },
+      { name = "trust: workload role creates a role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }, expect = "deny" },
+      { name = "trust: deploy role creates a role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-deploy" }, expect = "deny" },
+      { name = "trust: role under a path named like apply", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-worker", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/x/veda-gh-apply" }, expect = "deny" },
+      { name = "trust: apply role re-trusts a GitHub role", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-gh-plan", expect = "deny" },
+      # Trust bypass at use time: a federated session of any role but veda-gh-* can do nothing.
+      { name = "federated session of a workload role reads state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "deny" },
+      { name = "federated session of a workload role lists instances", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host", "aws:FederatedProvider" = "arn:aws:iam::111122223333:saml-provider/idp" }, expect = "deny" },
+      { name = "federated session of a path role named like a GitHub role", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/x/veda-gh-deploy", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "deny" },
+      { name = "federated session of veda-gh-deploy works", action = "ecr:GetAuthorizationToken", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-deploy", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "allow" },
+      { name = "federated session of veda-gh-apply creates a bounded role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-host", context = { "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "allow" },
+      { name = "instance-role session of a workload role works", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }, expect = "allow" },
+    ]
+  }
+
+  assert {
+    condition     = length(output.failures) == 0
+    error_message = "RR-03 boundary: ${join("; ", output.failures)}"
+  }
+}
+
+# RR-03/RR-07: a role cannot be pointed at an environment other than its protected one.
+run "rr03_rejects_other_github_environment" {
+  command = plan
+
+  variables {
+    github_environments = { plan = "staging-plan", apply = "unprotected", deploy = "staging", evidence = "staging-evidence" }
+  }
+
+  expect_failures = [var.github_environments]
 }

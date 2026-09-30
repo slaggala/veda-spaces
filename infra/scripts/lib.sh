@@ -18,6 +18,13 @@ export VEDA_REGION VEDA_PREFIX VEDA_ZONE VEDA_ACCOUNT_MANIFEST
 # Account names or aliases that can never be the Veda staging account.
 VEDA_FORBIDDEN_ACCOUNT_NAMES='prod|aurion'
 
+# The GitHub environment each veda-gh-* role is trusted by (RR-03): fixed, and each one protected and verified by
+# github-setup.sh (RR-07). Terraform's github_environments validation holds the same mapping.
+VEDA_GH_ROLE_ENVIRONMENTS='plan:staging-plan apply:staging-infra deploy:staging evidence:staging-evidence'
+# The only workflow whose plan runs an apply may use (RR-05).
+VEDA_BOOTSTRAP_WORKFLOW='.github/workflows/00-bootstrap.yml'
+export VEDA_GH_ROLE_ENVIRONMENTS VEDA_BOOTSTRAP_WORKFLOW
+
 log() { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 warn() { if [[ -n "${GITHUB_ACTIONS:-}" ]]; then echo "::warning::$*" >&2; else log "WARNING: $*"; fi; }
 die() {
@@ -154,6 +161,65 @@ state_bucket_name() { echo "${VEDA_PREFIX}-tfstate-$1"; }
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'
+}
+
+# RR-07: the environments the bootstrap relies on (bootstrap, and the one each role trusts) must exist with required
+# reviewers, no admin bypass and the main-only branch policy, and main must be protected. Fails closed: a missing
+# environment, an API error or no GitHub access stops the run.
+require_github_protection() {
+  "$INFRA_DIR/scripts/github-setup.sh" --repo "$1" --verify-environments ||
+    die "GitHub environment protection is a prerequisite of apply and could not be verified for $1; refusing (make -C infra github-environments APPLY=1)"
+}
+
+# Policies compare equal after the normalisation AWS applies when it stores them (one-element arrays become
+# scalars, element order, {"AWS":"*"} for "*").
+canonical_policy() {
+  jq -S 'walk(if type == "array" then (sort | if length == 1 then .[0] else . end)
+              elif type == "object" and .Principal == {"AWS": "*"} then .Principal = "*" else . end)'
+}
+same_policy() { [[ "$(canonical_policy <<<"$1")" == "$(canonical_policy <<<"$2")" ]]; }
+
+# RR-02: the state key is the one the state bucket encrypts with (its default-encryption rule), not whatever an
+# alias points at. The alias must agree, the key must be this account's, enabled and customer-managed.
+state_key_from_bucket() {
+  local bucket="$1" account="$2" enc key meta
+  enc="$(aws s3api get-bucket-encryption --bucket "$bucket" --expected-bucket-owner "$account" --output json)" ||
+    die "cannot read the default encryption of s3://$bucket; refusing"
+  key="$(jq -r '[.ServerSideEncryptionConfiguration.Rules[]?.ApplyServerSideEncryptionByDefault | select(.SSEAlgorithm == "aws:kms") | .KMSMasterKeyID] | if length == 1 then .[0] else empty end' <<<"$enc")"
+  [[ "$key" =~ ^arn:aws[a-z-]*:kms:${VEDA_REGION}:${account}:key/[0-9a-f-]+$ ]] ||
+    die "s3://$bucket is not encrypted with exactly one KMS key of account $account (got '${key:-none}'); refusing"
+  meta="$(aws kms describe-key --key-id "$key" --output json)" || die "cannot describe the state key $key; refusing"
+  jq -e '.KeyMetadata | .KeyState == "Enabled" and .KeyManager == "CUSTOMER"' <<<"$meta" >/dev/null ||
+    die "state key $key is not an enabled customer-managed key; refusing"
+  [[ "$(aws kms describe-key --key-id "alias/${VEDA_PREFIX}-tfstate" --output json | jq -r '.KeyMetadata.Arn // empty')" == "$key" ]] ||
+    die "alias/${VEDA_PREFIX}-tfstate does not point at the key s3://$bucket encrypts with ($key); refusing"
+  echo "$key"
+}
+
+# RR-01/RR-02: after an apply, the live protections must be exactly the reviewed ones: the bucket's policy and
+# default encryption (state key, no S3 Bucket Key), and the key's policy and rotation. $3 is `terraform output -json`.
+verify_state_protection() {
+  local bucket="$1" account="$2" outputs="$3" key want live problems=()
+  key="$(state_key_from_bucket "$bucket" "$account")"
+  [[ "$key" == "$(jq -r '.state_kms_key_arn.value' <<<"$outputs")" ]] || problems+=("bucket encrypts with $key, not the state key")
+  aws s3api get-bucket-encryption --bucket "$bucket" --expected-bucket-owner "$account" --output json |
+    jq -e '[.ServerSideEncryptionConfiguration.Rules[]? | .BucketKeyEnabled // false] | all(. == false)' >/dev/null ||
+    problems+=("S3 Bucket Key enabled: the key policy could not tell bootstrap/* from staging/*")
+  want="$(jq -r '.policy_documents.value.state_bucket' <<<"$outputs")"
+  live="$(aws s3api get-bucket-policy --bucket "$bucket" --expected-bucket-owner "$account" --output json | jq -r '.Policy // empty')" ||
+    die "cannot read the policy of s3://$bucket; refusing"
+  same_policy "$live" "$want" || problems+=("bucket policy differs from the reviewed plan")
+  want="$(jq -r '.policy_documents.value.state_key' <<<"$outputs")"
+  live="$(aws kms get-key-policy --key-id "$key" --policy-name default --output json | jq -r '.Policy // empty')" ||
+    die "cannot read the policy of $key; refusing"
+  same_policy "$live" "$want" || problems+=("key policy differs from the reviewed plan")
+  aws kms get-key-rotation-status --key-id "$key" --output json | jq -e '.KeyRotationEnabled == true' >/dev/null ||
+    problems+=("key rotation is off")
+  if ((${#problems[@]})); then
+    for p in "${problems[@]}"; do log "STATE PROTECTION: $p"; done
+    die "the live protections of s3://$bucket and its key are not the reviewed ones; do not use this state until an owner has investigated"
+  fi
+  log "state protection verified: bucket and key policies as reviewed, key $key, no Bucket Key, rotation on"
 }
 
 # The commit being run: GITHUB_SHA in Actions, HEAD locally.

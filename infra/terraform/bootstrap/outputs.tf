@@ -49,7 +49,7 @@ output "backend_config" {
 
 # Rendered policies, for review and for the offline policy evaluator in tests/ (no secrets).
 output "policy_documents" {
-  description = "Boundary, role and state-bucket policy JSON exactly as applied."
+  description = "Boundary, role, state-bucket and state-key policy JSON exactly as applied (bootstrap.sh compares the live bucket and key policies with these after apply)."
   value = {
     boundary       = data.aws_iam_policy_document.boundary.json
     plan           = data.aws_iam_policy_document.plan.json
@@ -58,5 +58,11 @@ output "policy_documents" {
     deploy         = data.aws_iam_policy_document.deploy.json
     evidence       = data.aws_iam_policy_document.evidence.json
     state_bucket   = data.aws_iam_policy_document.state_bucket.json
+    state_key      = data.aws_iam_policy_document.state_key.json
   }
+}
+
+# RR-01/RR-02: the principals that own bootstrap state and administer the state key (manifest + account root).
+output "owner_principal_arns" {
+  value = local.owner_principal_arns
 }

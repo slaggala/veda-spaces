@@ -3,7 +3,8 @@
 #
 #   infra/scripts/bootstrap.sh --expected-account-id 123456789012                # plan only (default)
 #   infra/scripts/bootstrap.sh --expected-account-id 123456789012 --mode apply   # plan, show, type the ID, apply
-#   ... --mode apply --plan-file F --plan-meta M [--yes]                          # apply a reviewed plan (00-bootstrap)
+#   ... --mode apply --plan-file F --plan-meta M --plan-sha256 D [--plan-run-id N] [--yes]
+#                                                                                 # apply the approved plan D
 #
 # Options: --repo owner/repo (default: discovered)
 #
@@ -12,10 +13,16 @@
 # be in it; discovery also checks its name, alias and emptiness (F3). The Terraform provider refuses any other account.
 #
 # plan  : discovery + terraform plan + plan guard (no destroy, bounded roles, no external trust). Writes the plan,
-#         its text and its metadata (commit, account, SHA-256) to infra/generated/. Nothing is created.
-# apply : applies exactly a reviewed plan (F4): either the one just made and shown here, confirmed by typing the
-#         account ID, or --plan-file/--plan-meta from an earlier plan run of the same commit. --yes (no prompt) is
-#         accepted only with --plan-file. Then moves the state into the bucket it created (first run) and writes
+#         its text and its metadata (commit, account, workflow, SHA-256 of the plan and of its text, Terraform
+#         version) to infra/generated/, and prints the plan's SHA-256: the digest a reviewer approves. Nothing is
+#         created.
+# apply : applies exactly a reviewed plan (F4, RR-05): either the one just made and shown here, confirmed by typing
+#         the account ID, or --plan-file/--plan-meta from an earlier plan run of the same commit whose SHA-256 is the
+#         approved --plan-sha256 D (checked against the file itself, not only its metadata), and whose text, rendered
+#         again from that file, is byte-identical to the text the reviewer read. --yes (no prompt) is accepted only
+#         with an approved plan. Apply needs the GitHub environments protected (RR-07; github-setup.sh
+#         --verify-environments) and stops otherwise. Then moves the state into the bucket it created (first run),
+#         verifies the live bucket and key policies are the reviewed ones (RR-01, RR-02) and writes
 #         infra/generated/bootstrap-outputs.json for github-setup.sh.
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -27,6 +34,8 @@ REPO_ARG=""
 YES=0
 REVIEWED_PLAN=""
 REVIEWED_META=""
+APPROVED_SHA=""
+PLAN_RUN=""
 while (($#)); do
   case "$1" in
     --mode) MODE="${2:-}"; shift 2 ;;
@@ -35,20 +44,26 @@ while (($#)); do
     --yes) YES=1; shift ;;
     --plan-file) REVIEWED_PLAN="${2:-}"; shift 2 ;;
     --plan-meta) REVIEWED_META="${2:-}"; shift 2 ;;
+    --plan-sha256) APPROVED_SHA="${2:-}"; shift 2 ;;
+    --plan-run-id) PLAN_RUN="${2:-}"; shift 2 ;;
     --skip-guardrails) die "--skip-guardrails was removed: set manage_account_guardrails in infra/config/staging-account.json in a reviewed change (F5)" ;;
-    -h | --help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,28p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
 
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || die "--mode must be plan or apply"
-if [[ -n "$REVIEWED_PLAN" || -n "$REVIEWED_META" ]]; then
-  [[ "$MODE" == "apply" ]] || die "--plan-file and --plan-meta are for --mode apply"
-  [[ -n "$REVIEWED_PLAN" && -n "$REVIEWED_META" ]] || die "--plan-file and --plan-meta go together"
+if [[ -n "$REVIEWED_PLAN" || -n "$REVIEWED_META" || -n "$APPROVED_SHA" || -n "$PLAN_RUN" ]]; then
+  [[ "$MODE" == "apply" ]] || die "--plan-file, --plan-meta, --plan-sha256 and --plan-run-id are for --mode apply"
+  [[ -n "$REVIEWED_PLAN" && -n "$REVIEWED_META" && -n "$APPROVED_SHA" ]] ||
+    die "--plan-file, --plan-meta and --plan-sha256 (the approved plan digest) go together"
+  [[ "$APPROVED_SHA" =~ ^[0-9a-f]{64}$ ]] || die "--plan-sha256 must be the 64-hex SHA-256 of the approved plan file"
+  [[ -z "$PLAN_RUN" || "$PLAN_RUN" =~ ^[0-9]+$ ]] || die "--plan-run-id must be a run ID"
 fi
 ((!YES)) || [[ -n "$REVIEWED_PLAN" ]] ||
-  die "--yes applies without a prompt, so it needs a reviewed plan: pass --plan-file and --plan-meta from a plan run"
+  die "--yes applies without a prompt, so it needs an approved plan: pass --plan-file, --plan-meta and --plan-sha256"
 require_tools aws jq terraform curl git
+[[ "$MODE" == plan ]] || require_tools gh
 require_account_id "$EXPECTED"
 require_region
 require_expected_account "$EXPECTED"
@@ -61,26 +76,50 @@ PLAN_FILE="$GENERATED_DIR/bootstrap.tfplan"
 META_FILE="$GENERATED_DIR/bootstrap-plan.meta.json"
 BUCKET="$(state_bucket_name "$EXPECTED")"
 COMMIT="$(current_commit)"
+WORKFLOW_REF="${GITHUB_WORKFLOW_REF:-local}"
+TF_VERSION="$(terraform version -json | jq -r '.terraform_version // empty')"
+[[ -n "$TF_VERSION" ]] || die "cannot read the Terraform version"
 
-# F4: a reviewed plan must be byte-identical to what was reviewed, for this commit and this account, and made as
-# a plan. Checked before Terraform runs at all.
+# F4, RR-05: the approved plan is the file whose SHA-256 the reviewer approved (--plan-sha256), made by a plan run of
+# this commit, account, workflow and Terraform version, with the text the reviewer read. Checked before Terraform
+# runs at all; the text is rendered again from the file once Terraform is initialised (verify_plan_text).
 verify_reviewed_plan() {
-  local sum
+  local sum meta text
   [[ -f "$REVIEWED_PLAN" ]] || die "reviewed plan not found: $REVIEWED_PLAN"
   [[ -f "$REVIEWED_META" ]] || die "reviewed plan metadata not found: $REVIEWED_META"
   REVIEWED_PLAN="$(cd "$(dirname "$REVIEWED_PLAN")" && pwd)/$(basename "$REVIEWED_PLAN")"
   REVIEWED_META="$(cd "$(dirname "$REVIEWED_META")" && pwd)/$(basename "$REVIEWED_META")"
+  meta="$REVIEWED_META"
   sum="$(sha256_of "$REVIEWED_PLAN")"
-  [[ "$sum" == "$(jq -r '.plan_sha256 // empty' "$REVIEWED_META")" ]] ||
+  [[ "$sum" == "$APPROVED_SHA" ]] ||
+    die "plan file sha256 $sum is not the approved plan ($APPROVED_SHA): refusing to apply a plan nobody approved"
+  [[ "$sum" == "$(jq -r '.plan_sha256 // empty' "$meta")" ]] ||
     die "reviewed plan checksum mismatch: the plan file is not the one that was reviewed"
-  [[ "$(jq -r '.mode // empty' "$REVIEWED_META")" == "plan" ]] || die "reviewed plan metadata is not from a plan run"
-  [[ "$(jq -r '.account_id // empty' "$REVIEWED_META")" == "$EXPECTED" ]] ||
-    die "reviewed plan was made for account $(jq -r .account_id "$REVIEWED_META"), not $EXPECTED"
-  [[ "$(jq -r '.commit // empty' "$REVIEWED_META")" == "$COMMIT" ]] ||
-    die "reviewed plan was made from commit $(jq -r .commit "$REVIEWED_META"), this run is $COMMIT; plan again"
-  [[ "$(jq -r '.dirty' "$REVIEWED_META")" == "false" ]] ||
+  [[ "$(jq -r '.mode // empty' "$meta")" == "plan" ]] || die "reviewed plan metadata is not from a plan run"
+  [[ "$(jq -r '.account_id // empty' "$meta")" == "$EXPECTED" ]] ||
+    die "reviewed plan was made for account $(jq -r .account_id "$meta"), not $EXPECTED"
+  [[ "$(jq -r '.commit // empty' "$meta")" == "$COMMIT" ]] ||
+    die "reviewed plan was made from commit $(jq -r .commit "$meta"), this run is $COMMIT; plan again"
+  [[ "$(jq -r '.dirty' "$meta")" == "false" ]] ||
     die "reviewed plan was made from a working tree with uncommitted infra changes; plan again from a clean commit"
-  log "reviewed plan verified: sha256 $sum, commit $COMMIT, account $EXPECTED"
+  [[ "$(jq -r '.workflow_ref // empty' "$meta")" == "$WORKFLOW_REF" ]] ||
+    die "reviewed plan was made by '$(jq -r '.workflow_ref // "?"' "$meta")', this run is '$WORKFLOW_REF'; refusing"
+  [[ -z "$PLAN_RUN" || "$(jq -r '.run_id // empty' "$meta")" == "$PLAN_RUN" ]] ||
+    die "reviewed plan metadata is from run $(jq -r '.run_id // "?"' "$meta"), not the approved run $PLAN_RUN"
+  [[ "$(jq -r '.terraform_version // empty' "$meta")" == "$TF_VERSION" ]] ||
+    die "reviewed plan was made with Terraform $(jq -r '.terraform_version // "?"' "$meta"), this is $TF_VERSION; refusing"
+  text="$(dirname "$REVIEWED_PLAN")/bootstrap-plan.txt"
+  [[ -f "$text" && "$(sha256_of "$text")" == "$(jq -r '.plan_text_sha256 // empty' "$meta")" ]] ||
+    die "the reviewed plan text beside the plan file is missing or is not the text recorded at plan time"
+  log "reviewed plan verified: sha256 $sum (approved), commit $COMMIT, account $EXPECTED, $WORKFLOW_REF"
+}
+
+# RR-05: the text the reviewer read is exactly what this Terraform renders from the file it is about to apply.
+verify_plan_text() {
+  terraform show -no-color "$PLAN_FILE" >"$GENERATED_DIR/applying-plan.txt"
+  [[ "$(sha256_of "$GENERATED_DIR/applying-plan.txt")" == "$(jq -r '.plan_text_sha256' "$REVIEWED_META")" ]] ||
+    die "the plan file renders a different text from the one that was reviewed; refusing"
+  log "plan text re-rendered from the approved file matches the reviewed text"
 }
 
 write_backend() {
@@ -111,6 +150,8 @@ if [[ -n "$REVIEWED_PLAN" ]]; then
   verify_account_identity "$EXPECTED"
   REPO="$(jq -r '.repository // empty' "$REVIEWED_META")"
   [[ -n "$REPO" ]] || die "reviewed plan metadata has no repository"
+  [[ -z "${GITHUB_REPOSITORY:-}" || "$REPO" == "$GITHUB_REPOSITORY" ]] ||
+    die "reviewed plan was made for $REPO, this run is $GITHUB_REPOSITORY"
 else
   discover_args=(--expected-account-id "$EXPECTED")
   [[ -n "$REPO_ARG" ]] && discover_args+=(--repo "$REPO_ARG")
@@ -119,6 +160,9 @@ else
 fi
 
 # Assigned before comparing: a failed lookup must stop the run, not read as "absent".
+# RR-07: the environments that gate this workflow and the new roles must be protected before anything is applied.
+[[ "$MODE" == plan ]] || require_github_protection "$REPO"
+
 BUCKET_STATUS="$(state_bucket_status "$BUCKET" "$EXPECTED")"
 STATE_EXISTS=false
 [[ "$BUCKET_STATUS" == exists ]] && STATE_EXISTS=true
@@ -129,9 +173,8 @@ fi
 
 cd "$BOOTSTRAP_DIR"
 if [[ "$STATE_EXISTS" == "true" ]]; then
-  KEY_ARN="$(aws kms describe-key --key-id "alias/${VEDA_PREFIX}-tfstate" --output json | jq -r '.KeyMetadata.Arn // empty')" ||
-    die "cannot read alias/${VEDA_PREFIX}-tfstate"
-  [[ -n "$KEY_ARN" ]] || die "state bucket $BUCKET exists but alias/${VEDA_PREFIX}-tfstate does not"
+  # RR-02: the key is the one the bucket encrypts with; the alias must agree with it, not decide it.
+  KEY_ARN="$(state_key_from_bucket "$BUCKET" "$EXPECTED")"
   [[ -f terraform.tfstate ]] && die "local terraform.tfstate present while $BUCKET exists: resolve manually (docs/operations/staging-bootstrap.md §6)"
   log "remote state: s3://$BUCKET/$STATE_KEY"
   write_backend
@@ -145,17 +188,21 @@ fi
 
 if [[ -n "$REVIEWED_PLAN" ]]; then
   PLAN_FILE="$REVIEWED_PLAN"
+  verify_plan_text
 else
   dirty=false
   [[ -z "$(git -C "$REPO_ROOT" status --porcelain -- infra/terraform/bootstrap infra/config infra/scripts)" ]] || dirty=true
   terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE"
   terraform show -no-color "$PLAN_FILE" >"$GENERATED_DIR/bootstrap-plan.txt"
   jq -n --arg commit "$COMMIT" --arg account "$EXPECTED" --arg repo "$REPO" --arg sum "$(sha256_of "$PLAN_FILE")" \
+    --arg text_sum "$(sha256_of "$GENERATED_DIR/bootstrap-plan.txt")" --arg tf "$TF_VERSION" --arg wf "$WORKFLOW_REF" \
     --argjson state_exists "$STATE_EXISTS" --argjson dirty "$dirty" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --arg run "${GITHUB_RUN_ID:-local}" \
-    '{mode: "plan", commit: $commit, dirty: $dirty, account_id: $account, repository: $repo, plan_sha256: $sum,
-      state_exists: $state_exists, created_at: $at, run_id: $run}' >"$META_FILE"
+    --arg run "${GITHUB_RUN_ID:-local}" --arg attempt "${GITHUB_RUN_ATTEMPT:-1}" \
+    '{mode: "plan", commit: $commit, dirty: $dirty, account_id: $account, repository: $repo, workflow_ref: $wf,
+      run_id: $run, run_attempt: $attempt, terraform_version: $tf, plan_sha256: $sum, plan_text_sha256: $text_sum,
+      state_exists: $state_exists, created_at: $at}' >"$META_FILE"
   log "plan written to $GENERATED_DIR/bootstrap-plan.txt (metadata: $META_FILE)"
+  log "plan sha256 (the digest to approve): $(jq -r .plan_sha256 "$META_FILE")"
 fi
 
 guard_plan "$PLAN_FILE"
@@ -167,6 +214,7 @@ fi
 
 if [[ -z "$REVIEWED_PLAN" ]]; then
   terraform show -no-color "$PLAN_FILE" >&2
+  log "plan sha256 $(sha256_of "$PLAN_FILE")"
   read -r -p "Apply the plan above to AWS account $EXPECTED? Type the account ID to confirm: " answer
   [[ "$answer" == "$EXPECTED" ]] || die "not confirmed"
 elif ((!YES)); then
@@ -190,6 +238,10 @@ if [[ "$STATE_EXISTS" != "true" ]]; then
   rm -f terraform.tfstate terraform.tfstate.backup
   log "state migrated and verified; local copy removed"
 fi
+
+# RR-01, RR-02: fail closed unless the live bucket and key protections are exactly the reviewed ones. No outputs
+# (and so no role ARNs for GitHub) are written otherwise.
+verify_state_protection "$BUCKET" "$EXPECTED" "$(terraform output -json)"
 
 terraform output -json | jq '{
   account_id: .account_id.value, region: .region.value,

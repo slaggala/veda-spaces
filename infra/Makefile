@@ -69,14 +69,15 @@ discover: ## Read-only discovery (needs EXPECTED_ACCOUNT_ID and a session in tha
 bootstrap-plan: ## Bootstrap plan: read-only (needs EXPECTED_ACCOUNT_ID)
 	scripts/bootstrap.sh --mode plan --expected-account-id "$(EXPECTED_ACCOUNT_ID)"
 
-bootstrap-apply: ## Bootstrap apply of the plan it shows, or of a reviewed PLAN_FILE (asks to type the account ID)
+bootstrap-apply: ## Apply the plan it shows, or the approved PLAN_FILE whose SHA-256 is PLAN_SHA256 (type the account ID)
 	scripts/bootstrap.sh --mode apply --expected-account-id "$(EXPECTED_ACCOUNT_ID)" \
-	  $(if $(PLAN_FILE),--plan-file $(PLAN_FILE) --plan-meta $(or $(PLAN_META),generated/bootstrap-plan.meta.json))
+	  $(if $(PLAN_FILE),--plan-file $(PLAN_FILE) --plan-meta $(or $(PLAN_META),generated/bootstrap-plan.meta.json) \
+	  --plan-sha256 "$(PLAN_SHA256)")
 
 github-environments: ## Dry run of the GitHub environments and main protection (APPLY=1 to apply; REVIEWERS=a,b)
 	scripts/github-setup.sh $(if $(REVIEWERS),--reviewers $(REVIEWERS)) $(if $(APPLY),--apply)
 
-github-verify: ## Read back environments and main protection; fail on drift
+github-verify: ## Read back environments and main protection; fail on drift (full: needs admin)
 	scripts/github-setup.sh --verify
 
 github-variables: ## Dry run of the GitHub variables from bootstrap outputs (APPLY=1 to set them)

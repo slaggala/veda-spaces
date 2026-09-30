@@ -8,7 +8,11 @@
 #   - roles without this boundary, IAM writes outside veda-*, the privileged AWS managed policies;
 #   - IAM users, access keys, identity providers, Organizations and account settings;
 #   - changes to this boundary, to the GitHub roles and to the OIDC provider (bootstrap-owned);
-#   - writes to bootstrap state and any change to the state bucket's configuration or key (F2);
+#   - IAM roles, policies and instance profiles under a path, which name patterns cannot bound (RR-03);
+#   - creating a role or changing a trust policy by any role but veda-gh-apply (RR-03);
+#   - using a web-identity or SAML session of any role but the veda-gh-* roles (RR-03);
+#   - any S3 action on bootstrap state, and any change or replication into the state bucket (F2, RR-01). The state
+#     key is protected by its own key policy (RR-02), not here;
 #   - weakening the account guardrails, CloudTrail or Access Analyzer, IMDSv1, GOVERNANCE bypass (F6);
 #   - sharing snapshots/AMIs, KMS grants, S3 writes and Lambda access across accounts (F7).
 # The IAM action patterns below are written to fit the 6,144-character managed-policy limit (asserted in tests).
@@ -63,6 +67,41 @@ data "aws_iam_policy_document" "boundary" {
     }
   }
 
+  # RR-03: only veda-gh-apply sets trust. A role created by any other bounded role (a workload role, or one that
+  # was given *:*) can neither create a role nor re-trust one, so no trust policy is written outside the reviewed,
+  # guarded apply (check-plan.sh). IAM has no condition key for trust content; this limits who can write it.
+  statement {
+    sid       = "DenyTrustWritesExceptApplyRole"
+    effect    = "Deny"
+    actions   = ["iam:CreateRole", "iam:UpdateAssumeRolePolicy"]
+    resources = ["*"]
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [local.apply_role_arn]
+    }
+  }
+
+  # RR-03: a session federated from an identity provider (web identity or SAML) is usable only as a veda-gh-* role.
+  # Even a trust policy that let GitHub, or any other provider, into a workload role yields a session that can do
+  # nothing.
+  statement {
+    sid       = "DenyFederatedSessionsOutsideGitHubRoles"
+    effect    = "Deny"
+    actions   = ["*"]
+    resources = ["*"]
+    condition {
+      test     = "Null"
+      variable = "aws:FederatedProvider"
+      values   = ["false"]
+    }
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [for n in values(local.role_names) : "arn:${local.partition}:iam::${local.account_id}:role/${n}"]
+    }
+  }
+
   # F1: IAM writes only on veda-* roles, policies and instance profiles. Everything else (users, groups,
   # OrganizationAccountAccessRole, SSO roles, identity providers, account settings) is out of reach.
   statement {
@@ -74,6 +113,19 @@ data "aws_iam_policy_document" "boundary" {
       "iam:Tag*", "iam:Untag*", "iam:Update*", "iam:Upload*",
     ]
     not_resources = local.veda_iam_arns
+  }
+
+  # RR-03: "*" in role/veda-* also matches "/", so role/veda-x/admin (path /veda-x/, name admin) would pass the
+  # statement above. Nothing under a path is created, passed or changed; Veda identities live at "/" only.
+  statement {
+    sid     = "DenyIamPaths"
+    effect  = "Deny"
+    actions = ["iam:Add*", "iam:Attach*", "iam:Create*", "iam:PassRole", "iam:Put*", "iam:Update*"]
+    resources = [
+      "arn:${local.partition}:iam::${local.account_id}:role/${local.prefix}-*/*",
+      "arn:${local.partition}:iam::${local.account_id}:policy/${local.prefix}-*/*",
+      "arn:${local.partition}:iam::${local.account_id}:instance-profile/${local.prefix}-*/*",
+    ]
   }
 
   # Users, keys, identity providers and account settings are already outside veda-* above; these are named
@@ -126,11 +178,12 @@ data "aws_iam_policy_document" "boundary" {
     ]
   }
 
-  # F2: bootstrap state is written by the owner session only, and no role changes the bucket's configuration.
+  # F2, RR-01: bootstrap state is the owner's alone (read, copy, write, replicate, restore, tag, delete), and no role
+  # changes the bucket's configuration or replicates into it. The bucket policy refuses the same to every non-owner.
   statement {
-    sid       = "DenyBootstrapStateWrites"
+    sid       = "DenyBootstrapState"
     effect    = "Deny"
-    actions   = ["s3:PutObject", "s3:DeleteObject", "s3:PutObjectTagging", "s3:DeleteObjectTagging"]
+    actions   = ["s3:*"]
     resources = ["${local.state_bucket_arn}/bootstrap/*"]
   }
 
@@ -140,31 +193,9 @@ data "aws_iam_policy_document" "boundary" {
     actions = [
       "s3:DeleteBucket*", "s3:PutBucket*", "s3:Put*Configuration", "s3:PutObjectAcl", "s3:PutObjectVersionAcl",
       "s3:PutObjectRetention", "s3:PutObjectLegalHold", "s3:DeleteObjectVersion*", "s3:BypassGovernanceRetention",
+      "s3:Replicate*", "s3:ObjectOwnerOverrideToBucketOwner",
     ]
     resources = [local.state_bucket_arn, "${local.state_bucket_arn}/*"]
-  }
-
-  statement {
-    sid    = "DenyStateKeyTampering"
-    effect = "Deny"
-    actions = [
-      "kms:ScheduleKeyDeletion", "kms:DisableKey", "kms:PutKeyPolicy", "kms:DisableKeyRotation",
-      "kms:CreateGrant",
-    ]
-    # Matched by alias rather than key ARN so the boundary is fully known at plan time.
-    resources = ["*"]
-    condition {
-      test     = "ForAnyValue:StringEquals"
-      variable = "kms:ResourceAliases"
-      values   = [local.state_kms_alias]
-    }
-  }
-
-  statement {
-    sid       = "DenyStateAliasTampering"
-    effect    = "Deny"
-    actions   = ["kms:DeleteAlias", "kms:UpdateAlias", "kms:CreateAlias"]
-    resources = ["arn:${local.partition}:kms:${local.region}:${local.account_id}:${local.state_kms_alias}"]
   }
 
   # F6. CloudTrail: trails can be created and started, never stopped, deleted or re-scoped by a role, so the

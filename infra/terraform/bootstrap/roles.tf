@@ -50,7 +50,29 @@ data "aws_iam_policy_document" "deny_data_reads" {
   }
 }
 
+# RR-02: the state key is usable only through S3 and only for staging/* state objects, the same bounds its key
+# policy enforces. Not matched by alias: the key policy, not the alias, decides.
+data "aws_iam_policy_document" "state_key_use" {
+  statement {
+    sid       = "StateKeyViaS3ForStagingState"
+    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
+    resources = ["arn:${local.partition}:kms:${local.region}:${local.account_id}:key/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = [local.state_s3_via_service]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:aws:s3:arn"
+      values   = ["${local.state_bucket_arn}/staging/*"]
+    }
+  }
+}
+
 data "aws_iam_policy_document" "state_rw" {
+  source_policy_documents = [data.aws_iam_policy_document.state_key_use.json]
+
   statement {
     sid       = "StateList"
     actions   = ["s3:ListBucket"]
@@ -64,7 +86,7 @@ data "aws_iam_policy_document" "state_rw" {
   statement {
     sid       = "StateRead"
     actions   = ["s3:GetObject"]
-    resources = ["${local.state_bucket_arn}/*"]
+    resources = ["${local.state_bucket_arn}/staging/*"]
     condition {
       test     = "StringEquals"
       variable = "aws:ResourceAccount"
@@ -82,19 +104,11 @@ data "aws_iam_policy_document" "state_rw" {
       values   = [local.account_id]
     }
   }
-  statement {
-    sid       = "StateKey"
-    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-    resources = ["arn:${local.partition}:kms:${local.region}:${local.account_id}:key/*"]
-    condition {
-      test     = "ForAnyValue:StringEquals"
-      variable = "kms:ResourceAliases"
-      values   = [local.state_kms_alias]
-    }
-  }
 }
 
 data "aws_iam_policy_document" "state_read_lock" {
+  source_policy_documents = [data.aws_iam_policy_document.state_key_use.json]
+
   statement {
     sid       = "StateList"
     actions   = ["s3:ListBucket"]
@@ -108,7 +122,7 @@ data "aws_iam_policy_document" "state_read_lock" {
   statement {
     sid       = "StateRead"
     actions   = ["s3:GetObject"]
-    resources = ["${local.state_bucket_arn}/*"]
+    resources = ["${local.state_bucket_arn}/staging/*"]
     condition {
       test     = "StringEquals"
       variable = "aws:ResourceAccount"
@@ -123,16 +137,6 @@ data "aws_iam_policy_document" "state_read_lock" {
       test     = "StringEquals"
       variable = "aws:ResourceAccount"
       values   = [local.account_id]
-    }
-  }
-  statement {
-    sid       = "StateKey"
-    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
-    resources = ["arn:${local.partition}:kms:${local.region}:${local.account_id}:key/*"]
-    condition {
-      test     = "ForAnyValue:StringEquals"
-      variable = "kms:ResourceAliases"
-      values   = [local.state_kms_alias]
     }
   }
 }

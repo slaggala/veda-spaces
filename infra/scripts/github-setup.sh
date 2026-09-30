@@ -4,6 +4,7 @@
 #
 #   infra/scripts/github-setup.sh [--repo owner/repo] [--reviewers alice,bob]            # environments + main
 #   infra/scripts/github-setup.sh --verify                                              # read back, fail on drift
+#   infra/scripts/github-setup.sh --verify-environments       # environments + main protected (RR-07; any read token)
 #   infra/scripts/github-setup.sh --outputs infra/generated/bootstrap-outputs.json --variables-only
 #   add --apply to make the changes
 #
@@ -21,6 +22,10 @@
 # "Variables: write" permission, so GH_ADMIN_TOKEN never needs "Environments" or "Administration" (F10). A role
 # ARN is not a secret: AWS enforces the environment through the OIDC trust.
 #
+# --verify-environments is the gate bootstrap.sh and 00-bootstrap run before any apply (RR-07). It reads only what a
+# workflow's GITHUB_TOKEN (actions: read, contents: read) can: each environment's reviewers, admin bypass and branch
+# policy, and whether main is protected. --verify also reads the protection details (needs admin).
+#
 # Secrets are never set here: the owner adds BOOTSTRAP_AWS_*, CF_READ_TOKEN and GH_ADMIN_TOKEN (see the runbook §3).
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -32,6 +37,7 @@ OUTPUTS=""
 APPLY=0
 VARIABLES_ONLY=0
 VERIFY=0
+VERIFY_ENVIRONMENTS=0
 while (($#)); do
   case "$1" in
     --repo) REPO_ARG="${2:-}"; shift 2 ;;
@@ -39,8 +45,9 @@ while (($#)); do
     --outputs) OUTPUTS="${2:-}"; shift 2 ;;
     --variables-only) VARIABLES_ONLY=1; shift ;;
     --verify) VERIFY=1; shift ;;
+    --verify-environments) VERIFY_ENVIRONMENTS=1; shift ;;
     --apply) APPLY=1; shift ;;
-    -h | --help) sed -n '2,27p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,32p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -52,7 +59,7 @@ REPO="$(resolve_repo "$REPO_ARG")"
 ENVIRONMENTS="bootstrap:yes:yes staging-plan:yes:no staging-infra:yes:yes staging:yes:yes staging-evidence:no:yes"
 
 # --- verify: read back and fail on any drift from the rules above ---------------------------------------------
-if ((VERIFY)); then
+if ((VERIFY || VERIFY_ENVIRONMENTS)); then
   problems=()
   for spec in $ENVIRONMENTS; do
     IFS=: read -r env with_reviewers main_only <<<"$spec"
@@ -72,7 +79,9 @@ if ((VERIFY)); then
       [[ "$policies" == "branch:main" ]] || problems+=("$env: deployment branches are '$policies', expected only main")
     fi
   done
-  if protection="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)"; then
+  if ((VERIFY_ENVIRONMENTS && !VERIFY)); then
+    [[ "$(gh api "repos/$REPO/branches/main" --jq .protected 2>/dev/null)" == true ]] || problems+=("main: branch not protected")
+  elif protection="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)"; then
     jq -e '.enforce_admins.enabled == true' <<<"$protection" >/dev/null || problems+=("main: protection not enforced for admins")
     jq -e '.required_pull_request_reviews != null' <<<"$protection" >/dev/null || problems+=("main: pull request not required")
     jq -e '(.allow_force_pushes.enabled // false) == false' <<<"$protection" >/dev/null || problems+=("main: force pushes allowed")

@@ -1,10 +1,11 @@
 {
-  "description": "Approved Veda staging AWS account (F3). Bootstrap refuses to run until account_id and account_name are committed here through a reviewed pull request. See docs/operations/staging-bootstrap.md section 2.",
+  "description": "Approved Veda staging AWS account (F3) and the owner principals of its bootstrap state (RR-01/RR-02). Bootstrap refuses to run until account_id, account_name and bootstrap_principal_arns are committed here through a reviewed pull request. See docs/operations/staging-bootstrap.md section 2.",
   "account_id": null,
   "account_name": null,
   "account_alias": null,
   "region": "ap-south-1",
   "manage_account_guardrails": true,
+  "bootstrap_principal_arns": [],
   "allowed_foreign_resources": {
     "iam_roles": ["OrganizationAccountAccessRole"],
     "iam_users": [],

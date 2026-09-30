@@ -4,7 +4,8 @@ This runbook covers the one-time bootstrap of the **dedicated Veda staging AWS a
 It is the only step that uses owner credentials. After it, every workflow runs through GitHub OIDC.
 It has no dependency on Aurion or any other system, and does not deploy the application or enable public intake.
 
-- **Status:** written and tested offline; remediated after the independent review (F1–F10, see the review package §8).
+- **Status:** written and tested offline; remediated after the independent review (F1–F10, see the review package §8)
+  and the final-certification re-review (RR-01, RR-02, RR-03, RR-05, RR-07, review package §9).
   It has **not been run** against any AWS account.
 - **Code:** [`infra/terraform/bootstrap`](../../infra/terraform/bootstrap), [`infra/scripts`](../../infra/scripts),
   [`.github/workflows/00-bootstrap.yml`](../../.github/workflows/00-bootstrap.yml).
@@ -34,6 +35,7 @@ Terraform variable validation refuse to run while `account_id` is `null`, or for
 | `account_name` | Its name exactly as `aws account get-account-information` returns it (for example `veda-staging`) |
 | `account_alias` | Its IAM account alias, or `null` if it has none |
 | `manage_account_guardrails` | `true` unless the account already manages the guardrails (§6). Changing it later never removes them |
+| `bootstrap_principal_arns` | The exact IAM role ARN (with its path) or IAM user ARN of the owner session that runs the bootstrap, for example `arn:aws:iam::<ACCOUNT_ID>:role/OrganizationAccountAccessRole` or `arn:aws:iam::<ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/ap-south-1/AWSReservedSSO_<set>_<id>`. These principals, and the account root, are the **only** ones that can read or write bootstrap state, change the state bucket or administer the state key (RR-01, RR-02). No wildcards, no `veda-*` identity; the plan fails unless the session running it is listed |
 | `allowed_foreign_resources` | Pre-existing IAM roles, users, buckets, instances or Lambda functions that are *not* Veda's but may stay. Empty for a new account (`OrganizationAccountAccessRole` is listed by default) |
 
 Discovery then refuses the run unless the live account name and alias match, neither looks like production or
@@ -76,13 +78,19 @@ make -C infra github-environments REVIEWERS=<login>              # dry run: envi
 make -C infra github-environments REVIEWERS=<login> APPLY=1
 make -C infra github-verify                                      # read back; fails on any drift
 make -C infra bootstrap-plan  EXPECTED_ACCOUNT_ID=<ACCOUNT_ID>    # read-only; review infra/generated/bootstrap-plan.txt
-make -C infra bootstrap-apply EXPECTED_ACCOUNT_ID=<ACCOUNT_ID> PLAN_FILE=generated/bootstrap.tfplan
-                                                                 # applies that reviewed plan; type the account ID
+                                                                 # and note the "plan sha256" it prints
+make -C infra bootstrap-apply EXPECTED_ACCOUNT_ID=<ACCOUNT_ID> PLAN_FILE=generated/bootstrap.tfplan \
+  PLAN_SHA256=<the reviewed digest>                              # applies that approved plan; type the account ID
 make -C infra github-variables                                   # dry run, then again with APPLY=1
 ```
 
-`bootstrap-apply` without `PLAN_FILE` plans, shows the plan and asks for the account ID before applying the plan it
-just showed. It never applies anything that was not shown.
+`bootstrap-apply` without `PLAN_FILE` plans, shows the plan and its SHA-256, and asks for the account ID before
+applying the plan it just showed. It never applies anything that was not shown. With `PLAN_FILE`, it applies only
+the file whose SHA-256 is `PLAN_SHA256` and whose text, rendered again, is the text you reviewed (RR-05).
+
+Either way, **apply refuses to start unless the GitHub environments are protected** (RR-07): `github-setup.sh
+--verify-environments` must pass (every environment present with required reviewers where required, no admin
+bypass, the main-only branch policy, and `main` protected). Run the `github-environments` step first.
 
 ### Option B: the `00-bootstrap` workflow
 
@@ -99,16 +107,26 @@ A `workflow_dispatch` workflow can only be started once it exists on the default
    gh secret set GH_ADMIN_TOKEN                  --env bootstrap   # optional, Variables: write only
    ```
 3. Run it: Actions → **00-bootstrap** → mode `plan`. Read the job summary and the `bootstrap-plan-<run id>`
-   artifact (`bootstrap-plan.txt`). Note the run ID.
-4. Run it again with mode `apply` and `plan_run_id` = that run ID. A `bootstrap` environment reviewer approves the
-   run. It applies **that plan file**, after checking that the plan run was a successful `plan` run of this workflow
-   on `main` for the same commit, and that the plan's SHA-256, commit and account match its metadata (F4).
+   artifact (`bootstrap-plan.txt`). Note the run ID and the **plan sha256** in the summary.
+4. Run it again with mode `apply`, `plan_run_id` = that run ID and `plan_sha256` = that digest. The run's name shows
+   both, so the `bootstrap` environment reviewer approves that exact digest. It applies **that plan file** only
+   (RR-05), after checking that:
+   - the plan run is a successful `workflow_dispatch` plan run of `.github/workflows/00-bootstrap.yml` (path and
+     workflow ID, not the name) on `main`, in this repository, for the same commit;
+   - the artifact's bytes match the SHA-256 GitHub recorded when the plan run uploaded it;
+   - the plan file's SHA-256 is the approved `plan_sha256`, and its metadata names that digest, run and workflow;
+   - the plan text, rendered again from the file, is byte-identical to the reviewed `bootstrap-plan.txt`.
    If anything changed in between (a new commit, or state), plan again.
 5. **Delete the bootstrap secrets** afterwards (they have expired anyway):
    `gh secret delete BOOTSTRAP_AWS_ACCESS_KEY_ID --env bootstrap` (and the other two).
 
 The workflow refuses to run without a session token, with a key that is not an `ASIA…` temporary key, from any
 branch but `main`, while `main` is unprotected, or for an account other than the manifest's.
+
+**It fails closed on environment protection (RR-07).** A first `preflight` job, with no environment and no secret,
+verifies every environment and `main` before the `bootstrap` job may even request its environment, so a missing
+environment is never auto-created without reviewers. The `bootstrap` job then proves, through the run's approval
+record, that a reviewer approved it for `bootstrap` before it reads any secret.
 
 ## 4. What the run does
 
@@ -129,12 +147,21 @@ branch but `main`, while `main` is unprotected, or for an account other than the
    - Cloudflare account and zone, planned-name collisions (every page of records) and live-site records;
    - the operator's public IP.
 4. **Plan:** `terraform plan` to `infra/generated/bootstrap.tfplan`, its text in `bootstrap-plan.txt`, and
-   `bootstrap-plan.meta.json` (commit, clean tree, account, repository, SHA-256, whether state existed).
+   `bootstrap-plan.meta.json` (commit, clean tree, account, repository, workflow, run, Terraform version, SHA-256 of
+   the plan and of its text, whether state existed). The plan fails unless `bootstrap_principal_arns` is set, exact,
+   free of `veda-*` identities and includes the session running it. When the state bucket exists, its key is the
+   one the bucket's default encryption names; the alias must agree with it (RR-02).
 5. **Plan guard** (`check-plan.sh`, on every plan and again before apply). It refuses:
    - any delete or replace;
    - any IAM role without `veda-boundary`, or with a trust policy unknown at plan time;
-   - any trust in another account, in everyone, or in an identity provider other than GitHub;
-   - GitHub trust on any role other than `veda-gh-*`, or with a subject other than `repo:<owner>/<repo>:environment:<name>`;
+   - any IAM role, policy or instance profile under a path, or not named `veda-*` (RR-03);
+   - any trust in another account, in everyone, or in an identity provider other than GitHub, or with
+     `NotAction`/`NotPrincipal`;
+   - GitHub trust on any role but the four `veda-gh-*` roles, or from any environment but the role's own protected
+     one (`plan`→`staging-plan`, `apply`→`staging-infra`, `deploy`→`staging`, `evidence`→`staging-evidence`), with
+     any action but `sts:AssumeRoleWithWebIdentity` (RR-03);
+   - privileged AWS managed policies, IAM users, groups, keys, SAML or other OIDC providers, account settings;
+   - an input that is not a Terraform plan;
    - any resource policy, Lambda permission, function URL, KMS grant or AMI/snapshot permission that opens something
      to another account or the public.
 6. **Apply** (apply mode only). This applies the reviewed plan file and nothing else; Terraform refuses it if the
@@ -142,6 +169,9 @@ branch but `main`, while `main` is unprotected, or for an account other than the
    - migrates the local state to `s3://veda-tfstate-<account>/bootstrap/terraform.tfstate`;
    - checks that the object exists (in this account);
    - deletes the local copy.
+
+   Then, on every apply, it reads the live state bucket policy, default encryption, key policy and key rotation back
+   and stops unless they are exactly the reviewed ones (RR-01, RR-02). No outputs are written otherwise.
 7. **Outputs:** `infra/generated/bootstrap-outputs.json` lists the role ARNs, the state bucket and key, and the backend settings.
 
 Re-running is safe. When the state bucket exists, the script uses the remote state and the plan shows only the differences.
@@ -152,7 +182,8 @@ All of these commands are read-only:
 
 ```sh
 aws s3api get-bucket-versioning        --bucket veda-tfstate-<ACCOUNT_ID>        # Enabled
-aws s3api get-bucket-encryption        --bucket veda-tfstate-<ACCOUNT_ID>        # aws:kms, alias/veda-tfstate key
+aws s3api get-bucket-encryption        --bucket veda-tfstate-<ACCOUNT_ID>        # aws:kms, the state key, BucketKeyEnabled false
+aws kms get-key-policy --key-id <state key ARN> --policy-name default            # = terraform output policy_documents.state_key
 aws s3api get-public-access-block      --bucket veda-tfstate-<ACCOUNT_ID>        # all true
 aws s3api head-object --bucket veda-tfstate-<ACCOUNT_ID> --key bootstrap/terraform.tfstate
 aws iam get-role --role-name veda-gh-apply --query 'Role.[PermissionsBoundary.PermissionsBoundaryArn,MaxSessionDuration]'
@@ -177,6 +208,9 @@ The first OIDC proof comes with AUT-301, when `10-infra-plan` assumes `veda-gh-p
 | An apply run refuses the reviewed plan (checksum, commit, account, state changed) | Plan again on the current commit and apply that run. |
 | A first apply fails **before** state migration | Resources may exist while only local state (`infra/terraform/bootstrap/terraform.tfstate`) knows them. Locally, keep the file and rerun `bootstrap-apply`. In CI, download the `bootstrap-local-state-<run>` artifact, put it at that path, and rerun locally. Never delete it until migration succeeds. |
 | The script refuses because local state exists while the bucket exists | A previous migration was interrupted. Compare the local file with `s3://…/bootstrap/terraform.tfstate`. Keep the newer serial in S3, then remove the local file. |
+| Apply refuses: "GitHub environment protection is a prerequisite of apply" | An environment is missing or unprotected, or `main` is not protected. Run `make -C infra github-environments REVIEWERS=<login> APPLY=1`, then `make -C infra github-verify`, then apply again. Never create the environments by hand without reviewers. |
+| Apply stops after Terraform: "the live protections … are not the reviewed ones" | Something other than the plan changed the bucket or key policy, encryption or rotation. Do not use the state. Compare `aws kms get-key-policy` and `aws s3api get-bucket-policy` with `terraform output policy_documents`, find who changed them (CloudTrail), then plan and apply again with an owner session. |
+| The owner principal changed (new SSO permission set, other admin role) | The new principal cannot touch bootstrap state or the key until it is listed. Add it to `bootstrap_principal_arns` in a reviewed change and apply that change **with the old principal** (or the account root). If the old principal no longer exists, the account root can replace the bucket policy and the key policy (both keep the root). |
 | A state lock is stuck (`*.tflock` object) | Confirm no job is running, then `terraform force-unlock <ID>` from the bootstrap directory. |
 | The session expired mid-run | Get a new temporary session and rerun. Applies are idempotent. |
 | An OIDC provider already exists (e.g. created by someone else) | Discovery passes it in as existing and the bootstrap does not manage it. |
@@ -210,19 +244,32 @@ is controlled by the `staging-infra` approval and the reviewed plan, not by thes
   `job-function/*` policy;
 - Organizations and account changes;
 - changes to the boundary, the `veda-gh-*` roles and policies (including creating new `veda-gh-*` names) and the OIDC provider;
-- writes to `bootstrap/*` state, and any change to the state bucket's configuration, versions or key;
+- IAM roles, policies and instance profiles under a path (`role/veda-x/admin` would otherwise match `role/veda-*`) (RR-03);
+- creating a role or changing a trust policy by any role but `veda-gh-apply` (RR-03);
+- any use of a web-identity or SAML session of a role other than the four `veda-gh-*` roles (RR-03);
+- any S3 action on `bootstrap/*` state (read, copy, write, replicate, restore, tag, delete), and any change to the
+  state bucket's configuration or versions, or replication into it (RR-01);
 - weakening the account guardrails; stopping, deleting or re-scoping CloudTrail trails; archiving Access Analyzer
   findings; launching or switching an instance to IMDSv1;
 - sharing snapshots or AMIs, KMS grants to other accounts, S3 writes to other accounts, Lambda permissions for other
   accounts, public function URLs;
 - bypassing GOVERNANCE Object Lock retention.
 
-The state bucket's own policy also refuses every `veda-*` role bootstrap-state writes and bucket changes, even a
-role that were somehow outside the boundary.
+**State bucket policy (RR-01).** Holds for every principal, bounded or not, whatever its name or path: only the
+`bootstrap_principal_arns` and the account root may perform any S3 action on `bootstrap/*`, change the bucket's
+configuration, delete an object version or replicate into the bucket; nobody reaches the bucket through an access
+point.
 
-**Not enforceable by IAM, enforced by the plan guard instead:** a trust policy's content (other accounts, GitHub
-subjects) and resource policies' principals. `check-plan.sh` checks these on every bootstrap plan; AUT-301 must run
-it on every staging plan (§8).
+**State key policy (RR-02).** The key policy itself, not an alias or the boundary, protects the key: only the owner
+principals and the account root may administer it (everyone else may only describe it, read its metadata and use it
+for S3); it encrypts and decrypts only through S3, only for objects of the state bucket, one object at a time (S3
+Bucket Keys are off); `bootstrap/*` objects only for the owners; no other account. The GitHub roles' own key
+permission has the same bounds (through S3, `staging/*` only).
+
+**Trust policies (RR-03).** IAM has no condition key for a trust policy's content. What IAM does enforce: only
+`veda-gh-apply` can write any trust policy, nothing under a path can be created, and a federated session of any role
+but the `veda-gh-*` roles can do nothing. What the plan guard enforces on every plan (`check-plan.sh`; AUT-301 must
+run it on every staging plan, §8): the trust content of every role the apply role creates.
 
 ## 8. Constraints on later stories
 
@@ -231,7 +278,8 @@ it on every staging plan (§8).
 | AUT-104 | Trails can be created and started by `veda-gh-apply`, but never updated, re-scoped (event selectors) or deleted by any Veda role. Define the trail's event selectors at creation; later changes are owner-run. |
 | AUT-107 | Seeded app secrets are never Terraform-managed (the CI roles cannot read them). |
 | AUT-201/203 | `veda-gh-plan` cannot read parameters outside `/veda/staging/config/*`, so secret-bearing parameters (`/edge/*`) must not be refreshed by a plan (seed them outside Terraform, or with write-only arguments). Cloudflare secrets that stay in Terraform state are readable by plan runs, which now need a reviewer. |
-| AUT-301 | Run `infra/scripts/check-plan.sh` on every staging plan and refuse the apply on any finding. Use the repository variables `AWS_ROLE_ARN_PLAN/APPLY/DEPLOY/EVIDENCE`. Apply only a reviewed saved plan, as `00-bootstrap` does. |
+| AUT-301 | Run `infra/scripts/check-plan.sh` on every staging plan and refuse the apply on any finding. Use the repository variables `AWS_ROLE_ARN_PLAN/APPLY/DEPLOY/EVIDENCE`. Apply only a reviewed saved plan bound by digest, as `00-bootstrap` does (`verify-run.sh plan-run`, a `plan_sha256` input, a credential-free preflight job and `verify-run.sh approval`). Only `veda-gh-apply` can create roles or write trust. |
+| AUT-1xx | Every Veda IAM role, policy and instance profile lives at path `/` and is named `veda-*`. Trust policy changes happen only through `veda-gh-apply`. State encryption uses per-object KMS context (no S3 Bucket Keys on the state bucket). |
 
 ## 9. Teardown
 

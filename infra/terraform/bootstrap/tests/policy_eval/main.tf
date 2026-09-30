@@ -6,9 +6,11 @@
 #   "allow"    an identity Allow matches and (when a boundary is given) a boundary Allow matches too;
 #   "implicit" otherwise (implicitly denied).
 # Supported: Action/NotAction, Resource/NotResource with * and ? wildcards (actions case-insensitive), and the
-# condition operators the Veda policies use. An unsupported operator never matches, so a probe that relies on it
-# fails loudly instead of passing silently. Principals are not evaluated: set the context keys a resource
-# policy conditions on (for example aws:PrincipalArn).
+# condition operators the Veda policies use (Null: "true" matches an absent key, "false" a present one). An
+# unsupported operator never matches, so a probe that relies on it fails loudly instead of passing silently.
+# Principals are not evaluated: set the context keys a resource policy conditions on (for example aws:PrincipalArn).
+# Key policies (key_policies) apply only to requests on a KMS key: their Deny statements are evaluated, and their
+# account-root Allow is the delegation that lets the identity policies decide.
 
 terraform {
   required_version = ">= 1.10.0, < 2.0.0"
@@ -28,6 +30,12 @@ variable "boundary_policy" {
 
 variable "resource_policies" {
   description = "Resource policy JSON documents; only their Deny statements are evaluated."
+  type        = list(string)
+  default     = []
+}
+
+variable "key_policies" {
+  description = "KMS key policy JSON documents; their Deny statements apply only to requests on a KMS key (a key policy's Resource \"*\" means that key)."
   type        = list(string)
   default     = []
 }
@@ -59,6 +67,7 @@ locals {
     [for d in var.identity_policies : { source = "identity", json = d }],
     var.boundary_policy == "" ? [] : [{ source = "boundary", json = var.boundary_policy }],
     [for d in var.resource_policies : { source = "resource", json = d }],
+    [for d in var.key_policies : { source = "key", json = d }],
   )
 
   statements = flatten([for d in local.documents : [for s in flatten([jsondecode(d.json).Statement]) : {
@@ -89,7 +98,8 @@ locals {
     expect  = p.expect
     context = merge(var.default_context, p.context)
     matched = [for s in local.statements : { source = s.source, sid = s.sid, effect = s.effect } if(
-      (s.has_not_action
+      (s.source != "key" || can(regex("^arn:aws[a-z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/", p.resource)))
+      && (s.has_not_action
         ? !anytrue([for r in s.not_action_patterns : can(regex(r, p.action))])
       : anytrue([for r in s.action_patterns : can(regex(r, p.action))]))
       && (s.has_not_resource
@@ -104,6 +114,8 @@ locals {
         ? anytrue([for r in c.value_patterns : can(regex(r, lookup(merge(var.default_context, p.context), c.key, "\u0000absent")))])
         : contains(["StringNotLike", "StringNotLikeIfExists", "ArnNotLike"], c.op)
         ? !anytrue([for r in c.value_patterns : can(regex(r, lookup(merge(var.default_context, p.context), c.key, "\u0000absent")))])
+        : c.op == "Null"
+        ? (lookup(merge(var.default_context, p.context), c.key, "\u0000absent") == "\u0000absent") == (c.values[0] == "true")
         : false
       )])
     )]

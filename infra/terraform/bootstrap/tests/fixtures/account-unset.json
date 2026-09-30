@@ -5,6 +5,9 @@
   "account_alias": "veda-staging",
   "region": "ap-south-1",
   "manage_account_guardrails": true,
+  "bootstrap_principal_arns": [
+    "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole"
+  ],
   "allowed_foreign_resources": {
     "iam_roles": [
       "OrganizationAccountAccessRole"

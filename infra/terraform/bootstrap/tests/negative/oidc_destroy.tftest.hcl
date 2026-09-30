@@ -3,10 +3,13 @@
 
 mock_provider "aws" {
   mock_data "aws_caller_identity" {
-    defaults = { account_id = "111122223333" }
+    defaults = { account_id = "111122223333", arn = "arn:aws:sts::111122223333:assumed-role/OrganizationAccountAccessRole/owner" }
   }
   mock_data "aws_partition" {
     defaults = { partition = "aws" }
+  }
+  mock_data "aws_iam_session_context" {
+    defaults = { issuer_arn = "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole" }
   }
   mock_resource "aws_iam_policy" {
     defaults = { arn = "arn:aws:iam::111122223333:policy/veda-mock" }

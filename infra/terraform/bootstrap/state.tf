@@ -1,12 +1,24 @@
 # Terraform state for every Veda staging stack (keys: bootstrap/, staging/core.tfstate, staging/edge.tfstate).
 # Encrypted with its own customer-managed key; locking is S3-native (use_lockfile), so no DynamoDB table.
 
+# RR-02: the key policy itself enforces the key's protection; no statement depends on an alias, a role name or a
+# permissions boundary. Whoever calls, and whatever their IAM policies allow:
+#   - only the owner principals (manifest bootstrap_principal_arns, and the account root) can administer the key:
+#     every other principal may only describe it, read its metadata and use it for S3;
+#   - the key encrypts and decrypts only through S3, only for objects of the state bucket, one object at a time
+#     (a bucket-level S3 Bucket Key context is refused, so every use is bound to one object ARN);
+#   - bootstrap/* objects are decrypted and encrypted for the owner principals only;
+#   - no other account uses it.
+# The account-root statement is kept so the key can never become unmanageable (KMS lockout safety check).
+locals {
+  state_key_crypto_actions = ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*"]
+  state_s3_via_service     = "s3.${local.region}.amazonaws.com"
+}
+
 data "aws_iam_policy_document" "state_key" {
-  #checkov:skip=CKV_AWS_109:Standard account-root key policy statement: delegates key use to IAM policies; tampering is denied by veda-boundary
-  #checkov:skip=CKV_AWS_111:Standard account-root key policy statement: delegates key use to IAM policies; tampering is denied by veda-boundary
-  #checkov:skip=CKV_AWS_356:Standard account-root key policy statement: delegates key use to IAM policies; tampering is denied by veda-boundary
-  # The account root statement lets IAM policies grant use of the key (the GitHub roles below). Nothing else
-  # is granted here; deletion and policy changes are refused to every veda-* role by the boundary.
+  #checkov:skip=CKV_AWS_109:Account-root delegation is required by KMS (lockout safety); administration is denied to every non-owner principal by DenyKeyAdministrationExceptOwner in this policy
+  #checkov:skip=CKV_AWS_111:Account-root delegation is required by KMS (lockout safety); administration is denied to every non-owner principal by DenyKeyAdministrationExceptOwner in this policy
+  #checkov:skip=CKV_AWS_356:A key policy's Resource "*" means this key only
   statement {
     sid       = "AccountAdministration"
     actions   = ["kms:*"]
@@ -14,6 +26,91 @@ data "aws_iam_policy_document" "state_key" {
     principals {
       type        = "AWS"
       identifiers = ["arn:${local.partition}:iam::${local.account_id}:root"]
+    }
+  }
+
+  statement {
+    sid         = "DenyKeyAdministrationExceptOwner"
+    effect      = "Deny"
+    not_actions = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey", "kms:Get*", "kms:List*"]
+    resources   = ["*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = local.owner_principal_arns
+    }
+  }
+
+  statement {
+    sid       = "DenyUseOutsideS3"
+    effect    = "Deny"
+    actions   = local.state_key_crypto_actions
+    resources = ["*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringNotEquals"
+      variable = "kms:ViaService"
+      values   = [local.state_s3_via_service]
+    }
+  }
+
+  statement {
+    sid       = "DenyUseOutsideStateObjects"
+    effect    = "Deny"
+    actions   = local.state_key_crypto_actions
+    resources = ["*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringNotLike"
+      variable = "kms:EncryptionContext:aws:s3:arn"
+      values   = ["${local.state_bucket_arn}/*"]
+    }
+  }
+
+  statement {
+    sid       = "DenyBootstrapStateExceptOwner"
+    effect    = "Deny"
+    actions   = local.state_key_crypto_actions
+    resources = ["*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:aws:s3:arn"
+      values   = ["${local.state_bucket_arn}/bootstrap/*"]
+    }
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = local.owner_principal_arns
+    }
+  }
+
+  statement {
+    sid       = "DenyOtherAccounts"
+    effect    = "Deny"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringNotEquals"
+      variable = "kms:CallerAccount"
+      values   = [local.account_id]
     }
   }
 }
@@ -27,6 +124,26 @@ resource "aws_kms_key" "state" {
 
   lifecycle {
     prevent_destroy = true
+
+    # RR-01/RR-02: the owner allow-list must be committed, exact, free of veda-* identities, and must include the
+    # session running this plan (otherwise it would lock itself out of the state it is about to write).
+    precondition {
+      condition     = length(local.manifest_owner_arns) > 0
+      error_message = "bootstrap_principal_arns is empty in the account manifest: commit the owner session's IAM role or user ARN in a reviewed change first (runbook §2)."
+    }
+    precondition {
+      condition = alltrue([for a in local.manifest_owner_arns :
+      can(regex("^arn:${local.partition}:iam::${local.approved_account_id}:(role|user)/[A-Za-z0-9+=,.@_/-]+$", a))])
+      error_message = "bootstrap_principal_arns must list exact IAM role or user ARNs (path included, no wildcards) in the approved account."
+    }
+    precondition {
+      condition     = !anytrue([for a in local.manifest_owner_arns : can(regex(":(role|user)/(.*/)?${local.prefix}-", a))])
+      error_message = "bootstrap_principal_arns must not name a ${local.prefix}-* identity: no Veda role may own the bootstrap state."
+    }
+    precondition {
+      condition     = contains(local.owner_principal_arns, data.aws_iam_session_context.current.issuer_arn)
+      error_message = "This session (${data.aws_iam_session_context.current.issuer_arn}) is not in bootstrap_principal_arns; it would lock itself out of the state it creates."
+    }
   }
 }
 
@@ -75,7 +192,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
       sse_algorithm     = "aws:kms"
       kms_master_key_id = aws_kms_key.state.arn
     }
-    bucket_key_enabled = true
+    # Off on purpose (RR-02): with an S3 Bucket Key the KMS encryption context is the bucket, and the key policy
+    # could no longer tell bootstrap/* from staging/* objects. State objects are few; the extra KMS calls are free-tier.
+    bucket_key_enabled = false
   }
 }
 
@@ -97,8 +216,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
   depends_on = [aws_s3_bucket_versioning.state]
 }
 
-# Resource-side controls that hold even for a role outside veda-boundary (F2): every veda-* role is refused
-# bootstrap state writes and any bucket configuration change. Only the owner session maintains the bucket.
+# RR-01: resource-side controls that hold for every principal, bounded or not, whatever its name or path. The
+# owner principals (manifest bootstrap_principal_arns, and the account root) are the only ones that can:
+#   - perform any S3 action on bootstrap/* objects: read, copy out, write, copy in, replicate in, restore, tag,
+#     delete or roll back a version;
+#   - change the bucket's configuration (policy, replication, inventory, logging, notifications, lifecycle,
+#     encryption, versioning, Object Lock, ownership, CORS, website, ...), delete it, or delete any object version;
+#   - replicate into any key of the bucket.
+# No principal reaches the bucket through an access point (identity policies see an access-point ARN there, so
+# name-based denies elsewhere would not match).
 data "aws_iam_policy_document" "state_bucket" {
   statement {
     sid     = "DenyInsecureTransport"
@@ -121,7 +247,8 @@ data "aws_iam_policy_document" "state_bucket" {
 
   # Keys outside this account and region are refused. The pattern (not the exact key ARN, which exists only after
   # apply) keeps the whole bucket policy known at plan time, so the reviewer and the plan guard see it on the
-  # first run too. Default encryption still uses the state key.
+  # first run too. Default encryption still uses the state key, and the state key's own policy (RR-02) binds it
+  # to this bucket's objects.
   statement {
     sid       = "DenyWrongKmsKey"
     effect    = "Deny"
@@ -139,27 +266,47 @@ data "aws_iam_policy_document" "state_bucket" {
   }
 
   statement {
-    sid       = "DenyVedaRolesBootstrapStateWrites"
+    sid     = "DenyAccessPoints"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      local.state_bucket_arn,
+      "${local.state_bucket_arn}/*",
+    ]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Null"
+      variable = "s3:DataAccessPointArn"
+      values   = ["false"]
+    }
+  }
+
+  statement {
+    sid       = "DenyBootstrapStateExceptOwner"
     effect    = "Deny"
-    actions   = ["s3:PutObject", "s3:DeleteObject", "s3:PutObjectTagging", "s3:DeleteObjectTagging"]
+    actions   = ["s3:*"]
     resources = ["${local.state_bucket_arn}/bootstrap/*"]
     principals {
       type        = "*"
       identifiers = ["*"]
     }
     condition {
-      test     = "ArnLike"
+      test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
-      values   = [local.veda_role_arn_pattern]
+      values   = local.owner_principal_arns
     }
   }
 
   statement {
-    sid    = "DenyVedaRolesBucketChanges"
+    sid    = "DenyStateMovementExceptOwner"
     effect = "Deny"
     actions = [
       "s3:DeleteBucket*", "s3:PutBucket*", "s3:Put*Configuration", "s3:PutObjectAcl", "s3:PutObjectVersionAcl",
-      "s3:PutObjectRetention", "s3:PutObjectLegalHold", "s3:DeleteObjectVersion*",
+      "s3:PutObjectRetention", "s3:PutObjectLegalHold", "s3:DeleteObjectVersion*", "s3:BypassGovernanceRetention",
+      "s3:Replicate*", "s3:ObjectOwnerOverrideToBucketOwner",
     ]
     resources = [local.state_bucket_arn, "${local.state_bucket_arn}/*"]
     principals {
@@ -167,9 +314,9 @@ data "aws_iam_policy_document" "state_bucket" {
       identifiers = ["*"]
     }
     condition {
-      test     = "ArnLike"
+      test     = "ArnNotEquals"
       variable = "aws:PrincipalArn"
-      values   = [local.veda_role_arn_pattern]
+      values   = local.owner_principal_arns
     }
   }
 }

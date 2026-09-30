@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Offline regression tests for the AUT-001..003 remediation (F3, F4, F5, F7, F9, F10 and their script sides).
-# Run: make -C infra test-scripts   (the policy findings F1, F2, F6, F7, F9 are in terraform/bootstrap/tests).
+# Offline regression tests for the AUT-001..003 remediation (F3, F4, F5, F7, F9, F10 and their script sides) and
+# the final-certification findings (RR-01, RR-02, RR-03, RR-05, RR-07).
+# Run: make -C infra test-scripts   (the policy findings F1, F2, F6, F7, F9 and the policy side of RR-01..RR-03 are
+# in terraform/bootstrap/tests).
 #
 # The scripts run from a temporary copy of infra/ with stub aws, gh and terraform commands first on PATH, so no
 # AWS, GitHub or Cloudflare API is reached and the working tree is never touched. The negative Terraform tests
@@ -12,6 +14,12 @@ INFRA="$(cd "$HERE/.." && pwd)"
 REAL_TF="$(command -v "${TERRAFORM:-terraform}" || true)"
 FIXTURE_MANIFEST="$INFRA/terraform/bootstrap/tests/fixtures/account.json"
 ACCT=111122223333
+KEY="arn:aws:kms:ap-south-1:$ACCT:key/00000000-0000-0000-0000-000000000000"
+# Reviewed policies as Terraform renders them, and the same policies as AWS stores them.
+REVIEWED_BUCKET_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapStateExceptOwner","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":"arn:aws:s3:::veda-tfstate-111122223333/bootstrap/*","Condition":{"ArnNotEquals":{"aws:PrincipalArn":["arn:aws:iam::111122223333:root","arn:aws:iam::111122223333:role/OrganizationAccountAccessRole"]}}}]}'
+LIVE_BUCKET_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapStateExceptOwner","Effect":"Deny","Principal":{"AWS":"*"},"Action":"s3:*","Resource":"arn:aws:s3:::veda-tfstate-111122223333/bootstrap/*","Condition":{"ArnNotEquals":{"aws:PrincipalArn":["arn:aws:iam::111122223333:role/OrganizationAccountAccessRole","arn:aws:iam::111122223333:root"]}}}]}'
+REVIEWED_KEY_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapStateExceptOwner","Effect":"Deny","Principal":"*","Action":["kms:Encrypt","kms:Decrypt"],"Resource":"*","Condition":{"StringLike":{"kms:EncryptionContext:aws:s3:arn":["arn:aws:s3:::veda-tfstate-111122223333/bootstrap/*"]}}}]}'
+LIVE_KEY_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapStateExceptOwner","Effect":"Deny","Principal":{"AWS":"*"},"Action":["kms:Decrypt","kms:Encrypt"],"Resource":"*","Condition":{"StringLike":{"kms:EncryptionContext:aws:s3:arn":"arn:aws:s3:::veda-tfstate-111122223333/bootstrap/*"}}}]}'
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -79,9 +87,35 @@ EOF
   echo '{"Functions":[{"FunctionName":"veda-canary"}]}' >"$d/lambda_list-functions.json"
   : >"$d/s3api_head-bucket.json"
   : >"$d/s3api_head-object.json"
-  echo "{\"KeyMetadata\":{\"Arn\":\"arn:aws:kms:ap-south-1:$ACCT:key/k\"}}" >"$d/kms_describe-key.json"
+  echo "{\"KeyMetadata\":{\"Arn\":\"$KEY\",\"KeyState\":\"Enabled\",\"KeyManager\":\"CUSTOMER\"}}" >"$d/kms_describe-key.json"
+  # Live state protections, as AWS returns them (scalars for one-element arrays, {"AWS":"*"}): equal to the
+  # reviewed policies in the terraform stub outputs once normalised.
+  echo "{\"ServerSideEncryptionConfiguration\":{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":{\"SSEAlgorithm\":\"aws:kms\",\"KMSMasterKeyID\":\"$KEY\"},\"BucketKeyEnabled\":false}]}}" >"$d/s3api_get-bucket-encryption.json"
+  jq -n --arg p "$LIVE_BUCKET_POLICY" '{Policy: $p}' >"$d/s3api_get-bucket-policy.json"
+  jq -n --arg p "$LIVE_KEY_POLICY" '{Policy: $p}' >"$d/kms_get-key-policy.json"
+  echo '{"KeyRotationEnabled":true}' >"$d/kms_get-key-rotation-status.json"
   echo "$d"
 }
+
+# GitHub answers for example-org/veda-spaces with every environment protected and main protected (RR-07).
+gh_compliant() {
+  local d="$TMP/gh.ok.$RANDOM$RANDOM" env reviewers policy
+  mkdir -p "$d"
+  for env in bootstrap staging-plan staging-infra staging staging-evidence; do
+    reviewers='[{"type":"required_reviewers","reviewers":[{"type":"User","reviewer":{"id":1001}}]}]'
+    [[ "$env" == staging-evidence ]] && reviewers='[]'
+    policy='{"protected_branches":false,"custom_branch_policies":true}'
+    [[ "$env" == staging-plan ]] && policy=null
+    jq -n --argjson r "$reviewers" --argjson p "$policy" '{can_admins_bypass: false, protection_rules: $r, deployment_branch_policy: $p}' \
+      >"$d/repos_example-org_veda-spaces_environments_$env.json"
+    echo '{"branch_policies":[{"name":"main","type":"branch"}]}' >"$d/repos_example-org_veda-spaces_environments_${env}_deployment-branch-policies.json"
+  done
+  echo '{"name":"main","protected":true}' >"$d/repos_example-org_veda-spaces_branches_main.json"
+  echo '{"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
+    >"$d/repos_example-org_veda-spaces_branches_main_protection.json"
+  echo "$d"
+}
+GHV="$(gh_compliant)"
 
 # lib.sh function in a strict shell, the way the scripts call it.
 lib() {
@@ -218,13 +252,13 @@ plan_json "$P.saml" "[$(role aws_iam_role.x veda-x "$(trust "{\"Federated\":\"ar
 check "role trusting another identity provider" fail "trusts Federated" -- guard "$P.saml"
 
 plan_json "$P.r2" "[$(role aws_iam_role.host veda-host "$(trust "$GH_PRINCIPAL" "$GH_OK_COND")")]"
-check "R2 non-veda-gh role trusting GitHub" fail "only veda-gh-\* roles may trust GitHub" -- guard "$P.r2"
+check "R2 non-veda-gh role trusting GitHub" fail "only the bootstrap GitHub roles .* may trust GitHub" -- guard "$P.r2"
 plan_json "$P.like" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},"StringLike":{"token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:*"}}')")]"
 check "R2 wildcard GitHub subject" fail "must use StringEquals only" -- guard "$P.like"
 plan_json "$P.pr" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:pull_request"}}')")]"
-check "R2 pull_request subject" fail "is not repo:example-org/veda-spaces:environment" -- guard "$P.pr"
+check "R2 pull_request subject" fail "must trust exactly repo:example-org/veda-spaces:environment:staging-plan" -- guard "$P.pr"
 plan_json "$P.repo" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:attacker/veda-spaces:environment:staging-plan"}}')")]"
-check "R2 another repository" fail "is not repo:example-org/veda-spaces" -- guard "$P.repo"
+check "R2 another repository" fail "must trust exactly repo:example-org/veda-spaces:environment:staging-plan.*got repo:attacker" -- guard "$P.repo"
 plan_json "$P.aud" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:environment:staging-plan"}}')")]"
 check "R2 GitHub trust without audience" fail "audience must be sts.amazonaws.com" -- guard "$P.aud"
 
@@ -257,41 +291,49 @@ check "F7 KMS grant to another account" fail "KMS grant to arn:aws:iam::99999999
 echo "== F4 / F5: bootstrap.sh applies only a verified, reviewed plan"
 T="$(new_tree)"
 BS="$T/infra/scripts/bootstrap.sh"
-check "--yes without a reviewed plan is refused" fail "needs a reviewed plan" -- env AWS_STUB_DIR="$(good_account)" "$BS" --mode apply --expected-account-id $ACCT --yes
+check "--yes without a reviewed plan is refused" fail "needs an approved plan" -- env AWS_STUB_DIR="$(good_account)" "$BS" --mode apply --expected-account-id $ACCT --yes
 check "F5 --skip-guardrails is gone" fail "was removed: set manage_account_guardrails" -- "$BS" --mode apply --expected-account-id $ACCT --skip-guardrails
 check "--plan-file with --mode plan is refused" fail "are for --mode apply" -- "$BS" --mode plan --expected-account-id $ACCT --plan-file x --plan-meta y
 
-# reviewed <dir> <meta overrides (jq)>: a plan file and matching metadata, as a plan run uploads them.
+sha() { shasum -a 256 "$1" | awk '{print $1}'; }
+# reviewed <dir> <meta overrides (jq)>: a plan file, its text and matching metadata, as a plan run uploads them.
 reviewed() {
   mkdir -p "$1"
   echo "reviewed plan bytes" >"$1/bootstrap.tfplan"
-  jq -n --arg sum "$(shasum -a 256 "$1/bootstrap.tfplan" | awk '{print $1}')" --arg acct $ACCT \
+  echo "stub plan text" >"$1/bootstrap-plan.txt"
+  jq -n --arg sum "$(sha "$1/bootstrap.tfplan")" --arg text "$(sha "$1/bootstrap-plan.txt")" --arg acct $ACCT \
     '{mode: "plan", commit: "c0ffee", dirty: false, account_id: $acct, repository: "example-org/veda-spaces",
-      plan_sha256: $sum, state_exists: true, created_at: "2026-09-30T00:00:00Z", run_id: "1"}' |
+      workflow_ref: "local", run_id: "1", run_attempt: "1", terraform_version: "1.16.4", plan_sha256: $sum,
+      plan_text_sha256: $text, state_exists: true, created_at: "2026-09-30T00:00:00Z"}' |
     jq "$2" >"$1/bootstrap-plan.meta.json"
 }
 tf_stub() { # tf_stub <plan.json source>
   local d="$TMP/tf.$RANDOM$RANDOM"
   mkdir -p "$d"
   cp "$1" "$d/plan.json"
-  echo '{"account_id":{"value":"111122223333"},"region":{"value":"ap-south-1"}}' >"$d/outputs.json"
+  jq -n --arg key "$KEY" --arg bp "$REVIEWED_BUCKET_POLICY" --arg kp "$REVIEWED_KEY_POLICY" \
+    '{account_id: {value: "111122223333"}, region: {value: "ap-south-1"}, state_kms_key_arn: {value: $key},
+      policy_documents: {value: {state_bucket: $bp, state_key: $kp}}}' >"$d/outputs.json"
   echo "$d"
 }
-apply_reviewed() { # apply_reviewed <reviewed dir> <tf stub dir> <aws stub dir>
-  env GITHUB_SHA=c0ffee TF_STUB_DIR="$2" AWS_STUB_DIR="$3" \
-    "$BS" --mode apply --expected-account-id $ACCT --plan-file "$1/bootstrap.tfplan" --plan-meta "$1/bootstrap-plan.meta.json" --yes
+# apply_reviewed <reviewed dir> <tf stub dir> <aws stub dir> [approved digest] [gh stub dir]
+apply_reviewed() {
+  env GITHUB_SHA=c0ffee TF_STUB_DIR="$2" AWS_STUB_DIR="$3" GH_STUB_DIR="${5:-$GHV}" \
+    "$BS" --mode apply --expected-account-id $ACCT --plan-file "$1/bootstrap.tfplan" --plan-meta "$1/bootstrap-plan.meta.json" \
+    --plan-sha256 "${4:-$(sha "$1/bootstrap.tfplan")}" --yes
 }
 
 R="$TMP/rev.ok" && reviewed "$R" '.'
 TFD="$(tf_stub "$P.ok")"
 check "reviewed plan is applied" ok "reviewed plan verified" -- apply_reviewed "$R" "$TFD" "$(good_account)"
+check "  ... after re-rendering the reviewed text and verifying the live protections" ok "state protection verified" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)"
 check "  ... exactly that plan file" ok "apply -input=false -lock-timeout=5m $R/bootstrap.tfplan" -- cat "$TFD/calls.log"
 
 R="$TMP/rev.sum" && reviewed "$R" '.'
 echo "tampered" >>"$R/bootstrap.tfplan"
 TFD="$(tf_stub "$P.ok")"
 check "tampered plan file" fail "checksum mismatch" -- apply_reviewed "$R" "$TFD" "$(good_account)"
-absent "  ... refused before terraform runs" "." "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+absent "  ... refused before terraform runs" "^(init|plan|show|apply)" "$(cat "$TFD/calls.log" 2>/dev/null || true)"
 
 R="$TMP/rev.commit" && reviewed "$R" '.commit = "badc0de"'
 check "plan from another commit" fail "made from commit badc0de" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)"
@@ -317,8 +359,8 @@ check "reviewed plan into a non-empty account is refused" fail "buckets: aurion-
 T5="$(new_tree)"
 jq '.account_id = null' "$FIXTURE_MANIFEST" >"$T5/infra/config/staging-account.json"
 R="$TMP/rev.unapproved" && reviewed "$R" '.'
-check "reviewed plan for an unapproved account is refused" fail "no approved staging account" -- env GITHUB_SHA=c0ffee TF_STUB_DIR="$(tf_stub "$P.ok")" AWS_STUB_DIR="$(good_account)" \
-  "$T5/infra/scripts/bootstrap.sh" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --yes
+check "reviewed plan for an unapproved account is refused" fail "no approved staging account" -- env GITHUB_SHA=c0ffee TF_STUB_DIR="$(tf_stub "$P.ok")" AWS_STUB_DIR="$(good_account)" GH_STUB_DIR="$GHV" \
+  "$T5/infra/scripts/bootstrap.sh" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --plan-sha256 "$(sha "$R/bootstrap.tfplan")" --yes
 
 echo "== F5: guardrails and the OIDC provider cannot be destroyed by a changed input"
 BOOT="$INFRA/terraform/bootstrap"
@@ -391,20 +433,34 @@ check "F10 protection not enforced for admins detected" fail "main: protection n
 U="$(drift g branches_main_protection '.')" && rm "$U/repos_example-org_veda-spaces_branches_main_protection.json"
 check "F10 unprotected main detected" fail "main: branch not protected" -- verify "$U"
 
-echo "== F4 / F10: 00-bootstrap workflow"
+echo "== F4 / F10 / RR-05 / RR-07: 00-bootstrap workflow"
 WF="$INFRA/../.github/workflows/00-bootstrap.yml"
 WFT="$(cat "$WF")"
+PREFLIGHT="$(awk '/^  preflight:/{p=1} /^  bootstrap:/{p=0} p' "$WF")"
+BOOTJOB="$(awk '/^  bootstrap:/{p=1} p' "$WF")"
 check "apply passes the reviewed plan file" ok "--plan-file infra/generated/reviewed/bootstrap.tfplan" -- printf '%s\n' "$WFT"
-check "  ... and its metadata, then --yes" ok "--plan-meta infra/generated/reviewed/bootstrap-plan.meta.json --yes" -- printf '%s\n' "$WFT"
+# shellcheck disable=SC2016 # literal $PLAN_SHA256 in the workflow text
+check "  ... with the approved digest and run, then --yes" ok '--plan-sha256 "\$PLAN_SHA256" --plan-run-id "\$PLAN_RUN_ID" --yes' -- printf '%s\n' "$WFT"
 absent "  ... never --yes on the same line as --mode apply" "--mode apply.*--yes" "$WFT"
-# shellcheck disable=SC2016 # literal $MODE / $sha in the workflow text
+# shellcheck disable=SC2016 # literal $MODE in the workflow text
 absent "  ... no mode passed through unchecked" '--mode "\$MODE"' "$WFT"
-# shellcheck disable=SC2016
-check "reviewed plan must be this commit's successful plan run on main" ok 'headSha == \$sha' -- cat "$WF"
-check "  ... of this workflow in plan mode" ok 'displayTitle == "00-bootstrap \(plan\)"' -- cat "$WF"
+check "RR-05 plan_sha256 is an input" ok "^      plan_sha256:" -- printf '%s\n' "$WFT"
+check "RR-05 the run name shows the approved digest to the environment reviewer" ok "^run-name: .*plan sha256 \{1\}.*inputs.plan_sha256" -- printf '%s\n' "$WFT"
+check "RR-05 the plan run and artifact are verified before approval (preflight)" ok "verify-run.sh plan-run" -- printf '%s\n' "$PREFLIGHT"
+check "RR-05 ... and again in the job that applies" ok "verify-run.sh plan-run" -- printf '%s\n' "$BOOTJOB"
+absent "RR-05 no match on the workflow name" "workflowName" "$WFT"
+check "RR-07 preflight verifies environment protection" ok "github-setup.sh --repo \"\\\$GITHUB_REPOSITORY\" --verify-environments" -- printf '%s\n' "$PREFLIGHT"
+absent "RR-07 preflight holds no environment" "environment:" "$PREFLIGHT"
+absent "RR-07 preflight holds no secret" "secrets\\." "$PREFLIGHT"
+check "RR-07 the environment job needs the preflight" ok "^    needs: preflight$" -- printf '%s\n' "$BOOTJOB"
+check "RR-07 the environment job proves its approval" ok "verify-run.sh approval .* --environment bootstrap" -- printf '%s\n' "$BOOTJOB"
+approval_line="$(grep -n 'verify-run.sh approval' <<<"$BOOTJOB" | head -1 | cut -d: -f1)"
+secret_line="$(grep -n 'secrets\.' <<<"$BOOTJOB" | head -1 | cut -d: -f1)"
+check "RR-07 ... before any secret is used (line $approval_line < $secret_line)" ok "^before$" -- bash -c "[[ -n '$approval_line' && -n '$secret_line' && $approval_line -lt $secret_line ]] && echo before"
 check "long-lived keys refused (ASIA prefix)" ok 'AWS_ACCESS_KEY_ID" == ASIA\*' -- cat "$WF"
 check "approved account checked against the manifest" ok "infra/config/staging-account.json" -- grep -F "staging-account.json" "$WF"
 check "runs only from protected main" ok "branches/main\" --jq .protected" -- cat "$WF"
+check "runs only as 00-bootstrap.yml on main" ok "GITHUB_WORKFLOW_REF.*00-bootstrap.yml@refs/heads/main" -- cat "$WF"
 check "GITHUB_TOKEN limited to contents and actions read" ok "^  contents: read$" -- cat "$WF"
 absent "  ... no write permission" "^ +[a-z-]+: write" "$WFT"
 
@@ -413,6 +469,241 @@ RB="$INFRA/../docs/operations/staging-bootstrap.md"
 absent "runbook does not claim every role is denied application data" "Applies to every role:" "$(cat "$RB")"
 check "runbook names the apply role as able to reach data through the host" ok "veda-gh-apply. carries the same" -- cat "$RB"
 check "  ... and says how" ok "reach that data through the host role" -- cat "$RB"
+
+echo "== RR-03: plan guard closes the IAM path and trust-policy bypass"
+T="$(new_tree)" # guard() (above) runs check-plan.sh from $T
+iam() { # iam <type> <address> <after JSON> [after_unknown JSON]
+  local unknown="${4:-}"
+  [[ -n "$unknown" ]] || unknown='{}'
+  jq -cn --arg t "$1" --arg a "$2" --argjson after "$3" --argjson u "$unknown" \
+    '{address: $a, type: $t, change: {actions: ["create"], after: $after, after_unknown: $u}}'
+}
+EC2_TRUST="$(trust '{"Service":"ec2.amazonaws.com"}')"
+gh_trust() { # gh_trust <subject> [action JSON]
+  jq -cn --arg p "$OIDC" --arg s "$1" --argjson a "${2:-\"sts:AssumeRoleWithWebIdentity\"}" \
+    '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: $a, Principal: {Federated: $p},
+      Condition: {StringEquals: {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                                 "token.actions.githubusercontent.com:sub": $s}}}]} | tojson'
+}
+B="arn:aws:iam::$ACCT:policy/veda-boundary"
+# iam_role <address> <name> <path> <trust JSON string> [after_unknown JSON]; built with jq (bash 3.2 would
+# brace-expand escaped JSON inside a nested command substitution).
+iam_role() {
+  iam aws_iam_role "$1" "$(jq -cn --arg n "$2" --arg p "$3" --arg b "$B" --argjson t "$4" \
+    '{name: $n, path: $p, permissions_boundary: $b, assume_role_policy: $t}')" "${5:-}"
+}
+plan_json "$P.rr3ok" "[$GH_ROLE,
+  $(iam_role aws_iam_role.host veda-host / "$EC2_TRUST"),
+  $(iam aws_iam_policy aws_iam_policy.p '{"name":"veda-host-permissions","path":"/"}'),
+  $(iam aws_iam_instance_profile aws_iam_instance_profile.p '{"name":"veda-host","path":"/"}'),
+  $(iam aws_iam_role_policy_attachment aws_iam_role_policy_attachment.ro '{"policy_arn":"arn:aws:iam::aws:policy/ReadOnlyAccess"}'),
+  $(iam aws_iam_openid_connect_provider 'aws_iam_openid_connect_provider.github[0]' '{"url":"https://token.actions.githubusercontent.com"}')]"
+check "bootstrap-shaped IAM at path / passes" ok "every role bounded at path /" -- guard "$P.rr3ok"
+: >"$P.empty"
+check "an empty plan file is refused, not passed as clean" fail "is not a Terraform plan" -- guard "$P.empty"
+echo '{"resource_changes":[]}' >"$P.foreign"
+check "a JSON file that is not a plan is refused" fail "is not a Terraform plan" -- guard "$P.foreign"
+
+plan_json "$P.rp" "[$(iam_role aws_iam_role.x admin /veda-x/ "$EC2_TRUST")]"
+check "RR-03 role under a path" fail "IAM role under path /veda-x/" -- guard "$P.rp"
+check "RR-03 ... and not named veda-*" fail "IAM role name admin is not veda-\*" -- guard "$P.rp"
+plan_json "$P.rpu" "[$(iam aws_iam_role aws_iam_role.x "$(jq -cn --arg b "$B" --argjson t "$EC2_TRUST" '{permissions_boundary: $b, assume_role_policy: $t}')" '{"name":true,"path":true}')]"
+check "RR-03 role name and path unknown at plan time" fail "IAM role under path \(unknown\)" -- guard "$P.rpu"
+plan_json "$P.pp" "[$(iam aws_iam_policy aws_iam_policy.x '{"name":"veda-admin","path":"/ops/"}')]"
+check "RR-03 policy under a path" fail "IAM policy under path /ops/" -- guard "$P.pp"
+plan_json "$P.ipp" "[$(iam aws_iam_instance_profile aws_iam_instance_profile.x '{"name":"veda-host","path":"/x/"}')]"
+check "RR-03 instance profile under a path" fail "IAM instance profile under path /x/" -- guard "$P.ipp"
+
+gh_role() { iam_role "aws_iam_role.github[\"$1\"]" "$2" / "$3"; }
+plan_json "$P.envx" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org/veda-spaces:environment:staging-plan)")]"
+check "RR-03 apply role trusted by the plan environment" fail "veda-gh-apply must trust exactly repo:example-org/veda-spaces:environment:staging-infra" -- guard "$P.envx"
+plan_json "$P.envu" "[$(gh_role deploy veda-gh-deploy "$(gh_trust repo:example-org/veda-spaces:environment:unprotected)")]"
+check "RR-03 role trusted by an unprotected environment" fail "veda-gh-deploy must trust exactly repo:example-org/veda-spaces:environment:staging, .*got repo:example-org/veda-spaces:environment:unprotected" -- guard "$P.envu"
+plan_json "$P.ghx" "[$(gh_role extra veda-gh-extra "$(gh_trust repo:example-org/veda-spaces:environment:staging-infra)")]"
+check "RR-03 a new veda-gh-* role trusting GitHub" fail "only the bootstrap GitHub roles" -- guard "$P.ghx"
+plan_json "$P.sub2" "[$(gh_role plan veda-gh-plan "$(jq -cn --arg p "$OIDC" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "sts:AssumeRoleWithWebIdentity", Principal: {Federated: $p}, Condition: {StringEquals: {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com", "token.actions.githubusercontent.com:sub": ["repo:example-org/veda-spaces:environment:staging-plan", "repo:example-org/veda-spaces:environment:dev"]}}}]} | tojson')")]"
+check "RR-03 a second subject beside the protected environment" fail "must trust exactly" -- guard "$P.sub2"
+plan_json "$P.tag" "[$(gh_role plan veda-gh-plan "$(gh_trust repo:example-org/veda-spaces:environment:staging-plan '["sts:AssumeRoleWithWebIdentity","sts:TagSession"]')")]"
+check "RR-03 GitHub trust with sts:TagSession" fail "sts:AssumeRoleWithWebIdentity only" -- guard "$P.tag"
+plan_json "$P.na" "[$(iam_role aws_iam_role.x veda-x / "$(jq -cn '{Statement: [{Effect: "Allow", NotAction: "iam:*", Principal: {Service: "ec2.amazonaws.com"}}]} | tojson')")]"
+check "RR-03 trust with NotAction" fail "trust with NotAction" -- guard "$P.na"
+for pol in AdministratorAccess AdministratorAccess-Amplify PowerUserAccess IAMFullAccess job-function/SystemAdministrator; do
+  plan_json "$P.priv" "[$(iam aws_iam_role_policy_attachment aws_iam_role_policy_attachment.x "{\"policy_arn\":\"arn:aws:iam::aws:policy/$pol\"}")]"
+  check "RR-03 privileged managed policy $pol" fail "privileged managed policy arn:aws:iam::aws:policy/$pol" -- guard "$P.priv"
+done
+for t in aws_iam_user aws_iam_access_key aws_iam_group aws_iam_saml_provider aws_iam_user_login_profile; do
+  plan_json "$P.forb" "[$(iam $t $t.x '{}')]"
+  check "RR-03 $t refused" fail "$t is not allowed" -- guard "$P.forb"
+done
+plan_json "$P.oidc2" "[$(iam aws_iam_openid_connect_provider aws_iam_openid_connect_provider.other '{"url":"https://evil.example"}')]"
+check "RR-03 another OIDC provider refused" fail "only the bootstrap creates the GitHub OIDC provider" -- guard "$P.oidc2"
+
+echo "== RR-07: GitHub environment protection is a hard prerequisite of apply"
+T="$(new_tree)"
+GS="$T/infra/scripts/github-setup.sh"
+venv() { GH_STUB_DIR="$1" "$GS" --repo example-org/veda-spaces --verify-environments; }
+check "RR-07 protected environments and main verify" ok "match the bootstrap rules" -- venv "$GHV"
+absent "  ... using only endpoints a workflow token can read (no admin protection endpoint)" "branches/main/protection" "$(cat "$GHV/calls.log")"
+gh_drift() { # gh_drift <file suffix> <jq, or DELETE>
+  local d="$TMP/ghd.$RANDOM$RANDOM"
+  cp -R "$GHV" "$d"
+  rm -f "$d/calls.log"
+  if [[ "$2" == DELETE ]]; then rm "$d/repos_example-org_veda-spaces_$1.json"; else
+    jq "$2" "$d/repos_example-org_veda-spaces_$1.json" >"$d/x" && mv "$d/x" "$d/repos_example-org_veda-spaces_$1.json"; fi
+  echo "$d"
+}
+check "RR-07 missing bootstrap environment (would be auto-created unprotected)" fail "bootstrap: environment missing" -- venv "$(gh_drift environments_bootstrap DELETE)"
+check "RR-07 bootstrap environment without reviewers" fail "bootstrap: no required reviewers" -- venv "$(gh_drift environments_bootstrap '.protection_rules = []')"
+check "RR-07 staging-infra (apply role) open to any branch" fail "staging-infra: not restricted to main" -- venv "$(gh_drift environments_staging-infra '.deployment_branch_policy = null')"
+check "RR-07 admin bypass on staging" fail "staging: admins can bypass" -- venv "$(gh_drift environments_staging '.can_admins_bypass = true')"
+check "RR-07 main unprotected" fail "main: branch not protected" -- venv "$(gh_drift branches_main '.protected = false')"
+check "RR-07 no GitHub access fails closed" fail "do not match the bootstrap rules" -- venv "$TMP/empty-gh-$RANDOM"
+
+T="$(new_tree)"
+BS="$T/infra/scripts/bootstrap.sh"
+R="$TMP/rev.rr7" && reviewed "$R" '.'
+TFD="$(tf_stub "$P.ok")"
+check "RR-07 apply refused while an environment is unprotected" fail "prerequisite of apply" -- apply_reviewed "$R" "$TFD" "$(good_account)" "" "$(gh_drift environments_staging-infra '.protection_rules = []')"
+absent "  ... and nothing is applied" "^apply " "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+R="$TMP/rev.rr7b" && reviewed "$R" '.'
+TFD="$(tf_stub "$P.ok")"
+check "RR-07 apply refused without GitHub access" fail "prerequisite of apply" -- apply_reviewed "$R" "$TFD" "$(good_account)" "" "$TMP/empty-gh-$RANDOM"
+absent "  ... and nothing is applied" "^apply " "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+
+VR="$T/infra/scripts/verify-run.sh"
+AP="$TMP/gh.approvals" && mkdir -p "$AP"
+approval() { GH_STUB_DIR="$1" "$VR" approval --repo example-org/veda-spaces --run-id 200 --environment bootstrap; }
+echo '[{"state":"approved","comment":"plan sha256 ok","environments":[{"name":"bootstrap"}],"user":{"login":"owner"}}]' >"$AP/repos_example-org_veda-spaces_actions_runs_200_approvals.json"
+check "RR-07 run approved for the bootstrap environment" ok "approved for environment 'bootstrap' by: owner" -- approval "$AP"
+echo '[]' >"$AP/repos_example-org_veda-spaces_actions_runs_200_approvals.json"
+check "RR-07 run that was never approved (unprotected environment)" fail "no approved review for environment 'bootstrap'" -- approval "$AP"
+echo '[{"state":"approved","environments":[{"name":"staging"}],"user":{"login":"owner"}}]' >"$AP/repos_example-org_veda-spaces_actions_runs_200_approvals.json"
+check "RR-07 approval for another environment only" fail "no approved review for environment 'bootstrap'" -- approval "$AP"
+echo '[{"state":"rejected","environments":[{"name":"bootstrap"}],"user":{"login":"owner"}}]' >"$AP/repos_example-org_veda-spaces_actions_runs_200_approvals.json"
+check "RR-07 rejected review" fail "no approved review" -- approval "$AP"
+rm "$AP/repos_example-org_veda-spaces_actions_runs_200_approvals.json"
+check "RR-07 approvals unreadable fails closed" fail "cannot read the approvals" -- approval "$AP"
+
+echo "== RR-05: reviewed plan -> approved plan -> applied plan"
+# bootstrap.sh side (local and in the job): the approved digest, the metadata binding and the re-rendered text.
+T="$(new_tree)"
+BS="$T/infra/scripts/bootstrap.sh"
+R="$TMP/rev.rr5" && reviewed "$R" '.'
+check "RR-05 --plan-file without the approved digest is refused" fail "go together" -- env GITHUB_SHA=c0ffee "$BS" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --yes
+check "RR-05 malformed approved digest is refused" fail "must be the 64-hex SHA-256" -- env GITHUB_SHA=c0ffee "$BS" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --plan-sha256 abc --yes
+
+# The attack RR-05 names: a genuine, self-consistent plan + metadata that is not the one the reviewer approved.
+R="$TMP/rev.subst" && reviewed "$R" '.'
+echo "an alternate plan" >"$R/bootstrap.tfplan"
+jq --arg s "$(sha "$R/bootstrap.tfplan")" '.plan_sha256 = $s' "$R/bootstrap-plan.meta.json" >"$R/m" && mv "$R/m" "$R/bootstrap-plan.meta.json"
+TFD="$(tf_stub "$P.ok")"
+check "RR-05 substituted plan with matching metadata is refused" fail "is not the approved plan" -- apply_reviewed "$R" "$TFD" "$(good_account)" "$(printf 'reviewed plan bytes\n' | shasum -a 256 | awk '{print $1}')"
+absent "  ... before terraform runs" "^(init|apply)" "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+
+R="$TMP/rev.wf" && reviewed "$R" '.workflow_ref = "example-org/veda-spaces/.github/workflows/evil.yml@refs/heads/main"'
+check "RR-05 plan made by another workflow" fail "was made by 'example-org/veda-spaces/.github/workflows/evil.yml" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)"
+R="$TMP/rev.tfv" && reviewed "$R" '.terraform_version = "1.15.0"'
+check "RR-05 plan made with another Terraform version" fail "made with Terraform 1.15.0" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)"
+R="$TMP/rev.txt" && reviewed "$R" '.'
+echo "a different text" >"$R/bootstrap-plan.txt"
+check "RR-05 reviewed text replaced beside the plan" fail "not the text recorded at plan time" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)"
+R="$TMP/rev.render" && reviewed "$R" '.'
+TFD="$(tf_stub "$P.ok")"
+echo "Plan: 99 to add" >"$TFD/plan.txt"
+check "RR-05 plan file renders a different text than was reviewed" fail "renders a different text" -- apply_reviewed "$R" "$TFD" "$(good_account)"
+absent "  ... and is never applied" "^apply " "$(cat "$TFD/calls.log")"
+R="$TMP/rev.run" && reviewed "$R" '.'
+check "RR-05 metadata from another run than the approved one" fail "not the approved run 42" -- env GITHUB_SHA=c0ffee TF_STUB_DIR="$(tf_stub "$P.ok")" AWS_STUB_DIR="$(good_account)" GH_STUB_DIR="$GHV" \
+  "$BS" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --plan-sha256 "$(sha "$R/bootstrap.tfplan")" --plan-run-id 42 --yes
+
+# verify-run.sh side (00-bootstrap): the plan run, its artifact and the approved digest.
+C=0123456789abcdef0123456789abcdef01234567
+VR="$T/infra/scripts/verify-run.sh"
+plan_run_stub() { # plan_run_stub: a GitHub with plan run 100 (and its artifact 555) and this apply run 200
+  local d="$TMP/ghrun.$RANDOM$RANDOM" z="$TMP/zip.$RANDOM$RANDOM"
+  mkdir -p "$d" "$z"
+  echo "reviewed plan bytes" >"$z/bootstrap.tfplan"
+  echo "stub plan text" >"$z/bootstrap-plan.txt"
+  echo '{}' >"$z/discovered.json"
+  jq -n --arg sum "$(sha "$z/bootstrap.tfplan")" --arg text "$(sha "$z/bootstrap-plan.txt")" --arg c $C \
+    '{mode: "plan", commit: $c, workflow_ref: "example-org/veda-spaces/.github/workflows/00-bootstrap.yml@refs/heads/main",
+      run_id: "100", plan_sha256: $sum, plan_text_sha256: $text}' >"$z/bootstrap-plan.meta.json"
+  (cd "$z" && zip -q -X "$d/repos_example-org_veda-spaces_actions_artifacts_555_zip.json" bootstrap.tfplan bootstrap-plan.meta.json bootstrap-plan.txt discovered.json)
+  jq -n --arg c $C '{id: 100, path: ".github/workflows/00-bootstrap.yml", workflow_id: 7, head_sha: $c, head_branch: "main",
+    event: "workflow_dispatch", status: "completed", conclusion: "success", display_title: "00-bootstrap (plan)",
+    repository: {full_name: "example-org/veda-spaces"}, head_repository: {full_name: "example-org/veda-spaces"}}' \
+    >"$d/repos_example-org_veda-spaces_actions_runs_100.json"
+  echo '{"id":200,"path":".github/workflows/00-bootstrap.yml","workflow_id":7}' >"$d/repos_example-org_veda-spaces_actions_runs_200.json"
+  jq -n --arg c $C --arg dg "sha256:$(sha "$d/repos_example-org_veda-spaces_actions_artifacts_555_zip.json")" \
+    '{artifacts: [{id: 555, name: "bootstrap-plan-100", expired: false, digest: $dg, workflow_run: {id: 100, head_sha: $c}}]}' \
+    >"$d/repos_example-org_veda-spaces_actions_runs_100_artifacts?per_page=100.json"
+  echo "$d"
+}
+APPROVED="$(printf 'reviewed plan bytes\n' | shasum -a 256 | awk '{print $1}')"
+bind() { GH_STUB_DIR="$1" "$VR" plan-run --repo example-org/veda-spaces --run-id 100 --this-run-id 200 --commit $C --plan-sha256 "${2:-$APPROVED}" --out "$TMP/out.$RANDOM"; }
+run_drift() { # run_drift <file suffix> <jq>
+  local d
+  d="$(plan_run_stub)"
+  jq "$2" "$d/repos_example-org_veda-spaces_$1.json" >"$d/x" && mv "$d/x" "$d/repos_example-org_veda-spaces_$1.json"
+  echo "$d"
+}
+check "RR-05 approved plan of a reviewed plan run is bound" ok "approved plan bound: run 100, artifact sha256:" -- bind "$(plan_run_stub)"
+check "RR-05 another plan (not the approved digest)" fail "is not the approved plan" -- bind "$(plan_run_stub)" "$(printf 'x' | shasum -a 256 | awk '{print $1}')"
+check "RR-05 a workflow file other than 00-bootstrap.yml (same name)" fail "was made by .github/workflows/evil.yml" -- bind "$(run_drift actions_runs_100 '.path = ".github/workflows/evil.yml"')"
+check "RR-05 another workflow ID" fail "belongs to workflow 8" -- bind "$(run_drift actions_runs_100 '.workflow_id = 8')"
+check "RR-05 the apply run is not 00-bootstrap.yml" fail "this apply run is .github/workflows/other.yml" -- bind "$(run_drift actions_runs_200 '.path = ".github/workflows/other.yml"')"
+check "RR-05 plan run for another commit" fail "is for commit badc0de" -- bind "$(run_drift actions_runs_100 '.head_sha = "badc0de"')"
+check "RR-05 plan run from a fork" fail "fork or other repository" -- bind "$(run_drift actions_runs_100 '.head_repository.full_name = "attacker/veda-spaces"')"
+check "RR-05 plan run on another branch" fail "ran on feature, not main" -- bind "$(run_drift actions_runs_100 '.head_branch = "feature"')"
+check "RR-05 failed plan run" fail "is completed/failure" -- bind "$(run_drift actions_runs_100 '.conclusion = "failure"')"
+check "RR-05 an apply run instead of a plan run" fail "not a plan run" -- bind "$(run_drift actions_runs_100 '.display_title = "00-bootstrap (apply of plan run 1, plan sha256 x)"')"
+D="$(plan_run_stub)"
+printf 'x' >>"$D/repos_example-org_veda-spaces_actions_artifacts_555_zip.json"
+check "RR-05 artifact bytes differ from the digest recorded at upload" fail "differs from the digest GitHub recorded" -- bind "$D"
+check "RR-05 artifact without a recorded digest" fail "no SHA-256 digest recorded" -- bind "$(run_drift 'actions_runs_100_artifacts?per_page=100' 'del(.artifacts[0].digest)')"
+check "RR-05 two artifacts with the plan's name" fail "exactly one artifact named bootstrap-plan-100" -- bind "$(run_drift 'actions_runs_100_artifacts?per_page=100' '.artifacts += .artifacts')"
+check "RR-05 expired artifact" fail "is expired" -- bind "$(run_drift 'actions_runs_100_artifacts?per_page=100' '.artifacts[0].expired = true')"
+check "RR-05 artifact of another run" fail "not from run 100" -- bind "$(run_drift 'actions_runs_100_artifacts?per_page=100' '.artifacts[0].workflow_run.id = 99')"
+D="$(plan_run_stub)"
+rm "$D/repos_example-org_veda-spaces_actions_runs_100.json"
+check "RR-05 plan run unreadable fails closed" fail "cannot read run 100" -- bind "$D"
+
+echo "== RR-01 / RR-02: live state protections verified after apply (fail closed)"
+T="$(new_tree)"
+BS="$T/infra/scripts/bootstrap.sh"
+prot() { # prot <aws stub dir>: apply a clean reviewed plan against that account
+  local r="$TMP/rev.p.$RANDOM$RANDOM" tfd
+  reviewed "$r" '.'
+  tfd="$(tf_stub "$P.ok")"
+  apply_reviewed "$r" "$tfd" "$1"
+  local rc=$?
+  [[ -f "$T/infra/generated/bootstrap-outputs.json" ]] && echo "OUTPUTS WRITTEN"
+  rm -f "$T/infra/generated/bootstrap-outputs.json"
+  return $rc
+}
+check "RR-01/02 live policies equal the reviewed ones (after AWS normalisation)" ok "state protection verified" -- prot "$(good_account)"
+D="$(good_account)"
+jq -n --arg p '{"Version":"2012-10-17","Statement":[{"Sid":"AccountAdministration","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::111122223333:root"},"Action":"kms:*","Resource":"*"}]}' '{Policy: $p}' >"$D/kms_get-key-policy.json"
+check "RR-02 live key policy weakened to root delegation only" fail "key policy differs from the reviewed plan" -- prot "$D"
+absent "  ... and no outputs (role ARNs) are written" "OUTPUTS WRITTEN" "$(prot "$D" 2>&1)"
+D="$(good_account)"
+jq -n --arg p "$(jq -c '.Statement[0].Condition.ArnNotEquals["aws:PrincipalArn"] += ["arn:aws:iam::111122223333:role/veda-gh-apply"]' <<<"$REVIEWED_BUCKET_POLICY")" '{Policy: $p}' >"$D/s3api_get-bucket-policy.json"
+check "RR-01 live bucket policy admits a veda role" fail "bucket policy differs from the reviewed plan" -- prot "$D"
+D="$(good_account)"
+jq '.ServerSideEncryptionConfiguration.Rules[0].BucketKeyEnabled = true' "$D/s3api_get-bucket-encryption.json" >"$D/x" && mv "$D/x" "$D/s3api_get-bucket-encryption.json"
+check "RR-02 S3 Bucket Key enabled" fail "S3 Bucket Key enabled" -- prot "$D"
+D="$(good_account)"
+echo '{"KeyRotationEnabled":false}' >"$D/kms_get-key-rotation-status.json"
+check "RR-02 key rotation off" fail "key rotation is off" -- prot "$D"
+D="$(good_account)"
+echo "AccessDenied" >"$D/kms_get-key-policy.fail"
+check "RR-02 key policy unreadable fails closed" fail "cannot read the policy of" -- prot "$D"
+D="$(good_account)"
+jq '.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.KMSMasterKeyID = "arn:aws:kms:ap-south-1:999999999999:key/x"' "$D/s3api_get-bucket-encryption.json" >"$D/x" && mv "$D/x" "$D/s3api_get-bucket-encryption.json"
+check "RR-02 bucket encrypted with another account's key" fail "not encrypted with exactly one KMS key of account $ACCT" -- prot "$D"
+D="$(good_account)"
+echo '{"KeyMetadata":{"Arn":"arn:aws:kms:ap-south-1:111122223333:key/k","KeyState":"PendingDeletion","KeyManager":"CUSTOMER"}}' >"$D/kms_describe-key.json"
+check "RR-02 state key pending deletion (or the alias points elsewhere)" fail "not an enabled customer-managed key|does not point at the key" -- prot "$D"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

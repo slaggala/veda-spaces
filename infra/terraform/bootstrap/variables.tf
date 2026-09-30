@@ -78,6 +78,15 @@ variable "github_environments" {
     deploy   = "staging"
     evidence = "staging-evidence"
   }
+
+  # RR-03/RR-07: each role is trusted only by the protected environment that infra/scripts/github-setup.sh creates
+  # and verifies for it. An override would point a role at an environment nobody protects.
+  validation {
+    condition = jsonencode(var.github_environments) == jsonencode({
+      plan = "staging-plan", apply = "staging-infra", deploy = "staging", evidence = "staging-evidence"
+    })
+    error_message = "github_environments is fixed: plan=staging-plan, apply=staging-infra, deploy=staging, evidence=staging-evidence (the protected environments github-setup.sh verifies)."
+  }
 }
 
 variable "existing_github_oidc_provider_arn" {
