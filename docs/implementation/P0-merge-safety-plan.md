@@ -97,11 +97,20 @@ This is corrected after the document-level check (DC-01). Every git step below w
 against `3f5920b` and the live `main` (`13276a0`); nothing was pushed. That simulation passed all six checks in
 steps C4, C7 and C8.
 
+**Runbook correction (RB-01).** The simulation checked the git steps but did not run CI. The Option C preparation
+review found that C5 would fail: the `app` job runs `eslint .` in `app/`, which lints the fixture's `assets/app.js`
+as an unconfigured script (56 `no-undef` errors for `document`, `window`, `fetch`, `crypto` and other browser
+globals). C3 now also excludes the fixture from ESLint, and C4 expects three changed files. The same review found
+that a push of `merge-prep/p0-foundation` does not start CI (`ci.yml` runs on pushes to `main` and
+`implementation/**`, and on pull requests), and that Cloudflare email obfuscation makes the live body differ from
+`dist/index.html`. C5 and C7 are corrected accordingly. The corrected C1–C4 were rehearsed on a branch under
+`implementation/`, so that CI ran on the resulting tree; the run ids are reported with this correction.
+
 **Variables:**
 
-- `APPROVED` is the implementation head the owner approves. It is the head of `implementation/p0-foundation` after
-  the document-conditions commit, as reported with that commit. It is **not** `6ec2e76`, and branching from an older
-  commit would drop later work.
+- `APPROVED` is the implementation head the owner approves. It is the head of `implementation/p0-foundation` that
+  carries runbook correction RB-01, as reported with that commit. It is **not** `6ec2e76`, and branching from an
+  older commit would drop later work.
 - `MAIN` is `origin/main`, the live site: `13276a0` at the time of writing.
 
 **Preconditions:**
@@ -115,7 +124,9 @@ steps C4, C7 and C8.
 `dist/`. The site checks (`site.e2e.mjs`, the site part of `axe.e2e.mjs`, the website step of `workspace.e2e.mjs`)
 and `test_governance_docs.py::test_public_intake_disabled` all assume the new site. With the live `dist/` in place,
 they would fail on `merge-prep`, and then on `main`. Option C therefore keeps the pending site release as a test
-fixture and points those checks at it. The fixture is a copy under `app/e2e/`, which Pages never publishes.
+fixture and points those checks at it. The fixture is a copy under `app/e2e/`, which Pages never publishes. The
+`app` job lints everything under `app/` (`eslint .`), so the fixture is excluded from ESLint in the same way as
+`dist/`: it is a verbatim copy of the published site, which CI does not lint.
 
 **Procedure** (run by an authorised engineer after the owner approves option C):
 
@@ -131,31 +142,45 @@ fixture and points those checks at it. The fixture is a copy under `app/e2e/`, w
    2. In `app/e2e/run-all.sh`, lines 32–33: replace `"$ROOT/dist"` with `"$APP/e2e/site-release"`.
    3. In `api/tests/unit/test_governance_docs.py::test_public_intake_disabled`: read `app/e2e/site-release/index.html`
       instead of `dist/index.html`. The live `dist/index.html` has no intake metas at all, so intake stays disabled.
-   4. `git add -A && git commit -m "Keep live site unchanged for the implementation merge"`
-   5. Record this commit as `KEEP`.
+   4. In `app/eslint.config.js`, add `'e2e/site-release/**'` to the global `ignores` list, after
+      `'e2e-artifacts/**'`. No lint rule changes; `src/`, `test/` and the e2e scripts stay linted.
+   5. `git add -A && git commit -m "Keep live site unchanged for the implementation merge"`
+   6. Record this commit as `KEEP`.
 4. **C4: integrity checks.** All must pass.
    - `git diff --quiet "$MAIN" HEAD -- dist`: the live site is byte-identical.
    - `git diff --quiet "$APPROVED:dist" "HEAD:app/e2e/site-release"`: the fixture is the reviewed site.
-   - `git diff --name-only "$APPROVED" HEAD -- . ':!dist' ':!app/e2e/site-release'` lists exactly
-     `api/tests/unit/test_governance_docs.py` and `app/e2e/run-all.sh`.
-5. **C5: CI on `merge-prep`.** Push `merge-prep/p0-foundation`. It is not `main`, so Pages builds only a preview.
-   The full CI workflow must pass: api (sqlite, postgresql), app, security, and browser + axe against the fixture.
-   Record the run id.
+   - `git diff --name-only "$APPROVED" HEAD -- . ':!dist' ':!app/e2e/site-release'` lists exactly three files:
+     `api/tests/unit/test_governance_docs.py`, `app/e2e/run-all.sh` and `app/eslint.config.js`.
+   - `git diff "$APPROVED" HEAD -- app/eslint.config.js` shows exactly one changed line: the `ignores` entry.
+5. **C5: CI on `merge-prep`.**
+   1. Before pushing, record the live-site baseline for C7 (below).
+   2. Push `merge-prep/p0-foundation`. It is not `main`, so Pages builds only a preview. The push alone does not
+      start CI: `ci.yml` runs on pushes to `main` and `implementation/**` only.
+   3. Open a pull request from `merge-prep/p0-foundation` into `main`, in the GitHub UI or with `gh pr create`. Do
+      not merge it. The `pull_request` event starts CI on the pull request's merge result.
+   4. The full CI workflow must pass: api (sqlite, postgresql), app, security, and browser e2e + axe against the
+      fixture. Record the run id and the pull request link.
 6. **C6: review and merge.**
-   1. Open a pull request from `merge-prep/p0-foundation` into `main`.
-   2. The reviewer checks the C4 outputs and the CI run.
-   3. Merge with a merge commit, with the owner's approval. Pages deploys a `dist/` identical to the live one.
+   1. The reviewer checks the C4 outputs and the C5 CI run on the pull request.
+   2. Merge with a merge commit, with the owner's approval. Pages deploys a `dist/` identical to the live one.
 7. **C7: after the merge.** Check:
    - `git diff --quiet "$MAIN" origin/main -- dist`;
    - CI on `main` is green (same tree as C5);
-   - the live site is unchanged: same body hash for `/`; `/404.html` still uses its inline style; no CSP header;
-     the form still hands off to WhatsApp.
+   - the live site is unchanged compared with the C5 baseline: HTTP 200 for `/`, HTTP 404 for a missing path, no
+     `Content-Security-Policy` header, the same `X-Frame-Options` and `Referrer-Policy`, `/404.html` still has its
+     inline `<style>`, no `veda-api-base` or `veda-turnstile-sitekey` meta, and the form still hands off to
+     WhatsApp (`wa.me/919515125153`);
+   - the body of `/` has the same hash as the baseline after Cloudflare email obfuscation is removed from both
+     (strip `/cdn-cgi/l/email-protection#…` link targets and `data-cfemail="…"` values). The raw live body never
+     matches `dist/index.html`, because Cloudflare rewrites its `mailto:` links. Fetch the baseline twice first to
+     confirm the normalised hash is stable.
 8. **C8: the later site release** (option A, with its own owner approval).
    1. `git switch -c site/p0-release origin/main`
    2. `git revert "$KEEP"`
 
-   The revert restores `dist/` to the reviewed site (including `404.css`), removes the fixture, and points the tests
-   back at `dist/`. In the simulation the result was identical to `APPROVED`.
+   The revert restores `dist/` to the reviewed site (including `404.css`), removes the fixture and its ESLint
+   ignore entry, and points the tests back at `dist/`. The result must be identical to `APPROVED`
+   (`git diff --quiet "$APPROVED" HEAD`).
    3. Then follow option A from its preview check onward.
 
 **Branch hygiene:**
@@ -182,7 +207,8 @@ fixture and points those checks at it. The fixture is a copy under `app/e2e/`, w
 
 - The site fixes (RR-01, RR-11) and the CSP wait for C8.
 - The fixture duplicates `dist/` under `app/e2e/` until C8.
-- C3 changes two test-harness lines. These changes are reviewed in C6, and C8 removes them.
+- C3 changes two test-harness lines and adds one ESLint ignore entry for the fixture. These changes are reviewed in
+  C6, and C8 removes them.
 
 **Owner action:**
 
@@ -194,7 +220,7 @@ fixture and points those checks at it. The fixture is a copy under `app/e2e/`, w
 
 - The C4 outputs and the `KEEP` SHA.
 - The C5 CI run id and the pull request link.
-- The C7 before/after comparison of the live site.
+- The C5 live-site baseline and the C7 before/after comparison of the live site.
 - For C8: the preview checks of option A.
 
 ## 4. Recommendation

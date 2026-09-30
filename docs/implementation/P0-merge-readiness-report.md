@@ -15,11 +15,11 @@
 | Amendments required before merge (AM-1…AM-7, AM-11…AM-13) | Met. AM-4 is APPROVED WITH CONDITIONS: its labelled gaps are accepted for merge as a tracked deviation (DEV-004); RR-12 completes it before production. |
 | Merge-safety option | APPROVED: option C, not executed |
 | Public intake disabled; WhatsApp fallback; custom domain untouched | Met |
-| CI green on the head | Met on `ca9845c` (run 36608504841). CI on the synchronization commit is reported with it, and must be green on `APPROVED` before option C starts. |
+| CI green on the head | Met on `ca9845c` (run 36608504841). CI on the synchronization commit and on the runbook-correction commit (RB-01) is reported with each, and must be green on `APPROVED` before option C starts. |
 
 **Not part of merge readiness (unchanged):**
 - Production deployment approval is PENDING.
 - Production blockers stay open, including RR-12 (AM-4 completion), AM-9 and AM-10 (deferred), and the release gates.
 - The certified registry (`docs/architecture/`) is unchanged.
 
-**Next step:** the owner issues a separate instruction to execute option C, steps C1–C8 of `P0-merge-safety-plan.md`, with `APPROVED` set to the head of `implementation/p0-foundation` that carries this synchronization.
+**Next step:** the owner issues a separate instruction to execute option C, steps C1–C8 of `P0-merge-safety-plan.md`, with `APPROVED` set to the head of `implementation/p0-foundation` that carries runbook correction RB-01 (C3 excludes the site-release fixture from ESLint; C4 expects three changed files; C5 starts CI through the pull request; C7 normalises Cloudflare email obfuscation). The correction changes only the procedure, not the application.
