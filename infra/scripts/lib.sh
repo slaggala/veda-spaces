@@ -94,7 +94,12 @@ manifest_problems() {
            ((.bootstrap_principal_arns // [])[] | select((type != "string")
               or (test("^arn:aws:iam::" + ($a | tostring) + ":role/[A-Za-z0-9+=,.@_/-]+$") | not)
               or test(":role/(.*/)?" + $prefix + "-"))
-            | "bootstrap_principal_arns: \(tojson) is not an exact, non-\($prefix) IAM role ARN in account \($a)"))
+            | "bootstrap_principal_arns: \(tojson) is not an exact, non-\($prefix) IAM role ARN in account \($a)"),
+           # The owner role is not a Veda resource: the all-region inventory must be told it may exist.
+           ((.allowed_foreign_resources.iam_roles // []) as $allowed
+            | (.bootstrap_principal_arns // [])[] | select(type == "string") | (split("/") | last) as $n
+            | select(($allowed | index($n)) == null)
+            | "owner role \($n) is not listed in allowed_foreign_resources.iam_roles"))
        else empty end)
     ] | .[]' "$VEDA_ACCOUNT_MANIFEST" 2>/dev/null || echo "manifest is not valid JSON"
 }

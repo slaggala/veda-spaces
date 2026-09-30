@@ -773,6 +773,32 @@ check "PB-09 owner session longer than one hour refused" fail "max_owner_session
 T6="$(man '.account_alias = null')"
 check "PB-01 an incomplete manifest stops the account check before any AWS call" fail "the account manifest is not complete" -- env AWS_STUB_DIR="$(good_account)" bash -c "set -euo pipefail; source '$T6/infra/scripts/lib.sh'; verify_account_identity $ACCT"
 
+echo "== Owner inputs: the templates are exactly what the checks accept"
+TPL="$INFRA/config/templates"
+fill() { # fill <template>: the owner values of the fixture account
+  sed -e 's/<ACCOUNT_ID: 12 digits>/111122223333/; s/<ACCOUNT_ID>/111122223333/g' \
+    -e 's/<ACCOUNT_NAME: [^>]*>/veda-staging/; s/<ACCOUNT_ALIAS: [^>]*>/veda-staging/' \
+    -e 's/<OWNER_ROLE_NAME>/bootstrap-owner/g; s/<OWNER_USER_NAME>/bootstrap-operator/g' "$1"
+}
+T="$(new_tree)"
+cp "$TPL/staging-account.template.json" "$T/infra/config/staging-account.json"
+check "the unfilled manifest template is refused (placeholders)" fail "placeholder value" -- "$T/infra/scripts/check-manifest.sh" --complete
+fill "$TPL/staging-account.template.json" >"$T/infra/config/staging-account.json"
+check "the manifest template, filled with the owner values, is complete" ok "valid \(complete\)" -- "$T/infra/scripts/check-manifest.sh" --complete
+jq '.allowed_foreign_resources.iam_roles = []' "$T/infra/config/staging-account.json" >"$T/x" && mv "$T/x" "$T/infra/config/staging-account.json"
+check "an owner role missing from allowed_foreign_resources.iam_roles is refused" fail "owner role bootstrap-owner is not listed" -- "$T/infra/scripts/check-manifest.sh" --complete
+T="$(new_tree)"
+fill "$TPL/staging-account.template.json" >"$T/infra/config/staging-account.json"
+D="$(good_account)"
+echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/bootstrap-owner/veda-bootstrap\"}" >"$D/sts_get-caller-identity.json"
+jq -n --argjson trust "$(fill "$TPL/owner-role-trust-policy.template.json")" \
+  '{Role: {RoleName: "bootstrap-owner", Arn: "arn:aws:iam::111122223333:role/bootstrap-owner", MaxSessionDuration: 3600, AssumeRolePolicyDocument: $trust}}' >"$D/iam_get-role.json"
+jq '.Roles = [{"RoleName":"bootstrap-owner","Path":"/"},{"RoleName":"veda-gh-apply","Path":"/"}]' "$D/iam_list-roles.json" >"$D/x" && mv "$D/x" "$D/iam_list-roles.json"
+echo '{"Users":[{"UserName":"bootstrap-operator"}]}' >"$D/iam_list-users.json"
+check "the owner role built from the templates passes the live owner and inventory checks" ok "no foreign resources in any region" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; verify_account_identity $ACCT"
+jq '.Role.MaxSessionDuration = 7200' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "  ... and a two-hour maximum session on that role is refused" fail "allows sessions longer than 3600 seconds" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; verify_account_identity $ACCT"
+
 echo "== PB-06: Mumbai only, enforced by IAM on the owner session and by the plan guard"
 T="$(new_tree)"
 rguard() { "$T/infra/scripts/check-plan.sh" --plan-json "$1" --account "$ACCT" --repo example-org/veda-spaces; }
@@ -865,7 +891,7 @@ echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0swing","Tags":[{"Key":"Na
 check "N-03 swing-trader-vm in another region refused as another project" fail "named like Aurion or swing-trader-vm \(instances: i-0swing@eu-west-1\)" -- vai "$D"
 D="$(good_account)"
 echo '{"Roles":[{"RoleName":"aurion-deployer","Path":"/"}]}' >"$D/iam_list-roles.json"
-T7="$(man '.allowed_foreign_resources.iam_roles = ["aurion-deployer"]')"
+T7="$(man '.allowed_foreign_resources.iam_roles += ["aurion-deployer"]')"
 check "N-03 Aurion role refused even when the manifest allows it" fail "named like Aurion or swing-trader-vm \(roles: aurion-deployer\)" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T7/infra/scripts/lib.sh'; verify_account_identity $ACCT"
 D="$(good_account)"
 echo '{"Vpcs":[{"VpcId":"vpc-0abc"}]}' >"$D/ec2_describe-vpcs@eu-west-1.json"
