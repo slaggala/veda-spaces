@@ -1,0 +1,10 @@
+# Reference only. infra/scripts/bootstrap.sh writes generated.auto.tfvars.json from discovery; set values here
+# (copied to terraform.tfvars, which is gitignored) only to override a discovered or default value.
+
+expected_account_id = "123456789012"
+github_owner        = "example-org"
+github_repo         = "veda-spaces"
+
+# aws_region                        = "ap-south-1"   # fixed by ADR-008
+# existing_github_oidc_provider_arn = ""             # discovered when the account already has one
+# enable_account_guardrails         = true

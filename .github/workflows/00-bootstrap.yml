@@ -1,0 +1,124 @@
+# One-time bootstrap of the dedicated Veda staging AWS account (AUT-003; runbook docs/operations/staging-bootstrap.md).
+# The only workflow that uses owner credentials: a TEMPORARY STS session stored in the "bootstrap" environment,
+# which expires by itself. Everything after this runs through GitHub OIDC with no stored AWS keys.
+# Run "plan" first and review it; "apply" needs the bootstrap environment reviewers.
+name: 00-bootstrap
+run-name: "00-bootstrap (${{ inputs.mode }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan (read-only) or apply"
+        type: choice
+        options: [plan, apply]
+        default: plan
+      expected_account_id:
+        description: "Dedicated Veda staging AWS account ID (12 digits)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veda-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: bootstrap (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    environment: bootstrap
+    timeout-minutes: 30
+    env:
+      MODE: ${{ inputs.mode }}
+      EXPECTED_ACCOUNT_ID: ${{ inputs.expected_account_id }}
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.4
+          terraform_wrapper: false
+
+      - name: Check inputs and credential type
+        env:
+          AWS_SESSION_TOKEN: ${{ secrets.BOOTSTRAP_AWS_SESSION_TOKEN }}
+        run: |
+          [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "::error::mode must be plan or apply"; exit 1; }
+          [[ "$EXPECTED_ACCOUNT_ID" =~ ^[0-9]{12}$ ]] || { echo "::error::expected_account_id must be 12 digits"; exit 1; }
+          # Long-lived access keys are refused: only a temporary session (with a session token) is accepted.
+          [[ -n "$AWS_SESSION_TOKEN" ]] || { echo "::error::BOOTSTRAP_AWS_SESSION_TOKEN is empty: provide temporary STS credentials"; exit 1; }
+
+      - name: Bootstrap (${{ inputs.mode }})
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BOOTSTRAP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BOOTSTRAP_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.BOOTSTRAP_AWS_SESSION_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_READ_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/bootstrap.sh --mode "$MODE" --expected-account-id "$EXPECTED_ACCOUNT_ID" \
+            --repo "$GITHUB_REPOSITORY" --yes
+
+      - name: Publish role ARNs and IDs as GitHub variables
+        if: inputs.mode == 'apply'
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::GH_ADMIN_TOKEN not set: run 'make -C infra github-variables' locally with the bootstrap-outputs artifact"
+            exit 0
+          fi
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" \
+            --outputs infra/generated/bootstrap-outputs.json --variables-only --apply
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 00-bootstrap ($MODE) for account $EXPECTED_ACCOUNT_ID"
+            if [[ -f infra/generated/bootstrap-plan.txt ]]; then
+              echo '```'
+              grep -E '^Plan:|No changes' infra/generated/bootstrap-plan.txt || true
+              echo '```'
+            fi
+            if [[ -f infra/generated/discovered.json ]]; then
+              echo '### Discovery'
+              echo '```json'
+              jq '{aws: (.aws | {account_id, region, state_bucket_exists, bootstrap_roles_exist, ses,
+                    github_oidc_provider_managed_by_bootstrap}), cloudflare: (.cloudflare | {discovered, zone, plan,
+                    planned_name_collisions})}' infra/generated/discovered.json
+              echo '```'
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload plan, discovery and outputs (no secrets)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bootstrap-${{ inputs.mode }}-${{ github.run_id }}
+          path: |
+            infra/generated/discovered.json
+            infra/generated/bootstrap-plan.txt
+            infra/generated/bootstrap-outputs.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # The bootstrap state holds no secrets. If a first apply fails before the state reaches S3, keep it so
+      # the next run can resume instead of recreating resources (runbook §6).
+      - name: Preserve unmigrated local state
+        if: failure() && inputs.mode == 'apply'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bootstrap-local-state-${{ github.run_id }}
+          path: infra/terraform/bootstrap/terraform.tfstate
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,20 @@
+# Terraform working files and state: state lives only in the S3 backend (AUT-002).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+terraform.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Written by infra/scripts (discovery, plans, outputs, generated backend and tfvars).
+generated/
+terraform/**/generated.auto.tfvars.json
+terraform/**/backend_s3.tf
+terraform/**/tmp.json
+
+# .terraform.lock.hcl IS committed (provider hashes for linux/darwin, amd64/arm64).
