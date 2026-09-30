@@ -2,10 +2,10 @@
 
 > **Owner decisions were recorded on 2026-09-30.** See [P0-owner-decision-record.md](P0-owner-decision-record.md), the canonical record.
 > - OD-2 and OD-3 are APPROVED.
-> - TG-01 and TG-08 are APPROVED; the registry evidence entry is still an owner action.
+> - TG-01 and TG-08 are APPROVED; the owner waived the decision-log and PR evidence for merge readiness (the certified registry is unchanged).
 > - Merge-safety option C is APPROVED but not executed.
 > - Production deployment approval is PENDING.
-> - **AM-4 is not decided.**
+> - **AM-4 is APPROVED WITH CONDITIONS** (labelled gaps accepted for merge; RR-12 before production).
 
 ## References
 
@@ -25,7 +25,7 @@
 | [AM-1](../proposals/amendments/AM-1.md) | TECHNICALLY SOUND | TECHNICALLY SOUND | APPROVE | **APPROVED** | None |
 | [AM-2](../proposals/amendments/AM-2.md) | TECHNICALLY SOUND WITH OWNER CONDITIONS (accept invite-link password-overwrite residual) | TECHNICALLY SOUND WITH OWNER CONDITIONS | APPROVE WITH CONDITIONS | **APPROVED WITH CONDITIONS** | Accept the invite-link residual (link holder sets the password before activation). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-3](../proposals/amendments/AM-3.md) | TECHNICALLY SOUND | TECHNICALLY SOUND | APPROVE WITH CONDITIONS | **APPROVED** | None |
-| [AM-4](../proposals/amendments/AM-4.md) | INCOMPLETE (gaps honestly labelled: later-version rule, create-time consent, immutability) | INCOMPLETE — states 422 where code/tests return 409; 'later version' has no ordering rule; the immutability option conflicts with erasure rewriting consent notes (DC-02) | APPROVE WITH CONDITIONS | **NOT DECIDED — not included in the consolidated owner decision** | Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d). |
+| [AM-4](../proposals/amendments/AM-4.md) | INCOMPLETE (gaps honestly labelled: later-version rule, create-time consent, immutability) | INCOMPLETE — states 422 where code/tests return 409; 'later version' has no ordering rule; the immutability option conflicts with erasure rewriting consent notes (DC-02) | APPROVE WITH CONDITIONS | **APPROVED WITH CONDITIONS** | For merge: the labelled gaps are accepted — the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) is a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d), including the choice of option (a) or (b) for (d). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-5](../proposals/amendments/AM-5.md) | TECHNICALLY SOUND WITH OWNER CONDITIONS (outbox retention bound not enforced) | TECHNICALLY SOUND WITH OWNER CONDITIONS | APPROVE WITH CONDITIONS | **APPROVED WITH CONDITIONS** | Outbox retention ≥ break-glass window enforced or operationally controlled before production (IR-A10). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-6](../proposals/amendments/AM-6.md) | TECHNICALLY SOUND WITH OWNER CONDITIONS (resolve FC-12 release floor) | TECHNICALLY SOUND WITH OWNER CONDITIONS | APPROVE WITH CONDITIONS | **APPROVED WITH CONDITIONS** | RG-7 rollback rehearsal before production. (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-7](../proposals/amendments/AM-7.md) | INCOMPLETE (FC-05 reset-link disclosure; FC-A06 outage bound) | TECHNICALLY SOUND WITH OWNER CONDITIONS — upgraded from INCOMPLETE: every claim verified against kernel/ratelimit.py, auth/throttle.py, auth/service.py; discloses reset-link suppression and that a Turnstile outage is fail-closed with unbounded availability impact under attack; makes none of the forbidden claims | APPROVE WITH CONDITIONS | **APPROVED WITH CONDITIONS** | Accept the disclosed disruption bounds (FC-05 reset-link gap, escalation during a Turnstile outage); staging Turnstile, proxy and alarm evidence. (the owner stated no different conditions; the conditions of the decision package apply) |
@@ -45,7 +45,7 @@
 
 | Item | Status |
 |---|---|
-| TG-01 | **APPROVED** (registry evidence entry outstanding) |
-| TG-08 | **APPROVED** (registry evidence entry outstanding) |
+| TG-01 | **APPROVED** (registry evidence entry waived by the owner for merge readiness) |
+| TG-08 | **APPROVED** (registry evidence entry waived by the owner for merge readiness) |
 | Merge-safety decision | **APPROVED — Option C (not executed)** |
 | Production deployment approval | **PENDING** |

@@ -2,7 +2,9 @@
   "record": "P0 owner decision record",
   "date": "2026-09-30",
   "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf",
+  "confirmation_source": "Owner instruction VEDA-SPACES-P0-FINAL-GOVERNANCE-EVIDENCE-SYNC, confirmed by the owner in session on 2026-09-30: re-confirms OD-2, OD-3, TG-01, TG-08 and merge-safety option C; approves AM-4 with the decision-package conditions; waives the TG-01/TG-08 decision-log and PR evidence for merge readiness",
   "recorded_at_head": "ca9845c0dd60280fd19cdc9d41843d8567191801",
+  "synchronized_at_head": "1be68c2",
   "implementation_code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
   "technical_conditions_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
   "owner_decisions": {
@@ -22,15 +24,15 @@
       "decision": "APPROVED",
       "text": "Certified architecture accepted.",
       "date": "2026-09-30",
-      "registry_evidence": "OUTSTANDING (owner action)",
-      "note": "The gate registry (docs/architecture/gate-registry.json) names docs/architecture/decisions/decision-log.md as the evidence location and, for TG-01, requires approval from the owner's own account. Both files are in the certified tree, which this workstream was instructed not to change. The certified registry therefore still reads 'Pending'; this record is the owner decision, and the registry evidence entry remains an owner action."
+      "registry_evidence": "WAIVED by the owner for merge readiness (2026-09-30); certified registry unchanged",
+      "note": "The gate registry (docs/architecture/gate-registry.json) names docs/architecture/decisions/decision-log.md as the evidence location and, for TG-01, requires approval from the owner's own account. Both files are in the certified tree, which this workstream was instructed not to change. The certified registry therefore still reads 'Pending'. On 2026-09-30 the owner explicitly waived the decision-log and PR-evidence requirement for merge-readiness purposes; this record and the owner decision package are the owner evidence."
     },
     "TG-08": {
       "decision": "APPROVED",
       "text": "Certified implementation accepted.",
       "date": "2026-09-30",
-      "registry_evidence": "OUTSTANDING (owner action)",
-      "note": "The gate registry (docs/architecture/gate-registry.json) names docs/architecture/decisions/decision-log.md as the evidence location and, for TG-01, requires approval from the owner's own account. Both files are in the certified tree, which this workstream was instructed not to change. The certified registry therefore still reads 'Pending'; this record is the owner decision, and the registry evidence entry remains an owner action."
+      "registry_evidence": "WAIVED by the owner for merge readiness (2026-09-30); certified registry unchanged",
+      "note": "The gate registry (docs/architecture/gate-registry.json) names docs/architecture/decisions/decision-log.md as the evidence location and, for TG-01, requires approval from the owner's own account. Both files are in the certified tree, which this workstream was instructed not to change. The certified registry therefore still reads 'Pending'. On 2026-09-30 the owner explicitly waived the decision-log and PR-evidence requirement for merge-readiness purposes; this record and the owner decision package are the owner evidence."
     }
   },
   "amendments": {
@@ -50,9 +52,10 @@
       "date": "2026-09-30"
     },
     "AM-4": {
-      "decision": "NOT DECIDED — not included in the consolidated owner decision",
-      "conditions": "Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d).",
-      "date": null
+      "decision": "APPROVED WITH CONDITIONS",
+      "conditions": "For merge: the labelled gaps are accepted — the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) is a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d), including the choice of option (a) or (b) for (d). (the owner stated no different conditions; the conditions of the decision package apply)",
+      "date": "2026-09-30",
+      "source": "Owner instruction VEDA-SPACES-P0-FINAL-GOVERNANCE-EVIDENCE-SYNC, confirmed by the owner in session"
     },
     "AM-5": {
       "decision": "APPROVED WITH CONDITIONS",
@@ -106,9 +109,16 @@
     "date": "2026-09-30",
     "executed": false
   },
-  "not_decided": [
-    "AM-4"
-  ],
+  "not_decided": [],
+  "evidence_waiver": {
+    "gates": [
+      "TG-01",
+      "TG-08"
+    ],
+    "text": "The owner explicitly waives the TG-01/TG-08 decision-log and PR-evidence requirement for merge-readiness purposes. This record and the owner decision package are the owner evidence. The certified registry (docs/architecture/gate-registry.json) and decision log are unchanged and still read 'Pending'.",
+    "date": "2026-09-30",
+    "source": "Owner instruction VEDA-SPACES-P0-FINAL-GOVERNANCE-EVIDENCE-SYNC, confirmed by the owner in session"
+  },
   "unchanged": [
     "No merge",
     "No deployment",

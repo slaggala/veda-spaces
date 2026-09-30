@@ -44,7 +44,7 @@
 | IR-11 | MAJOR | Backup (Litestream config, nightly snapshot), restore verification and API deploy/migrate runbooks are absent from the deliverable | PARTIALLY RESOLVED (RR-14 fixed; RR-15 open) |
 | IR-12 | MAJOR | No metrics, no alert routing, error tracker optional (LOG-006 is mandatory in P0) | CODE RESOLVED (RR-07); RG-5 REQUIRED |
 | IR-38 | MINOR | Browser E2E evidence overstates coverage and security-critical modules have the lowest coverage | PARTIALLY RESOLVED |
-| DEV-004 | DECISION | Staff lead update accepts a re-consent object | PENDING — AM-4 NOT DECIDED |
+| DEV-004 | DECISION | Staff lead update accepts a re-consent object | APPROVED WITH CONDITIONS (via AM-4, 2026-09-30) |
 | OI-RM-1 | MAJOR | First CI run of the remediation commit | OPEN |
 | OI-RM-2 | MINOR | Browser matrix: Firefox and WebKit legs (12 §4.8) | OPEN |
 | OI-RM-4 | MINOR | Developer machines on Node ≥ 22.13 | OPEN |
@@ -58,7 +58,7 @@
 ## Deferred decisions
 
 - **AM-9, AM-10:** deferred to staging/production, and required before production.
-- **AM-4:** not decided. Its completion (RR-12) is required before production.
+- **AM-4:** approved with conditions. Its completion (RR-12, rules (a)–(d) and the choice of option (a) or (b)) is required before production.
 
 ## Public-intake enablement
 

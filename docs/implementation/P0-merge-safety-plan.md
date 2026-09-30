@@ -28,9 +28,9 @@ All of these must hold before any merge. None holds yet unless it says so.
 
 1. The final targeted check verdict is recorded: CERTIFIED WITH TECHNICAL CONDITIONS, at `56c20ba`. **This holds.**
 2. The document-level check has been done (`093cfa6`: READY WITH DOCUMENT CONDITIONS). Its document conditions are addressed by the document-conditions commit, and a confirmation check is pending.
-3. **Gate TG-01 must pass** before any merge; the gate registry marks it merge-blocking (FC-A03). Current status: **APPROVED** by the owner on 2026-09-30; the registry evidence entry is outstanding.
-4. **Gate TG-08 must pass**, as the owner requires. Current status: **APPROVED** by the owner on 2026-09-30; the registry evidence entry is outstanding.
-5. The owner has decided every amendment required before merge (see the owner decision package): AM-1…AM-7 and AM-11…AM-13, including acceptance of AM-4's labelled gaps. OD-2 and OD-3 are confirmed in a decision record.
+3. **Gate TG-01 must pass** before any merge; the gate registry marks it merge-blocking (FC-A03). Current status: **APPROVED** by the owner on 2026-09-30; the owner waived the registry evidence entry for merge readiness. **This holds.**
+4. **Gate TG-08 must pass**, as the owner requires. Current status: **APPROVED** by the owner on 2026-09-30; the owner waived the registry evidence entry for merge readiness. **This holds.**
+5. The owner has decided every amendment required before merge (see the owner decision package): AM-1…AM-7 and AM-11…AM-13, including acceptance of AM-4's labelled gaps. OD-2 and OD-3 are confirmed in a decision record. **This holds** (AM-4 approved with conditions on 2026-09-30).
 6. The owner has chosen and approved an option below.
 7. The intake metas `veda-api-base` and `veda-turnstile-sitekey` are empty in the merged `dist/index.html`.
 8. The public enquiry API stays disabled. The WhatsApp fallback keeps working.

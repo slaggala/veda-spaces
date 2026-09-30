@@ -3,7 +3,7 @@
   "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "branch": "implementation/p0-foundation",
   "approved": "per deviation; see status and P0-owner-decision-record.md",
-  "note": "Owner decisions recorded 2026-09-30 through the amendments. DEV-004 (AM-4) is not decided.",
+  "note": "Owner decisions recorded 2026-09-30 through the amendments. DEV-004 (AM-4) is approved with conditions (tracked deviation until RR-12).",
   "deviations": [
     {
       "id": "DEV-001",
@@ -164,7 +164,7 @@
       ],
       "rollback": "Remove the consent field from LeadPatchIn and the consent branch in veda/modules/crm/leads/service.py::_update. Re-consent then cannot be recorded until 04 §5.4 and 08 §8.5 are reconciled. No data migration.",
       "decision_required": "AM-4: approve the corrected mechanism and choose in-row + timeline activity (implemented) or a dedicated append-only consent-event table.",
-      "status": "PENDING — AM-4 NOT DECIDED",
+      "status": "APPROVED WITH CONDITIONS (via AM-4, 2026-09-30)",
       "reviewer_decision": "REQUIRES IMPLEMENTATION CHANGE",
       "reviewer_conditions": [
         "IR-16"

@@ -1003,7 +1003,7 @@
       "evidence_required": "Signed decision on AM-4",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING — AM-4 NOT DECIDED",
+      "status": "APPROVED WITH CONDITIONS (via AM-4, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1139,7 +1139,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED — NOT DECIDED (owner decision required before merge)",
+      "status": "APPROVED WITH CONDITIONS (2026-09-30; labelled gaps accepted for merge; RR-12 before production)",
       "residual": ""
     },
     {
@@ -1343,7 +1343,7 @@
       "evidence_required": "Link to the PR approval (or signed log) recorded in the decision log",
       "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass. The architecture must not be described as owner-approved.",
       "target_phase": "Before any implementation begins",
-      "status": "APPROVED (2026-09-30; registry evidence entry outstanding)",
+      "status": "APPROVED (2026-09-30; registry evidence entry waived by the owner for merge readiness)",
       "residual": ""
     },
     {
@@ -1462,7 +1462,7 @@
       "evidence_required": "Decision-log entry referencing the authorization",
       "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass.",
       "target_phase": "Before any implementation begins",
-      "status": "APPROVED (2026-09-30; registry evidence entry outstanding)",
+      "status": "APPROVED (2026-09-30; registry evidence entry waived by the owner for merge readiness)",
       "residual": ""
     },
     {

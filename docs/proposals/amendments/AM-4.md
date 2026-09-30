@@ -1,11 +1,11 @@
 # AM-4: proposed amendment to 04 §5.4 vs 08 §8.5; LEAD-027
 
-> **Status: PROPOSED, NOT APPROVED.** Not included in the consolidated owner decision of 2026-09-30. Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and changes no certified document.
+> **Status: APPROVED WITH CONDITIONS.** Owner decision recorded 2026-09-30 ([decision record](../../implementation/P0-owner-decision-record.md)): the labelled gaps are accepted for merge as a tracked deviation; RR-12 before production. Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and changes no certified document.
 
 | Field | Value |
 |---|---|
 | Amendment ID | AM-4 |
-| Status | **PROPOSED, NOT APPROVED** |
+| Status | **APPROVED WITH CONDITIONS** |
 | Amends | 04 §5.4 vs 08 §8.5; LEAD-027 |
 | Affected requirements | LEAD-012, LEAD-027 |
 | Related findings | IR-16, RR-12 |

@@ -13,7 +13,7 @@ As of 2026-09-30, no staging environment has been built or evaluated. None of th
 | DEV-001 | MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment | Blocks with merge | APPROVED (via AM-1, 2026-09-30) |
 | DEV-002 | Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success | Blocks with merge | APPROVED WITH CONDITIONS (via AM-2, 2026-09-30) |
 | DEV-003 | Login accepts an optional CAPTCHA token | Blocks with merge | APPROVED (via AM-3, 2026-09-30) |
-| DEV-004 | Staff lead update accepts a re-consent object | Blocks with merge | PENDING — AM-4 NOT DECIDED |
+| DEV-004 | Staff lead update accepts a re-consent object | Blocks with merge | APPROVED WITH CONDITIONS (via AM-4, 2026-09-30) |
 | DEV-005 | Break-glass cancel link endpoint and page (06 §7.5 step 5) | Blocks with merge | APPROVED WITH CONDITIONS (via AM-5, 2026-09-30) |
 | DEV-006 | mfa_challenge binds enrollment transactions to a factor and a path | Blocks with merge | APPROVED WITH CONDITIONS (via AM-11, 2026-09-30) |
 | DEV-007 | Per-email login and forgot-password limits keyed by (email, network) | Blocks with merge | APPROVED WITH CONDITIONS (via AM-7, 2026-09-30) |
@@ -38,7 +38,7 @@ As of 2026-09-30, no staging environment has been built or evaluated. None of th
 | AM-1 | APPROVED | Migration upgrade-with-data on SQLite, PostgreSQL 16 and 18 (CI and local evidence); no staging host run yet. |
 | AM-2 | APPROVED WITH CONDITIONS | None. |
 | AM-3 | APPROVED | Real Turnstile keys in staging (IR-18) before production. |
-| AM-4 | NOT DECIDED — not included in the consolidated owner decision | None required. |
+| AM-4 | APPROVED WITH CONDITIONS | None required. |
 | AM-5 | APPROVED WITH CONDITIONS | Staging check that outbox retention ≥ break-glass window (IR-A10). |
 | AM-6 | APPROVED WITH CONDITIONS | RG-7 rollback rehearsal (not performed). |
 | AM-7 | APPROVED WITH CONDITIONS | Real Turnstile keys (success, failure, outage simulated by a blocked siteverify); deployed trusted-proxy CIDR; load probe of the thresholds; alarm on ACCOUNT_THROTTLED account_* and aggregate escalation. |

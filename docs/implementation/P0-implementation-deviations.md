@@ -2,14 +2,14 @@
 
 Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · review review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4 · targeted re-review review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305
 
-> **Owner decisions were recorded on 2026-09-30** through the amendments. See [P0-owner-decision-record.md](P0-owner-decision-record.md). DEV-004 (AM-4) is not decided.
+> **Owner decisions were recorded on 2026-09-30** through the amendments. See [P0-owner-decision-record.md](P0-owner-decision-record.md). DEV-004 (AM-4) is approved with conditions (tracked deviation until RR-12).
 
 | ID | Title | Reviewer decision | Targeted re-review | Amendment | Status |
 |---|---|---|---|---|---|
 | DEV-001 | MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-1 | APPROVED (via AM-1, 2026-09-30) |
 | DEV-002 | Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-2 | APPROVED WITH CONDITIONS (via AM-2, 2026-09-30) |
 | DEV-003 | Login accepts an optional CAPTCHA token | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-3 | APPROVED (via AM-3, 2026-09-30) |
-| DEV-004 | Staff lead update accepts a re-consent object | REQUIRES IMPLEMENTATION CHANGE | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-4 | PENDING — AM-4 NOT DECIDED |
+| DEV-004 | Staff lead update accepts a re-consent object | REQUIRES IMPLEMENTATION CHANGE | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-4 | APPROVED WITH CONDITIONS (via AM-4, 2026-09-30) |
 | DEV-005 | Break-glass cancel link endpoint and page (06 §7.5 step 5) | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-5 | APPROVED WITH CONDITIONS (via AM-5, 2026-09-30) |
 | DEV-006 | mfa_challenge binds enrollment transactions to a factor and a path | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-11 | APPROVED WITH CONDITIONS (via AM-11, 2026-09-30) |
 | DEV-007 | Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds | n/a (remediation) | REQUIRES IMPLEMENTATION CHANGE | AM-7 | APPROVED WITH CONDITIONS (via AM-7, 2026-09-30) |
@@ -110,7 +110,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Corrected behaviour verified on both engines; residuals RR-12
 - **Decision required:** AM-4: approve the corrected mechanism and choose in-row + timeline activity (implemented) or a dedicated append-only consent-event table.
 - **Amendment:** AM-4
-- **Status:** PENDING — AM-4 NOT DECIDED
+- **Status:** APPROVED WITH CONDITIONS (via AM-4, 2026-09-30)
 
 ## DEV-005: Break-glass cancel link endpoint and page (06 §7.5 step 5)
 

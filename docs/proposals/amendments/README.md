@@ -1,13 +1,13 @@
 # Architecture amendments
 
-> Owner decisions recorded on 2026-09-30: see [the decision record](../../implementation/P0-owner-decision-record.md). The certified documents in `docs/architecture/` are unchanged; approved amendments take effect alongside them. AM-4 is not decided.
+> Owner decisions recorded on 2026-09-30: see [the decision record](../../implementation/P0-owner-decision-record.md). The certified documents in `docs/architecture/` are unchanged; approved amendments take effect alongside them. AM-4 is approved with conditions.
 
 | ID | Amends | Owner decision | Conditions |
 |---|---|---|---|
 | [AM-1](AM-1.md) | 03 §5.5 | **APPROVED** | None |
 | [AM-2](AM-2.md) | 08 §4.5, 05 §11.3 | **APPROVED WITH CONDITIONS** | Accept the invite-link residual (link holder sets the password before activation). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-3](AM-3.md) | 08 §4.1, §4.7 | **APPROVED** | None |
-| [AM-4](AM-4.md) | 04 §5.4 vs 08 §8.5; LEAD-027 | **PROPOSED, NOT APPROVED** | Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d). |
+| [AM-4](AM-4.md) | 04 §5.4 vs 08 §8.5; LEAD-027 | **APPROVED WITH CONDITIONS** | For merge: the labelled gaps are accepted — the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) is a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d), including the choice of option (a) or (b) for (d). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-5](AM-5.md) | 08 §1, 06 §11 (RBX-003), 06 §7.5, 09 | **APPROVED WITH CONDITIONS** | Outbox retention ≥ break-glass window enforced or operationally controlled before production (IR-A10). (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-6](AM-6.md) | LOG-005, 08 §3, 02 §12.4 | **APPROVED WITH CONDITIONS** | RG-7 rollback rehearsal before production. (the owner stated no different conditions; the conditions of the decision package apply) |
 | [AM-7](AM-7.md) | 08 §12, 05 §4 | **APPROVED WITH CONDITIONS** | Accept the disclosed disruption bounds (FC-05 reset-link gap, escalation during a Turnstile outage); staging Turnstile, proxy and alarm evidence. (the owner stated no different conditions; the conditions of the decision package apply) |

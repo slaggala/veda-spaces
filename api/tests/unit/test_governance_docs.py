@@ -41,10 +41,9 @@ def test_amendments_live_outside_the_certified_tree():
 RECORD = REPO / "docs/implementation/P0-owner-decision-record.json"
 EXPECTED_DECISIONS = {
     **dict.fromkeys(("AM-1", "AM-3", "AM-8"), "APPROVED"),
-    **dict.fromkeys(("AM-2", "AM-5", "AM-6", "AM-7", "AM-11", "AM-12", "AM-13"), "APPROVED WITH CONDITIONS"),
+    **dict.fromkeys(("AM-2", "AM-4", "AM-5", "AM-6", "AM-7", "AM-11", "AM-12", "AM-13"), "APPROVED WITH CONDITIONS"),
     **dict.fromkeys(("AM-9", "AM-10"), "DEFERRED TO STAGING / PRODUCTION"),
 }
-UNDECIDED = {"AM-4"}
 
 
 def _status(aid):
@@ -66,11 +65,11 @@ def test_decision_record_matches_the_owner_instruction():
     assert rec["date"] == "2026-09-30"
     assert {k: v["decision"] for k, v in rec["owner_decisions"].items()} == {"OD-2": "APPROVED", "OD-3": "APPROVED"}
     assert {k: v["decision"] for k, v in rec["gates"].items()} == {"TG-01": "APPROVED", "TG-08": "APPROVED"}
-    assert all(v["registry_evidence"].startswith("OUTSTANDING") for v in rec["gates"].values())
+    assert all(v["registry_evidence"].startswith("WAIVED by the owner") for v in rec["gates"].values())
+    assert rec["evidence_waiver"]["gates"] == ["TG-01", "TG-08"]
     assert rec["merge_safety"]["decision"] == "APPROVED — Option C" and rec["merge_safety"]["executed"] is False
-    got = {k: v["decision"] for k, v in rec["amendments"].items()}
-    assert {k: v for k, v in got.items() if k not in UNDECIDED} == EXPECTED_DECISIONS
-    assert rec["not_decided"] == ["AM-4"] and got["AM-4"].startswith("NOT DECIDED")
+    assert {k: v["decision"] for k, v in rec["amendments"].items()} == EXPECTED_DECISIONS
+    assert rec["not_decided"] == []
 
 
 def test_amendment_json_and_package_agree_with_the_record():
@@ -95,11 +94,12 @@ def test_no_undecided_item_reads_as_decided():
     for path in docs:
         text = path.read_text()
         assert not re.search(r"OD-[23][^|\n]{0,15}\bgiven\b", text), path.name
-        assert not re.search(r"AM-4\b[^|\n]{0,40}\*\*APPROVED", text), path.name
+        assert not re.search(r"AM-4\b[^|\n]{0,40}\b(not decided|NOT DECIDED)", text), path.name
         assert not re.search(r"[Pp]roduction deployment approval[^|\n]{0,10}\|\s*\**APPROVED", text), path.name
         assert not re.search(r"\b(merged|deployed) to (main|production)\b", text), path.name
     readiness = (REPO / "docs/implementation/P0-merge-readiness-report.md").read_text()
-    assert "NOT READY TO MERGE" in readiness and "AM-4" in readiness
+    assert "READY FOR CONTROLLED MERGE" in readiness and "NOT READY" not in readiness and "AM-4" in readiness
+    assert "nothing has been merged or deployed" in readiness
 
 
 # --- SHA references (DC-04) --------------------------------------------------------------------------------------
@@ -125,6 +125,7 @@ KNOWN_COMMITS = {
     "56c20ba992b519daa79aa3802a28343aab8c0b41": ("Add final targeted P0 implementation check", "final targeted check"),
     "093cfa6872c209deb9991910c457afcdb4ad2d04": ("Add P0 document-level technical check", "document-level check"),
     "ca9845c0dd60280fd19cdc9d41843d8567191801": ("Close P0 document conditions", "head when the owner decisions were recorded"),
+    "1be68c2": ("Record P0 consolidated owner decisions", "head when the owner confirmation was synchronized"),
     "13276a017a137c4a86b15fea0306ea2e83ac2729": ("Prepare Veda Spaces for Cloudflare Pages", "live site (main)"),
 }  # fmt: skip
 EXTRA_DOCS = (
@@ -224,7 +225,8 @@ def test_role_specific_references():
 
 def test_gate_records():
     """The certified registry is not edited by this workstream (it still reads Pending); the owner's approval of
-    TG-01 and TG-08 is carried by the decision record and the register, with the registry evidence outstanding."""
+    TG-01 and TG-08 is carried by the decision record and the register, with the registry evidence waived by the
+    owner for merge readiness."""
     gates = {
         g["gate_id"]: g["status"]
         for g in json.loads((REPO / "docs/architecture/gate-registry.json").read_text())["gates"]
@@ -235,7 +237,7 @@ def test_gate_records():
         for i in json.loads((REPO / "docs/implementation/P0-open-issues.json").read_text())["items"]
     }
     assert issues["TG-01"].startswith("APPROVED") and issues["TG-08"].startswith("APPROVED")
-    assert "evidence entry outstanding" in issues["TG-01"] and "evidence entry outstanding" in issues["TG-08"]
+    assert "waived by the owner" in issues["TG-01"] and "waived by the owner" in issues["TG-08"]
     report = (REPO / "docs/implementation/P0-gate-status-report.md").read_text()
     other = [g for g in gates if g not in ("TG-01", "TG-08")]
     for gid in other:

@@ -7,7 +7,7 @@
   "document_check": "review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04",
   "document_check_verdict": "READY WITH DOCUMENT CONDITIONS",
   "sha_correction": "The brief's SHA 6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41 does not exist (FC-A01); the implementation commit is 6ec2e76f156e963c7363c4ad9ce93d0bccb11f41.",
-  "note": "Owner decisions recorded 2026-09-30; see P0-owner-decision-record.md. AM-4 not decided. No merge, no deployment.",
+  "note": "Owner decisions recorded 2026-09-30; see P0-owner-decision-record.md. AM-4 approved with conditions. The owner waived the TG-01/TG-08 decision-log and PR evidence for merge readiness. No merge, no deployment.",
   "amendments": [
     {
       "id": "AM-1",
@@ -76,10 +76,10 @@
       "production_dependency": "RR-12 implemented with tests for (a)–(c) on both engines; Data Protection lead sign-off of option (a) or (b).",
       "recommendation": "Resolves the certified 04/08 conflict; completion is tracked.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NOT DECIDED — not included in the consolidated owner decision",
-      "status": "PROPOSED, NOT APPROVED",
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
       "decision_before": "Merge (owner may accept labelled gaps) / completion before production",
-      "owner_conditions": "Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d)."
+      "owner_conditions": "For merge: the labelled gaps are accepted — the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) is a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d), including the choice of option (a) or (b) for (d). (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-5",
@@ -262,12 +262,12 @@
     {
       "id": "TG-01",
       "status": "APPROVED",
-      "note": "registry evidence entry outstanding"
+      "note": "registry evidence entry waived by the owner for merge readiness; the owner decision record is the evidence; the certified registry is unchanged"
     },
     {
       "id": "TG-08",
       "status": "APPROVED",
-      "note": "registry evidence entry outstanding"
+      "note": "registry evidence entry waived by the owner for merge readiness; the owner decision record is the evidence; the certified registry is unchanged"
     },
     {
       "id": "Merge-safety decision",

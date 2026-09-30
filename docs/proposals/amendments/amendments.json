@@ -1,5 +1,5 @@
 {
-  "status": "Owner decisions recorded 2026-09-30; see docs/implementation/P0-owner-decision-record.md (AM-4 not decided)",
+  "status": "Owner decisions recorded 2026-09-30; see docs/implementation/P0-owner-decision-record.md (AM-4 approved with conditions)",
   "baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
   "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
@@ -155,12 +155,12 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "INCOMPLETE — states 422 where code/tests return 409; 'later version' has no ordering rule; the immutability option conflicts with erasure rewriting consent notes (DC-02)",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED WITH CONDITIONS",
       "owner_decision_recorded": {
-        "decision": "NOT DECIDED — not included in the consolidated owner decision",
-        "conditions": "Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d).",
-        "date": null,
-        "source": null
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "For merge: the labelled gaps are accepted — the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) is a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d), including the choice of option (a) or (b) for (d). (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-FINAL-GOVERNANCE-EVIDENCE-SYNC, confirmed by the owner in session, recorded by the author on the owner's behalf"
       }
     },
     {

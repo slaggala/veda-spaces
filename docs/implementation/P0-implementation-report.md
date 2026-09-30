@@ -24,10 +24,9 @@ The owner's decisions are recorded in [P0-owner-decision-record.md](P0-owner-dec
 - **OD-2 and OD-3:** APPROVED.
 - **Amendments:**
   - APPROVED: AM-1, AM-3, AM-8.
-  - APPROVED WITH CONDITIONS: AM-2, AM-5, AM-6, AM-7, AM-11, AM-12, AM-13.
+  - APPROVED WITH CONDITIONS: AM-2, AM-4, AM-5, AM-6, AM-7, AM-11, AM-12, AM-13. AM-4 was approved by the confirmation instruction VEDA-SPACES-P0-FINAL-GOVERNANCE-EVIDENCE-SYNC.
   - DEFERRED: AM-9, AM-10.
-  - **Not decided: AM-4.**
-- **Gates:** TG-01 and TG-08 APPROVED. Their evidence entries in the certified-tree decision log are an outstanding owner action.
+- **Gates:** TG-01 and TG-08 APPROVED. The owner waived their evidence entries in the certified-tree decision log for merge readiness; the certified registry is unchanged.
 - **Merge safety:** option C APPROVED, not executed.
 
 Reports:
