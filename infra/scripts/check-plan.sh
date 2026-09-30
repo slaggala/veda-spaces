@@ -15,7 +15,13 @@
 #     AWSOrganizationsFullAccess, job-function/*), or creates IAM users, groups, access keys, login profiles,
 #     SAML providers, account settings or another OIDC provider;
 #   - adds a resource policy, Lambda permission, KMS grant, AMI/snapshot permission or function URL that opens a
-#     resource to another account or to the public.
+#     resource to another account or to the public;
+#   - deploys outside ap-south-1 (Mumbai only, owner decision): an AWS provider configuration whose region is not the
+#     constant ap-south-1 or the root variable aws_region (provider aliases and providers inside modules included),
+#     an aws_region variable other than ap-south-1, or a resource whose planned region (AWS provider v6 records it on
+#     every regional resource, whichever alias, module or per-resource region argument set it) is another region or
+#     unknown. Global resources (IAM) have no region;
+#   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
 #   infra/scripts/check-plan.sh --plan-json plan.json --account 123456789012 --repo owner/repo [--prefix veda]
@@ -50,7 +56,7 @@ jq -e 'type == "object" and (.format_version | type) == "string"' "$PLAN_JSON" >
 GH_ENVS="$(for spec in $VEDA_GH_ROLE_ENVIRONMENTS; do printf '%s\n' "$spec"; done |
   jq -R --arg prefix "$PREFIX" 'split(":") | {key: "\($prefix)-gh-\(.[0])", value: .[1]}' | jq -s from_entries)"
 
-violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg prefix "$PREFIX" --argjson ghenv "$GH_ENVS" '
+violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg prefix "$PREFIX" --arg region "$VEDA_REGION" --argjson ghenv "$GH_ENVS" '
   def arr: if type == "array" then . elif . == null then [] else [.] end;
   def esc: gsub("(?<c>[.+*?()\\[\\]{}|^$\\\\])"; "\\\(.c)");
   def own: tostring | (. == $acct) or test("^arn:aws[a-z-]*:(iam|sts)::" + $acct + ":");
@@ -112,12 +118,33 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg prefix "$PREF
   def policy_field:
     {"aws_s3_bucket_policy": "policy", "aws_kms_key": "policy", "aws_sqs_queue_policy": "policy", "aws_sqs_queue": "policy",
      "aws_sns_topic_policy": "policy", "aws_sns_topic": "policy", "aws_ecr_repository_policy": "policy",
-     "aws_cloudwatch_log_resource_policy": "policy_document", "aws_secretsmanager_secret_policy": "policy",
-     "aws_secretsmanager_secret": "policy", "aws_ssm_resource_policy": "policy", "aws_lambda_layer_version_permission": "policy"}[.];
+     "aws_cloudwatch_log_resource_policy": "policy_document", "aws_secretsmanager_secret_policy": "policy", # pragma: allowlist secret
+     "aws_secretsmanager_secret": "policy", "aws_ssm_resource_policy": "policy", "aws_lambda_layer_version_permission": "policy"}[.]; # pragma: allowlist secret
+  def aws_provider: ((.provider_name // "") | test("(^|/)hashicorp/aws$")) or ((.type // "") | startswith("aws_"));
+  # Mumbai only: every AWS provider configuration pins the approved region, at the root, either as the constant or as
+  # the validated root variable; the planned region of a resource (AWS provider v6) must be that region or absent (global).
+  def region_ok: . == {"constant_value": $region} or . == {"references": ["var.aws_region"]};
+  def region_findings:
+    (.variables.aws_region.value // $region) as $region_var
+    | ([.configuration.provider_config // {} | to_entries[] | select(.value.name == "aws")] as $pcs
+     | (if ([.resource_changes[]? | select(aws_provider)] | length) > 0 and ($pcs | length) == 0
+          then "plan has AWS resources but no AWS provider configuration: the region cannot be verified" else empty end),
+       ($pcs[] | .key as $k | .value
+        | if .module_address then "provider \($k): a module configures its own AWS provider (region must come from the root, \($region) only)"
+          elif (.expressions.region | region_ok) | not then
+            "provider \($k): region \((.expressions.region // {}) | .constant_value // ((.references // []) | if length > 0 then join(",") else null end) // "unset") is not \($region)"
+          elif .expressions.region.references and ($region_var != $region) then
+            "provider \($k): variable aws_region is \($region_var | tojson), not \($region)"
+          else empty end)),
+    ([.resource_changes[]? | select(aws_provider) | select((.change.actions - ["no-op", "read"]) | length > 0)
+      | if .change.after_unknown.region == true then "\(.address): region not known at plan time (\($region) only)"
+        elif (.change.after.region // null) != null and .change.after.region != $region
+          then "\(.address): planned in \(.change.after.region), not \($region) (Mumbai only)"
+        else empty end][]);
 
-  [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
-    | if (.change.actions | index("delete")) then
-        "\($addr): plan \(.change.actions | join("+")) (the bootstrap never applies a destroy or replace)"
+  [ region_findings ] + [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
+    | if (.change.actions - ["create", "update", "read", "no-op"]) | length > 0 then
+        "\($addr): plan \(.change.actions | join("+")) (the bootstrap never applies a destroy, replace or forget)"
       elif (.change.actions | index("create") or index("update")) | not then empty
       elif (.type | forbidden_type) then "\($addr): \(.type) is not allowed (users, groups, keys and account settings are out of scope)"
       elif .type == "aws_iam_openid_connect_provider" and $addr != "aws_iam_openid_connect_provider.github[0]" then
@@ -155,4 +182,4 @@ if [[ -n "$violations" ]]; then
   printf '%s\n' "$violations" | while IFS= read -r v; do log "REFUSED: $v"; done
   die "plan guard refused the plan ($(printf '%s\n' "$violations" | wc -l | tr -d ' ') finding(s))"
 fi
-log "plan guard: no destroy, every role bounded at path /, GitHub trust only from each role's protected environment, no trust or resource policy outside account $ACCOUNT"
+log "plan guard: no destroy, everything in $VEDA_REGION, every role bounded at path /, GitHub trust only from each role's protected environment, no trust or resource policy outside account $ACCOUNT"

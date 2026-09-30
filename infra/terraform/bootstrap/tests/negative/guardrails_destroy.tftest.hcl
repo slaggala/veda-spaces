@@ -35,7 +35,7 @@ mock_provider "aws" {
 variables {
   expected_account_id   = "111122223333"
   github_owner          = "example-org"
-  github_repo           = "veda-spaces-aws-source"
+  github_repo           = "veda-spaces"
   account_manifest_path = "tests/fixtures/account.json"
 }
 

@@ -10,7 +10,9 @@
 #   - changes to this boundary, to the GitHub roles and to the OIDC provider (bootstrap-owned);
 #   - IAM roles, policies and instance profiles under a path, which name patterns cannot bound (RR-03);
 #   - creating a role or changing a trust policy by any role but veda-gh-apply (RR-03);
-#   - using a web-identity or SAML session of any role but the veda-gh-* roles (RR-03);
+#   - using a web-identity (OIDC) session of any role but the veda-gh-* roles (RR-03). SAML sessions are NOT covered:
+#     AWS sets aws:FederatedProvider for OIDC sessions only (N-01). SAML is closed outside the boundary instead: no
+#     Veda role can create a SAML provider, and discovery refuses an account that has one;
 #   - any S3 action on bootstrap state, and any change or replication into the state bucket (F2, RR-01). The state
 #     key is protected by its own key policy (RR-02), not here;
 #   - weakening the account guardrails, CloudTrail or Access Analyzer, IMDSv1, GOVERNANCE bypass (F6);
@@ -82,9 +84,9 @@ data "aws_iam_policy_document" "boundary" {
     }
   }
 
-  # RR-03: a session federated from an identity provider (web identity or SAML) is usable only as a veda-gh-* role.
-  # Even a trust policy that let GitHub, or any other provider, into a workload role yields a session that can do
-  # nothing.
+  # RR-03: a web-identity (OIDC) session is usable only as a veda-gh-* role. Even a trust policy that let GitHub, or
+  # any other OIDC provider, into a workload role yields a session that can do nothing. aws:FederatedProvider is
+  # absent from SAML sessions, so this statement does not see them (N-01; see the header).
   statement {
     sid       = "DenyFederatedSessionsOutsideGitHubRoles"
     effect    = "Deny"

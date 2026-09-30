@@ -14,8 +14,9 @@
 #   staging-infra     reviewers, main only        infra apply, secrets seed
 #   staging           reviewers, main only        deploy, drills
 #   staging-evidence  no reviewers, main only     evidence collection (read-only role)
-# Branch protection on main (F10): pull request required (0 approvals, so a single owner can merge), enforced for
-# admins, no force pushes, no deletion. "main only" environments mean nothing without it.
+# Branch protection on main (F10): pull request required (0 approvals, so a single owner can merge; owner decision
+# RR-G), enforced for admins, no force pushes, no deletion. "main only" environments mean nothing without it. An
+# already compliant protection is left as it is, and required status checks are never dropped.
 #
 # Variables (--outputs): repository-level AWS_ROLE_ARN_PLAN/APPLY/DEPLOY/EVIDENCE, AWS_ACCOUNT_ID, AWS_REGION,
 # TF_STATE_BUCKET, TF_STATE_KMS_KEY_ARN, CF_ACCOUNT_ID, CF_ZONE_ID. Repository variables need only the
@@ -120,7 +121,8 @@ setup_environment() {
     reviewers_json="$(printf '%s\n' "${REVIEWER_IDS[@]}" | jq -R 'tonumber | {type: "User", id: .}' | jq -s .)"
   fi
   [[ "$main_only" == yes ]] && policy='{"protected_branches": false, "custom_branch_policies": true}'
-  # prevent_self_review stays false: a single-owner repository would otherwise deadlock every approval (R5).
+  # prevent_self_review stays false: a single-owner repository would otherwise deadlock every approval (R5; owner
+  # decision RR-F of 2026-09-30, to be revisited before a second collaborator is added).
   body="$(jq -n --argjson r "$reviewers_json" --argjson p "$policy" \
     '{wait_timer: 0, prevent_self_review: false, can_admins_bypass: false, reviewers: $r, deployment_branch_policy: $p}')"
   log "environment $env (reviewers: $with_reviewers, main only: $main_only, admins cannot bypass)"
@@ -134,16 +136,37 @@ setup_environment() {
   fi
 }
 
+# Keeps whatever protection main already has when it meets the rules (its required status checks included). Only a
+# non-compliant or missing protection is written, and then the existing required status checks, review settings,
+# linear history and conversation resolution are carried over: a PUT replaces the whole protection.
 protect_main() {
-  log "branch protection on main (pull request required, enforced for admins, no force push or deletion)"
-  api_json PUT "repos/$REPO/branches/main/protection" '{
-    "required_status_checks": null,
-    "enforce_admins": true,
-    "required_pull_request_reviews": {"required_approving_review_count": 0, "dismiss_stale_reviews": true},
-    "restrictions": null,
-    "allow_force_pushes": false,
-    "allow_deletions": false
-  }'
+  local current='{}' body
+  if current="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)"; then
+    if jq -e '.enforce_admins.enabled == true and .required_pull_request_reviews != null
+              and (.allow_force_pushes.enabled // false) == false and (.allow_deletions.enabled // false) == false' \
+      <<<"$current" >/dev/null; then
+      log "branch protection on main already meets the rules; left unchanged (required status checks kept)"
+      return
+    fi
+  else
+    current='{}'
+  fi
+  log "branch protection on main (pull request required, enforced for admins, no force push or deletion; existing checks kept)"
+  body="$(jq -c '{
+    required_status_checks: (.required_status_checks | if . == null then null
+      else {strict: (.strict // false), checks: [.checks[]? | {context, app_id}]} end),
+    enforce_admins: true,
+    required_pull_request_reviews: {
+      required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 0),
+      dismiss_stale_reviews: true,
+      require_code_owner_reviews: (.required_pull_request_reviews.require_code_owner_reviews // false),
+      require_last_push_approval: (.required_pull_request_reviews.require_last_push_approval // false)},
+    restrictions: null,
+    required_linear_history: (.required_linear_history.enabled // false),
+    required_conversation_resolution: (.required_conversation_resolution.enabled // false),
+    allow_force_pushes: false,
+    allow_deletions: false}' <<<"$current")"
+  api_json PUT "repos/$REPO/branches/main/protection" "$body"
 }
 
 if ((!VARIABLES_ONLY)); then

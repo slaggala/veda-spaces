@@ -5,8 +5,13 @@ It is the only step that uses owner credentials. After it, every workflow runs t
 It has no dependency on Aurion or any other system, and does not deploy the application or enable public intake.
 
 - **Status:** written and tested offline; remediated after the independent review (F1–F10, see the review package §8)
-  and the final-certification re-review (RR-01, RR-02, RR-03, RR-05, RR-07, review package §9).
+  and the final-certification re-review (RR-01, RR-02, RR-03, RR-05, RR-07, review package §9); pre-bootstrap
+  conditions PB-01 to PB-11 addressed in
+  [`AUT-001-003-pre-bootstrap-closure.md`](../implementation/staging/AUT-001-003-pre-bootstrap-closure.md).
   It has **not been run** against any AWS account.
+- **Owner decisions (2026-09-30):** ap-south-1 (Mumbai) only; standalone AWS account (no Organizations); no
+  Cloudflare write token for the bootstrap; **controlled local first run** (§3, Option A). See
+  [`AUT-001-003-owner-decisions.md`](../implementation/staging/AUT-001-003-owner-decisions.md).
 - **Code:** [`infra/terraform/bootstrap`](../../infra/terraform/bootstrap), [`infra/scripts`](../../infra/scripts),
   [`.github/workflows/00-bootstrap.yml`](../../.github/workflows/00-bootstrap.yml).
 
@@ -27,52 +32,66 @@ Nothing else is created: no VPC, no instance, no bucket other than the state buc
 
 **First, in a reviewed pull request:** record the dedicated account in
 [`infra/config/staging-account.json`](../../infra/config/staging-account.json). Every script, the workflow and the
-Terraform variable validation refuse to run while `account_id` is `null`, or for any other account (F3).
+Terraform variable validation refuse to run while `account_id` is `null`, or for any other account (F3), and
+`infra/scripts/check-manifest.sh --complete` must pass (PB-01). The fixed fields (`schema_version`, `region` =
+`ap-south-1`, `organizations_mode` = `standalone`, `repository` = `slaggala/veda-spaces`, `repository_id`,
+`max_owner_session_seconds` = 3600) record the owner decisions and are checked on every run.
 
 | Field | Value |
 |---|---|
 | `account_id` | The 12-digit ID of the dedicated staging account |
 | `account_name` | Its name exactly as `aws account get-account-information` returns it (for example `veda-staging`) |
-| `account_alias` | Its IAM account alias, or `null` if it has none |
+| `account_alias` | Its IAM account alias (**required**: create one with `aws iam create-account-alias` if the account has none). It must not contain `prod` or `aurion` |
 | `manage_account_guardrails` | `true` unless the account already manages the guardrails (§6). Changing it later never removes them |
-| `bootstrap_principal_arns` | The exact IAM role ARN (with its path) or IAM user ARN of the owner session that runs the bootstrap, for example `arn:aws:iam::<ACCOUNT_ID>:role/OrganizationAccountAccessRole` or `arn:aws:iam::<ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/ap-south-1/AWSReservedSSO_<set>_<id>`. These principals, and the account root, are the **only** ones that can read or write bootstrap state, change the state bucket or administer the state key (RR-01, RR-02). No wildcards, no `veda-*` identity; the plan fails unless the session running it is listed |
-| `allowed_foreign_resources` | Pre-existing IAM roles, users, buckets, instances or Lambda functions that are *not* Veda's but may stay. Empty for a new account (`OrganizationAccountAccessRole` is listed by default) |
+| `bootstrap_principal_arns` | The exact IAM **role** ARN (with its path) of the dedicated owner role that runs the bootstrap, for example `arn:aws:iam::<ACCOUNT_ID>:role/bootstrap-owner` (never a `veda-*` name). These principals, and the account root, are the **only** ones that can read or write bootstrap state, change the state bucket or administer the state key (RR-01, RR-02). No wildcards, no IAM users, no `veda-*` identity. The role must allow sessions of at most one hour (`MaxSessionDuration` ≤ 3600) and be trusted only by principals of this account (no identity provider, service or other account; PB-09). The root user may not run the bootstrap |
+| `allowed_foreign_resources` | Pre-existing IAM roles, users, SAML providers, buckets, instances or Lambda functions that are *not* Veda's but may stay. Empty for a new standalone account. Anything named like Aurion or `swing-trader` is refused even if listed |
 
-Discovery then refuses the run unless the live account name and alias match, neither looks like production or
-Aurion (`prod`, `aurion`), and the account holds nothing beyond `veda-*` resources, service-linked and SSO roles,
-and the allowlist.
+Discovery then refuses the run unless (N-03): the live account name and alias match; neither looks like production
+or Aurion (`prod`, `aurion`); the account is **not** an AWS Organizations member (owner decision: standalone); the
+session is an assumed owner role and every owner role passes the checks above; and an inventory of **every enabled
+region** finds nothing but the allowlist and, once the bootstrap has run, Veda's own resources in ap-south-1. The
+inventory covers IAM roles, users and identity providers (only the GitHub OIDC provider; **no SAML provider**, N-01),
+S3 buckets, and per region EC2 instances, non-default VPCs, Lambda functions, RDS instances, ECS clusters, Secrets
+Manager secrets and customer-managed KMS keys. Before the bootstrap has run, no `veda-*` resource may exist at all.
 
 Then, at run time:
 
 | # | Item | Used for |
 |---|---|---|
 | 1 | The same account ID | `EXPECTED_ACCOUNT_ID`: checked against the manifest and the session |
-| 2 | A **temporary** administrator session in that account (access key `ASIA…`, secret key, **session token**) | Bootstrap only; it expires by itself |
-| 3 | A Cloudflare API token with **Zone:Read and DNS:Read on `vedaspaces.com` only**, short TTL (`CF_READ_TOKEN`) | Optional at bootstrap: discovers the account and zone IDs and checks for name collisions. No Cloudflare write or edit token is needed or accepted at this stage |
-| 4 | Optional: a fine-grained GitHub token (`GH_ADMIN_TOKEN`) with **only *Variables: write*** on this repository | Lets `00-bootstrap` publish the role ARNs as repository variables; without it, run `make -C infra github-variables APPLY=1` locally. Never grant it *Environments* or *Administration* |
+| 2 | A **temporary**, **region-guarded** session of the owner role (access key `ASIA…`, secret key, **session token**), at most one hour | Bootstrap only; it expires by itself |
+| 3 | **No Cloudflare token for the first run** (owner decision; PB-07). Later, a read-only token (Zone:Read, DNS:Read on `vedaspaces.com` only) may be used for discovery; a write token is never used by the bootstrap | Cloudflare discovery is deferred to AUT-201 |
+| 4 | **No `GH_ADMIN_TOKEN` for the first run** (PB-11): set repository variables locally with `make -C infra github-variables APPLY=1` | — |
 
-Ways to obtain the temporary session (pick one):
+**The session must be confined to ap-south-1 by IAM (PB-06).** The owner role is not under `veda-boundary`, so the
+session carries the region-deny session policy
+[`infra/config/bootstrap-session-policy.json`](../../infra/config/bootstrap-session-policy.json). It denies every
+action outside ap-south-1 except the global services the boundary exempts and the read-only calls of the all-region
+inventory. `bootstrap.sh` and `discover.sh` prove it before anything else: a harmless read in us-east-1 must be
+**denied**, otherwise they stop.
 
 ```sh
-# From the Organizations management account, into the new member account:
-aws sts assume-role --role-arn arn:aws:iam::<ACCOUNT_ID>:role/OrganizationAccountAccessRole \
-  --role-session-name veda-bootstrap --duration-seconds 3600
-
-# From an IAM Identity Center profile for the new account:
-aws configure export-credentials --profile <veda-staging-admin> --format env
+aws sts assume-role --role-arn arn:aws:iam::<ACCOUNT_ID>:role/<owner role> \
+  --role-session-name veda-bootstrap-$(date -u +%Y%m%d) --duration-seconds 3600 \
+  --policy file://infra/config/bootstrap-session-policy.json
 ```
 
 ## 3. Run it
 
-### Option A: locally (recommended for the first run)
+### Option A: locally (the approved procedure for the first run)
 
 Prerequisites: `aws` v2, `terraform` 1.16.4, `jq`, `curl`, `git`, `gh` (authenticated as a repository admin).
-Run from a clean checkout of `main` that includes the manifest commit.
+Run from a **clean checkout** of `main` that includes the manifest commit. The plan refuses a checkout with
+uncommitted, untracked or *ignored* files the plan could read (`override.tf`, `*_override.tf`, `terraform.tfvars`;
+N-05, PB-08). Before the first run, record the all-region inventory evidence with the same session (PB-02):
+`infra/scripts/account-inventory.sh --expected-account-id <ACCOUNT_ID>` writes
+`infra/generated/account-inventory.json` and fails unless the account is dedicated to Veda.
 
 ```sh
-export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_SESSION_TOKEN=… AWS_REGION=ap-south-1
-export CF_API_TOKEN=…                                            # optional (read-only token)
+export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_SESSION_TOKEN=… AWS_REGION=ap-south-1   # region-guarded
+unset CF_API_TOKEN                                               # no Cloudflare token (owner decision)
 
+infra/scripts/check-manifest.sh --complete                       # PB-01
 make -C infra check                                              # offline checks
 make -C infra github-environments REVIEWERS=<login>              # dry run: environments + main protection
 make -C infra github-environments REVIEWERS=<login> APPLY=1
@@ -92,9 +111,12 @@ Either way, **apply refuses to start unless the GitHub environments are protecte
 --verify-environments` must pass (every environment present with required reviewers where required, no admin
 bypass, the main-only branch policy, and `main` protected). Run the `github-environments` step first.
 
-### Option B: the `00-bootstrap` workflow
+### Option B: the `00-bootstrap` workflow (not for the first run; private repository only)
 
-A `workflow_dispatch` workflow can only be started once it exists on the default branch. Merge this change first.
+A `workflow_dispatch` workflow can only be started once it exists on the default branch. It runs **only from a
+private repository** (N-04): the plan artifact and the job summary are readable by anyone who can read the
+repository. While the repository is public, the workflow refuses to start and Option A is the only way. It also
+checks the repository name and numeric ID against the manifest (PB-01).
 
 1. Create and verify the GitHub environments and the `main` protection:
    `make -C infra github-environments REVIEWERS=<login> APPLY=1 && make -C infra github-verify`.
@@ -103,7 +125,7 @@ A `workflow_dispatch` workflow can only be started once it exists on the default
    gh secret set BOOTSTRAP_AWS_ACCESS_KEY_ID     --env bootstrap
    gh secret set BOOTSTRAP_AWS_SECRET_ACCESS_KEY --env bootstrap
    gh secret set BOOTSTRAP_AWS_SESSION_TOKEN     --env bootstrap
-   gh secret set CF_READ_TOKEN                   --env bootstrap   # optional, read-only
+   gh secret set CF_READ_TOKEN                   --env bootstrap   # optional, read-only (never a write token)
    gh secret set GH_ADMIN_TOKEN                  --env bootstrap   # optional, Variables: write only
    ```
 3. Run it: Actions → **00-bootstrap** → mode `plan`. Read the job summary and the `bootstrap-plan-<run id>`
@@ -131,10 +153,13 @@ record, that a reviewer approved it for `bootstrap` before it reads any secret.
 ## 4. What the run does
 
 1. **Guards:** region must be `ap-south-1`; the account must be the manifest's and `aws sts get-caller-identity`
-   must return it. The Terraform provider also pins `allowed_account_ids`, and the Terraform variable validation
-   checks the manifest too.
+   must return it; the manifest must be complete; the session must be **denied** a read in us-east-1 (PB-06). The
+   Terraform provider also pins `allowed_account_ids`, and the Terraform variable validation checks the manifest
+   (account, region, repository) too.
 2. **Account identity** (fails closed): account name and alias match the manifest; neither looks like production
-   or Aurion; no foreign IAM roles or users, S3 buckets, EC2 instances or Lambda functions (§2).
+   or Aurion; standalone account; the session is an owner role and every owner role is safe (§2); nothing in any
+   enabled region but the allowlist and Veda's own resources in ap-south-1; nothing named like Aurion or
+   `swing-trader` (N-03). The repository is the manifest's by name and numeric ID (PB-01).
 3. **Discovery** (`discover.sh`, read-only), written to `infra/generated/discovered.json`:
    - account and caller;
    - availability zones, and whether t4g.medium is offered in ap-south-1a;
@@ -162,6 +187,10 @@ record, that a reviewer approved it for `bootstrap` before it reads any secret.
      any action but `sts:AssumeRoleWithWebIdentity` (RR-03);
    - privileged AWS managed policies, IAM users, groups, keys, SAML or other OIDC providers, account settings;
    - an input that is not a Terraform plan;
+   - anything outside ap-south-1 (PB-06): an AWS provider whose region is not the constant `ap-south-1` or the root
+     variable `aws_region`, any provider configured inside a module, `aws_region` set to another region, or any
+     resource whose planned region (AWS provider v6 records it per resource, whichever alias, module or per-resource
+     `region` argument set it) is another region or unknown; a `forget` (`removed` block) is refused like a delete;
    - any resource policy, Lambda permission, function URL, KMS grant or AMI/snapshot permission that opens something
      to another account or the public.
 6. **Apply** (apply mode only). This applies the reviewed plan file and nothing else; Terraform refuses it if the
@@ -246,7 +275,9 @@ is controlled by the `staging-infra` approval and the reviewed plan, not by thes
 - changes to the boundary, the `veda-gh-*` roles and policies (including creating new `veda-gh-*` names) and the OIDC provider;
 - IAM roles, policies and instance profiles under a path (`role/veda-x/admin` would otherwise match `role/veda-*`) (RR-03);
 - creating a role or changing a trust policy by any role but `veda-gh-apply` (RR-03);
-- any use of a web-identity or SAML session of a role other than the four `veda-gh-*` roles (RR-03);
+- any use of a web-identity (OIDC) session of a role other than the four `veda-gh-*` roles (RR-03). SAML sessions
+  are **not** covered: AWS sets `aws:FederatedProvider` for OIDC sessions only (N-01). SAML is closed instead by no
+  Veda role being able to create a SAML provider and discovery refusing any account that has one;
 - any S3 action on `bootstrap/*` state (read, copy, write, replicate, restore, tag, delete), and any change to the
   state bucket's configuration or versions, or replication into it (RR-01);
 - weakening the account guardrails; stopping, deleting or re-scoping CloudTrail trails; archiving Access Analyzer
@@ -268,7 +299,7 @@ permission has the same bounds (through S3, `staging/*` only).
 
 **Trust policies (RR-03).** IAM has no condition key for a trust policy's content. What IAM does enforce: only
 `veda-gh-apply` can write any trust policy, nothing under a path can be created, and a federated session of any role
-but the `veda-gh-*` roles can do nothing. What the plan guard enforces on every plan (`check-plan.sh`; AUT-301 must
+but the `veda-gh-*` roles can do nothing (OIDC; for SAML see the boundary above). What the plan guard enforces on every plan (`check-plan.sh`; AUT-301 must
 run it on every staging plan, §8): the trust content of every role the apply role creates.
 
 ## 8. Constraints on later stories

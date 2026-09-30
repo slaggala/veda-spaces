@@ -30,6 +30,12 @@ variable "aws_region" {
     condition     = var.aws_region == "ap-south-1"
     error_message = "Veda staging is approved for ap-south-1 only."
   }
+
+  # The reviewed manifest records the same owner decision; a manifest naming another region stops the plan too.
+  validation {
+    condition     = try(local.manifest.region, "") == var.aws_region
+    error_message = "The account manifest must approve ap-south-1 (Mumbai) only."
+  }
 }
 
 variable "environment" {
@@ -62,6 +68,12 @@ variable "github_owner" {
 variable "github_repo" {
   description = "GitHub repository name (auto-discovered)."
   type        = string
+
+  # PB-01: the OIDC subjects name only the repository approved in the reviewed manifest.
+  validation {
+    condition     = "${var.github_owner}/${var.github_repo}" == try(local.manifest.repository, "")
+    error_message = "github_owner/github_repo is not the repository approved in infra/config/staging-account.json."
+  }
 }
 
 variable "github_environments" {

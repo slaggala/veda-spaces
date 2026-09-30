@@ -11,6 +11,10 @@
 #    recorded at upload, and only the plan file whose SHA-256 is the approved digest and whose re-rendered text is
 #    the reviewed text. Terraform refuses the plan if the state changed since.
 #
+# Runs only from a PRIVATE repository (N-04): the plan artifact and the job summary are readable by everyone who can
+# read the repository. A public repository uses the local procedure (runbook §4, owner decision: controlled local
+# first run). The repository must also be the one the manifest approves, by name and numeric ID (PB-01).
+#
 # Fails closed on environment protection (RR-07): the "preflight" job, which holds no secret, verifies that every
 # environment exists with required reviewers, no admin bypass and the main-only branch policy, and that main is
 # protected, BEFORE the "bootstrap" job can even request the environment (a missing environment is never
@@ -70,7 +74,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Inputs, approved account, this workflow on protected main
+      - name: Inputs, approved account and repository, this workflow on protected main
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
         run: |
           [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "::error::mode must be plan or apply"; exit 1; }
           [[ "$EXPECTED_ACCOUNT_ID" =~ ^[0-9]{12}$ ]] || { echo "::error::expected_account_id must be 12 digits"; exit 1; }
@@ -78,6 +84,14 @@ jobs:
           approved="$(jq -r '.account_id // empty' infra/config/staging-account.json)"
           [[ -n "$approved" ]] || { echo "::error::no approved account in infra/config/staging-account.json"; exit 1; }
           [[ "$EXPECTED_ACCOUNT_ID" == "$approved" ]] || { echo "::error::$EXPECTED_ACCOUNT_ID is not the approved account"; exit 1; }
+          infra/scripts/check-manifest.sh --complete
+          # PB-01: the approved repository, by name and by ID (a re-registered name has another ID).
+          [[ "$GITHUB_REPOSITORY" == "$(jq -r .repository infra/config/staging-account.json)" &&
+             "$GITHUB_REPOSITORY_ID" == "$(jq -r .repository_id infra/config/staging-account.json)" ]] ||
+            { echo "::error::$GITHUB_REPOSITORY ($GITHUB_REPOSITORY_ID) is not the repository the manifest approves"; exit 1; }
+          # N-04: artifacts and summaries of a public repository are readable by anyone.
+          [[ "$REPOSITORY_PRIVATE" == "true" ]] ||
+            { echo "::error::00-bootstrap runs only from a private repository; use the local procedure (runbook §4)"; exit 1; }
           [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::00-bootstrap runs from main only"; exit 1; }
           [[ "$GITHUB_WORKFLOW_REF" == "$GITHUB_REPOSITORY/.github/workflows/00-bootstrap.yml@refs/heads/main" ]] ||
             { echo "::error::this is $GITHUB_WORKFLOW_REF, not 00-bootstrap.yml on main"; exit 1; }
@@ -176,7 +190,8 @@ jobs:
           infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" \
             --outputs infra/generated/bootstrap-outputs.json --variables-only --apply
 
-      # The plan artifact is what a later apply run applies; its name is fixed so that run can find it.
+      # The plan artifact is what a later apply run applies; its name is fixed so that run can find it. Discovery
+      # output (caller ARN, runner IP, Cloudflare IDs) stays on the runner (N-04).
       - name: Upload the plan for review and apply (no secrets)
         id: upload
         if: inputs.mode == 'plan'
@@ -187,7 +202,6 @@ jobs:
             infra/generated/bootstrap.tfplan
             infra/generated/bootstrap-plan.meta.json
             infra/generated/bootstrap-plan.txt
-            infra/generated/discovered.json
           if-no-files-found: error
           retention-days: 7
 
@@ -221,14 +235,6 @@ jobs:
               grep -E '^Plan:|No changes' infra/generated/bootstrap-plan.txt || true
               echo '```'
             fi
-            if [[ -f infra/generated/discovered.json ]]; then
-              echo '### Discovery'
-              echo '```json'
-              jq '{aws: (.aws | {account_id, region, state_bucket_exists, bootstrap_roles_exist, ses,
-                    github_oidc_provider_managed_by_bootstrap}), cloudflare: (.cloudflare | {discovered, zone, plan,
-                    planned_name_collisions})}' infra/generated/discovered.json
-              echo '```'
-            fi
           } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload apply outputs (no secrets)
@@ -237,7 +243,6 @@ jobs:
         with:
           name: bootstrap-apply-${{ github.run_id }}
           path: |
-            infra/generated/discovered.json
             infra/generated/bootstrap-outputs.json
           if-no-files-found: ignore
           retention-days: 30

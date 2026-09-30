@@ -17,6 +17,14 @@ export VEDA_REGION VEDA_PREFIX VEDA_ZONE VEDA_ACCOUNT_MANIFEST
 
 # Account names or aliases that can never be the Veda staging account.
 VEDA_FORBIDDEN_ACCOUNT_NAMES='prod|aurion'
+# Resources that betray another project in the account (Aurion, the swing-trader VM): refused even if allowed.
+VEDA_FORBIDDEN_RESOURCE_NAMES='aurion|swing[-_]?trader'
+# PB-06: a region the region-guarded owner session must NOT be able to use (proved by a harmless read being denied).
+VEDA_REGION_PROBE="us-east-1"
+# The read-only calls the all-region inventory makes (N-03). The bootstrap session policy
+# (infra/config/bootstrap-session-policy.json) exempts exactly these, plus the global services, from its region deny.
+VEDA_INVENTORY_ACTIONS='ec2:DescribeRegions ec2:DescribeInstances ec2:DescribeVpcs lambda:ListFunctions rds:DescribeDBInstances ecs:ListClusters kms:ListKeys kms:ListAliases kms:DescribeKey secretsmanager:ListSecrets'
+export VEDA_FORBIDDEN_RESOURCE_NAMES VEDA_REGION_PROBE VEDA_INVENTORY_ACTIONS
 
 # The GitHub environment each veda-gh-* role is trusted by (RR-03): fixed, and each one protected and verified by
 # github-setup.sh (RR-07). Terraform's github_environments validation holds the same mapping.
@@ -51,15 +59,82 @@ require_region() {
 
 manifest_get() { jq -r "$1 // empty" "$VEDA_ACCOUNT_MANIFEST"; }
 
-# F3: the account typed at run time must be the one committed in the manifest.
+# PB-01: prints one line per problem with the manifest; nothing means valid. "structure" checks the schema and the
+# fixed owner decisions (the committed manifest may still hold nulls); "complete" also requires every value a
+# bootstrap needs, with no placeholder.
+manifest_problems() {
+  local mode="$1"
+  [[ -f "$VEDA_ACCOUNT_MANIFEST" ]] || { echo "manifest not found: $VEDA_ACCOUNT_MANIFEST"; return 0; }
+  jq -r --arg mode "$mode" --arg forbidden "$VEDA_FORBIDDEN_ACCOUNT_NAMES" --arg prefix "$VEDA_PREFIX" '
+    def str_or_null: . == null or type == "string";
+    def placeholder: type == "string" and (test("[<>]|TODO|CHANGE|REPLACE|EXAMPLE|PLACEHOLDER"; "i") or . == "123456789012" or . == "000000000000");
+    [ (if .schema_version != 2 then "schema_version must be 2" else empty end),
+      (if .region != "ap-south-1" then "region must be ap-south-1 (Mumbai only)" else empty end),
+      (if .organizations_mode != "standalone" then "organizations_mode must be \"standalone\" (owner decision)" else empty end),
+      (if (.repository | type) != "string" or (.repository | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$") | not) then "repository must be owner/repo" else empty end),
+      (if (.repository_id | type) != "number" or .repository_id <= 0 then "repository_id must be the numeric GitHub repository ID" else empty end),
+      (if (.max_owner_session_seconds | type) != "number" or .max_owner_session_seconds < 900 or .max_owner_session_seconds > 3600
+         then "max_owner_session_seconds must be 900-3600" else empty end),
+      (if (.manage_account_guardrails | type) != "boolean" then "manage_account_guardrails must be true or false" else empty end),
+      (if (.bootstrap_principal_arns | type) != "array" then "bootstrap_principal_arns must be a list" else empty end),
+      (if (.allowed_foreign_resources | type) != "object" then "allowed_foreign_resources must be an object" else empty end),
+      (if (.account_id | str_or_null) and (.account_name | str_or_null) and (.account_alias | str_or_null) | not
+         then "account_id, account_name and account_alias must be strings or null" else empty end),
+      ([.account_id, .account_name, .account_alias, (.bootstrap_principal_arns // [])[]] | map(select(placeholder)) | .[]
+         | "placeholder value \(tojson)"),
+      (if $mode == "complete" then
+        (.account_id as $a
+         | (if ($a | type) != "string" or ($a | test("^[0-9]{12}$") | not) then "account_id must be the 12-digit account ID" else empty end),
+           (if (.account_name | type) != "string" or .account_name == "" then "account_name is not set" else empty end),
+           (if (.account_alias | type) != "string" or (.account_alias | test("^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])$") | not)
+              then "account_alias must be set (3-63 lowercase letters, digits, hyphens)" else empty end),
+           ([.account_name, .account_alias] | map(select(type == "string" and test($forbidden; "i"))) | .[]
+              | "\(tojson) looks like production or Aurion"),
+           (if ((.bootstrap_principal_arns // []) | length) == 0 then "bootstrap_principal_arns is empty" else empty end),
+           ((.bootstrap_principal_arns // [])[] | select((type != "string")
+              or (test("^arn:aws:iam::" + ($a | tostring) + ":role/[A-Za-z0-9+=,.@_/-]+$") | not)
+              or test(":role/(.*/)?" + $prefix + "-"))
+            | "bootstrap_principal_arns: \(tojson) is not an exact, non-\($prefix) IAM role ARN in account \($a)"))
+       else empty end)
+    ] | .[]' "$VEDA_ACCOUNT_MANIFEST" 2>/dev/null || echo "manifest is not valid JSON"
+}
+
+# F3: the account typed at run time must be the one committed in the manifest, and the manifest complete (PB-01).
 require_approved_account() {
-  local expected="$1" approved
+  local expected="$1" approved problems
   [[ -f "$VEDA_ACCOUNT_MANIFEST" ]] || die "account manifest not found: $VEDA_ACCOUNT_MANIFEST"
   approved="$(manifest_get .account_id)"
   [[ "$approved" =~ ^[0-9]{12}$ ]] ||
     die "no approved staging account in ${VEDA_ACCOUNT_MANIFEST#"$REPO_ROOT"/}: commit account_id and account_name in a reviewed change first (runbook §2)"
   [[ "$expected" == "$approved" ]] ||
     die "account $expected is not the approved staging account ($approved) in ${VEDA_ACCOUNT_MANIFEST#"$REPO_ROOT"/}; refusing"
+  problems="$(manifest_problems complete)"
+  [[ -z "$problems" ]] || die "the account manifest is not complete: $(tr '\n' ';' <<<"$problems" | sed 's/;$//'); refusing"
+}
+
+# PB-01 / N-11: the repository is the one the manifest approves, by name and by its numeric ID (a deleted and
+# re-registered repository of the same name has another ID). Needs gh; every lookup fails closed.
+require_repository_identity() {
+  local repo="$1" want_repo want_id id
+  want_repo="$(manifest_get .repository)"
+  want_id="$(manifest_get .repository_id)"
+  [[ "$repo" == "$want_repo" ]] || die "repository $repo is not the one the manifest approves ($want_repo); refusing"
+  id="$(gh api "repos/$repo" --jq .id 2>/dev/null)" || die "cannot read the ID of repository $repo; refusing"
+  [[ -n "$id" && "$id" == "$want_id" ]] ||
+    die "repository $repo has ID ${id:-?}, the manifest approves $want_id (renamed, deleted or re-registered?); refusing"
+}
+
+# PB-06: the owner session must be confined to ap-south-1 by IAM (the region-deny session policy in
+# infra/config/bootstrap-session-policy.json). Proof: a harmless read in another region must be DENIED. A success
+# means the session could deploy anywhere; any other error proves nothing. Both stop the run.
+require_region_guarded_session() {
+  local err
+  if err="$(aws ec2 describe-availability-zones --region "$VEDA_REGION_PROBE" --output json 2>&1 >/dev/null)"; then
+    die "this AWS session can act in $VEDA_REGION_PROBE: start it with the region-deny session policy (infra/config/bootstrap-session-policy.json, runbook §3); refusing"
+  fi
+  grep -Eq 'UnauthorizedOperation|AccessDenied|explicit deny' <<<"$err" ||
+    die "cannot prove the session is confined to $VEDA_REGION ($VEDA_REGION_PROBE probe: ${err:-no detail}); refusing"
+  log "session confined to $VEDA_REGION by IAM ($VEDA_REGION_PROBE denied)"
 }
 
 # Refuses to continue unless the active AWS session belongs to the expected (dedicated Veda) account.
@@ -71,11 +146,12 @@ require_expected_account() {
   [[ "$actual" == "$expected" ]] || die "AWS session is for account $actual, expected $expected; refusing"
 }
 
-# F3: prove the session is in the dedicated staging account, not merely in the account whose ID was typed:
-# manifest approval, the live account name and alias, a production/Aurion name check, and no resources that
-# the bootstrap did not create (unless the manifest lists them). Every lookup fails closed.
+# F3, N-03: prove the session is in the dedicated staging account, not merely in the account whose ID was typed:
+# a complete manifest, the live account name and alias, no production/Aurion name, a standalone account (owner
+# decision), an owner role that is safe to hold the state (PB-09), and an all-region inventory with nothing the
+# bootstrap did not create (unless the manifest lists it). Every lookup fails closed.
 verify_account_identity() {
-  local expected="$1" name alias want_name want_alias foreign
+  local expected="$1" name alias want_name want_alias bucket_status state_exists=false inventory foreign forbidden
   require_approved_account "$expected"
   require_expected_account "$expected"
 
@@ -95,39 +171,131 @@ verify_account_identity() {
     die "account '$name' (alias '${alias:-<none>}') looks like production or Aurion; refusing"
   fi
 
-  foreign="$(foreign_resources)" || die "cannot list account resources; refusing"
+  require_standalone_account
+  require_owner_session "$expected"
+
+  # Assigned before comparing: a failed lookup must stop the run, not read as "absent".
+  bucket_status="$(state_bucket_status "$(state_bucket_name "$expected")" "$expected")" || die "cannot read the state bucket; refusing"
+  if [[ "$bucket_status" == exists ]]; then state_exists=true; fi
+  inventory="$(account_inventory)" || die "cannot list account resources; refusing"
+  forbidden="$(jq -r --arg re "$VEDA_FORBIDDEN_RESOURCE_NAMES" '[.[] | select(([.id, .name] | join(" ")) | test($re; "i"))]
+    | group_by(.kind) | map("\(.[0].kind): " + (map(.id + (if .region == "global" then "" else "@" + .region end)) | join(","))) | join("; ")' <<<"$inventory")"
+  [[ -z "$forbidden" ]] || die "the account holds resources named like Aurion or swing-trader-vm ($forbidden); it is not the dedicated Veda account; refusing"
+  foreign="$(foreign_resources "$inventory" "$state_exists")" || die "cannot evaluate account resources; refusing"
   [[ -z "$foreign" ]] ||
     die "the account holds resources the bootstrap did not create and the manifest does not allow: $foreign"
-  log "account $expected verified: name '$name', alias '${alias:-<none>}', no foreign resources"
+  log "account $expected verified: name '$name', alias '${alias:-<none>}', standalone, owner session, no foreign resources in any region"
 }
 
-# Prints "roles: a,b; buckets: c" for resources that are neither Veda's nor allowed by the manifest.
+# Owner decision: a standalone account, not an AWS Organizations member.
+require_standalone_account() {
+  local err
+  if err="$(aws organizations describe-organization --output json 2>&1 >/dev/null)"; then
+    die "the account belongs to an AWS Organization; the manifest approves a standalone account (organizations_mode); refusing"
+  fi
+  grep -q 'AWSOrganizationsNotInUseException' <<<"$err" ||
+    die "cannot tell whether the account belongs to an AWS Organization (${err:-no detail}); refusing"
+}
+
+# PB-09 / N-12: the session is one of the manifest's owner roles (not the root user, not an IAM user), and every owner
+# role is safe to hold the bootstrap state: at its exact ARN, sessions of at most max_owner_session_seconds, and a
+# trust policy that admits only principals of this account (no identity provider, service, other account or "*").
+require_owner_session() {
+  local expected="$1" caller role_name max arn want role bad
+  caller="$(aws sts get-caller-identity --output json | jq -r '.Arn // empty')" || die "cannot read the caller identity; refusing"
+  [[ "$caller" =~ ^arn:aws[a-z-]*:sts::${expected}:assumed-role/([^/]+)/.+$ ]] ||
+    die "the session is $caller, not an assumed owner role (root and IAM users may not run the bootstrap); refusing"
+  role_name="${BASH_REMATCH[1]}"
+  max="$(manifest_get .max_owner_session_seconds)"
+  for want in $(jq -r '.bootstrap_principal_arns[]' "$VEDA_ACCOUNT_MANIFEST"); do
+    role="$(aws iam get-role --role-name "${want##*/}" --output json)" || die "cannot read owner role ${want##*/}; refusing"
+    arn="$(jq -r '.Role.Arn // empty' <<<"$role")"
+    [[ "$arn" == "$want" ]] || die "owner role ${want##*/} is $arn, the manifest names $want; refusing"
+    jq -e --argjson max "$max" '.Role.MaxSessionDuration <= $max' <<<"$role" >/dev/null ||
+      die "owner role $want allows sessions longer than $max seconds; set its maximum session duration to $max or less; refusing"
+    bad="$(jq -r --arg acct "$expected" '
+      (.Role.AssumeRolePolicyDocument | if type == "string" then fromjson else . end).Statement
+      | (if type == "array" then . else [.] end)[] | select(.Effect == "Allow")
+      | if .NotPrincipal then "NotPrincipal"
+        elif .Principal == "*" then "*"
+        else (.Principal // {}) | to_entries[] | .key as $k | (.value | if type == "array" then .[] else . end)
+          | select($k != "AWS" or (. != $acct and (test("^arn:aws[a-z-]*:iam::" + $acct + ":") | not)))
+          | "\($k) \(.)" end' <<<"$role")" || die "cannot read the trust policy of owner role $want; refusing"
+    [[ -z "$bad" ]] || die "owner role $want is trusted by $(tr '\n' ',' <<<"$bad" | sed 's/,$//'): only principals of this account may assume it; refusing"
+  done
+  jq -e --arg n "$role_name" '[.bootstrap_principal_arns[] | split("/") | last] | index($n) != null' "$VEDA_ACCOUNT_MANIFEST" >/dev/null ||
+    die "the session role $role_name is not in bootstrap_principal_arns; refusing"
+}
+
+# N-03: every resource of the kinds a workload or another project would leave, in every enabled region (regional
+# kinds) or account-wide (IAM, S3). JSON array of {kind, id, region, name, veda}. Read-only; fails on any lookup error.
+account_inventory() {
+  local out j regions r keys k meta
+  j="$(aws iam list-roles --output json)" || return 1
+  out="$(jq -c '[.Roles[] | select((.Path | startswith("/aws-service-role/") or startswith("/aws-reserved/")) | not)
+    | {kind: "roles", id: .RoleName, region: "global", name: .RoleName, veda: false}]' <<<"$j")" || return 1
+  j="$(aws iam list-users --output json)" || return 1
+  out="$(jq -c --argjson o "$out" '$o + [.Users[] | {kind: "users", id: .UserName, region: "global", name: .UserName, veda: false}]' <<<"$j")" || return 1
+  j="$(aws iam list-open-id-connect-providers --output json)" || return 1
+  out="$(jq -c --argjson o "$out" '$o + [.OpenIDConnectProviderList[] | {kind: "oidc providers", id: .Arn, region: "global", name: .Arn, veda: false}]' <<<"$j")" || return 1
+  j="$(aws iam list-saml-providers --output json)" || return 1
+  out="$(jq -c --argjson o "$out" '$o + [.SAMLProviderList[] | {kind: "saml providers", id: .Arn, region: "global", name: .Arn, veda: false}]' <<<"$j")" || return 1
+  j="$(aws s3api list-buckets --output json)" || return 1
+  out="$(jq -c --argjson o "$out" '$o + [.Buckets[] | {kind: "buckets", id: .Name, region: "global", name: .Name, veda: false}]' <<<"$j")" || return 1
+  regions="$(aws ec2 describe-regions --output json | jq -r '.Regions[].RegionName')" || return 1
+  [[ -n "$regions" ]] || return 1
+  for r in $regions; do
+    j="$(aws ec2 describe-instances --region "$r" --filters Name=instance-state-name,Values=pending,running,stopping,stopped --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.Reservations[].Instances[] | {kind: "instances", id: .InstanceId, region: $r,
+      name: ([.Tags[]? | .Value] | join(" ")), veda: ([.Tags[]? | select(.Key == "project" and .Value == "veda-spaces")] | length > 0)}]' <<<"$j")" || return 1
+    j="$(aws ec2 describe-vpcs --region "$r" --filters Name=is-default,Values=false --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.Vpcs[] | {kind: "vpcs", id: .VpcId, region: $r,
+      name: ([.Tags[]? | .Value] | join(" ")), veda: ([.Tags[]? | select(.Key == "project" and .Value == "veda-spaces")] | length > 0)}]' <<<"$j")" || return 1
+    j="$(aws lambda list-functions --region "$r" --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.Functions[] | {kind: "lambda functions", id: .FunctionName, region: $r, name: .FunctionName, veda: false}]' <<<"$j")" || return 1
+    j="$(aws rds describe-db-instances --region "$r" --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.DBInstances[] | {kind: "rds instances", id: .DBInstanceIdentifier, region: $r, name: .DBInstanceIdentifier, veda: false}]' <<<"$j")" || return 1
+    j="$(aws ecs list-clusters --region "$r" --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.clusterArns[] | {kind: "ecs clusters", id: ., region: $r, name: ., veda: false}]' <<<"$j")" || return 1
+    j="$(aws secretsmanager list-secrets --region "$r" --output json)" || return 1
+    out="$(jq -c --argjson o "$out" --arg r "$r" '$o + [.SecretList[] | {kind: "secrets", id: .Name, region: $r, name: .Name, veda: false}]' <<<"$j")" || return 1
+    # Customer-managed keys only (AWS-managed keys come with the services); a Veda key carries an alias/veda-* alias.
+    j="$(aws kms list-aliases --region "$r" --output json)" || return 1
+    keys="$(aws kms list-keys --region "$r" --output json | jq -r '.Keys[].KeyId')" || return 1
+    for k in $keys; do
+      meta="$(aws kms describe-key --region "$r" --key-id "$k" --output json)" || return 1
+      out="$(jq -c --argjson o "$out" --arg r "$r" --arg k "$k" --argjson aliases "$j" '
+        .KeyMetadata as $m | $o + (if $m.KeyManager == "CUSTOMER" and ($m.KeyState | test("^Pending.*Deletion$") | not)
+          then [{kind: "kms keys", id: $k, region: $r,
+                 name: ([$aliases.Aliases[] | select(.TargetKeyId == $k) | .AliasName] | join(" ")),
+                 veda: ([$aliases.Aliases[] | select(.TargetKeyId == $k and (.AliasName | startswith("alias/veda-")))] | length > 0)}]
+          else [] end)' <<<"$meta")" || return 1
+    done
+  done
+  echo "$out"
+}
+
+# Prints "roles: a,b; instances: i-1@us-east-1" for inventoried resources that are neither Veda's nor allowed by the
+# manifest. Nothing may exist outside ap-south-1 except account-wide IAM and S3 entries. Before the bootstrap (no
+# state bucket yet) no veda-* resource may exist at all: a squatted name is not ours.
 foreign_resources() {
-  local allow roles users buckets instances functions out=""
-  allow="$(jq -c '.allowed_foreign_resources // {}' "$VEDA_ACCOUNT_MANIFEST")"
-  roles="$(aws iam list-roles --output json | jq -r --argjson a "$allow" '
-    [.Roles[] | select((.Path | startswith("/aws-service-role/") or startswith("/aws-reserved/")) | not)
-      | .RoleName | select(startswith("veda-") | not) | select(. as $n | ($a.iam_roles // []) | index($n) | not)]
-    | join(",")')" || return 1
-  users="$(aws iam list-users --output json | jq -r --argjson a "$allow" '
-    [.Users[].UserName | select(. as $n | ($a.iam_users // []) | index($n) | not)] | join(",")')" || return 1
-  buckets="$(aws s3api list-buckets --output json | jq -r --argjson a "$allow" '
-    [.Buckets[].Name | select(startswith("veda-") | not) | select(. as $n | ($a.s3_buckets // []) | index($n) | not)]
-    | join(",")')" || return 1
-  instances="$(aws ec2 describe-instances --filters Name=instance-state-name,Values=pending,running,stopping,stopped \
-    --output json | jq -r --argjson a "$allow" '
-    [.Reservations[].Instances[]
-      | select(([.Tags[]? | select(.Key == "project" and .Value == "veda-spaces")] | length) == 0)
-      | .InstanceId | select(. as $n | ($a.ec2_instances // []) | index($n) | not)] | join(",")')" || return 1
-  functions="$(aws lambda list-functions --output json | jq -r --argjson a "$allow" '
-    [.Functions[].FunctionName | select(startswith("veda-") | not)
-      | select(. as $n | ($a.lambda_functions // []) | index($n) | not)] | join(",")')" || return 1
-  [[ -n "$roles" ]] && out+="roles: $roles; "
-  [[ -n "$users" ]] && out+="users: $users; "
-  [[ -n "$buckets" ]] && out+="buckets: $buckets; "
-  [[ -n "$instances" ]] && out+="instances: $instances; "
-  [[ -n "$functions" ]] && out+="lambda functions: $functions; "
-  printf '%s' "${out%; }"
+  local inventory="$1" state_exists="$2" allow
+  allow="$(jq -c '.allowed_foreign_resources // {}' "$VEDA_ACCOUNT_MANIFEST")" || return 1
+  jq -r --argjson a "$allow" --argjson ours "$state_exists" --arg home "$VEDA_REGION" --arg prefix "$VEDA_PREFIX-" '
+    def allowed($list): . as $id | ($a[$list] // []) | index($id) != null;
+    [ .[] | select(
+        if .kind == "roles" then (.id | allowed("iam_roles")) or ($ours and (.id | startswith($prefix)))
+        elif .kind == "users" then (.id | allowed("iam_users"))
+        elif .kind == "oidc providers" then (.id | endswith(":oidc-provider/token.actions.githubusercontent.com"))
+        elif .kind == "saml providers" then (.id | allowed("saml_providers"))
+        elif .kind == "buckets" then (.id | allowed("s3_buckets")) or ($ours and (.id | startswith($prefix)))
+        elif .kind == "instances" then (.id | allowed("ec2_instances")) or ($ours and .region == $home and .veda)
+        elif .kind == "vpcs" then $ours and .region == $home and .veda
+        elif .kind == "lambda functions" then (.id | allowed("lambda_functions")) or ($ours and .region == $home and (.id | startswith($prefix)))
+        elif .kind == "kms keys" then $ours and .region == $home and .veda
+        else false end | not) ]
+    | group_by(.kind) | map("\(.[0].kind): " + (map(.id + (if .region == "global" then "" else "@" + .region end)) | join(",")))
+    | join("; ")' <<<"$inventory"
 }
 
 # F4: whether the GitHub OIDC provider was created by this bootstrap (tags stack=bootstrap, project=veda-spaces).
@@ -220,6 +388,20 @@ verify_state_protection() {
     die "the live protections of s3://$bucket and its key are not the reviewed ones; do not use this state until an owner has investigated"
   fi
   log "state protection verified: bucket and key policies as reviewed, key $key, no Bucket Key, rotation on"
+}
+
+# N-05 / PB-08: a plan is made only from a clean checkout of a commit. Tracked changes, untracked files and IGNORED
+# files (override.tf, *_override.tf, terraform.tfvars, *.auto.tfvars other than the generated one) in the paths the
+# plan reads all stop it; only Terraform working files and what the scripts themselves generate are tolerated.
+require_clean_tree() {
+  local status problems
+  git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+    die "not a git checkout: a plan must be made from a reviewed commit; refusing"
+  status="$(git -C "$REPO_ROOT" status --porcelain --ignored --untracked-files=all -- \
+    infra/terraform/bootstrap infra/config infra/scripts .github/workflows)" || die "cannot read the git status; refusing"
+  problems="$(grep -vE '^!! infra/terraform/bootstrap/(\.terraform/.*|\.terraform/|generated\.auto\.tfvars\.json|backend_s3\.tf|terraform\.tfstate|terraform\.tfstate\.backup|\.terraform\.tfstate\.lock\.info)$' <<<"$status" || true)"
+  [[ -z "$problems" ]] ||
+    die "the checkout is not clean (uncommitted, untracked or ignored files the plan could read): $(tr '\n' ';' <<<"$problems" | sed 's/;$//'); refusing"
 }
 
 # The commit being run: GITHUB_SHA in Actions, HEAD locally.

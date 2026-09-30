@@ -1,0 +1,33 @@
+# AUT-001..003 staging bootstrap: owner decisions
+
+- **Date:** 2026-09-30
+- **Owner:** repository owner (`slaggala`), the sole collaborator and the reviewer of every GitHub environment
+- **Context:** the independent certification of `e8157f31a9e6df23d79c2b4d79bed896a7b65cb0` returned *CERTIFIED WITH
+  PRE-BOOTSTRAP CONDITIONS* (PB-01 to PB-11). These decisions close the owner-decision part of PB-05. Where a decision
+  is enforced by code, the enforcing check is named. Nothing here authorizes running the bootstrap.
+
+## Decisions
+
+| ID | Decision | Enforced by |
+|---|---|---|
+| OD-B1 | **AWS region: ap-south-1 (Mumbai) only.** Every regional resource of every Veda stack lives there. Global services (IAM, STS, billing, support, read-only Organizations/account) are the only exceptions. Using an India region is not, by itself, a claim of legal or regulatory compliance | Terraform `aws_region` validation and the manifest `region`; `check-plan.sh` refuses any other provider region, module provider or per-resource region; `veda-boundary` region deny for every Veda role; the region-deny session policy on the owner session, proved at run time (`require_region_guarded_session`) |
+| OD-B2 | **Organizations: standalone AWS account.** The staging account is not an AWS Organizations member. No SCP or RCP is available | Manifest `organizations_mode: standalone`; discovery refuses an account that belongs to an Organization (`require_standalone_account`) |
+| OD-B3 | **Cloudflare: no write token for the bootstrap.** The first run uses no Cloudflare token at all. A read-only token (Zone:Read, DNS:Read on `vedaspaces.com`) may be used later for discovery | Runbook §2 and §3; nothing in the bootstrap writes to Cloudflare |
+| OD-B4 | **Bootstrap: controlled local first run** (runbook §3, Option A). No AWS credential is stored in GitHub for it; `GH_ADMIN_TOKEN` is not created | The `00-bootstrap` workflow refuses to run from a public repository (the repository is public) |
+| OD-B5 | **Single-owner review model accepted** (RR-F, RR-G): `prevent_self_review: false` on every environment and 0 required approvals on `main`, while the owner is the only collaborator. To be revisited before any collaborator or second reviewer is added | `github-setup.sh` (environments created 2026-09-30) |
+| OD-B6 | **CloudTrail until AUT-104** (RR-H): rely on CloudTrail Event History (90-day management events) and export the bootstrap session's events as first-run evidence. No trail is created before bootstrap | Runbook first-run evidence step |
+| OD-B7 | **AUT-301 trust-writing gap** (RR-D, with N-01): raw API trust writes by `veda-gh-apply` are **decided before AUT-301**, as a gate: no workflow may assume `veda-gh-apply` until it is closed or explicitly accepted. It does not affect the bootstrap, which never assumes the apply role | Gate recorded here and in the closure matrix |
+| OD-B8 | **Owner principal:** a dedicated IAM role in the staging account, not the root user and not an IAM user. It allows sessions of one hour at most and is trusted only by principals of the account | Manifest schema (roles only); Terraform preconditions (session must be a manifest role, not root); discovery (`require_owner_session`: role ARN, `MaxSessionDuration` ≤ 3600, trust inside the account) |
+
+## Acknowledgements still open (do not block the bootstrap)
+
+| ID | Item | Gate |
+|---|---|---|
+| RR-A | The repository will not be renamed, transferred or deleted while the OIDC roles trust `repo:slaggala/veda-spaces:…` by name. The bootstrap scripts and workflow now also check the repository's numeric ID (1392733148), but the AWS trust policies still match on the name | Before AUT-301 (move to a custom OIDC `sub` claim that includes `repository_id`) |
+| RR-I | The boundary uses 5,947 of the 6,144 characters IAM allows. Any addition must compress or replace a statement | Before any boundary change |
+
+## Values the owner still has to commit (PB-01)
+
+`account_id`, `account_name`, `account_alias` (required) and `bootstrap_principal_arns` in
+`infra/config/staging-account.json`, through a reviewed pull request. `infra/scripts/check-manifest.sh --complete`
+must pass. These are not secrets, but only the owner knows them.

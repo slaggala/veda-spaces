@@ -2,8 +2,10 @@
 # Auto-discovery for the staging bootstrap (plan §13, AUT-003). READ-ONLY: every AWS, Cloudflare and GitHub
 # call below is a Get/List/Describe/Head. Nothing is created or changed.
 #
-# It first proves the session is in the approved staging account (F3: manifest, account name and alias, no
-# production/Aurion name, no foreign resources) and stops otherwise. Lookups the plan depends on fail closed.
+# It first proves the session is confined to ap-south-1 by IAM (PB-06) and is in the approved, dedicated staging
+# account (F3, N-03: complete manifest, account name and alias, no production/Aurion name, standalone, a safe owner
+# role, and no foreign resource in any region), then that the repository is the approved one by name and ID (PB-01),
+# and stops otherwise. Lookups the plan depends on fail closed.
 #
 #   infra/scripts/discover.sh --expected-account-id 123456789012 [--repo owner/repo]
 #
@@ -28,13 +30,15 @@ while (($#)); do
   esac
 done
 
-require_tools aws jq curl git
+require_tools aws jq curl git gh
 require_account_id "$EXPECTED"
 require_region
+require_region_guarded_session
 verify_account_identity "$EXPECTED"
 mkdir -p "$GENERATED_DIR"
 
 REPO="$(resolve_repo "$REPO_ARG")"
+require_repository_identity "$REPO"
 log "account $EXPECTED, region $VEDA_REGION, repository $REPO"
 
 # --- AWS ------------------------------------------------------------------------------------------------------

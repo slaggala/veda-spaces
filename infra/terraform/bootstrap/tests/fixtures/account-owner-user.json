@@ -11,7 +11,8 @@
   "max_owner_session_seconds": 3600,
   "manage_account_guardrails": true,
   "bootstrap_principal_arns": [
-    "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole"
+    "arn:aws:iam::111122223333:role/OrganizationAccountAccessRole",
+    "arn:aws:iam::111122223333:user/owner"
   ],
   "allowed_foreign_resources": {
     "iam_roles": [

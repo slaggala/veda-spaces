@@ -82,9 +82,43 @@ good_account() {
   {"RoleName":"veda-gh-apply","Path":"/"}]}
 EOF
   echo '{"Users":[]}' >"$d/iam_list-users.json"
+  echo '{"OpenIDConnectProviderList":[]}' >"$d/iam_list-open-id-connect-providers.json"
+  echo '{"SAMLProviderList":[]}' >"$d/iam_list-saml-providers.json"
   echo "{\"Buckets\":[{\"Name\":\"veda-tfstate-$ACCT\"}]}" >"$d/s3api_list-buckets.json"
-  echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0veda","Tags":[{"Key":"project","Value":"veda-spaces"}]}]}]}' >"$d/ec2_describe-instances.json"
-  echo '{"Functions":[{"FunctionName":"veda-canary"}]}' >"$d/lambda_list-functions.json"
+  # PB-06: the session is region-guarded (a read in us-east-1 is denied by its session policy).
+  echo "An error occurred (UnauthorizedOperation) when calling the DescribeAvailabilityZones operation: explicit deny in a session policy" \
+    >"$d/ec2_describe-availability-zones@us-east-1.fail"
+  # Owner decision: standalone account.
+  echo "An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization operation: Your account is not a member of an organization." \
+    >"$d/organizations_describe-organization.fail"
+  # PB-09: the owner role (fixture manifest), one-hour sessions, trusted only inside the account.
+  jq -n --arg acct "$ACCT" '{Role: {RoleName: "OrganizationAccountAccessRole", Arn: "arn:aws:iam::\($acct):role/OrganizationAccountAccessRole",
+    MaxSessionDuration: 3600, AssumeRolePolicyDocument: {Version: "2012-10-17", Statement: [{Effect: "Allow",
+    Principal: {AWS: "arn:aws:iam::\($acct):root"}, Action: "sts:AssumeRole"}]}}}' >"$d/iam_get-role.json"
+  # N-03: every enabled region is inventoried; only ap-south-1 holds (Veda) resources.
+  echo '{"Regions":[{"RegionName":"ap-south-1"},{"RegionName":"us-east-1"},{"RegionName":"eu-west-1"}]}' >"$d/ec2_describe-regions.json"
+  echo '{"Reservations":[]}' >"$d/ec2_describe-instances.json"
+  echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0veda","Tags":[{"Key":"project","Value":"veda-spaces"}]}]}]}' >"$d/ec2_describe-instances@ap-south-1.json"
+  echo '{"Vpcs":[]}' >"$d/ec2_describe-vpcs.json"
+  echo '{"Functions":[]}' >"$d/lambda_list-functions.json"
+  echo '{"Functions":[{"FunctionName":"veda-canary"}]}' >"$d/lambda_list-functions@ap-south-1.json"
+  echo '{"DBInstances":[]}' >"$d/rds_describe-db-instances.json"
+  echo '{"clusterArns":[]}' >"$d/ecs_list-clusters.json"
+  echo '{"SecretList":[]}' >"$d/secretsmanager_list-secrets.json"
+  echo '{"Keys":[]}' >"$d/kms_list-keys.json"
+  echo '{"Aliases":[]}' >"$d/kms_list-aliases.json"
+  echo '{"Keys":[{"KeyId":"k1"}]}' >"$d/kms_list-keys@ap-south-1.json"
+  echo '{"Aliases":[{"AliasName":"alias/veda-tfstate","TargetKeyId":"k1"},{"AliasName":"alias/aws/s3","TargetKeyId":"k2"}]}' >"$d/kms_list-aliases@ap-south-1.json"
+  # PB-10: IAM's simulation of the rendered boundary, as IAM answers it: only the control probe is allowed.
+  cat >"$d/iam_simulate-custom-policy.cmd" <<'EOS'
+#!/usr/bin/env bash
+decision=explicitDeny
+[[ " $* " == *" --action-names ec2:DescribeInstances "* ]] && decision=allowed
+[[ -f "$AWS_STUB_DIR/simulate.allow" ]] && grep -qxF "$(sed -E 's/.*--action-names ([^ ]+).*/\1/' <<<"$*")" "$AWS_STUB_DIR/simulate.allow" && decision=allowed
+[[ -f "$AWS_STUB_DIR/simulate.denyall" ]] && decision=explicitDeny
+printf '{"EvaluationResults":[{"EvalDecision":"%s"}]}\n' "$decision"
+EOS
+  chmod +x "$d/iam_simulate-custom-policy.cmd"
   : >"$d/s3api_head-bucket.json"
   : >"$d/s3api_head-object.json"
   echo "{\"KeyMetadata\":{\"Arn\":\"$KEY\",\"KeyState\":\"Enabled\",\"KeyManager\":\"CUSTOMER\"}}" >"$d/kms_describe-key.json"
@@ -111,6 +145,7 @@ gh_compliant() {
     echo '{"branch_policies":[{"name":"main","type":"branch"}]}' >"$d/repos_example-org_veda-spaces_environments_${env}_deployment-branch-policies.json"
   done
   echo '{"name":"main","protected":true}' >"$d/repos_example-org_veda-spaces_branches_main.json"
+  echo '{"id":424242,"full_name":"example-org/veda-spaces","private":true}' >"$d/repos_example-org_veda-spaces.json"
   echo '{"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
     >"$d/repos_example-org_veda-spaces_branches_main_protection.json"
   echo "$d"
@@ -210,7 +245,12 @@ check "F11 state bucket name owned elsewhere (403) stops the run" fail "may be t
 
 echo "== F4 / F7 / R2: plan guard"
 # plan_json <file> <resource_changes JSON array>
-plan_json() { jq -n --argjson rc "$2" '{format_version: "1.2", resource_changes: $rc}' >"$1"; }
+# Shaped like `terraform show -json`: the root AWS provider takes its region from var.aws_region (ap-south-1).
+plan_json() {
+  jq -n --argjson rc "$2" '{format_version: "1.2", variables: {aws_region: {value: "ap-south-1"}},
+    configuration: {provider_config: {aws: {name: "aws", full_name: "registry.terraform.io/hashicorp/aws",
+      expressions: {region: {references: ["var.aws_region"]}}}}}, resource_changes: $rc}' >"$1"
+}
 trust() { # trust <principal JSON> [condition JSON]
   jq -cn --argjson p "$1" --argjson c "${2:-null}" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "sts:AssumeRoleWithWebIdentity", Principal: $p} + (if $c then {Condition: $c} else {} end)]} | tojson'
 }
@@ -224,7 +264,9 @@ GH_ROLE="$(role 'aws_iam_role.github["apply"]' veda-gh-apply "$(trust "$GH_PRINC
 guard() { "$T/infra/scripts/check-plan.sh" --plan-json "$1" --account $ACCT --repo example-org/veda-spaces; }
 P="$TMP/plan"
 
-plan_json "$P.ok" "[$GH_ROLE,
+BOUNDARY_RES="$(jq -cn '{address: "aws_iam_policy.boundary", type: "aws_iam_policy", change: {actions: ["create"],
+  after: {name: "veda-boundary", path: "/", policy: ({Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "*", Resource: "*"}]} | tojson)}, after_unknown: {}}}')"
+plan_json "$P.ok" "[$GH_ROLE, $BOUNDARY_RES,
   $(role aws_iam_role.host veda-host "$(trust '{"Service":"ec2.amazonaws.com"}')"),
   {\"address\":\"aws_s3_bucket_policy.state\",\"type\":\"aws_s3_bucket_policy\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn '{Statement:[{Effect:"Deny",Principal:"*",Action:"s3:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
   {\"address\":\"aws_kms_key.state\",\"type\":\"aws_kms_key\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn --arg a "arn:aws:iam::$ACCT:root" '{Statement:[{Effect:"Allow",Principal:{AWS:$a},Action:"kms:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
@@ -705,6 +747,260 @@ D="$(good_account)"
 echo '{"KeyMetadata":{"Arn":"arn:aws:kms:ap-south-1:111122223333:key/k","KeyState":"PendingDeletion","KeyManager":"CUSTOMER"}}' >"$D/kms_describe-key.json"
 check "RR-02 state key pending deletion (or the alias points elsewhere)" fail "not an enabled customer-managed key|does not point at the key" -- prot "$D"
 
+echo "== PB-01: the account manifest (schema, owner decisions, completeness)"
+T="$(new_tree)"
+CM="$T/infra/scripts/check-manifest.sh"
+cp "$INFRA/config/staging-account.json" "$T/infra/config/staging-account.json"
+check "PB-01 committed manifest is structurally valid (Mumbai, standalone, repository and ID)" ok "valid \(structure\)" -- "$CM"
+check "PB-01 committed manifest is not complete yet (owner values missing)" fail "account_id must be the 12-digit account ID" -- "$CM" --complete
+check "  ... names every missing owner value" fail "account_alias must be set" -- "$CM" --complete
+man() { # man <jq over the fixture manifest>: a tree whose manifest is the fixture changed by the jq program
+  local t
+  t="$(new_tree)"
+  jq "$1" "$FIXTURE_MANIFEST" >"$t/infra/config/staging-account.json"
+  echo "$t"
+}
+check "PB-01 complete fixture manifest passes" ok "valid \(complete\)" -- "$(man '.')/infra/scripts/check-manifest.sh" --complete
+check "PB-01 placeholder account ID refused" fail "placeholder value \"123456789012\"" -- "$(man '.account_id = "123456789012"')/infra/scripts/check-manifest.sh" --complete
+check "PB-01 placeholder name refused" fail "placeholder value \"<account name>\"" -- "$(man '.account_name = "<account name>"')/infra/scripts/check-manifest.sh" --complete
+check "PB-01 missing alias refused" fail "account_alias must be set" -- "$(man '.account_alias = null')/infra/scripts/check-manifest.sh" --complete
+check "PB-01 Aurion alias refused" fail "looks like production or Aurion" -- "$(man '.account_alias = "aurion-staging"')/infra/scripts/check-manifest.sh" --complete
+check "PB-01 another region refused" fail "region must be ap-south-1" -- "$(man '.region = "us-east-1"')/infra/scripts/check-manifest.sh"
+check "PB-01 Organizations member refused (owner decision: standalone)" fail "organizations_mode must be" -- "$(man '.organizations_mode = "member"')/infra/scripts/check-manifest.sh"
+check "PB-01 repository ID required" fail "repository_id must be the numeric GitHub repository ID" -- "$(man 'del(.repository_id)')/infra/scripts/check-manifest.sh"
+check "PB-09 IAM user as owner refused" fail "is not an exact, non-veda IAM role ARN" -- "$(man '.bootstrap_principal_arns = ["arn:aws:iam::111122223333:user/owner"]')/infra/scripts/check-manifest.sh" --complete
+check "PB-09 owner session longer than one hour refused" fail "max_owner_session_seconds must be 900-3600" -- "$(man '.max_owner_session_seconds = 43200')/infra/scripts/check-manifest.sh"
+T6="$(man '.account_alias = null')"
+check "PB-01 an incomplete manifest stops the account check before any AWS call" fail "the account manifest is not complete" -- env AWS_STUB_DIR="$(good_account)" bash -c "set -euo pipefail; source '$T6/infra/scripts/lib.sh'; verify_account_identity $ACCT"
+
+echo "== PB-06: Mumbai only, enforced by IAM on the owner session and by the plan guard"
+T="$(new_tree)"
+rguard() { "$T/infra/scripts/check-plan.sh" --plan-json "$1" --account "$ACCT" --repo example-org/veda-spaces; }
+REAL="$HERE/fixtures/plan-regions.json" # `terraform show -json` of Terraform 1.16.4 / AWS provider 6.x, see the file
+check "PB-06 real plan: provider alias in us-east-1 refused" fail "provider aws.use1: region us-east-1 is not ap-south-1" -- rguard "$REAL"
+check "PB-06 real plan: module with its own provider refused" fail "provider module.m:aws: a module configures its own AWS provider" -- rguard "$REAL"
+check "PB-06 real plan: resource through the alias refused" fail "aws_sns_topic.alias: planned in us-east-1" -- rguard "$REAL"
+check "PB-06 real plan: per-resource region argument refused" fail "aws_sns_topic.arg: planned in eu-west-1" -- rguard "$REAL"
+check "PB-06 real plan: resource in a module refused" fail "module.m.aws_sns_topic.mod: planned in sa-east-1" -- rguard "$REAL"
+jq 'del(.configuration.provider_config["aws.use1"], .configuration.provider_config["module.m:aws"])
+    | .resource_changes |= map(select(.address == "aws_sns_topic.home" or .address == "aws_iam_policy.global"))' "$REAL" >"$P.mumbai"
+check "PB-06 real plan: Mumbai resource and a global IAM policy pass" ok "everything in ap-south-1" -- rguard "$P.mumbai"
+jq '.variables.aws_region.value = "eu-west-1"' "$P.mumbai" >"$P.var"
+check "PB-06 aws_region variable other than Mumbai refused" fail "variable aws_region is \"eu-west-1\"" -- rguard "$P.var"
+jq '.configuration.provider_config.aws.expressions.region = {"constant_value": "us-east-1"}' "$P.mumbai" >"$P.const"
+check "PB-06 root provider with another constant region refused" fail "provider aws: region us-east-1 is not ap-south-1" -- rguard "$P.const"
+jq 'del(.configuration.provider_config.aws.expressions.region)' "$P.mumbai" >"$P.noreg"
+check "PB-06 root provider without a region (environment fallback) refused" fail "provider aws: region unset is not ap-south-1" -- rguard "$P.noreg"
+jq 'del(.configuration)' "$P.mumbai" >"$P.nocfg"
+check "PB-06 AWS resources without a provider configuration refused" fail "no AWS provider configuration" -- rguard "$P.nocfg"
+jq '.resource_changes[0].change.after_unknown.region = true' "$P.mumbai" >"$P.unk"
+check "PB-06 region unknown at plan time refused" fail "region not known at plan time" -- rguard "$P.unk"
+jq '.resource_changes[0].change.actions = ["forget"]' "$P.mumbai" >"$P.forget"
+check "a forget (removed block) is refused" fail "plan forget" -- rguard "$P.forget"
+
+D="$(good_account)"
+rm "$D/ec2_describe-availability-zones@us-east-1.fail"
+echo '{"AvailabilityZones":[{"ZoneName":"us-east-1a"}]}' >"$D/ec2_describe-availability-zones@us-east-1.json"
+check "PB-06 owner session that can act outside Mumbai is refused" fail "can act in us-east-1" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; require_region_guarded_session"
+D="$(good_account)"
+echo "Could not connect to the endpoint URL" >"$D/ec2_describe-availability-zones@us-east-1.fail"
+check "PB-06 unproven region guard fails closed" fail "cannot prove the session is confined" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; require_region_guarded_session"
+check "PB-06 region-guarded session passes" ok "confined to ap-south-1 by IAM" -- env AWS_STUB_DIR="$(good_account)" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; require_region_guarded_session"
+D="$(good_account)"
+rm "$D/ec2_describe-availability-zones@us-east-1.fail"
+echo '{"AvailabilityZones":[]}' >"$D/ec2_describe-availability-zones@us-east-1.json"
+R="$TMP/rev.region" && reviewed "$R" '.'
+TFD="$(tf_stub "$P.ok")"
+check "PB-06 apply refused with a session that is not region-guarded" fail "can act in us-east-1" -- apply_reviewed "$R" "$TFD" "$D"
+absent "  ... before terraform runs" "^(init|apply)" "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+
+SP="$INFRA/config/bootstrap-session-policy.json"
+VEDA_INVENTORY_ACTIONS="$(bash -c "source '$INFRA/scripts/lib.sh'; echo \"\$VEDA_INVENTORY_ACTIONS\"")"
+BOUNDARY_GLOBALS="$(sed -n '/global_actions = \[/,/\]/p' "$INFRA/terraform/bootstrap/main.tf" | grep -oE '"[a-z-]+:[A-Za-z*]+"' | tr -d '"' | sort)"
+{ printf '%s\n' "$BOUNDARY_GLOBALS"; tr ' ' '\n' <<<"$VEDA_INVENTORY_ACTIONS"; } | sort >"$TMP/sp.want"
+jq -r '.Statement[] | select(.Effect == "Deny") | .NotAction[]' "$SP" | sort >"$TMP/sp.got"
+check "PB-06 session policy exempts exactly the boundary's global services and the inventory reads" ok "^same$" -- bash -c "diff '$TMP/sp.want' '$TMP/sp.got' && echo same"
+check "  ... denies every other action outside ap-south-1" ok '^"ap-south-1"$' -- jq '.Statement[] | select(.Effect == "Deny") | .Condition.StringNotEquals["aws:RequestedRegion"]' "$SP"
+absent "  ... the inventory exemptions are read-only" ":(Create|Put|Update|Delete|Run|Start|Attach|Modify|Invoke|Tag)" "$(tr ' ' '\n' <<<"$VEDA_INVENTORY_ACTIONS")"
+check "  ... and fits the 2,048-character STS session-policy limit" ok "^fits$" -- bash -c "[[ \$(jq -c . '$SP' | wc -c) -lt 2048 ]] && echo fits"
+# CLI operation -> IAM action, for every regional call the inventory makes.
+INVENTORY_CALLS='ec2/describe-instances=ec2:DescribeInstances ec2/describe-vpcs=ec2:DescribeVpcs lambda/list-functions=lambda:ListFunctions rds/describe-db-instances=rds:DescribeDBInstances ecs/list-clusters=ecs:ListClusters secretsmanager/list-secrets=secretsmanager:ListSecrets kms/list-aliases=kms:ListAliases kms/list-keys=kms:ListKeys kms/describe-key=kms:DescribeKey'
+calls="$(grep -oE 'aws [a-z0-9]+ [a-z-]+ --region' "$INFRA/scripts/lib.sh" | awk '{print $2"/"$3}' | grep -v '^ec2/describe-availability-zones$' | sort -u)"
+uncovered=""
+for c in $calls; do
+  action=""
+  for m in $INVENTORY_CALLS; do [[ "${m%%=*}" == "$c" ]] && action="${m#*=}"; done
+  [[ -n "$action" && " $VEDA_INVENTORY_ACTIONS " == *" $action "* ]] || uncovered+="$c "
+done
+check "  ... and every regional inventory call is exempted ($(wc -l <<<"$calls" | tr -d ' ') calls)" ok "^covered$" -- bash -c "[[ -z '$uncovered' ]] && echo covered || { echo 'uncovered: $uncovered'; exit 1; }"
+
+echo "== PB-10: IAM's own simulation of the rendered boundary is a stop condition"
+T="$(new_tree)"
+SIM="$T/infra/scripts/simulate-boundary.sh"
+check "PB-10 boundary evaluated by IAM as reviewed passes" ok "matches the review \(7 probes, 1 allowed control\)" -- env AWS_STUB_DIR="$(good_account)" "$SIM" --plan-json "$P.ok" --account $ACCT
+D="$(good_account)" && echo s3:CreateBucket >"$D/simulate.allow"
+check "PB-10 IAM allowing a bucket outside Mumbai stops the run" fail "S3 bucket outside Mumbai: IAM says allowed, expected explicitDeny" -- env AWS_STUB_DIR="$D" "$SIM" --plan-json "$P.ok" --account $ACCT
+D="$(good_account)" && : >"$D/simulate.denyall"
+check "PB-10 a simulator that denies everything stops the run" fail "control: a workload role reads EC2 in Mumbai: IAM says explicitDeny, expected allowed" -- env AWS_STUB_DIR="$D" "$SIM" --plan-json "$P.ok" --account $ACCT
+D="$(good_account)" && rm "$D/iam_simulate-custom-policy.cmd" && echo "AccessDenied" >"$D/iam_simulate-custom-policy.fail"
+check "PB-10 simulation unavailable fails closed" fail "IAM simulation failed" -- env AWS_STUB_DIR="$D" "$SIM" --plan-json "$P.ok" --account $ACCT
+jq 'del(.resource_changes[] | select(.address == "aws_iam_policy.boundary"))' "$P.ok" >"$P.nob2"
+check "PB-10 a plan without the boundary cannot be simulated and is refused" fail "no known veda-boundary policy" -- env AWS_STUB_DIR="$(good_account)" "$SIM" --plan-json "$P.nob2" --account $ACCT
+BS="$T/infra/scripts/bootstrap.sh"
+D="$(good_account)" && echo iam:AttachRolePolicy >"$D/simulate.allow"
+R="$TMP/rev.sim" && reviewed "$R" '.'
+TFD="$(tf_stub "$P.ok")"
+check "PB-10 apply stops when IAM disagrees with the review" fail "does not evaluate the rendered boundary as reviewed" -- apply_reviewed "$R" "$TFD" "$D"
+absent "  ... and nothing is applied" "^apply " "$(cat "$TFD/calls.log" 2>/dev/null || true)"
+
+echo "== N-03: the account is dedicated to Veda in every region (owner decision: standalone)"
+T="$(new_tree)"
+vai() { env AWS_STUB_DIR="$1" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; verify_account_identity $ACCT"; }
+check "N-03 empty account verified across all regions" ok "no foreign resources in any region" -- vai "$(good_account)"
+D="$(good_account)"
+echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0use1","Tags":[{"Key":"project","Value":"veda-spaces"}]}]}]}' >"$D/ec2_describe-instances@us-east-1.json"
+check "N-03 instance outside Mumbai refused even when tagged veda-spaces" fail "instances: i-0use1@us-east-1" -- vai "$D"
+D="$(good_account)"
+echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0swing","Tags":[{"Key":"Name","Value":"swing-trader-vm"}]}]}]}' >"$D/ec2_describe-instances@eu-west-1.json"
+check "N-03 swing-trader-vm in another region refused as another project" fail "named like Aurion or swing-trader-vm \(instances: i-0swing@eu-west-1\)" -- vai "$D"
+D="$(good_account)"
+echo '{"Roles":[{"RoleName":"aurion-deployer","Path":"/"}]}' >"$D/iam_list-roles.json"
+T7="$(man '.allowed_foreign_resources.iam_roles = ["aurion-deployer"]')"
+check "N-03 Aurion role refused even when the manifest allows it" fail "named like Aurion or swing-trader-vm \(roles: aurion-deployer\)" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T7/infra/scripts/lib.sh'; verify_account_identity $ACCT"
+D="$(good_account)"
+echo '{"Vpcs":[{"VpcId":"vpc-0abc"}]}' >"$D/ec2_describe-vpcs@eu-west-1.json"
+check "N-03 non-default VPC in another region refused" fail "vpcs: vpc-0abc@eu-west-1" -- vai "$D"
+D="$(good_account)"
+echo '{"DBInstances":[{"DBInstanceIdentifier":"trades"}]}' >"$D/rds_describe-db-instances@ap-south-1.json"
+check "N-03 RDS instance refused" fail "rds instances: trades@ap-south-1" -- vai "$D"
+D="$(good_account)"
+echo '{"clusterArns":["arn:aws:ecs:us-east-1:111122223333:cluster/c"]}' >"$D/ecs_list-clusters@us-east-1.json"
+check "N-03 ECS cluster refused" fail "ecs clusters: arn:aws:ecs:us-east-1:111122223333:cluster/c@us-east-1" -- vai "$D"
+D="$(good_account)"
+echo '{"SecretList":[{"Name":"broker-api"}]}' >"$D/secretsmanager_list-secrets@eu-west-1.json"
+check "N-03 Secrets Manager secret refused" fail "secrets: broker-api@eu-west-1" -- vai "$D"
+D="$(good_account)"
+echo '{"Keys":[{"KeyId":"k9"}]}' >"$D/kms_list-keys@us-east-1.json"
+check "N-03 customer-managed KMS key outside Mumbai refused" fail "kms keys: k9@us-east-1" -- vai "$D"
+D="$(good_account)"
+echo '{"SAMLProviderList":[{"Arn":"arn:aws:iam::111122223333:saml-provider/corp"}]}' >"$D/iam_list-saml-providers.json"
+check "N-01 SAML identity provider refused (the boundary cannot see SAML sessions)" fail "saml providers: arn:aws:iam::111122223333:saml-provider/corp" -- vai "$D"
+D="$(good_account)"
+echo '{"OpenIDConnectProviderList":[{"Arn":"arn:aws:iam::111122223333:oidc-provider/accounts.google.com"}]}' >"$D/iam_list-open-id-connect-providers.json"
+check "N-03 identity provider other than GitHub refused" fail "oidc providers: arn:aws:iam::111122223333:oidc-provider/accounts.google.com" -- vai "$D"
+D="$(good_account)"
+rm "$D/s3api_head-bucket.json"
+echo "An error occurred (404) when calling the HeadBucket operation: Not Found" >"$D/s3api_head-bucket.fail"
+echo '{"Buckets":[]}' >"$D/s3api_list-buckets.json"
+echo '{"Reservations":[]}' >"$D/ec2_describe-instances@ap-south-1.json"
+echo '{"Functions":[]}' >"$D/lambda_list-functions@ap-south-1.json"
+echo '{"Keys":[]}' >"$D/kms_list-keys@ap-south-1.json"
+check "N-03 before the bootstrap, a squatted veda-* role is foreign" fail "roles: veda-gh-apply" -- vai "$D"
+D="$(good_account)"
+echo "AccessDenied" >"$D/ec2_describe-regions.fail"
+check "N-03 region listing fails closed" fail "cannot list account resources" -- vai "$D"
+D="$(good_account)"
+echo "AccessDenied" >"$D/rds_describe-db-instances@eu-west-1.fail"
+check "N-03 a regional listing fails closed" fail "cannot list account resources" -- vai "$D"
+D="$(good_account)"
+rm "$D/organizations_describe-organization.fail"
+echo '{"Organization":{"Id":"o-abc"}}' >"$D/organizations_describe-organization.json"
+check "owner decision: an Organizations member account is refused" fail "belongs to an AWS Organization" -- vai "$D"
+D="$(good_account)"
+echo "AccessDenied" >"$D/organizations_describe-organization.fail"
+check "  ... and an unknown membership fails closed" fail "cannot tell whether the account belongs" -- vai "$D"
+
+INV="$T/infra/scripts/account-inventory.sh"
+check "PB-02 inventory evidence written for a dedicated account" ok "wrote .*account-inventory.json" -- env AWS_STUB_DIR="$(good_account)" "$INV" --expected-account-id $ACCT
+check "  ... listing every region and resource" ok '"ap-south-1"' -- jq -c '.regions' "$T/infra/generated/account-inventory.json"
+D="$(good_account)"
+echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0swing","Tags":[{"Key":"Name","Value":"swing-trader-vm"}]}]}]}' >"$D/ec2_describe-instances@us-east-1.json"
+check "PB-02 inventory refuses an account that is not dedicated" fail "named like Aurion or swing-trader-vm" -- env AWS_STUB_DIR="$D" "$INV" --expected-account-id $ACCT
+
+echo "== PB-09 / N-12: the owner session and owner role"
+D="$(good_account)"
+echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:iam::$ACCT:root\"}" >"$D/sts_get-caller-identity.json"
+check "PB-09 root user session refused" fail "not an assumed owner role" -- vai "$D"
+D="$(good_account)"
+echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:iam::$ACCT:user/alice\"}" >"$D/sts_get-caller-identity.json"
+check "PB-09 IAM user session refused" fail "not an assumed owner role" -- vai "$D"
+D="$(good_account)"
+echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/SomeOtherAdmin/s\"}" >"$D/sts_get-caller-identity.json"
+check "PB-09 session of a role that is not an owner refused" fail "session role SomeOtherAdmin is not in bootstrap_principal_arns" -- vai "$D"
+D="$(good_account)"
+jq '.Role.MaxSessionDuration = 43200' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "PB-09 owner role allowing 12-hour sessions refused" fail "allows sessions longer than 3600 seconds" -- vai "$D"
+D="$(good_account)"
+jq '.Role.AssumeRolePolicyDocument.Statement += [{"Effect":"Allow","Principal":{"Federated":"arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"},"Action":"sts:AssumeRoleWithWebIdentity"}]' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "N-12 owner role trusted by a web identity refused" fail "is trusted by Federated arn:aws:iam::111122223333:oidc-provider" -- vai "$D"
+D="$(good_account)"
+jq '.Role.AssumeRolePolicyDocument.Statement[0].Principal.AWS = "arn:aws:iam::999999999999:root"' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "N-12 owner role trusted by another account refused" fail "is trusted by AWS arn:aws:iam::999999999999:root" -- vai "$D"
+D="$(good_account)"
+jq '.Role.AssumeRolePolicyDocument.Statement[0].Principal = {"Service":"ec2.amazonaws.com"}' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "N-12 owner role assumable by a service refused" fail "is trusted by Service ec2.amazonaws.com" -- vai "$D"
+D="$(good_account)"
+jq '.Role.Arn = "arn:aws:iam::111122223333:role/other/OrganizationAccountAccessRole"' "$D/iam_get-role.json" >"$D/x" && mv "$D/x" "$D/iam_get-role.json"
+check "PB-09 owner role at another path refused" fail "owner role OrganizationAccountAccessRole is arn:aws:iam::111122223333:role/other/" -- vai "$D"
+
+echo "== PB-01 / N-11: the repository is the approved one, by name and numeric ID"
+T="$(new_tree)"
+BS="$T/infra/scripts/bootstrap.sh"
+G2="$TMP/ghid.$RANDOM" && cp -R "$GHV" "$G2" && rm -f "$G2/calls.log"
+echo '{"id":999,"full_name":"example-org/veda-spaces","private":true}' >"$G2/repos_example-org_veda-spaces.json"
+R="$TMP/rev.repoid" && reviewed "$R" '.'
+check "PB-01 re-registered repository (same name, other ID) refused" fail "has ID 999, the manifest approves 424242" -- apply_reviewed "$R" "$(tf_stub "$P.ok")" "$(good_account)" "" "$G2"
+R="$TMP/rev.repo" && reviewed "$R" '.repository = "example-org/other"'
+check "PB-01 plan for a repository the manifest does not approve refused" fail "repository example-org/other is not the one the manifest approves" -- env GITHUB_SHA=c0ffee TF_STUB_DIR="$(tf_stub "$P.ok")" AWS_STUB_DIR="$(good_account)" GH_STUB_DIR="$GHV" \
+  "$BS" --mode apply --expected-account-id $ACCT --plan-file "$R/bootstrap.tfplan" --plan-meta "$R/bootstrap-plan.meta.json" --plan-sha256 "$(sha "$R/bootstrap.tfplan")" --yes
+
+echo "== N-05 / PB-08: a plan is made only from a clean checkout (ignored files included)"
+git_tree() { # a git checkout of a copy of infra/ with one commit
+  local g="$TMP/git.$RANDOM$RANDOM"
+  mkdir -p "$g"
+  cp -R "$INFRA" "$g/infra"
+  rm -rf "$g/infra/terraform/bootstrap/.terraform" "$g/infra/generated"
+  cp "$FIXTURE_MANIFEST" "$g/infra/config/staging-account.json"
+  git -C "$g" init -q && git -C "$g" add -A && git -C "$g" -c user.name=t -c user.email=t@example.invalid commit -qm base
+  echo "$g"
+}
+ct() { bash -c "set -euo pipefail; source '$1/infra/scripts/lib.sh'; require_clean_tree && echo clean"; }
+Gt="$(git_tree)"
+mkdir -p "$Gt/infra/terraform/bootstrap/.terraform/providers" && : >"$Gt/infra/terraform/bootstrap/generated.auto.tfvars.json" && : >"$Gt/infra/terraform/bootstrap/terraform.tfstate"
+check "N-05 clean checkout with Terraform working files and generated inputs passes" ok "^clean$" -- ct "$Gt"
+Gt="$(git_tree)" && printf 'provider "aws" {\n  region = "us-east-1"\n}\n' >"$Gt/infra/terraform/bootstrap/override.tf"
+check "N-05 ignored override.tf refused" fail "not clean .*infra/terraform/bootstrap/override.tf" -- ct "$Gt"
+Gt="$(git_tree)" && : >"$Gt/infra/terraform/bootstrap/x_override.tf"
+check "N-05 ignored *_override.tf refused" fail "x_override.tf" -- ct "$Gt"
+Gt="$(git_tree)" && : >"$Gt/infra/terraform/bootstrap/terraform.tfvars"
+check "N-05 ignored terraform.tfvars refused" fail "terraform.tfvars" -- ct "$Gt"
+Gt="$(git_tree)" && : >"$Gt/infra/terraform/bootstrap/extra.tf"
+check "N-05 untracked .tf refused" fail "extra.tf" -- ct "$Gt"
+Gt="$(git_tree)" && echo "# edit" >>"$Gt/infra/terraform/bootstrap/boundary.tf"
+check "N-05 uncommitted change refused" fail "boundary.tf" -- ct "$Gt"
+check "N-05 not a git checkout refused" fail "not a git checkout" -- ct "$T"
+
+echo "== N-04 / PB-01: 00-bootstrap runs only from the approved, private repository"
+check "N-04 public repository refused before any environment is used" ok 'REPOSITORY_PRIVATE" == "true"' -- printf '%s\n' "$PREFLIGHT"
+check "PB-01 repository name and ID checked against the manifest" ok 'GITHUB_REPOSITORY_ID" == "\$\(jq -r .repository_id' -- printf '%s\n' "$PREFLIGHT"
+check "PB-01 manifest must be complete" ok "check-manifest.sh --complete" -- printf '%s\n' "$PREFLIGHT"
+absent "N-04 discovery output is not uploaded or summarised" "discovered\\.json" "$WFT"
+check "N-08 only refs/heads/main may run it" ok 'GITHUB_REF" == "refs/heads/main"' -- printf '%s\n' "$PREFLIGHT"
+
+echo "== PB-03: GitHub setup never drops main's existing protection"
+T="$(new_tree)"
+GS="$T/infra/scripts/github-setup.sh"
+Gp="$TMP/gh.prot" && mkdir -p "$Gp"
+echo '{"login":"owner"}' >"$Gp/user.json"
+echo '{"id":1001}' >"$Gp/users_owner.json"
+echo '{"required_status_checks":{"strict":true,"checks":[{"context":"app","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
+  >"$Gp/repos_example-org_veda-spaces_branches_main_protection.json"
+out_p="$(GH_STUB_DIR="$Gp" "$GS" --repo example-org/veda-spaces 2>&1)"
+check "PB-03 compliant main protection is left unchanged" ok "already meets the rules; left unchanged" -- printf '%s\n' "$out_p"
+absent "  ... no protection write at all" "branches/main/protection <<<" "$out_p"
+jq '.enforce_admins.enabled = false' "$Gp/repos_example-org_veda-spaces_branches_main_protection.json" >"$Gp/x" && mv "$Gp/x" "$Gp/repos_example-org_veda-spaces_branches_main_protection.json"
+out_p="$(GH_STUB_DIR="$Gp" "$GS" --repo example-org/veda-spaces 2>&1)"
+check "PB-03 non-compliant protection is fixed with its required status checks kept" ok 'branches/main/protection <<< .*"required_status_checks":\{"strict":true,"checks":\[\{"context":"app","app_id":15368\}\]\}.*"enforce_admins":true' -- printf '%s\n' "$out_p"
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then

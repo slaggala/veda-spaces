@@ -19,13 +19,16 @@ WORKFLOWS  := $(wildcard ../.github/workflows/0*.yml)
 OFFLINE_ENV := AWS_PROFILE= AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= AWS_SESSION_TOKEN= \
                AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true
 
-.PHONY: help check fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
+.PHONY: help check manifest-check inventory fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
         discover bootstrap-plan bootstrap-apply github-environments github-verify github-variables clean
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-22s %s\n", $$1, $$2}'
 
-check: fmt-check validate test test-scripts lint ## All offline checks (no AWS access)
+check: manifest-check fmt-check validate test test-scripts lint ## All offline checks (no AWS access)
+
+manifest-check: ## Account manifest schema and owner decisions (PB-01; --complete is required before any AWS call)
+	scripts/check-manifest.sh
 
 fmt: ## Format Terraform
 	$(TERRAFORM) fmt -recursive terraform
@@ -62,6 +65,9 @@ shellcheck: ## shellcheck the scripts and their tests
 
 actionlint: ## actionlint the infra workflows
 	$(ACTIONLINT) $(WORKFLOWS)
+
+inventory: ## PB-02 evidence: all-region, read-only account inventory (needs EXPECTED_ACCOUNT_ID and a region-guarded session)
+	scripts/account-inventory.sh --expected-account-id "$(EXPECTED_ACCOUNT_ID)"
 
 discover: ## Read-only discovery (needs EXPECTED_ACCOUNT_ID and a session in that account)
 	scripts/discover.sh --expected-account-id "$(EXPECTED_ACCOUNT_ID)"

@@ -125,24 +125,25 @@ resource "aws_kms_key" "state" {
   lifecycle {
     prevent_destroy = true
 
-    # RR-01/RR-02: the owner allow-list must be committed, exact, free of veda-* identities, and must include the
-    # session running this plan (otherwise it would lock itself out of the state it is about to write).
+    # RR-01/RR-02: the owner allow-list must be committed, exact IAM roles (PB-09: no IAM users, no root), free of
+    # veda-* identities, and must include the role running this plan (otherwise it would lock itself out of the state
+    # it is about to write). The account root stays an owner for recovery but may not run the bootstrap.
     precondition {
       condition     = length(local.manifest_owner_arns) > 0
       error_message = "bootstrap_principal_arns is empty in the account manifest: commit the owner session's IAM role or user ARN in a reviewed change first (runbook §2)."
     }
     precondition {
       condition = alltrue([for a in local.manifest_owner_arns :
-      can(regex("^arn:${local.partition}:iam::${local.approved_account_id}:(role|user)/[A-Za-z0-9+=,.@_/-]+$", a))])
-      error_message = "bootstrap_principal_arns must list exact IAM role or user ARNs (path included, no wildcards) in the approved account."
+      can(regex("^arn:${local.partition}:iam::${local.approved_account_id}:role/[A-Za-z0-9+=,.@_/-]+$", a))])
+      error_message = "bootstrap_principal_arns must list exact IAM role ARNs (path included, no wildcards, no users) in the approved account."
     }
     precondition {
       condition     = !anytrue([for a in local.manifest_owner_arns : can(regex(":(role|user)/(.*/)?${local.prefix}-", a))])
       error_message = "bootstrap_principal_arns must not name a ${local.prefix}-* identity: no Veda role may own the bootstrap state."
     }
     precondition {
-      condition     = contains(local.owner_principal_arns, data.aws_iam_session_context.current.issuer_arn)
-      error_message = "This session (${data.aws_iam_session_context.current.issuer_arn}) is not in bootstrap_principal_arns; it would lock itself out of the state it creates."
+      condition     = contains(local.manifest_owner_arns, data.aws_iam_session_context.current.issuer_arn)
+      error_message = "This session (${data.aws_iam_session_context.current.issuer_arn}) is not a role in bootstrap_principal_arns (the root user may not run the bootstrap); it would lock itself out of the state it creates."
     }
   }
 }

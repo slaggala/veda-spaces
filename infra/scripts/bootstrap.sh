@@ -62,11 +62,12 @@ if [[ -n "$REVIEWED_PLAN" || -n "$REVIEWED_META" || -n "$APPROVED_SHA" || -n "$P
 fi
 ((!YES)) || [[ -n "$REVIEWED_PLAN" ]] ||
   die "--yes applies without a prompt, so it needs an approved plan: pass --plan-file, --plan-meta and --plan-sha256"
-require_tools aws jq terraform curl git
-[[ "$MODE" == plan ]] || require_tools gh
+require_tools aws jq terraform curl git gh
 require_account_id "$EXPECTED"
 require_region
 require_expected_account "$EXPECTED"
+# PB-06: Mumbai only is enforced by IAM on this (unbounded) owner session, not only by the code it runs.
+require_region_guarded_session
 export TF_IN_AUTOMATION=1 TF_INPUT=0
 mkdir -p "$GENERATED_DIR"
 
@@ -143,6 +144,8 @@ guard_plan() {
   terraform show -json "$1" >"$GENERATED_DIR/bootstrap-plan.json"
   "$INFRA_DIR/scripts/check-plan.sh" --plan-json "$GENERATED_DIR/bootstrap-plan.json" --account "$EXPECTED" \
     --repo "$REPO" --prefix "$VEDA_PREFIX"
+  # PB-10: IAM itself must evaluate the rendered boundary as reviewed (read-only simulation).
+  "$INFRA_DIR/scripts/simulate-boundary.sh" --plan-json "$GENERATED_DIR/bootstrap-plan.json" --account "$EXPECTED"
 }
 
 if [[ -n "$REVIEWED_PLAN" ]]; then
@@ -152,7 +155,11 @@ if [[ -n "$REVIEWED_PLAN" ]]; then
   [[ -n "$REPO" ]] || die "reviewed plan metadata has no repository"
   [[ -z "${GITHUB_REPOSITORY:-}" || "$REPO" == "$GITHUB_REPOSITORY" ]] ||
     die "reviewed plan was made for $REPO, this run is $GITHUB_REPOSITORY"
+  [[ "$REPO" == "$(manifest_get .repository)" ]] ||
+    die "repository $REPO is not the one the manifest approves ($(manifest_get .repository)); refusing"
 else
+  # N-05 / PB-08: plan only from a clean checkout, ignored files included.
+  require_clean_tree
   discover_args=(--expected-account-id "$EXPECTED")
   [[ -n "$REPO_ARG" ]] && discover_args+=(--repo "$REPO_ARG")
   "$INFRA_DIR/scripts/discover.sh" "${discover_args[@]}"
@@ -162,6 +169,8 @@ fi
 # Assigned before comparing: a failed lookup must stop the run, not read as "absent".
 # RR-07: the environments that gate this workflow and the new roles must be protected before anything is applied.
 [[ "$MODE" == plan ]] || require_github_protection "$REPO"
+# PB-01: the approved repository by name and numeric ID (discovery checked it too on the plan path).
+require_repository_identity "$REPO"
 
 BUCKET_STATUS="$(state_bucket_status "$BUCKET" "$EXPECTED")"
 STATE_EXISTS=false
@@ -190,8 +199,7 @@ if [[ -n "$REVIEWED_PLAN" ]]; then
   PLAN_FILE="$REVIEWED_PLAN"
   verify_plan_text
 else
-  dirty=false
-  [[ -z "$(git -C "$REPO_ROOT" status --porcelain -- infra/terraform/bootstrap infra/config infra/scripts)" ]] || dirty=true
+  dirty=false # require_clean_tree above refused anything else
   terraform plan -input=false -lock-timeout=5m -out="$PLAN_FILE"
   terraform show -no-color "$PLAN_FILE" >"$GENERATED_DIR/bootstrap-plan.txt"
   jq -n --arg commit "$COMMIT" --arg account "$EXPECTED" --arg repo "$REPO" --arg sum "$(sha256_of "$PLAN_FILE")" \

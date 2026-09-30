@@ -4,7 +4,7 @@
 provider "aws" {
   region                      = "ap-south-1"
   access_key                  = "offline-test"
-  secret_key                  = "offline-test"
+  secret_key                  = "offline-test" # pragma: allowlist secret
   skip_credentials_validation = true
   skip_requesting_account_id  = true
   skip_metadata_api_check     = true
@@ -13,7 +13,7 @@ provider "aws" {
 variables {
   expected_account_id   = "111122223333"
   github_owner          = "example-org"
-  github_repo           = "veda-spaces-aws-source"
+  github_repo           = "veda-spaces"
   account_manifest_path = "tests/fixtures/account.json"
 }
 
@@ -97,7 +97,7 @@ run "defaults" {
   # Each role is trusted by exactly its own environment and nothing broader.
   assert {
     condition = alltrue([for k, env in { plan = "staging-plan", apply = "staging-infra", deploy = "staging", evidence = "staging-evidence" } :
-      strcontains(data.aws_iam_policy_document.github_trust[k].json, "\"repo:example-org/veda-spaces-aws-source:environment:${env}\"")
+      strcontains(data.aws_iam_policy_document.github_trust[k].json, "\"repo:example-org/veda-spaces:environment:${env}\"")
     ])
     error_message = "Trust subject must pin repository and environment."
   }
@@ -712,6 +712,42 @@ run "rr01_owner_session_must_be_listed" {
   expect_failures = [aws_kms_key.state]
 }
 
+# PB-09 / N-12: the root user may own the state for recovery but may not run the bootstrap; owners are roles only.
+run "pb09_root_session_cannot_run_the_bootstrap" {
+  command = plan
+  override_data {
+    target = data.aws_iam_session_context.current
+    values = { issuer_arn = "arn:aws:iam::111122223333:root" }
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+run "pb09_owner_list_rejects_iam_users" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-owner-user.json"
+  }
+  expect_failures = [aws_kms_key.state]
+}
+
+# PB-01: the OIDC subjects may name only the repository approved in the manifest.
+run "pb01_rejects_repository_other_than_manifest" {
+  command = plan
+  variables {
+    github_repo = "veda-spaces-fork"
+  }
+  expect_failures = [var.github_repo]
+}
+
+# PB-06: the manifest itself must approve Mumbai only.
+run "pb06_rejects_manifest_region_other_than_mumbai" {
+  command = plan
+  variables {
+    account_manifest_path = "tests/fixtures/account-region-other.json"
+  }
+  expect_failures = [var.aws_region]
+}
+
 # --- RR-02: the state key's own policy decides, not an alias -----------------------------------------------------
 # The apply role's real policies (kms:* on *) with NO boundary, so every refusal below comes from the key policy.
 # No request carries kms:ResourceAliases; one carries a foreign alias to show it changes nothing.
@@ -837,7 +873,7 @@ run "rr03_boundary_closes_path_and_trust_bypass" {
       { name = "trust: apply role re-trusts a GitHub role", action = "iam:UpdateAssumeRolePolicy", resource = "arn:aws:iam::111122223333:role/veda-gh-plan", expect = "deny" },
       # Trust bypass at use time: a federated session of any role but veda-gh-* can do nothing.
       { name = "federated session of a workload role reads state", action = "s3:GetObject", resource = "arn:aws:s3:::veda-tfstate-111122223333/staging/core.tfstate", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "deny" },
-      { name = "federated session of a workload role lists instances", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host", "aws:FederatedProvider" = "arn:aws:iam::111122223333:saml-provider/idp" }, expect = "deny" },
+      { name = "SAML session of a workload role is not seen by the boundary (N-01: aws:FederatedProvider is OIDC-only; closed by discovery)", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-host" }, expect = "not_deny" },
       { name = "federated session of a path role named like a GitHub role", action = "ec2:DescribeInstances", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/x/veda-gh-deploy", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "deny" },
       { name = "federated session of veda-gh-deploy works", action = "ecr:GetAuthorizationToken", resource = "*", context = { "aws:PrincipalArn" = "arn:aws:iam::111122223333:role/veda-gh-deploy", "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "allow" },
       { name = "federated session of veda-gh-apply creates a bounded role", action = "iam:CreateRole", resource = "arn:aws:iam::111122223333:role/veda-host", context = { "aws:FederatedProvider" = "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" }, expect = "allow" },
