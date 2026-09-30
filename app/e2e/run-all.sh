@@ -29,8 +29,8 @@ INVITE_LINK="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["i
     VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors \
     "$PY" -m flask --app wsgi run --port 5000 ) > "$OUT/api.log" 2>&1 & pids+=($!)
 ( cd "$APP" && exec node node_modules/vite/bin/vite.js --port 5173 --strictPort ) > "$OUT/vite.log" 2>&1 & pids+=($!)
-node "$APP/e2e/static-server.mjs" "$ROOT/dist" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)
-node "$APP/e2e/static-server.mjs" "$ROOT/dist" 8001 > "$OUT/site-off.log" 2>&1 & pids+=($!)
+node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)
+node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8001 > "$OUT/site-off.log" 2>&1 & pids+=($!)
 wait_for http://127.0.0.1:5000/health/live && wait_for http://localhost:5173/ && wait_for http://localhost:8000/ \
   && wait_for http://localhost:8001/ || exit 1
 

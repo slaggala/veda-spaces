@@ -245,6 +245,6 @@ def test_gate_records():
 
 
 def test_public_intake_disabled():
-    html = (REPO / "dist/index.html").read_text()
+    html = (REPO / "app/e2e/site-release/index.html").read_text()
     assert '<meta name="veda-api-base" content="">' in html
     assert '<meta name="veda-turnstile-sitekey" content="">' in html

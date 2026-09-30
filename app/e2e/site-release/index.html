@@ -7,6 +7,10 @@
   <title>Veda Spaces — Interior Design & Execution, Hyderabad</title>
   <link rel="canonical" href="https://www.vedaspaces.com/">
   <meta name="theme-color" content="#281a13">
+  <!-- Public intake (LEAD-001). Leave veda-api-base empty to keep the WhatsApp-only form. -->
+  <meta name="veda-api-base" content="">
+  <meta name="veda-turnstile-sitekey" content="">
+  <meta name="veda-policy-version" content="2026-09-v1">
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Veda Spaces">
@@ -161,17 +165,24 @@
 
     <section class="contact section" id="contact">
       <div class="contact-copy"><p class="eyebrow">Begin your home</p><h2>Let’s create a home<br><em>that feels yours.</em></h2><p>Whether you are planning a complete home or beginning with an idea, we would love to understand how you want to live.</p><a class="phone" href="tel:+919515125153">+91 95151 25153</a><a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Chat on WhatsApp →</a><a class="instagram-link" href="mailto:interiors@vedaspaces.com">interiors@vedaspaces.com ↗</a><a class="instagram-link" href="https://instagram.com/vedaspaces_" target="_blank" rel="noopener">Instagram @vedaspaces_ ↗</a></div>
-      <form class="contact-form" id="contact-form">
-        <label>Full Name<input name="name" required placeholder="Your name"></label>
-        <label>Phone Number<input name="phone" required inputmode="tel" placeholder="+91"></label>
-        <label>Email Address<input name="email" type="email" placeholder="you@email.com"></label>
-        <label>Property Type<select name="property" required><option value="" disabled selected>Select property</option><option>Apartment / Flat</option><option>Independent House / Villa</option><option>Home Renovation</option><option>Other</option></select></label>
-        <label>Service Required<select name="service" required><option value="" disabled selected>Select service</option><option>Complete Home Interiors</option><option>Modular Kitchen</option><option>Bedrooms & Wardrobes</option><option>Living & Dining</option><option>Space Planning & Styling</option><option>Other</option></select></label>
-        <label>Project Location<input name="location" placeholder="Area, city"></label>
-        <label class="full">Brief Description of Requirements<textarea name="brief" rows="4" placeholder="Tell us about your home and what you have in mind"></textarea></label>
+      <form class="contact-form" id="contact-form" novalidate>
+        <div class="form-summary full" id="form-summary" role="alert" tabindex="-1" hidden></div>
+        <label for="cf-name">Full Name <span class="req">Required</span><input id="cf-name" name="name" required aria-required="true" autocomplete="name" maxlength="150" placeholder="Your name" aria-describedby="cf-name-err"><span class="field-error" id="cf-name-err"></span></label>
+        <label for="cf-phone">Phone Number <span class="req">Required</span><input id="cf-phone" name="phone" required aria-required="true" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+91" aria-describedby="cf-phone-err"><span class="field-error" id="cf-phone-err"></span></label>
+        <label for="cf-email">Email Address <span class="opt">(optional)</span><input id="cf-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@email.com" aria-describedby="cf-email-err"><span class="field-error" id="cf-email-err"></span></label>
+        <label for="cf-property">Property Type <span class="opt">(optional)</span><select id="cf-property" name="property"><option value="">Choose…</option><option value="APARTMENT">Apartment / Flat</option><option value="INDEPENDENT_HOUSE">Independent House</option><option value="VILLA">Villa</option><option value="OFFICE">Office</option><option value="RETAIL">Retail / Shop</option><option value="OTHER">Other</option></select></label>
+        <label for="cf-service">Service Required <span class="opt">(optional)</span><select id="cf-service" name="service"><option value="">Choose…</option><option value="FULL_HOME">Complete Home Interiors</option><option value="MODULAR_KITCHEN">Modular Kitchen</option><option value="BEDROOM_WARDROBE">Bedrooms &amp; Wardrobes</option><option value="LIVING_DINING">Living &amp; Dining</option><option value="SPACE_PLANNING">Space Planning &amp; Styling</option><option value="RENOVATION">Home Renovation</option><option value="OTHER">Other</option></select></label>
+        <label for="cf-budget">Budget <span class="opt">(optional)</span><select id="cf-budget" name="budget"><option value="">Choose…</option><option value="UNDER_5L">Under ₹5 L</option><option value="5L_10L">₹5–10 L</option><option value="10L_20L">₹10–20 L</option><option value="20L_35L">₹20–35 L</option><option value="35L_50L">₹35–50 L</option><option value="ABOVE_50L">Above ₹50 L</option><option value="UNDECIDED">Not decided yet</option></select></label>
+        <label class="full" for="cf-location">Project Location <span class="opt">(optional)</span><input id="cf-location" name="location" maxlength="100" autocomplete="address-level2" placeholder="Area, city"></label>
+        <label class="full" for="cf-brief">Brief Description of Requirements <span class="opt">(optional)</span><textarea id="cf-brief" name="brief" rows="4" maxlength="4000" placeholder="Tell us about your home and what you have in mind"></textarea></label>
+        <div class="hp-field" aria-hidden="true"><label for="cf-website">Company website<input id="cf-website" name="company_website_url" tabindex="-1" autocomplete="off"></label></div>
+        <label class="full consent" for="cf-consent" data-intake-only hidden><input id="cf-consent" name="consent" type="checkbox" required aria-required="true" aria-describedby="cf-consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the <a href="/privacy">Privacy Notice</a> (v2026-09-v1). <span class="req">Required</span></span><span class="field-error" id="cf-consent-err"></span></label>
+        <div class="turnstile full" id="cf-turnstile" data-intake-only hidden></div>
         <button class="button button-dark full" type="submit">Let’s Talk About Your Home →</button>
-        <p class="form-note full">Submitting opens WhatsApp with your project details pre-filled for a faster response.</p>
+        <p class="form-note full" id="form-note">Submitting opens WhatsApp with your project details pre-filled for a faster response.</p>
       </form>
+      <div class="form-panel" id="form-success" role="status" tabindex="-1" hidden><h3>Thank you.</h3><p>Your reference is <strong id="form-reference"></strong>. Our design team will call you within one working day.</p><a class="whatsapp-link" id="success-whatsapp" href="https://wa.me/919515125153" target="_blank" rel="noopener">Prefer WhatsApp? Continue there →</a></div>
+      <div class="form-panel" id="form-fallback" role="alert" tabindex="-1" hidden><h3>We couldn’t send that just now.</h3><p id="fallback-message">Please continue on WhatsApp — your details are already filled in.</p><a class="button button-dark" id="fallback-whatsapp" href="https://wa.me/919515125153" target="_blank" rel="noopener">Continue on WhatsApp →</a></div>
     </section>
   </main>
 
