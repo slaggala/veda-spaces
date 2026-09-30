@@ -1,5 +1,5 @@
 {
-  "register": "P0 open issues after the document-conditions closure",
+  "register": "P0 open issues after the consolidated owner decision",
   "review": "review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4",
   "note": "Every open finding (independent review and targeted re-review), advisory, deviation, proposed amendment and unexecuted gate. Statuses reflect this commit; the final targeted independent check confirms or rejects them.",
   "items": [
@@ -952,7 +952,7 @@
       "evidence_required": "Signed decision on AM-1",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED (via AM-1, 2026-09-30)",
       "residual": ""
     },
     {
@@ -969,7 +969,7 @@
       "evidence_required": "Signed decision on AM-2",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-2, 2026-09-30)",
       "residual": ""
     },
     {
@@ -986,7 +986,7 @@
       "evidence_required": "Signed decision on AM-3",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED (via AM-3, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1003,7 +1003,7 @@
       "evidence_required": "Signed decision on AM-4",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "CORRECTED — PENDING RE-REVIEW AND ARCHITECTURE-OWNER DECISION",
+      "status": "PENDING — AM-4 NOT DECIDED",
       "residual": ""
     },
     {
@@ -1020,7 +1020,7 @@
       "evidence_required": "Signed decision on AM-5",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-5, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1037,7 +1037,7 @@
       "evidence_required": "Signed decision on AM-11",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-11, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1054,7 +1054,7 @@
       "evidence_required": "Signed decision on AM-7",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED — reimplemented (layered limiter)",
+      "status": "APPROVED WITH CONDITIONS (via AM-7, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1071,7 +1071,7 @@
       "evidence_required": "Signed decision on AM-6",
       "failure_behavior": "Rejected → implement the rollback in the register before merge.",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-6, 2026-09-30)",
       "residual": ""
     },
     {
@@ -1088,7 +1088,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED",
       "residual": ""
     },
     {
@@ -1105,7 +1105,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED WITH CONDITIONS",
       "residual": ""
     },
     {
@@ -1122,7 +1122,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED",
       "residual": ""
     },
     {
@@ -1139,7 +1139,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "PROPOSED, NOT APPROVED — NOT DECIDED (owner decision required before merge)",
       "residual": ""
     },
     {
@@ -1156,7 +1156,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED WITH CONDITIONS",
       "residual": ""
     },
     {
@@ -1173,7 +1173,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED WITH CONDITIONS",
       "residual": ""
     },
     {
@@ -1190,7 +1190,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED (rewritten after RR-04; earlier text rejected as written)",
+      "status": "APPROVED WITH CONDITIONS",
       "residual": ""
     },
     {
@@ -1207,7 +1207,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Before production",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED",
       "residual": ""
     },
     {
@@ -1224,7 +1224,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Before production",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "DEFERRED TO STAGING / PRODUCTION",
       "residual": ""
     },
     {
@@ -1241,7 +1241,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Before production",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "DEFERRED TO STAGING / PRODUCTION",
       "residual": ""
     },
     {
@@ -1258,7 +1258,7 @@
       "evidence_required": "Recorded owner decision.",
       "failure_behavior": "Rejected → revert the corresponding implementation.",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED",
+      "status": "APPROVED WITH CONDITIONS",
       "residual": ""
     },
     {
@@ -1343,7 +1343,7 @@
       "evidence_required": "Link to the PR approval (or signed log) recorded in the decision log",
       "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass. The architecture must not be described as owner-approved.",
       "target_phase": "Before any implementation begins",
-      "status": "PENDING",
+      "status": "APPROVED (2026-09-30; registry evidence entry outstanding)",
       "residual": ""
     },
     {
@@ -1462,7 +1462,7 @@
       "evidence_required": "Decision-log entry referencing the authorization",
       "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass.",
       "target_phase": "Before any implementation begins",
-      "status": "PENDING",
+      "status": "APPROVED (2026-09-30; registry evidence entry outstanding)",
       "residual": ""
     },
     {
@@ -2704,7 +2704,7 @@
       "staging_impact": "None",
       "production_impact": "None",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS"
     },
     {
       "owner_category": "Architecture Owner",
@@ -2721,7 +2721,7 @@
       "staging_impact": "None",
       "production_impact": "None",
       "target_phase": "Merge",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS"
     },
     {
       "owner_category": "Architecture Owner",
@@ -2738,7 +2738,7 @@
       "staging_impact": "None",
       "production_impact": "None",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "APPROVED WITH CONDITIONS (via AM-12, 2026-09-30)"
     },
     {
       "owner_category": "Architecture Owner",
@@ -2755,7 +2755,7 @@
       "staging_impact": "None",
       "production_impact": "None",
       "target_phase": "Merge",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION"
+      "status": "APPROVED WITH CONDITIONS (via AM-13, 2026-09-30)"
     },
     {
       "owner_category": "Engineering",
@@ -3044,7 +3044,7 @@
       "acceptance_criteria": "See the final targeted check",
       "evidence_required": "—",
       "target_phase": "Merge",
-      "status": "PENDING OWNER CONFIRMATION"
+      "status": "RESOLVED — OD-2 and OD-3 APPROVED in the owner decision record (2026-09-30)"
     },
     {
       "owner_category": "Engineering",
@@ -3458,5 +3458,6 @@
   "rereview": "review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305",
   "final_check": "review/p0-independent-implementation-review @ 56c20ba992b519daa79aa3802a28343aab8c0b41",
   "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
-  "document_check": "review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04"
+  "document_check": "review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04",
+  "decision_record": "docs/implementation/P0-owner-decision-record.md"
 }

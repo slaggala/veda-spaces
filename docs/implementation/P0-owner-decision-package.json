@@ -7,7 +7,7 @@
   "document_check": "review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04",
   "document_check_verdict": "READY WITH DOCUMENT CONDITIONS",
   "sha_correction": "The brief's SHA 6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41 does not exist (FC-A01); the implementation commit is 6ec2e76f156e963c7363c4ad9ce93d0bccb11f41.",
-  "note": "Author recommendations only. No owner decision is recorded or implied: every amendment is PROPOSED, NOT APPROVED; OD-2 and OD-3 await formal owner confirmation; TG-01, TG-08, the merge-safety decision and production deployment approval are PENDING.",
+  "note": "Owner decisions recorded 2026-09-30; see P0-owner-decision-record.md. AM-4 not decided. No merge, no deployment.",
   "amendments": [
     {
       "id": "AM-1",
@@ -22,9 +22,10 @@
       "production_dependency": "Not applicable beyond the release gates.",
       "recommendation": "Matches the implementation; removes a certified contradiction.",
       "author_proposed_disposition": "APPROVE",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED",
+      "status": "APPROVED",
+      "decision_before": "Merge",
+      "owner_conditions": "None"
     },
     {
       "id": "AM-2",
@@ -39,9 +40,10 @@
       "production_dependency": "Invitation email delivery through SES in staging before production.",
       "recommendation": "The certified 204 cannot express path B.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge",
+      "owner_conditions": "Accept the invite-link residual (link holder sets the password before activation). (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-3",
@@ -56,9 +58,10 @@
       "production_dependency": "Turnstile production secret provisioned.",
       "recommendation": "Implements the certified 05 §4 control.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED",
+      "status": "APPROVED",
+      "decision_before": "Merge",
+      "owner_conditions": "None"
     },
     {
       "id": "AM-4",
@@ -73,9 +76,10 @@
       "production_dependency": "RR-12 implemented with tests for (a)–(c) on both engines; Data Protection lead sign-off of option (a) or (b).",
       "recommendation": "Resolves the certified 04/08 conflict; completion is tracked.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
+      "owner_decision_recorded": "NOT DECIDED — not included in the consolidated owner decision",
       "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge (owner may accept labelled gaps) / completion before production"
+      "decision_before": "Merge (owner may accept labelled gaps) / completion before production",
+      "owner_conditions": "Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d)."
     },
     {
       "id": "AM-5",
@@ -90,9 +94,10 @@
       "production_dependency": "Retention configuration evidence.",
       "recommendation": "Makes the certified veto usable.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge; retention enforcement before production"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge; retention enforcement before production",
+      "owner_conditions": "Outbox retention ≥ break-glass window enforced or operationally controlled before production (IR-A10). (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-6",
@@ -107,9 +112,10 @@
       "production_dependency": "RG-7 evidence.",
       "recommendation": "Release and schema floors now enforced in every deploy mode (FC-12).",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge",
+      "owner_conditions": "RG-7 rollback rehearsal before production. (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-7",
@@ -124,9 +130,10 @@
       "production_dependency": "Alarms configured and test-fired (RG-5); owner acceptance of the disclosed disruption bounds.",
       "recommendation": "Replaces the rejected text; restores a cross-network bound for all accounts.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge — correct text before approval; real-Turnstile staging evidence"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge — correct text before approval; real-Turnstile staging evidence",
+      "owner_conditions": "Accept the disclosed disruption bounds (FC-05 reset-link gap, escalation during a Turnstile outage); staging Turnstile, proxy and alarm evidence. (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-8",
@@ -141,9 +148,10 @@
       "production_dependency": "Key provisioning evidence.",
       "recommendation": "Documentation of an implemented trade-off.",
       "author_proposed_disposition": "APPROVE",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Production"
+      "owner_decision_recorded": "APPROVED",
+      "status": "APPROVED",
+      "decision_before": "Production",
+      "owner_conditions": "None"
     },
     {
       "id": "AM-9",
@@ -158,9 +166,10 @@
       "production_dependency": "Production-required: custodians named (OWNER-INPUT-004), PG-BG passed, the chosen option implemented and tested.",
       "recommendation": "Not implemented; no merge dependency.",
       "author_proposed_disposition": "DEFER",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Production"
+      "owner_decision_recorded": "DEFERRED TO STAGING / PRODUCTION",
+      "status": "DEFERRED TO STAGING / PRODUCTION",
+      "decision_before": "Production",
+      "owner_conditions": "Decision deferred to staging/production. Decide before production; recommended option R (target cannot cancel custodian recovery)."
     },
     {
       "id": "AM-10",
@@ -175,9 +184,10 @@
       "production_dependency": "Production-required: implementation with tests on both engines, the staging evidence above, Data Protection lead sign-off, and the erasure-audit job (erasure-audit) reporting 0 residual fields.",
       "recommendation": "Not implemented; no merge dependency.",
       "author_proposed_disposition": "DEFER",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Production"
+      "owner_decision_recorded": "DEFERRED TO STAGING / PRODUCTION",
+      "status": "DEFERRED TO STAGING / PRODUCTION",
+      "decision_before": "Production",
+      "owner_conditions": "Decision deferred to staging/production. Decide before production with the Data Protection lead; RR-13."
     },
     {
       "id": "AM-11",
@@ -192,9 +202,10 @@
       "production_dependency": "RG-7 evidence.",
       "recommendation": "IR-01 fix; wording corrected (FC-A08, FC-12).",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge; RG-7 before production"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge; RG-7 before production",
+      "owner_conditions": "RG-7 before production. (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-12",
@@ -209,9 +220,10 @@
       "production_dependency": "None beyond the release gates.",
       "recommendation": "Implements OD-2.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge",
+      "owner_conditions": "Decide whether reactivation after restore requires credential and MFA resets (FC-A12). (the owner stated no different conditions; the conditions of the decision package apply)"
     },
     {
       "id": "AM-13",
@@ -226,9 +238,10 @@
       "production_dependency": "None beyond the release gates.",
       "recommendation": "Implements OD-3.",
       "author_proposed_disposition": "APPROVE WITH CONDITIONS",
-      "owner_decision_recorded": "NONE",
-      "status": "PROPOSED, NOT APPROVED",
-      "decision_before": "Merge"
+      "owner_decision_recorded": "APPROVED WITH CONDITIONS",
+      "status": "APPROVED WITH CONDITIONS",
+      "decision_before": "Merge",
+      "owner_conditions": "Accept 'blocked, not withdrawn' for role-definition changes (FC-08) and the FC-A09 residual, or require withdrawal. (the owner stated no different conditions; the conditions of the decision package apply)"
     }
   ],
   "owner_confirmations": [
@@ -236,27 +249,29 @@
       "id": "OD-2",
       "title": "Founder restoration requires two distinct eligible human principals",
       "implementation": "Code at 6ec2e76 (unchanged at 3f5920b) follows this brief instruction (RR-02, AM-12).",
-      "record_status": "AWAITING FORMAL OWNER CONFIRMATION — a brief instruction to the author, not a recorded owner decision; no decision-log entry exists (FC-A02)."
+      "record_status": "APPROVED by the owner on 2026-09-30 (decision record)"
     },
     {
       "id": "OD-3",
       "title": "Sensitive operations revalidate the current governance class at execution",
       "implementation": "Code at 6ec2e76 (unchanged at 3f5920b) follows this brief instruction (RR-03, AM-13), within the FC-08 and FC-A09 limits stated in AM-13.",
-      "record_status": "AWAITING FORMAL OWNER CONFIRMATION — a brief instruction to the author, not a recorded owner decision; no decision-log entry exists (FC-A02)."
+      "record_status": "APPROVED by the owner on 2026-09-30 (decision record)"
     }
   ],
   "gates": [
     {
       "id": "TG-01",
-      "status": "PENDING"
+      "status": "APPROVED",
+      "note": "registry evidence entry outstanding"
     },
     {
       "id": "TG-08",
-      "status": "PENDING"
+      "status": "APPROVED",
+      "note": "registry evidence entry outstanding"
     },
     {
       "id": "Merge-safety decision",
-      "status": "PENDING"
+      "status": "APPROVED — Option C (not executed)"
     },
     {
       "id": "Production deployment approval",
@@ -269,5 +284,6 @@
     "TG-01",
     "TG-08",
     "Site production deployment on merge"
-  ]
+  ],
+  "decision_record": "docs/implementation/P0-owner-decision-record.md"
 }

@@ -2,20 +2,20 @@
 
 Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · review review/p0-independent-implementation-review @ 1aaf019b6c872a075d13e9b3a2a2e9c16489f6f4 · targeted re-review review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305
 
-> **No deviation is approved.** Reviewer decisions are recorded; approval is the Architecture Owner's, through the proposed amendments in [docs/proposals/amendments](../proposals/amendments/README.md).
+> **Owner decisions were recorded on 2026-09-30** through the amendments. See [P0-owner-decision-record.md](P0-owner-decision-record.md). DEV-004 (AM-4) is not decided.
 
 | ID | Title | Reviewer decision | Targeted re-review | Amendment | Status |
 |---|---|---|---|---|---|
-| DEV-001 | MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-1 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-002 | Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-2 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-003 | Login accepts an optional CAPTCHA token | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-3 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-004 | Staff lead update accepts a re-consent object | REQUIRES IMPLEMENTATION CHANGE | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-4 | CORRECTED — PENDING RE-REVIEW AND ARCHITECTURE-OWNER DECISION |
-| DEV-005 | Break-glass cancel link endpoint and page (06 §7.5 step 5) | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-5 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-006 | mfa_challenge binds enrollment transactions to a factor and a path | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-11 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-007 | Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds | n/a (remediation) | REQUIRES IMPLEMENTATION CHANGE | AM-7 | PROPOSED, NOT APPROVED — implementation changed per RR-04; pending final targeted check and Architecture-Owner decision |
-| DEV-008 | Readiness accepts a declared newer schema and hides details at the edge | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-6 | PENDING ARCHITECTURE-OWNER DECISION |
-| DEV-009 | Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2) | n/a (OD-2 brief instruction; awaiting formal owner confirmation) | n/a | AM-12 | PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision |
-| DEV-010 | Pending identity changes are re-validated against the target's current governance class (OD-3) | n/a (OD-3 brief instruction; awaiting formal owner confirmation) | n/a | AM-13 | PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision |
+| DEV-001 | MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-1 | APPROVED (via AM-1, 2026-09-30) |
+| DEV-002 | Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-2 | APPROVED WITH CONDITIONS (via AM-2, 2026-09-30) |
+| DEV-003 | Login accepts an optional CAPTCHA token | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-3 | APPROVED (via AM-3, 2026-09-30) |
+| DEV-004 | Staff lead update accepts a re-consent object | REQUIRES IMPLEMENTATION CHANGE | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-4 | PENDING — AM-4 NOT DECIDED |
+| DEV-005 | Break-glass cancel link endpoint and page (06 §7.5 step 5) | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-5 | APPROVED WITH CONDITIONS (via AM-5, 2026-09-30) |
+| DEV-006 | mfa_challenge binds enrollment transactions to a factor and a path | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-11 | APPROVED WITH CONDITIONS (via AM-11, 2026-09-30) |
+| DEV-007 | Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds | n/a (remediation) | REQUIRES IMPLEMENTATION CHANGE | AM-7 | APPROVED WITH CONDITIONS (via AM-7, 2026-09-30) |
+| DEV-008 | Readiness accepts a declared newer schema and hides details at the edge | n/a (remediation) | ACCEPTABLE WITH ARCHITECTURE AMENDMENT | AM-6 | APPROVED WITH CONDITIONS (via AM-6, 2026-09-30) |
+| DEV-009 | Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2) | n/a (OD-2 brief instruction; approved by the owner on 2026-09-30) | n/a | AM-12 | APPROVED WITH CONDITIONS (via AM-12, 2026-09-30) |
+| DEV-010 | Pending identity changes are re-validated against the target's current governance class (OD-3) | n/a (OD-3 brief instruction; approved by the owner on 2026-09-30) | n/a | AM-13 | APPROVED WITH CONDITIONS (via AM-13, 2026-09-30) |
 
 ## DEV-001: MFA factor uniqueness permits the current authenticator and a pending replacement to coexist during controlled re-enrollment
 
@@ -39,7 +39,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** IR-20 condition met; only one ACTIVE factor; PENDING never authenticates
 - **Decision required:** Amend 03 §5.5 to key ux_user_mfa_factor__user_live on (user_id, factor_type, status), or resolve TD-E/05 §11.5 another way.
 - **Amendment:** AM-1
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED (via AM-1, 2026-09-30)
 
 ## DEV-002: Invitation acceptance returns an MFA-enrollment step when MFA is required instead of immediate final success
 
@@ -63,7 +63,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Conditions IR-01, IR-21, IR-25 met; AM-2 must state that link replay before activation overwrites the password
 - **Decision required:** Amend 08 §4.5 to document the 200 MFA_ENROLLMENT_REQUIRED response, or choose an alternative mechanism for path B.
 - **Amendment:** AM-2
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED WITH CONDITIONS (via AM-2, 2026-09-30)
 
 ## DEV-003: Login accepts an optional CAPTCHA token
 
@@ -87,7 +87,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Conditions IR-22, IR-09, IR-02 met
 - **Decision required:** Amend 08 §4.1 / §4.7 to document the optional fields.
 - **Amendment:** AM-3
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED (via AM-3, 2026-09-30)
 
 ## DEV-004: Staff lead update accepts a re-consent object
 
@@ -110,7 +110,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Corrected behaviour verified on both engines; residuals RR-12
 - **Decision required:** AM-4: approve the corrected mechanism and choose in-row + timeline activity (implemented) or a dedicated append-only consent-event table.
 - **Amendment:** AM-4
-- **Status:** CORRECTED — PENDING RE-REVIEW AND ARCHITECTURE-OWNER DECISION
+- **Status:** PENDING — AM-4 NOT DECIDED
 
 ## DEV-005: Break-glass cancel link endpoint and page (06 §7.5 step 5)
 
@@ -131,7 +131,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Endpoint, page, authorization, replay prevention, events, RBX registration verified; OpenAPI status code RR-A09
 - **Decision required:** AM-5.
 - **Amendment:** AM-5
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED WITH CONDITIONS (via AM-5, 2026-09-30)
 
 ## DEV-006: mfa_challenge binds enrollment transactions to a factor and a path
 
@@ -152,7 +152,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Expand-only; no schema/authz/replay/migration regression; AM-11 incomplete (rollback reintroduces IR-01; 02 §8.3 placement)
 - **Decision required:** AM-11.
 - **Amendment:** AM-11
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED WITH CONDITIONS (via AM-11, 2026-09-30)
 
 ## DEV-007: Layered sign-in limits: per-(identifier, network) limits plus cross-network account, aggregate and reset-email bounds
 
@@ -173,7 +173,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Removes cross-network guessing bound for MFA holders and reset-email cap (RR-04)
 - **Decision required:** AM-7 (rewritten; the earlier AM-7 was rejected as written, OD-1).
 - **Amendment:** AM-7
-- **Status:** PROPOSED, NOT APPROVED — implementation changed per RR-04; pending final targeted check and Architecture-Owner decision
+- **Status:** APPROVED WITH CONDITIONS (via AM-7, 2026-09-30)
 
 ## DEV-008: Readiness accepts a declared newer schema and hides details at the edge
 
@@ -194,7 +194,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Targeted re-review basis:** Safe; no secrets; AM-6 must state that rollback of this release is snapshot restore (RR-17)
 - **Decision required:** AM-6.
 - **Amendment:** AM-6
-- **Status:** PENDING ARCHITECTURE-OWNER DECISION
+- **Status:** APPROVED WITH CONDITIONS (via AM-6, 2026-09-30)
 
 ## DEV-009: Deleted Founders are restored only through FOUNDER_STATUS_CHANGE status=RESTORE (OD-2)
 
@@ -203,7 +203,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Architecture references:** 06 §7.2.2, 06 §7.1 G11, 08 §5.11
 - **Certified behavior:** FOUNDER_STATUS_CHANGE statuses DISABLED/ACTIVE/UNLOCK/DELETE; restore of a deleted user through user.restore (USER-001).
 - **Implemented behavior:** POST /users/{id}/restore refuses Founders (403 FOUNDER_PROTECTED, FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE requested by one eligible Founder and approved in-app by another; refused on both break-glass channels (SECOND_FOUNDER_REQUIRED); re-validated at execution.
-- **Reason:** RR-02 and the OD-2 brief instruction (awaiting formal owner confirmation).
+- **Reason:** RR-02 and the OD-2 brief instruction (approved by the owner on 2026-09-30).
 - **Security impact:** Closes a G11 bypass.
 - **Compatibility impact:** Additive status value.
 - **Data model impact:** None.
@@ -211,11 +211,11 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Ui impact:** Restore action on the Founder actions page.
 - **Tests:** api/tests/integration/test_final_merge_blockers.py::test_RR02_*
 - **Rollback:** Remove RESTORE (deleted Founders unrestorable).
-- **Reviewer decision:** n/a (OD-2 brief instruction; awaiting formal owner confirmation)
+- **Reviewer decision:** n/a (OD-2 brief instruction; approved by the owner on 2026-09-30)
 - **Reviewer conditions:** 
 - **Decision required:** AM-12.
 - **Amendment:** AM-12
-- **Status:** PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision
+- **Status:** APPROVED WITH CONDITIONS (via AM-12, 2026-09-30)
 
 ## DEV-010: Pending identity changes are re-validated against the target's current governance class (OD-3)
 
@@ -224,7 +224,7 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Architecture references:** 06 §7.4, 05 §8.6
 - **Certified behavior:** G11/G9 re-evaluated when a STANDARD request is decided and executed; email verification completes with no further check.
 - **Implemented behavior:** Class escalation (GRANT_FOUNDER, roles, permissions) withdraws weaker-class work in the same transaction; verification recomputes the proposal's authorising class and fails closed when it is weaker than the target's current class or the account is disabled.
-- **Reason:** RR-03 (N17) and the OD-3 brief instruction (awaiting formal owner confirmation).
+- **Reason:** RR-03 (N17) and the OD-3 brief instruction (approved by the owner on 2026-09-30).
 - **Security impact:** Closes RR-03.
 - **Compatibility impact:** Behavioural tightening.
 - **Data model impact:** None.
@@ -232,8 +232,8 @@ Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e` · reviewed `9236aa3` · rev
 - **Ui impact:** None.
 - **Tests:** api/tests/integration/test_final_merge_blockers.py::test_RR03_*
 - **Rollback:** Remove the checks (RR-03 returns).
-- **Reviewer decision:** n/a (OD-3 brief instruction; awaiting formal owner confirmation)
+- **Reviewer decision:** n/a (OD-3 brief instruction; approved by the owner on 2026-09-30)
 - **Reviewer conditions:** 
 - **Decision required:** AM-13.
 - **Amendment:** AM-13
-- **Status:** PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision
+- **Status:** APPROVED WITH CONDITIONS (via AM-13, 2026-09-30)

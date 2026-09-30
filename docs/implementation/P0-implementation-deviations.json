@@ -2,8 +2,8 @@
   "register": "P0 implementation deviations",
   "architecture_baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "branch": "implementation/p0-foundation",
-  "approved": false,
-  "note": "No deviation is approved. The targeted re-review decisions are recorded per deviation (rereview_decision). DEV-007 was reimplemented after RR-04; DEV-009 and DEV-010 implement the OD-2 and OD-3 brief instructions, which await formal owner confirmation. All await the Architecture Owner's decision through the proposed amendments in docs/proposals/amendments.",
+  "approved": "per deviation; see status and P0-owner-decision-record.md",
+  "note": "Owner decisions recorded 2026-09-30 through the amendments. DEV-004 (AM-4) is not decided.",
   "deviations": [
     {
       "id": "DEV-001",
@@ -38,7 +38,7 @@
       ],
       "rollback": "Restore the certified two-column key in 0004_auth and the model, and change enroll/start to create the PENDING factor only after revoking the ACTIVE one. That reintroduces the TD-E conflict, so it needs an architecture decision first. No data migration: existing rows satisfy both definitions whenever no PENDING factor is open.",
       "decision_required": "Amend 03 §5.5 to key ux_user_mfa_factor__user_live on (user_id, factor_type, status), or resolve TD-E/05 §11.5 another way.",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED (via AM-1, 2026-09-30)",
       "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "reviewer_conditions": [
         "IR-20"
@@ -81,7 +81,7 @@
       ],
       "rollback": "None available without an alternative design: the certified 204 cannot carry path B. Alternatives would be (a) emailing a separate enrollment link (path C) after acceptance, or (b) returning the context in a header. Either needs an architecture decision.",
       "decision_required": "Amend 08 §4.5 to document the 200 MFA_ENROLLMENT_REQUIRED response, or choose an alternative mechanism for path B.",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-2, 2026-09-30)",
       "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "reviewer_conditions": [
         "IR-01",
@@ -124,7 +124,7 @@
       ],
       "rollback": "Remove turnstile_token from LoginIn and the captcha branch in veda/platform/auth/service.py::login; per-network throttling then relies on the escalating delay only. No data migration.",
       "decision_required": "Amend 08 §4.1 / §4.7 to document the optional fields.",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED (via AM-3, 2026-09-30)",
       "reviewer_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "reviewer_conditions": [
         "IR-22",
@@ -164,7 +164,7 @@
       ],
       "rollback": "Remove the consent field from LeadPatchIn and the consent branch in veda/modules/crm/leads/service.py::_update. Re-consent then cannot be recorded until 04 §5.4 and 08 §8.5 are reconciled. No data migration.",
       "decision_required": "AM-4: approve the corrected mechanism and choose in-row + timeline activity (implemented) or a dedicated append-only consent-event table.",
-      "status": "CORRECTED — PENDING RE-REVIEW AND ARCHITECTURE-OWNER DECISION",
+      "status": "PENDING — AM-4 NOT DECIDED",
       "reviewer_decision": "REQUIRES IMPLEMENTATION CHANGE",
       "reviewer_conditions": [
         "IR-16"
@@ -201,7 +201,7 @@
       "rollback": "Remove endpoint and page.",
       "decision_required": "AM-5.",
       "amendment": "AM-5",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-5, 2026-09-30)",
       "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "rereview_basis": "Endpoint, page, authorization, replay prevention, events, RBX registration verified; OpenAPI status code RR-A09"
     },
@@ -236,7 +236,7 @@
       "rollback": "N-1 image ignores the columns.",
       "decision_required": "AM-11.",
       "amendment": "AM-11",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-11, 2026-09-30)",
       "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "rereview_basis": "Expand-only; no schema/authz/replay/migration regression; AM-11 incomplete (rollback reintroduces IR-01; 02 §8.3 placement)"
     },
@@ -268,7 +268,7 @@
       "rollback": "Remove the account, aggregate and reset tiers (reintroduces RR-04). Not recommended.",
       "decision_required": "AM-7 (rewritten; the earlier AM-7 was rejected as written, OD-1).",
       "amendment": "AM-7",
-      "status": "PROPOSED, NOT APPROVED — implementation changed per RR-04; pending final targeted check and Architecture-Owner decision",
+      "status": "APPROVED WITH CONDITIONS (via AM-7, 2026-09-30)",
       "rereview_decision": "REQUIRES IMPLEMENTATION CHANGE",
       "rereview_basis": "Removes cross-network guessing bound for MFA holders and reset-email cap (RR-04)"
     },
@@ -301,7 +301,7 @@
       "rollback": "Strict head equality.",
       "decision_required": "AM-6.",
       "amendment": "AM-6",
-      "status": "PENDING ARCHITECTURE-OWNER DECISION",
+      "status": "APPROVED WITH CONDITIONS (via AM-6, 2026-09-30)",
       "rereview_decision": "ACCEPTABLE WITH ARCHITECTURE AMENDMENT",
       "rereview_basis": "Safe; no secrets; AM-6 must state that rollback of this release is snapshot restore (RR-17)"
     },
@@ -323,7 +323,7 @@
       ],
       "certified_behavior": "FOUNDER_STATUS_CHANGE statuses DISABLED/ACTIVE/UNLOCK/DELETE; restore of a deleted user through user.restore (USER-001).",
       "implemented_behavior": "POST /users/{id}/restore refuses Founders (403 FOUNDER_PROTECTED, FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE requested by one eligible Founder and approved in-app by another; refused on both break-glass channels (SECOND_FOUNDER_REQUIRED); re-validated at execution.",
-      "reason": "RR-02 and the OD-2 brief instruction (awaiting formal owner confirmation).",
+      "reason": "RR-02 and the OD-2 brief instruction (approved by the owner on 2026-09-30).",
       "security_impact": "Closes a G11 bypass.",
       "compatibility_impact": "Additive status value.",
       "data_model_impact": "None.",
@@ -334,8 +334,8 @@
       ],
       "rollback": "Remove RESTORE (deleted Founders unrestorable).",
       "decision_required": "AM-12.",
-      "status": "PROPOSED, NOT APPROVED — implements the OD-2 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision",
-      "reviewer_decision": "n/a (OD-2 brief instruction; awaiting formal owner confirmation)",
+      "status": "APPROVED WITH CONDITIONS (via AM-12, 2026-09-30)",
+      "reviewer_decision": "n/a (OD-2 brief instruction; approved by the owner on 2026-09-30)",
       "reviewer_conditions": "",
       "amendment": "AM-12"
     },
@@ -355,7 +355,7 @@
       ],
       "certified_behavior": "G11/G9 re-evaluated when a STANDARD request is decided and executed; email verification completes with no further check.",
       "implemented_behavior": "Class escalation (GRANT_FOUNDER, roles, permissions) withdraws weaker-class work in the same transaction; verification recomputes the proposal's authorising class and fails closed when it is weaker than the target's current class or the account is disabled.",
-      "reason": "RR-03 (N17) and the OD-3 brief instruction (awaiting formal owner confirmation).",
+      "reason": "RR-03 (N17) and the OD-3 brief instruction (approved by the owner on 2026-09-30).",
       "security_impact": "Closes RR-03.",
       "compatibility_impact": "Behavioural tightening.",
       "data_model_impact": "None.",
@@ -366,8 +366,8 @@
       ],
       "rollback": "Remove the checks (RR-03 returns).",
       "decision_required": "AM-13.",
-      "status": "PROPOSED, NOT APPROVED — implements the OD-3 brief instruction (awaiting formal owner confirmation); pending Architecture-Owner decision",
-      "reviewer_decision": "n/a (OD-3 brief instruction; awaiting formal owner confirmation)",
+      "status": "APPROVED WITH CONDITIONS (via AM-13, 2026-09-30)",
+      "reviewer_decision": "n/a (OD-3 brief instruction; approved by the owner on 2026-09-30)",
       "reviewer_conditions": "",
       "amendment": "AM-13"
     }

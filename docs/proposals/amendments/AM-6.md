@@ -1,11 +1,11 @@
 # AM-6: proposed amendment to LOG-005, 08 §3, 02 §12.4
 
-> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
+> **Status: APPROVED WITH CONDITIONS.** Owner decision recorded 2026-09-30 ([decision record](../../implementation/P0-owner-decision-record.md)). Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and changes no certified document.
 
 | Field | Value |
 |---|---|
 | Amendment ID | AM-6 |
-| Status | **PROPOSED, NOT APPROVED** |
+| Status | **APPROVED WITH CONDITIONS** |
 | Amends | LOG-005, 08 §3, 02 §12.4 |
 | Affected requirements | LOG-005, OPS-004 |
 | Related findings | IR-10, IR-A17, RR-17 |
@@ -29,3 +29,4 @@
 | Owner decision required | Approve the readiness states, the rollback floor mechanism and the statement that this release rolls back only by forward fix or snapshot restore (OD-1). |
 | Approval readiness | Wording complete and behaviour matches; submit with the reviewer's confirmation (OD-1). No rehearsal is claimed. |
 | Decision owner | Architecture Owner, Operations |
+| Owner decision recorded | APPROVED WITH CONDITIONS (2026-09-30). Conditions: RG-7 rollback rehearsal before production. (the owner stated no different conditions; the conditions of the decision package apply) |

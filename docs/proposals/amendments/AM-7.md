@@ -1,11 +1,11 @@
 # AM-7: proposed amendment to 08 §12, 05 §4
 
-> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
+> **Status: APPROVED WITH CONDITIONS.** Owner decision recorded 2026-09-30 ([decision record](../../implementation/P0-owner-decision-record.md)). Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and changes no certified document.
 
 | Field | Value |
 |---|---|
 | Amendment ID | AM-7 |
-| Status | **PROPOSED, NOT APPROVED** |
+| Status | **APPROVED WITH CONDITIONS** |
 | Amends | 08 §12, 05 §4 |
 | Affected requirements | AUTH-008, AUTH-010, SEC-011 |
 | Related findings | IR-23, RR-04 |
@@ -29,3 +29,4 @@
 | Owner decision required | Approve the layered design and thresholds, accept the disclosed victim-disruption and outage behaviour, or require changes (for example per-requester-network reset caps or a victim-initiated bypass, FC-05). |
 | Approval readiness | Text corrected for FC-05, FC-A05 and FC-A06; submit after the reviewer's document-level check. |
 | Decision owner | Architecture Owner, Security |
+| Owner decision recorded | APPROVED WITH CONDITIONS (2026-09-30). Conditions: Accept the disclosed disruption bounds (FC-05 reset-link gap, escalation during a Turnstile outage); staging Turnstile, proxy and alarm evidence. (the owner stated no different conditions; the conditions of the decision package apply) |

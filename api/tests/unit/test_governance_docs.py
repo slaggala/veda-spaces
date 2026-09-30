@@ -36,57 +36,70 @@ def test_amendments_live_outside_the_certified_tree():
     assert sorted(p.stem for p in AMEND.glob("AM-*.md")) == sorted(f"AM-{i}" for i in range(1, 14))
 
 
+# The owner's decisions of 2026-09-30 (docs/implementation/P0-owner-decision-record.json) are the source of truth:
+# every governance artifact must agree with them, and nothing undecided may read as decided.
+RECORD = REPO / "docs/implementation/P0-owner-decision-record.json"
+EXPECTED_DECISIONS = {
+    **dict.fromkeys(("AM-1", "AM-3", "AM-8"), "APPROVED"),
+    **dict.fromkeys(("AM-2", "AM-5", "AM-6", "AM-7", "AM-11", "AM-12", "AM-13"), "APPROVED WITH CONDITIONS"),
+    **dict.fromkeys(("AM-9", "AM-10"), "DEFERRED TO STAGING / PRODUCTION"),
+}
+UNDECIDED = {"AM-4"}
+
+
+def _status(aid):
+    return EXPECTED_DECISIONS.get(aid, STATUS)
+
+
 @pytest.mark.parametrize("n", range(1, 14))
 def test_amendment_format_and_status(n):
     text = (AMEND / f"AM-{n}.md").read_text()
     rows = dict(re.findall(r"^\| ([^|]+?) \| (.+) \|$", text, re.MULTILINE))
     for field in REQUIRED_FIELDS:
         assert field in rows and rows[field].strip() not in ("", "—"), f"AM-{n}: {field}"
-    assert rows["Status"] == f"**{STATUS}**"
-    assert f"Status: {STATUS}" in text
-    assert not re.search(r"\bStatus\b[^|\n]*\|\s*\**APPROVED", text)
+    assert rows["Status"] == f"**{_status(f'AM-{n}')}**"
+    assert f"Status: {_status(f'AM-{n}')}." in text
 
 
-def test_amendment_json_status():
+def test_decision_record_matches_the_owner_instruction():
+    rec = json.loads(RECORD.read_text())
+    assert rec["date"] == "2026-09-30"
+    assert {k: v["decision"] for k, v in rec["owner_decisions"].items()} == {"OD-2": "APPROVED", "OD-3": "APPROVED"}
+    assert {k: v["decision"] for k, v in rec["gates"].items()} == {"TG-01": "APPROVED", "TG-08": "APPROVED"}
+    assert all(v["registry_evidence"].startswith("OUTSTANDING") for v in rec["gates"].values())
+    assert rec["merge_safety"]["decision"] == "APPROVED — Option C" and rec["merge_safety"]["executed"] is False
+    got = {k: v["decision"] for k, v in rec["amendments"].items()}
+    assert {k: v for k, v in got.items() if k not in UNDECIDED} == EXPECTED_DECISIONS
+    assert rec["not_decided"] == ["AM-4"] and got["AM-4"].startswith("NOT DECIDED")
+
+
+def test_amendment_json_and_package_agree_with_the_record():
     data = json.loads((AMEND / "amendments.json").read_text())
-    assert data["status"] == STATUS and data["reviewed_sha"] == REVIEWED
-    assert [a["status"] for a in data["amendments"]] == [STATUS] * 13
-
-
-def test_owner_package_records_no_decision():
+    assert data["reviewed_sha"] == REVIEWED
+    assert {a["id"]: a["status"] for a in data["amendments"]} == {f"AM-{n}": _status(f"AM-{n}") for n in range(1, 14)}
     pkg = json.loads((REPO / "docs/implementation/P0-owner-decision-package.json").read_text())
     assert pkg["reviewed_sha"] == REVIEWED
-    assert {a["owner_decision_recorded"] for a in pkg["amendments"]} == {"NONE"}
-    assert {a["status"] for a in pkg["amendments"]} == {STATUS}
-    assert {a["author_proposed_disposition"] for a in pkg["amendments"]} <= {
-        "APPROVE",
-        "APPROVE WITH CONDITIONS",
-        "REJECT",
-        "DEFER",
-    }
-    assert {g["id"]: g["status"] for g in pkg["gates"]} == {
-        "TG-01": "PENDING", "TG-08": "PENDING", "Merge-safety decision": "PENDING", "Production deployment approval": "PENDING",
-    }  # fmt: skip
-    assert {o["id"] for o in pkg["owner_confirmations"]} == {"OD-2", "OD-3"}
-    assert all("AWAITING FORMAL OWNER CONFIRMATION" in o["record_status"] for o in pkg["owner_confirmations"])
+    assert {a["id"]: a["status"] for a in pkg["amendments"]} == {f"AM-{n}": _status(f"AM-{n}") for n in range(1, 14)}
+    gates = {g["id"]: g["status"] for g in pkg["gates"]}
+    assert gates["TG-01"] == gates["TG-08"] == "APPROVED"
+    assert gates["Merge-safety decision"].startswith("APPROVED — Option C (not executed)")
+    assert gates["Production deployment approval"] == "PENDING"
+    assert all(o["record_status"].startswith("APPROVED by the owner on 2026-09-30") for o in pkg["owner_confirmations"])
 
 
-def test_no_owner_decision_is_implied_anywhere():
-    """DC-07: OD-2/OD-3 are never described as given or decided; no amendment, gate or merge is described as approved."""
+def test_no_undecided_item_reads_as_decided():
     docs = [REPO / f"docs/implementation/{n}" for n in (
         "P0-owner-decision-package.md", "P0-final-merge-blocker-matrix.md", "P0-implementation-deviations.md",
-        "P0-implementation-report.md", "P0-merge-safety-plan.md")] + sorted(AMEND.glob("*.md"))  # fmt: skip
+        "P0-implementation-report.md", "P0-merge-safety-plan.md", "P0-merge-readiness-report.md",
+        "P0-production-gate-report.md", "P0-gate-status-report.md")] + sorted(AMEND.glob("*.md"))  # fmt: skip
     for path in docs:
         text = path.read_text()
         assert not re.search(r"OD-[23][^|\n]{0,15}\bgiven\b", text), path.name
-        assert not re.search(r"owner decision OD-[23]\b", text), path.name
-        assert not re.search(
-            r"\bTG-0[18]\b\W{0,6}(?:status\W{0,4})?(?:is\s+)?\**(?:PASS|PASSED|APPROVED|COMPLETE)\b", text
-        ), path.name
-    package = (REPO / "docs/implementation/P0-owner-decision-package.md").read_text()
-    assert "| TG-01 | **PENDING** |" in package and "| TG-08 | **PENDING** |" in package
-    for aid, a in ((a["id"], a) for a in json.loads((AMEND / "amendments.json").read_text())["amendments"]):
-        assert a["status"] == STATUS, aid
+        assert not re.search(r"AM-4\b[^|\n]{0,40}\*\*APPROVED", text), path.name
+        assert not re.search(r"[Pp]roduction deployment approval[^|\n]{0,10}\|\s*\**APPROVED", text), path.name
+        assert not re.search(r"\b(merged|deployed) to (main|production)\b", text), path.name
+    readiness = (REPO / "docs/implementation/P0-merge-readiness-report.md").read_text()
+    assert "NOT READY TO MERGE" in readiness and "AM-4" in readiness
 
 
 # --- SHA references (DC-04) --------------------------------------------------------------------------------------
@@ -111,6 +124,7 @@ KNOWN_COMMITS = {
     "15d25a759cfc0342bdca45ba4a9c51550270f305": ("Add targeted P0 implementation re-review", "targeted re-review"),
     "56c20ba992b519daa79aa3802a28343aab8c0b41": ("Add final targeted P0 implementation check", "final targeted check"),
     "093cfa6872c209deb9991910c457afcdb4ad2d04": ("Add P0 document-level technical check", "document-level check"),
+    "ca9845c0dd60280fd19cdc9d41843d8567191801": ("Close P0 document conditions", "head when the owner decisions were recorded"),
     "13276a017a137c4a86b15fea0306ea2e83ac2729": ("Prepare Veda Spaces for Cloudflare Pages", "live site (main)"),
 }  # fmt: skip
 EXTRA_DOCS = (
@@ -208,7 +222,9 @@ def test_role_specific_references():
     assert "`13276a0`" in plan and "3f5920b17d21214b39414d080d34246746c8c40d" in plan
 
 
-def test_gates_pending():
+def test_gate_records():
+    """The certified registry is not edited by this workstream (it still reads Pending); the owner's approval of
+    TG-01 and TG-08 is carried by the decision record and the register, with the registry evidence outstanding."""
     gates = {
         g["gate_id"]: g["status"]
         for g in json.loads((REPO / "docs/architecture/gate-registry.json").read_text())["gates"]
@@ -218,7 +234,12 @@ def test_gates_pending():
         i["id"]: i["status"]
         for i in json.loads((REPO / "docs/implementation/P0-open-issues.json").read_text())["items"]
     }
-    assert issues["TG-01"].startswith("PENDING") and issues["TG-08"].startswith("PENDING")
+    assert issues["TG-01"].startswith("APPROVED") and issues["TG-08"].startswith("APPROVED")
+    assert "evidence entry outstanding" in issues["TG-01"] and "evidence entry outstanding" in issues["TG-08"]
+    report = (REPO / "docs/implementation/P0-gate-status-report.md").read_text()
+    other = [g for g in gates if g not in ("TG-01", "TG-08")]
+    for gid in other:
+        assert f"| {gid} |" in report and "APPROVED" not in report.split(f"| {gid} |", 1)[1].split("\n", 1)[0], gid
 
 
 def test_public_intake_disabled():

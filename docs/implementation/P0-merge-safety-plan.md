@@ -1,6 +1,6 @@
 # Merge-safety plan: implementation branch vs. the live site (OD-5)
 
-> **Status: PLAN ONLY. The owner's merge-safety decision is PENDING.**
+> **Status: the owner APPROVED option C on 2026-09-30, to be recorded only. It is NOT executed** ([decision record](P0-owner-decision-record.md)). Execution needs a separate owner instruction, and the preconditions in [P0-merge-readiness-report.md](P0-merge-readiness-report.md) must be met first.
 > - Nothing in this document has been executed: no merge, no deployment, and no DNS or Cloudflare change.
 > - Intake has not been enabled.
 > - Implementation logic: `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`. Reviewed tree: `3f5920b17d21214b39414d080d34246746c8c40d`. Live site: `main` at `13276a0`.
@@ -28,8 +28,8 @@ All of these must hold before any merge. None holds yet unless it says so.
 
 1. The final targeted check verdict is recorded: CERTIFIED WITH TECHNICAL CONDITIONS, at `56c20ba`. **This holds.**
 2. The document-level check has been done (`093cfa6`: READY WITH DOCUMENT CONDITIONS). Its document conditions are addressed by the document-conditions commit, and a confirmation check is pending.
-3. **Gate TG-01 must pass** before any merge; the gate registry marks it merge-blocking (FC-A03). Current status: **PENDING**.
-4. **Gate TG-08 must pass**, as the owner requires. Current status: **PENDING**.
+3. **Gate TG-01 must pass** before any merge; the gate registry marks it merge-blocking (FC-A03). Current status: **APPROVED** by the owner on 2026-09-30; the registry evidence entry is outstanding.
+4. **Gate TG-08 must pass**, as the owner requires. Current status: **APPROVED** by the owner on 2026-09-30; the registry evidence entry is outstanding.
 5. The owner has decided every amendment required before merge (see the owner decision package): AM-1…AM-7 and AM-11…AM-13, including acceptance of AM-4's labelled gaps. OD-2 and OD-3 are confirmed in a decision record.
 6. The owner has chosen and approved an option below.
 7. The intake metas `veda-api-base` and `veda-turnstile-sitekey` are empty in the merged `dist/index.html`.
@@ -209,7 +209,7 @@ fixture and points those checks at it. The fixture is a copy under `app/e2e/`, w
 
 The site improvements then follow as a deliberate option A release that the owner approves on its own merits.
 
-I recommend option C but have not executed it. The merge-safety decision is **PENDING**.
+The owner approved option C on 2026-09-30. It has not been executed.
 
 ## 5. Rollback reference
 

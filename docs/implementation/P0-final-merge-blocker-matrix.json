@@ -3,7 +3,7 @@
   "rereview": "review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305",
   "previous_head": "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe",
   "branch": "implementation/p0-foundation",
-  "owner_decision_numbering": "Owner-decision ids follow the numbering of the remediation brief; OD-2 and OD-3 are brief instructions awaiting formal owner confirmation: OD-1 = re-review OD-1 + OD-2 (amendments; AM-7 rejected as written), OD-2 = re-review OD-3 (deleted-Founder restore), OD-3 = execution-time revalidation (new, RR-03), OD-4 = re-review OD-4 (TG-01, TG-08), OD-5 = re-review OD-5 (merge = site deploy). Re-review OD-6…OD-8 are unchanged and not decided.",
+  "owner_decision_numbering": "Owner-decision ids follow the numbering of the remediation brief; OD-2 and OD-3 were brief instructions; the owner approved both on 2026-09-30: OD-1 = re-review OD-1 + OD-2 (amendments; AM-7 rejected as written), OD-2 = re-review OD-3 (deleted-Founder restore), OD-3 = execution-time revalidation (new, RR-03), OD-4 = re-review OD-4 (TG-01, TG-08), OD-5 = re-review OD-5 (merge = site deploy). Re-review OD-6…OD-8 are unchanged and not decided.",
   "counts": {
     "findings": 18,
     "advisories": 25,
@@ -80,7 +80,7 @@
         "06 §7.2.2",
         "06 §7.2.6"
       ],
-      "remediation": "Implements the OD-2 brief instruction (awaiting formal owner confirmation): generic restore applies G3 and G11 (403 FOUNDER_PROTECTED + FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE via the canonical workflow (requester ≠ approver ≠ target, one decision, eligibility at request/approval/execution, execution re-validates deleted state and address, invariants re-checked); refused on single-Founder and custodian break-glass (SECOND_FOUNDER_REQUIRED). Audited (approver as actor) and security-logged (REQUESTED/APPROVED/TRANSITION RESTORE/EXECUTED). Generic status/unlock/roles/permissions/Founder actions address only live accounts (404). SPA: restore action on the Founder actions page; drawer links there for Founders.",
+      "remediation": "Implements the OD-2 brief instruction (approved by the owner on 2026-09-30): generic restore applies G3 and G11 (403 FOUNDER_PROTECTED + FOUNDER_GOVERNANCE_BYPASS_BLOCKED); FOUNDER_STATUS_CHANGE status=RESTORE via the canonical workflow (requester ≠ approver ≠ target, one decision, eligibility at request/approval/execution, execution re-validates deleted state and address, invariants re-checked); refused on single-Founder and custodian break-glass (SECOND_FOUNDER_REQUIRED). Audited (approver as actor) and security-logged (REQUESTED/APPROVED/TRANSITION RESTORE/EXECUTED). Generic status/unlock/roles/permissions/Founder actions address only live accounts (404). SPA: restore action on the Founder actions page; drawer links there for Founders.",
       "regression_tests": [
         "api/tests/integration/test_final_merge_blockers.py::test_RR02_P11_single_founder_cannot_restore_a_deleted_founder",
         "api/tests/integration/test_final_merge_blockers.py::test_RR02_generic_endpoints_cannot_restore_a_founder",
@@ -93,8 +93,8 @@
         "api/tests/integration/test_final_merge_blockers.py::test_RR02_standard_restore_unchanged_and_audited"
       ],
       "amendment": "AM-12 (06 §7.2.2)",
-      "owner_decision": "OD-2 awaiting formal owner confirmation; AM-12 not decided",
-      "merge_impact": "Cleared by the fix (implements the OD-2 brief instruction; awaiting formal owner confirmation); AM-12 decision pending",
+      "owner_decision": "OD-2 approved by the owner on 2026-09-30; AM-12 approved with conditions",
+      "merge_impact": "Cleared by the fix (implements the OD-2 brief instruction; approved by the owner on 2026-09-30); AM-12 decision pending",
       "staging_impact": "Cleared",
       "production_impact": "Cleared",
       "review_blocking": "merge (Founder-governance invariant; same class as IR-04)",
@@ -130,7 +130,7 @@
         "06 §7.1 G11",
         "06 §7.2.2 FOUNDER_EMAIL_CHANGE"
       ],
-      "remediation": "Implements the OD-3 brief instruction (awaiting formal owner confirmation): governance classes (STANDARD_CONTROL < DUAL_CONTROL < FOUNDER_GOVERNANCE); any class increase (GRANT_FOUNDER, roles, permissions) cancels open STANDARD requests (for Founders) and clears a pending non-self email proposal with its links, recording EMAIL_CHANGE_CANCELLED with reason and class transition; verification recomputes the proposal's authorising class (self / direct / EMAIL_CHANGE / FOUNDER_EMAIL_CHANGE) against the current class and refuses weaker authorisation or a disabled account (EMAIL_CHANGE_VERIFIED FAILURE, FOUNDER_GOVERNANCE_BYPASS_BLOCKED). Founder-level and break-glass requests re-validate the target at execution (existing, now tested for status and post-approval changes). Password reset and invitation acceptance already re-check account status; MFA reset executes atomically at approval under standard_still_permitted. Concurrency: verification takes the governance lock before touching rows, and on PostgreSQL a unit of work that has written nothing takes its single clock reading when it acquires the governance lock, so rows it updates are never stamped before rows committed by the transaction it waited for (found by the clean PostgreSQL run: a CheckViolation on user_action_token and a deadlock-driven 503 under concurrent promotion; fixed and looped 20× clean).",
+      "remediation": "Implements the OD-3 brief instruction (approved by the owner on 2026-09-30): governance classes (STANDARD_CONTROL < DUAL_CONTROL < FOUNDER_GOVERNANCE); any class increase (GRANT_FOUNDER, roles, permissions) cancels open STANDARD requests (for Founders) and clears a pending non-self email proposal with its links, recording EMAIL_CHANGE_CANCELLED with reason and class transition; verification recomputes the proposal's authorising class (self / direct / EMAIL_CHANGE / FOUNDER_EMAIL_CHANGE) against the current class and refuses weaker authorisation or a disabled account (EMAIL_CHANGE_VERIFIED FAILURE, FOUNDER_GOVERNANCE_BYPASS_BLOCKED). Founder-level and break-glass requests re-validate the target at execution (existing, now tested for status and post-approval changes). Password reset and invitation acceptance already re-check account status; MFA reset executes atomically at approval under standard_still_permitted. Concurrency: verification takes the governance lock before touching rows, and on PostgreSQL a unit of work that has written nothing takes its single clock reading when it acquires the governance lock, so rows it updates are never stamped before rows committed by the transaction it waited for (found by the clean PostgreSQL run: a CheckViolation on user_action_token and a deadlock-driven 503 under concurrent promotion; fixed and looped 20× clean).",
       "regression_tests": [
         "api/tests/integration/test_final_merge_blockers.py::test_RR03_N17_executed_standard_email_change_cannot_complete_after_promotion",
         "api/tests/integration/test_final_merge_blockers.py::test_RR03_verify_fails_closed_even_without_the_cleanup",
@@ -144,8 +144,8 @@
         "api/tests/integration/test_governance_remediation.py::test_IR04_*"
       ],
       "amendment": "AM-13 (06 §7.4, 05 §8.6)",
-      "owner_decision": "OD-3 awaiting formal owner confirmation; AM-13 not decided",
-      "merge_impact": "Cleared by the fix (implements the OD-3 brief instruction; awaiting formal owner confirmation); AM-13 decision pending",
+      "owner_decision": "OD-3 approved by the owner on 2026-09-30; AM-13 approved with conditions",
+      "merge_impact": "Cleared by the fix (implements the OD-3 brief instruction; approved by the owner on 2026-09-30); AM-13 decision pending",
       "staging_impact": "Cleared",
       "production_impact": "Cleared",
       "review_blocking": "merge (Founder-governance invariant)",

@@ -1,11 +1,11 @@
 # AM-2: proposed amendment to 08 §4.5, 05 §11.3
 
-> **Status: PROPOSED, NOT APPROVED.** Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and records no owner decision.
+> **Status: APPROVED WITH CONDITIONS.** Owner decision recorded 2026-09-30 ([decision record](../../implementation/P0-owner-decision-record.md)). Baseline `778aa8fdd918da48340319696ada3ff673e9fb8e`; implementation logic `6ec2e76f156e963c7363c4ad9ce93d0bccb11f41`; reviewed tree `3f5920b17d21214b39414d080d34246746c8c40d`; document-level check review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04. This proposal lives outside `docs/architecture/`, changes no certified document, and changes no certified document.
 
 | Field | Value |
 |---|---|
 | Amendment ID | AM-2 |
-| Status | **PROPOSED, NOT APPROVED** |
+| Status | **APPROVED WITH CONDITIONS** |
 | Amends | 08 §4.5, 05 §11.3 |
 | Affected requirements | AUTH-011, MFA-014, UI-015 |
 | Related findings | DEV-002 (conditions IR-01, IR-21, IR-25) |
@@ -29,3 +29,4 @@
 | Owner decision required | Approve the response shape and accept the stated link-possession residual, or require an additional proof before activation. |
 | Approval readiness | Wording corrected per RR assessment; submit with the reviewer's confirmation. |
 | Decision owner | Architecture Owner |
+| Owner decision recorded | APPROVED WITH CONDITIONS (2026-09-30). Conditions: Accept the invite-link residual (link holder sets the password before activation). (the owner stated no different conditions; the conditions of the decision package apply) |

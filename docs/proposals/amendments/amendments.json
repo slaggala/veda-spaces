@@ -1,5 +1,5 @@
 {
-  "status": "PROPOSED, NOT APPROVED",
+  "status": "Owner decisions recorded 2026-09-30; see docs/implementation/P0-owner-decision-record.md (AM-4 not decided)",
   "baseline": "778aa8fdd918da48340319696ada3ff673e9fb8e",
   "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
   "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
@@ -37,7 +37,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED",
+      "owner_decision_recorded": {
+        "decision": "APPROVED",
+        "conditions": "None",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-2",
@@ -71,7 +77,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "Accept the invite-link residual (link holder sets the password before activation). (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-3",
@@ -105,7 +117,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED",
+      "owner_decision_recorded": {
+        "decision": "APPROVED",
+        "conditions": "None",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-4",
@@ -137,7 +155,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "INCOMPLETE — states 422 where code/tests return 409; 'later version' has no ordering rule; the immutability option conflicts with erasure rewriting consent notes (DC-02)",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "PROPOSED, NOT APPROVED",
+      "owner_decision_recorded": {
+        "decision": "NOT DECIDED — not included in the consolidated owner decision",
+        "conditions": "Owner decision still required. For merge: accept the labelled gaps — approval makes the current code (any different version accepted; no create-time note; no withdrawal note in the snapshot; application-level protection only) a tracked deviation from the approved text. Before production: RR-12 implements rules (a)–(d).",
+        "date": null,
+        "source": null
+      }
     },
     {
       "id": "AM-5",
@@ -170,7 +194,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "Outbox retention ≥ break-glass window enforced or operationally controlled before production (IR-A10). (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-6",
@@ -204,7 +234,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "RG-7 rollback rehearsal before production. (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-7",
@@ -238,7 +274,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS — upgraded from INCOMPLETE: every claim verified against kernel/ratelimit.py, auth/throttle.py, auth/service.py; discloses reset-link suppression and that a Turnstile outage is fail-closed with unbounded availability impact under attack; makes none of the forbidden claims",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "Accept the disclosed disruption bounds (FC-05 reset-link gap, escalation during a Turnstile outage); staging Turnstile, proxy and alarm evidence. (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-8",
@@ -271,7 +313,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED",
+      "owner_decision_recorded": {
+        "decision": "APPROVED",
+        "conditions": "None",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-9",
@@ -305,7 +353,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "INCOMPLETE — owner decision not yet taken; repository/staging/production/provider/owner evidence are separated, but the policy itself is undecided",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "DEFERRED TO STAGING / PRODUCTION",
+      "owner_decision_recorded": {
+        "decision": "DEFERRED TO STAGING / PRODUCTION",
+        "conditions": "Decision deferred to staging/production. Decide before production; recommended option R (target cannot cancel custodian recovery).",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-10",
@@ -337,7 +391,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "INCOMPLETE — omits PII entering outbox_event.last_error from SQL and handler exception text (DC-03)",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "DEFERRED TO STAGING / PRODUCTION",
+      "owner_decision_recorded": {
+        "decision": "DEFERRED TO STAGING / PRODUCTION",
+        "conditions": "Decision deferred to staging/production. Decide before production with the Data Protection lead; RR-13.",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-11",
@@ -371,17 +431,23 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "RG-7 before production. (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-12",
       "target": "06 §7.2.2, 06 §7.1 (G11), 08 §5.11",
       "finding": "RR-02, OD-2",
       "deviation": "DEV-009",
-      "rr_assessment": "New (OD-2 brief instruction; awaiting formal owner confirmation).",
+      "rr_assessment": "New (OD-2 brief instruction; approved by the owner on 2026-09-30).",
       "existing": "FOUNDER_STATUS_CHANGE status ∈ {DISABLED, ACTIVE, UNLOCK, DELETE}; restore of deleted users is USER-001 (user.restore) with G9 only.",
       "proposed": "A deleted Founder keeps FOUNDER protection and roles and is restored only by FOUNDER_STATUS_CHANGE status=RESTORE: requested by one eligible Founder, approved in-app by a second, distinct eligible Founder (requester and target can never approve; one decision per request). The account returns DISABLED and FOUNDER-protected; reactivation is a separate FOUNDER_STATUS_CHANGE ACTIVE. Eligibility is checked at request, approval and execution under the governance lock; at execution the target must still be deleted and its address free, otherwise the request FAILS. Neither break-glass channel (single-Founder or custodian) may carry a restore — it is outside the approved break-glass policy (SECOND_FOUNDER_REQUIRED). POST /users/{id}/restore applies G3 and G11 and answers 403 FOUNDER_PROTECTED with a FOUNDER_GOVERNANCE_BYPASS_BLOCKED event for a Founder. Last-Founder invariants are re-checked (a restore never reduces the Founder count). Precise behaviour (FC-A10, FC-A11, FC-A12): the custodian CLI cannot address a deleted account at all — it refuses the restore as an unknown target and records no BREAK_GLASS_REQUESTED FAILURE event; SECOND_FOUNDER_REQUIRED is the service-level answer for in-app and direct callers. The FOUNDER_ACTION_REQUESTED/EXECUTED/FAILED events carry action FOUNDER_STATUS_CHANGE; RESTORE appears in the request payload (status) and in the FOUNDER_TRANSITION event. A restored and later reactivated Founder signs in with the password and MFA factor held before deletion (deletion revoked sessions and links, not credentials); the owner may require a FOUNDER_MFA_RESET and a password reset as part of reactivation.",
-      "reason": "RR-02; OD-2 brief instruction (a single Founder must not reverse a dual-control deletion), awaiting formal owner confirmation.",
+      "reason": "RR-02; OD-2 brief instruction (a single Founder must not reverse a dual-control deletion), approved by the owner on 2026-09-30.",
       "code": "Implemented at 6ec2e76 (unchanged at 3f5920b) (rbac/governance.py, rbac/users.py, rbac/routes.py; SPA Founder actions page).",
       "security": "Closes RR-02 (G11 bypass). Audit actor of the restore is the approving Founder; events FOUNDER_ACTION_REQUESTED/APPROVED/EXECUTED and FOUNDER_TRANSITION(RESTORE).",
       "data": "None.",
@@ -392,10 +458,10 @@
       "tests": [
         "api/tests/integration/test_final_merge_blockers.py::test_RR02_*"
       ],
-      "owner_decision": "Confirm OD-2 formally, then decide this amendment (06 §7.2.2), including whether reactivation after restore requires credential and MFA resets (FC-A12).",
+      "owner_decision": "(Recorded 2026-09-30: OD-2 approved; amendment approved with conditions.) Remaining decision: (06 §7.2.2), including whether reactivation after restore requires credential and MFA resets (FC-A12).",
       "staging": "None.",
       "production": "None beyond the release gates.",
-      "readiness": "Behaviour matches the OD-2 brief instruction; the owner must confirm OD-2 formally and decide this amendment.",
+      "readiness": "Behaviour matches the OD-2 brief instruction; OD-2 approved and this amendment approved with conditions on 2026-09-30.",
       "owner": "Architecture Owner",
       "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (FC-A10, FC-A12 wording)",
       "requirements": "RBAC-020, RBAC-021, USER-001",
@@ -403,17 +469,23 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "Decide whether reactivation after restore requires credential and MFA resets (FC-A12). (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     },
     {
       "id": "AM-13",
       "target": "06 §7.4, 05 §8.6",
       "finding": "RR-03, OD-3",
       "deviation": "DEV-010",
-      "rr_assessment": "New (OD-3 brief instruction; awaiting formal owner confirmation).",
+      "rr_assessment": "New (OD-3 brief instruction; approved by the owner on 2026-09-30).",
       "existing": "06 §7.4 re-evaluates G11 and G9 when a STANDARD request is decided and executed; a started email change (05 §8.6) completes on verification with no further check.",
       "proposed": "Governance classes: STANDARD_CONTROL < DUAL_CONTROL (holds a sensitive permission) < FOUNDER_GOVERNANCE. Withdrawal happens on GRANT_FOUNDER and on user-level role or permission changes that raise the class: open STANDARD requests are cancelled (Founder) and a pending email proposal not requested by the owner is cleared with its links (EMAIL_CHANGE_CANCELLED with reason and class transition). A class raised in any other way — a role DEFINITION gaining a sensitive permission — does not withdraw anything: the proposal is only BLOCKED at verification while the class stays raised, and if the change is reverted the old link verifies again (FC-08). At verification the proposal's authorising class (self, direct administrator, EMAIL_CHANGE request, FOUNDER_EMAIL_CHANGE request) is recomputed against the current class; weaker authorisation or a DISABLED account fails closed (EMAIL_TOKEN_INVALID; EMAIL_CHANGE_VERIFIED FAILURE; FOUNDER_GOVERNANCE_BYPASS_BLOCKED for Founders). Not covered (FC-A09): administrator-issued password-reset links and MFA-enrollment links survive a promotion to Founder; they are delivered only to the account's own verified address. Founder-level and break-glass requests re-validate the target at execution.",
-      "reason": "RR-03; OD-3 brief instruction (authorisation must match the target's class at execution), awaiting formal owner confirmation.",
+      "reason": "RR-03; OD-3 brief instruction (authorisation must match the target's class at execution), approved by the owner on 2026-09-30.",
       "code": "Implemented at 6ec2e76 (unchanged at 3f5920b) (rbac/governance.py governance_class, revalidate_after_escalation, proposal_still_authorised; auth/service.py verify_email_change; rbac/users.py role and permission paths).",
       "security": "Closes RR-03 (N17). Owner-requested changes are unaffected.",
       "data": "None.",
@@ -425,10 +497,10 @@
         "api/tests/integration/test_final_merge_blockers.py::test_RR03_*",
         "api/tests/integration/test_governance_remediation.py::test_IR04_*"
       ],
-      "owner_decision": "Confirm OD-3 formally, then decide this amendment (06 §7.4 / 05 §8.6), including the 'blocked, not withdrawn' behaviour for role-definition changes (FC-08) and the FC-A09 residual.",
+      "owner_decision": "(Recorded 2026-09-30: OD-3 approved; amendment approved with conditions.) Remaining decision: (06 §7.4 / 05 §8.6), including the 'blocked, not withdrawn' behaviour for role-definition changes (FC-08) and the FC-A09 residual.",
       "staging": "None.",
       "production": "None beyond the release gates.",
-      "readiness": "Behaviour matches the OD-3 brief instruction; the owner must confirm OD-3 formally and decide this amendment.",
+      "readiness": "Behaviour matches the OD-3 brief instruction; OD-3 approved and this amendment approved with conditions on 2026-09-30.",
       "owner": "Architecture Owner",
       "classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS (correct withdrawal over-claim FC-08, FC-A09)",
       "requirements": "RBAC-020, USER-007",
@@ -436,7 +508,13 @@
       "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
       "doc_classification": "TECHNICALLY SOUND WITH OWNER CONDITIONS",
       "code_sha": "6ec2e76f156e963c7363c4ad9ce93d0bccb11f41",
-      "status": "PROPOSED, NOT APPROVED"
+      "status": "APPROVED WITH CONDITIONS",
+      "owner_decision_recorded": {
+        "decision": "APPROVED WITH CONDITIONS",
+        "conditions": "Accept 'blocked, not withdrawn' for role-definition changes (FC-08) and the FC-A09 residual, or require withdrawal. (the owner stated no different conditions; the conditions of the decision package apply)",
+        "date": "2026-09-30",
+        "source": "Owner instruction VEDA-SPACES-P0-CONSOLIDATED-OWNER-DECISION, recorded by the author on the owner's behalf"
+      }
     }
   ]
 }
