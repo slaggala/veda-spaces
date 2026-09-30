@@ -1,0 +1,19 @@
+.....................................................................sss [ 16%]
+sss..................................................................... [ 33%]
+........................................................................ [ 49%]
+..........s..............................s.............................. [ 66%]
+........................................................................ [ 82%]
+........................................................................ [ 99%]
+...                                                                      [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/integration/test_backups.py:19: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:25: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:31: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:42: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:47: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:58: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_schema.py:93: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:354: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+427 passed, 8 skipped in 72.50s (0:01:12)
+{"event": "Exiting 29487 remaining pids=[29487]", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T10:43:57.420772Z"}
+{"event": "Cleaning last handle for server: /private/var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-pg-tests", "level": "info", "logger": "pixeltable_pgserver", "ts": "2026-09-29T10:43:57.420831Z"}

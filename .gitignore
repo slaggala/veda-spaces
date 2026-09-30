@@ -16,3 +16,20 @@ node_modules/
 # Misc
 *.log
 *.zip
+
+# Generated artifacts (P0 implementation)
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.pem
+e2e-artifacts/
+playwright-report/
+test-results/

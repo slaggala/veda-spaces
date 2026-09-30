@@ -1,0 +1,679 @@
+{
+ "registry": "Veda Spaces canonical gate registry",
+ "rule": "A gate passes only on recorded evidence meeting its acceptance criteria; a missing, stale or failed evaluation is FAIL and never defaults to pass. Owners are categories; naming individuals is an owner decision outside the architecture.",
+ "gates": [
+  {
+   "gate_id": "OWNER-INPUT-001",
+   "title": "Recovery objectives and availability target",
+   "purpose": "Obtain owner-approved RPO, RTO and API availability target (owner Decision 6)",
+   "owner": "Product Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Rebuild/restore mechanisms designed (02 §12.3)",
+   "acceptance_criteria": "Numeric RPO, RTO and monthly availability target approved and recorded; no value proposed by the architecture",
+   "evidence_required": "Signed or PR-approved decision-log entry with the values",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval)",
+   "approver": "Product Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner. NFR-002 and OPS-005 remain 'Not testable'.",
+   "retry_revalidation_rule": "Re-approval required if ADR-008 topology changes",
+   "expiry_or_freshness": "Valid until changed by a new decision-log entry",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-005",
+    "NFR-002",
+    "OPS-009"
+   ],
+   "blocking_scope": "Production release; RG-1",
+   "status": "Blocked — awaiting owner input"
+  },
+  {
+   "gate_id": "OWNER-INPUT-002",
+   "title": "Retention periods",
+   "purpose": "Obtain approved retention periods for audit, security events, sessions, tokens, outbox, notifications, closed leads and application logs",
+   "owner": "Privacy Owner",
+   "trigger_point": "Before enabling any purge, archival or anonymization job",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Retention mechanisms designed (03 §2.10, 04 §14, 05 §9.4, 07 §8)",
+   "acceptance_criteria": "Every retention setting has an approved value recorded; legal basis noted",
+   "evidence_required": "Decision-log entry + configuration record listing each value",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval)",
+   "approver": "Privacy Owner",
+   "failure_behavior": "Retention, archival and anonymization jobs refuse to run (nothing is deleted); PG-RET fails; production release blocked where retention is required.",
+   "retry_revalidation_rule": "Re-approval on any legal or policy change",
+   "expiry_or_freshness": "Reviewed at least at each DPDP policy change",
+   "dependencies": [],
+   "requirements_protected": [
+    "SEVT-004",
+    "LEAD-028",
+    "DATA-017",
+    "AUDIT-009",
+    "SEC-009"
+   ],
+   "blocking_scope": "Enabling retention jobs; PG-RET",
+   "status": "Blocked — awaiting owner input"
+  },
+  {
+   "gate_id": "OWNER-INPUT-003",
+   "title": "Restore-rehearsal cadence",
+   "purpose": "Set how often full restore rehearsals repeat",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "RG-2 mechanism exists",
+   "acceptance_criteria": "Cadence approved and recorded",
+   "evidence_required": "Decision-log entry",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval)",
+   "approver": "Product Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Re-approval on topology change",
+   "expiry_or_freshness": "Valid until changed",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-009",
+    "SEC-008"
+   ],
+   "blocking_scope": "Production release; RG-2 schedule",
+   "status": "Blocked — awaiting owner input"
+  },
+  {
+   "gate_id": "OWNER-INPUT-004",
+   "title": "Break-glass custodians",
+   "purpose": "Designate two break-glass custodians (IAM principals mapped to distinct humans) — 06 §7.5",
+   "owner": "Security Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Break-glass design (06 §7.5)",
+   "acceptance_criteria": "Two IAM principals in the break-glass group, AWS MFA enforced, each mapped to exactly one distinct human in the custodian register; neither maps to the same human",
+   "evidence_required": "Decision-log entry + IAM group membership export + custodian register (hashes)",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval); Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Product Owner",
+   "failure_behavior": "Production release blocked; single-Founder mode and Founder recovery are unavailable (Founder-level actions cannot execute).",
+   "retry_revalidation_rule": "Revalidate on any personnel change or IAM change",
+   "expiry_or_freshness": "Revalidated at least on every custodian change; PG-BG drill evidence ≤ one release old",
+   "dependencies": [],
+   "requirements_protected": [
+    "RBAC-021",
+    "MFA-015",
+    "RBAC-020"
+   ],
+   "blocking_scope": "Production release; PG-BG",
+   "status": "Blocked — awaiting owner input"
+  },
+  {
+   "gate_id": "TG-01",
+   "title": "Verifiable owner approval of the architecture (F-18)",
+   "purpose": "Provide verifiable evidence that the owner accepts the architecture decisions",
+   "owner": "Product Owner",
+   "trigger_point": "Before any implementation begins",
+   "applies_to_phase": "Pre-implementation",
+   "entry_criteria": "Architecture at the reviewed SHA; decision log present",
+   "acceptance_criteria": "The owner approves the architecture pull request (or signs the decision log) from the owner's own account",
+   "evidence_required": "Link to the PR approval (or signed log) recorded in the decision log",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval)",
+   "approver": "Product Owner (self-evidencing)",
+   "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass. The architecture must not be described as owner-approved.",
+   "retry_revalidation_rule": "Re-approval required for any later architecture commit that changes an ADR",
+   "expiry_or_freshness": "Tied to the approved SHA; stale when a later ADR-changing commit lands",
+   "dependencies": [],
+   "requirements_protected": [
+    "PLAT-006"
+   ],
+   "blocking_scope": "All implementation",
+   "status": "Pending — no verifiable owner approval exists"
+  },
+  {
+   "gate_id": "TG-02",
+   "title": "Real KMS blob fits the MFA columns (F-13)",
+   "purpose": "Prove `wrapped_data_key`/`kms_key_arn` store real KMS output",
+   "owner": "Security Owner",
+   "trigger_point": "During the MFA implementation story, before it is Done",
+   "applies_to_phase": "Implementation",
+   "entry_criteria": "Prerequisite: TG-01 and TG-08 passed; staging KMS key available",
+   "acceptance_criteria": "12 §4.5 'KMS blob size' test passes on both engines with a real GenerateDataKey blob and a maximum-length ARN",
+   "evidence_required": "CI test report",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Security Owner",
+   "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass.",
+   "retry_revalidation_rule": "Re-run on KMS key or schema change",
+   "expiry_or_freshness": "Latest CI run on the release commit",
+   "dependencies": [
+    "TG-01",
+    "TG-08"
+   ],
+   "requirements_protected": [
+    "MFA-010",
+    "MFA-001"
+   ],
+   "blocking_scope": "MFA story Done",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "TG-03",
+   "title": "Security assessment tracked from F-19",
+   "purpose": "Track F-19's DAST/penetration deficiency to PG-DAST",
+   "owner": "Security Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Staging deployed at the release candidate",
+   "acceptance_criteria": "PG-DAST passed",
+   "evidence_required": "PG-DAST evidence",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Security Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "As PG-DAST",
+   "expiry_or_freshness": "As PG-DAST",
+   "dependencies": [
+    "PG-DAST"
+   ],
+   "requirements_protected": [
+    "SEC-010",
+    "SEC-002",
+    "SEC-003"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "TG-04",
+   "title": "Retention values applied (F-15)",
+   "purpose": "Ensure retention jobs run only with approved values",
+   "owner": "Privacy Owner",
+   "trigger_point": "Before enabling retention jobs in production",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "OWNER-INPUT-002 approved",
+   "acceptance_criteria": "PG-RET passed",
+   "evidence_required": "PG-RET evidence",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Privacy Owner",
+   "failure_behavior": "Retention jobs stay disabled; production release blocked where retention is required.",
+   "retry_revalidation_rule": "As PG-RET",
+   "expiry_or_freshness": "As PG-RET",
+   "dependencies": [
+    "OWNER-INPUT-002",
+    "PG-RET"
+   ],
+   "requirements_protected": [
+    "LEAD-028",
+    "SEVT-004"
+   ],
+   "blocking_scope": "Retention enablement",
+   "status": "Blocked — awaiting OWNER-INPUT-002"
+  },
+  {
+   "gate_id": "TG-05",
+   "title": "Runbook rehearsal (F-12)",
+   "purpose": "Track F-12's rehearsal to RG-7",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Staging environment",
+   "acceptance_criteria": "RG-7 passed",
+   "evidence_required": "RG-7 evidence",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "As RG-7",
+   "expiry_or_freshness": "As RG-7",
+   "dependencies": [
+    "RG-7"
+   ],
+   "requirements_protected": [
+    "OPS-004"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "TG-06",
+   "title": "Single-process performance and revocation under load (F-09, F-10)",
+   "purpose": "Track ASM-013 and uncached-session costs to RG-4",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Staging at release candidate",
+   "acceptance_criteria": "RG-4 passed and 12 §4.5 revocation tests green",
+   "evidence_required": "RG-4 evidence + CI report",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "As RG-4",
+   "expiry_or_freshness": "As RG-4",
+   "dependencies": [
+    "RG-4"
+   ],
+   "requirements_protected": [
+    "OPS-010",
+    "AUTH-006",
+    "NFR-001"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "TG-07",
+   "title": "Targeted independent verification of the final minor remediation",
+   "purpose": "Independent confirmation that N-01…N-04 and F-19 are corrected",
+   "owner": "Architecture Owner",
+   "trigger_point": "Before implementing the Founder workflow, approvals, conformance check, recovery, RBAC resolver, duplicate-detection or concurrency stories",
+   "applies_to_phase": "Pre-implementation",
+   "entry_criteria": "This remediation committed and pushed",
+   "acceptance_criteria": "An independent reviewer (not the author) confirms N-01…N-04 and F-19 resolved at the new SHA",
+   "evidence_required": "Review artifact on the review branch",
+   "evidence_storage_location": "`review/p0-foundation-independent-review` branch",
+   "approver": "Architecture Owner (acceptance of the independent verdict)",
+   "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass. Affected stories: RBAC-021, MFA-015, DATA-011, DATA-014, MFA-013, RBAC-006, LEAD-010, API-006.",
+   "retry_revalidation_rule": "Re-verification after any change to 06 §7.2, 03 §2.11 or 12 §4.12",
+   "expiry_or_freshness": "Tied to the verified SHA",
+   "dependencies": [],
+   "requirements_protected": [
+    "RBAC-021",
+    "MFA-015",
+    "DATA-011",
+    "DATA-014",
+    "MFA-013",
+    "RBAC-006",
+    "LEAD-010",
+    "API-006"
+   ],
+   "blocking_scope": "Listed implementation stories",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "TG-08",
+   "title": "Explicit owner authorization of the implementation workstream",
+   "purpose": "Implementation needs separate explicit owner authorization (focused re-review, section 16)",
+   "owner": "Product Owner",
+   "trigger_point": "Before any implementation begins",
+   "applies_to_phase": "Pre-implementation",
+   "entry_criteria": "Prerequisite: TG-01 passed",
+   "acceptance_criteria": "Explicit written authorization naming the implementation scope",
+   "evidence_required": "Decision-log entry referencing the authorization",
+   "evidence_storage_location": "`docs/architecture/decisions/decision-log.md` (new dated entry referencing the approval)",
+   "approver": "Product Owner",
+   "failure_behavior": "The affected implementation work must not start, or must not be marked Done. A failed or missing evaluation is FAIL, never pass.",
+   "retry_revalidation_rule": "New authorization for scope changes",
+   "expiry_or_freshness": "Per authorized scope",
+   "dependencies": [
+    "TG-01"
+   ],
+   "requirements_protected": [
+    "PLAT-012"
+   ],
+   "blocking_scope": "All implementation",
+   "status": "Pending — not authorized"
+  },
+  {
+   "gate_id": "RG-1",
+   "title": "Recovery objectives met",
+   "purpose": "Prove the owner's RPO/RTO are achievable",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Full rebuild-and-restore rehearsal on staging measures RPO and RTO that meet OWNER-INPUT-001",
+   "evidence_required": "Rehearsal report with timestamps, restored row counts, measured RPO/RTO",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [
+    "OWNER-INPUT-001"
+   ],
+   "requirements_protected": [
+    "OPS-005",
+    "OPS-009",
+    "NFR-002"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-2",
+   "title": "Restore verification green",
+   "purpose": "Prove backups restore",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Automated restore verification (OPS-009) passed on consecutive scheduled runs covering at least the owner-approved cadence window, and its failure alert was test-fired",
+   "evidence_required": "Job run history + alert test-fire record",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [
+    "OWNER-INPUT-003"
+   ],
+   "requirements_protected": [
+    "OPS-009",
+    "SEC-008",
+    "OPS-002"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-3",
+   "title": "Single instance and process enforced",
+   "purpose": "Enforce SQLite single-writer topology",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Deployment config and a CI/OP check prove exactly one instance, one gunicorn worker process and one Litestream replicator",
+   "evidence_required": "Config export + check output",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-006",
+    "OPS-010"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-4",
+   "title": "Load and contention",
+   "purpose": "Prove performance targets with one process",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Load test at ASM-007 fixture sizes meets NFR-001 and NFR-003; no SQLITE_BUSY surfaced to clients; chain-append latency recorded",
+   "evidence_required": "Load-test report",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "NFR-001",
+    "NFR-003",
+    "OPS-010",
+    "SEVT-006"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-5",
+   "title": "Backup and disk alerts",
+   "purpose": "Prove operators are warned",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Litestream lag, snapshot-missing and disk alerts wired and each test-fired to its destination",
+   "evidence_required": "Alert test-fire records",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-002",
+    "LOG-006"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-6",
+   "title": "Encrypted persistent volume",
+   "purpose": "Prove data is not in the container layer",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "DB path on the dedicated KMS-encrypted volume; DeleteOnTermination=false verified",
+   "evidence_required": "Instance/volume description export",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-007"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-7",
+   "title": "Migration runbook rehearsal",
+   "purpose": "Prove deploy and both rollback paths",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "02 §12.4 rehearsed on staging including N-1 rollback and snapshot-restore rollback with the data-loss window reported",
+   "evidence_required": "Rehearsal record",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-004"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-8",
+   "title": "PostgreSQL gate recorded",
+   "purpose": "Keep gated modules off SQLite",
+   "owner": "Architecture Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "Release checklist confirms no procurement, inventory, finance or multi-instance feature is enabled while SQLite is authoritative",
+   "evidence_required": "Signed release checklist",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Architecture Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-008",
+    "PLAT-012"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "RG-9",
+   "title": "No SQLite-incompatible usage",
+   "purpose": "Prevent unsafe scale or BI access",
+   "owner": "Architecture Owner",
+   "trigger_point": "Before production readiness sign-off (and re-run before each production release that changes infrastructure)",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate deployed to staging; dependencies met",
+   "acceptance_criteria": "No second instance, gated module or direct BI DB access configured",
+   "evidence_required": "Config and access review record",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Architecture Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Fix and re-run the full gate; partial re-runs are not accepted",
+   "expiry_or_freshness": "Evidence older than the current release candidate is stale",
+   "dependencies": [],
+   "requirements_protected": [
+    "OPS-006",
+    "OPS-008"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "PG-DAST",
+   "title": "Security assessment",
+   "purpose": "Independent security testing of auth, MFA recovery, account control and public intake",
+   "owner": "Security Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Release candidate on staging; test accounts provisioned; scope letter agreed",
+   "acceptance_criteria": "An assessment (automated DAST baseline + authenticated scan + manual penetration test of the listed surfaces) is complete; the report states its methodology and severity scale; **no finding the assessor rates at the report's two highest severities remains open** — each is fixed and verified by retest, or formally risk-accepted by the Security Owner and Product Owner with rationale; all remaining findings are triaged with an owner",
+   "evidence_required": "Assessment report, retest evidence, risk-acceptance records",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Security Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner.",
+   "retry_revalidation_rule": "Retest affected areas after fixes; full re-assessment if auth/MFA/account-control code changes materially",
+   "expiry_or_freshness": "Assessment must be against the release candidate or a build with no security-relevant changes since",
+   "dependencies": [
+    "TG-03"
+   ],
+   "requirements_protected": [
+    "SEC-010",
+    "SEC-002",
+    "SEC-003",
+    "SEC-004",
+    "AUTH-005",
+    "MFA-013",
+    "USER-007",
+    "LEAD-018"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "PG-RET",
+   "title": "Retention values applied",
+   "purpose": "Retention jobs use approved values",
+   "owner": "Privacy Owner",
+   "trigger_point": "Before enabling any retention/archival/anonymization job",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "OWNER-INPUT-002 approved",
+   "acceptance_criteria": "Configured values equal the approved values; staging run of each job succeeds with those values; archival verifies checksums before deletion",
+   "evidence_required": "Config diff vs decision log + job run evidence",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Privacy Owner",
+   "failure_behavior": "Jobs remain disabled; nothing is deleted; production release blocked where retention is legally required.",
+   "retry_revalidation_rule": "Re-run after any value change",
+   "expiry_or_freshness": "Evidence per configuration version",
+   "dependencies": [
+    "OWNER-INPUT-002"
+   ],
+   "requirements_protected": [
+    "LEAD-028",
+    "SEVT-004",
+    "DATA-017",
+    "SEC-009"
+   ],
+   "blocking_scope": "Retention enablement; production",
+   "status": "Blocked — awaiting OWNER-INPUT-002"
+  },
+  {
+   "gate_id": "PG-BG",
+   "title": "Break-glass readiness",
+   "purpose": "Founder recovery must work before production",
+   "owner": "Security Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "OWNER-INPUT-004 approved",
+   "acceptance_criteria": "Custodians identified per OWNER-INPUT-004; a staging drill executes single-Founder-mode approval and full break-glass: same-human refusal observed, cooling-off respected, cancel link works, all events and notifications recorded",
+   "evidence_required": "Drill record + event export (no secrets)",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Security Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner. Founder-level actions cannot execute in production.",
+   "retry_revalidation_rule": "Re-drill on custodian change",
+   "expiry_or_freshness": "Drill evidence must be from the current release line",
+   "dependencies": [
+    "OWNER-INPUT-004"
+   ],
+   "requirements_protected": [
+    "RBAC-021",
+    "MFA-015"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Blocked — awaiting OWNER-INPUT-004"
+  },
+  {
+   "gate_id": "PG-EMAIL",
+   "title": "Production email readiness",
+   "purpose": "Security flows depend on outbound email",
+   "owner": "Operations Owner",
+   "trigger_point": "Before production readiness sign-off",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "SES production access requested",
+   "acceptance_criteria": "SES production access granted; SPF, DKIM and DMARC pass; reset, invite, enrollment-link, recovery-notification and email-change messages delivered to test inboxes; forced provider failure leaves leads persisted and outbox rows FAILED/DEAD with an alert (NOTIF-008)",
+   "evidence_required": "Delivery evidence + DNS check output + failure-drill record",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Operations Owner",
+   "failure_behavior": "Production release is blocked. A failed or missing evaluation is recorded as FAIL, never as pass. A remediation item is opened with the gate owner. Unless the Product Owner explicitly records acceptance of go-live without outbound email (security flows would then be unavailable).",
+   "retry_revalidation_rule": "Re-verify after DNS or provider change",
+   "expiry_or_freshness": "Current release line",
+   "dependencies": [],
+   "requirements_protected": [
+    "NOTIF-002",
+    "NOTIF-008",
+    "NOTIF-009",
+    "AUTH-008",
+    "MFA-014",
+    "USER-007"
+   ],
+   "blocking_scope": "Production release",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "PG-PRIV",
+   "title": "Privacy notice and consent",
+   "purpose": "Public intake must be lawful",
+   "owner": "Privacy Owner",
+   "trigger_point": "Before public intake goes live",
+   "applies_to_phase": "Pre-production",
+   "entry_criteria": "Privacy text drafted",
+   "acceptance_criteria": "Versioned privacy notice approved by the Privacy Owner and published; its version id equals `consent.policy_version` sent by the form; consent checkbox unchecked by default; withdrawal process published",
+   "evidence_required": "Approved notice + form E2E evidence",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Privacy Owner",
+   "failure_behavior": "Public intake (LEAD-001) must not go live; the website keeps the WhatsApp-only flow.",
+   "retry_revalidation_rule": "Re-approve on notice change (new version id)",
+   "expiry_or_freshness": "Per notice version",
+   "dependencies": [],
+   "requirements_protected": [
+    "LEAD-012",
+    "LEAD-027",
+    "SEC-009"
+   ],
+   "blocking_scope": "Public intake go-live",
+   "status": "Pending"
+  },
+  {
+   "gate_id": "PGM-1",
+   "title": "PostgreSQL migration rehearsal (includes A-13 criterion)",
+   "purpose": "Validate migration and the advisory-lock cost of security-event chaining",
+   "owner": "Architecture Owner",
+   "trigger_point": "Before PostgreSQL cutover (post-P0)",
+   "applies_to_phase": "Post-P0 migration",
+   "entry_criteria": "PostgreSQL release gate triggered (OPS-008)",
+   "acceptance_criteria": "Rehearsal per 11 §3.4 passes (row counts, checksums, keyed-chain recomputation); **NFR-001 p95 is met on PostgreSQL with security-event chain appends enabled under the advisory lock** (A-13)",
+   "evidence_required": "Rehearsal report",
+   "evidence_storage_location": "Release evidence register `docs/release-evidence/<gate-id>/` (summary, links and SHA-256 of artifacts; no secrets or personal data), with raw artifacts in the restricted evidence bucket referenced by hash",
+   "approver": "Architecture Owner",
+   "failure_behavior": "Cutover must not proceed; stay on SQLite; if A-13 fails, implement deferred chaining (sequence + asynchronous chaining) and re-run.",
+   "retry_revalidation_rule": "Full re-rehearsal after fixes",
+   "expiry_or_freshness": "Current migration candidate",
+   "dependencies": [
+    "RG-8"
+   ],
+   "requirements_protected": [
+    "OPS-008",
+    "SEVT-006",
+    "NFR-001"
+   ],
+   "blocking_scope": "PostgreSQL cutover",
+   "status": "Not applicable until post-P0"
+  }
+ ]
+}

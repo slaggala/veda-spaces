@@ -1,0 +1,693 @@
+"""0004_auth: sessions, tokens, MFA and the security event log (+ immutability guards).
+
+Revision ID: 0004_auth
+Revises: 0003_rbac
+"""
+
+import sqlalchemy as sa
+from alembic import op
+
+from veda.kernel import migration_support as ms  # noqa: F401
+from veda.kernel.types import GUID, JSONType, UTCDateTime  # noqa: F401
+
+revision = "0004_auth"
+down_revision = "0003_rbac"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    # --- generated DDL (tools/render_migrations.py) ---
+    op.create_table(
+        "user_session",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("user_id", GUID(), nullable=False),
+        sa.Column("started_on", UTCDateTime(), nullable=False),
+        sa.Column("last_seen_on", UTCDateTime(), nullable=False),
+        sa.Column("idle_expires_on", UTCDateTime(), nullable=False),
+        sa.Column("absolute_expires_on", UTCDateTime(), nullable=False),
+        sa.Column("session_type", sa.String(10), nullable=False, server_default="FULL"),
+        sa.Column("auth_methods", sa.String(50), nullable=False),
+        sa.Column("reauth_on", UTCDateTime(), nullable=True),
+        sa.Column("mfa_verified_on", UTCDateTime(), nullable=True),
+        sa.Column("revoked_on", UTCDateTime(), nullable=True),
+        sa.Column("revoked_by", GUID(), nullable=True),
+        sa.Column("revoke_reason", sa.String(30), nullable=True),
+        sa.Column("ip_address", sa.String(45), nullable=True),
+        sa.Column("user_agent", sa.String(500), nullable=True),
+        sa.Column("device_label", sa.String(100), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_user_session"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_user_session__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_user_session__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["revoked_by"], ["app_user.id"], name="fk_user_session__revoked_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_user_session__updated_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["app_user.id"], name="fk_user_session__user_id", ondelete="RESTRICT"),
+        sa.CheckConstraint("auth_methods IN ('pwd', 'pwd+totp', 'pwd+recovery')", name="ck_user_session__auth_methods"),
+        sa.CheckConstraint("length(auth_methods) <= 50", name="ck_user_session__auth_methods_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_session__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_user_session__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(device_label) <= 100", name="ck_user_session__device_label_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_session__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(ip_address) <= 45", name="ck_user_session__ip_address_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_user_session__is_deleted_bool").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted = false", name="ck_user_session__never_deleted"),
+        sa.CheckConstraint(
+            "revoke_reason IS NULL OR revoke_reason IN ('LOGOUT', 'LOGOUT_ALL', 'ADMIN_REVOKE', 'PASSWORD_CHANGED', 'PASSWORD_RESET', 'USER_DISABLED', 'TOKEN_REUSE', 'MFA_RESET', 'MFA_RECOVERY', 'RECOVERY_COMPLETED', 'EMAIL_CHANGED', 'EXPIRED')",
+            name="ck_user_session__revoke_reason",
+        ),
+        sa.CheckConstraint("length(revoke_reason) <= 30", name="ck_user_session__revoke_reason_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "revoked_by IS NULL OR (length(revoked_by) = 32 AND revoked_by NOT GLOB '*[^0-9a-f]*' AND substr(revoked_by, 13, 1) = '7' AND substr(revoked_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_user_session__revoked_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("session_type IN ('FULL', 'RECOVERY')", name="ck_user_session__session_type"),
+        sa.CheckConstraint("length(session_type) <= 10", name="ck_user_session__session_type_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_user_session__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_user_session__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_session__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(user_agent) <= 500", name="ck_user_session__user_agent_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(user_id) = 32 AND user_id NOT GLOB '*[^0-9a-f]*' AND substr(user_id, 13, 1) = '7' AND substr(user_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_session__user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_user_session__version_positive"),
+    )
+    op.create_index("ix_user_session__absolute_expires_on", "user_session", ["absolute_expires_on"])
+    op.create_index(
+        "ix_user_session__user_active",
+        "user_session",
+        ["user_id"],
+        sqlite_where=sa.text("revoked_on IS NULL"),
+        postgresql_where=sa.text("revoked_on IS NULL"),
+    )
+
+    op.create_table(
+        "refresh_token",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("session_id", GUID(), nullable=False),
+        sa.Column("token_hash", sa.CHAR(64), nullable=False),
+        sa.Column("issued_on", UTCDateTime(), nullable=False),
+        sa.Column("expires_on", UTCDateTime(), nullable=False),
+        sa.Column("used_on", UTCDateTime(), nullable=True),
+        sa.Column("replaced_by_id", GUID(), nullable=True),
+        sa.Column("grace_used_on", UTCDateTime(), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_refresh_token"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_refresh_token__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_refresh_token__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["session_id"], ["user_session.id"], name="fk_refresh_token__session_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_refresh_token__updated_by", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_refresh_token__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_refresh_token__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_refresh_token__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_refresh_token__is_deleted_bool").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted = false", name="ck_refresh_token__never_deleted"),
+        sa.CheckConstraint(
+            "replaced_by_id IS NULL OR (length(replaced_by_id) = 32 AND replaced_by_id NOT GLOB '*[^0-9a-f]*' AND substr(replaced_by_id, 13, 1) = '7' AND substr(replaced_by_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_refresh_token__replaced_by_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(session_id) = 32 AND session_id NOT GLOB '*[^0-9a-f]*' AND substr(session_id, 13, 1) = '7' AND substr(session_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_refresh_token__session_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_refresh_token__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("length(token_hash) <= 64", name="ck_refresh_token__token_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_refresh_token__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_refresh_token__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_refresh_token__version_positive"),
+    )
+    op.create_index("ix_refresh_token__expires_on", "refresh_token", ["expires_on"])
+    op.create_index("ix_refresh_token__session_id", "refresh_token", ["session_id"])
+    op.create_index("ux_refresh_token__token_hash", "refresh_token", ["token_hash"], unique=True)
+
+    op.create_table(
+        "user_action_token",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("user_id", GUID(), nullable=False),
+        sa.Column("purpose", sa.String(25), nullable=False),
+        sa.Column("token_hash", sa.CHAR(64), nullable=False),
+        sa.Column("expires_on", UTCDateTime(), nullable=False),
+        sa.Column("sent_to_email_normalized", sa.String(254), nullable=False),
+        sa.Column("used_on", UTCDateTime(), nullable=True),
+        sa.Column("invalidated_on", UTCDateTime(), nullable=True),
+        sa.Column("requested_ip", sa.String(45), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_user_action_token"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_user_action_token__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_user_action_token__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_user_action_token__updated_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["app_user.id"], name="fk_user_action_token__user_id", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_action_token__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_user_action_token__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_action_token__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_user_action_token__is_deleted_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("is_deleted = false", name="ck_user_action_token__never_deleted"),
+        sa.CheckConstraint(
+            "purpose IN ('PASSWORD_RESET', 'INVITE', 'MFA_ENROLLMENT', 'EMAIL_VERIFICATION', 'EMAIL_CHANGE_CANCEL', 'APPROVAL_CANCEL')",
+            name="ck_user_action_token__purpose",
+        ),
+        sa.CheckConstraint("length(purpose) <= 25", name="ck_user_action_token__purpose_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(requested_ip) <= 45", name="ck_user_action_token__requested_ip_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(sent_to_email_normalized) <= 254", name="ck_user_action_token__sent_to_email_normalized_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_user_action_token__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("length(token_hash) <= 64", name="ck_user_action_token__token_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_user_action_token__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_action_token__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(user_id) = 32 AND user_id NOT GLOB '*[^0-9a-f]*' AND substr(user_id, 13, 1) = '7' AND substr(user_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_action_token__user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_user_action_token__version_positive"),
+    )
+    op.create_index(
+        "ix_user_action_token__user_open",
+        "user_action_token",
+        ["user_id", "purpose"],
+        sqlite_where=sa.text("used_on IS NULL AND invalidated_on IS NULL"),
+        postgresql_where=sa.text("used_on IS NULL AND invalidated_on IS NULL"),
+    )
+    op.create_index("ux_user_action_token__token_hash", "user_action_token", ["token_hash"], unique=True)
+
+    op.create_table(
+        "user_mfa_factor",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("user_id", GUID(), nullable=False),
+        sa.Column("factor_type", sa.String(10), nullable=False, server_default="TOTP"),
+        sa.Column("status", sa.String(10), nullable=False, server_default="PENDING"),
+        sa.Column("secret_ciphertext", sa.Text(), nullable=False),
+        sa.Column("wrapped_data_key", sa.Text(), nullable=False),
+        sa.Column("kms_key_arn", sa.String(2048), nullable=False),
+        sa.Column("label", sa.String(100), nullable=True),
+        sa.Column("confirmed_on", UTCDateTime(), nullable=True),
+        sa.Column("last_used_step", sa.BigInteger(), nullable=True),
+        sa.Column("last_used_on", UTCDateTime(), nullable=True),
+        sa.Column("revoked_on", UTCDateTime(), nullable=True),
+        sa.Column("revoke_reason", sa.String(20), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_user_mfa_factor"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_user_mfa_factor__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_user_mfa_factor__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_user_mfa_factor__updated_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["app_user.id"], name="fk_user_mfa_factor__user_id", ondelete="RESTRICT"),
+        sa.CheckConstraint(
+            "status <> 'ACTIVE' OR confirmed_on IS NOT NULL", name="ck_user_mfa_factor__active_confirmed"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_factor__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_user_mfa_factor__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("factor_type IN ('TOTP')", name="ck_user_mfa_factor__factor_type"),
+        sa.CheckConstraint("length(factor_type) <= 10", name="ck_user_mfa_factor__factor_type_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_factor__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_user_mfa_factor__is_deleted_bool").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(kms_key_arn) <= 2048", name="ck_user_mfa_factor__kms_key_arn_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(label) <= 100", name="ck_user_mfa_factor__label_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "revoke_reason IS NULL OR revoke_reason IN ('USER_REMOVED', 'ADMIN_RESET', 'REPLACED', 'ENROLLMENT_ABANDONED', 'BREAK_GLASS')",
+            name="ck_user_mfa_factor__revoke_reason",
+        ),
+        sa.CheckConstraint("length(revoke_reason) <= 20", name="ck_user_mfa_factor__revoke_reason_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_user_mfa_factor__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("status IN ('PENDING', 'ACTIVE', 'REVOKED')", name="ck_user_mfa_factor__status"),
+        sa.CheckConstraint("length(status) <= 10", name="ck_user_mfa_factor__status_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_user_mfa_factor__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_factor__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(user_id) = 32 AND user_id NOT GLOB '*[^0-9a-f]*' AND substr(user_id, 13, 1) = '7' AND substr(user_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_factor__user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_user_mfa_factor__version_positive"),
+    )
+    op.create_index(
+        "ux_user_mfa_factor__user_live",
+        "user_mfa_factor",
+        ["user_id", "factor_type", "status"],
+        unique=True,
+        sqlite_where=sa.text("status IN ('PENDING','ACTIVE') AND is_deleted = 0"),
+        postgresql_where=sa.text("status IN ('PENDING','ACTIVE') AND is_deleted = false"),
+    )
+
+    op.create_table(
+        "user_mfa_recovery_code",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("user_id", GUID(), nullable=False),
+        sa.Column("batch_id", GUID(), nullable=False),
+        sa.Column("code_hash", sa.CHAR(64), nullable=False),
+        sa.Column("used_on", UTCDateTime(), nullable=True),
+        sa.Column("invalidated_on", UTCDateTime(), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_user_mfa_recovery_code"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_user_mfa_recovery_code__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_user_mfa_recovery_code__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_user_mfa_recovery_code__updated_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["app_user.id"], name="fk_user_mfa_recovery_code__user_id", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "length(batch_id) = 32 AND batch_id NOT GLOB '*[^0-9a-f]*' AND substr(batch_id, 13, 1) = '7' AND substr(batch_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_recovery_code__batch_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(code_hash) <= 64", name="ck_user_mfa_recovery_code__code_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_recovery_code__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_user_mfa_recovery_code__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_recovery_code__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_user_mfa_recovery_code__is_deleted_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("is_deleted = false", name="ck_user_mfa_recovery_code__never_deleted"),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_user_mfa_recovery_code__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_user_mfa_recovery_code__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_recovery_code__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(user_id) = 32 AND user_id NOT GLOB '*[^0-9a-f]*' AND substr(user_id, 13, 1) = '7' AND substr(user_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_user_mfa_recovery_code__user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_user_mfa_recovery_code__version_positive"),
+    )
+    op.create_index("ix_user_mfa_recovery_code__batch", "user_mfa_recovery_code", ["user_id", "batch_id"])
+    op.create_index(
+        "ix_user_mfa_recovery_code__user_open",
+        "user_mfa_recovery_code",
+        ["user_id"],
+        sqlite_where=sa.text("used_on IS NULL AND invalidated_on IS NULL"),
+        postgresql_where=sa.text("used_on IS NULL AND invalidated_on IS NULL"),
+    )
+    op.create_index("ux_user_mfa_recovery_code__hash", "user_mfa_recovery_code", ["code_hash"], unique=True)
+
+    op.create_table(
+        "mfa_challenge",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("user_id", GUID(), nullable=False),
+        sa.Column("purpose", sa.String(20), nullable=False),
+        sa.Column("token_hash", sa.CHAR(64), nullable=False),
+        sa.Column("session_id", GUID(), nullable=True),
+        sa.Column("expires_on", UTCDateTime(), nullable=False),
+        sa.Column("failed_attempts", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("completed_on", UTCDateTime(), nullable=True),
+        sa.Column("ip_address", sa.String(45), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_mfa_challenge"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_mfa_challenge__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_mfa_challenge__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["session_id"], ["user_session.id"], name="fk_mfa_challenge__session_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_mfa_challenge__updated_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["app_user.id"], name="fk_mfa_challenge__user_id", ondelete="RESTRICT"),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_mfa_challenge__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_mfa_challenge__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("failed_attempts BETWEEN 0 AND 5", name="ck_mfa_challenge__failed_attempts"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_mfa_challenge__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(ip_address) <= 45", name="ck_mfa_challenge__ip_address_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_mfa_challenge__is_deleted_bool").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted = false", name="ck_mfa_challenge__never_deleted"),
+        sa.CheckConstraint("purpose IN ('LOGIN', 'ENROLLMENT', 'STEP_UP')", name="ck_mfa_challenge__purpose"),
+        sa.CheckConstraint("length(purpose) <= 20", name="ck_mfa_challenge__purpose_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "session_id IS NULL OR (length(session_id) = 32 AND session_id NOT GLOB '*[^0-9a-f]*' AND substr(session_id, 13, 1) = '7' AND substr(session_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_mfa_challenge__session_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_mfa_challenge__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("length(token_hash) <= 64", name="ck_mfa_challenge__token_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_mfa_challenge__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_mfa_challenge__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(user_id) = 32 AND user_id NOT GLOB '*[^0-9a-f]*' AND substr(user_id, 13, 1) = '7' AND substr(user_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_mfa_challenge__user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_mfa_challenge__version_positive"),
+    )
+    op.create_index("ix_mfa_challenge__expires_on", "mfa_challenge", ["expires_on"])
+    op.create_index("ux_mfa_challenge__token_hash", "mfa_challenge", ["token_hash"], unique=True)
+
+    op.create_table(
+        "security_event_log",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("event_type", sa.String(50), nullable=False),
+        sa.Column("event_category", sa.String(20), nullable=False),
+        sa.Column("outcome", sa.String(10), nullable=False),
+        sa.Column("severity", sa.String(10), nullable=False, server_default="INFO"),
+        sa.Column("subject_user_id", GUID(), nullable=True),
+        sa.Column("session_id", GUID(), nullable=True),
+        sa.Column("email_attempted_hash", sa.CHAR(64), nullable=True),
+        sa.Column("failure_reason", sa.String(40), nullable=True),
+        sa.Column("permission_code", sa.String(100), nullable=True),
+        sa.Column("target_entity_type", sa.String(60), nullable=True),
+        sa.Column("target_entity_id", GUID(), nullable=True),
+        sa.Column("occurred_on", UTCDateTime(), nullable=False),
+        sa.Column("ip_address", sa.String(45), nullable=True),
+        sa.Column("user_agent", sa.String(500), nullable=True),
+        sa.Column("request_id", sa.String(64), nullable=True),
+        sa.Column("detail", JSONType(), nullable=True),
+        sa.Column("chain_seq", sa.BigInteger(), nullable=False),
+        sa.Column("prev_hash", sa.CHAR(64), nullable=True),
+        sa.Column("chain_key_label", sa.String(40), nullable=False),
+        sa.Column("row_hash", sa.CHAR(64), nullable=False),
+        sa.PrimaryKeyConstraint("id", name="pk_security_event_log"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_security_event_log__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_security_event_log__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["subject_user_id"], ["app_user.id"], name="fk_security_event_log__subject_user_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_security_event_log__updated_by", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint("length(chain_key_label) <= 40", name="ck_security_event_log__chain_key_label_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("chain_seq >= 1", name="ck_security_event_log__chain_seq_positive"),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_security_event_log__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_security_event_log__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("detail IS NULL OR json_valid(detail)", name="ck_security_event_log__detail_json").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(email_attempted_hash) <= 64", name="ck_security_event_log__email_attempted_hash_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "event_category IN ('AUTHENTICATION', 'SESSION', 'PASSWORD', 'MFA', 'ACCOUNT', 'AUTHORIZATION', 'PUBLIC_INTAKE')",
+            name="ck_security_event_log__event_category",
+        ),
+        sa.CheckConstraint("length(event_category) <= 20", name="ck_security_event_log__event_category_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(event_type) <= 50", name="ck_security_event_log__event_type_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(failure_reason) <= 40", name="ck_security_event_log__failure_reason_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_security_event_log__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted = false AND version = 1", name="ck_security_event_log__immutable_contract"),
+        sa.CheckConstraint("length(ip_address) <= 45", name="ck_security_event_log__ip_address_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_security_event_log__is_deleted_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("outcome IN ('SUCCESS', 'FAILURE', 'BLOCKED')", name="ck_security_event_log__outcome"),
+        sa.CheckConstraint("length(outcome) <= 10", name="ck_security_event_log__outcome_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(permission_code) <= 100", name="ck_security_event_log__permission_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(prev_hash) <= 64", name="ck_security_event_log__prev_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(request_id) <= 64", name="ck_security_event_log__request_id_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(row_hash) <= 64", name="ck_security_event_log__row_hash_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "session_id IS NULL OR (length(session_id) = 32 AND session_id NOT GLOB '*[^0-9a-f]*' AND substr(session_id, 13, 1) = '7' AND substr(session_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_security_event_log__session_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("severity IN ('INFO', 'WARNING', 'CRITICAL')", name="ck_security_event_log__severity"),
+        sa.CheckConstraint("length(severity) <= 10", name="ck_security_event_log__severity_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_security_event_log__soft_delete_consistent",
+        ),
+        sa.CheckConstraint(
+            "subject_user_id IS NULL OR (length(subject_user_id) = 32 AND subject_user_id NOT GLOB '*[^0-9a-f]*' AND substr(subject_user_id, 13, 1) = '7' AND substr(subject_user_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_security_event_log__subject_user_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "target_entity_id IS NULL OR (length(target_entity_id) = 32 AND target_entity_id NOT GLOB '*[^0-9a-f]*' AND substr(target_entity_id, 13, 1) = '7' AND substr(target_entity_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_security_event_log__target_entity_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(target_entity_type) <= 60", name="ck_security_event_log__target_entity_type_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(target_entity_type IS NULL) = (target_entity_id IS NULL)", name="ck_security_event_log__target_pair"
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_security_event_log__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_security_event_log__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(user_agent) <= 500", name="ck_security_event_log__user_agent_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("version >= 1", name="ck_security_event_log__version_positive"),
+    )
+    op.create_index("ix_security_event_log__ip", "security_event_log", ["ip_address", sa.text("occurred_on DESC")])
+    op.create_index(
+        "ix_security_event_log__occurred", "security_event_log", [sa.text("occurred_on DESC"), sa.text("id DESC")]
+    )
+    op.create_index(
+        "ix_security_event_log__outcome",
+        "security_event_log",
+        ["outcome", sa.text("occurred_on DESC")],
+        sqlite_where=sa.text("outcome <> 'SUCCESS'"),
+        postgresql_where=sa.text("outcome <> 'SUCCESS'"),
+    )
+    op.create_index(
+        "ix_security_event_log__subject", "security_event_log", ["subject_user_id", sa.text("occurred_on DESC")]
+    )
+    op.create_index(
+        "ix_security_event_log__target",
+        "security_event_log",
+        ["target_entity_type", "target_entity_id", sa.text("occurred_on DESC")],
+        sqlite_where=sa.text("target_entity_id IS NOT NULL"),
+        postgresql_where=sa.text("target_entity_id IS NOT NULL"),
+    )
+    op.create_index("ix_security_event_log__type", "security_event_log", ["event_type", sa.text("occurred_on DESC")])
+    op.create_index("ux_security_event_log__chain_seq", "security_event_log", ["chain_seq"], unique=True)
+    # --- end generated DDL ---
+    ms.create_immutability_guards(op.get_bind(), "security_event_log")
+
+
+def downgrade() -> None:
+    # Expand-only migrations; no down-migrations are relied on (02 §12.4).
+    raise NotImplementedError("down-migrations are not supported")

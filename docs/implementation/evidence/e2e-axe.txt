@@ -1,0 +1,13 @@
+PASS login: 0 violation(s), 0 serious/critical
+PASS MFA challenge: 0 violation(s), 0 serious/critical
+PASS dashboard: 0 violation(s), 0 serious/critical
+PASS lead list: 0 violation(s), 0 serious/critical
+PASS users: 0 violation(s), 0 serious/critical
+PASS roles: 0 violation(s), 0 serious/critical
+PASS audit log: 0 violation(s), 0 serious/critical
+PASS lead detail: 0 violation(s), 0 serious/critical
+FAIL website (idle): 1 violation(s), 1 serious/critical
+   - [serious] color-contrast: Elements must meet minimum color contrast ratio thresholds (19 node(s))
+FAIL website form (error state): 1 violation(s), 1 serious/critical
+   - [serious] color-contrast: Elements must meet minimum color contrast ratio thresholds (19 node(s))
+8/10 screens without serious/critical violations

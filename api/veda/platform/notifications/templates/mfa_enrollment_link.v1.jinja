@@ -1,0 +1,13 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}Set up two-step verification{% endblock %}
+{% block headline %}Set up two-step verification{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+Your account needs two-step verification. Open this link, confirm your password
+and scan the code with an authenticator app. The link expires in 30 minutes:
+{{ link }}
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>Your account needs two-step verification. Open the link, confirm your password and scan the code with an authenticator app.</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Set up two-step verification</a></p><p style="color:#5D574F;font-size:13px">The link expires in 30 minutes.</p>
+{% endblock %}

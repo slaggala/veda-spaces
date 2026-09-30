@@ -1,0 +1,53 @@
+{
+  "alembic_heads": [
+    "0009_mfa_challenge_binding"
+  ],
+  "revision_order": [
+    "0001_kernel",
+    "0002_identity",
+    "0003_rbac",
+    "0004_auth",
+    "0005_audit",
+    "0006_reference",
+    "0007_notifications",
+    "0008_account_security",
+    "0100_crm_leads",
+    "0009_mfa_challenge_binding"
+  ],
+  "postgresql": {
+    "server_version": "16.4",
+    "version": "0009_mfa_challenge_binding",
+    "tables": 24,
+    "columns": 504,
+    "mfa_challenge_binding_columns": [
+      "enrollment_path",
+      "factor_id"
+    ],
+    "indexes": 72,
+    "foreign_keys": 108,
+    "check_constraints": 164,
+    "conformance_ok": true,
+    "conformance_problems": [],
+    "audit_columns_on_every_table": true,
+    "immutability_guards": true,
+    "human_users": 0,
+    "password_hashes": 0,
+    "seed_counts": {
+      "roles": 3,
+      "permissions": 45,
+      "matrix": 101,
+      "lookups": 47,
+      "system_users": 3,
+      "sequence": 1
+    },
+    "raw_uuidv4_insert_rejected_by_db": "n/a (native uuid; version nibble validated by the kernel GUID type on bind)",
+    "downgrade_-1": "refused: NotImplementedError(down-migrations are not supported) \u2014 expand-only policy, 02 \u00a712.4",
+    "version_after_refused_downgrade": "0009_mfa_challenge_binding",
+    "binding_columns_after_refused_downgrade": [
+      "enrollment_path",
+      "factor_id"
+    ],
+    "version_after_downgrade_attempt_and_reupgrade": "0009_mfa_challenge_binding",
+    "seed_deterministic_across_fresh_databases": true
+  }
+}

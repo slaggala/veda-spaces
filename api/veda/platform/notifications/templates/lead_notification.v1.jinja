@@ -1,0 +1,11 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}{{ title }}{% endblock %}
+{% block headline %}{{ title }}{% endblock %}
+{% block text %}
+Lead: {{ body }}
+
+Open the lead: {{ link }}
+{% endblock %}
+{% block content %}
+<p>{{ body }}</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Open lead</a></p>
+{% endblock %}

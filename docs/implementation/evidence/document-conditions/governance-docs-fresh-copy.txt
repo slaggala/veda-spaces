@@ -1,0 +1,35 @@
+$ CI=true pytest tests/unit/test_governance_docs.py (fresh copy, no git history)
+>               pytest.fail("CI must check out full history (fetch-depth: 0) for the SHA check (DC-04)")
+E               Failed: CI must check out full history (fetch-depth: 0) for the SHA check (DC-04)
+PASSED tests/unit/test_governance_docs.py::test_amendments_live_outside_the_certified_tree
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[1]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[2]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[3]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[4]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[5]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[6]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[7]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[8]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[9]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[10]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[11]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[12]
+PASSED tests/unit/test_governance_docs.py::test_amendment_format_and_status[13]
+PASSED tests/unit/test_governance_docs.py::test_amendment_json_status
+PASSED tests/unit/test_governance_docs.py::test_owner_package_records_no_decision
+PASSED tests/unit/test_governance_docs.py::test_no_owner_decision_is_implied_anywhere
+PASSED tests/unit/test_governance_docs.py::test_every_cited_sha_is_a_known_commit
+PASSED tests/unit/test_governance_docs.py::test_invalid_sha_references_are_caught[Implementation `6ec2e76f156e963c7363c4ad9ce93d0bccb11f42`.-unknown SHA]
+PASSED tests/unit/test_governance_docs.py::test_invalid_sha_references_are_caught[at 6ec2e77 the fix-unknown SHA]
+PASSED tests/unit/test_governance_docs.py::test_invalid_sha_references_are_caught[reviewed 0123456789abcdef0123456789abcdef01234567-unknown SHA]
+PASSED tests/unit/test_governance_docs.py::test_invalid_sha_references_are_caught[the implementation is 6ec2e76f156e963c7363c4ad9ce93d0bc0b11f41-nonexistent SHA]
+PASSED tests/unit/test_governance_docs.py::test_valid_and_non_sha_tokens_pass
+PASSED tests/unit/test_governance_docs.py::test_role_specific_references
+PASSED tests/unit/test_governance_docs.py::test_gates_pending
+PASSED tests/unit/test_governance_docs.py::test_public_intake_disabled
+FAILED tests/unit/test_governance_docs.py::test_known_commits_exist_with_the_recorded_subjects - Failed: CI must check out full history (fetch-depth: 0) for the SHA check (DC-04)
+1 failed, 26 passed in 0.06s
+---
+$ pytest (same fresh copy, not CI)
+SKIPPED [1] tests/unit/test_governance_docs.py:189: the project history is not available (fresh copy); CI runs this with full history
+26 passed, 1 skipped in 0.05s

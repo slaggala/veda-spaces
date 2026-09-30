@@ -1,0 +1,14 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}A change of your sign-in email was requested{% endblock %}
+{% block headline %}Sign-in email change requested{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+A change of your sign-in email to {{ proposed }} was requested by {{ requester }}.
+Your current address stays active until the new one is verified.
+If this wasn't you, cancel it and contact the Founder:
+{{ link }}
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>A change of your sign-in email to <strong>{{ proposed }}</strong> was requested by {{ requester }}. Your current address stays active until the new one is verified.</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Cancel this change</a></p><p><strong>If this wasn't you, cancel it and contact the Founder.</strong></p>
+{% endblock %}

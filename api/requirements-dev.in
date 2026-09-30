@@ -1,0 +1,12 @@
+# Development and CI tools (pinned through requirements-dev.txt).
+-c requirements.txt
+-r requirements.in
+pytest>=8
+pytest-cov>=5
+ruff>=0.16,<0.17
+mypy>=1.14
+pip-audit>=2.7
+bandit>=1.8
+detect-secrets>=1.5
+# Embedded PostgreSQL for the dual-engine integration suite (OPS-001)
+pixeltable-pgserver>=0.3

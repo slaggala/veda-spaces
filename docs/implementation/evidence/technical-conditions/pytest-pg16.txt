@@ -1,0 +1,21 @@
+.........................s.............................................. [ 11%]
+........ssssss.......................................................... [ 23%]
+........................................................................ [ 35%]
+...........................................................s............ [ 47%]
+...........................s.........s.................................. [ 58%]
+........................................................................ [ 70%]
+...............................................................s........ [ 82%]
+........................................................................ [ 94%]
+...................................                                      [100%]
+=========================== short test summary info ============================
+SKIPPED [2] tests/integration/test_archive_ordering.py:267: snapshots and the database-volume check are SQLite-only (the P0 production engine)
+SKIPPED [1] tests/integration/test_backups.py:19: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:25: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:31: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:42: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:47: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_backups.py:58: snapshots apply to the SQLite deployment; PostgreSQL uses managed snapshots
+SKIPPED [1] tests/integration/test_schema.py:93: SQLite pragma
+SKIPPED [1] tests/integration/test_schema.py:354: format CHECKs are SQLite-only; PostgreSQL's native uuid enforces format (03 §12)
+SKIPPED [1] tests/unit/test_governance_docs.py:86: the project history is not available (fresh copy or shallow clone)
+600 passed, 11 skipped in 119.23s (0:01:59)

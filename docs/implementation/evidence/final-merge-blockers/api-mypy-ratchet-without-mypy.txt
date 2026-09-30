@@ -1,0 +1,2 @@
+mypy ratchet: FAIL (check not performed): mypy produced no summary (not installed or not run?): <scratch>/tools-venv/bin/python: No module named mypy
+

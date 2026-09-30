@@ -1,0 +1,9 @@
+PASS accept invitation (path B: forced MFA enrollment)
+PASS dashboard renders for the Founder
+PASS website enquiry reaches the lead list
+PASS lead detail and status change
+PASS audit viewer shows the change
+PASS sign out and sign back in with TOTP
+PASS mobile width lead list (360 px, no horizontal scroll)
+console errors: 0
+7/7 journeys passed

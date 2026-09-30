@@ -1,0 +1,578 @@
+FF.FFFFFFFFFFFFF                                                         [100%]
+=================================== FAILURES ===================================
+_______ test_RR05_C11_forged_manifest_without_export_is_detected[sqlite] _______
+
+api = <tests.support.api.ApiClient object at 0x10b367620>
+factory = <tests.support.factory.Factory object at 0x10b367e00>
+
+    def test_RR05_C11_forged_manifest_without_export_is_detected(api, factory):
+        _activity(api, factory)
+        anchor = maintenance.anchor_chain()
+        _activity(api, factory)
+        _forge_prefix_deletion(anchor_store.store(), anchor)
+        report = maintenance.verify_chain()
+>       assert not report.ok and report.problem == "archive export missing", report
+E       AssertionError: ChainReport(ok=False, checked=0, head_seq=3, head_hash='ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', problem='prev_hash mismatch', at_seq=4)
+E       assert (not False and 'prev_hash mismatch' == 'archive export missing'
+E        +  where False = ChainReport(ok=False, checked=0, head_seq=3, head_hash='ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', problem='prev_hash mismatch', at_seq=4).ok
+E         
+E         - archive export missing
+E         + prev_hash mismatch)
+
+tests/integration/test_archive_ordering.py:75: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.855343Z", "_aws": {"Timestamp": 1790686492855, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "b83f2db45a1b1a39", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 22.3, "_aws": {"Timestamp": 1790686492855, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 22.3, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.855862Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.862195Z", "_aws": {"Timestamp": 1790686492862, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "955c558f99e468fe", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 4.1, "_aws": {"Timestamp": 1790686492862, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 4.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.862677Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.866198Z", "_aws": {"Timestamp": 1790686492866, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_CHAIN_ANCHORED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.872060Z", "_aws": {"Timestamp": 1790686492872, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "c7b5e140db7af46f", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.8, "_aws": {"Timestamp": 1790686492872, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.8, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.872448Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.877926Z", "_aws": {"Timestamp": 1790686492877, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "f3378c5006f77712", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.6, "_aws": {"Timestamp": 1790686492878, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.878278Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.882833Z", "_aws": {"Timestamp": 1790686492882, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [[]], "Metrics": [{"Name": "ChainVerificationFailed", "Unit": "Count"}]}]}, "ChainVerificationFailed": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.883542Z", "_aws": {"Timestamp": 1790686492883, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_CHAIN_BROKEN", "Outcome": "FAILURE", "SecurityEvents": 1}
+{"event": "security_log_chain_broken at_seq=4 problem=prev_hash mismatch", "level": "critical", "logger": "veda.maintenance", "ts": "2026-09-29T12:54:52.883612Z"}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'b83f2db45a1b1a39', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 22.3, '_aws': {'Timestamp': 1790686492855, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 22.3, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.855862Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '955c558f99e468fe', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 4.1, '_aws': {'Timestamp': 1790686492862, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.862677Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'c7b5e140db7af46f', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.8, '_aws': {'Timestamp': 1790686492872, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.8, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.872448Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'f3378c5006f77712', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.6, '_aws': {'Timestamp': 1790686492878, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.878278Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+CRITICAL veda.maintenance:maintenance.py:397 security_log_chain_broken at_seq=4 problem=prev_hash mismatch
+_________ test_RR05_forged_export_that_drops_rows_is_detected[sqlite] __________
+
+api = <tests.support.api.ApiClient object at 0x10b83a210>
+factory = <tests.support.factory.Factory object at 0x10b83a350>
+retention = None
+tmp_path = PosixPath('<tmp>')
+
+    def test_RR05_forged_export_that_drops_rows_is_detected(api, factory, retention, tmp_path):
+        """The host attacker also writes an export: without recomputing every later hash (which the anchor pins),
+        the doctored export does not chain."""
+        _age(api, factory)
+        store = anchor_store.store()
+        maintenance.archive_security_events(str(tmp_path))
+        real = store.all("archive")[0]
+>       blob = store.get_blob("export", real["last_seq"]).decode().splitlines()
+               ^^^^^^^^^^^^^^
+E       AttributeError: 'LocalAnchorStore' object has no attribute 'get_blob'
+
+tests/integration/test_archive_ordering.py:86: AttributeError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.952995Z", "_aws": {"Timestamp": 1790686492952, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "7cf79b4be16cc045", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 13.1, "_aws": {"Timestamp": 1790686492953, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 13.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.953421Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.959153Z", "_aws": {"Timestamp": 1790686492959, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "c249a21e56b5d523", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.7, "_aws": {"Timestamp": 1790686492959, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.7, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:52.959543Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:52.963665Z", "_aws": {"Timestamp": 1790686492963, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_ARCHIVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '7cf79b4be16cc045', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 13.1, '_aws': {'Timestamp': 1790686492953, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 13.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.953421Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'c249a21e56b5d523', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.7, '_aws': {'Timestamp': 1790686492959, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.7, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:52.959543Z'}
+INFO     veda.metrics:metrics.py:51 metric
+__________ test_RR05_forgery_through_the_s3_store_is_detected[sqlite] __________
+
+api = <tests.support.api.ApiClient object at 0x10c7ec9d0>
+factory = <tests.support.factory.Factory object at 0x10c7ecb00>
+
+    def test_RR05_forgery_through_the_s3_store_is_detected(api, factory):
+        fake = FakeS3()
+        anchor_store.use_store(anchor_store.S3AnchorStore("veda-anchors", client=fake))
+        try:
+            _activity(api, factory)
+            anchor = maintenance.anchor_chain()
+            _activity(api, factory)
+            _forge_prefix_deletion(anchor_store.store(), anchor)
+            report = maintenance.verify_chain()
+>           assert not report.ok and report.problem == "archive export missing"
+E           AssertionError: assert (not False and 'prev_hash mismatch' == 'archive export missing'
+E            +  where False = ChainReport(ok=False, checked=0, head_seq=3, head_hash='ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', problem='prev_hash mismatch', at_seq=4).ok
+E             
+E             - archive export missing
+E             + prev_hash mismatch)
+
+tests/integration/test_archive_ordering.py:137: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.078675Z", "_aws": {"Timestamp": 1790686493078, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "7198fbe78ae9c918", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 10.1, "_aws": {"Timestamp": 1790686493079, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 10.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.079087Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.085077Z", "_aws": {"Timestamp": 1790686493084, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "4bcbbdddee331fe6", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 4.1, "_aws": {"Timestamp": 1790686493085, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 4.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.085644Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.087277Z", "_aws": {"Timestamp": 1790686493087, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_CHAIN_ANCHORED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.092832Z", "_aws": {"Timestamp": 1790686493092, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "3e91106f7683f29e", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.7, "_aws": {"Timestamp": 1790686493093, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.7, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.093196Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.098757Z", "_aws": {"Timestamp": 1790686493098, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "e64e5c1f4ac017cf", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.6, "_aws": {"Timestamp": 1790686493099, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.099107Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.100713Z", "_aws": {"Timestamp": 1790686493100, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [[]], "Metrics": [{"Name": "ChainVerificationFailed", "Unit": "Count"}]}]}, "ChainVerificationFailed": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.101250Z", "_aws": {"Timestamp": 1790686493101, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_CHAIN_BROKEN", "Outcome": "FAILURE", "SecurityEvents": 1}
+{"event": "security_log_chain_broken at_seq=4 problem=prev_hash mismatch", "level": "critical", "logger": "veda.maintenance", "ts": "2026-09-29T12:54:53.101306Z"}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '7198fbe78ae9c918', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 10.1, '_aws': {'Timestamp': 1790686493079, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 10.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.079087Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '4bcbbdddee331fe6', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 4.1, '_aws': {'Timestamp': 1790686493085, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.085644Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '3e91106f7683f29e', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.7, '_aws': {'Timestamp': 1790686493093, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.7, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.093196Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'e64e5c1f4ac017cf', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.6, '_aws': {'Timestamp': 1790686493099, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.099107Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+CRITICAL veda.maintenance:maintenance.py:397 security_log_chain_broken at_seq=4 problem=prev_hash mismatch
+________ test_RR05_genuine_archives_verify_through_the_s3_store[sqlite] ________
+
+api = <tests.support.api.ApiClient object at 0x10c974fc0>
+factory = <tests.support.factory.Factory object at 0x10c9750f0>
+retention = None
+tmp_path = PosixPath('<tmp>')
+
+    def test_RR05_genuine_archives_verify_through_the_s3_store(api, factory, retention, tmp_path):
+        fake = FakeS3()
+        anchor_store.use_store(anchor_store.S3AnchorStore("veda-anchors", client=fake))
+        try:
+            _age(api, factory)
+            maintenance.anchor_chain()
+            first = maintenance.archive_security_events(str(tmp_path))
+            _age(api, factory)
+            second = maintenance.archive_security_events(str(tmp_path))
+            assert first["archived"] and second["archived"]
+            assert all(a["ObjectLockMode"] == "COMPLIANCE" for a in fake.put_args)
+            kinds = sorted({k.split("/")[1] for k in fake.objects})
+>           assert kinds == ["anchors", "archives", "exports", "pendings"]
+E           AssertionError: assert ['anchors', 'archives'] == ['anchors', '...', 'pendings']
+E             
+E             Right contains 2 more items, first extra item: 'exports'
+E             Use -v to get more diff
+
+tests/integration/test_archive_ordering.py:154: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.145392Z", "_aws": {"Timestamp": 1790686493145, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "f695a28e5a801e53", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 10.6, "_aws": {"Timestamp": 1790686493145, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 10.6, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.145818Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.151771Z", "_aws": {"Timestamp": 1790686493151, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "c5fb6c42ca9912ce", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.9, "_aws": {"Timestamp": 1790686493152, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.9, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.152176Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.154078Z", "_aws": {"Timestamp": 1790686493154, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_CHAIN_ANCHORED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.156903Z", "_aws": {"Timestamp": 1790686493156, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_ARCHIVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.164602Z", "_aws": {"Timestamp": 1790686493164, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "88b586e40df3f6f4", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 5.1, "_aws": {"Timestamp": 1790686493165, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 5.1, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.165124Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.171823Z", "_aws": {"Timestamp": 1790686493171, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "d5b3fda90d015782", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 4.0, "_aws": {"Timestamp": 1790686493172, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 4.0, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.172223Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.174645Z", "_aws": {"Timestamp": 1790686493174, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_ARCHIVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'f695a28e5a801e53', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 10.6, '_aws': {'Timestamp': 1790686493145, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 10.6, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.145818Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'c5fb6c42ca9912ce', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.9, '_aws': {'Timestamp': 1790686493152, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.9, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.152176Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '88b586e40df3f6f4', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 5.1, '_aws': {'Timestamp': 1790686493165, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 5.1, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.165124Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'd5b3fda90d015782', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 4.0, '_aws': {'Timestamp': 1790686493172, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.0, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.172223Z'}
+INFO     veda.metrics:metrics.py:51 metric
+_ test_RR06_C12_database_failure_after_the_pending_manifest_is_not_an_alarm[sqlite] _
+
+api = <tests.support.api.ApiClient object at 0x10ca944d0>
+factory = <tests.support.factory.Factory object at 0x10ca94ef0>
+retention = None
+tmp_path = PosixPath('<tmp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10cb14c30>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x10c8297f0>
+
+    def test_RR06_C12_database_failure_after_the_pending_manifest_is_not_an_alarm(
+        api, factory, retention, tmp_path, monkeypatch, caplog
+    ):
+        _age(api, factory)
+        online_before = len(events())
+    
+        def fail(conn, table):
+            raise RuntimeError("simulated database failure")
+    
+        monkeypatch.setattr(migration_support, "drop_immutability_guards", fail)
+        with caplog.at_level(logging.INFO), pytest.raises(RuntimeError):
+            maintenance.archive_security_events(str(tmp_path))
+>       assert _emf(caplog, "SecurityLogArchiveFailed")
+E       AssertionError: assert []
+E        +  where [] = _emf(<_pytest.logging.LogCaptureFixture object at 0x10c8297f0>, 'SecurityLogArchiveFailed')
+
+tests/integration/test_archive_ordering.py:175: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.222353Z", "_aws": {"Timestamp": 1790686493222, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "ac2d722596896a14", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 10.8, "_aws": {"Timestamp": 1790686493222, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 10.8, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.222799Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.228910Z", "_aws": {"Timestamp": 1790686493228, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "50f173fbdc410c46", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 3.9, "_aws": {"Timestamp": 1790686493229, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 3.9, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.229328Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.234527Z", "_aws": {"Timestamp": 1790686493234, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "SECURITY_LOG_ARCHIVED", "Outcome": "SUCCESS", "SecurityEvents": 1}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'ac2d722596896a14', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 10.8, '_aws': {'Timestamp': 1790686493222, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 10.8, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.222799Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '50f173fbdc410c46', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 3.9, '_aws': {'Timestamp': 1790686493229, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 3.9, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.229328Z'}
+INFO     veda.metrics:metrics.py:51 metric
+________ test_RR06_failure_after_commit_is_alarmed_and_repaired[sqlite] ________
+
+api = <tests.support.api.ApiClient object at 0x10cb9fac0>
+factory = <tests.support.factory.Factory object at 0x10cb9fbd0>
+retention = None
+tmp_path = PosixPath('<tmp>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c7ed0f0>
+
+    def test_RR06_failure_after_commit_is_alarmed_and_repaired(api, factory, retention, tmp_path, monkeypatch):
+        _age(api, factory)
+        real_put = anchor_store.LocalAnchorStore.put
+    
+        def put(self, kind, seq, body):
+            if kind == "archive":
+                raise ConnectionError("object store unavailable")
+            return real_put(self, kind, seq, body)
+    
+        monkeypatch.setattr(anchor_store.LocalAnchorStore, "put", put)
+        with pytest.raises(ConnectionError):
+            maintenance.archive_security_events(str(tmp_path))
+        monkeypatch.undo()
+        report = maintenance.verify_chain()
+>       assert not report.ok and report.problem == "archive not finalised", "a durable failure state is alarmed"
+E       AssertionError: a durable failure state is alarmed
+E       assert (not True)
+E        +  where True = ChainReport(ok=True, checked=2, head_seq=2, head_hash='c7c642efe96ec1b40aa1e85bfae36c2ca1483ff23f76a011376ff43cde2ebecd', problem=None, at_seq=None).ok
+
+tests/integration/test_archive_ordering.py:201: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.312650Z", "_aws": {"Timestamp": 1790686493312, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "fd4450259af1da94", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 14.0, "_aws": {"Timestamp": 1790686493313, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 14.0, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.313223Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.320839Z", "_aws": {"Timestamp": 1790686493320, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "e85535dc31e36a90", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 4.5, "_aws": {"Timestamp": 1790686493321, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 4.5, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.321307Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.335797Z", "_aws": {"Timestamp": 1790686493335, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [[]], "Metrics": [{"Name": "ChainVerificationFailed", "Unit": "Count"}]}]}, "ChainVerificationFailed": 0}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'fd4450259af1da94', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 14.0, '_aws': {'Timestamp': 1790686493313, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 14.0, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.313223Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': 'e85535dc31e36a90', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 4.5, '_aws': {'Timestamp': 1790686493321, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.5, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.321307Z'}
+INFO     veda.metrics:metrics.py:51 metric
+____ test_RR06_anchor_store_outage_during_verification_is_a_failure[sqlite] ____
+
+api = <tests.support.api.ApiClient object at 0x10ccfee00>
+factory = <tests.support.factory.Factory object at 0x10ccfef10>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x10c9c3250>
+
+    def test_RR06_anchor_store_outage_during_verification_is_a_failure(api, factory, caplog):
+        _activity(api, factory)
+    
+        class Down:
+            def latest(self, kind):
+                raise ConnectionError("store down")
+    
+            all = latest
+    
+        anchor_store.use_store(Down())
+        try:
+            with caplog.at_level(logging.INFO):
+>               report = maintenance.verify_chain()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/test_archive_ordering.py:219: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+veda/platform/maintenance.py:356: in verify_chain
+    anchor = store.latest("anchor")
+             ^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tests.integration.test_archive_ordering.test_RR06_anchor_store_outage_during_verification_is_a_failure.<locals>.Down object at 0x10c82a270>
+kind = 'anchor'
+
+    def latest(self, kind):
+>       raise ConnectionError("store down")
+E       ConnectionError: store down
+
+tests/integration/test_archive_ordering.py:212: ConnectionError
+----------------------------- Captured stdout call -----------------------------
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.406039Z", "_aws": {"Timestamp": 1790686493405, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "43a5f61c145fc608", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 20.2, "_aws": {"Timestamp": 1790686493406, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 20.2, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.406636Z"}
+{"event": "metric", "level": "info", "logger": "veda.metrics", "ts": "2026-09-29T12:54:53.414249Z", "_aws": {"Timestamp": 1790686493414, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["EventType", "Outcome"]], "Metrics": [{"Name": "SecurityEvents", "Unit": "Count"}]}]}, "EventType": "LOGIN", "Outcome": "SUCCESS", "SecurityEvents": 1}
+{"request_id": "11e5885fdb420b53", "method": "POST", "route": "/api/v1/auth/login", "status": 200, "duration_ms": 4.7, "_aws": {"Timestamp": 1790686493414, "CloudWatchMetrics": [{"Namespace": "Veda/API", "Dimensions": [["Route", "StatusClass"]], "Metrics": [{"Name": "Requests", "Unit": "Count"}, {"Name": "Latency", "Unit": "Milliseconds"}]}]}, "Route": "/api/v1/auth/login", "StatusClass": "2xx", "Requests": 1, "Latency": 4.7, "ip": "127.0.0.0/24", "user_id": null, "session_id": null, "event": "request", "level": "info", "logger": "veda.http", "ts": "2026-09-29T12:54:53.415066Z"}
+------------------------------ Captured log call -------------------------------
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '43a5f61c145fc608', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 20.2, '_aws': {'Timestamp': 1790686493406, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 20.2, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.406636Z'}
+INFO     veda.metrics:metrics.py:51 metric
+INFO     veda.http:logging.py:173 {'request_id': '11e5885fdb420b53', 'method': 'POST', 'route': '/api/v1/auth/login', 'status': 200, 'duration_ms': 4.7, '_aws': {'Timestamp': 1790686493414, 'CloudWatchMetrics': [{'Namespace': 'Veda/API', 'Dimensions': [['Route', 'StatusClass']], 'Metrics': [{'Name': 'Requests', 'Unit': 'Count'}, {'Name': 'Latency', 'Unit': 'Milliseconds'}]}]}, 'Route': '/api/v1/auth/login', 'StatusClass': '2xx', 'Requests': 1, 'Latency': 4.7, 'ip': '127.0.0.0/24', 'user_id': None, 'session_id': None, 'event': 'request', 'level': 'info', 'logger': 'veda.http', 'ts': '2026-09-29T12:54:53.415066Z'}
+______ test_RR07_cli_jobs_emit_their_metrics[sqlite-disk-usage-DiskUsed] _______
+
+app = <Flask 'veda'>
+database_url = 'sqlite:////var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-tests-6xio6rxh/t-2139394e018644ccb2d2c20ad1a6609d.db'
+engine = 'sqlite', job = 'disk-usage', metric = 'DiskUsed'
+
+    @pytest.mark.parametrize(
+        "job,metric",
+        [
+            ("disk-usage", "DiskUsed"),
+            ("verify-chain", "ChainVerificationFailed"),
+            ("invariants", "GovernanceInvariantFailures"),
+            ("snapshot", "MaintenanceJobFailed"),
+        ],
+    )
+    def test_RR07_cli_jobs_emit_their_metrics(app, database_url, engine, job, metric):
+        if engine != "sqlite" and job in ("snapshot", "disk-usage"):
+            pytest.skip("snapshots and the database-volume check are SQLite-only (the P0 production engine)")
+        r = _cli(database_url, "maintenance", job)
+        metrics = _metric_lines(r.stdout)
+>       assert metric in metrics, (r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+E       AssertionError: (0, '{"used_percent": 84.6, "free_bytes": 76095344640}
+E         ', '')
+E       assert 'DiskUsed' in {}
+
+tests/integration/test_archive_ordering.py:269: AssertionError
+______ test_RR07_failing_job_exits_non_zero_with_an_alarm_metric[sqlite] _______
+
+app = <Flask 'veda'>
+database_url = 'sqlite:////var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-tests-6xio6rxh/t-85377aa10940456aa1e1c9ad61b43099.db'
+
+    def test_RR07_failing_job_exits_non_zero_with_an_alarm_metric(app, database_url):
+        r = _cli(database_url, "maintenance", "archive-security-events")  # no approved retention → refuses
+        assert r.returncode == 1
+        metrics = _metric_lines(r.stdout)
+>       assert metrics.get("MaintenanceJobFailed") == 1
+E       AssertionError: assert None == 1
+E        +  where None = <built-in method get of dict object at 0x10cf160c0>('MaintenanceJobFailed')
+E        +    where <built-in method get of dict object at 0x10cf160c0> = {}.get
+
+tests/integration/test_archive_ordering.py:277: AssertionError
+______________ test_RR17_schema_status_and_rollback_floor[sqlite] ______________
+
+self = ArgumentParser(prog='veda', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+args = ['schema-status', '--require-known', '0009_mfa_challenge_binding']
+namespace = Namespace(command=None), intermixed = False
+
+    def _parse_known_args2(self, args, namespace, intermixed):
+        if args is None:
+            # args default to the system args
+            args = _sys.argv[1:]
+        else:
+            # make sure that args are mutable
+            args = list(args)
+    
+        # default Namespace built from parser defaults
+        if namespace is None:
+            namespace = Namespace()
+    
+        # add any action defaults that aren't present
+        for action in self._actions:
+            if action.dest is not SUPPRESS:
+                if not hasattr(namespace, action.dest):
+                    if action.default is not SUPPRESS:
+                        setattr(namespace, action.dest, action.default)
+    
+        # add any parser defaults that aren't present
+        for dest in self._defaults:
+            if not hasattr(namespace, dest):
+                setattr(namespace, dest, self._defaults[dest])
+    
+        # parse the arguments and exit if there are any errors
+        if self.exit_on_error:
+            try:
+>               namespace, args = self._parse_known_args(args, namespace, intermixed)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:1937: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2169: in _parse_known_args
+    positionals_end_index = consume_positionals(start_index)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2144: in consume_positionals
+    take_action(action, args)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:1998: in take_action
+    argument_values = self._get_values(action, argument_strings)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2528: in _get_values
+    self._check_value(action, value[0])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='veda', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+action = _SubParsersAction(option_strings=[], dest='command', nargs='A...', const=None, default=None, type=None, choices={'migr...e.HelpFormatter'>, conflict_handler='error', add_help=True)}, required=True, help=None, metavar=None, deprecated=False)
+value = 'schema-status'
+
+    def _check_value(self, action, value):
+        # converted value must be one of the choices (if specified)
+        choices = action.choices
+        if choices is not None:
+            if isinstance(choices, str):
+                choices = iter(choices)
+            if value not in choices:
+                args = {'value': str(value),
+                        'choices': ', '.join(map(str, action.choices))}
+                msg = _('invalid choice: %(value)r (choose from %(choices)s)')
+>               raise ArgumentError(action, msg % args)
+E               argparse.ArgumentError: argument command: invalid choice: 'schema-status' (choose from migrate, bootstrap-founder, sync-permissions, worker, scheduler, maintenance, break-glass, conformance, openapi, deploy-check)
+
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2578: ArgumentError
+
+During handling of the above exception, another exception occurred:
+
+app = <Flask 'veda'>
+capsys = <_pytest.capture.CaptureFixture object at 0x10cfe4440>
+
+    def test_RR17_schema_status_and_rollback_floor(app, capsys):
+        from veda.cli.main import main
+    
+>       assert main(["schema-status", "--require-known", "0009_mfa_challenge_binding"]) == 0
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/test_archive_ordering.py:310: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+veda/cli/main.py:344: in main
+    args = parser.parse_args(argv)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:1898: in parse_args
+    args, argv = self.parse_known_args(args, namespace)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:1908: in parse_known_args
+    return self._parse_known_args2(args, namespace, intermixed=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:1939: in _parse_known_args2
+    self.error(str(err))
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2658: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='veda', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+status = 2
+message = "veda: error: argument command: invalid choice: 'schema-status' (choose from migrate, bootstrap-founder, sync-permissions, worker, scheduler, maintenance, break-glass, conformance, openapi, deploy-check)\n"
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/argparse.py:2645: SystemExit
+----------------------------- Captured stderr call -----------------------------
+usage: veda [-h]
+            {migrate,bootstrap-founder,sync-permissions,worker,scheduler,maintenance,break-glass,conformance,openapi,deploy-check} ...
+veda: error: argument command: invalid choice: 'schema-status' (choose from migrate, bootstrap-founder, sync-permissions, worker, scheduler, maintenance, break-glass, conformance, openapi, deploy-check)
+_ test_RR07_cli_jobs_emit_their_metrics[sqlite-verify-chain-ChainVerificationFailed] _
+
+app = <Flask 'veda'>
+database_url = 'sqlite:////var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-tests-6xio6rxh/t-2e56295a88f048278fb9c3450d337ec6.db'
+engine = 'sqlite', job = 'verify-chain', metric = 'ChainVerificationFailed'
+
+    @pytest.mark.parametrize(
+        "job,metric",
+        [
+            ("disk-usage", "DiskUsed"),
+            ("verify-chain", "ChainVerificationFailed"),
+            ("invariants", "GovernanceInvariantFailures"),
+            ("snapshot", "MaintenanceJobFailed"),
+        ],
+    )
+    def test_RR07_cli_jobs_emit_their_metrics(app, database_url, engine, job, metric):
+        if engine != "sqlite" and job in ("snapshot", "disk-usage"):
+            pytest.skip("snapshots and the database-volume check are SQLite-only (the P0 production engine)")
+        r = _cli(database_url, "maintenance", job)
+        metrics = _metric_lines(r.stdout)
+>       assert metric in metrics, (r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+E       AssertionError: (0, '{"ok": true, "checked": 0, "head_seq": 0, "head_hash": null, "problem": null, "at_seq": null}
+E         ', '')
+E       assert 'ChainVerificationFailed' in {}
+
+tests/integration/test_archive_ordering.py:269: AssertionError
+_ test_RR07_cli_jobs_emit_their_metrics[sqlite-invariants-GovernanceInvariantFailures] _
+
+app = <Flask 'veda'>
+database_url = 'sqlite:////var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-tests-6xio6rxh/t-c0ef3723c643484ba7d720f31f87ec24.db'
+engine = 'sqlite', job = 'invariants', metric = 'GovernanceInvariantFailures'
+
+    @pytest.mark.parametrize(
+        "job,metric",
+        [
+            ("disk-usage", "DiskUsed"),
+            ("verify-chain", "ChainVerificationFailed"),
+            ("invariants", "GovernanceInvariantFailures"),
+            ("snapshot", "MaintenanceJobFailed"),
+        ],
+    )
+    def test_RR07_cli_jobs_emit_their_metrics(app, database_url, engine, job, metric):
+        if engine != "sqlite" and job in ("snapshot", "disk-usage"):
+            pytest.skip("snapshots and the database-volume check are SQLite-only (the P0 production engine)")
+        r = _cli(database_url, "maintenance", job)
+        metrics = _metric_lines(r.stdout)
+>       assert metric in metrics, (r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+E       AssertionError: (0, '{"i1": false, "i2": false, "i2_effective": false, "i3": true, "problems": ["I1: no ACTIVE Founder", "I2: no recov...ministrator"]}
+E         ', "governance_invariant_failed problems=['I1: no ACTIVE Founder', 'I2: no recovery administrator']
+E         ")
+E       assert 'GovernanceInvariantFailures' in {}
+
+tests/integration/test_archive_ordering.py:269: AssertionError
+_ test_RR07_cli_jobs_emit_their_metrics[sqlite-snapshot-MaintenanceJobFailed] __
+
+app = <Flask 'veda'>
+database_url = 'sqlite:////var/folders/kl/2781cd4d2m37g7slkxsz546c0000gn/T/veda-tests-6xio6rxh/t-4b204482290349779648ccbc7693d78f.db'
+engine = 'sqlite', job = 'snapshot', metric = 'MaintenanceJobFailed'
+
+    @pytest.mark.parametrize(
+        "job,metric",
+        [
+            ("disk-usage", "DiskUsed"),
+            ("verify-chain", "ChainVerificationFailed"),
+            ("invariants", "GovernanceInvariantFailures"),
+            ("snapshot", "MaintenanceJobFailed"),
+        ],
+    )
+    def test_RR07_cli_jobs_emit_their_metrics(app, database_url, engine, job, metric):
+        if engine != "sqlite" and job in ("snapshot", "disk-usage"):
+            pytest.skip("snapshots and the database-volume check are SQLite-only (the P0 production engine)")
+        r = _cli(database_url, "maintenance", job)
+        metrics = _metric_lines(r.stdout)
+>       assert metric in metrics, (r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+E       AssertionError: (0, '{"file": "veda-20260929T125456Z.db", "sha256": "aec092405e24d4441ca012cb58a1623683a623127d918b0df7e356c19a8e82ed", "bytes": 974848, "taken_on": "2026-09-29T12:54:56.564624Z", "source": "t-4b204482290349779648ccbc7693d78f.db"}
+E         ', '')
+E       assert 'MaintenanceJobFailed' in {}
+
+tests/integration/test_archive_ordering.py:269: AssertionError
+____________________ test_RR07_scheduler_records_exit_codes ____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10cc09370>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x10cc69bd0>
+
+    def test_RR07_scheduler_records_exit_codes(monkeypatch, caplog):
+        from veda.cli import main as cli
+    
+        codes = iter([0, 3])
+    
+        def fake_run(cmd, check, timeout):
+            return subprocess.CompletedProcess(cmd, next(codes))
+    
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        with caplog.at_level(logging.INFO):
+>           assert cli.run_scheduled_job("disk-usage") == 0
+                   ^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'veda.cli.main' has no attribute 'run_scheduled_job'
+
+tests/integration/test_archive_ordering.py:291: AttributeError
+_________ test_RR17_deploy_script_rollback_floor_is_the_ir01_revision __________
+
+    def test_RR17_deploy_script_rollback_floor_is_the_ir01_revision():
+        script = (ROOT / "deploy" / "deploy.sh").read_text()
+>       assert 'ROLLBACK_FLOOR="0009_mfa_challenge_binding"' in script
+E       assert 'ROLLBACK_FLOOR="0009_mfa_challenge_binding"' in '#!/usr/bin/env bash\n# Deploy and migrate the API (02 §12.4, OPS-004; IR-11). Run on the host from the deploy directo...fi\n\necho "6. Resume the worker and scheduler"\n"${COMPOSE[@]}" up -d --no-deps worker scheduler\necho "done: $TAG"\n'
+
+tests/integration/test_archive_ordering.py:320: AssertionError
+=========================== short test summary info ============================
+FAILED tests/integration/test_archive_ordering.py::test_RR05_C11_forged_manifest_without_export_is_detected[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR05_forged_export_that_drops_rows_is_detected[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR05_forgery_through_the_s3_store_is_detected[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR05_genuine_archives_verify_through_the_s3_store[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR06_C12_database_failure_after_the_pending_manifest_is_not_an_alarm[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR06_failure_after_commit_is_alarmed_and_repaired[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR06_anchor_store_outage_during_verification_is_a_failure[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_cli_jobs_emit_their_metrics[sqlite-disk-usage-DiskUsed]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_failing_job_exits_non_zero_with_an_alarm_metric[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR17_schema_status_and_rollback_floor[sqlite]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_cli_jobs_emit_their_metrics[sqlite-verify-chain-ChainVerificationFailed]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_cli_jobs_emit_their_metrics[sqlite-invariants-GovernanceInvariantFailures]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_cli_jobs_emit_their_metrics[sqlite-snapshot-MaintenanceJobFailed]
+FAILED tests/integration/test_archive_ordering.py::test_RR07_scheduler_records_exit_codes
+FAILED tests/integration/test_archive_ordering.py::test_RR17_deploy_script_rollback_floor_is_the_ir01_revision
+15 failed, 1 passed in 5.00s

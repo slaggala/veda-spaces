@@ -1,0 +1,785 @@
+Run started:2026-09-29 13:12:13.261361+00:00
+
+Test results:
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: veda/cli/main.py:195:4
+194	    ScheduledJobFailed (0 or 1) per job, and a non-zero exit or timeout is logged at ERROR with the code."""
+195	    import subprocess
+196	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: veda/cli/main.py:200:15
+199	    try:
+200	        code = subprocess.run(
+201	            [sys.executable, "-m", "veda.cli", "maintenance", job], check=False, timeout=JOB_TIMEOUT_SECONDS
+202	        ).returncode
+203	    except subprocess.TimeoutExpired:
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'This link has expired or was already used'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:25:4
+24	    "MFA_REQUIRED_BY_POLICY": "Two-step verification is required by policy",
+25	    "RESET_TOKEN_INVALID": "This link has expired or was already used",
+26	    "INVITE_TOKEN_INVALID": "This invitation has expired or was already used",
+27	    "EMAIL_TOKEN_INVALID": "This link has expired or was already used",
+28	    "AUTH_REQUIRED": "Authentication required",
+29	    "TOKEN_EXPIRED": "Access token expired",
+30	    "SESSION_INVALID": "Session is no longer valid",
+31	    "INVALID_CREDENTIALS": "Email or password is incorrect",
+32	    "PERMISSION_DENIED": "You don't have access",
+33	    "PASSWORD_CHANGE_REQUIRED": "Password change required",
+34	    "CSRF_REJECTED": "Request rejected",
+35	    "ESCALATION_DENIED": "Includes permissions you don't have",
+36	    "SELF_MODIFICATION_DENIED": "You can't change your own access",
+37	    "NOT_FOUND": "Not found",
+38	    "METHOD_NOT_ALLOWED": "Method not allowed",
+39	    "VERSION_CONFLICT": "This record was changed by someone else",
+40	    "DUPLICATE": "Already exists",
+41	    "LAST_ADMINISTRATOR": "The last recovery administrator cannot be removed",
+42	    "LAST_FOUNDER": "The last Founder cannot be removed",
+43	    "SYSTEM_OBJECT": "System objects cannot be changed this way",
+44	    "ROLE_IN_USE": "Role is assigned to users",
+45	    "INVALID_STATE": "Invalid state for this action",
+46	    "PAYLOAD_TOO_LARGE": "Payload too large",
+47	    "UNSUPPORTED_MEDIA_TYPE": "Unsupported media type",
+48	    "VALIDATION_FAILED": "Validation failed",
+49	    "INVALID_STATUS_TRANSITION": "Status change not allowed",
+50	    "NO_OP_TRANSITION": "Lead is already in this status",
+51	    "LOST_REASON_REQUIRED": "A lost reason is required",
+52	    "COMMENT_REQUIRED": "A comment is required",
+53	    "SAME_AS_CURRENT": "Same as current",
+54	    "CONSENT_WITHDRAWN": "Consent to contact was withdrawn",
+55	    "ERASURE_BLOCKED": "Erasure blocked",
+56	    "TIME_BOUND_GRANTS_NOT_ENABLED": "Time-bound grants are not enabled",
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'This invitation has expired or was already used'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:26:4
+25	    "RESET_TOKEN_INVALID": "This link has expired or was already used",
+26	    "INVITE_TOKEN_INVALID": "This invitation has expired or was already used",
+27	    "EMAIL_TOKEN_INVALID": "This link has expired or was already used",
+28	    "AUTH_REQUIRED": "Authentication required",
+29	    "TOKEN_EXPIRED": "Access token expired",
+30	    "SESSION_INVALID": "Session is no longer valid",
+31	    "INVALID_CREDENTIALS": "Email or password is incorrect",
+32	    "PERMISSION_DENIED": "You don't have access",
+33	    "PASSWORD_CHANGE_REQUIRED": "Password change required",
+34	    "CSRF_REJECTED": "Request rejected",
+35	    "ESCALATION_DENIED": "Includes permissions you don't have",
+36	    "SELF_MODIFICATION_DENIED": "You can't change your own access",
+37	    "NOT_FOUND": "Not found",
+38	    "METHOD_NOT_ALLOWED": "Method not allowed",
+39	    "VERSION_CONFLICT": "This record was changed by someone else",
+40	    "DUPLICATE": "Already exists",
+41	    "LAST_ADMINISTRATOR": "The last recovery administrator cannot be removed",
+42	    "LAST_FOUNDER": "The last Founder cannot be removed",
+43	    "SYSTEM_OBJECT": "System objects cannot be changed this way",
+44	    "ROLE_IN_USE": "Role is assigned to users",
+45	    "INVALID_STATE": "Invalid state for this action",
+46	    "PAYLOAD_TOO_LARGE": "Payload too large",
+47	    "UNSUPPORTED_MEDIA_TYPE": "Unsupported media type",
+48	    "VALIDATION_FAILED": "Validation failed",
+49	    "INVALID_STATUS_TRANSITION": "Status change not allowed",
+50	    "NO_OP_TRANSITION": "Lead is already in this status",
+51	    "LOST_REASON_REQUIRED": "A lost reason is required",
+52	    "COMMENT_REQUIRED": "A comment is required",
+53	    "SAME_AS_CURRENT": "Same as current",
+54	    "CONSENT_WITHDRAWN": "Consent to contact was withdrawn",
+55	    "ERASURE_BLOCKED": "Erasure blocked",
+56	    "TIME_BOUND_GRANTS_NOT_ENABLED": "Time-bound grants are not enabled",
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'This link has expired or was already used'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:27:4
+26	    "INVITE_TOKEN_INVALID": "This invitation has expired or was already used",
+27	    "EMAIL_TOKEN_INVALID": "This link has expired or was already used",
+28	    "AUTH_REQUIRED": "Authentication required",
+29	    "TOKEN_EXPIRED": "Access token expired",
+30	    "SESSION_INVALID": "Session is no longer valid",
+31	    "INVALID_CREDENTIALS": "Email or password is incorrect",
+32	    "PERMISSION_DENIED": "You don't have access",
+33	    "PASSWORD_CHANGE_REQUIRED": "Password change required",
+34	    "CSRF_REJECTED": "Request rejected",
+35	    "ESCALATION_DENIED": "Includes permissions you don't have",
+36	    "SELF_MODIFICATION_DENIED": "You can't change your own access",
+37	    "NOT_FOUND": "Not found",
+38	    "METHOD_NOT_ALLOWED": "Method not allowed",
+39	    "VERSION_CONFLICT": "This record was changed by someone else",
+40	    "DUPLICATE": "Already exists",
+41	    "LAST_ADMINISTRATOR": "The last recovery administrator cannot be removed",
+42	    "LAST_FOUNDER": "The last Founder cannot be removed",
+43	    "SYSTEM_OBJECT": "System objects cannot be changed this way",
+44	    "ROLE_IN_USE": "Role is assigned to users",
+45	    "INVALID_STATE": "Invalid state for this action",
+46	    "PAYLOAD_TOO_LARGE": "Payload too large",
+47	    "UNSUPPORTED_MEDIA_TYPE": "Unsupported media type",
+48	    "VALIDATION_FAILED": "Validation failed",
+49	    "INVALID_STATUS_TRANSITION": "Status change not allowed",
+50	    "NO_OP_TRANSITION": "Lead is already in this status",
+51	    "LOST_REASON_REQUIRED": "A lost reason is required",
+52	    "COMMENT_REQUIRED": "A comment is required",
+53	    "SAME_AS_CURRENT": "Same as current",
+54	    "CONSENT_WITHDRAWN": "Consent to contact was withdrawn",
+55	    "ERASURE_BLOCKED": "Erasure blocked",
+56	    "TIME_BOUND_GRANTS_NOT_ENABLED": "Time-bound grants are not enabled",
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+105	        self.headers = headers or {}
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Access token expired'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:29:4
+28	    "AUTH_REQUIRED": "Authentication required",
+29	    "TOKEN_EXPIRED": "Access token expired",
+30	    "SESSION_INVALID": "Session is no longer valid",
+31	    "INVALID_CREDENTIALS": "Email or password is incorrect",
+32	    "PERMISSION_DENIED": "You don't have access",
+33	    "PASSWORD_CHANGE_REQUIRED": "Password change required",
+34	    "CSRF_REJECTED": "Request rejected",
+35	    "ESCALATION_DENIED": "Includes permissions you don't have",
+36	    "SELF_MODIFICATION_DENIED": "You can't change your own access",
+37	    "NOT_FOUND": "Not found",
+38	    "METHOD_NOT_ALLOWED": "Method not allowed",
+39	    "VERSION_CONFLICT": "This record was changed by someone else",
+40	    "DUPLICATE": "Already exists",
+41	    "LAST_ADMINISTRATOR": "The last recovery administrator cannot be removed",
+42	    "LAST_FOUNDER": "The last Founder cannot be removed",
+43	    "SYSTEM_OBJECT": "System objects cannot be changed this way",
+44	    "ROLE_IN_USE": "Role is assigned to users",
+45	    "INVALID_STATE": "Invalid state for this action",
+46	    "PAYLOAD_TOO_LARGE": "Payload too large",
+47	    "UNSUPPORTED_MEDIA_TYPE": "Unsupported media type",
+48	    "VALIDATION_FAILED": "Validation failed",
+49	    "INVALID_STATUS_TRANSITION": "Status change not allowed",
+50	    "NO_OP_TRANSITION": "Lead is already in this status",
+51	    "LOST_REASON_REQUIRED": "A lost reason is required",
+52	    "COMMENT_REQUIRED": "A comment is required",
+53	    "SAME_AS_CURRENT": "Same as current",
+54	    "CONSENT_WITHDRAWN": "Consent to contact was withdrawn",
+55	    "ERASURE_BLOCKED": "Erasure blocked",
+56	    "TIME_BOUND_GRANTS_NOT_ENABLED": "Time-bound grants are not enabled",
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+105	        self.headers = headers or {}
+106	        self.title = title
+107	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Password change required'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:33:4
+32	    "PERMISSION_DENIED": "You don't have access",
+33	    "PASSWORD_CHANGE_REQUIRED": "Password change required",
+34	    "CSRF_REJECTED": "Request rejected",
+35	    "ESCALATION_DENIED": "Includes permissions you don't have",
+36	    "SELF_MODIFICATION_DENIED": "You can't change your own access",
+37	    "NOT_FOUND": "Not found",
+38	    "METHOD_NOT_ALLOWED": "Method not allowed",
+39	    "VERSION_CONFLICT": "This record was changed by someone else",
+40	    "DUPLICATE": "Already exists",
+41	    "LAST_ADMINISTRATOR": "The last recovery administrator cannot be removed",
+42	    "LAST_FOUNDER": "The last Founder cannot be removed",
+43	    "SYSTEM_OBJECT": "System objects cannot be changed this way",
+44	    "ROLE_IN_USE": "Role is assigned to users",
+45	    "INVALID_STATE": "Invalid state for this action",
+46	    "PAYLOAD_TOO_LARGE": "Payload too large",
+47	    "UNSUPPORTED_MEDIA_TYPE": "Unsupported media type",
+48	    "VALIDATION_FAILED": "Validation failed",
+49	    "INVALID_STATUS_TRANSITION": "Status change not allowed",
+50	    "NO_OP_TRANSITION": "Lead is already in this status",
+51	    "LOST_REASON_REQUIRED": "A lost reason is required",
+52	    "COMMENT_REQUIRED": "A comment is required",
+53	    "SAME_AS_CURRENT": "Same as current",
+54	    "CONSENT_WITHDRAWN": "Consent to contact was withdrawn",
+55	    "ERASURE_BLOCKED": "Erasure blocked",
+56	    "TIME_BOUND_GRANTS_NOT_ENABLED": "Time-bound grants are not enabled",
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+105	        self.headers = headers or {}
+106	        self.title = title
+107	
+108	
+109	def field_error(field: str, code: str, message: str) -> dict[str, str]:
+110	    return {"field": field, "code": code, "message": message}
+111	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Password does not meet the policy'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:58:4
+57	    "UNKNOWN_POLICY_VERSION": "Unknown privacy policy version",
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+105	        self.headers = headers or {}
+106	        self.title = title
+107	
+108	
+109	def field_error(field: str, code: str, message: str) -> dict[str, str]:
+110	    return {"field": field, "code": code, "message": message}
+111	
+112	
+113	def validation_failed(errors: list[dict], code: str = "VALIDATION_FAILED", status: int = 422) -> ApiError:
+114	    n = len(errors)
+115	    return ApiError(status, code, f"{n} field{'s are' if n != 1 else ' is'} invalid.", errors=errors)
+116	
+117	
+118	def not_found() -> ApiError:
+119	    return ApiError(404, "NOT_FOUND", "The resource does not exist or is not visible to you.")
+120	
+121	
+122	def problem_body(err: ApiError, request_id: str | None) -> dict[str, Any]:
+123	    slug = err.code.lower().replace("_", "-")
+124	    body: dict[str, Any] = {
+125	        "type": f"https://api.vedaspaces.com/problems/{slug}",
+126	        "title": err.title or TITLES.get(err.code, err.code.replace("_", " ").capitalize()),
+127	        "status": err.status,
+128	        "code": err.code,
+129	    }
+130	    if err.detail:
+131	        body["detail"] = err.detail
+132	    body["request_id"] = request_id
+133	    if err.errors is not None:
+134	        body["errors"] = err.errors
+135	    body.update(err.extra)
+136	    return body
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Choose a different password'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/kernel/errors.py:59:4
+58	    "PASSWORD_POLICY": "Password does not meet the policy",
+59	    "PASSWORD_REUSED": "Choose a different password",
+60	    "CAPTCHA_FAILED": "Verification failed",
+61	    "CONSENT_REQUIRED": "Consent is required",
+62	    "REASON_REQUIRED": "A reason is required",
+63	    "SCOPE_NOT_SUPPORTED": "Scope not supported",
+64	    "FIELD_NOT_UPDATABLE": "Field cannot be updated here",
+65	    "IMMUTABLE_FIELD": "Field is immutable",
+66	    "INVALID_QUERY_PARAM": "Invalid query parameter",
+67	    "IDEMPOTENCY_KEY_REUSED": "Idempotency key reused with a different request",
+68	    "PRECONDITION_REQUIRED": "If-Match header required",
+69	    "IDEMPOTENCY_KEY_REQUIRED": "Idempotency-Key header required",
+70	    "RATE_LIMITED": "Too many requests",
+71	    "INTERNAL_ERROR": "Something went wrong",
+72	    "SERVICE_UNAVAILABLE": "Service unavailable",
+73	    "SOURCE_NOT_ALLOWED": "Source not allowed",
+74	    "INVALID_ASSIGNEE": "Invalid assignee",
+75	    "NO_OP_ASSIGNMENT": "Lead is already assigned this way",
+76	    "VISIBILITY_NOT_SUPPORTED": "Visibility not supported",
+77	    "SYSTEM_TYPE_NOT_ALLOWED": "System activity types cannot be created",
+78	    "SCHEDULE_REQUIRED": "A schedule is required",
+79	    "INVALID_OWNER": "Invalid owner",
+80	    "LEAD_CLOSED": "Lead is closed",
+81	    "SYSTEM_ACTIVITY_READ_ONLY": "System activities are read-only",
+82	    "INVALID_ACTIVITY_STATE": "Invalid activity state",
+83	    "INVALID_LOOKUP": "Unknown value",
+84	}
+85	
+86	
+87	class ApiError(Exception):
+88	    def __init__(
+89	        self,
+90	        status: int,
+91	        code: str,
+92	        detail: str | None = None,
+93	        *,
+94	        errors: list[dict] | None = None,
+95	        extra: dict[str, Any] | None = None,
+96	        headers: dict[str, str] | None = None,
+97	        title: str | None = None,
+98	    ):
+99	        super().__init__(f"{status} {code}: {detail or ''}")
+100	        self.status = status
+101	        self.code = code
+102	        self.detail = detail
+103	        self.errors = errors
+104	        self.extra = extra or {}
+105	        self.headers = headers or {}
+106	        self.title = title
+107	
+108	
+109	def field_error(field: str, code: str, message: str) -> dict[str, str]:
+110	    return {"field": field, "code": code, "message": message}
+111	
+112	
+113	def validation_failed(errors: list[dict], code: str = "VALIDATION_FAILED", status: int = 422) -> ApiError:
+114	    n = len(errors)
+115	    return ApiError(status, code, f"{n} field{'s are' if n != 1 else ' is'} invalid.", errors=errors)
+116	
+117	
+118	def not_found() -> ApiError:
+119	    return ApiError(404, "NOT_FOUND", "The resource does not exist or is not visible to you.")
+120	
+121	
+122	def problem_body(err: ApiError, request_id: str | None) -> dict[str, Any]:
+123	    slug = err.code.lower().replace("_", "-")
+124	    body: dict[str, Any] = {
+125	        "type": f"https://api.vedaspaces.com/problems/{slug}",
+126	        "title": err.title or TITLES.get(err.code, err.code.replace("_", " ").capitalize()),
+127	        "status": err.status,
+128	        "code": err.code,
+129	    }
+130	    if err.detail:
+131	        body["detail"] = err.detail
+132	    body["request_id"] = request_id
+133	    if err.errors is not None:
+134	        body["errors"] = err.errors
+135	    body.update(err.extra)
+136	    return body
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: veda/kernel/migration_support.py:702:8
+701	    conn.exec_driver_sql(  # nosec B608
+702	        "DO $$ BEGIN "
+703	        f"IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'veda_app') THEN "
+704	        f"REVOKE UPDATE, DELETE, TRUNCATE ON {table} FROM veda_app; GRANT INSERT, SELECT ON {table} TO veda_app; END IF; "
+705	        f"IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'veda_retention') THEN "
+706	        f"GRANT SELECT, DELETE ON {table} TO veda_retention; END IF; END $$"
+707	    )
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Bearer'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/mfa.py:209:8
+208	        "access_token": issued.access_token,
+209	        "token_type": "Bearer",
+210	        "expires_in": issued.expires_in,
+211	        "allowed": RECOVERY_ALLOWED,
+212	    }
+213	
+214	
+215	# --- enrollment (05 §11.3) --------------------------------------------------------------
+216	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Bearer'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/mfa.py:515:16
+514	                "access_token": access,
+515	                "token_type": "Bearer",
+516	                "expires_in": ttl,
+517	                "must_change_password": False,
+518	                "_refresh_token": refresh,
+519	            }
+520	        else:
+521	            if path == "PATH_B":
+522	                service.activate_invited_user(s, user, None)
+523	            if path == "PATH_D":
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'False'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/mfa.py:517:16
+516	                "expires_in": ttl,
+517	                "must_change_password": False,
+518	                "_refresh_token": refresh,
+519	            }
+520	        else:
+521	            if path == "PATH_B":
+522	                service.activate_invited_user(s, user, None)
+523	            if path == "PATH_D":
+524	                if ctx is None:  # unreachable: PATH_D is bound to the caller's recovery session
+525	                    raise ApiError(401, "MFA_CHALLENGE_INVALID", "Start again.")
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'PASSWORD_RESET_COMPLETED'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/service.py:265:4
+264	TOKEN_EVENTS = {
+265	    "PASSWORD_RESET": "PASSWORD_RESET_COMPLETED",
+266	    "INVITE": "INVITE_ACCEPTED",
+267	    "EMAIL_VERIFICATION": "EMAIL_CHANGE_VERIFIED",
+268	    "EMAIL_CHANGE_CANCEL": "EMAIL_CHANGE_CANCELLED",
+269	    "APPROVAL_CANCEL": "BREAK_GLASS_CANCELLED",
+270	    "MFA_ENROLLMENT": "MFA_ENROLLMENT_STARTED",
+271	}
+272	
+273	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Bearer'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/service.py:550:8
+549	        "access_token": issued.access_token,
+550	        "token_type": "Bearer",
+551	        "expires_in": issued.expires_in,
+552	        "must_change_password": pwd_change,
+553	        "user": {
+554	            "id": user.id,
+555	            "full_name": user.full_name,
+556	            "display_name": user.display_name,
+557	            "timezone": user.timezone,
+558	        },
+559	        "_refresh_token": issued.refresh_token,
+560	    }
+561	
+562	
+563	# --- refresh (05 §6) ------------------------------------------------------------------------
+564	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Bearer'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/service.py:618:44
+617	            security_events.record(s, "TOKEN_REFRESH", "SUCCESS", subject_user_id=user.id)
+618	            return {"access_token": access, "token_type": "Bearer", "expires_in": ttl, "_refresh_token": new_raw}
+619	        successor = s.get(RefreshToken, tok.replaced_by_id) if tok.replaced_by_id else None
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'Bearer'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/service.py:626:44
+625	            security_events.record(s, "TOKEN_REFRESH", "SUCCESS", subject_user_id=user.id, detail={"stage": "grace"})
+626	            return {"access_token": access, "token_type": "Bearer", "expires_in": ttl, "_refresh_token": None}
+627	        # Reuse outside the grace window: treat as theft (05 §6.1).
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'None'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: veda/platform/auth/service.py:626:87
+625	            security_events.record(s, "TOKEN_REFRESH", "SUCCESS", subject_user_id=user.id, detail={"stage": "grace"})
+626	            return {"access_token": access, "token_type": "Bearer", "expires_in": ttl, "_refresh_token": None}
+627	        # Reuse outside the grace window: treat as theft (05 §6.1).
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 16085
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 3
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 17
+		Medium: 1
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 1
+		Medium: 15
+		High: 2
+Files skipped (0):

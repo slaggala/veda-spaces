@@ -1,0 +1,394 @@
+{
+ "report": "Veda Spaces P0 architecture — final minor remediation validation",
+ "generated_on": "2026-09-29",
+ "branch": "architecture/p0-foundation-freeze",
+ "previous_remediation_commit": "c3aae47a7d9b12fc0cb1491865991fde28abcf55",
+ "frozen_commit": "4dce177745a2b8f0b9fdb21de2e563ccd022fb0e",
+ "focused_rereview": {
+  "commit": "06a4f6e7d535e84c9b4ff427d4d8bedbf96e0ba7",
+  "verdict": "CERTIFIED WITH MINOR CONDITIONS",
+  "p0_classification": {
+   "Fully covered": 202,
+   "Partially covered": 3,
+   "Not testable pending owner input": 2,
+   "Contradictory": 1
+  }
+ },
+ "method": {
+  "coverage": "Baseline = focused independent re-review classification per requirement. Only DATA-011, DATA-014, MFA-015 and RBAC-021 differ; they are author assessments pending targeted independent check TG-07. Navigation references are resolvability-checked only.",
+  "tooling": "Validation scripts run in the authoring session; not committed per the 'no implementation code' instruction (advisory N-A8 accepted). Non-vacuity was exercised by injected defects for the new checks."
+ },
+ "checks": [
+  {
+   "id": "V01",
+   "name": "All Requirement IDs (and named registers) resolve",
+   "result": "PASS",
+   "details": "221 registered IDs; 0 unresolved references; 0 missing from 01; named registers EXC 11, RBX 6, ASM 13, OWNER-INPUT 4, TG 8, AX 10; 0 unresolved named refs",
+   "evidence": []
+  },
+  {
+   "id": "V02",
+   "name": "No duplicate Requirement IDs",
+   "result": "PASS",
+   "details": "221 IDs, 221 unique",
+   "evidence": []
+  },
+  {
+   "id": "V03",
+   "name": "All cross-document references resolve",
+   "result": "PASS",
+   "details": "1663 section references, 110 relative links, 759 registry navigation references checked",
+   "evidence": []
+  },
+  {
+   "id": "V04",
+   "name": "JSON files are syntactically valid",
+   "result": "PASS",
+   "details": "4 JSON files parsed",
+   "evidence": []
+  },
+  {
+   "id": "V05",
+   "name": "No physical table named user",
+   "result": "PASS",
+   "details": "24 inventory tables, 24 table definitions scanned; app_user.id referenced 36 times",
+   "evidence": []
+  },
+  {
+   "id": "V06",
+   "name": "All complete example and seeded IDs follow the UUIDv7 32-hex contract",
+   "result": "PASS",
+   "details": "12 complete 32-hex identifiers found in documents (elided examples ending in … are excluded); validation pattern and INVALID_ID documented",
+   "evidence": []
+  },
+  {
+   "id": "V07",
+   "name": "No hardcoded role-name authorization",
+   "result": "PASS",
+   "details": "1 mentions, all in prohibition context",
+   "evidence": [
+    "06-rbac.md:33: 1. **Code checks permission codes only.** Nothing references role codes (`FOUNDER`, `ADMIN`, `SALES`), \"is_admin\" flags "
+   ]
+  },
+  {
+   "id": "V08",
+   "name": "No default Sales security-event access",
+   "result": "PASS",
+   "details": "Matrix cell blank for Sales; ALL-only; 05 §9.5 prohibition; /auth/me example; negative tests present",
+   "evidence": []
+  },
+  {
+   "id": "V09",
+   "name": "No recovery-code-only (or password-only) authenticator enrollment",
+   "result": "PASS",
+   "details": "Two-proof enrollment paths A–D; recovery requires password + code; login returns no enrollment token",
+   "evidence": []
+  },
+  {
+   "id": "V10",
+   "name": "No direct generic email replacement or mass assignment of security attributes",
+   "result": "PASS",
+   "details": "PATCH DTOs profile-only; email only via proposed-email workflow; user.update retired",
+   "evidence": []
+  },
+  {
+   "id": "V11",
+   "name": "Founder and last-administrator protection exists (service and database-safe)",
+   "result": "PASS",
+   "details": "G3/G4/G9/G11/G12, invariants I1/I2 under write lock, nightly check, protection_level attribute, error codes",
+   "evidence": []
+  },
+  {
+   "id": "V12",
+   "name": "All three MAJOR findings substantively resolved (contradiction probes)",
+   "result": "PASS",
+   "details": "F-01: no sensitive permission in the Sales column, Sales MFA optional, MFA-gated activation. F-02: no single-factor enrollment, restricted recovery session, cooling-off. F-03: granular sensitive account-control permissions, G9 over email/status, Founder protection.",
+   "evidence": []
+  },
+  {
+   "id": "V13",
+   "name": "Every finding (35 original + 4 MINOR and 9 ADVISORY from re-review) dispositioned; every MINOR resolved or tracked",
+   "result": "PASS",
+   "details": "35 original + 13 re-review findings dispositioned",
+   "evidence": []
+  },
+  {
+   "id": "V14",
+   "name": "No secret material",
+   "result": "PASS",
+   "details": "Scanned for cloud keys, private keys, tokens, complete JWTs and the published example TOTP key (A-10)",
+   "evidence": []
+  },
+  {
+   "id": "V15",
+   "name": "No implementation code added; only architecture documentation changed; no review artifact touched",
+   "result": "PASS",
+   "details": "21 changed paths, all under docs/architecture/ and all .md/.json",
+   "evidence": []
+  },
+  {
+   "id": "V16",
+   "name": "dist/ unchanged",
+   "result": "PASS",
+   "details": "No dist/ diff vs c3aae47 or working tree; content SHA-256 8986bdfaa44dd800968183d338ddfa63c6cae2ef915d1ae41e7ad4939363c9a8",
+   "evidence": []
+  },
+  {
+   "id": "V17",
+   "name": "Every table follows the audit contract; exception registry complete (incl. F-08 indexes)",
+   "result": "PASS",
+   "details": "24 tables; 24 unique indexes checked against the predicate rule or EXC-007",
+   "evidence": []
+  },
+  {
+   "id": "V18",
+   "name": "Every foreign key uses the canonical ID type; non-FK correlation ids are registered",
+   "result": "PASS",
+   "details": "45 reference columns checked; correlation ids registered in EXC-009",
+   "evidence": []
+  },
+  {
+   "id": "V19",
+   "name": "SQLite and PostgreSQL mappings are explicit",
+   "result": "PASS",
+   "details": "Types used: ['BIGINT', 'BOOL', 'CHAR(n)', 'CODE(n)', 'DATE', 'GUID', 'INTEGER', 'JSON', 'MONEY_MINOR', 'SMALLINT', 'TEXT', 'UTCDATETIME', 'VARCHAR(n)']",
+   "evidence": []
+  },
+  {
+   "id": "V20",
+   "name": "Public lead API reveals no internal fields; property type optional and consistent",
+   "result": "PASS",
+   "details": "Response keys ⊆ {reference, message}; request limited to ADR-005 fields incl. optional property_type_code; identical honeypot response; seeds APARTMENT…OTHER",
+   "evidence": []
+  },
+  {
+   "id": "V21",
+   "name": "Security-event logs contain no secrets",
+   "result": "PASS",
+   "details": "20 columns checked; prohibition list present; API excludes hash/chain",
+   "evidence": []
+  },
+  {
+   "id": "V22",
+   "name": "Deferred modules not promoted into P0",
+   "result": "PASS",
+   "details": "No roadmap tables, endpoints or permissions; doc 10 banner present",
+   "evidence": []
+  },
+  {
+   "id": "V23",
+   "name": "Accessibility fixes documented as tokens; light and dark contrast verified",
+   "result": "PASS",
+   "details": "22 token/background combinations recomputed; AX-01…AX-10 defined",
+   "evidence": [
+    "--vs-on-copper-strong on --vs-copper-strong [light] 7.10",
+    "--vs-on-copper-strong on --vs-copper-strong [dark] 9.51",
+    "--vs-on-danger on --vs-danger [light] 6.57",
+    "--vs-on-danger on --vs-danger [dark] 6.16",
+    "--vs-ink [light on #FBF7EF] 15.77",
+    "--vs-ink [dark on #171614] 15.89",
+    "--vs-ink [dark on #201F1C] 14.48",
+    "--vs-ink-muted [light on #FBF7EF] 6.68",
+    "--vs-ink-muted [dark on #171614] 8.43",
+    "--vs-ink-muted [dark on #201F1C] 7.68",
+    "--vs-copper-text [light on #FBF7EF] 5.36",
+    "--vs-copper-text [dark on #171614] 8.32",
+    "--vs-copper-text [dark on #201F1C] 7.58",
+    "--vs-danger [light on #FBF7EF] 6.15",
+    "--vs-danger [dark on #171614] 6.16",
+    "--vs-danger [dark on #201F1C] 5.61",
+    "--vs-success [light on #FBF7EF] 5.76",
+    "--vs-success [dark on #171614] 8.01",
+    "--vs-success [dark on #201F1C] 7.30",
+    "--vs-warning [light on #FBF7EF] 5.33",
+    "--vs-warning [dark on #171614] 9.35",
+    "--vs-warning [dark on #201F1C] 8.52"
+   ]
+  },
+  {
+   "id": "V24",
+   "name": "No undecided text or invented RPO/RTO/availability/retention/volume values",
+   "result": "PASS",
+   "details": "Scanned for sign-off, TBD/TODO, invented volumes, RPO/RTO/availability figures and retention defaults",
+   "evidence": []
+  },
+  {
+   "id": "V25",
+   "name": "Money in integer minor units with currency; UTC storage and local display explicit",
+   "result": "PASS",
+   "details": "Monetary columns use MONEY_MINOR + currency; 03 §2.2 time rules",
+   "evidence": []
+  },
+  {
+   "id": "V26",
+   "name": "Coverage model is substantive (no citation-derived coverage); every requirement assessed",
+   "result": "PASS",
+   "details": "No Traces lines; every requirement has a classification and history; every upgrade from the focused re-review baseline is flagged for TG-07",
+   "evidence": []
+  },
+  {
+   "id": "V27",
+   "name": "N-01: canonical Founder approval rules consistent everywhere",
+   "result": "PASS",
+   "details": "06 §7.2 is the single definition; ADR-010, ADR-006, 05, 08 and 09 defer to it; no permissive eligibility text or retired action names remain",
+   "evidence": []
+  },
+  {
+   "id": "V28",
+   "name": "N-01: no direct Founder-power grant path remains",
+   "result": "PASS",
+   "details": "G13 + grant_path flags + seed lock + registry rule 5; generic role, permission and role-definition APIs reject; negative tests G4–G6; matrix grants user.founder.manage only to Founder",
+   "evidence": []
+  },
+  {
+   "id": "V29",
+   "name": "No requester can approve their own request (Founder and standard dual control)",
+   "result": "PASS",
+   "details": "DB CHECK + service eligibility (06 §7.2.3, §7.4) + API error + tests G1/G3",
+   "evidence": []
+  },
+  {
+   "id": "V30",
+   "name": "N-02: ten FK-less identifier columns registered and constrained; rule 3 exact; tests present",
+   "result": "PASS",
+   "details": "10 registry rows, each with 10 documented fields; allow-list equals the required set",
+   "evidence": []
+  },
+  {
+   "id": "V31",
+   "name": "Every ID-like column has a FK or is exactly a registered FK-less column",
+   "result": "PASS",
+   "details": "45 ID-like columns scanned across 24 table definitions",
+   "evidence": []
+  },
+  {
+   "id": "V32",
+   "name": "N-03: six test designs are concrete (all ten fields, requirement IDs)",
+   "result": "PASS",
+   "details": "TD-A…TD-F each state requirement IDs, purpose, preconditions, fixtures, action, expected result, events, negative assertion, cleanup and evidence",
+   "evidence": []
+  },
+  {
+   "id": "V33",
+   "name": "F-19 resolved or enforceably tracked",
+   "result": "PASS",
+   "details": "13 F-19 deficiencies mapped; tracked items reference registry gates with owner, acceptance and evidence",
+   "evidence": []
+  },
+  {
+   "id": "V34",
+   "name": "Every RG, PG and TG gate has all mandatory attributes; failure never defaults to pass",
+   "result": "PASS",
+   "details": "27 gates × 18 attributes; owners are categories; all gate references resolve; PG-DAST has no invented numeric threshold",
+   "evidence": []
+  },
+  {
+   "id": "V35",
+   "name": "TG-01 remains pending; no owner approval is fabricated",
+   "result": "PASS",
+   "details": "TG-01 status Pending; scan for approval claims found only negated or pending statements; decision-log disclaimer present",
+   "evidence": []
+  },
+  {
+   "id": "V36",
+   "name": "Requirement counts consistent (221 / 208 P0 / 10 P1 / 3 P2)",
+   "result": "PASS",
+   "details": "requirements.json and 01 agree with the focused re-review recount",
+   "evidence": []
+  },
+  {
+   "id": "V37",
+   "name": "No P0 contradiction (or partial/uncovered) remains in the author's classification",
+   "result": "PASS",
+   "details": "P0 author classification {'Fully covered': 206, 'Not testable pending owner input': 2}; the four corrected requirements are flagged for TG-07",
+   "evidence": []
+  }
+ ],
+ "coverage": {
+  "total": 221,
+  "p0": 208,
+  "by_priority": {
+   "P0": 208,
+   "P1": 10,
+   "P2": 3
+  },
+  "before_p0": {
+   "Fully covered": 202,
+   "Partially covered": 3,
+   "Not testable pending owner input": 2,
+   "Contradictory": 1
+  },
+  "after_p0_author": {
+   "Fully covered": 206,
+   "Not testable pending owner input": 2
+  },
+  "reassessed": [
+   {
+    "id": "DATA-011",
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-H",
+    "finding": [
+     "F-08",
+     "N-02"
+    ]
+   },
+   {
+    "id": "DATA-014",
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-H",
+    "finding": [
+     "F-07",
+     "F-08",
+     "N-02"
+    ]
+   },
+   {
+    "id": "MFA-015",
+    "before": "Partially covered",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-G",
+    "finding": [
+     "N-01"
+    ]
+   },
+   {
+    "id": "RBAC-021",
+    "before": "Contradictory",
+    "after": "Fully covered",
+    "evidence": "12 §4.12 TD-G",
+    "finding": [
+     "N-01"
+    ]
+   }
+  ],
+  "not_testable_pending_owner_input": [
+   "NFR-002",
+   "OPS-005"
+  ],
+  "test_design": {
+   "automated": 166,
+   "review": 21,
+   "operational": 19,
+   "owner-gated": 2
+  },
+  "deferred": [
+   "ACT-005",
+   "AUDIT-007",
+   "AUDIT-009",
+   "AUDIT-013",
+   "LEAD-017",
+   "LEAD-021",
+   "LEAD-022",
+   "NFR-004",
+   "NOTE-003",
+   "NOTIF-006",
+   "NOTIF-007",
+   "RBAC-007",
+   "SEC-010"
+  ]
+ },
+ "unresolved_blockers": [],
+ "author_verdict": "READY FOR FINAL TARGETED INDEPENDENT CHECK"
+}

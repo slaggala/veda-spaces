@@ -1,0 +1,13 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}{{ title }}{% endblock %}
+{% block headline %}{{ title }}{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+{{ message }}
+
+{{ link }}
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>{{ message }}</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Open workspace</a></p>
+{% endblock %}

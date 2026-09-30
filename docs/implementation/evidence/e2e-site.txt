@@ -1,0 +1,8 @@
+PASS error summary focused with invalid fields — 3 invalid
+PASS honeypot off-screen, aria-hidden, not tabbable
+PASS 201 shows the reference and focuses the panel — DMFQ-RR97
+PASS network error offers prefilled WhatsApp
+PASS flag off keeps the WhatsApp hand-off — https://api.whatsapp.com/send/?phone=919
+PASS 360 px without horizontal scroll — 0px
+PASS no page errors
+7/7 site checks passed

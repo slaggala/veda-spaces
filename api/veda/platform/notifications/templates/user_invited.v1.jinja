@@ -1,0 +1,15 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}You're invited to Veda Workspace{% endblock %}
+{% block headline %}Welcome to Veda Spaces, {{ name }}{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+You have been invited to Veda Workspace, the Veda Spaces studio app.
+Set your password here (the link expires in {{ expires_hours }} hours):
+{{ link }}
+
+If you weren't expecting this, you can ignore this email.
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>You have been invited to Veda Workspace, the Veda Spaces studio app.</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Accept invitation</a></p><p style="color:#5D574F;font-size:13px">The link expires in {{ expires_hours }} hours. If you weren't expecting this, you can ignore this email.</p>
+{% endblock %}

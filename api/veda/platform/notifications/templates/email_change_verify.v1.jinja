@@ -1,0 +1,12 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}Confirm your new sign-in email{% endblock %}
+{% block headline %}Confirm your new sign-in email{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+Confirm this address as your new Veda Workspace sign-in email. The link expires in {{ expires_minutes }} minutes:
+{{ link }}
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p><p>Confirm this address as your new Veda Workspace sign-in email.</p><p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Confirm email</a></p><p style="color:#5D574F;font-size:13px">The link expires in {{ expires_minutes }} minutes.</p>
+{% endblock %}

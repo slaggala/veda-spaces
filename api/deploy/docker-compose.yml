@@ -1,0 +1,31 @@
+# Single host, single instance (ADR-008, OPS-006). Exactly one api, one worker,
+# one scheduler and one Litestream replicator.
+services:
+  api:
+    image: veda-api:${VEDA_IMAGE_TAG:-local}
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    ports: ["127.0.0.1:8000:8000"]
+    restart: unless-stopped
+  worker:
+    image: veda-api:${VEDA_IMAGE_TAG:-local}
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    command: ["python", "-m", "veda.cli", "worker"]
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    restart: unless-stopped
+  scheduler:
+    image: veda-api:${VEDA_IMAGE_TAG:-local}
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    env_file: /etc/veda/api.env
+    command: ["python", "-m", "veda.cli", "scheduler"]
+    volumes: ["/var/lib/veda:/var/lib/veda"]
+    restart: unless-stopped
+  litestream:
+    image: litestream/litestream:0.3.13@sha256:027eda2a89a86015b9797d2129d4dd447e8953097b4190e1d5a30b73e76d8d58
+    command: ["replicate"]
+    env_file: /etc/veda/api.env
+    volumes: ["/var/lib/veda:/var/lib/veda", "./litestream.yml:/etc/litestream.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]  # replication-lag metrics for the CloudWatch agent only
+    restart: unless-stopped
