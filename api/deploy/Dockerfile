@@ -1,7 +1,13 @@
-# Base image pinned by digest (python:3.13-slim multi-arch index, resolved 2026-09-29); dependencies installed
+# Base image pinned by digest (python:3.13-slim multi-arch index, resolved 2026-10-02); dependencies installed
 # only from the hash-locked requirements.txt, so the image is the tested set (IR-13, SEC-007).
 # To update: resolve the new digest, rebuild, rerun CI, and record the change in the release notes.
-FROM python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b
+FROM python:3.13-slim@sha256:bb2988715db2cf7ace7b53f38f3cffbef7c7046a656bee66245eb0ed386e2e81
+# CVE-2026-103111: the pinned base still ships libpcre2-8-0 10.46-1~deb13u2. Upgrade only that package from Debian
+# security, and fail the build unless the fixed version is installed. Remove once the base digest includes it.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade libpcre2-8-0 \
+ && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ge 10.46-1~deb13u3 \
+ && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /srv/api
 COPY requirements.txt .
