@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Validates the approved-account manifest, infra/config/staging-account.json (PB-01). Offline: reads the file only.
 #
-#   infra/scripts/check-manifest.sh              # schema and the fixed owner decisions (Mumbai only, standalone
-#                                                # account, repository and its ID); nulls are allowed
+#   infra/scripts/check-manifest.sh              # schema and the fixed owner decisions (Mumbai only, member of the
+#                                                # approved AWS organization, repository and its ID); nulls allowed
 #   infra/scripts/check-manifest.sh --complete   # also every value a bootstrap needs, with no placeholder: what
 #                                                # bootstrap.sh and discover.sh require before any AWS call
 set -euo pipefail

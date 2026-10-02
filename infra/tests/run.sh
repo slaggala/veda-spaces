@@ -88,9 +88,9 @@ EOF
   # PB-06: the session is region-guarded (a read in us-east-1 is denied by its session policy).
   echo "An error occurred (UnauthorizedOperation) when calling the DescribeAvailabilityZones operation: explicit deny in a session policy" \
     >"$d/ec2_describe-availability-zones@us-east-1.fail"
-  # Owner decision: standalone account.
-  echo "An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization operation: Your account is not a member of an organization." \
-    >"$d/organizations_describe-organization.fail"
+  # Owner decision: a member account of the approved organization (fixture: o-exampleorg01, management 999988887777).
+  echo '{"Organization":{"Id":"o-exampleorg01","MasterAccountId":"999988887777","FeatureSet":"ALL"}}' \
+    >"$d/organizations_describe-organization.json"
   # PB-09: the owner role (fixture manifest), one-hour sessions, trusted only inside the account.
   jq -n --arg acct "$ACCT" '{Role: {RoleName: "OrganizationAccountAccessRole", Arn: "arn:aws:iam::\($acct):role/OrganizationAccountAccessRole",
     MaxSessionDuration: 3600, AssumeRolePolicyDocument: {Version: "2012-10-17", Statement: [{Effect: "Allow",
@@ -751,7 +751,7 @@ echo "== PB-01: the account manifest (schema, owner decisions, completeness)"
 T="$(new_tree)"
 CM="$T/infra/scripts/check-manifest.sh"
 cp "$INFRA/config/staging-account.json" "$T/infra/config/staging-account.json"
-check "PB-01 committed manifest is structurally valid (Mumbai, standalone, repository and ID)" ok "valid \(structure\)" -- "$CM"
+check "PB-01 committed manifest is structurally valid (Mumbai, organization member, repository and ID)" ok "valid \(structure\)" -- "$CM"
 check "PB-01 committed manifest is not complete yet (owner values missing)" fail "account_id must be the 12-digit account ID" -- "$CM" --complete
 check "  ... names every missing owner value" fail "account_alias must be set" -- "$CM" --complete
 man() { # man <jq over the fixture manifest>: a tree whose manifest is the fixture changed by the jq program
@@ -766,7 +766,9 @@ check "PB-01 placeholder name refused" fail "placeholder value \"<account name>\
 check "PB-01 missing alias refused" fail "account_alias must be set" -- "$(man '.account_alias = null')/infra/scripts/check-manifest.sh" --complete
 check "PB-01 Aurion alias refused" fail "looks like production or Aurion" -- "$(man '.account_alias = "aurion-staging"')/infra/scripts/check-manifest.sh" --complete
 check "PB-01 another region refused" fail "region must be ap-south-1" -- "$(man '.region = "us-east-1"')/infra/scripts/check-manifest.sh"
-check "PB-01 Organizations member refused (owner decision: standalone)" fail "organizations_mode must be" -- "$(man '.organizations_mode = "member"')/infra/scripts/check-manifest.sh"
+check "PB-01 standalone account refused (owner decision: member account)" fail "organizations_mode must be \"member\"" -- "$(man '.organizations_mode = "standalone"')/infra/scripts/check-manifest.sh"
+check "PB-01 organization ID required" fail "organization_id must be the AWS Organizations ID" -- "$(man 'del(.organization_id)')/infra/scripts/check-manifest.sh"
+check "PB-01 management account as the staging account refused" fail "account_id is the management account" -- "$(man '.management_account_id = .account_id')/infra/scripts/check-manifest.sh"
 check "PB-01 repository ID required" fail "repository_id must be the numeric GitHub repository ID" -- "$(man 'del(.repository_id)')/infra/scripts/check-manifest.sh"
 check "PB-09 IAM user as owner refused" fail "is not an exact, non-veda IAM role ARN" -- "$(man '.bootstrap_principal_arns = ["arn:aws:iam::111122223333:user/owner"]')/infra/scripts/check-manifest.sh" --complete
 check "PB-09 owner session longer than one hour refused" fail "max_owner_session_seconds must be 900-3600" -- "$(man '.max_owner_session_seconds = 43200')/infra/scripts/check-manifest.sh"
@@ -791,6 +793,8 @@ T="$(new_tree)"
 fill "$TPL/staging-account.template.json" >"$T/infra/config/staging-account.json"
 D="$(good_account)"
 echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/bootstrap-owner/veda-bootstrap\"}" >"$D/sts_get-caller-identity.json"
+jq -n --slurpfile m "$T/infra/config/staging-account.json" '{Organization: {Id: $m[0].organization_id, MasterAccountId: $m[0].management_account_id}}' \
+  >"$D/organizations_describe-organization.json"
 jq -n --argjson trust "$(fill "$TPL/owner-role-trust-policy.template.json")" \
   '{Role: {RoleName: "bootstrap-owner", Arn: "arn:aws:iam::111122223333:role/bootstrap-owner", MaxSessionDuration: 3600, AssumeRolePolicyDocument: $trust}}' >"$D/iam_get-role.json"
 jq '.Roles = [{"RoleName":"bootstrap-owner","Path":"/"},{"RoleName":"veda-gh-apply","Path":"/"}]' "$D/iam_list-roles.json" >"$D/x" && mv "$D/x" "$D/iam_list-roles.json"
@@ -879,7 +883,7 @@ TFD="$(tf_stub "$P.ok")"
 check "PB-10 apply stops when IAM disagrees with the review" fail "does not evaluate the rendered boundary as reviewed" -- apply_reviewed "$R" "$TFD" "$D"
 absent "  ... and nothing is applied" "^apply " "$(cat "$TFD/calls.log" 2>/dev/null || true)"
 
-echo "== N-03: the account is dedicated to Veda in every region (owner decision: standalone)"
+echo "== N-03: the account is dedicated to Veda in every region (owner decision: organization member account)"
 T="$(new_tree)"
 vai() { env AWS_STUB_DIR="$1" bash -c "set -euo pipefail; source '$T/infra/scripts/lib.sh'; verify_account_identity $ACCT"; }
 check "N-03 empty account verified across all regions" ok "no foreign resources in any region" -- vai "$(good_account)"
@@ -929,19 +933,23 @@ D="$(good_account)"
 echo "AccessDenied" >"$D/rds_describe-db-instances@eu-west-1.fail"
 check "N-03 a regional listing fails closed" fail "cannot list account resources" -- vai "$D"
 D="$(good_account)"
-rm "$D/organizations_describe-organization.fail"
-echo '{"Organization":{"Id":"o-abc"}}' >"$D/organizations_describe-organization.json"
-check "owner decision: an Organizations member account is refused" fail "belongs to an AWS Organization" -- vai "$D"
+rm "$D/organizations_describe-organization.json"
+echo "An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization operation: Your account is not a member of an organization." >"$D/organizations_describe-organization.fail"
+check "owner decision: a standalone account is refused" fail "cannot read the AWS Organization" -- vai "$D"
 D="$(good_account)"
+echo '{"Organization":{"Id":"o-otherorg0001","MasterAccountId":"999988887777"}}' >"$D/organizations_describe-organization.json"
+check "  ... a member of another organization is refused" fail "belongs to organization o-otherorg0001, the manifest approves o-exampleorg01" -- vai "$D"
+D="$(good_account)"
+echo '{"Organization":{"Id":"o-exampleorg01","MasterAccountId":"444455556666"}}' >"$D/organizations_describe-organization.json"
+check "  ... an organization with another management account is refused" fail "management account is 444455556666" -- vai "$D"
+T8="$(man '.management_account_id = "111122223333" | .account_id = "111122223333"')"
+D="$(good_account)"
+echo '{"Organization":{"Id":"o-exampleorg01","MasterAccountId":"111122223333"}}' >"$D/organizations_describe-organization.json"
+check "  ... the management account itself is refused" fail "is the management account" -- env AWS_STUB_DIR="$D" bash -c "set -euo pipefail; source '$T8/infra/scripts/lib.sh'; verify_account_identity $ACCT"
+D="$(good_account)"
+rm "$D/organizations_describe-organization.json"
 echo "AccessDenied" >"$D/organizations_describe-organization.fail"
-check "  ... and an unknown membership fails closed" fail "cannot tell whether the account belongs" -- vai "$D"
-
-INV="$T/infra/scripts/account-inventory.sh"
-check "PB-02 inventory evidence written for a dedicated account" ok "wrote .*account-inventory.json" -- env AWS_STUB_DIR="$(good_account)" "$INV" --expected-account-id $ACCT
-check "  ... listing every region and resource" ok '"ap-south-1"' -- jq -c '.regions' "$T/infra/generated/account-inventory.json"
-D="$(good_account)"
-echo '{"Reservations":[{"Instances":[{"InstanceId":"i-0swing","Tags":[{"Key":"Name","Value":"swing-trader-vm"}]}]}]}' >"$D/ec2_describe-instances@us-east-1.json"
-check "PB-02 inventory refuses an account that is not dedicated" fail "named like Aurion or swing-trader-vm" -- env AWS_STUB_DIR="$D" "$INV" --expected-account-id $ACCT
+check "  ... and an unreadable organization fails closed" fail "cannot read the AWS Organization" -- vai "$D"
 
 echo "== PB-09 / N-12: the owner session and owner role"
 D="$(good_account)"

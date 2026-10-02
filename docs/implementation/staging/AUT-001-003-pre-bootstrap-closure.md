@@ -6,7 +6,9 @@
 - **This change:** closes what can be closed without AWS access and without values only the owner holds. Nothing was
   applied or deployed; no AWS or Cloudflare API was called; no credential was requested or used. GitHub environments
   were created by the owner's authorization (PB-03).
-- **Owner decisions:** [`AUT-001-003-owner-decisions.md`](AUT-001-003-owner-decisions.md)
+- **Owner decisions:** [`AUT-001-003-owner-decisions.md`](AUT-001-003-owner-decisions.md). OD-B2 was revised on
+  2026-10-02 from "standalone" to "member account" (`veda-staging`, `813238078849`, in organization `o-q9ji0hj18c`);
+  the checks that enforced "standalone" now enforce that membership
 - **Status:** written by the implementer. It needs an independent review before the first real run, as the base did.
 
 ## 1. Pre-bootstrap conditions
@@ -77,7 +79,7 @@ it, and TF3 is detected.
 | Group | Reverted controls (all detected) |
 |---|---|
 | Region (R01–R06) | plan-guard region findings; per-resource region; module providers; the region-guard proof in `bootstrap.sh`; the proof accepting any error; `ec2:RunInstances` exempted in the session policy |
-| Dedicated account (A01–A09) | veda-tagged instances allowed outside Mumbai; the Aurion/swing-trader name check; the standalone check; the owner-role trust check; the owner max-session check; root/IAM-user sessions; SAML providers allowed; pre-bootstrap `veda-*` squatting; a failed regional listing ignored |
+| Dedicated account (A01–A09) | veda-tagged instances allowed outside Mumbai; the Aurion/swing-trader name check; the standalone check (since 2026-10-02 the organization-member check, with its own tests); the owner-role trust check; the owner max-session check; root/IAM-user sessions; SAML providers allowed; pre-bootstrap `veda-*` squatting; a failed regional listing ignored |
 | Clean tree (C01–C02) | ignored files tolerated; non-git checkout accepted |
 | GitHub (G01–G03) | repository ID not compared; public repository allowed in the workflow; `main` protection always rewritten |
 | Manifest (P01–P02) | placeholders accepted; `organizations_mode` unchecked |

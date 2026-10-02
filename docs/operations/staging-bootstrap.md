@@ -9,7 +9,8 @@ It has no dependency on Aurion or any other system, and does not deploy the appl
   conditions PB-01 to PB-11 addressed in
   [`AUT-001-003-pre-bootstrap-closure.md`](../implementation/staging/AUT-001-003-pre-bootstrap-closure.md).
   It has **not been run** against any AWS account.
-- **Owner decisions (2026-09-30):** ap-south-1 (Mumbai) only; standalone AWS account (no Organizations); no
+- **Owner decisions (2026-09-30, OD-B2 revised 2026-10-02):** ap-south-1 (Mumbai) only; a **member account**
+  (`veda-staging`, `813238078849`) of organization `o-q9ji0hj18c`, never its management account; no
   Cloudflare write token for the bootstrap; **controlled local first run** (§3, Option A). See
   [`AUT-001-003-owner-decisions.md`](../implementation/staging/AUT-001-003-owner-decisions.md).
 - **Code:** [`infra/terraform/bootstrap`](../../infra/terraform/bootstrap), [`infra/scripts`](../../infra/scripts),
@@ -34,7 +35,8 @@ Nothing else is created: no VPC, no instance, no bucket other than the state buc
 [`infra/config/staging-account.json`](../../infra/config/staging-account.json). Every script, the workflow and the
 Terraform variable validation refuse to run while `account_id` is `null`, or for any other account (F3), and
 `infra/scripts/check-manifest.sh --complete` must pass (PB-01). The fixed fields (`schema_version`, `region` =
-`ap-south-1`, `organizations_mode` = `standalone`, `repository` = `slaggala/veda-spaces`, `repository_id`,
+`ap-south-1`, `organizations_mode` = `member` with `organization_id` and `management_account_id`, `repository` =
+`slaggala/veda-spaces`, `repository_id`,
 `max_owner_session_seconds` = 3600) record the owner decisions and are checked on every run.
 
 | Field | Value |
@@ -44,10 +46,11 @@ Terraform variable validation refuse to run while `account_id` is `null`, or for
 | `account_alias` | Its IAM account alias (**required**: create one with `aws iam create-account-alias` if the account has none). It must not contain `prod` or `aurion` |
 | `manage_account_guardrails` | `true` unless the account already manages the guardrails (§6). Changing it later never removes them |
 | `bootstrap_principal_arns` | The exact IAM **role** ARN (with its path) of the dedicated owner role that runs the bootstrap, for example `arn:aws:iam::<ACCOUNT_ID>:role/bootstrap-owner` (never a `veda-*` name). These principals, and the account root, are the **only** ones that can read or write bootstrap state, change the state bucket or administer the state key (RR-01, RR-02). No wildcards, no IAM users, no `veda-*` identity. The role must allow sessions of at most one hour (`MaxSessionDuration` ≤ 3600) and be trusted only by principals of this account (no identity provider, service or other account; PB-09). The root user may not run the bootstrap |
-| `allowed_foreign_resources` | Pre-existing IAM roles, users, SAML providers, buckets, instances or Lambda functions that are *not* Veda's but may stay. For a new standalone account: the owner role in `iam_roles` (required by `check-manifest.sh --complete`) and the owner IAM user in `iam_users`, nothing else. Anything named like Aurion or `swing-trader` is refused even if listed. Exact owner inputs, the owner-role specification and templates: [`bootstrap-owner-inputs.md`](bootstrap-owner-inputs.md) |
+| `allowed_foreign_resources` | Pre-existing IAM roles, users, SAML providers, buckets, instances or Lambda functions that are *not* Veda's but may stay. For the new member account: the owner role and `OrganizationAccountAccessRole` in `iam_roles` (the owner role is required by `check-manifest.sh --complete`) and the owner IAM user in `iam_users`, nothing else. Anything named like Aurion or `swing-trader` is refused even if listed. Exact owner inputs, the owner-role specification and templates: [`bootstrap-owner-inputs.md`](bootstrap-owner-inputs.md) |
 
 Discovery then refuses the run unless (N-03): the live account name and alias match; neither looks like production
-or Aurion (`prod`, `aurion`); the account is **not** an AWS Organizations member (owner decision: standalone); the
+or Aurion (`prod`, `aurion`); the account is a member of exactly the approved organization and is not its
+management account (owner decision: member account); the
 session is an assumed owner role and every owner role passes the checks above; and an inventory of **every enabled
 region** finds nothing but the allowlist and, once the bootstrap has run, Veda's own resources in ap-south-1. The
 inventory covers IAM roles, users and identity providers (only the GitHub OIDC provider; **no SAML provider**, N-01),
@@ -157,7 +160,7 @@ record, that a reviewer approved it for `bootstrap` before it reads any secret.
    Terraform provider also pins `allowed_account_ids`, and the Terraform variable validation checks the manifest
    (account, region, repository) too.
 2. **Account identity** (fails closed): account name and alias match the manifest; neither looks like production
-   or Aurion; standalone account; the session is an owner role and every owner role is safe (§2); nothing in any
+   or Aurion; a member (not the management) account of the approved organization; the session is an owner role and every owner role is safe (§2); nothing in any
    enabled region but the allowlist and Veda's own resources in ap-south-1; nothing named like Aurion or
    `swing-trader` (N-03). The repository is the manifest's by name and numeric ID (PB-01).
 3. **Discovery** (`discover.sh`, read-only), written to `infra/generated/discovered.json`:

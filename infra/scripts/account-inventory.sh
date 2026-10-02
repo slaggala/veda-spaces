@@ -3,7 +3,7 @@
 #
 #   infra/scripts/account-inventory.sh --expected-account-id 123456789012
 #
-# Runs every check discovery runs before a plan (region-guarded session, complete manifest, name, alias, standalone,
+# Runs every check discovery runs before a plan (region-guarded session, complete manifest, name, alias, organization member,
 # owner role, all-region inventory with nothing foreign or named like Aurion/swing-trader), then writes the full
 # inventory to infra/generated/account-inventory.json (gitignored) for the owner to archive. Creates nothing.
 set -euo pipefail

@@ -3,7 +3,7 @@
 # call below is a Get/List/Describe/Head. Nothing is created or changed.
 #
 # It first proves the session is confined to ap-south-1 by IAM (PB-06) and is in the approved, dedicated staging
-# account (F3, N-03: complete manifest, account name and alias, no production/Aurion name, standalone, a safe owner
+# account (F3, N-03: complete manifest, account name and alias, no production/Aurion name, organization member, a safe owner
 # role, and no foreign resource in any region), then that the repository is the approved one by name and ID (PB-01),
 # and stops otherwise. Lookups the plan depends on fail closed.
 #
