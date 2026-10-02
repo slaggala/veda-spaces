@@ -752,8 +752,8 @@ T="$(new_tree)"
 CM="$T/infra/scripts/check-manifest.sh"
 cp "$INFRA/config/staging-account.json" "$T/infra/config/staging-account.json"
 check "PB-01 committed manifest is structurally valid (Mumbai, organization member, repository and ID)" ok "valid \(structure\)" -- "$CM"
-check "PB-01 committed manifest is not complete yet (owner values missing)" fail "account_id must be the 12-digit account ID" -- "$CM" --complete
-check "  ... names every missing owner value" fail "account_alias must be set" -- "$CM" --complete
+check "PB-01 committed manifest is complete (owner values committed)" ok "valid \(complete\)" -- "$CM" --complete
+check "  ... for the veda-staging member account of the Veda organization" ok '^813238078849 o-q9ji0hj18c 749251636763$' -- jq -r '"\(.account_id) \(.organization_id) \(.management_account_id)"' "$T/infra/config/staging-account.json"
 man() { # man <jq over the fixture manifest>: a tree whose manifest is the fixture changed by the jq program
   local t
   t="$(new_tree)"
