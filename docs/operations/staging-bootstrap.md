@@ -8,7 +8,8 @@ It has no dependency on Aurion or any other system, and does not deploy the appl
   and the final-certification re-review (RR-01, RR-02, RR-03, RR-05, RR-07, review package §9); pre-bootstrap
   conditions PB-01 to PB-11 addressed in
   [`AUT-001-003-pre-bootstrap-closure.md`](../implementation/staging/AUT-001-003-pre-bootstrap-closure.md).
-  It has **not been run** against any AWS account.
+  **Applied to `veda-staging` (813238078849) on 2026-10-03** by the local procedure (Option A), under the owner
+  authorization; evidence: [`docs/release-evidence/AUT-002/`](../release-evidence/AUT-002/README.md).
 - **Owner decisions (2026-09-30, OD-B2 revised 2026-10-02):** ap-south-1 (Mumbai) only; a **member account**
   (`veda-staging`, `813238078849`) of organization `o-q9ji0hj18c`, never its management account; no
   Cloudflare write token for the bootstrap; **controlled local first run** (§3, Option A). See

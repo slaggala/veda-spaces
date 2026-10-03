@@ -13,8 +13,8 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | Item | State |
 |---|---|
 | AUT-001 repository structure | this directory |
-| AUT-002 Terraform bootstrap | `terraform/bootstrap/`: written and tested offline, remediated after independent review, **not applied** |
-| AUT-003 bootstrap workflow | `.github/workflows/00-bootstrap.yml` + `scripts/`: **not run** |
+| AUT-002 Terraform bootstrap | `terraform/bootstrap/`: **applied to `veda-staging` (813238078849) on 2026-10-03**; evidence in `docs/release-evidence/AUT-002/` |
+| AUT-003 bootstrap workflow | `scripts/` run locally (Option A) for the first bootstrap; `.github/workflows/00-bootstrap.yml` **not run** (public repository) |
 | AUT-101 onward | not started (see `terraform/modules/README.md`) |
 
 ## Layout
