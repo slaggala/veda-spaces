@@ -165,9 +165,22 @@ All keys are at least 32 random bytes, base64. Staging and production refuse any
 
 ## 7. Break-glass (06 §7.5)
 
-1. **Custodian session.** A custodian starts an SSM session to the host with their own IAM role.
-   - The CLI reads the caller's identity from STS; `--principal-arn` is only an assertion that must match it.
-   - Two different humans are required (IR-06).
+1. **Custodian credentials and session (RR-09).** An SSM session gives a shell on the host, but the only AWS
+   identity on the host is its instance role, and the CLI refuses it. Each custodian therefore brings their own
+   short-lived credentials:
+   - On their own workstation, the custodian assumes their custodian role with MFA:
+     `aws sts assume-role --role-arn <custodian role> --role-session-name <their name> --serial-number <MFA device> --token-code <code> --duration-seconds 3600`.
+   - In their SSM session on the host, they pass **only** those credentials into a one-off container:
+     `AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… AWS_SESSION_TOKEN=… docker compose run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN api python -m veda.cli break-glass …`.
+   - The CLI reads the caller's identity from STS using only the credentials supplied: the instance-metadata and
+     container-role providers are disabled, and an EC2 instance-profile session is refused even if it is listed.
+     Missing, expired or unusable credentials are refused with a `BREAK_GLASS_*` FAILURE event.
+   - `--principal-arn` is only an assertion that must match the STS identity.
+   - Two different humans are required (IR-06). The STS session name appears in the evidence, so use your own
+     name.
+   - **Owner decision OD-6 (OWNER-INPUT-004):** this credential model (assume-role with MFA, passed per command)
+     is the proposal. The custodian roles, their MFA requirement and their trust policies are AWS configuration,
+     to be created and rehearsed in staging with CloudTrail evidence before break-glass is relied on.
 2. **Request.**
    - Run `veda break-glass request --target <user-id> --founder-action GRANT_FOUNDER --reason "…"`.
    - It is refused while any eligible Founder other than the target exists (IR-05).
