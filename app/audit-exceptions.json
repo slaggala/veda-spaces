@@ -1,0 +1,22 @@
+{
+  "policy": "docs/operations/dependency-audit-exceptions.md",
+  "exceptions": [
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "range": "<=3.0.3",
+      "severity": "high",
+      "scope": "development",
+      "reason": "No patched braces release exists (3.0.3 is the latest). It is reached only through the browser unit-test runner (@web/test-runner, @open-wc/testing -> globby@11 -> fast-glob -> micromatch -> braces), whose glob patterns come from the committed web-test-runner.config.mjs, never from untrusted input. Not in any production dependency, the workspace build or the Cloudflare Pages dist/.",
+      "compensating_controls": [
+        "npm audit --omit=dev stays strict and runs first: braces can never reach a production dependency unnoticed",
+        "the exception matches this advisory, package and range only; any other high or critical advisory fails CI",
+        "it expires; CI fails on the expiry date until it is re-reviewed or removed",
+        "replacement of @web/test-runner and @open-wc/testing (Option B) is tracked as the permanent fix"
+      ],
+      "approved_on": "2026-10-03",
+      "expires": "2026-12-31",
+      "tracking": "Replace @web/test-runner / @open-wc/testing (Vitest browser mode has no braces dependency)"
+    }
+  ]
+}

@@ -284,6 +284,29 @@ def test_IRA04_password_reset_invalidates_open_challenges(api, factory):
     assert r.status == 401 and r.code == "MFA_CHALLENGE_INVALID"
 
 
+def test_IRA04_password_reset_retires_the_emailed_enrollment_link(api, factory):
+    flagged = factory.user("SALES", mfa_required=True)
+    r = api.post("/api/v1/auth/login", {"email": flagged.email, "password": flagged.password}, anonymous=True)
+    assert r.data["status"] == "MFA_ENROLLMENT_EMAIL_SENT"
+    enrollment = link_from(flagged.email, "two-step verification")
+    api.post("/api/v1/auth/password/forgot", {"email": flagged.email}, anonymous=True)
+    new_password = "Brand-New-Lantern-77"
+    reset = link_from(flagged.email, "reset")
+    assert api.post(
+        "/api/v1/auth/password/reset", {"token": reset, "new_password": new_password}, anonymous=True
+    ).status in (200, 204)
+    # The link sent before the reset is dead even with the new password; a fresh login sends a new one.
+    r = api.post(
+        "/api/v1/auth/mfa/enroll/start", {"enrollment_token": enrollment, "password": new_password}, anonymous=True
+    )
+    assert r.status == 401 and r.code == "ENROLLMENT_PROOF_INVALID"
+    r = api.post("/api/v1/auth/login", {"email": flagged.email, "password": new_password}, anonymous=True)
+    assert r.data["status"] == "MFA_ENROLLMENT_EMAIL_SENT"
+    fresh = link_from(flagged.email, "two-step verification")
+    r = api.post("/api/v1/auth/mfa/enroll/start", {"enrollment_token": fresh, "password": new_password}, anonymous=True)
+    assert r.status == 200 and r.data["secret"]
+
+
 # --- IR-35: CF-Connecting-IP only from a trusted proxy -----------------------------------------------------
 
 

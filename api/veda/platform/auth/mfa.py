@@ -338,21 +338,20 @@ def enroll_start(s: Session, ctx: AuthContext | None, body) -> dict:
 
 
 def _invite_live(s: Session, user_id: str) -> bool:
+    """An unused invitation is still within its effective lifetime (24 h once privileged, FC-09)."""
     now = db.tx_time(s)
-    return (
-        s.execute(
-            sa.select(sa.func.count())
-            .select_from(UserActionToken)
-            .where(
+    return any(
+        service.invite_expires_on(s, tok) > now
+        for tok in s.execute(
+            sa.select(UserActionToken).where(
                 UserActionToken.user_id == user_id,
                 UserActionToken.purpose == "INVITE",
                 UserActionToken.used_on.is_(None),
                 UserActionToken.invalidated_on.is_(None),
                 UserActionToken.expires_on > now,
             )
-        ).scalar()
-        or 0
-    ) > 0
+        ).scalars()
+    )
 
 
 def _issue_recovery_codes(s: Session, user_id: str) -> list[str]:

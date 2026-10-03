@@ -80,10 +80,14 @@ jobs:
         run: bandit -q -r veda -ll -ii
       - name: Frontend dependency audit
         working-directory: app
+        # Production dependencies: strict, no exceptions. Development dependencies: any high or critical advisory
+        # fails unless app/audit-exceptions.json covers it with a reviewed, expiring, development-only exception
+        # (docs/operations/dependency-audit-exceptions.md).
         run: |
           npm ci --ignore-scripts
           npm audit --omit=dev
-          npm audit --audit-level=high
+          node --test scripts/audit-dev.test.mjs
+          node scripts/audit-dev.mjs
       - name: Build the API image
         run: docker build -f api/deploy/Dockerfile -t veda-api:ci api
       - name: Container image scan

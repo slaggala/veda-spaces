@@ -280,3 +280,41 @@ def test_RR04_limiter_keys_and_events_carry_no_raw_address(app, api, factory):
         _login(api, "Private.Person@Example.test", BAD, _v6(i))
     for e in events():
         assert "private.person" not in str(e.detail or {}).lower()
+
+
+# --- IR-A08: per-user limit across all endpoints (08 §12) -----------------------------------------------------
+
+
+def test_IRA08_user_limit_is_the_documented_value():
+    from veda.kernel import ratelimit
+
+    assert ratelimit.USER_LIMIT == "600 per 5 minutes"
+
+
+@pytest.mark.settings(rate_limits_enabled=True)
+def test_IRA08_authenticated_user_is_limited_across_endpoints(api, factory, monkeypatch):
+    from veda.kernel import ratelimit
+
+    monkeypatch.setattr(ratelimit, "USER_LIMIT", "3 per 5 minutes")
+    reader = factory.user("SALES")
+    token = factory.login(api, reader)
+    # One budget for the user, whatever the endpoint.
+    assert api.get("/api/v1/auth/me", token=token).status == 200
+    assert api.get("/api/v1/leads", token=token).status == 200
+    assert api.get("/api/v1/auth/me", token=token).status == 200
+    r = api.get("/api/v1/leads", token=token)
+    assert r.status == 429 and r.code == "RATE_LIMITED"
+    assert 1 <= int(r.headers["Retry-After"]) <= 300
+    # Another user and unauthenticated public routes keep their own budgets.
+    other = factory.user("SALES")
+    assert api.get("/api/v1/auth/me", token=factory.login(api, other)).status == 200
+    assert api.get("/api/v1/auth/me", token=token).status == 429
+
+
+def test_IRA08_user_limit_off_when_rate_limits_are_disabled(api, factory, monkeypatch):
+    from veda.kernel import ratelimit
+
+    monkeypatch.setattr(ratelimit, "USER_LIMIT", "1 per 5 minutes")
+    reader = factory.user("SALES")
+    token = factory.login(api, reader)
+    assert [api.get("/api/v1/auth/me", token=token).status for _ in range(3)] == [200, 200, 200]

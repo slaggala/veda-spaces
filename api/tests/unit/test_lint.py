@@ -93,6 +93,29 @@ def test_IRA05_rbx_exceptions_are_checked_against_the_register(app):
         http.ROUTES[:] = original
 
 
+@pytest.mark.parametrize("field", ["permission", "any_of"])
+def test_FCA04_unknown_permission_codes_are_rejected_at_startup(app, field):
+    """A misspelt code is never granted, so its route would deny everyone; startup refuses it (FC-A04)."""
+    from dataclasses import replace
+
+    from veda.app import check_route_declarations
+    from veda.kernel import http
+    from veda.platform.rbac.registry import REGISTRY
+
+    known = {e.code for e in REGISTRY}
+    declared = {c for s in http.ROUTES for c in (*s.permission, *s.any_of)}
+    assert declared and declared <= known, "every code a route declares is in the registry"
+    original = list(http.ROUTES)
+    try:
+        spec = next(s for s in http.ROUTES if s.permission == ("lead.read",))
+        http.ROUTES[http.ROUTES.index(spec)] = replace(spec, **{field: ("lead.raed",)})
+        with pytest.raises(RuntimeError, match=r"declares unknown permission codes \['lead.raed'\]"):
+            check_route_declarations(app)
+    finally:
+        http.ROUTES[:] = original
+    check_route_declarations(app)
+
+
 def test_IRA05_optional_and_public_routes_cannot_hide_a_permission(app):
     """Startup refuses optional-auth + permission, public + permission, and an unregistered public or optional
     route; every current route passes and none became public (final merge-blocker remediation)."""
