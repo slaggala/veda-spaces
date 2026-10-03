@@ -361,13 +361,15 @@ def _archived_events_online(s: Session) -> set[tuple[int, str]]:
     return found
 
 
-def _verify_archives(store, s: Session, anchor: dict | None) -> tuple[int, str | None, str | None, int, int | None]:
+def _verify_archives(
+    store, s: Session, anchors: dict[int, dict]
+) -> tuple[int, str | None, str | None, int, int | None]:
     """Check the finalised archive manifests against the write-once exports (RR-05).
 
     Manifests must be contiguous from sequence 1; each export must match its manifest's SHA-256, count and range,
     and its rows must recompute to a chain that starts where the previous segment ended and ends at the
-    manifest's last row hash; each manifest must be announced by its SECURITY_LOG_ARCHIVED event; an anchor that
-    falls inside the archived range must match the exported row. Returns (through, through_hash, problem, at_seq,
+    manifest's last row hash; each manifest must be announced by its SECURITY_LOG_ARCHIVED event; every anchor that
+    falls inside the archived range must match the exported row (FC-01). Returns (through, through_hash, problem, at_seq,
     unannounced_first_seq); the announcement is reported by the caller after the online checks, which name a
     removed announcement row more precisely.
     """
@@ -395,7 +397,8 @@ def _verify_archives(store, s: Session, anchor: dict | None) -> tuple[int, str |
                 return expected - 1, prev_hash, "archive export chain broken", seq, None
             if not hmac.compare_digest(security_events.hash_representation(rep, prev_hash, key), row["row_hash"]):
                 return expected - 1, prev_hash, "archive export chain broken", seq, None
-            if anchor is not None and seq == anchor["chain_seq"] and row["row_hash"] != anchor["row_hash"]:
+            anchored = anchors.get(seq)
+            if anchored is not None and row["row_hash"] != anchored["row_hash"]:
                 return expected - 1, prev_hash, "anchor mismatch", seq, None
             if row.get("event_type") == "SECURITY_LOG_ARCHIVED" and row.get("outcome") == "SUCCESS":
                 detail = row.get("detail") or {}
@@ -418,17 +421,22 @@ def verify_chain() -> security_events.ChainReport:
     follow the last archived segment and chain to its last hash), a forged, altered or unannounced archive
     manifest or export, a deletion committed without its manifest being finalised, removal of the anchored row
     unless a verified export covers it, and truncation below the latest anchor (head < anchored sequence). An
-    unreadable anchor store is itself a verification failure (RR-07)."""
+    unreadable anchor store is itself a verification failure (RR-07).
+
+    Every retained anchor is checked, not only the latest (FC-01): someone holding the chain key can rewrite
+    history, recompute every later hash and post a new anchor for the forged head, but the anchors already in
+    write-once storage still name the original hashes. The earliest contradicted anchor is reported."""
     store = anchor_store.store()
     with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
         report = None
         try:
-            anchor = store.latest("anchor")
-            through, through_hash, problem, at_seq, unannounced = _verify_archives(store, s, anchor)
+            anchors = {a["chain_seq"]: a for a in store.all("anchor")}
+            anchor = anchors[max(anchors)] if anchors else None
+            through, through_hash, problem, at_seq, unannounced = _verify_archives(store, s, anchors)
             pending = store.all("pending")
         except Exception:
             log.critical("security_log_anchor_store_unavailable", exc_info=True)
-            anchor, through, through_hash, pending = None, 0, None, []
+            anchors, anchor, through, through_hash, pending = {}, None, 0, None, []
             problem, at_seq, unannounced = "anchor store unavailable", 0, None
         first_seq, head_seq = s.execute(
             sa.select(sa.func.min(SecurityEventLog.chain_seq), sa.func.max(SecurityEventLog.chain_seq))
@@ -454,23 +462,26 @@ def verify_chain() -> security_events.ChainReport:
             report = security_events.verify_chain(
                 s, from_seq=first_seq, anchor_hash=through_hash, from_genesis=through == 0
             )
-            if report.ok and anchor is not None and anchor["chain_seq"] > through:
-                anchored = s.execute(
-                    sa.select(SecurityEventLog.row_hash).where(SecurityEventLog.chain_seq == anchor["chain_seq"])
-                ).scalar()
-                if anchored is None:
+            online_anchors = sorted(seq for seq in anchors if seq > through)
+            if report.ok and online_anchors:
+                online_hashes = dict(
+                    s.execute(
+                        sa.select(SecurityEventLog.chain_seq, SecurityEventLog.row_hash).where(
+                            SecurityEventLog.chain_seq.in_(online_anchors)
+                        )
+                    ).all()
+                )
+                for seq in online_anchors:  # ascending: the earliest contradiction is reported
+                    if seq not in online_hashes:
+                        problem = "anchored row missing"
+                    elif online_hashes[seq] != anchors[seq]["row_hash"]:
+                        problem = "anchor mismatch"
+                    else:
+                        continue
                     report = security_events.ChainReport(
-                        False,
-                        report.checked,
-                        report.head_seq,
-                        report.head_hash,
-                        "anchored row missing",
-                        anchor["chain_seq"],
+                        False, report.checked, report.head_seq, report.head_hash, problem, seq
                     )
-                elif anchored != anchor["row_hash"]:
-                    report = security_events.ChainReport(
-                        False, report.checked, report.head_seq, report.head_hash, "anchor mismatch", anchor["chain_seq"]
-                    )
+                    break
         if unannounced is not None and (report is None or report.ok):
             report = security_events.ChainReport(
                 False, 0, through, through_hash, "archive not announced by SECURITY_LOG_ARCHIVED", unannounced
