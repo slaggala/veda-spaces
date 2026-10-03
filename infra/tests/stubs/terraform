@@ -6,10 +6,14 @@
 set -euo pipefail
 : "${TF_STUB_DIR:?TF_STUB_DIR must be set}"
 printf '%s\n' "$*" >>"$TF_STUB_DIR/calls.log"
+# "-chdir=DIR <command>" (stack.sh, AUT-301): the directory is logged with the call, then the command is handled.
+[[ "${1:-}" == -chdir=* ]] && shift
 case "${1:-}" in
   init | apply) exit 0 ;;
   plan)
     for a in "$@"; do [[ "$a" == -out=* ]] && echo "stub plan" >"${a#-out=}"; done
+    # What terraform plan prints, like the real one (AUT-301 checks it never reaches the job log).
+    [[ -f "$TF_STUB_DIR/plan.stdout" ]] && cat "$TF_STUB_DIR/plan.stdout"
     exit 0
     ;;
   show)

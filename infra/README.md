@@ -15,7 +15,8 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | AUT-001 repository structure | this directory |
 | AUT-002 Terraform bootstrap | `terraform/bootstrap/`: **applied to `veda-staging` (813238078849) on 2026-10-03**; evidence in `docs/release-evidence/AUT-002/` |
 | AUT-003 bootstrap workflow | `scripts/` run locally (Option A) for the first bootstrap; `.github/workflows/00-bootstrap.yml` **not run** (public repository) |
-| AUT-101 onward | not started (see `terraform/modules/README.md`) |
+| AUT-301 infra workflows | `.github/workflows/10-infra-plan.yml` (OIDC plan, live) and `11-infra-apply.yml` (**disabled** until OD-B7: `config/apply-gate.json`); `scripts/stack.sh`, `scripts/oidc-session.sh`; runbook `docs/operations/staging-infra-workflows.md` |
+| AUT-101 onward | not started (see `terraform/modules/README.md`); `envs/staging-core/` exists, empty |
 
 ## Layout
 
@@ -33,13 +34,16 @@ infra/
                            protected environment, no external trust or resource policies
     bootstrap.sh           plan | apply of the approved plan (digest-bound), state migration, live protection check, outputs
     github-setup.sh        GitHub environments, main protection, --verify, --verify-environments, variables (dry run)
-    verify-run.sh          00-bootstrap: plan run → artifact → approved digest binding; environment approval proof
+    verify-run.sh          plan run → artifact → approved digest binding (00-bootstrap, or --stack for 10/11); approval proof
+    stack.sh               staging stack plan | apply of the approved digest | gate (AUT-301, OIDC sessions only)
+    oidc-session.sh        GitHub OIDC token → veda-gh-plan / veda-gh-apply session, masked, into $GITHUB_ENV
+    install-tools.sh       pinned, SHA-256-verified check tools (tools/tools.lock); --only terraform for the workflows
   tests/                   offline script/workflow tests with stub aws, gh, terraform (make test-scripts)
   terraform/
     bootstrap/             state bucket + KMS, GitHub OIDC, 4 roles, permissions boundary, account guardrails
       tests/               offline `terraform test` suite, IAM policy evaluator, negative tests
     modules/               AUT-101 … AUT-112, AUT-201 … AUT-205
-    envs/staging-core/     AWS root (AUT-1xx)
+    envs/staging-core/     AWS root (AUT-1xx): backend at init (staging/core.tfstate), provider pinned to the manifest account
     envs/staging-edge/     Cloudflare root (AUT-2xx)
   host/                    cloud-init and host files (AUT-109)
   ssm-documents/           deploy, collect, drill documents (AUT-107)

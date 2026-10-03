@@ -3,6 +3,7 @@
 #
 #   infra/scripts/install-tools.sh [--dir infra/.tools]      # download, check SHA-256, install
 #   infra/scripts/install-tools.sh --verify [--dir …]        # the tools on PATH are exactly the pinned versions
+#   ... --only "terraform"                                    # only these tools (the plan/apply workflows, AUT-301)
 #
 # Versions and SHA-256 digests: infra/tools/tools.lock (terraform, tflint, shellcheck, actionlint) and
 # infra/tools/requirements-checkov.txt (checkov and every dependency, hash-locked; Python 3.13). A download whose
@@ -19,11 +20,13 @@ LOCK="$INFRA_DIR/tools/tools.lock"
 CHECKOV_REQUIREMENTS="$INFRA_DIR/tools/requirements-checkov.txt"
 DIR="$INFRA_DIR/.tools"
 VERIFY=0
+ONLY=""
 while (($#)); do
   case "$1" in
     --dir) DIR="${2:-}"; shift 2 ;;
     --verify) VERIFY=1; shift ;;
-    -h | --help) sed -n '2,14p' "$0"; exit 0 ;;
+    --only) ONLY="${2:-}"; shift 2 ;;
+    -h | --help) sed -n '2,15p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -45,6 +48,10 @@ installed_version() {
 }
 
 TOOLS="terraform tflint shellcheck actionlint checkov"
+if [[ -n "$ONLY" ]]; then
+  for t in $ONLY; do [[ " $TOOLS " == *" $t "* ]] || die "--only: unknown tool $t (known: $TOOLS)"; done
+  TOOLS="$ONLY"
+fi
 
 if ((VERIFY)); then
   require_tools jq
@@ -89,6 +96,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 for t in terraform tflint shellcheck actionlint; do
+  [[ " $TOOLS " == *" $t "* ]] || continue
   read -r version sum url < <(awk -v t="$t" -v o="$OS" -v a="$ARCH" '$1 == t && $3 == o && $4 == a { print $2, $5, $6 }' "$LOCK")
   [[ -n "${url:-}" ]] || die "$t: no pinned download for $OS/$ARCH in $LOCK"
   if [[ "$(installed_version "$t")" == "$version" && -x "$DIR/bin/$t" ]]; then
@@ -112,6 +120,10 @@ for t in terraform tflint shellcheck actionlint; do
   log "$t $version installed (SHA-256 verified)"
 done
 
+if [[ " $TOOLS " != *" checkov "* ]]; then
+  log "tools installed in $DIR/bin; verifying"
+  exec "$0" --verify --dir "$DIR" --only "$TOOLS"
+fi
 want="$(pinned checkov)"
 py="${PYTHON:-python3}"
 "$py" -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 13) else 1)' ||

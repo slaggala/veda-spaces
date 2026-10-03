@@ -1,0 +1,128 @@
+# Plan of the staging core stack through GitHub OIDC (AUT-301; runbook docs/operations/staging-infra-workflows.md).
+#
+# Runs in the "staging-plan" environment (required reviewer, any branch) and assumes veda-gh-plan: read-only access,
+# state read and lock files only. It creates nothing. Every plan passes the plan guard (check-plan.sh); a refusal fails
+# the run.
+#
+# A plan that 11-infra-apply may apply comes only from a workflow_dispatch run on main (pull-request plans are for
+# review). Terraform's plan output stays off the job log (public repository, N-04-S). The plan file, its text and its
+# metadata are uploaded as the artifact core-plan-<run> only from a private repository, or once the owner accepts
+# publishing them (gate N-04-S in infra/config/apply-gate.json); the summary always shows the change counts and the
+# plan's SHA-256.
+name: 10-infra-plan
+run-name: "10-infra-plan (core)"
+
+on:
+  pull_request:
+    paths:
+      - infra/terraform/envs/staging-core/**
+      - infra/terraform/modules/**
+      - infra/scripts/**
+      - infra/config/**
+      - .github/workflows/10-infra-plan.yml
+  push:
+    branches: [main]
+    paths:
+      - infra/terraform/envs/staging-core/**
+      - infra/terraform/modules/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-plan-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan (staging-core)
+    # A fork's pull request gets no OIDC token and no access to the environment; it is not planned.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    environment: staging-plan
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read # approval proof (RR-07)
+      id-token: write # OIDC: veda-gh-plan, trusted only for environment staging-plan
+    env:
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Terraform (SHA-256 verified)
+        run: |
+          infra/scripts/install-tools.sh --only terraform
+          echo "$PWD/infra/.tools/bin" >>"$GITHUB_PATH"
+
+      - name: Approved run and protected environments (RR-07)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment staging-plan
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+
+      - name: OIDC session (veda-gh-plan)
+        env:
+          AWS_ROLE_ARN_PLAN: ${{ vars.AWS_ROLE_ARN_PLAN }}
+        run: infra/scripts/oidc-session.sh --role plan
+
+      - name: Plan and plan guard (creates nothing)
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_KMS_KEY_ARN: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+        run: infra/scripts/stack.sh plan --stack core --out infra/generated/core
+
+      - name: Publish the plan for review? (N-04-S)
+        id: publish
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          status="$(jq -r '.gates["N-04-S"].status' infra/config/apply-gate.json)"
+          if [[ "$REPOSITORY_PRIVATE" == "true" || "$status" == "ACCEPTED" ]]; then echo "publish=true" >>"$GITHUB_OUTPUT"
+          else echo "publish=false" >>"$GITHUB_OUTPUT"; fi
+
+      - name: Upload the plan for review and apply (no secrets)
+        id: upload
+        if: steps.publish.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: core-plan-${{ github.run_id }}
+          path: |
+            infra/generated/core/core.tfplan
+            infra/generated/core/core-plan.meta.json
+            infra/generated/core/core-plan.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        env:
+          PUBLISH: ${{ steps.publish.outputs.publish }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          meta=infra/generated/core/core-plan.meta.json
+          {
+            echo "## 10-infra-plan (core)"
+            if [[ -f "$meta" ]]; then
+              echo '```'
+              grep -E '^(Plan: |No changes\.)' infra/generated/core/core-plan.txt | head -n 1 || true
+              echo '```'
+              echo "Plan sha256: \`$(jq -r .plan_sha256 "$meta")\` (text sha256 \`$(jq -r .plan_text_sha256 "$meta")\`)"
+              echo '### Plan metadata'
+              echo '```json'
+              jq '{stack, commit, account_id, workflow_ref, run_id, terraform_version, state_key, changes}' "$meta"
+              echo '```'
+              if [[ "$PUBLISH" == "true" ]]; then
+                echo "Artifact \`core-plan-$GITHUB_RUN_ID\` (digest recorded at upload: \`${ARTIFACT_DIGEST:-none}\`)."
+              else
+                echo "The plan text is not published (public repository, gate N-04-S undecided): no apply can use this run."
+              fi
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
