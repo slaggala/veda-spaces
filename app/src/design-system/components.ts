@@ -339,22 +339,31 @@ export class VsPagination extends LitElement {
 }
 
 export interface TabItem { id: string; label: string; hidden?: boolean }
-/** Tabs with roving arrow-key focus (AX-01). */
+/**
+ * Tabs with roving arrow-key focus (AX-01) that own their tabpanel (WAI-ARIA tabs pattern; RR-18). The selected
+ * tab's content is passed as children: <vs-tabs label="…" .tabs=… .selected=…>${content}</vs-tabs>. Tab and panel
+ * sit in the same shadow root, so aria-controls and aria-labelledby resolve (ID references do not cross shadow
+ * roots, which is why a panel rendered by the page could never be wired to these tabs).
+ */
 export class VsTabs extends LitElement {
-  static override properties = { tabs: { attribute: false }, selected: { type: String } };
+  static override properties = { tabs: { attribute: false }, selected: { type: String }, label: { type: String } };
   declare tabs: TabItem[];
   declare selected: string;
+  /** Accessible name of the tab list. */
+  declare label: string;
   static override styles = css`
-    :host { display: block; border-bottom: 1px solid var(--vs-line); }
-    div { display: flex; gap: 4px; overflow-x: auto; }
+    :host { display: block; }
+    [role='tablist'] { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--vs-line); }
     button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; min-height: 44px; font: 600 14px/20px var(--vs-font-sans); color: var(--vs-ink-muted); cursor: pointer; white-space: nowrap; }
     button[aria-selected='true'] { color: var(--vs-ink); border-bottom-color: var(--vs-copper); }
-    button:focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: -2px; }
+    button:focus-visible, [role='tabpanel']:focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: -2px; }
+    [role='tabpanel'] { display: flex; flex-direction: column; gap: var(--vs-space-3); padding-top: var(--vs-space-3); }
   `;
   constructor() {
     super();
     this.tabs = [];
     this.selected = '';
+    this.label = '';
   }
   private select(id: string) {
     this.selected = id;
@@ -363,21 +372,25 @@ export class VsTabs extends LitElement {
   private onKey(e: KeyboardEvent) {
     const visible = this.tabs.filter((t) => !t.hidden);
     const i = visible.findIndex((t) => t.id === this.selected);
-    let next = -1;
-    if (e.key === 'ArrowRight') next = (i + 1) % visible.length;
-    if (e.key === 'ArrowLeft') next = (i - 1 + visible.length) % visible.length;
-    if (next < 0) return;
+    const last = visible.length - 1;
+    const next =
+      e.key === 'ArrowRight' ? (i + 1) % visible.length :
+      e.key === 'ArrowLeft' ? (i - 1 + visible.length) % visible.length :
+      e.key === 'Home' ? 0 :
+      e.key === 'End' ? last : -1;
+    if (next < 0 || !visible.length) return;
     e.preventDefault();
     this.select(visible[next].id);
     this.updateComplete.then(() => (this.renderRoot.querySelector('[aria-selected="true"]') as HTMLElement | null)?.focus());
   }
   override render() {
-    return html`<div role="tablist" @keydown=${this.onKey}>${this.tabs
-      .filter((t) => !t.hidden)
-      .map(
-        (t) => html`<button role="tab" aria-selected=${t.id === this.selected ? 'true' : 'false'} tabindex=${t.id === this.selected ? 0 : -1}
-          @click=${() => this.select(t.id)}>${t.label}</button>`,
-      )}</div>`;
+    const visible = this.tabs.filter((t) => !t.hidden);
+    const current = visible.find((t) => t.id === this.selected);
+    return html`<div role="tablist" aria-label=${this.label || nothing} @keydown=${this.onKey}>${visible.map(
+        (t) => html`<button role="tab" id="tab-${t.id}" aria-controls="panel" aria-selected=${t.id === this.selected ? 'true' : 'false'}
+          tabindex=${t.id === this.selected ? 0 : -1} @click=${() => this.select(t.id)}>${t.label}</button>`,
+      )}</div>
+      <div role="tabpanel" id="panel" aria-labelledby=${current ? `tab-${current.id}` : nothing} tabindex="0"><slot></slot></div>`;
   }
 }
 

@@ -203,9 +203,10 @@ export class VsProfilePage extends SessionElement {
     return html`<div class="page">
       <div class="page-head"><div><p class="eyebrow">Account</p><h1 class="display">Profile</h1></div></div>
       <vs-problem-banner .problem=${this.problem}></vs-problem-banner>
-      <vs-tabs .tabs=${[{ id: 'profile', label: 'Profile' }, { id: 'security', label: 'Security' }, { id: 'sessions', label: 'Sessions', hidden: !this.can('session.read') }]}
-        .selected=${this.tab} @tab-change=${(e: CustomEvent<string>) => { this.tab = e.detail; if (e.detail === 'sessions') void this.loadSessions(); }}></vs-tabs>
-      ${this.tab === 'profile' ? this.renderProfile() : this.tab === 'security' ? this.renderSecurity() : this.renderSessions()}
+      <vs-tabs label="Account sections" .tabs=${[{ id: 'profile', label: 'Profile' }, { id: 'security', label: 'Security' }, { id: 'sessions', label: 'Sessions', hidden: !this.can('session.read') }]}
+        .selected=${this.tab} @tab-change=${(e: CustomEvent<string>) => { this.tab = e.detail; if (e.detail === 'sessions') void this.loadSessions(); }}>
+        ${this.tab === 'profile' ? this.renderProfile() : this.tab === 'security' ? this.renderSecurity() : this.renderSessions()}
+      </vs-tabs>
       <vs-dialog .open=${this.emailDialog} heading="Change sign-in email" @close=${() => (this.emailDialog = false)}>
         <form @submit=${this.requestEmailChange} novalidate>
           <p>We'll send a verification link to the new address. Your current address stays active for sign-in and password recovery until you verify, and we'll alert it too.</p>

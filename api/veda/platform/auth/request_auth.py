@@ -30,6 +30,9 @@ from . import jwt_tokens, security_events
 from .crypto import new_opaque_token, sha256_hex
 from .models import MfaChallenge, UserMfaFactor, UserSession
 
+# Lifetime of a step-up challenge; the 403 reports it as expires_in so the dialog can warn before expiry (AX-07).
+STEP_UP_CHALLENGE_TTL = timedelta(minutes=5)
+
 log = logging.getLogger("veda.auth")
 
 LAST_SEEN_INTERVAL = timedelta(minutes=5)
@@ -273,7 +276,7 @@ def _issue_step_up_challenge(ctx: AuthContext) -> str:
                 purpose="STEP_UP",
                 token_hash=token_hash,
                 session_id=session_id,
-                expires_on=now + timedelta(minutes=5),
+                expires_on=now + STEP_UP_CHALLENGE_TTL,
                 failed_attempts=0,
                 ip_address=current_actor().ip,
             )
@@ -304,7 +307,11 @@ def require_step_up(ctx: AuthContext, *, allow_password: bool = False) -> None:
             403,
             "STEP_UP_REQUIRED",
             "Confirm it's you with your authenticator.",
-            extra={"kind": "mfa", "mfa_token": _issue_step_up_challenge(ctx), "expires_in": 300},
+            extra={
+                "kind": "mfa",
+                "mfa_token": _issue_step_up_challenge(ctx),
+                "expires_in": int(STEP_UP_CHALLENGE_TTL.total_seconds()),
+            },
         )
     if allow_password:
         if ctx.session.reauth_on is not None and now - ctx.session.reauth_on <= s.reauth_window:

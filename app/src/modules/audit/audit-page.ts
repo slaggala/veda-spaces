@@ -148,9 +148,10 @@ export class VsAuditPage extends SessionElement {
     const ev = this.eventDetail;
     return html`<div class="page">
       <div class="page-head"><div><p class="eyebrow">Admin</p><h1 class="display">${this.tab === 'audit' ? 'Audit log' : 'Security events'}</h1></div></div>
-      <vs-tabs .tabs=${[{ id: 'audit', label: 'Audit log', hidden: !this.can('audit.read') }, { id: 'security', label: 'Security events', hidden: !this.can('security_event.read') }]}
-        .selected=${this.tab} @tab-change=${(e: CustomEvent<'audit' | 'security'>) => { this.tab = e.detail; this.filters = {}; this.cursor = null; history.replaceState(null, '', e.detail === 'security' ? '/audit?tab=security' : '/audit'); void this.load(true); }}></vs-tabs>
-      ${this.tab === 'audit' ? this.renderAudit() : this.renderSecurity()}
+      <vs-tabs label="Logs" .tabs=${[{ id: 'audit', label: 'Audit log', hidden: !this.can('audit.read') }, { id: 'security', label: 'Security events', hidden: !this.can('security_event.read') }]}
+        .selected=${this.tab} @tab-change=${(e: CustomEvent<'audit' | 'security'>) => { this.tab = e.detail; this.filters = {}; this.cursor = null; history.replaceState(null, '', e.detail === 'security' ? '/audit?tab=security' : '/audit'); void this.load(true); }}>
+        ${this.tab === 'audit' ? this.renderAudit() : this.renderSecurity()}
+      </vs-tabs>
       <vs-drawer wide .open=${Boolean(d)} heading=${d ? `${d.action} · ${humanize(d.entity_type)}${d.entity_label ? ` ${d.entity_label}` : ''}` : ''} @close=${() => (this.detail = null)}>
         ${d ? html`<dl>
             <dt>By</dt><dd>${d.performed_by?.display_name ?? '—'} · ${formatFull(d.performed_on)} · via ${d.performed_via}</dd>

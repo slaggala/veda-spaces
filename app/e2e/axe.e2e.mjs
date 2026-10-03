@@ -76,6 +76,62 @@ await page.goto(`${BASE}/leads`);
 await page.getByText('Anita Reddy').first().click();
 await page.getByText(/VS-L-\d{4}-\d{6}/).first().waitFor();
 ok.push(await scan(page, 'lead detail'));
+
+// RR-18: the states the re-review found (UI-016 AX-01, AX-09), scanned and exercised in the running app.
+function check(name, pass, detail = '') {
+  console.log(`${pass ? 'PASS' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`);
+  ok.push(Boolean(pass));
+}
+// Lead detail tabs: tablist, tabs and tabpanel wired inside one root (ID references resolve).
+const tabWiring = await page.locator('vs-tabs').first().evaluate((el) => {
+  const root = el.shadowRoot;
+  const panel = root.querySelector('[role="tabpanel"]');
+  const tabs = [...root.querySelectorAll('[role="tab"]')];
+  return Boolean(root.querySelector('[role="tablist"]').getAttribute('aria-label')) && tabs.length > 0
+    && tabs.every((t) => root.getElementById(t.getAttribute('aria-controls')) === panel)
+    && root.getElementById(panel.getAttribute('aria-labelledby'))?.getAttribute('aria-selected') === 'true'
+    && panel.querySelector('slot').assignedElements().length > 0;
+});
+check('lead detail tabs wired to their tabpanel', tabWiring);
+await page.getByRole('tab', { name: /Notes/ }).focus();
+await page.keyboard.press('End');
+check('tabs: End moves to the last tab', await page.getByRole('tab', { name: /History/ }).getAttribute('aria-selected') === 'true');
+ok.push(await scan(page, 'lead detail, History tab'));
+
+// Account menu: closes on an outside press, on focus leaving and on Escape from the toggle.
+const toggle = page.getByRole('button', { name: 'Account menu' });
+await toggle.click();
+ok.push(await scan(page, 'account menu open'));
+await page.locator('h1').first().click(); // plain page text, away from the menu
+check('account menu closes on an outside press', await toggle.getAttribute('aria-expanded') === 'false');
+await toggle.click();
+await toggle.focus();
+await page.keyboard.press('Escape');
+check('account menu closes on Escape from its toggle and keeps focus there',
+  await toggle.getAttribute('aria-expanded') === 'false' && await toggle.evaluate((el) => el.matches(':focus')));
+await toggle.click();
+await page.locator('#account-menu').getByRole('link', { name: /Profile/ }).focus();
+await page.keyboard.press('Tab');
+await page.keyboard.press('Tab');
+check('account menu closes when keyboard focus leaves it', await toggle.getAttribute('aria-expanded') === 'false');
+
+// Command palette: combobox + listbox, arrow keys keep focus in the input, Enter opens the lead.
+await page.keyboard.press('Control+k');
+const combo = page.getByRole('combobox', { name: 'Search leads and pages' });
+await combo.waitFor();
+ok.push(await scan(page, 'command palette'));
+await combo.fill('Anita');
+const option = page.getByRole('option', { name: /Anita Reddy/ }).first();
+await option.waitFor();
+check('palette: first result is the active descendant',
+  await combo.getAttribute('aria-activedescendant') === await option.getAttribute('id') && await option.getAttribute('aria-selected') === 'true');
+await page.keyboard.press('ArrowDown');
+await page.keyboard.press('ArrowUp');
+check('palette: focus stays in the combobox while options move', await combo.evaluate((el) => el.matches(':focus')));
+ok.push(await scan(page, 'command palette with results'));
+await page.keyboard.press('Enter');
+await page.waitForURL(/\/leads\/[0-9a-f]{32}$/);
+check('palette: Enter opens the active lead', true);
 // The marketing site fades sections in on scroll; reduced motion renders everything at full opacity (AX-10).
 // bypassCSP lets the axe script run; the production CSP itself is exercised by site.e2e.mjs.
 const siteCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });

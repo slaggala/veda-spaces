@@ -23,7 +23,7 @@ from veda.platform.rbac import resolver
 from . import jwt_tokens, passwords, security_events, throttle
 from .crypto import derive_action_token, new_opaque_token, sha256_hex
 from .models import MfaChallenge, RefreshToken, UserActionToken, UserMfaFactor, UserSession
-from .request_auth import AuthContext, schedule_write
+from .request_auth import STEP_UP_CHALLENGE_TTL, AuthContext, schedule_write
 
 TOKEN_TTLS = {
     "PASSWORD_RESET": timedelta(minutes=30),
@@ -31,7 +31,7 @@ TOKEN_TTLS = {
     "INVITE_SENSITIVE": timedelta(hours=24),
     "MFA_ENROLLMENT": timedelta(minutes=30),
 }
-CHALLENGE_TTLS = {"LOGIN": timedelta(minutes=5), "STEP_UP": timedelta(minutes=5), "ENROLLMENT": timedelta(minutes=15)}
+CHALLENGE_TTLS = {"LOGIN": timedelta(minutes=5), "STEP_UP": STEP_UP_CHALLENGE_TTL, "ENROLLMENT": timedelta(minutes=15)}
 METHODS_AMR = {"pwd": ["pwd"], "pwd+totp": ["pwd", "otp"], "pwd+recovery": ["pwd", "recovery"]}
 
 
