@@ -44,6 +44,25 @@ def _scrub(_, __, event_dict):
     return event_dict
 
 
+def error_fingerprint(exc_type: type, tb) -> tuple[str, list[str]]:
+    """Stable id of an error (type + code path) and its stack frames; never the message (IR-27)."""
+    frames = traceback.extract_tb(tb)
+    stack = [f"{f.filename.rsplit('/veda/', 1)[-1]}:{f.lineno} {f.name}" for f in frames]
+    return hashlib.sha256((exc_type.__name__ + "|" + "|".join(stack)).encode()).hexdigest()[:16], stack
+
+
+def error_summary(exc: BaseException) -> str:
+    """A PII-free description of an error for storage (RR-13): type, the provider's error code when it has one,
+    and the fingerprint that the matching log line carries, so the full stack can be found in the logs."""
+    code = None
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):  # botocore ClientError (SES, S3): a machine code, never the message
+        code = (response.get("Error") or {}).get("Code")
+    fingerprint, _ = error_fingerprint(type(exc), exc.__traceback__)
+    label = type(exc).__name__ + (f"[{code}]" if isinstance(code, str) and code.isidentifier() else "")
+    return f"{label} #{fingerprint}"
+
+
 def _safe_exception(_, __, event_dict):
     """Exceptions are logged as type, fingerprint and stack frames only. The message is dropped: database errors
     carry bound values and failing rows (names, phones, messages) that masking cannot recognise (IR-27, LOG-003)."""
@@ -53,12 +72,9 @@ def _safe_exception(_, __, event_dict):
     if isinstance(exc_info, BaseException):
         exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
     if exc_info and exc_info[0] is not None:
-        frames = traceback.extract_tb(exc_info[2])
-        stack = [f"{f.filename.rsplit('/veda/', 1)[-1]}:{f.lineno} {f.name}" for f in frames]
+        fingerprint, stack = error_fingerprint(exc_info[0], exc_info[2])
         event_dict["error_type"] = exc_info[0].__name__
-        event_dict["error_fingerprint"] = hashlib.sha256(
-            (exc_info[0].__name__ + "|" + "|".join(stack)).encode()
-        ).hexdigest()[:16]
+        event_dict["error_fingerprint"] = fingerprint
         event_dict["stack"] = stack[-15:]
     event_dict.pop("exception", None)
     return event_dict
@@ -126,31 +142,99 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
+_URL_QUERY = re.compile(r"(https?://[^\s?#]+)[?#]\S*")
+# Span attributes worth keeping: what ran and how long, never what it was asked for (RR-13).
+_SPAN_DATA_KEEP = frozenset(
+    {"db.system", "db.operation", "http.method", "http.request.method", "http.response.status_code", "thread.id",
+     "thread.name", "server.address"}
+)  # fmt: skip
+
+
+def _strip_query(url):
+    return url.split("?", 1)[0].split("#", 1)[0] if isinstance(url, str) else url
+
+
+def _scrub_request(request) -> None:
+    """Request context: method and path only. The query string is dropped, not masked: it is URL-encoded
+    (``q=priya%40example.com``), so pattern masking cannot recognise what it carries (RR-13)."""
+    if not isinstance(request, dict):
+        return
+    for key in ("data", "cookies", "query_string", "env"):
+        request.pop(key, None)
+    request["url"] = _strip_query(request.get("url"))
+    request["headers"] = {
+        k: v
+        for k, v in (request.get("headers") or {}).items()
+        if k.lower() in ("user-agent", "x-request-id", "content-type")
+    }
+
+
+def _scrub_breadcrumbs(event) -> None:
+    for crumb in (event.get("breadcrumbs") or {}).get("values", []) or []:
+        if isinstance(crumb.get("message"), str):
+            crumb["message"] = _mask(_URL_QUERY.sub(r"\1", crumb["message"]))
+        crumb.pop("data", None)
+
+
+def _scrub_span(span) -> None:
+    if not isinstance(span, dict):
+        return
+    if isinstance(span.get("description"), str):
+        span["description"] = _mask(_URL_QUERY.sub(r"\1", span["description"]))
+    data = span.get("data")
+    if isinstance(data, dict):
+        span["data"] = {k: v for k, v in data.items() if k in _SPAN_DATA_KEEP}
+
+
 def sentry_before_send(event, _hint):
-    """Sentry receives exception types and frames only: values, request bodies, cookies, headers and local
-    variables are removed (IR-27, LOG-004)."""
+    """Sentry receives exception types and frames only: values, request bodies, query strings, cookies, headers
+    and local variables are removed (IR-27, LOG-004, RR-13)."""
     for exc in (event.get("exception") or {}).get("values", []) or []:
         exc["value"] = "[omitted]"
         for frame in (exc.get("stacktrace") or {}).get("frames", []) or []:
             frame.pop("vars", None)
-    request = event.get("request")
-    if isinstance(request, dict):
-        for key in ("data", "cookies", "query_string", "env"):
-            request.pop(key, None)
-        request["headers"] = {
-            k: v
-            for k, v in (request.get("headers") or {}).items()
-            if k.lower() in ("user-agent", "x-request-id", "content-type")
-        }
+    _scrub_request(event.get("request"))
     event.pop("user", None)
     if isinstance(event.get("logentry"), dict):
         event["logentry"]["message"] = _mask(str(event["logentry"].get("message", "")))
         event["logentry"].pop("params", None)
-    for crumb in (event.get("breadcrumbs") or {}).get("values", []) or []:
-        if isinstance(crumb.get("message"), str):
-            crumb["message"] = _mask(crumb["message"])
-        crumb.pop("data", None)
+    _scrub_breadcrumbs(event)
     return event
+
+
+def sentry_before_send_transaction(event, _hint):
+    """Performance transactions get the same treatment as errors (RR-13): they carry the request context too, and
+    before_send never sees them. Spans keep their operation and timing, not their parameters."""
+    _scrub_request(event.get("request"))
+    event.pop("user", None)
+    _scrub_breadcrumbs(event)
+    trace = (event.get("contexts") or {}).get("trace")
+    if isinstance(trace, dict):
+        _scrub_span(trace)
+    for span in event.get("spans") or []:
+        _scrub_span(span)
+    return event
+
+
+def sentry_before_send_span(span, _hint=None):
+    """Streamed spans (span-first mode) are scrubbed like the spans inside a transaction."""
+    _scrub_span(span)
+    return span
+
+
+def sentry_options(settings) -> dict[str, Any]:
+    """The one Sentry configuration (create_app); the PII probe in the tests uses it as is."""
+    return {
+        "dsn": settings.sentry_dsn,
+        "send_default_pii": False,
+        "traces_sample_rate": 0.1,
+        "environment": settings.env,
+        "include_local_variables": False,
+        "max_request_body_size": "never",
+        "before_send": sentry_before_send,
+        "before_send_transaction": sentry_before_send_transaction,
+        "before_send_span": sentry_before_send_span,
+    }
 
 
 def _truncate_ip(ip: str | None) -> str | None:

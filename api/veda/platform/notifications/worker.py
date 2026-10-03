@@ -19,6 +19,7 @@ import sqlalchemy as sa
 
 from veda.kernel import clock, db
 from veda.kernel.context import ActorContext, actor
+from veda.kernel.logging import error_summary
 
 from . import email as email_mod
 from .handlers import MAINTENANCE_ONLY, begin_email_queue, dispatch, take_email_queue
@@ -110,13 +111,15 @@ def process(event_id: str, *, handler=None) -> bool:
         return True
     except Exception as exc:
         take_email_queue()
-        log.warning("outbox_handler_failed event_id=%s error=%s", event_id, type(exc).__name__)
+        # The log line carries the stack and the same fingerprint as last_error (message dropped, IR-27).
+        log.warning("outbox_handler_failed event_id=%s error=%s", event_id, type(exc).__name__, exc_info=True)
         with actor(_system()), db.unit_of_work(write=True) as s:
             ev = s.get(OutboxEvent, event_id)
             if ev is not None:
                 ev.attempts += 1
                 now = db.tx_time(s)
-                ev.last_error = f"{type(exc).__name__}: {str(exc)[:300]}"[:2000]
+                # Never the message: provider errors name recipients, database errors carry row values (RR-13).
+                ev.last_error = error_summary(exc)
                 ev.locked_by = ev.locked_on = None
                 if ev.attempts >= MAX_ATTEMPTS:
                     ev.status = "DEAD"
