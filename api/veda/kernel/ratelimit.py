@@ -8,9 +8,11 @@ gunicorn worker count is not 1.
 from __future__ import annotations
 
 import json
+import time
 
 from flask import request
 from flask_limiter import Limiter
+from limits import parse
 
 
 def ip_key() -> str:
@@ -52,3 +54,19 @@ limiter = Limiter(
     header_name_mapping=None,
     strategy="fixed-window",
 )
+
+
+# 08 §12: every authenticated user, across all endpoints (IR-A08). Applied after authentication, so it is keyed by
+# the user, not by the address, and a stolen token cannot page through the lead book faster than this.
+USER_LIMIT = "600 per 5 minutes"
+
+
+def user_limit_retry_after(user_id: str) -> int | None:
+    """Count one request for ``user_id``; seconds until the window resets if the limit is exceeded, else None."""
+    if not limiter.enabled:
+        return None
+    item = parse(USER_LIMIT)
+    if limiter.limiter.hit(item, "user", user_id):
+        return None
+    reset_at, _remaining = limiter.limiter.get_window_stats(item, "user", user_id)
+    return max(1, int(reset_at - time.time()))

@@ -585,6 +585,13 @@ def dispatch(spec: RouteSpec, path_params: dict[str, Any]) -> Response:
         session = db.new_session(write=spec.write)
         if spec.auth == "bearer" or (spec.auth == "optional" and request.headers.get("Authorization")):
             ctx = request_auth.authenticate(session, spec)
+            from veda.kernel.ratelimit import user_limit_retry_after
+
+            retry = user_limit_retry_after(ctx.user.id)
+            if retry is not None:
+                raise ApiError(
+                    429, "RATE_LIMITED", "Too many requests. Try again shortly.", headers={"Retry-After": str(retry)}
+                )
         actor_ctx = ActorContext(
             actor_id=ctx.user.id if ctx else request_auth.anonymous_actor_id(),
             via="API",
