@@ -140,6 +140,7 @@ KNOWN_COMMITS = {
     "7f34261b3251ad28061419a0c5c56ef63c4d6fff": ("Merge pull request #9 from slaggala/fix/rr13-pii-in-tracking", "PR #9: RR-13"),  # pragma: allowlist secret (commit SHA)
     "35862ae9dd1b1d18d3c2c41969598c629ca17c8f": ("Merge pull request #10 from slaggala/fix/rr12-staff-reconsent", "PR #10: RR-12"),  # pragma: allowlist secret (commit SHA)
     "a5a59a741bfcb8a3586bd90eb5c1c72e90773916": ("Merge pull request #11 from slaggala/fix/rr18-accessibility-remnants", "PR #11: RR-18"),  # pragma: allowlist secret (commit SHA)
+    "9361d104fef8dcef608ac6e925157eb8896a5ae3": ("Merge pull request #15 from slaggala/docs/bootstrap-authorization", "commit applied by the first bootstrap (AUT-002)"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

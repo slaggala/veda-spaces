@@ -2,7 +2,11 @@
 
 As of 2026-09-30, no staging environment has been built or evaluated. None of the items below has passed.
 
-**Updated 2026-10-03:** still no staging environment. The account is chosen and its manifest committed (PR #3,
+**Bootstrap applied 2026-10-03** (AUT-002: state bucket, state key, GitHub OIDC, the four `veda-gh-*` roles, `veda-boundary`,
+account guardrails; evidence in [`docs/release-evidence/AUT-002/`](../release-evidence/AUT-002/README.md)). No staging stack
+beyond the bootstrap exists yet (RD-01), so none of the items below has been evaluated.
+
+**Earlier update (2026-10-03):** still no staging environment. The account is chosen and its manifest committed (PR #3,
 `veda-staging`, 813238078849); the bootstrap has not been run (prerequisites RD-03, RD-04 and the owner's run
 authorization), and no staging stack beyond the bootstrap exists (RD-01). Release readiness and the execution plans:
 [P0-release-readiness-report.md](P0-release-readiness-report.md).

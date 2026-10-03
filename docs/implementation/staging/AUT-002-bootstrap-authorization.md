@@ -60,3 +60,9 @@
 
 **Verdict: READY FOR CONTROLLED BOOTSTRAP.** The run itself remains a separate, operator-executed step under §2.
 Its stop conditions are the final gate.
+
+## 5. Execution
+
+Carried out on 2026-10-03, 17:20–17:50 UTC, under §2 and within its security requirements. 33 resources were created
+from the approved plan digest, and every stop condition passed. The temporary key was deleted afterwards. Evidence:
+[`docs/release-evidence/AUT-002/`](../../release-evidence/AUT-002/README.md).
