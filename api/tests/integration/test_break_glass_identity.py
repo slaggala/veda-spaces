@@ -16,6 +16,7 @@ from veda.platform.rbac import custodians
 K1 = "arn:aws:iam::111111111111:role/custodian-a"
 HOST_ROLE = "arn:aws:iam::111111111111:role/veda-host"
 HOST_SESSION = "arn:aws:sts::111111111111:assumed-role/veda-host/i-0a1b2c3d4e5f60718"
+FAKE_KEY_ID = "ASIAEXAMPLECUSTODIAN"  # pragma: allowlist secret (fake, offline test only)
 
 
 def _cli(args):
@@ -102,8 +103,8 @@ def test_RR09_custodian_session_cannot_reach_host_credentials(monkeypatch, tmp_p
     methods = [p.METHOD for p in session._session.get_component("credential_provider").providers]
     assert "env" in methods and not set(custodians.HOST_CREDENTIAL_PROVIDERS) & set(methods)
     assert session.get_credentials() is None
-    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ASIAEXAMPLECUSTODIAN")  # pragma: allowlist secret (fake)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", FAKE_KEY_ID)
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "example-secret")  # pragma: allowlist secret
     monkeypatch.setenv("AWS_SESSION_TOKEN", "example-token")
     creds = custodians.custodian_session().get_credentials()
-    assert creds is not None and creds.access_key == "ASIAEXAMPLECUSTODIAN" and creds.method == "env"
+    assert creds is not None and creds.access_key == FAKE_KEY_ID and creds.method == "env"
