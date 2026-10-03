@@ -83,12 +83,17 @@ def test_RR05_forged_export_that_drops_rows_is_detected(api, factory, retention,
     store = anchor_store.store()
     maintenance.archive_security_events(str(tmp_path))
     real = store.all("archive")[0]
-    blob = store.get_blob("export", real["last_seq"]).decode().splitlines()
+    blob = store.get_blob("export", anchor_store.export_id(real)).decode().splitlines()
     doctored = ("\n".join(blob[:1] + blob[2:]) + "\n").encode()  # drop the second archived row
     import hashlib
 
-    forged = {**real, "last_seq": real["last_seq"] + 1000, "sha256": hashlib.sha256(doctored).hexdigest()}
-    store.put_blob("export", forged["last_seq"], doctored)
+    forged = {
+        **real,
+        "last_seq": real["last_seq"] + 1000,
+        "sha256": hashlib.sha256(doctored).hexdigest(),
+        "export_id": "forged",
+    }
+    store.put_blob("export", forged["export_id"], doctored)
     anchor_store.use_store(ForgedView(store, forged))
     try:
         report = maintenance.verify_chain()
