@@ -83,7 +83,9 @@ aws sts assume-role --role-arn arn:aws:iam::<ACCOUNT_ID>:role/<owner role> \
 
 ### Option A: locally (the approved procedure for the first run)
 
-Prerequisites: `aws` v2, `terraform` 1.16.4, `jq`, `curl`, `git`, `gh` (authenticated as a repository admin).
+Prerequisites: `aws` v2, `jq`, `curl`, `git`, `gh` (authenticated as a repository admin), Python 3.13, and the pinned
+check tools (Terraform 1.16.4, tflint, shellcheck, actionlint, checkov): `make -C infra tools` installs them, SHA-256
+verified, into `infra/.tools`.
 Run from a **clean checkout** of `main` that includes the manifest commit. The plan refuses a checkout with
 uncommitted, untracked or *ignored* files the plan could read (`override.tf`, `*_override.tf`, `terraform.tfvars`;
 N-05, PB-08). Before the first run, record the all-region inventory evidence with the same session (PB-02):

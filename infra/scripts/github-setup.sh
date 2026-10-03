@@ -17,6 +17,9 @@
 # Branch protection on main (F10): pull request required (0 approvals, so a single owner can merge; owner decision
 # RR-G), enforced for admins, no force pushes, no deletion. "main only" environments mean nothing without it. An
 # already compliant protection is left as it is, and required status checks are never dropped.
+# Required status checks (RD-02): every job of .github/workflows/ci.yml, including "infra" (make -C infra check), is
+# required on main and bound to the GitHub Actions app, so a failing infrastructure check blocks the merge. Missing
+# ones are added (never removed); --verify and --verify-environments fail while any is missing.
 #
 # Variables (--outputs): repository-level AWS_ROLE_ARN_PLAN/APPLY/DEPLOY/EVIDENCE, AWS_ACCOUNT_ID, AWS_REGION,
 # TF_STATE_BUCKET, TF_STATE_KMS_KEY_ARN, CF_ACCOUNT_ID, CF_ZONE_ID. Repository variables need only the
@@ -48,7 +51,7 @@ while (($#)); do
     --verify) VERIFY=1; shift ;;
     --verify-environments) VERIFY_ENVIRONMENTS=1; shift ;;
     --apply) APPLY=1; shift ;;
-    -h | --help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,35p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -58,6 +61,18 @@ REPO="$(resolve_repo "$REPO_ARG")"
 
 # name reviewers(yes|no) main_only(yes|no)
 ENVIRONMENTS="bootstrap:yes:yes staging-plan:yes:no staging-infra:yes:yes staging:yes:yes staging-evidence:no:yes"
+
+# The status checks main requires: the job names of .github/workflows/ci.yml (infra/tests/run.sh keeps the two equal).
+REQUIRED_CHECKS=("api (sqlite)" "api (postgresql)" "app" "security" "browser e2e + axe" "infra")
+GITHUB_ACTIONS_APP_ID=15368
+
+# The required checks a protection JSON lacks, one per line (reads .required_status_checks or, for the branch
+# endpoint a workflow token can read, .protection.required_status_checks).
+missing_checks() {
+  jq -r --args '((.required_status_checks // .protection.required_status_checks // {}) as $r
+    | [$r.contexts[]?, $r.checks[]?.context]) as $have
+    | $ARGS.positional[] | select(. as $c | $have | index($c) | not)' "${REQUIRED_CHECKS[@]}"
+}
 
 # --- verify: read back and fail on any drift from the rules above ---------------------------------------------
 if ((VERIFY || VERIFY_ENVIRONMENTS)); then
@@ -81,12 +96,17 @@ if ((VERIFY || VERIFY_ENVIRONMENTS)); then
     fi
   done
   if ((VERIFY_ENVIRONMENTS && !VERIFY)); then
-    [[ "$(gh api "repos/$REPO/branches/main" --jq .protected 2>/dev/null)" == true ]] || problems+=("main: branch not protected")
+    if branch="$(gh api "repos/$REPO/branches/main" 2>/dev/null)" && [[ "$(jq -r .protected <<<"$branch")" == true ]]; then
+      while IFS= read -r c; do [[ -n "$c" ]] && problems+=("main: required status check '$c' missing"); done < <(missing_checks <<<"$branch")
+    else
+      problems+=("main: branch not protected")
+    fi
   elif protection="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)"; then
     jq -e '.enforce_admins.enabled == true' <<<"$protection" >/dev/null || problems+=("main: protection not enforced for admins")
     jq -e '.required_pull_request_reviews != null' <<<"$protection" >/dev/null || problems+=("main: pull request not required")
     jq -e '(.allow_force_pushes.enabled // false) == false' <<<"$protection" >/dev/null || problems+=("main: force pushes allowed")
     jq -e '(.allow_deletions.enabled // false) == false' <<<"$protection" >/dev/null || problems+=("main: deletion allowed")
+    while IFS= read -r c; do [[ -n "$c" ]] && problems+=("main: required status check '$c' missing"); done < <(missing_checks <<<"$protection")
   else
     problems+=("main: branch not protected")
   fi
@@ -136,25 +156,39 @@ setup_environment() {
   fi
 }
 
-# Keeps whatever protection main already has when it meets the rules (its required status checks included). Only a
-# non-compliant or missing protection is written, and then the existing required status checks, review settings,
-# linear history and conversation resolution are carried over: a PUT replaces the whole protection.
+# Keeps whatever protection main already has when it meets the rules (its required status checks included); only
+# required checks it lacks are added, through the required-status-checks endpoint (RD-02). A non-compliant or missing
+# protection is written whole, and then the existing required status checks, review settings, linear history and
+# conversation resolution are carried over: a PUT replaces the whole protection.
 protect_main() {
-  local current='{}' body
-  if current="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)"; then
-    if jq -e '.enforce_admins.enabled == true and .required_pull_request_reviews != null
-              and (.allow_force_pushes.enabled // false) == false and (.allow_deletions.enabled // false) == false' \
-      <<<"$current" >/dev/null; then
+  local current='{}' body missing=() c
+  current="$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null)" || current='{}'
+  while IFS= read -r c; do [[ -n "$c" ]] && missing+=("$c"); done < <(missing_checks <<<"$current")
+  # Every check main must require, with its existing settings: the existing entries first (app ids kept), then the
+  # missing ones bound to the GitHub Actions app.
+  checks() {
+    jq -c --argjson app "$GITHUB_ACTIONS_APP_ID" --args '[(.required_status_checks.checks[]? | {context, app_id}),
+      ((.required_status_checks.contexts[]? as $c | select([.required_status_checks.checks[]?.context] | index($c) | not)
+        | {context: $c, app_id: $app})),
+      ($ARGS.positional[] | {context: ., app_id: $app})] | unique_by(.context)' ${missing[@]+"${missing[@]}"} <<<"$current"
+  }
+  if jq -e '.enforce_admins.enabled == true and .required_pull_request_reviews != null
+            and (.allow_force_pushes.enabled // false) == false and (.allow_deletions.enabled // false) == false' \
+    <<<"$current" >/dev/null; then
+    if ((${#missing[@]} == 0)); then
       log "branch protection on main already meets the rules; left unchanged (required status checks kept)"
       return
     fi
-  else
-    current='{}'
+    if jq -e '.required_status_checks != null' <<<"$current" >/dev/null; then
+      log "branch protection on main meets the rules; adding the missing required status checks: ${missing[*]}"
+      api_json PATCH "repos/$REPO/branches/main/protection/required_status_checks" \
+        "$(jq -c --argjson checks "$(checks)" '{strict: (.required_status_checks.strict // false), checks: $checks}' <<<"$current")"
+      return
+    fi
   fi
-  log "branch protection on main (pull request required, enforced for admins, no force push or deletion; existing checks kept)"
-  body="$(jq -c '{
-    required_status_checks: (.required_status_checks | if . == null then null
-      else {strict: (.strict // false), checks: [.checks[]? | {context, app_id}]} end),
+  log "branch protection on main (pull request required, enforced for admins, no force push or deletion; existing checks kept, required checks added)"
+  body="$(jq -c --argjson checks "$(checks)" '{
+    required_status_checks: {strict: (.required_status_checks.strict // false), checks: $checks},
     enforce_admins: true,
     required_pull_request_reviews: {
       required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 0),

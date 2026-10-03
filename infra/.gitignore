@@ -18,3 +18,6 @@ terraform/**/backend_s3.tf
 terraform/**/tmp.json
 
 # .terraform.lock.hcl IS committed (provider hashes for linux/darwin, amd64/arm64).
+
+# Pinned check tools installed by scripts/install-tools.sh (RD-02).
+.tools/

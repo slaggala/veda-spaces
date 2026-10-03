@@ -55,12 +55,25 @@ infra/
 | Terraform | 1.16.4 (`>= 1.10` required for S3 native locking) |
 | AWS provider | `~> 6.66` (lock file: linux/darwin × amd64/arm64) |
 | tflint / AWS ruleset | 0.64.0 / 0.49.0 |
+| shellcheck / actionlint / checkov | 0.11.0 / 1.7.12 / 3.3.21 |
 | actions/checkout, hashicorp/setup-terraform, actions/upload-artifact | pinned by commit SHA |
+
+The check tools are pinned with their SHA-256 in [`tools/tools.lock`](tools/tools.lock) (linux and macOS, amd64 and
+arm64) and checkov with every dependency in [`tools/requirements-checkov.txt`](tools/requirements-checkov.txt)
+(hash-locked, Python 3.13). `make -C infra tools` installs exactly these into `infra/.tools`; `make -C infra check`
+refuses to run with any other version.
+
+**CI (RD-02):** the `infra` job of `.github/workflows/ci.yml` installs the same tools, verifies the bootstrap
+prerequisites that need no AWS access (approved repository by name and ID, complete manifest, protected environments,
+`main` protected with every required check) and runs `make -C infra check`. It holds no AWS credential. `infra` is a
+required status check on `main`, so a failure blocks the merge; `github-setup.sh` keeps the required checks equal to
+the jobs of `ci.yml`.
 
 ## Commands
 
 ```sh
-make -C infra check                                             # offline: fmt, validate, test, test-scripts, tflint, checkov, shellcheck, actionlint
+make -C infra tools                                             # install the pinned check tools (SHA-256 verified) into infra/.tools
+make -C infra check                                             # offline: tool versions, manifest complete, fmt, validate, test, test-scripts, tflint, checkov, shellcheck, actionlint
 make -C infra bootstrap-plan  EXPECTED_ACCOUNT_ID=123456789012   # read-only against the approved Veda account
 make -C infra bootstrap-apply EXPECTED_ACCOUNT_ID=123456789012 PLAN_FILE=generated/bootstrap.tfplan PLAN_SHA256=<digest>
                                                                  # applies that approved plan; asks to type the account ID

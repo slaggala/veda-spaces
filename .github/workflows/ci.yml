@@ -115,6 +115,36 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Infrastructure checks (RD-02): the offline checks of infra/ with the pinned tools (infra/tools/tools.lock), and
+  # the bootstrap prerequisites that need no AWS access. No AWS credentials exist in this job and the Makefile blanks
+  # every AWS credential source. It runs on every pull request (no path filter): a required check that is skipped
+  # never reports, and would block every merge.
+  infra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.13" }
+      - name: Install the pinned check tools (SHA-256 and hash-locked)
+        run: infra/scripts/install-tools.sh
+      - name: Bootstrap prerequisites (approved repository; protected environments; main protected with every required check)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$GITHUB_REPOSITORY" == "$(jq -r .repository infra/config/staging-account.json)" &&
+             "$GITHUB_REPOSITORY_ID" == "$(jq -r .repository_id infra/config/staging-account.json)" ]] ||
+            { echo "::error::$GITHUB_REPOSITORY ($GITHUB_REPOSITORY_ID) is not the repository the manifest approves"; exit 1; }
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+      - name: Infrastructure checks (make -C infra check; no AWS access)
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # tflint --init fetches the pinned AWS ruleset
+        run: make -C infra check
+
   e2e:
     name: browser e2e + axe
     runs-on: ubuntu-latest
