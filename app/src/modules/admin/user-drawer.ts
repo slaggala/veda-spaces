@@ -307,10 +307,11 @@ export class VsUserDrawer extends SessionElement {
     return html`<vs-drawer wide .open=${Boolean(this.userId)} heading=${u ? `${u.full_name}${u.protection_level === 'FOUNDER' ? ' ★' : ''}` : 'User'} @close=${() => this.close()}>
       <vs-problem-banner .problem=${this.problem}></vs-problem-banner>
       ${!u ? html`<vs-skeleton rows="6"></vs-skeleton>` : html`
-        <vs-tabs .tabs=${[{ id: 'profile', label: 'Profile' }, { id: 'access', label: 'Access' }, { id: 'security', label: 'Security' }, { id: 'sessions', label: 'Sessions' }, { id: 'activity', label: 'Activity', hidden: !this.can('audit.read') }]}
-          .selected=${this.tab} @tab-change=${(e: CustomEvent<string>) => { this.tab = e.detail; this.action = ''; this.actionProblem = null; if (e.detail === 'access') void this.loadAccess(); if (e.detail === 'activity') navigate(`/audit?performed_by=${u.id}`); }}></vs-tabs>
+        <vs-tabs label="User sections" .tabs=${[{ id: 'profile', label: 'Profile' }, { id: 'access', label: 'Access' }, { id: 'security', label: 'Security' }, { id: 'sessions', label: 'Sessions' }, { id: 'activity', label: 'Activity', hidden: !this.can('audit.read') }]}
+          .selected=${this.tab} @tab-change=${(e: CustomEvent<string>) => { this.tab = e.detail; this.action = ''; this.actionProblem = null; if (e.detail === 'access') void this.loadAccess(); if (e.detail === 'activity') navigate(`/audit?performed_by=${u.id}`); }}>
         ${err ? html`<vs-banner kind="danger">${ERRORS[err.code] ?? err.detail ?? err.title}${err.requestId ? html` <span class="mono small">(${err.requestId})</span>` : nothing}</vs-banner>` : nothing}
-        ${this.tab === 'profile' ? this.renderProfile(u) : this.tab === 'access' ? this.renderAccess(u) : this.tab === 'security' ? this.renderSecurity(u) : this.tab === 'sessions' ? this.renderSessions(u) : nothing}`}
+        ${this.tab === 'profile' ? this.renderProfile(u) : this.tab === 'access' ? this.renderAccess(u) : this.tab === 'security' ? this.renderSecurity(u) : this.tab === 'sessions' ? this.renderSessions(u) : nothing}
+        </vs-tabs>`}
     </vs-drawer>`;
   }
 }

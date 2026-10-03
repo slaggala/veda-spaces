@@ -16,6 +16,7 @@ import { ensureToaster } from '../design-system/components.js';
 import { icon } from '../design-system/icons.js';
 import { shared } from '../design-system/styles.js';
 import './command-palette.js';
+import './account-menu.js';
 import './conflict-dialog.js';
 import './notifications-tray.js';
 import './step-up-dialog.js';
@@ -27,12 +28,11 @@ import './step-up-dialog.js';
  */
 export class VsApp extends LitElement {
   static override properties = {
-    pathname: { state: true }, menuOpen: { state: true }, approvalsPending: { state: true }, announced: { state: true },
+    pathname: { state: true }, approvalsPending: { state: true }, announced: { state: true },
   };
   declare pathname: string;
   declare announced: string;
   private navigations = 0;
-  declare menuOpen: boolean;
   declare approvalsPending: number;
   private sessionProvider = new ContextProvider(this, { context: sessionContext, initialValue: session.state });
   private lookupsProvider = new ContextProvider(this, { context: lookupsContext, initialValue: {} as Record<string, LookupCategory> });
@@ -55,11 +55,6 @@ export class VsApp extends LitElement {
       .main { display: flex; flex-direction: column; min-width: 0; }
       header.top { display: flex; align-items: center; gap: 8px; padding: 8px 24px; border-bottom: 1px solid var(--vs-line); background: var(--vs-paper); position: sticky; top: 0; z-index: 20; min-height: 60px; }
       header.top .search { display: inline-flex; align-items: center; gap: 8px; color: var(--vs-ink-muted); background: var(--vs-surface); border: 1px solid var(--vs-line); border-radius: 2px; min-height: 40px; padding: 0 12px; cursor: pointer; font: inherit; }
-      .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--vs-cream); color: var(--vs-ink); display: inline-flex; align-items: center; justify-content: center; font: 700 12px/1 var(--vs-font-sans); }
-      .menu { position: relative; }
-      .menu-panel { position: absolute; right: 0; top: 48px; min-width: 220px; background: var(--vs-surface); border: 1px solid var(--vs-line); border-radius: 8px; box-shadow: var(--vs-shadow); padding: 8px; z-index: 50; display: flex; flex-direction: column; }
-      .menu-panel a, .menu-panel button { text-align: left; background: none; border: 0; min-height: 44px; padding: 0 12px; font: inherit; color: var(--vs-ink); cursor: pointer; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-      .menu-btn { background: none; border: 0; cursor: pointer; min-height: 44px; min-width: 44px; }
       .badge { background: var(--vs-copper-strong); color: var(--vs-on-copper-strong); border-radius: 999px; font: 700 11px/18px var(--vs-font-sans); padding: 0 6px; margin-left: auto; }
       .banners { display: flex; flex-direction: column; gap: 8px; padding: 12px 24px 0; }
       .banners:empty { display: none; }
@@ -85,7 +80,6 @@ export class VsApp extends LitElement {
   constructor() {
     super();
     this.pathname = window.location.pathname;
-    this.menuOpen = false;
     this.approvalsPending = 0;
     this.announced = '';
     ensureToaster();
@@ -97,7 +91,8 @@ export class VsApp extends LitElement {
     });
     window.addEventListener('vaadin-router-location-changed', (e) => {
       this.pathname = e.detail.location.pathname;
-      this.menuOpen = false;
+      const menu = this.renderRoot.querySelector('vs-account-menu') as { open: boolean } | null;
+      if (menu) menu.open = false;
       this.onNavigated(this.navigations++ === 0);
     });
   }
@@ -196,21 +191,8 @@ export class VsApp extends LitElement {
                   aria-label="Search (Ctrl K)">${icon('search')}<span class="search-text">Search</span><span class="small">⌘K</span></button>
                 <span class="spacer"></span>
                 <vs-notifications-tray></vs-notifications-tray>
-                <div class="menu">
-                  <button class="menu-btn" aria-controls="account-menu" aria-expanded=${this.menuOpen ? 'true' : 'false'} aria-label="Account menu"
-                    @click=${() => (this.menuOpen = !this.menuOpen)}><span class="avatar" aria-hidden="true">${initials(me?.display_name || me?.full_name)}</span></button>
-                  ${this.menuOpen
-                    ? html`<div class="menu-panel" id="account-menu" @keydown=${(e: KeyboardEvent) => {
-                        if (e.key !== 'Escape') return;
-                        this.menuOpen = false;
-                        (this.renderRoot.querySelector('.menu-btn') as HTMLElement | null)?.focus();
-                      }}>
-                        <span class="small muted">${me?.full_name}</span>
-                        <a href="/profile">${icon('settings')} Profile</a>
-                        <button @click=${async () => { await session.logout(); navigate('/login'); }}>${icon('logout')} Sign out</button>
-                      </div>`
-                    : nothing}
-                </div>
+                <vs-account-menu name=${me?.full_name ?? ''} initials=${initials(me?.display_name || me?.full_name)}
+                  @sign-out=${async () => { await session.logout(); navigate('/login'); }}></vs-account-menu>
               </header>
               ${this.renderBanners()}`
             : nothing}

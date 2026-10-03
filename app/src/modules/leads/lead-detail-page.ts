@@ -475,9 +475,10 @@ export class VsLeadDetailPage extends LookupAwareElement {
       <div class="grid">
         ${this.renderDetails(lead)}
         <section class="stack">
-          <vs-tabs .tabs=${[{ id: 'timeline', label: 'Timeline' }, { id: 'notes', label: `Notes${this.notes ? ` ${this.notes.length}` : ''}`, hidden: !this.can('lead_note.read') }, { id: 'history', label: 'History', hidden: !showHistory }]}
-            .selected=${this.tab} @tab-change=${(e: CustomEvent<'timeline' | 'notes' | 'history'>) => { this.tab = e.detail; if (e.detail === 'history' && !this.history) void this.loadHistory(); }}></vs-tabs>
-          ${this.tab === 'timeline' ? this.renderTimeline(lead) : this.tab === 'notes' ? this.renderNotes(lead) : this.renderHistory()}
+          <vs-tabs label="Lead records" .tabs=${[{ id: 'timeline', label: 'Timeline' }, { id: 'notes', label: `Notes${this.notes ? ` ${this.notes.length}` : ''}`, hidden: !this.can('lead_note.read') }, { id: 'history', label: 'History', hidden: !showHistory }]}
+            .selected=${this.tab} @tab-change=${(e: CustomEvent<'timeline' | 'notes' | 'history'>) => { this.tab = e.detail; if (e.detail === 'history' && !this.history) void this.loadHistory(); }}>
+            ${this.tab === 'timeline' ? this.renderTimeline(lead) : this.tab === 'notes' ? this.renderNotes(lead) : this.renderHistory()}
+          </vs-tabs>
         </section>
         ${this.renderSide(lead)}
       </div>
