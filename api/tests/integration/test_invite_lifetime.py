@@ -11,7 +11,7 @@ from tests.support.dbh import events
 from veda.kernel import clock
 from veda.platform.rbac.registry import SENSITIVE_CODES
 
-PASSWORD = "Monsoon-Garden-Window-88"
+PASSWORD = "Monsoon-Garden-Window-88"  # pragma: allowlist secret (test-only invitee password)
 
 
 def _invite(api, factory, email: str, role: str) -> str:
