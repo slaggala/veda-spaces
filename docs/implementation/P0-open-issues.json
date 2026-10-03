@@ -10,14 +10,14 @@
       "owner_category": "Engineering (security)",
       "severity": "BLOCKER",
       "affected_scope": "Authentication / MFA",
-      "merge_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
-      "staging_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
-      "production_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
+      "merge_impact": "Cleared (AM-11 approved with conditions, 2026-09-30)",
+      "staging_impact": "Cleared (AM-11 approved with conditions, 2026-09-30)",
+      "production_impact": "Cleared (AM-11 approved with conditions, 2026-09-30)",
       "acceptance_criteria": "Regression tests reproducing P1 and P1b (and a path-D variant: recovery session + foreign unbound challenge) must fail closed on SQLite and PostgreSQL; full MFA suite green.",
       "evidence_required": "api/tests/integration/test_mfa_binding.py (19 tests: P1, P1b, path-D variant, attacker/victim bearer, same user other session, revoked/disabled session, stale eligibility, expired, replay, wrong factor, wrong purpose, invitation context, recovery transaction, parallel confirms, failure half-way, failed replacement, refresh rotation); api/tests/integration/test_mfa.py; api/tests/integration/test_schema.py; re-review: Yes — security re-review of the enrollment/step-up state machine",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Merge",
-      "status": "RESOLVED — AMENDMENT PENDING OWNER DECISION",
+      "status": "RESOLVED — AM-11 APPROVED WITH CONDITIONS (2026-09-30)",
       "residual": ""
     },
     {
@@ -97,12 +97,12 @@
       "affected_scope": "Founder governance / break-glass",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Blocks until the RR-09 staging rehearsal (PG-BG)",
       "acceptance_criteria": "CLI approve fails when caller identity ≠ supplied ARN (mocked STS); TD-G case.",
       "evidence_required": "...test_governance_remediation.py::test_IR06_P13_single_operator_cannot_assert_a_second_custodian (STS stubbed); ::test_IR06_asserted_identity_refused_outside_local_and_test; api/tests/unit/test_config_environments.py; re-review: Targeted",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Production",
-      "status": "PARTIALLY RESOLVED",
+      "status": "RESOLVED IN CODE (RR-09, PR #8) — STAGING REHEARSAL REQUIRED (PG-BG)",
       "residual": "Real STS/SSM identity must be exercised in staging (PG-BG gate)."
     },
     {
@@ -114,12 +114,12 @@
       "affected_scope": "Founder governance / break-glass (Phase 4)",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
+      "production_impact": "Cleared (AM-5 approved with conditions, 2026-09-30)",
       "acceptance_criteria": "Browser E2E cancels a pending break-glass request from the emailed link.",
       "evidence_required": "app/e2e/access.e2e.mjs: break-glass cancel link works end to end from the email; api/tests/integration/test_founder_governance.py::test_G12_cancel_link_by_notified_party; app/test/router.test.ts (route title); re-review: Targeted",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Production",
-      "status": "RESOLVED — AMENDMENT PENDING OWNER DECISION",
+      "status": "RESOLVED — AM-5 APPROVED WITH CONDITIONS (2026-09-30)",
       "residual": ""
     },
     {
@@ -165,12 +165,12 @@
       "affected_scope": "Operations / Migrations",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
+      "production_impact": "Cleared (AM-6 approved with conditions, 2026-09-30)",
       "acceptance_criteria": "Test that loads an app whose script directory lacks the latest revision against a head DB and expects 200; 503 when genuinely behind or divergent.",
       "evidence_required": "api/tests/integration/test_ops_remediation.py (head, N-1 image with and without declaration, behind, divergent, downgrade refused and schema unchanged); re-review: Targeted",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Production",
-      "status": "RESOLVED — AMENDMENT PENDING OWNER DECISION",
+      "status": "RESOLVED — AM-6 APPROVED WITH CONDITIONS (2026-09-30)",
       "residual": "RG-7 rollback rehearsal not executed (production gate)."
     },
     {
@@ -265,14 +265,14 @@
       "owner_category": "Engineering",
       "severity": "MAJOR",
       "affected_scope": "Leads / Privacy (DEV-004)",
-      "merge_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
-      "staging_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
-      "production_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
+      "merge_impact": "Cleared",
+      "staging_impact": "Cleared",
+      "production_impact": "Cleared in code; AM-4 option (a) confirmation (RR-12)",
       "acceptance_criteria": "Probe P3/P3b variants: provenance cleared, activity written, re-consent without withdrawal rejected, WEBSITE_FORM rejected.",
       "evidence_required": "api/tests/integration/test_consent_dev004.py (13 tests: provenance, history, refusal without withdrawal, new version, WEBSITE_FORM/note/policy validation, raw fields and public re-consent rejected, staff create, scope, duplicate detection, audit immutability, erasure); re-review: Yes (DEV-004)",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Merge",
-      "status": "RESOLVED — AMENDMENT PENDING OWNER DECISION",
+      "status": "RESOLVED (completed by RR-12, PR #10; AM-4 APPROVED WITH CONDITIONS on 2026-09-30)",
       "residual": ""
     },
     {
@@ -386,12 +386,12 @@
       "affected_scope": "Authentication / Rate limits",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks until the Architecture Owner decides the amendment (fix implemented)",
+      "production_impact": "Cleared (AM-7 approved with conditions, 2026-09-30)",
       "acceptance_criteria": "Regression test reproducing the evidence must pass.",
       "evidence_required": "api/tests/integration/test_auth_remediation.py::test_IR23_P5_third_party_cannot_rate_limit_the_victim_from_elsewhere; re-review: Targeted",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "target_phase": "Production",
-      "status": "RESOLVED BY RR-04",
+      "status": "RESOLVED BY RR-04 — AM-7 APPROVED WITH CONDITIONS (2026-09-30)",
       "residual": ""
     },
     {
@@ -745,11 +745,11 @@
       "staging_impact": "None",
       "production_impact": "None (tracked)",
       "acceptance_criteria": "Reviewer advisory addressed or explicitly accepted by the owner.",
-      "evidence_required": "Owner decision or change with tests.",
+      "evidence_required": "PR #5 (merge `100ff8a`): api/tests/integration/test_layered_limiter.py (600 per 5 minutes per user, across endpoints)",
       "failure_behavior": "Tracked; no stage blocked.",
       "target_phase": "Post-production follow-up",
-      "status": "OPEN — TRACKED",
-      "residual": "08 §12 per-user 600 req/5 min limit not implemented."
+      "status": "RESOLVED (PR #5)",
+      "residual": ""
     },
     {
       "id": "IR-A10",
@@ -896,12 +896,12 @@
       "affected_scope": "see note",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "None (tracked)",
+      "production_impact": "Cleared",
       "acceptance_criteria": "Reviewer advisory addressed or explicitly accepted by the owner.",
       "evidence_required": "Owner decision or change with tests.",
       "failure_behavior": "Tracked; no stage blocked.",
       "target_phase": "Owner decision",
-      "status": "OPEN — OWNER DECISION REQUIRED",
+      "status": "RESOLVED — AM-8 APPROVED (2026-09-30)",
       "residual": "AM-8."
     },
     {
@@ -1729,12 +1729,12 @@
       "affected_scope": "—",
       "merge_impact": "Blocks merge",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared",
       "acceptance_criteria": "All CI jobs green on the pushed commit, including the postgres:16 leg, secret scan, audits, image scan and E2E.",
-      "evidence_required": "CI run URL and job logs.",
+      "evidence_required": "https://github.com/slaggala/veda-spaces/actions/runs/37099761380 (PR #11, all jobs green); earlier PR runs on the same workflow",
       "failure_behavior": "Fix and re-run; merge blocked (IR-14).",
       "target_phase": "Merge",
-      "status": "OPEN",
+      "status": "RESOLVED (CI green on PRs #4 to #11, including the postgres:16 leg, security and browser E2E + axe)",
       "residual": ""
     },
     {
@@ -1799,7 +1799,7 @@
       "staging_impact": "None",
       "production_impact": "Blocks",
       "acceptance_criteria": "Scripted checks of 09 §5 pass.",
-      "evidence_required": "Recorded session notes.",
+      "evidence_required": "Recorded session notes per docs/operations/accessibility-manual-script.md",
       "failure_behavior": "Production blocked (IR-19/IR-37 residual).",
       "target_phase": "Production",
       "status": "OPEN",
@@ -1833,11 +1833,11 @@
       "source": "targeted re-review",
       "title": "A single Founder can restore a Founder deleted through dual-Founder approval (G11 bypass; no governance record)",
       "severity": "MAJOR",
-      "merge_impact": "Cleared by the fix (OD-2 implemented); AM-12 decision pending",
+      "merge_impact": "Cleared by the fix (OD-2 implemented); AM-12 approved with conditions (2026-09-30)",
       "staging_impact": "Cleared",
       "production_impact": "Cleared",
       "target_phase": "Merge",
-      "status": "RESOLVED — AMENDMENT AM-12 PENDING OWNER DECISION"
+      "status": "RESOLVED — AM-12 APPROVED WITH CONDITIONS (2026-09-30)"
     },
     {
       "owner_category": "Engineering (security)",
@@ -1850,11 +1850,11 @@
       "source": "targeted re-review",
       "title": "An executed STANDARD email change stays pending through GRANT_FOUNDER and can be verified on the new Founder",
       "severity": "MAJOR",
-      "merge_impact": "Cleared by the fix (OD-3 implemented); AM-13 decision pending",
+      "merge_impact": "Cleared by the fix (OD-3 implemented); AM-13 approved with conditions (2026-09-30)",
       "staging_impact": "Cleared",
       "production_impact": "Cleared",
       "target_phase": "Merge",
-      "status": "RESOLVED — AMENDMENT AM-13 PENDING OWNER DECISION"
+      "status": "RESOLVED — AM-13 APPROVED WITH CONDITIONS (2026-09-30)"
     },
     {
       "owner_category": "Engineering (security)",
@@ -1867,11 +1867,11 @@
       "source": "targeted re-review",
       "title": "DEV-007 keys per-email login/forgot limits by (email, network), removing the only cross-network bound on password guessing for MFA holders and multiplying reset-email volume",
       "severity": "MAJOR",
-      "merge_impact": "Cleared by the fix; AM-7 decision pending",
+      "merge_impact": "Cleared by the fix; AM-7 approved with conditions (2026-09-30)",
       "staging_impact": "Real Turnstile keys and deployed proxy CIDR to be verified",
       "production_impact": "Alarm on escalation to be configured (RG-5)",
       "target_phase": "Merge",
-      "status": "RESOLVED — AMENDMENT AM-7 (REWRITTEN) PENDING OWNER DECISION"
+      "status": "RESOLVED — AM-7 APPROVED WITH CONDITIONS (2026-09-30)"
     },
     {
       "owner_category": "Engineering (security)",
@@ -1945,7 +1945,7 @@
       "owner_category": "Engineering",
       "affected_scope": "RBAC-021, 06 §7.5 items 2 and 4, PG-BG",
       "acceptance_criteria": "Staging rehearsal with CloudTrail evidence.",
-      "evidence_required": "Implementation and tests",
+      "evidence_required": "PR #8 (merge `24b1a4a`): api/tests/integration/test_break_glass_identity.py (host instance role never a custodian; missing or broken credentials refused with a FAILURE event; no host credential providers). Staging: rehearsal per the release-readiness plan, CloudTrail AssumeRole by both custodians with MFA",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "id": "RR-09",
@@ -1953,10 +1953,10 @@
       "title": "Break-glass STS identity check sees the host instance role, not the custodian, when the CLI runs via docker compose as the runbook prescribes; with no credentials it crashes without a failure event",
       "severity": "MAJOR",
       "merge_impact": "None",
-      "staging_impact": "Rehearsal",
-      "production_impact": "Blocks (PG-BG)",
+      "staging_impact": "Rehearsal with two custodian principals and CloudTrail evidence (needs AUT-106 custodian roles, AUT-108 host, AUT-107 Session Manager; RD-01)",
+      "production_impact": "Blocks (PG-BG) until OD-6, OWNER-INPUT-004 and the staging rehearsal",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER (OWNER DECISION OD-6)"
+      "status": "RESOLVED IN CODE (PR #8) — OWNER DECISION OD-6, OWNER-INPUT-004 AND STAGING REHEARSAL REQUIRED"
     },
     {
       "owner_category": "Engineering",
@@ -1996,35 +1996,35 @@
       "owner_category": "Engineering",
       "affected_scope": "LEAD-012, LEAD-027",
       "acceptance_criteria": "D02/D05 variants.",
-      "evidence_required": "Implementation and tests",
+      "evidence_required": "PR #10 (merge `35862ae`): migration 0010_consent_evidence_guard; api/tests/integration/test_consent_rr12.py (32 cases per engine; 27 fail on the code before the fix); api/tests/integration/test_consent_dev004.py",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
-      "residual": "",
+      "residual": "AM-4 lists option (a) or (b) for rule (d) as the owner's choice; PR #10 implements option (a) and also refuses an earlier version after a withdrawal. Both need recording in the owner decision.",
       "id": "RR-12",
       "source": "targeted re-review",
       "title": "DEV-004 residuals: alternating between published policy versions is accepted without withdrawal; consent history activity is mutable at DB level; staff create-time consent needs no note and writes no consent activity",
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; the owner confirms AM-4 option (a) and the earlier-version rule before production",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED (PR #10) — OWNER CONFIRMATION OF AM-4 OPTION (a) REQUIRED"
     },
     {
       "owner_category": "Engineering",
       "affected_scope": "LOG-003, SEC-009",
       "acceptance_criteria": "Probe asserts no PII in Sentry payloads or last_error.",
-      "evidence_required": "Implementation and tests",
+      "evidence_required": "PR #9 (merge `7f34261`): api/tests/integration/test_pii_tracking.py (real Sentry SDK with production options: no query string, URL-encoded value or header in transactions, spans or errors; outbox last_error has no recipient)",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
-      "residual": "",
+      "residual": "Lead search still travels in GET /leads?q= and the SPA address bar (RD-05).",
       "id": "RR-13",
       "source": "targeted re-review",
       "title": "Residual PII paths: Sentry transaction events carry request query strings (e.g. lead search by email); outbox_event.last_error stores provider errors containing recipient emails",
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; AM-10 staging check (Sentry test project, provider-error outbox row) before production",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED IN CODE (PR #9) — AM-10 STAGING CHECK REQUIRED"
     },
     {
       "owner_category": "Engineering",
@@ -2098,7 +2098,7 @@
       "owner_category": "Engineering",
       "affected_scope": "UI-011, UI-016 (AX-06, AX-07, AX-09)",
       "acceptance_criteria": "axe + manual SR script.",
-      "evidence_required": "Implementation and tests",
+      "evidence_required": "PR #11 (merge `a5a59a7`): app/test/a11y.test.ts (16 tests with axe-core; 11 fail on the code before the fix); app/e2e/axe.e2e.mjs (16 axe scans, 0 serious/critical; tab, menu and palette behaviour checks); api/tests/integration/test_step_up_expiry.py. Manual: docs/operations/accessibility-manual-script.md",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "id": "RR-18",
@@ -2107,9 +2107,9 @@
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; the manual NVDA/VoiceOver run and Firefox/WebKit/200 % zoom checks (OI-RM-5, OI-RM-2) before production",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED IN CODE (PR #11) — MANUAL SCREEN-READER RUN REQUIRED (OI-RM-5)"
     },
     {
       "owner_category": "Engineering",
@@ -2557,7 +2557,7 @@
       "owner_category": "Engineering",
       "affected_scope": "",
       "acceptance_criteria": "See the re-review reconciliation",
-      "evidence_required": "—",
+      "evidence_required": "PR #5 (merge `100ff8a`): api/tests/integration/test_auth_remediation.py::test_IRA04_password_reset_retires_the_emailed_enrollment_link",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "id": "IR-A04",
@@ -2568,7 +2568,7 @@
       "staging_impact": "None",
       "production_impact": "Tracked",
       "target_phase": "Production",
-      "status": "PARTIALLY RESOLVED"
+      "status": "RESOLVED (PR #5)"
     },
     {
       "owner_category": "Engineering",
@@ -2761,18 +2761,18 @@
       "owner_category": "Engineering",
       "affected_scope": "SEVT-006, SEVT-007, 05 §9.6",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
-      "residual": "",
+      "residual": "The verifier half is done in code; the separate writer role and real Object Lock are AWS configuration (AUT-103, AUT-106) proven in staging.",
       "id": "FC-01",
       "source": "final targeted check (56c20ba)",
       "title": "Security-event verification checks only the latest anchor, so an attacker holding the chain key can rewrite history, recompute the chain and post a new anchor that verifies",
       "severity": "MAJOR",
       "merge_impact": "None",
-      "staging_impact": "None",
-      "production_impact": "production (tamper-evidence claim); design residual first noted in the original review E.3",
+      "staging_impact": "Writer/verifier role separation and Object Lock evidenced (needs AUT-103, AUT-106; RD-01)",
+      "production_impact": "Blocks until staging evidence: anchors written by a separate writer role into real S3 Object Lock (FC-03, RR-05)",
       "acceptance_criteria": "Verify against every retained anchor (or a hash-linked anchor chain) and against anchors written by a separate writer role; alarm on any anchor that no longer matches",
-      "evidence_required": "api/veda/platform/maintenance.py:426 (store.latest('anchor')); REPRODUCED on both engines with local and S3-model stores",
+      "evidence_required": "PR #7 (merge `72d260a`): api/tests/integration/test_anchor_history.py (every retained anchor verified, including archived ones, S3 store model). Staging: CloudTrail shows anchor PutObject only by the writer role; an overwrite and a delete by the host role are refused; verify-chain passes against the real bucket",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED IN CODE (PR #7) — STAGING EVIDENCE REQUIRED (SEPARATE ANCHOR WRITER ROLE, FC-03)"
     },
     {
       "owner_category": "Engineering",
@@ -2795,7 +2795,7 @@
       "owner_category": "Engineering",
       "affected_scope": "SEVT-007, 05 §9.6",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
-      "residual": "",
+      "residual": "Code not changed as of 2026-10-03: api/veda/platform/anchor_store.py still writes without IfNoneMatch and reads the current version.",
       "id": "FC-03",
       "source": "final targeted check (56c20ba)",
       "title": "S3 anchor/archive store writes without IfNoneMatch and reads the current object version, so an overwrite with the app credential creates a new version that verification trusts",
@@ -2806,7 +2806,7 @@
       "acceptance_criteria": "Conditional writes (IfNoneMatch='*'), read by first version / version id recorded in the manifest, writer role without s3:PutObject on existing keys; prove in staging",
       "evidence_required": "api/veda/platform/anchor_store.py (put_object/get_object); SOURCE-INSPECTED plus simulated versioned store; real S3 not exercised",
       "target_phase": "Staging",
-      "status": "OPEN — STAGING EVIDENCE / PRODUCTION GATE"
+      "status": "OPEN — CODE CHANGE AND STAGING EVIDENCE REQUIRED (PREREQUISITE OF FC-01 EVIDENCE)"
     },
     {
       "owner_category": "Engineering",
@@ -2904,11 +2904,11 @@
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "production",
+      "production_impact": "Cleared",
       "acceptance_criteria": "Shorten/reissue on privilege escalation",
-      "evidence_required": "REPRODUCED: accepted after 30 h",
+      "evidence_required": "PR #5 (merge `100ff8a`): api/tests/integration/test_invite_lifetime.py (privileged at issue and escalated after sending: 24 h; unprivileged: 72 h)",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED (PR #5)"
     },
     {
       "owner_category": "Engineering",
@@ -2972,11 +2972,11 @@
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "production",
+      "production_impact": "Cleared; a real-S3 archival run remains part of RR-06 (staging)",
       "acceptance_criteria": "Key by (first_seq, last_seq, run id)",
-      "evidence_required": "REPRODUCED both engines",
+      "evidence_required": "PR #6 (merge `c6a7fea`): api/tests/integration/test_archive_fc13_fc14.py (reviewer case F3b, per-run keys, pre-FC-13 manifests still verify)",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED (PR #6)"
     },
     {
       "owner_category": "Engineering",
@@ -2989,11 +2989,11 @@
       "severity": "MINOR",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "production",
+      "production_impact": "Cleared",
       "acceptance_criteria": "Upload outside the write transaction",
-      "evidence_required": "SOURCE-INSPECTED; api/veda/platform/maintenance.py",
+      "evidence_required": "PR #6 (merge `c6a7fea`): api/tests/integration/test_archive_fc13_fc14.py (no SQLite write lock during object-store I/O; superseded run stands down; changed segment refused)",
       "target_phase": "Production",
-      "status": "OPEN — PRODUCTION BLOCKER"
+      "status": "RESOLVED (PR #6)"
     },
     {
       "owner_category": "Engineering",
@@ -3076,9 +3076,9 @@
       "staging_impact": "None",
       "production_impact": "Tracked",
       "acceptance_criteria": "See the final targeted check",
-      "evidence_required": "—",
+      "evidence_required": "PR #5 (merge `100ff8a`): api/tests/integration/test_auth_remediation.py::test_FCA04_unknown_permission_codes_are_rejected_at_startup",
       "target_phase": "Production",
-      "status": "OPEN — TRACKED"
+      "status": "RESOLVED (PR #5)"
     },
     {
       "owner_category": "Engineering",
@@ -3299,7 +3299,7 @@
       "acceptance_criteria": "Extend AM-10 scope",
       "evidence_required": "api/veda/platform/notifications/worker.py stores str(exc)[:300] in outbox_event.last_error, including SQL/handler exception text",
       "target_phase": "Production",
-      "status": "OPEN — BEFORE PRODUCTION (AM-10 scope)"
+      "status": "PARTIALLY RESOLVED (outbox last_error by RR-13, PR #9) — AM-10 DECISION REQUIRED BEFORE PRODUCTION"
     },
     {
       "owner_category": "Engineering",
@@ -3453,11 +3453,114 @@
       "evidence_required": "—",
       "target_phase": "Production",
       "status": "OPEN — TRACKED"
+    },
+    {
+      "id": "RD-01",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "Staging infrastructure is not built: AUT-101…AUT-112 (network, KMS, storage with Object Lock, CloudTrail, ECR, IAM incl. anchor writer/verifier and custodian roles, SSM, compute, observability, SES, budgets), AUT-201…AUT-205 (Cloudflare edge), AUT-301 (infra workflows), AUT-302 (secret seeding) and AUT-401 (evidence collectors) have not started; every staging gate and staging evidence item depends on them",
+      "owner_category": "Engineering (infrastructure)",
+      "severity": "MAJOR",
+      "affected_scope": "All staging evidence; RG-1…RG-9, PG-BG, PG-EMAIL, PG-DAST, TG-02, TG-05, TG-06",
+      "merge_impact": "None",
+      "staging_impact": "Blocks",
+      "production_impact": "Blocks",
+      "acceptance_criteria": "staging-core and staging-edge applied through the reviewed OIDC workflows; the host serves the API; evidence collectors write to the evidence bucket",
+      "evidence_required": "Applied plans (digest-bound), workflow runs, AUT-401 evidence summaries",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Staging",
+      "status": "OPEN — STAGING BLOCKER (CRITICAL PATH)"
+    },
+    {
+      "id": "RD-02",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "The infrastructure offline checks (make -C infra check: terraform fmt/validate/test, script tests, tflint, checkov, shellcheck, actionlint) are not a required CI check; only the 00-bootstrap workflow runs them",
+      "owner_category": "Engineering (infrastructure)",
+      "severity": "MINOR",
+      "affected_scope": "12 §5 CI gates; AUT-002, AUT-003",
+      "merge_impact": "None",
+      "staging_impact": "Blocks (before AUT-301)",
+      "production_impact": "None",
+      "acceptance_criteria": "An infra job in ci.yml runs make -C infra check on every pull request and is a required status check on main",
+      "evidence_required": "ci.yml job and branch-protection read-back",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Staging",
+      "status": "OPEN — STAGING (CI gate integrity)"
+    },
+    {
+      "id": "RD-03",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "The bootstrap operator (IAM user bootstrap-operator) had no MFA device and no access key at the PR #3 validation, and its trust requires MFA, so the first run cannot obtain the region-guarded owner session",
+      "owner_category": "Owner",
+      "severity": "MAJOR",
+      "affected_scope": "AUT-002 first run; PB-06, PB-09",
+      "merge_impact": "None",
+      "staging_impact": "Blocks (bootstrap)",
+      "production_impact": "None",
+      "acceptance_criteria": "bootstrap-operator has one virtual MFA device; credentials are temporary or rotated immediately after the run; assume-role with MFA and the session policy succeeds and a us-east-1 read is denied",
+      "evidence_required": "iam list-mfa-devices / list-access-keys read-back; the bootstrap run's region-guard proof",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Staging",
+      "status": "OPEN — OWNER ACTION BEFORE BOOTSTRAP"
+    },
+    {
+      "id": "RD-04",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "The pre-bootstrap closure (PB-01…PB-11, including the OD-B2 member-account revision) states that it needs an independent review before the first real run; no such review is recorded",
+      "owner_category": "Owner",
+      "severity": "MINOR",
+      "affected_scope": "AUT-001…AUT-003",
+      "merge_impact": "None",
+      "staging_impact": "Blocks (bootstrap)",
+      "production_impact": "None",
+      "acceptance_criteria": "An independent review of the closure and member-account changes is recorded, or the owner records an explicit waiver",
+      "evidence_required": "Review verdict or owner waiver in docs/implementation/staging/",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Staging",
+      "status": "OPEN — OWNER DECISION REQUIRED"
+    },
+    {
+      "id": "RD-05",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "RR-13 residual: the lead search term travels in GET /api/v1/leads?q= and the SPA address bar and history; Cloudflare edge logs on the API hostname would see it",
+      "owner_category": "Engineering",
+      "severity": "ADVISORY",
+      "affected_scope": "LOG-003, SEC-009 (AM-10 scope)",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "Tracked",
+      "acceptance_criteria": "Search moved to a request body (API contract change) or the owner accepts the residual under AM-10",
+      "evidence_required": "Owner decision or change with tests",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Production",
+      "status": "OPEN — TRACKED"
+    },
+    {
+      "id": "RD-06",
+      "source": "release-readiness review (2026-10-03)",
+      "title": "PostgreSQL: two writers with the same If-Match can both pass the pre-check under READ COMMITTED; the loser gets 409 without current_version/updated_by/updated_on (test_TD_F_two_writer_conflict is intermittent on the CI PostgreSQL leg); no data loss",
+      "owner_category": "Engineering",
+      "severity": "ADVISORY",
+      "affected_scope": "08 §2.4 conflict contract; PostgreSQL release gate (RG-8, PGM-1)",
+      "merge_impact": "None",
+      "staging_impact": "None",
+      "production_impact": "PostgreSQL release gate",
+      "acceptance_criteria": "The PostgreSQL conflict path returns the same problem body as SQLite; the test is deterministic",
+      "evidence_required": "Fix with a deterministic two-session test",
+      "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
+      "residual": "",
+      "target_phase": "Production",
+      "status": "OPEN — POSTGRESQL RELEASE GATE"
     }
   ],
   "rereview": "review/p0-independent-implementation-review @ 15d25a759cfc0342bdca45ba4a9c51550270f305",
   "final_check": "review/p0-independent-implementation-review @ 56c20ba992b519daa79aa3802a28343aab8c0b41",
   "reviewed_sha": "3f5920b17d21214b39414d080d34246746c8c40d",
   "document_check": "review/p0-independent-implementation-review @ 093cfa6872c209deb9991910c457afcdb4ad2d04",
-  "decision_record": "docs/implementation/P0-owner-decision-record.md"
+  "decision_record": "docs/implementation/P0-owner-decision-record.md",
+  "status_update": "2026-10-03: merged pull requests #3 to #11 applied; release-readiness items RD-01…RD-06 added. See docs/implementation/P0-release-readiness-report.md."
 }

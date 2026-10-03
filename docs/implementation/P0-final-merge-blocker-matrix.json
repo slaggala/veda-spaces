@@ -373,24 +373,30 @@
         "N06: instance-role ARN → 403 not a registered custodian; no credentials → uncaught NoCredentialsError"
       ],
       "root_cause": "Default boto3 credential chain inside the container sees the instance role; NoCredentialsError uncaught.",
-      "files_changed": [],
+      "files_changed": [
+        "api/veda/platform/rbac/custodians.py",
+        "api/tests/integration/test_break_glass_identity.py",
+        "docs/operations/api-runbooks.md"
+      ],
       "requirements": [
         "RBAC-021",
         "06 §7.5 items 2 and 4",
         "PG-BG"
       ],
-      "remediation": "Not changed in this workstream: needs the custodian credential model (re-review OD-6 / OWNER-INPUT-004) and a staging rehearsal with CloudTrail.",
-      "regression_tests": [],
+      "remediation": "2026-10-03, PR #8 (merge `24b1a4a`): the CLI resolves the caller from STS using only credentials the custodian brought (instance-metadata and container-role providers disabled); a host instance-role session is refused even if listed; missing, expired or unusable credentials are refused with a BREAK_GLASS_* FAILURE event. The credential model is documented as the OD-6 proposal (runbook §7).",
+      "regression_tests": [
+        "api/tests/integration/test_break_glass_identity.py"
+      ],
       "amendment": "06 §7.5 wording (minor)",
-      "owner_decision": "Re-review OD-6 (not decided)",
+      "owner_decision": "Re-review OD-6 (custodian credential model) and OWNER-INPUT-004 (not decided)",
       "merge_impact": "None",
       "staging_impact": "Rehearsal",
-      "production_impact": "Blocks (PG-BG)",
+      "production_impact": "Blocks (PG-BG) until OD-6, OWNER-INPUT-004 and the staging rehearsal",
       "review_blocking": "production (PG-BG)",
       "review_stages": [
         "production"
       ],
-      "status": "OPEN — PRODUCTION BLOCKER (OWNER DECISION OD-6)",
+      "status": "RESOLVED IN CODE (PR #8) — OWNER DECISION OD-6, OWNER-INPUT-004 AND STAGING REHEARSAL REQUIRED",
       "note": ""
     },
     {
@@ -474,23 +480,34 @@
         "api/veda/modules/crm/leads/service.py:837, 552-556"
       ],
       "root_cause": "DEV-004 residuals.",
-      "files_changed": [],
+      "files_changed": [
+        "api/migrations/versions/0010_consent_evidence_guard.py",
+        "api/veda/kernel/migration_support.py",
+        "api/veda/modules/crm/leads/service.py",
+        "api/veda/modules/crm/leads/schemas.py",
+        "api/veda/kernel/audit_registry.py",
+        "api/veda/config.py",
+        "api/tests/integration/test_consent_rr12.py"
+      ],
       "requirements": [
         "LEAD-012",
         "LEAD-027"
       ],
-      "remediation": "Not changed; AM-4 now states the target behaviour and the gap explicitly.",
-      "regression_tests": [],
+      "remediation": "2026-10-03, PR #10 (merge `35862ae`): AM-4 rules (a)–(d). (a) later-version ordering from VEDA_PUBLISHED_POLICY_VERSIONS; (b) create-time staff consent requires a note and writes the CAPTURED activity; (c) withdrawal note in the snapshot; (d) option (a): database guard on consent-history activities with the erasure exemption (0010, triggers only, both engines). Erasure now also covers the withdrawal note.",
+      "regression_tests": [
+        "api/tests/integration/test_consent_rr12.py",
+        "api/tests/integration/test_consent_dev004.py"
+      ],
       "amendment": "AM-4",
-      "owner_decision": "AM-4 option (a)/(b)",
+      "owner_decision": "AM-4: confirm option (a) and the earlier-version rule",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; AM-4 option (a) confirmation before production",
       "review_blocking": "production",
       "review_stages": [
         "production"
       ],
-      "status": "OPEN — PRODUCTION BLOCKER",
+      "status": "RESOLVED (PR #10) — OWNER CONFIRMATION OF AM-4 OPTION (a) REQUIRED",
       "note": ""
     },
     {
@@ -503,23 +520,33 @@
         "api/veda/platform/notifications/worker.py:119"
       ],
       "root_cause": "Sentry transactions and outbox last_error carry PII.",
-      "files_changed": [],
+      "files_changed": [
+        "api/veda/kernel/logging.py",
+        "api/veda/app.py",
+        "api/veda/platform/notifications/worker.py",
+        "app/src/core/telemetry/telemetry.ts",
+        "api/tests/integration/test_pii_tracking.py",
+        "app/test/telemetry.test.ts"
+      ],
       "requirements": [
         "LOG-003",
         "SEC-009"
       ],
-      "remediation": "Not changed; folded into AM-10 decision scope.",
-      "regression_tests": [],
+      "remediation": "2026-10-03, PR #9 (merge `7f34261`): Sentry transactions, spans and errors are scrubbed of query strings, URL-encoded values, headers and messages (before_send, before_send_transaction, before_send_span; send_default_pii off); outbox_event.last_error stores the error type and a fingerprint only.",
+      "regression_tests": [
+        "api/tests/integration/test_pii_tracking.py",
+        "app/test/telemetry.test.ts"
+      ],
       "amendment": "AM-10",
-      "owner_decision": "Re-review OD-7",
+      "owner_decision": "AM-10 (deferred to staging / production)",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; AM-10 staging check before production",
       "review_blocking": "production",
       "review_stages": [
         "production"
       ],
-      "status": "OPEN — PRODUCTION BLOCKER",
+      "status": "RESOLVED IN CODE (PR #9) — AM-10 STAGING CHECK REQUIRED",
       "note": ""
     },
     {
@@ -678,23 +705,37 @@
         "shell/app.ts:200-208"
       ],
       "root_cause": "Accessibility remnants in the SPA.",
-      "files_changed": [],
+      "files_changed": [
+        "app/src/design-system/components.ts",
+        "app/src/shell/command-palette.ts",
+        "app/src/shell/account-menu.ts",
+        "app/src/shell/app.ts",
+        "app/src/shell/step-up-dialog.ts",
+        "api/veda/platform/auth/request_auth.py",
+        "app/test/a11y.test.ts",
+        "app/e2e/axe.e2e.mjs",
+        "api/tests/integration/test_step_up_expiry.py"
+      ],
       "requirements": [
         "UI-011",
         "UI-016 (AX-06, AX-07, AX-09)"
       ],
-      "remediation": "Not changed.",
-      "regression_tests": [],
+      "remediation": "2026-10-03, PR #11 (merge `a5a59a7`): vs-tabs owns its tabpanel (ID references resolve in one shadow root); command palette is a WAI-ARIA combobox with a listbox popup; account menu closes on outside press, focus loss and Escape; step-up dialog states, warns and enforces expiry and announces attempts left.",
+      "regression_tests": [
+        "app/test/a11y.test.ts",
+        "app/e2e/axe.e2e.mjs",
+        "api/tests/integration/test_step_up_expiry.py"
+      ],
       "amendment": "No",
       "owner_decision": "No",
       "merge_impact": "None",
       "staging_impact": "None",
-      "production_impact": "Blocks",
+      "production_impact": "Cleared in code; OI-RM-5 manual run before production",
       "review_blocking": "production",
       "review_stages": [
         "production"
       ],
-      "status": "OPEN — PRODUCTION BLOCKER",
+      "status": "RESOLVED IN CODE (PR #11) — MANUAL SCREEN-READER RUN REQUIRED (OI-RM-5)",
       "note": ""
     },
     {
@@ -1330,8 +1371,8 @@
       "production_impact": "Production (PG-BG); staging rehearsal",
       "review_blocking": "Production (PG-BG); staging rehearsal",
       "review_stages": [],
-      "status": "ACCEPTABLY GATED FOR STAGING (unchanged)",
-      "note": ""
+      "status": "RESOLVED IN CODE (RR-09, PR #8) — STAGING REHEARSAL REQUIRED (PG-BG)",
+      "note": "Changed after this workstream: PR #8."
     },
     {
       "id": "IR-08",
@@ -1583,8 +1624,8 @@
       "production_impact": "Production",
       "review_blocking": "Production",
       "review_stages": [],
-      "status": "PARTIALLY RESOLVED (unchanged)",
-      "note": ""
+      "status": "RESOLVED IN CODE (RR-18, PR #11) — MANUAL SCREEN-READER RUN REQUIRED",
+      "note": "Changed after this workstream: PR #11."
     },
     {
       "id": "IR-38",
@@ -1675,8 +1716,8 @@
       "production_impact": "—",
       "review_blocking": "—",
       "review_stages": [],
-      "status": "PARTIALLY RESOLVED (unchanged)",
-      "note": ""
+      "status": "RESOLVED (PR #5)",
+      "note": "Changed after this workstream: PR #5."
     },
     {
       "id": "IR-A05",
@@ -1767,8 +1808,8 @@
       "production_impact": "Production traffic hardening",
       "review_blocking": "Production traffic hardening",
       "review_stages": [],
-      "status": "NOT RESOLVED (unchanged)",
-      "note": ""
+      "status": "RESOLVED (PR #5)",
+      "note": "Changed after this workstream: PR #5."
     },
     {
       "id": "IR-A10",
@@ -2184,5 +2225,6 @@
       ],
       "note": ""
     }
-  ]
+  ],
+  "status_update": "2026-10-03: RR-09, RR-12, RR-13, RR-18, IR-06, IR-37, IR-A04, IR-A08 updated from pull requests #5 to #11."
 }
