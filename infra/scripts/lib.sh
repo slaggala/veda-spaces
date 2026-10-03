@@ -70,7 +70,14 @@ manifest_problems() {
     def placeholder: type == "string" and (test("[<>]|TODO|CHANGE|REPLACE|EXAMPLE|PLACEHOLDER"; "i") or . == "123456789012" or . == "000000000000");
     [ (if .schema_version != 2 then "schema_version must be 2" else empty end),
       (if .region != "ap-south-1" then "region must be ap-south-1 (Mumbai only)" else empty end),
-      (if .organizations_mode != "standalone" then "organizations_mode must be \"standalone\" (owner decision)" else empty end),
+      # Owner decision (2026-10-02): a member account of the Veda organization, never its management account.
+      (if .organizations_mode != "member" then "organizations_mode must be \"member\" (owner decision)" else empty end),
+      (if (.organization_id | type) != "string" or (.organization_id | test("^o-[a-z0-9]{10,32}$") | not)
+         then "organization_id must be the AWS Organizations ID (o-...)" else empty end),
+      (if (.management_account_id | type) != "string" or (.management_account_id | test("^[0-9]{12}$") | not)
+         then "management_account_id must be the 12-digit management account ID" else empty end),
+      (if .account_id != null and .account_id == .management_account_id
+         then "account_id is the management account: Veda staging must be a member account" else empty end),
       (if (.repository | type) != "string" or (.repository | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$") | not) then "repository must be owner/repo" else empty end),
       (if (.repository_id | type) != "number" or .repository_id <= 0 then "repository_id must be the numeric GitHub repository ID" else empty end),
       (if (.max_owner_session_seconds | type) != "number" or .max_owner_session_seconds < 900 or .max_owner_session_seconds > 3600
@@ -152,8 +159,8 @@ require_expected_account() {
 }
 
 # F3, N-03: prove the session is in the dedicated staging account, not merely in the account whose ID was typed:
-# a complete manifest, the live account name and alias, no production/Aurion name, a standalone account (owner
-# decision), an owner role that is safe to hold the state (PB-09), and an all-region inventory with nothing the
+# a complete manifest, the live account name and alias, no production/Aurion name, membership of the approved
+# AWS organization as a member (not management) account (owner decision), an owner role that is safe to hold the state (PB-09), and an all-region inventory with nothing the
 # bootstrap did not create (unless the manifest lists it). Every lookup fails closed.
 verify_account_identity() {
   local expected="$1" name alias want_name want_alias bucket_status state_exists=false inventory foreign forbidden
@@ -176,7 +183,7 @@ verify_account_identity() {
     die "account '$name' (alias '${alias:-<none>}') looks like production or Aurion; refusing"
   fi
 
-  require_standalone_account
+  require_organization_member "$expected"
   require_owner_session "$expected"
 
   # Assigned before comparing: a failed lookup must stop the run, not read as "absent".
@@ -189,17 +196,22 @@ verify_account_identity() {
   foreign="$(foreign_resources "$inventory" "$state_exists")" || die "cannot evaluate account resources; refusing"
   [[ -z "$foreign" ]] ||
     die "the account holds resources the bootstrap did not create and the manifest does not allow: $foreign"
-  log "account $expected verified: name '$name', alias '${alias:-<none>}', standalone, owner session, no foreign resources in any region"
+  log "account $expected verified: name '$name', alias '${alias:-<none>}', member of $(manifest_get .organization_id), owner session, no foreign resources in any region"
 }
 
-# Owner decision: a standalone account, not an AWS Organizations member.
-require_standalone_account() {
-  local err
-  if err="$(aws organizations describe-organization --output json 2>&1 >/dev/null)"; then
-    die "the account belongs to an AWS Organization; the manifest approves a standalone account (organizations_mode); refusing"
-  fi
-  grep -q 'AWSOrganizationsNotInUseException' <<<"$err" ||
-    die "cannot tell whether the account belongs to an AWS Organization (${err:-no detail}); refusing"
+# Owner decision (2026-10-02): the account is a member of exactly the approved organization, and is not its
+# management account (SCPs do not apply to the management account). Fails closed on any lookup error.
+require_organization_member() {
+  local expected="$1" org want_org want_mgmt
+  org="$(aws organizations describe-organization --output json 2>&1)" ||
+    die "cannot read the AWS Organization of this account (${org:-no detail}); the manifest approves a member account; refusing"
+  want_org="$(manifest_get .organization_id)"
+  want_mgmt="$(manifest_get .management_account_id)"
+  [[ "$(jq -r '.Organization.Id // empty' <<<"$org")" == "$want_org" ]] ||
+    die "the account belongs to organization $(jq -r '.Organization.Id // "?"' <<<"$org"), the manifest approves $want_org; refusing"
+  [[ "$(jq -r '.Organization.MasterAccountId // empty' <<<"$org")" == "$want_mgmt" ]] ||
+    die "the organization's management account is $(jq -r '.Organization.MasterAccountId // "?"' <<<"$org"), the manifest approves $want_mgmt; refusing"
+  [[ "$expected" != "$want_mgmt" ]] || die "account $expected is the management account; Veda staging must be a member account; refusing"
 }
 
 # PB-09 / N-12: the session is one of the manifest's owner roles (not the root user, not an IAM user), and every owner

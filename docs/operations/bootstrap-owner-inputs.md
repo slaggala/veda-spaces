@@ -1,7 +1,8 @@
 # Staging bootstrap: owner inputs (PB-01, PB-09)
 
 What the owner must create and commit before the controlled first run of the staging bootstrap. It is written for
-the approved decisions: **ap-south-1 (Mumbai) only**, a **standalone** AWS account (no Organizations), a controlled
+the approved decisions: **ap-south-1 (Mumbai) only**, a **member account** of the Veda AWS organization (never its
+management account), a controlled
 **local** first run, and **no Cloudflare token**. Everything here is checked by code. The templates are tested to be
 exactly what the checks accept (`infra/tests/run.sh`, "Owner inputs").
 
@@ -19,7 +20,8 @@ the account alias and the owner identities, not Veda infrastructure.
 | 5 | `OWNER_USER_NAME` | The one IAM user allowed to assume the owner role, with MFA; not `veda-*`; no `aurion` or `swing-trader`; for example `bootstrap-operator` | manifest `allowed_foreign_resources.iam_users`; the role's trust policy |
 | 6 | `manage_account_guardrails` | `true` for a new account (default) | manifest |
 
-Nothing else. `region`, `organizations_mode`, `repository`, `repository_id` (1392733148) and
+Nothing else. `region`, `organizations_mode` (`member`), `organization_id` (`o-q9ji0hj18c`),
+`management_account_id` (`749251636763`), `repository`, `repository_id` (1392733148) and
 `max_owner_session_seconds` (3600) are fixed owner decisions, already set.
 
 None of these values is a secret. **Never** put an access key, secret key, session token, password or MFA seed in
@@ -34,13 +36,15 @@ the repository.
 | `account_name` | string | non-empty, equals the live account name, no `prod`/`aurion` | `--complete`, discovery |
 | `account_alias` | string | IAM alias syntax, equals the live alias, no `prod`/`aurion` | `--complete`, discovery |
 | `region` | string | `ap-south-1` | `check-manifest.sh`, Terraform `aws_region` |
-| `organizations_mode` | string | `standalone` | `check-manifest.sh`, discovery (the account must not be an Organizations member) |
+| `organizations_mode` | string | `member` | `check-manifest.sh`, discovery |
+| `organization_id` | string | `o-q9ji0hj18c` | `check-manifest.sh`, discovery (the account must belong to exactly this organization) |
+| `management_account_id` | string | `749251636763`; never equal to `account_id` | `check-manifest.sh`, discovery (the organization must have this management account) |
 | `repository` | string | `slaggala/veda-spaces` | `check-manifest.sh`, Terraform `github_repo`, scripts, workflow |
 | `repository_id` | number | `1392733148` (GitHub's ID for this repository) | scripts and workflow |
 | `max_owner_session_seconds` | number | 900–3600 (set: 3600) | `check-manifest.sh`, discovery (owner role `MaxSessionDuration`) |
 | `manage_account_guardrails` | boolean | `true` | `check-manifest.sh`, Terraform |
 | `bootstrap_principal_arns` | list of strings | exactly `["arn:aws:iam::<ACCOUNT_ID>:role/<OWNER_ROLE_NAME>"]`: roles only, exact ARN with path, no wildcard, no `veda-*`, this account | `--complete`, Terraform preconditions, discovery |
-| `allowed_foreign_resources.iam_roles` | list | must include `<OWNER_ROLE_NAME>` | `--complete`, all-region inventory |
+| `allowed_foreign_resources.iam_roles` | list | must include `<OWNER_ROLE_NAME>`; in a member account also `OrganizationAccountAccessRole` (created by Organizations) | `--complete`, all-region inventory |
 | `allowed_foreign_resources.iam_users` | list | `["<OWNER_USER_NAME>"]` | all-region inventory |
 | `allowed_foreign_resources.saml_providers`, `s3_buckets`, `ec2_instances`, `lambda_functions` | lists | `[]` for a new account | all-region inventory |
 
