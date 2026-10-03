@@ -24,7 +24,7 @@ from veda.kernel import clock, db, metrics, migration_support, outbox
 from veda.kernel.audit_hook import write_explicit_audit
 from veda.kernel.audit_registry import policy_for
 from veda.kernel.context import actor, system_context
-from veda.kernel.ids import SYSTEM_USER_ID
+from veda.kernel.ids import SYSTEM_USER_ID, new_id
 from veda.platform import anchor_store
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth import security_events
@@ -378,7 +378,7 @@ def _verify_archives(store, s: Session, anchor: dict | None) -> tuple[int, str |
     for m in manifests:
         if m["first_seq"] != expected or m["last_seq"] < m["first_seq"]:
             return expected - 1, prev_hash, "archive manifests not contiguous", expected, None
-        blob = store.get_blob("export", m["last_seq"])
+        blob = store.get_blob("export", anchor_store.export_id(m))
         if blob is None:
             return expected - 1, prev_hash, "archive export missing", m["first_seq"], None
         if hashlib.sha256(blob).hexdigest() != m["sha256"]:
@@ -425,19 +425,17 @@ def verify_chain() -> security_events.ChainReport:
         try:
             anchor = store.latest("anchor")
             through, through_hash, problem, at_seq, unannounced = _verify_archives(store, s, anchor)
-            pending = {p["last_seq"]: p for p in store.all("pending")}
+            pending = store.all("pending")
         except Exception:
             log.critical("security_log_anchor_store_unavailable", exc_info=True)
-            anchor, through, through_hash, pending = None, 0, None, {}
+            anchor, through, through_hash, pending = None, 0, None, []
             problem, at_seq, unannounced = "anchor store unavailable", 0, None
         first_seq, head_seq = s.execute(
             sa.select(sa.func.min(SecurityEventLog.chain_seq), sa.func.max(SecurityEventLog.chain_seq))
         ).one()
         # A pending manifest whose rows are gone was committed but never finalised: a durable failure that the next
         # archival run repairs. One whose rows are still online is an abandoned attempt and is ignored (RR-06).
-        stranded = [
-            p for seq, p in pending.items() if seq > through and (first_seq is None or first_seq > p["last_seq"])
-        ]
+        stranded = [p for p in pending if p["last_seq"] > through and (first_seq is None or first_seq > p["last_seq"])]
         if problem:
             report = security_events.ChainReport(False, 0, through, through_hash, problem, at_seq)
         elif stranded:
@@ -529,18 +527,22 @@ def anchor_chain() -> dict | None:
 
 def _finalise_committed_archives(store) -> int:
     """Finalise pending manifests whose deletion committed (rows gone, SECURITY_LOG_ARCHIVED recorded): the
-    recovery step for a failure between the commit and the final write (RR-06). Idempotent."""
+    recovery step for a failure between the commit and the final write (RR-06). Idempotent.
+
+    Several pending manifests can end at the same sequence (an abandoned attempt, a concurrent loser, FC-13);
+    only the one whose export the committed run announced is finalised, and only once."""
     finalised = {m["last_seq"] for m in store.all("archive")}
     done = 0
     with db.unit_of_work(write=False) as s:
         first_online = s.execute(sa.select(sa.func.min(SecurityEventLog.chain_seq))).scalar()
         announced = _archived_events_online(s)
     for p in sorted(store.all("pending"), key=lambda m: m["first_seq"]):
-        if p["last_seq"] in finalised:
+        if p["last_seq"] in finalised:  # a committed segment ends here; any other pending for it was abandoned
             continue
         gone = first_online is None or first_online > p["last_seq"]
         if gone and (p["last_seq"], p["sha256"][:16]) in announced:
             store.put("archive", p["last_seq"], p)
+            finalised.add(p["last_seq"])
             done += 1
     return done
 
@@ -552,8 +554,13 @@ def archive_security_events(export_dir: str | None = None) -> dict:
     (RR-06): the export and a *pending* manifest go to write-once storage, then one database transaction appends
     SECURITY_LOG_ARCHIVED and deletes exactly the exported range, and only after it commits is the *archive*
     manifest written. A failure before the commit leaves the rows online and the pending manifest is ignored; a
-    failure after it is repaired by the next run (``_finalise_committed_archives``). Retries of the same segment
-    re-write identical objects, so they are idempotent."""
+    failure after it is repaired by the next run (``_finalise_committed_archives``).
+
+    No object-store I/O happens inside a write transaction (FC-14): the segment is read and verified in a read
+    transaction, exported and staged with no transaction open, and the write transaction (on SQLite the
+    database-wide write lock) only re-checks that the exported rows are still the online prefix, then records and
+    deletes. Each run writes its export and pending manifest under its own ``(first_seq, last_seq, run id)`` key
+    (FC-13), so an abandoned attempt or a concurrent run never blocks a later segment."""
     days = settings().security_event_online_retention_days
     if not days:
         raise RuntimeError("SECURITY_EVENT_ONLINE_RETENTION_DAYS is not configured (OWNER-INPUT-002); nothing archived")
@@ -563,8 +570,8 @@ def archive_security_events(export_dir: str | None = None) -> dict:
     try:
         recovered = _finalise_committed_archives(store)
         through, through_hash = _archived_through(store.all("archive"))
-        manifest: dict[str, Any] | None = None
-        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        # 1. Read and verify the segment. A read transaction: nothing here blocks the application's writers.
+        with actor(system_context("CLI")), db.unit_of_work(write=False) as s:
             cutoff = db.tx_time(s) - timedelta(days=days)
             rows = []
             for r in s.execute(sa.select(SecurityEventLog).order_by(SecurityEventLog.chain_seq)).scalars():
@@ -591,50 +598,69 @@ def archive_security_events(export_dir: str | None = None) -> dict:
                 )
                 for r in rows
             ]
-            blob = ("\n".join(lines) + "\n").encode()
-            checksum = hashlib.sha256(blob).hexdigest()
-            path = out_dir / f"security_event_log_{first.chain_seq}_{last.chain_seq}.jsonl"
-            path.write_bytes(blob)
-            if hashlib.sha256(path.read_bytes()).hexdigest() != checksum or len(path.read_text().splitlines()) != len(
-                rows
-            ):
-                raise RuntimeError("archive verification failed")
-            manifest = {
-                "kind": "archive",
-                "first_seq": first.chain_seq,
-                "last_seq": last.chain_seq,
-                "count": len(rows),
-                "sha256": checksum,
-                "last_row_hash": last.row_hash,
-                "chain_key_label": last.chain_key_label,
-                "file": path.name,
-            }
-            store.put_blob("export", last.chain_seq, blob)
-            store.put("pending", last.chain_seq, manifest)
+            first_seq, last_seq, count = first.chain_seq, last.chain_seq, len(rows)
+            last_row_hash, last_key_label = last.row_hash, last.chain_key_label
+        blob = ("\n".join(lines) + "\n").encode()
+        checksum = hashlib.sha256(blob).hexdigest()
+        run = anchor_store.segment_id(first_seq, last_seq, new_id())
+        # 2. Export and stage with no transaction open: object-store latency never holds the write lock.
+        path = out_dir / f"security_event_log_{first_seq}_{last_seq}.jsonl"
+        path.write_bytes(blob)
+        if hashlib.sha256(path.read_bytes()).hexdigest() != checksum or len(path.read_text().splitlines()) != count:
+            raise RuntimeError("archive verification failed")
+        manifest: dict[str, Any] = {
+            "kind": "archive",
+            "first_seq": first_seq,
+            "last_seq": last_seq,
+            "count": count,
+            "sha256": checksum,
+            "last_row_hash": last_row_hash,
+            "chain_key_label": last_key_label,
+            "file": path.name,
+            "export_id": run,
+        }
+        store.put_blob("export", run, blob)
+        store.put("pending", run, manifest)
+        # 3. Record and delete in one short write transaction, after re-checking under the write lock that the
+        #    exported rows are still exactly the online prefix (a concurrent run may have archived them meanwhile).
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            table = cast(sa.Table, SecurityEventLog.__table__)
+            online_first = s.execute(sa.select(sa.func.min(table.c.chain_seq))).scalar()
+            if online_first != first_seq:
+                log.info("security_log_archive_superseded first_seq=%s online_first=%s", first_seq, online_first)
+                metrics.emit_many(
+                    {"SecurityLogArchivedRows": (0.0, "Count"), "SecurityLogArchiveFailed": (0.0, "Count")}
+                )
+                return {"archived": 0, "recovered": recovered, "superseded": True}
+            still, still_last_hash = s.execute(
+                sa.select(sa.func.count(), sa.func.max(sa.case((table.c.chain_seq == last_seq, table.c.row_hash))))
+                .select_from(table)
+                .where(table.c.chain_seq.between(first_seq, last_seq))
+            ).one()
+            if still != count or still_last_hash != last_row_hash:
+                raise RuntimeError("archive segment changed after it was exported")
             # Append the summary event first so the chain continues past the archived segment.
             security_events.record(
                 s,
                 "SECURITY_LOG_ARCHIVED",
                 "SUCCESS",
-                detail={"through_seq": last.chain_seq, "count": len(rows), "anchor": checksum[:16]},
+                detail={"through_seq": last_seq, "count": count, "anchor": checksum[:16]},
             )
             conn = s.connection()
             migration_support.drop_immutability_guards(conn, "security_event_log")
-            table = cast(sa.Table, SecurityEventLog.__table__)
-            result = s.execute(sa.delete(table).where(table.c.chain_seq.between(first.chain_seq, last.chain_seq)))
+            result = s.execute(sa.delete(table).where(table.c.chain_seq.between(first_seq, last_seq)))
             deleted = getattr(result, "rowcount", -1)
             migration_support.restore_immutability_guards(conn, "security_event_log")
-            if deleted != len(rows):
-                raise RuntimeError(f"archival deleted {deleted} rows but exported {len(rows)}")
-        store.put("archive", manifest["last_seq"], manifest)
+            if deleted != count:
+                raise RuntimeError(f"archival deleted {deleted} rows but exported {count}")
+        # 4. Finalise after the commit.
+        store.put("archive", last_seq, manifest)
     except Exception:
         log.critical("security_log_archive_failed", exc_info=True)
         metrics.emit("SecurityLogArchiveFailed", 1)
         raise
-    metrics.emit_many(
-        {"SecurityLogArchivedRows": (float(manifest["count"]), "Count"), "SecurityLogArchiveFailed": (0.0, "Count")}
-    )
-    return {"archived": manifest["count"], "file": str(path), "sha256": manifest["sha256"], "recovered": recovered}
+    metrics.emit_many({"SecurityLogArchivedRows": (float(count), "Count"), "SecurityLogArchiveFailed": (0.0, "Count")})
+    return {"archived": count, "file": str(path), "sha256": checksum, "recovered": recovered}
 
 
 # --- governance invariants (06 §7.3) ----------------------------------------------------------------
