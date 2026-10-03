@@ -87,9 +87,12 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
 
 
 def check_route_declarations(app: Flask) -> None:
-    """Startup fails if a route lacks a permission or RBX declaration, uses an RBX exception it is not registered
-    for, or is public or optional-auth yet declares a permission that would never be enforced or has no RBX
+    """Startup fails if a route lacks a permission or RBX declaration, declares a permission code the registry
+    does not define (FC-A04), uses an RBX exception it is not registered for, or is public or optional-auth yet declares a permission that would never be enforced or has no RBX
     registration (06 §8 Layer 1, 06 §11; IR-A05)."""
+    from veda.platform.rbac.registry import REGISTRY
+
+    known_codes = {entry.code for entry in REGISTRY}
     declared = {spec.endpoint: spec for spec in http.ROUTES}
     for rule in app.url_map.iter_rules():
         if rule.endpoint in ("static", "openapi"):
@@ -99,6 +102,10 @@ def check_route_declarations(app: Flask) -> None:
             raise RuntimeError(f"route {rule.rule} ({rule.endpoint}) has no permission or RBX declaration")
         if spec.auth not in http.AUTH_MODES:
             raise RuntimeError(f"route {spec.method} {spec.rule} has an unknown auth mode {spec.auth!r}")
+        # A code missing from the registry is never granted, so the route would deny everyone (FC-A04).
+        unknown = sorted(c for c in (*spec.permission, *spec.any_of) if c not in known_codes)
+        if unknown:
+            raise RuntimeError(f"route {spec.method} {spec.rule} declares unknown permission codes {unknown}")
         if spec.rbx and (spec.method, spec.rule) not in RBX_REGISTER.get(spec.rbx, frozenset()):
             raise RuntimeError(f"route {spec.method} {spec.rule} is not in the {spec.rbx} register (06 §11)")
         # Without a signed-in principal (public, or optional auth used anonymously) no permission is ever checked,
