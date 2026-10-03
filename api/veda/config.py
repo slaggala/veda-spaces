@@ -293,6 +293,10 @@ def validate_environment(settings: Settings) -> list[str]:
     problems: list[str] = []
     if settings.env not in ENVIRONMENTS:
         return [f"VEDA_ENV must be one of {', '.join(ENVIRONMENTS)}"]
+    versions = settings.published_policy_versions
+    if not versions or len(set(versions)) != len(versions):
+        # Their order is the re-consent "later version" rule (AM-4, RR-12): oldest first, each version once.
+        problems.append("VEDA_PUBLISHED_POLICY_VERSIONS must list each published notice once, oldest first")
     if not settings.is_deployed:
         return problems
     env = settings.env

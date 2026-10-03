@@ -1,7 +1,8 @@
 """DEV-004 as corrected (IR-16): staff re-consent (04 §5.4, LEAD-012, LEAD-024, LEAD-027).
 
 Privacy: staff cannot assert website provenance; a staff capture carries no web IP or source page.
-Consent: accepted only after withdrawal, when never captured, or for a new notice version; a note is required.
+Consent: accepted only after withdrawal, when never captured, or for a later notice version; a note is required
+(the later-version rule and create-time capture are RR-12: test_consent_rr12.py).
 History: the superseded evidence is kept append-only in a read-only timeline activity and in audit_log.
 Authorization, duplicate detection, tamper evidence and erasure are covered below.
 """
@@ -128,7 +129,7 @@ def test_DEV004_staff_create_cannot_claim_website_provenance(api, founder):
         "name": "Walk-in",
         "phone": "+919812345678",
         "source_code": "REFERRAL",
-        "consent": {"channel": "WEBSITE_FORM", "policy_version": POLICY},
+        "consent": {"channel": "WEBSITE_FORM", "policy_version": POLICY, "note": "met at the studio"},
     }
     assert api.post("/api/v1/leads", body).status == 422
     body["consent"]["channel"] = "IN_PERSON"

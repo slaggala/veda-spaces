@@ -724,8 +724,118 @@ def restore_immutability_guards(conn, table: str) -> None:
         conn.exec_driver_sql("SET LOCAL veda.maintenance = 'off'")
 
 
+# --- consent history (AM-4 option a, RR-12) -------------------------------------------------------------------
+# A lead_activity row whose metadata carries consent_event is consent evidence: it cannot be deleted, and the only
+# update admitted is the erasure rewrite (07 §8.2) of a lead that is already anonymized: description and location
+# become '[anonymized]', and the snapshot's withdrawal_note and source_page are anonymized or cleared. Every
+# other column stays as it is (the audit columns updated_on, updated_by and version move with any update). An
+# update may not turn an ordinary activity into consent evidence either.
+
+CONSENT_GUARD = ("trg_lead_activity__consent_no_update", "trg_lead_activity__consent_no_delete")
+_CONSENT_FROZEN = (
+    "id", "created_on", "created_by", "is_deleted", "deleted_on", "deleted_by", "lead_id", "activity_type",
+    "is_system_generated", "activity_status", "subject", "direction", "scheduled_on", "completed_on",
+    "duration_minutes", "outcome_id", "owner_user_id", "from_status", "to_status", "cancelled_reason",
+)  # fmt: skip
+_SNAPSHOT_TEXT = ("withdrawal_note", "source_page")
+
+
+def _consent_erasure_sqlite() -> str:
+    def j(row: str, key: str) -> str:
+        return f"json_extract({row}.metadata, '$.previous.{key}')"
+
+    paths = ", ".join(f"'$.previous.{k}'" for k in _SNAPSHOT_TEXT)
+    return " AND ".join(
+        [
+            "json_extract(OLD.metadata, '$.consent_event') IS NOT NULL",
+            "EXISTS (SELECT 1 FROM lead WHERE lead.id = OLD.lead_id AND lead.anonymized_on IS NOT NULL)",
+            *(f"NEW.{c} IS OLD.{c}" for c in _CONSENT_FROZEN),
+            *(f"(NEW.{c} IS OLD.{c} OR NEW.{c} = '[anonymized]')" for c in ("description", "location")),
+            f"json_remove(NEW.metadata, {paths}) IS json_remove(OLD.metadata, {paths})",
+            f"({j('NEW', 'withdrawal_note')} IS {j('OLD', 'withdrawal_note')} OR "
+            f"{j('NEW', 'withdrawal_note')} IS NULL OR {j('NEW', 'withdrawal_note')} = '[anonymized]')",
+            f"({j('NEW', 'source_page')} IS {j('OLD', 'source_page')} OR {j('NEW', 'source_page')} IS NULL)",
+        ]
+    )
+
+
+def _consent_erasure_postgresql() -> str:
+    def j(row: str, key: str) -> str:
+        return f"({row}.metadata #>> '{{previous,{key}}}')"
+
+    def strip(row: str) -> str:
+        return f"({row}.metadata" + "".join(f" #- '{{previous,{k}}}'" for k in _SNAPSHOT_TEXT) + ")"
+
+    frozen_new = ", ".join(f"NEW.{c}" for c in _CONSENT_FROZEN)
+    frozen_old = ", ".join(f"OLD.{c}" for c in _CONSENT_FROZEN)
+    return " AND ".join(
+        [
+            "(OLD.metadata -> 'consent_event') IS NOT NULL",
+            "EXISTS (SELECT 1 FROM lead WHERE lead.id = OLD.lead_id AND lead.anonymized_on IS NOT NULL)",
+            f"({frozen_new}) IS NOT DISTINCT FROM ({frozen_old})",
+            *(
+                f"(NEW.{c} IS NOT DISTINCT FROM OLD.{c} OR NEW.{c} = '[anonymized]')"
+                for c in ("description", "location")
+            ),
+            f"{strip('NEW')} IS NOT DISTINCT FROM {strip('OLD')}",
+            f"({j('NEW', 'withdrawal_note')} IS NOT DISTINCT FROM {j('OLD', 'withdrawal_note')} OR "
+            f"{j('NEW', 'withdrawal_note')} IS NULL OR {j('NEW', 'withdrawal_note')} = '[anonymized]')",
+            f"({j('NEW', 'source_page')} IS NOT DISTINCT FROM {j('OLD', 'source_page')} OR "
+            f"{j('NEW', 'source_page')} IS NULL)",
+        ]
+    )
+
+
+def create_consent_evidence_guard(conn) -> None:
+    upd, dele = CONSENT_GUARD
+    if dialect_name(conn) == "sqlite":
+        conn.exec_driver_sql(
+            f"CREATE TRIGGER IF NOT EXISTS {upd} BEFORE UPDATE ON lead_activity "
+            "WHEN json_extract(OLD.metadata, '$.consent_event') IS NOT NULL "
+            "OR json_extract(NEW.metadata, '$.consent_event') IS NOT NULL "
+            f"BEGIN SELECT RAISE(ABORT, 'immutable') WHERE NOT ({_consent_erasure_sqlite()}); END"
+        )
+        conn.exec_driver_sql(
+            f"CREATE TRIGGER IF NOT EXISTS {dele} BEFORE DELETE ON lead_activity "
+            "WHEN json_extract(OLD.metadata, '$.consent_event') IS NOT NULL "
+            "BEGIN SELECT RAISE(ABORT, 'immutable'); END"
+        )
+        return
+    conn.exec_driver_sql(
+        "CREATE OR REPLACE FUNCTION veda_consent_evidence_guard() RETURNS trigger LANGUAGE plpgsql AS $$ "
+        "BEGIN IF current_setting('veda.maintenance', true) = 'on' THEN "
+        "IF TG_OP = 'DELETE' THEN RETURN OLD; END IF; RETURN NEW; END IF; "
+        "IF TG_OP = 'DELETE' THEN "
+        "IF (OLD.metadata -> 'consent_event') IS NULL THEN RETURN OLD; END IF; "
+        "ELSIF (OLD.metadata -> 'consent_event') IS NULL AND (NEW.metadata -> 'consent_event') IS NULL THEN "
+        "RETURN NEW; "
+        f"ELSIF {_consent_erasure_postgresql()} THEN RETURN NEW; END IF; "
+        "RAISE EXCEPTION 'immutable' USING ERRCODE = 'restrict_violation'; END $$"
+    )
+    conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {upd} ON lead_activity")
+    conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {dele} ON lead_activity")
+    conn.exec_driver_sql(
+        f"CREATE TRIGGER {upd} BEFORE UPDATE ON lead_activity FOR EACH ROW EXECUTE FUNCTION veda_consent_evidence_guard()"
+    )
+    conn.exec_driver_sql(
+        f"CREATE TRIGGER {dele} BEFORE DELETE ON lead_activity FOR EACH ROW EXECUTE FUNCTION veda_consent_evidence_guard()"
+    )
+
+
+def drop_consent_evidence_guard(conn) -> None:
+    """Tests only (readiness and pre-0010 fixtures); 0010 has no down-migration."""
+    upd, dele = CONSENT_GUARD
+    if dialect_name(conn) == "sqlite":
+        conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {upd}")
+        conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {dele}")
+        return
+    conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {upd} ON lead_activity")
+    conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {dele} ON lead_activity")
+    conn.exec_driver_sql("DROP FUNCTION IF EXISTS veda_consent_evidence_guard()")
+
+
 def guards_present(conn) -> bool:
-    expected = {name for t in IMMUTABLE_TABLES for name in trigger_names(t)}
+    expected = {name for t in IMMUTABLE_TABLES for name in trigger_names(t)} | set(CONSENT_GUARD)
     if dialect_name(conn) == "sqlite":
         found = {r[0] for r in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
     else:

@@ -411,35 +411,9 @@
         "title": "ChangeIn",
         "type": "object"
       },
-      "ConsentCapture": {
-        "additionalProperties": false,
-        "description": "Consent captured by staff. WEBSITE_FORM is reserved for the public form, whose request context is the\nevidence; staff cannot assert it (IR-16).",
-        "properties": {
-          "channel": {
-            "enum": [
-              "PHONE_VERBAL",
-              "IN_PERSON",
-              "WHATSAPP",
-              "EMAIL"
-            ],
-            "title": "Channel",
-            "type": "string"
-          },
-          "policy_version": {
-            "title": "Policy Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "channel",
-          "policy_version"
-        ],
-        "title": "ConsentCapture",
-        "type": "object"
-      },
       "ConsentRecapture": {
         "additionalProperties": false,
-        "description": "Re-consent on an existing lead (04 \u00a75.4, DEV-004 as corrected): how and when it was obtained.",
+        "description": "Staff consent, at creation or as re-consent (04 \u00a75.4, DEV-004, RR-12): how it was obtained, with a note.",
         "properties": {
           "channel": {
             "enum": [
@@ -1006,7 +980,7 @@
           "consent": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ConsentCapture"
+                "$ref": "#/components/schemas/ConsentRecapture"
               },
               {
                 "type": "null"

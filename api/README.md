@@ -30,7 +30,8 @@ veda/
   modules/crm/leads/     lead, lead_note, lead_activity: repository, service, routes, events
   cli/                   migrate, bootstrap-founder, sync-permissions, worker, scheduler,
                          maintenance jobs, break-glass, conformance, openapi, deploy-check
-migrations/versions/     0001_kernel … 0008_account_security, 0100_crm_leads, 0009_mfa_challenge_binding
+migrations/versions/     0001_kernel … 0008_account_security, 0100_crm_leads, 0009_mfa_challenge_binding,
+                         0010_consent_evidence_guard
 tests/                   unit/ and integration/ (dual-engine)
 tools/                   render_migrations.py, mypy_ratchet.py (+ mypy-baseline.json), openapi_check.py,
                          secret_scan.sh, e2e_reset.sh

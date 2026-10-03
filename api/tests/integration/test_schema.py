@@ -11,7 +11,7 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
-HEAD = "0009_mfa_challenge_binding"
+HEAD = "0010_consent_evidence_guard"
 
 
 def _connect():
@@ -216,6 +216,7 @@ def test_RBAC_001_migration_order():
         "0007_notifications",
         "0008_account_security",
         "0100_crm_leads",
+        "0009_mfa_challenge_binding",
         HEAD,
     ]
 

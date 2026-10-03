@@ -22,10 +22,11 @@ def test_IR10_current_image_on_its_own_head_is_ready(client):
 
 
 def test_IR10_n_minus_1_image_on_migrated_schema_needs_the_operator_declaration(client, monkeypatch):
+    database_head = health.alembic_head()  # the revision the N-1 image does not know
     _as_n_minus_1_image(monkeypatch)
     r = client.get("/health/ready")
     assert r.status_code == 503 and r.get_json()["checks"]["migrations"] == "ahead_undeclared"
-    config.settings().schema_ahead_accepted = ["0009_mfa_challenge_binding"]
+    config.settings().schema_ahead_accepted = [database_head]
     try:
         r = client.get("/health/ready")
         assert r.status_code == 200 and r.get_json()["checks"]["migrations"] == "ahead"
