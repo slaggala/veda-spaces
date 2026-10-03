@@ -128,17 +128,9 @@ def create_app(settings: config_mod.Settings | None = None) -> Flask:
     if settings.sentry_dsn:  # pragma: no cover - external service
         import sentry_sdk
 
-        from veda.kernel.logging import sentry_before_send
+        from veda.kernel.logging import sentry_options
 
-        sentry_sdk.init(
-            dsn=settings.sentry_dsn,
-            send_default_pii=False,
-            traces_sample_rate=0.1,
-            environment=settings.env,
-            include_local_variables=False,
-            max_request_body_size="never",
-            before_send=sentry_before_send,
-        )
+        sentry_sdk.init(**sentry_options(settings))
 
     app = Flask("veda")
     app.config["MAX_CONTENT_LENGTH"] = http.DEFAULT_MAX_BODY
