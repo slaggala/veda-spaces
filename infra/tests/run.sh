@@ -24,7 +24,9 @@ LIVE_KEY_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapState
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export PATH="$HERE/stubs:$PATH"
-unset GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_SHA
+# The scripts read the run's identity from the Actions environment (GITHUB_WORKFLOW_REF, GITHUB_RUN_ID, …). Clear
+# all of it, so the tests see a local run whether they run on a workstation or inside a CI job (RD-02).
+while IFS= read -r v; do unset "$v"; done < <(compgen -e | grep -E '^(GITHUB_|RUNNER_|ACTIONS_)|^CI$')
 export AWS_REGION=ap-south-1
 
 PASS=0
@@ -1036,6 +1038,7 @@ jq '.enforce_admins.enabled = false' "$Gp/repos_example-org_veda-spaces_branches
 out_p="$(GH_STUB_DIR="$Gp" "$GS" --repo example-org/veda-spaces 2>&1)"
 check "PB-03 non-compliant protection is fixed with its required status checks kept" ok 'branches/main/protection <<< .*"required_status_checks":\{"strict":true,"checks":\[.*\{"context":"app","app_id":15368\}.*\{"context":"infra","app_id":15368\}.*\]\}.*"enforce_admins":true' -- printf '%s\n' "$out_p"
 echo "== RD-02: infrastructure checks run in CI, block the merge and use the pinned tools"
+absent "RD-02 the tests run without the CI job's Actions environment (no run identity leaks in)" "^(GITHUB_|RUNNER_|ACTIONS_)|^CI=" "$(env)"
 CI="$INFRA/../.github/workflows/ci.yml"
 CIT="$(cat "$CI")"
 INFRA_JOB="$(awk '/^  infra:/{p=1; print; next} p && /^  [a-z0-9-]+:$/{p=0} p' "$CI")"
