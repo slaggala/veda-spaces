@@ -58,7 +58,7 @@ class ConsentCapture(Closed):
 
 
 class ConsentRecapture(ConsentCapture):
-    """Re-consent on an existing lead (04 §5.4, DEV-004 as corrected): how and when it was obtained."""
+    """Staff consent, at creation or as re-consent (04 §5.4, DEV-004, RR-12): how it was obtained, with a note."""
 
     note: Annotated[str, text(500, min_len=1)]
 
@@ -79,7 +79,7 @@ class LeadCreateIn(Closed):
     assigned_to: Id | None = None
     expected_close_on: CalendarDate | None = None
     initial_note: Annotated[str | None, optional_text(10000)] = None
-    consent: ConsentCapture | None = None
+    consent: ConsentRecapture | None = None  # staff capture: how it was obtained, with a note (RR-12, AM-4 b)
 
 
 class LeadPatchIn(Closed):

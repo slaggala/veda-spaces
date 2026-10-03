@@ -111,6 +111,7 @@ register(
                 "locality",
                 "consent_ip_address",
                 "consent_source_page",
+                "consent_withdrawal_note",
                 "intake_unmapped",
             }
         ),
@@ -118,7 +119,12 @@ register(
     )
 )
 register(AuditPolicy("lead_note", FULL, parent=("lead", "lead_id"), pii=frozenset({"body"})))
-register(AuditPolicy("lead_activity", FULL, parent=("lead", "lead_id"), pii=frozenset({"description", "location"})))
+# metadata_ carries the consent-history snapshot, which holds the withdrawal note and source page (RR-12).
+register(
+    AuditPolicy(
+        "lead_activity", FULL, parent=("lead", "lead_id"), pii=frozenset({"description", "location", "metadata_"})
+    )
+)
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))
 register(AuditPolicy("refresh_token", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-007", "EXC-009")))

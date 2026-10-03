@@ -550,8 +550,7 @@ def create_manual(s: Session, ctx, body) -> tuple[Lead, list[dict]]:
         **ids,
     )
     if body.consent:
-        if body.consent.policy_version not in settings().published_policy_versions:
-            raise ApiError(422, "UNKNOWN_POLICY_VERSION", "Unknown privacy notice version.")
+        _require_published(body.consent.policy_version)
         lead.consent_contact, lead.consent_policy_version = True, body.consent.policy_version
         lead.consent_captured_on, lead.consent_channel = now, body.consent.channel
     dup = find_duplicate(s, lead)
@@ -561,6 +560,8 @@ def create_manual(s: Session, ctx, body) -> tuple[Lead, list[dict]]:
     s.add(lead)
     s.flush()
     add_system_activity(s, lead, "SYSTEM", "Lead created")
+    if body.consent:
+        _add_consent_evidence(s, lead, body.consent, previous=None, now=now)  # RR-12 (b): same evidence as PATCH
     if assigned_to:
         add_system_activity(
             s,
@@ -821,36 +822,22 @@ def withdraw_consent(s: Session, ctx, lead: Lead, channel: str, note: str | None
     return cancelled
 
 
-def record_reconsent(s: Session, lead: Lead, capture) -> None:
-    """Staff re-consent (04 §5.4; DEV-004 as corrected for IR-16).
-
-    * Accepted only when consent was withdrawn, never captured, or is being given for a different published
-      privacy-notice version; re-recording identical consent would only overwrite evidence.
-    * The consent evidence it supersedes is first written to a read-only system activity in the lead timeline
-      (append-only history, visible wherever the lead is), and the full prior row values stay in audit_log.
-    * The new capture carries its own provenance: the staff channel and note, with no web IP or source page.
-    """
-    if capture.policy_version not in settings().published_policy_versions:
+def _require_published(version: str) -> None:
+    if version not in settings().published_policy_versions:
         raise ApiError(422, "UNKNOWN_POLICY_VERSION", "Unknown privacy notice version.")
-    withdrawn = lead.consent_withdrawn_on is not None
-    never_captured = lead.consent_captured_on is None
-    new_version = lead.consent_policy_version != capture.policy_version
-    if not (withdrawn or never_captured or new_version):
-        raise ApiError(409, "INVALID_STATE", "Consent is already recorded for this privacy notice version.")
-    now = db.tx_time(s)
-    previous = (
-        None
-        if never_captured
-        else {
-            "policy_version": lead.consent_policy_version,
-            "channel": lead.consent_channel,
-            "captured_on": clock.to_rfc3339(lead.consent_captured_on),
-            "source_page": lead.consent_source_page,
-            "ip_address_recorded": lead.consent_ip_address is not None,
-            "withdrawn_on": clock.to_rfc3339(lead.consent_withdrawn_on),
-            "withdrawal_channel": lead.consent_withdrawal_channel,
-        }
-    )
+
+
+def policy_rank(version: str | None) -> int:
+    """Publication order of a privacy-notice version (AM-4 rule a, RR-12).
+
+    VEDA_PUBLISHED_POLICY_VERSIONS lists the published notices oldest first. A version that is no longer listed
+    (or none at all) counts as the earliest."""
+    versions = settings().published_policy_versions
+    return versions.index(version) if version in versions else -1
+
+
+def _add_consent_evidence(s: Session, lead: Lead, capture, *, previous: dict | None, now) -> None:
+    """The consent-history entry of the lead timeline: read-only in the API, guarded in the database (0010)."""
     add_system_activity(
         s,
         lead,
@@ -867,6 +854,42 @@ def record_reconsent(s: Session, lead: Lead, capture) -> None:
             },
         },
     )
+
+
+def record_reconsent(s: Session, lead: Lead, capture) -> None:
+    """Staff re-consent (04 §5.4; DEV-004 as corrected for IR-16 and RR-12, AM-4).
+
+    * Accepted when consent was withdrawn or never captured, or for a LATER published privacy-notice version
+      (policy_rank). Re-recording the same version, or going back to an earlier one, would only overwrite
+      evidence: 409 INVALID_STATE. An earlier version is refused even after a withdrawal.
+    * The consent evidence it supersedes, including the withdrawal note, is first written to a consent-history
+      system activity (append-only, guarded in the database), and the full prior row values stay in audit_log.
+    * The new capture carries its own provenance: the staff channel and note, with no web IP or source page.
+    """
+    _require_published(capture.policy_version)
+    withdrawn = lead.consent_withdrawn_on is not None
+    never_captured = lead.consent_captured_on is None
+    recorded, offered = policy_rank(lead.consent_policy_version), policy_rank(capture.policy_version)
+    if not never_captured and offered < recorded:
+        raise ApiError(409, "INVALID_STATE", "Consent is already recorded for a later privacy notice version.")
+    if not (withdrawn or never_captured or offered > recorded):
+        raise ApiError(409, "INVALID_STATE", "Consent is already recorded for this privacy notice version.")
+    now = db.tx_time(s)
+    previous = (
+        None
+        if never_captured
+        else {
+            "policy_version": lead.consent_policy_version,
+            "channel": lead.consent_channel,
+            "captured_on": clock.to_rfc3339(lead.consent_captured_on),
+            "source_page": lead.consent_source_page,
+            "ip_address_recorded": lead.consent_ip_address is not None,
+            "withdrawn_on": clock.to_rfc3339(lead.consent_withdrawn_on),
+            "withdrawal_channel": lead.consent_withdrawal_channel,
+            "withdrawal_note": lead.consent_withdrawal_note,
+        }
+    )
+    _add_consent_evidence(s, lead, capture, previous=previous, now=now)
     lead.consent_contact, lead.consent_policy_version = True, capture.policy_version
     lead.consent_captured_on, lead.consent_channel = now, capture.channel
     lead.consent_source_page = lead.consent_ip_address = None
@@ -901,6 +924,7 @@ PII_PLACEHOLDERS = {
     "message": None,
     "consent_ip_address": None,
     "consent_source_page": None,
+    "consent_withdrawal_note": None,
     "intake_unmapped": None,
 }
 
@@ -916,6 +940,7 @@ def anonymize(s: Session, lead: Lead, *, legal_basis: str, request_ref: str | No
             changed.append(field)
     lead.search_text = repo.fold(" ".join(p for p in (lead.lead_number, lead.public_reference) if p))
     lead.anonymized_on = db.tx_time(s)
+    s.flush()  # the consent-evidence guard (0010) admits the erasure rewrite only once the lead is anonymized
     for note in s.execute(
         sa.select(LeadNote).where(LeadNote.lead_id == lead.id).execution_options(include_deleted=True)
     ).scalars():
@@ -929,6 +954,14 @@ def anonymize(s: Session, lead: Lead, *, legal_basis: str, request_ref: str | No
             act.description = ANONYMIZED
         if act.location:
             act.location = ANONYMIZED
+        meta = act.metadata_ or {}
+        previous = meta.get("previous") if "consent_event" in meta else None
+        if previous and (previous.get("withdrawal_note") or previous.get("source_page")):
+            # Personal text copied into the consent-history snapshot (RR-12 c); the rest of the evidence stays.
+            scrubbed = {**previous, "source_page": None}
+            if previous.get("withdrawal_note"):
+                scrubbed["withdrawal_note"] = ANONYMIZED
+            act.metadata_ = {**meta, "previous": scrubbed}
     write_explicit_audit(
         s,
         entity_type="lead",
