@@ -102,7 +102,7 @@ def test_RR09_custodian_session_cannot_reach_host_credentials(monkeypatch, tmp_p
     methods = [p.METHOD for p in session._session.get_component("credential_provider").providers]
     assert "env" in methods and not set(custodians.HOST_CREDENTIAL_PROVIDERS) & set(methods)
     assert session.get_credentials() is None
-    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ASIAEXAMPLECUSTODIAN")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ASIAEXAMPLECUSTODIAN")  # pragma: allowlist secret (fake)
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "example-secret")  # pragma: allowlist secret
     monkeypatch.setenv("AWS_SESSION_TOKEN", "example-token")
     creds = custodians.custodian_session().get_credentials()
