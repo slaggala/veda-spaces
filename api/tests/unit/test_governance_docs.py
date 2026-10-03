@@ -131,6 +131,15 @@ KNOWN_COMMITS = {
     "fca56da706aa2ad3528d71f8c30dfa46f693cfb7": ("Add staging bootstrap infrastructure as code (AUT-001..003)", "staging bootstrap implementation"),
     "74d0724e1de923ce81db2952bc1a7567cc79b315": ("Remediate AUT-001..003 independent review findings F1-F10", "staging bootstrap first remediation"),
     "e8157f31a9e6df23d79c2b4d79bed896a7b65cb0": ("Close AUT-001..003 final-certification blockers RR-01/02/03/05/07", "staging bootstrap certified with pre-bootstrap conditions"),
+    "af3404c7e27fdf15b5f32a977a5c645237faacdd": ("Merge pull request #3 from slaggala/config/staging-account-813238078849", "PR #3: veda-staging account manifest (PB-01, OD-B2)"),  # pragma: allowlist secret (commit SHA)
+    "5765248b3997eea42ecb7e22eaa219444ba04428": ("Merge pull request #4 from slaggala/security/api-base-image-cve-2026-10", "PR #4: API base image CVEs"),  # pragma: allowlist secret (commit SHA)
+    "100ff8a3cecd5afd41657fc2de7644cf2f910a53": ("Merge pull request #5 from slaggala/fix/auth-rbac-hardening-fc09-fca04-ira04-ira08", "PR #5: FC-09, FC-A04, IR-A04, IR-A08"),  # pragma: allowlist secret (commit SHA)
+    "c6a7fea7ee633941e0362efff3a0071f40e2fb0d": ("Merge pull request #6 from slaggala/fix/archive-fc13-fc14", "PR #6: FC-13, FC-14"),  # pragma: allowlist secret (commit SHA)
+    "72d260a6f9ee4b21e7e8054f931aa5c6e0781dae": ("Merge pull request #7 from slaggala/fix/fc01-verify-every-anchor", "PR #7: FC-01 (code)"),  # pragma: allowlist secret (commit SHA)
+    "24b1a4ab33851d7833dedd516a35ba819eb542ed": ("Merge pull request #8 from slaggala/fix/rr09-break-glass-custodian-identity", "PR #8: RR-09 (code)"),  # pragma: allowlist secret (commit SHA)
+    "7f34261b3251ad28061419a0c5c56ef63c4d6fff": ("Merge pull request #9 from slaggala/fix/rr13-pii-in-tracking", "PR #9: RR-13"),  # pragma: allowlist secret (commit SHA)
+    "35862ae9dd1b1d18d3c2c41969598c629ca17c8f": ("Merge pull request #10 from slaggala/fix/rr12-staff-reconsent", "PR #10: RR-12"),  # pragma: allowlist secret (commit SHA)
+    "a5a59a741bfcb8a3586bd90eb5c1c72e90773916": ("Merge pull request #11 from slaggala/fix/rr18-accessibility-remnants", "PR #11: RR-18"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

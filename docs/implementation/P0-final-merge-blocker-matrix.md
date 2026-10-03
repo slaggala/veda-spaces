@@ -6,6 +6,8 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 
 > Owner-decision ids follow the numbering of the remediation brief; OD-2 and OD-3 were brief instructions; the owner approved both on 2026-09-30: OD-1 = re-review OD-1 + OD-2 (amendments; AM-7 rejected as written), OD-2 = re-review OD-3 (deleted-Founder restore), OD-3 = execution-time revalidation (new, RR-03), OD-4 = re-review OD-4 (TG-01, TG-08), OD-5 = re-review OD-5 (merge = site deploy). Re-review OD-6…OD-8 are unchanged and not decided.
 
+> **Status update 2026-10-03:** RR-09, RR-12, RR-13 and RR-18 and the reconciliation items IR-06, IR-37, IR-A04 and IR-A08 were changed by pull requests #5 to #11 after this matrix was written; their rows say so. Every other row is unchanged. Current status: [P0-release-readiness-report.md](P0-release-readiness-report.md).
+
 ## Findings
 
 | ID | Severity | Status | Merge | Staging | Production | Amendment | Owner decision |
@@ -18,16 +20,16 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 | [RR-06](#rr-06) | MAJOR | RESOLVED IN CODE — STAGING EVIDENCE REQUIRED BEFORE ARCHIVAL IS ENABLED | None | Archival stays disabled until OWNER-INPUT-002 | Staging archival run required | No | No |
 | [RR-07](#rr-07) | MAJOR | RESOLVED IN CODE — ALARM WIRING (RG-5) REQUIRED IN STAGING | None | Alarm acceptance (RG-5) | RG-5 | No | No |
 | [RR-08](#rr-08) | MAJOR | RESOLVED | None | Cleared | Cleared | No | No |
-| [RR-09](#rr-09) | MAJOR | OPEN — PRODUCTION BLOCKER (OWNER DECISION OD-6) | None | Rehearsal | Blocks (PG-BG) | 06 §7.5 wording (minor) | Re-review OD-6 (not decided) |
+| [RR-09](#rr-09) | MAJOR | RESOLVED IN CODE (PR #8) — OWNER DECISION OD-6, OWNER-INPUT-004 AND STAGING REHEARSAL REQUIRED | None | Rehearsal | Blocks (PG-BG) until OD-6, OWNER-INPUT-004 and the staging rehearsal | 06 §7.5 wording (minor) | Re-review OD-6 (custodian credential model) and OWNER-INPUT-004 (not decided) |
 | [RR-10](#rr-10) | MINOR | RESOLVED | None | Cleared | Cleared | No | No |
 | [RR-11](#rr-11) | MINOR | RESOLVED (verified locally; CI and final targeted check pending) | Cleared by the fix | Cleared | Cleared | No | No |
-| [RR-12](#rr-12) | MINOR | OPEN — PRODUCTION BLOCKER | None | None | Blocks | AM-4 | AM-4 option (a)/(b) |
-| [RR-13](#rr-13) | MINOR | OPEN — PRODUCTION BLOCKER | None | None | Blocks | AM-10 | Re-review OD-7 |
+| [RR-12](#rr-12) | MINOR | RESOLVED (PR #10) — OWNER CONFIRMATION OF AM-4 OPTION (a) REQUIRED | None | None | Cleared in code; AM-4 option (a) confirmation before production | AM-4 | AM-4: confirm option (a) and the earlier-version rule |
+| [RR-13](#rr-13) | MINOR | RESOLVED IN CODE (PR #9) — AM-10 STAGING CHECK REQUIRED | None | None | Cleared in code; AM-10 staging check before production | AM-10 | AM-10 (deferred to staging / production) |
 | [RR-14](#rr-14) | MINOR | RESOLVED IN CODE — STAGING DEPLOY EVIDENCE REQUIRED | None | Staging deploy evidence | Cleared after staging | No | No |
 | [RR-15](#rr-15) | MINOR | OPEN — STAGING BLOCKER | None | Blocks (RG-1, RG-2) | Blocks | No | No |
 | [RR-16](#rr-16) | MINOR | RESOLVED | None | Cleared | Cleared | No | No |
 | [RR-17](#rr-17) | MINOR | RESOLVED IN CODE AND DOCUMENTATION — RG-7 REHEARSAL REQUIRED | None | RG-7 rehearsal | Blocks until RG-7 | AM-6, AM-11 | OD-1 (AM-6, AM-11) |
-| [RR-18](#rr-18) | MINOR | OPEN — PRODUCTION BLOCKER | None | None | Blocks | No | No |
+| [RR-18](#rr-18) | MINOR | RESOLVED IN CODE (PR #11) — MANUAL SCREEN-READER RUN REQUIRED (OI-RM-5) | None | None | Cleared in code; OI-RM-5 manual run before production | No | No |
 
 ### RR-01
 
@@ -199,17 +201,17 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 |---|---|
 | Evidence (re-review) | api/veda/platform/rbac/custodians.py:22-25 — default boto3 credential chain; api/deploy/deploy.sh:24-35 and docs/operations/api-runbooks.md:94-95 — CLI run inside the api container; N06: instance-role ARN → 403 not a registered custodian; no credentials → uncaught NoCredentialsError |
 | Root cause | Default boto3 credential chain inside the container sees the instance role; NoCredentialsError uncaught. |
-| Files changed | — |
+| Files changed | api/veda/platform/rbac/custodians.py; api/tests/integration/test_break_glass_identity.py; docs/operations/api-runbooks.md |
 | Requirements affected | RBAC-021; 06 §7.5 items 2 and 4; PG-BG |
-| Remediation | Not changed in this workstream: needs the custodian credential model (re-review OD-6 / OWNER-INPUT-004) and a staging rehearsal with CloudTrail. |
-| Regression tests | — |
+| Remediation | 2026-10-03, PR #8 (merge `24b1a4a`): the CLI resolves the caller from STS using only credentials the custodian brought (instance-metadata and container-role providers disabled); a host instance-role session is refused even if listed; missing, expired or unusable credentials are refused with a BREAK_GLASS_* FAILURE event. The credential model is documented as the OD-6 proposal (runbook §7). |
+| Regression tests | api/tests/integration/test_break_glass_identity.py |
 | Amendment needed | 06 §7.5 wording (minor) |
-| Owner decision | Re-review OD-6 (not decided) |
+| Owner decision | Re-review OD-6 (custodian credential model) and OWNER-INPUT-004 (not decided) |
 | Re-review blocking scope | production (PG-BG) |
 | Merge impact | None |
 | Staging impact | Rehearsal |
-| Production impact | Blocks (PG-BG) |
-| Status | OPEN — PRODUCTION BLOCKER (OWNER DECISION OD-6) |
+| Production impact | Blocks (PG-BG) until OD-6, OWNER-INPUT-004 and the staging rehearsal |
+| Status | RESOLVED IN CODE (PR #8) — OWNER DECISION OD-6, OWNER-INPUT-004 AND STAGING REHEARSAL REQUIRED |
 
 ### RR-10
 
@@ -259,17 +261,17 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 |---|---|
 | Evidence (re-review) | api/veda/modules/crm/leads/service.py:837, 552-556 |
 | Root cause | DEV-004 residuals. |
-| Files changed | — |
+| Files changed | api/migrations/versions/0010_consent_evidence_guard.py; api/veda/kernel/migration_support.py; api/veda/modules/crm/leads/service.py; api/veda/modules/crm/leads/schemas.py; api/veda/kernel/audit_registry.py; api/veda/config.py; api/tests/integration/test_consent_rr12.py |
 | Requirements affected | LEAD-012; LEAD-027 |
-| Remediation | Not changed; AM-4 now states the target behaviour and the gap explicitly. |
-| Regression tests | — |
+| Remediation | 2026-10-03, PR #10 (merge `35862ae`): AM-4 rules (a)–(d). (a) later-version ordering from VEDA_PUBLISHED_POLICY_VERSIONS; (b) create-time staff consent requires a note and writes the CAPTURED activity; (c) withdrawal note in the snapshot; (d) option (a): database guard on consent-history activities with the erasure exemption (0010, triggers only, both engines). Erasure now also covers the withdrawal note. |
+| Regression tests | api/tests/integration/test_consent_rr12.py; api/tests/integration/test_consent_dev004.py |
 | Amendment needed | AM-4 |
-| Owner decision | AM-4 option (a)/(b) |
+| Owner decision | AM-4: confirm option (a) and the earlier-version rule |
 | Re-review blocking scope | production |
 | Merge impact | None |
 | Staging impact | None |
-| Production impact | Blocks |
-| Status | OPEN — PRODUCTION BLOCKER |
+| Production impact | Cleared in code; AM-4 option (a) confirmation before production |
+| Status | RESOLVED (PR #10) — OWNER CONFIRMATION OF AM-4 OPTION (a) REQUIRED |
 
 ### RR-13
 
@@ -279,17 +281,17 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 |---|---|
 | Evidence (re-review) | api/veda/app.py:117-125 (traces_sample_rate with before_send only); api/veda/platform/notifications/worker.py:119 |
 | Root cause | Sentry transactions and outbox last_error carry PII. |
-| Files changed | — |
+| Files changed | api/veda/kernel/logging.py; api/veda/app.py; api/veda/platform/notifications/worker.py; app/src/core/telemetry/telemetry.ts; api/tests/integration/test_pii_tracking.py; app/test/telemetry.test.ts |
 | Requirements affected | LOG-003; SEC-009 |
-| Remediation | Not changed; folded into AM-10 decision scope. |
-| Regression tests | — |
+| Remediation | 2026-10-03, PR #9 (merge `7f34261`): Sentry transactions, spans and errors are scrubbed of query strings, URL-encoded values, headers and messages (before_send, before_send_transaction, before_send_span; send_default_pii off); outbox_event.last_error stores the error type and a fingerprint only. |
+| Regression tests | api/tests/integration/test_pii_tracking.py; app/test/telemetry.test.ts |
 | Amendment needed | AM-10 |
-| Owner decision | Re-review OD-7 |
+| Owner decision | AM-10 (deferred to staging / production) |
 | Re-review blocking scope | production |
 | Merge impact | None |
 | Staging impact | None |
-| Production impact | Blocks |
-| Status | OPEN — PRODUCTION BLOCKER |
+| Production impact | Cleared in code; AM-10 staging check before production |
+| Status | RESOLVED IN CODE (PR #9) — AM-10 STAGING CHECK REQUIRED |
 
 ### RR-14
 
@@ -379,17 +381,17 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 |---|---|
 | Evidence (re-review) | app/src/modules/auth/step-up-dialog.ts:71; command-palette.ts:79-80; design-system/components.ts:375-380; shell/app.ts:200-208 |
 | Root cause | Accessibility remnants in the SPA. |
-| Files changed | — |
+| Files changed | app/src/design-system/components.ts; app/src/shell/command-palette.ts; app/src/shell/account-menu.ts; app/src/shell/app.ts; app/src/shell/step-up-dialog.ts; api/veda/platform/auth/request_auth.py; app/test/a11y.test.ts; app/e2e/axe.e2e.mjs; api/tests/integration/test_step_up_expiry.py |
 | Requirements affected | UI-011; UI-016 (AX-06, AX-07, AX-09) |
-| Remediation | Not changed. |
-| Regression tests | — |
+| Remediation | 2026-10-03, PR #11 (merge `a5a59a7`): vs-tabs owns its tabpanel (ID references resolve in one shadow root); command palette is a WAI-ARIA combobox with a listbox popup; account menu closes on outside press, focus loss and Escape; step-up dialog states, warns and enforces expiry and announces attempts left. |
+| Regression tests | app/test/a11y.test.ts; app/e2e/axe.e2e.mjs; api/tests/integration/test_step_up_expiry.py |
 | Amendment needed | No |
 | Owner decision | No |
 | Re-review blocking scope | production |
 | Merge impact | None |
 | Staging impact | None |
-| Production impact | Blocks |
-| Status | OPEN — PRODUCTION BLOCKER |
+| Production impact | Cleared in code; OI-RM-5 manual run before production |
+| Status | RESOLVED IN CODE (PR #11) — MANUAL SCREEN-READER RUN REQUIRED (OI-RM-5) |
 
 ## Advisories (RR-A01…RR-A25)
 
@@ -426,7 +428,7 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 | ID | Original severity | Status now | Re-review conclusion | Change in this workstream |
 |---|---|---|---|---|
 | IR-03 | MAJOR | CODE RESOLVED (RR-05/06/07); STAGING S3 EVIDENCE REQUIRED | See RR-05, RR-06, RR-07; S3 behaviour unexecuted | Not changed in this workstream. |
-| IR-06 | MAJOR | ACCEPTABLY GATED FOR STAGING (unchanged) | Self-assertion closed; but in the deployed container topology STS sees the instance role (RR-09) | Not changed in this workstream. |
+| IR-06 | MAJOR | RESOLVED IN CODE (RR-09, PR #8) — STAGING REHEARSAL REQUIRED (PG-BG) | Self-assertion closed; but in the deployed container topology STS sees the instance role (RR-09) | Changed after this workstream: PR #8. |
 | IR-08 | MAJOR | RESOLVED BY RR-02 | IR-08 itself fixed; deleted Founders keep role/protection and one Founder can restore them (RR-02) | Deleted Founders are restored only by the dual-control workflow. |
 | IR-11 | MAJOR | PARTIALLY RESOLVED (RR-14 fixed; RR-15 open) | Artefacts exist; off-host replica never verified; snapshot dir ephemeral | Not changed in this workstream. |
 | IR-12 | MAJOR | CODE RESOLVED (RR-07); RG-5 REQUIRED | See RR-07 | Not changed in this workstream. |
@@ -437,15 +439,15 @@ Targeted re-review: review/p0-independent-implementation-review @ 15d25a759cfc03
 | IR-32 | MINOR | RESOLVED BY RR-01 | CSP sub-item regressed the live 404 page | 404 styles external; site CSP unchanged. |
 | IR-33 | MINOR | ACCEPTABLY GATED FOR PRODUCTION (unchanged) | Tracked | Not changed in this workstream. |
 | IR-34 | MINOR | NOT RESOLVED (unchanged) | Tracked, non-blocking | Not changed in this workstream. |
-| IR-37 | MINOR | PARTIALLY RESOLVED (unchanged) | Author matrix overstates as RESOLVED (RR-18) | Not changed in this workstream. |
+| IR-37 | MINOR | RESOLVED IN CODE (RR-18, PR #11) — MANUAL SCREEN-READER RUN REQUIRED | Author matrix overstates as RESOLVED (RR-18) | Changed after this workstream: PR #11. |
 | IR-38 | MINOR | PARTIALLY RESOLVED (unchanged) | RR-A19 | Not changed in this workstream. |
 | IR-A01 | ADVISORY | ACCEPTABLY GATED FOR PRODUCTION (unchanged) | — | Not changed in this workstream. |
 | IR-A02 | ADVISORY | NOT RESOLVED (unchanged) | Accepted residual | Not changed in this workstream. |
-| IR-A04 | ADVISORY | PARTIALLY RESOLVED (unchanged) | No practical impact | Not changed in this workstream. |
+| IR-A04 | ADVISORY | RESOLVED (PR #5) | No practical impact | Changed after this workstream: PR #5. |
 | IR-A05 | ADVISORY | RESOLVED | Latent | Startup refuses optional-auth or public routes that declare a permission, and unregistered public/optional routes (api/tests/unit/test_lint.py::test_IRA05_optional_and_public_routes_cannot_hide_a_permission). |
 | IR-A06 | ADVISORY | NOT RESOLVED (unchanged) | Owner decision | Not changed in this workstream. |
 | IR-A07 | ADVISORY | PARTIALLY RESOLVED (unchanged) | Decision: KEEP 403/404 DIFFERENCE (§9) | Not changed in this workstream. |
-| IR-A08 | ADVISORY | NOT RESOLVED (unchanged) | — | Not changed in this workstream. |
+| IR-A08 | ADVISORY | RESOLVED (PR #5) | — | Changed after this workstream: PR #5. |
 | IR-A10 | ADVISORY | ACCEPTABLY GATED FOR STAGING (unchanged) | — | Not changed in this workstream. |
 | IR-A11 | ADVISORY | NOT RESOLVED (unchanged) | Owner decision | Not changed in this workstream. |
 | IR-A12 | ADVISORY | NOT RESOLVED (unchanged) | Accepted as correlation-only | Not changed in this workstream. |
