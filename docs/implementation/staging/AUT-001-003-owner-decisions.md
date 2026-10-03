@@ -36,8 +36,13 @@ created through Organizations (root email `interiors+veda-staging@vedaspaces.com
 assume `bootstrap-owner` with MFA; role `bootstrap-owner` (path `/`, one-hour sessions, trusted only by
 `bootstrap-operator` with MFA, `AdministratorAccess`). No Veda infrastructure was created.
 
-## Values the owner still has to commit (PB-01)
+## Values the owner had to commit (PB-01)
 
 `account_id`, `account_name`, `account_alias` (required) and `bootstrap_principal_arns` in
 `infra/config/staging-account.json`, through a reviewed pull request. `infra/scripts/check-manifest.sh --complete`
-must pass. These are not secrets, but only the owner knows them.
+must pass. These are not secrets, but only the owner knows them. **Done in PR #3** (2026-10-02).
+
+## Decisions of 2026-10-03
+
+RD-04 (independent review of the pre-bootstrap closure) **waived**, and the first controlled bootstrap **authorized**:
+see [AUT-002-bootstrap-authorization.md](AUT-002-bootstrap-authorization.md).

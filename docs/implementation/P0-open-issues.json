@@ -3499,11 +3499,11 @@
       "staging_impact": "Blocks (bootstrap)",
       "production_impact": "None",
       "acceptance_criteria": "bootstrap-operator has one virtual MFA device; credentials are temporary or rotated immediately after the run; assume-role with MFA and the session policy succeeds and a us-east-1 read is denied",
-      "evidence_required": "iam list-mfa-devices / list-access-keys read-back; the bootstrap run's region-guard proof",
+      "evidence_required": "Owner attestation recorded in docs/implementation/staging/AUT-002-bootstrap-authorization.md §3; enforced at the run by the bootstrap-owner trust (MFA required)",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "target_phase": "Staging",
-      "status": "OPEN — OWNER ACTION BEFORE BOOTSTRAP"
+      "status": "RESOLVED — MFA ENABLED (OWNER ATTESTATION 2026-10-03); TEMPORARY KEY ON THE RUN DAY ONLY"
     },
     {
       "id": "RD-04",
@@ -3516,11 +3516,11 @@
       "staging_impact": "Blocks (bootstrap)",
       "production_impact": "None",
       "acceptance_criteria": "An independent review of the closure and member-account changes is recorded, or the owner records an explicit waiver",
-      "evidence_required": "Review verdict or owner waiver in docs/implementation/staging/",
+      "evidence_required": "Waiver and rationale: docs/implementation/staging/AUT-002-bootstrap-authorization.md §1",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "target_phase": "Staging",
-      "status": "OPEN — OWNER DECISION REQUIRED"
+      "status": "WAIVED BY THE OWNER (2026-10-03)"
     },
     {
       "id": "RD-05",
