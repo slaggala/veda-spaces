@@ -726,9 +726,11 @@ def reset_password(s: Session, raw: str, new_password: str) -> None:
         tok.used_on = db.tx_time(s)
         throttle.clear_account(user.id)
         revoke_all_sessions(s, user.id, "PASSWORD_RESET")
-        # Challenges and enrollment transactions opened with the old password end with it (IR-A04).
+        # Challenges and enrollment transactions opened with the old password end with it (IR-A04), and so do the
+        # emailed links still outstanding for the account: MFA enrollment (path C) and any other reset link.
         invalidate_challenges(s, user.id)
         invalidate_enrollment(s, user.id)
+        invalidate_action_tokens(s, user.id, ("MFA_ENROLLMENT", "PASSWORD_RESET"))
         security_events.record(s, "PASSWORD_RESET_COMPLETED", "SUCCESS", subject_user_id=user.id)
         outbox.enqueue(s, "auth.password_changed", "app_user", user.id, user_id=user.id)
 
@@ -812,8 +814,31 @@ def reauth(s: Session, ctx: AuthContext, password: str) -> None:
 # --- invitation (05 §8.4) ------------------------------------------------------------------
 
 
+def invite_expires_on(s: Session, tok: UserActionToken) -> datetime:
+    """When an invitation actually expires (FC-09, 05 §8.4).
+
+    An invitation that would grant a sensitive permission lives 24 h, whatever lifetime it was issued with. The
+    rule is evaluated against the invitee's grants when the link is used, so a role, direct permission or role
+    grant added after the link was sent shortens it too: no escalation path can keep a 72 h privileged link.
+    """
+    if resolver.is_privileged(s, tok.user_id):
+        return min(tok.expires_on, tok.created_on + TOKEN_TTLS["INVITE_SENSITIVE"])
+    return tok.expires_on
+
+
 def accept_invite(s: Session, raw: str, new_password: str, full_name: str | None) -> dict | None:
     tok = consume_action_token(s, raw, "INVITE", "INVITE_TOKEN_INVALID")
+    if invite_expires_on(s, tok) <= db.tx_time(s):
+        security_events.defer(
+            "INVITE_ACCEPTED",
+            "FAILURE",
+            subject_user_id=tok.user_id,
+            failure_reason="TOKEN_EXPIRED",
+            detail={"stage": "link", "reason": "PRIVILEGED_INVITE_LIFETIME"},
+            dedupe_key=f"tok:INVITE:{sha256_hex(raw)[:16]}",
+            dedupe_seconds=300,
+        )
+        raise ApiError(400, "INVITE_TOKEN_INVALID", "This invitation has expired or was already used.")
     user = s.get(User, tok.user_id)
     if user is None or user.status != "INVITED":
         raise ApiError(400, "INVITE_TOKEN_INVALID", "This invitation has expired or was already used.")
