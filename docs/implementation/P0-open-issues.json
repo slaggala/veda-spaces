@@ -3482,11 +3482,11 @@
       "staging_impact": "Blocks (before AUT-301)",
       "production_impact": "None",
       "acceptance_criteria": "An infra job in ci.yml runs make -C infra check on every pull request and is a required status check on main",
-      "evidence_required": "ci.yml job and branch-protection read-back",
+      "evidence_required": "ci.yml job 'infra' (install-tools.sh, bootstrap prerequisites, make -C infra check); infra/tests/run.sh RD-02 section (47 checks); branch-protection read-back listing 'infra' (github-setup.sh --verify)",
       "failure_behavior": "Stays open and keeps its blocking scope; the stage it blocks does not proceed.",
       "residual": "",
       "target_phase": "Staging",
-      "status": "OPEN — STAGING (CI gate integrity)"
+      "status": "RESOLVED IN CODE — REQUIRED CHECK TO BE ENABLED ON MAIN"
     },
     {
       "id": "RD-03",

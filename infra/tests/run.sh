@@ -24,7 +24,9 @@ LIVE_KEY_POLICY='{"Version":"2012-10-17","Statement":[{"Sid":"DenyBootstrapState
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export PATH="$HERE/stubs:$PATH"
-unset GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_SHA
+# The scripts read the run's identity from the Actions environment (GITHUB_WORKFLOW_REF, GITHUB_RUN_ID, …). Clear
+# all of it, so the tests see a local run whether they run on a workstation or inside a CI job (RD-02).
+while IFS= read -r v; do unset "$v"; done < <(compgen -e | grep -E '^(GITHUB_|RUNNER_|ACTIONS_)|^CI$')
 export AWS_REGION=ap-south-1
 
 PASS=0
@@ -144,9 +146,9 @@ gh_compliant() {
       >"$d/repos_example-org_veda-spaces_environments_$env.json"
     echo '{"branch_policies":[{"name":"main","type":"branch"}]}' >"$d/repos_example-org_veda-spaces_environments_${env}_deployment-branch-policies.json"
   done
-  echo '{"name":"main","protected":true}' >"$d/repos_example-org_veda-spaces_branches_main.json"
+  echo '{"name":"main","protected":true,"protection":{"enabled":true,"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]}}}' >"$d/repos_example-org_veda-spaces_branches_main.json"
   echo '{"id":424242,"full_name":"example-org/veda-spaces","private":true}' >"$d/repos_example-org_veda-spaces.json"
-  echo '{"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
+  echo '{"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
     >"$d/repos_example-org_veda-spaces_branches_main_protection.json"
   echo "$d"
 }
@@ -456,7 +458,7 @@ for env in bootstrap staging-plan staging-infra staging staging-evidence; do
     >"$V/repos_example-org_veda-spaces_environments_$env.json"
   echo '{"branch_policies":[{"name":"main","type":"branch"}]}' >"$V/repos_example-org_veda-spaces_environments_${env}_deployment-branch-policies.json"
 done
-echo '{"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
+echo '{"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
   >"$V/repos_example-org_veda-spaces_branches_main_protection.json"
 verify() { GH_STUB_DIR="$1" "$GS" --repo example-org/veda-spaces --verify; }
 check "F10 compliant repository verifies" ok "match the bootstrap rules" -- verify "$V"
@@ -1027,14 +1029,124 @@ GS="$T/infra/scripts/github-setup.sh"
 Gp="$TMP/gh.prot" && mkdir -p "$Gp"
 echo '{"login":"owner"}' >"$Gp/user.json"
 echo '{"id":1001}' >"$Gp/users_owner.json"
-echo '{"required_status_checks":{"strict":true,"checks":[{"context":"app","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
+echo '{"required_status_checks":{"strict":true,"checks":[{"context":"app","app_id":15368},{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
   >"$Gp/repos_example-org_veda-spaces_branches_main_protection.json"
 out_p="$(GH_STUB_DIR="$Gp" "$GS" --repo example-org/veda-spaces 2>&1)"
 check "PB-03 compliant main protection is left unchanged" ok "already meets the rules; left unchanged" -- printf '%s\n' "$out_p"
 absent "  ... no protection write at all" "branches/main/protection <<<" "$out_p"
 jq '.enforce_admins.enabled = false' "$Gp/repos_example-org_veda-spaces_branches_main_protection.json" >"$Gp/x" && mv "$Gp/x" "$Gp/repos_example-org_veda-spaces_branches_main_protection.json"
 out_p="$(GH_STUB_DIR="$Gp" "$GS" --repo example-org/veda-spaces 2>&1)"
-check "PB-03 non-compliant protection is fixed with its required status checks kept" ok 'branches/main/protection <<< .*"required_status_checks":\{"strict":true,"checks":\[\{"context":"app","app_id":15368\}\]\}.*"enforce_admins":true' -- printf '%s\n' "$out_p"
+check "PB-03 non-compliant protection is fixed with its required status checks kept" ok 'branches/main/protection <<< .*"required_status_checks":\{"strict":true,"checks":\[.*\{"context":"app","app_id":15368\}.*\{"context":"infra","app_id":15368\}.*\]\}.*"enforce_admins":true' -- printf '%s\n' "$out_p"
+echo "== RD-02: infrastructure checks run in CI, block the merge and use the pinned tools"
+absent "RD-02 the tests run without the CI job's Actions environment (no run identity leaks in)" "^(GITHUB_|RUNNER_|ACTIONS_)|^CI=" "$(env)"
+CI="$INFRA/../.github/workflows/ci.yml"
+CIT="$(cat "$CI")"
+INFRA_JOB="$(awk '/^  infra:/{p=1; print; next} p && /^  [a-z0-9-]+:$/{p=0} p' "$CI")"
+check "RD-02 ci.yml has an infra job" ok "^  infra:" -- printf '%s\n' "$INFRA_JOB"
+check "RD-02 the job installs the pinned tools" ok "run: infra/scripts/install-tools.sh$" -- printf '%s\n' "$INFRA_JOB"
+check "RD-02 the job runs make -C infra check" ok "run: make -C infra check$" -- printf '%s\n' "$INFRA_JOB"
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "RD-02 the job verifies the bootstrap prerequisites (environments, main, required checks)" ok 'github-setup.sh --repo "\$GITHUB_REPOSITORY" --verify-environments' -- printf '%s\n' "$INFRA_JOB"
+check "RD-02 the job checks the approved repository by name and ID" ok 'GITHUB_REPOSITORY_ID" == "\$\(jq -r .repository_id' -- printf '%s\n' "$INFRA_JOB"
+check "RD-02 the checkout keeps no credentials" ok "persist-credentials: false" -- printf '%s\n' "$INFRA_JOB"
+absent "RD-02 no secret, OIDC token or AWS action in the job" 'secrets\.|id-token|aws-actions|AWS_ROLE' "$INFRA_JOB"
+absent "RD-02 no path filter on pull_request (a skipped required check blocks every merge)" '^    paths' "$CIT"
+absent "RD-02 every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$CIT"
+
+# The required checks github-setup.sh enforces are exactly the contexts ci.yml reports (a renamed job would
+# otherwise stop being required, or block every merge waiting for a check that never runs).
+ci_contexts() {
+  python3 - "$CI" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read().split("\njobs:\n", 1)[1]
+for block in re.split(r"\n(?=  [a-z0-9-]+:\n)", "\n" + text):
+    m = re.match(r"\n?  ([a-z0-9-]+):\n", block)
+    if not m:
+        continue
+    name = re.search(r"^    name: (.+)$", block, re.M)
+    name = name.group(1).strip() if name else m.group(1)
+    engines = re.search(r"engine: \[([^\]]+)\]", block)
+    if "${{ matrix.engine }}" in name and engines:
+        for e in engines.group(1).split(","):
+            print(name.replace("${{ matrix.engine }}", e.strip()))
+    else:
+        print(name)
+PY
+}
+required_checks() { bash -c 'eval "$(grep "^REQUIRED_CHECKS=" "$0")"; printf "%s\n" "${REQUIRED_CHECKS[@]}"' "$INFRA/scripts/github-setup.sh"; }
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "RD-02 required checks = ci.yml job contexts" ok "^same$" -- bash -c '[[ "$(sort <<<"$1")" == "$(sort <<<"$2")" ]] && echo same || { echo "ci.yml:"; echo "$1"; echo "required:"; echo "$2"; }' _ "$(ci_contexts)" "$(required_checks)"
+check "RD-02 infra is a required check" ok "^infra$" -- required_checks
+
+T="$(new_tree)"
+GS="$T/infra/scripts/github-setup.sh"
+check "RD-02 missing required check detected by --verify" fail "main: required status check 'infra' missing" -- verify "$(drift r branches_main_protection '.required_status_checks.contexts -= ["infra"] | .required_status_checks.checks |= map(select(.context != "infra"))')"
+check "RD-02 missing required check detected by --verify-environments (workflow token)" fail "main: required status check 'infra' missing" -- venv "$(gh_drift branches_main '.protection.required_status_checks.contexts -= ["infra"] | .protection.required_status_checks.checks |= map(select(.context != "infra"))')"
+check "RD-02 renamed job detected (its context is never required)" fail "main: required status check 'browser e2e \+ axe' missing" -- venv "$(gh_drift branches_main '.protection.required_status_checks.contexts |= map(if . == "browser e2e + axe" then "e2e" else . end) | .protection.required_status_checks.checks |= map(if .context == "browser e2e + axe" then .context = "e2e" else . end)')"
+check "RD-02 compliant protection with every required check verifies" ok "match the bootstrap rules" -- venv "$GHV"
+
+Gm="$TMP/gh.missing" && mkdir -p "$Gm"
+echo '{"login":"owner"}' >"$Gm/user.json"
+echo '{"id":1001}' >"$Gm/users_owner.json"
+jq '.required_status_checks.checks |= map(select(.context != "infra")) | .required_status_checks.contexts -= ["infra"] | .required_status_checks.checks[0].app_id = 999' \
+  "$GHV/repos_example-org_veda-spaces_branches_main_protection.json" >"$Gm/repos_example-org_veda-spaces_branches_main_protection.json"
+out_m="$(GH_STUB_DIR="$Gm" "$GS" --repo example-org/veda-spaces 2>&1)"
+check "RD-02 the missing check is added to a compliant protection (dry run)" ok 'adding the missing required status checks: infra' -- printf '%s\n' "$out_m"
+check "  ... through the required-status-checks endpoint, bound to the GitHub Actions app" ok 'PATCH repos/example-org/veda-spaces/branches/main/protection/required_status_checks <<< .*\{"context":"infra","app_id":15368\}' -- printf '%s\n' "$out_m"
+check "  ... keeping every existing check and its app id" ok '\{"context":"api \(sqlite\)","app_id":999\}' -- printf '%s\n' "$out_m"
+absent "  ... without rewriting the whole protection" "-X PUT repos/example-org/veda-spaces/branches/main/protection <<<" "$out_m"
+absent "  ... and the dry run writes nothing" "-X (PUT|POST|PATCH)" "$(cat "$Gm/calls.log")"
+
+echo "== RD-02: pinned tools, verified downloads, reproducible versions"
+LOCKF="$INFRA/tools/tools.lock"
+for t in terraform tflint shellcheck actionlint; do
+  for plat in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64"; do
+    check "RD-02 $t pinned for ${plat/ //} with a SHA-256 and an https URL" ok "^$t +[0-9.]+ +${plat/ / +} +[0-9a-f]{64} +https://" -- grep -E "^$t " "$LOCKF"
+  done
+done
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "RD-02 terraform pin = the 00-bootstrap workflow's terraform_version" ok "^same$" -- bash -c '[[ "$(awk "\$1==\"terraform\"{print \$2; exit}" "$0")" == "$(sed -nE "s/^ *terraform_version: ([0-9.]+)$/\1/p" "$1")" ]] && echo same' "$LOCKF" "$INFRA/../.github/workflows/00-bootstrap.yml"
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "RD-02 checkov pin = requirements-checkov.txt" ok "^same$" -- bash -c '[[ "checkov==$(awk "\$1==\"checkov\"{print \$2}" "$0")" == "$(grep -oE "^checkov==[0-9.]+" "$1")" ]] && echo same' "$LOCKF" "$INFRA/tools/requirements-checkov.txt"
+check "RD-02 every checkov requirement is hash-locked" ok "^all hashed$" -- python3 -c '
+import re, sys
+reqs = re.split(r"\n(?=[a-z0-9])", open(sys.argv[1]).read().split("\n\n", 1)[-1] if False else open(sys.argv[1]).read())
+pins = [r for r in reqs if re.match(r"^[A-Za-z0-9_.-]+==", r)]
+bad = [r.split()[0] for r in pins if "--hash=sha256:" not in r]
+print("all hashed" if pins and not bad else f"unhashed: {bad}")' "$INFRA/tools/requirements-checkov.txt"
+check "RD-02 make check verifies tool versions and the bootstrap prerequisites first" ok "^check: tool-versions prerequisites " -- grep -E "^check:" "$INFRA/Makefile"
+check "RD-02 prerequisites require a complete manifest" ok "check-manifest.sh --complete" -- awk '/^prerequisites:/{p=1;next} /^[a-z-]+:/{p=0} p' "$INFRA/Makefile"
+check "RD-02 actionlint covers every workflow, not only 00-bootstrap" ok '^WORKFLOWS +:= \$\(wildcard \.\./\.github/workflows/\*\.yml\)$' -- grep -E "^WORKFLOWS" "$INFRA/Makefile"
+
+T="$(new_tree)" && cp -R "$INFRA/tools" "$T/infra/tools"
+IT="$T/infra/scripts/install-tools.sh"
+fake_tools() { # fake_tools <dir> <terraform version>: tools on PATH that report the given versions
+  local d="$1/bin"
+  mkdir -p "$d"
+  printf '#!/bin/sh\necho "{\\"terraform_version\\":\\"%s\\"}"\n' "$2" >"$d/terraform"
+  printf '#!/bin/sh\necho "TFLint version 0.64.0"\necho "+ ruleset.aws (0.49.0)"\n' >"$d/tflint"
+  printf '#!/bin/sh\necho "ShellCheck - shell script analysis tool"\necho "version: 0.11.0"\n' >"$d/shellcheck"
+  printf '#!/bin/sh\necho "1.7.12"\necho "installed by downloading from release page"\n' >"$d/actionlint"
+  printf '#!/bin/sh\necho "3.3.21"\n' >"$d/checkov"
+  chmod +x "$d"/*
+}
+F="$TMP/tools.ok" && fake_tools "$F" 1.16.4
+check "RD-02 pinned versions verify" ok "every infra check tool is the pinned version" -- "$IT" --verify --dir "$F"
+F="$TMP/tools.old" && fake_tools "$F" 1.16.3
+check "RD-02 another terraform version is refused" fail "terraform: 1.16.3 installed, 1.16.4 pinned" -- "$IT" --verify --dir "$F"
+F="$TMP/tools.none" && fake_tools "$F" 1.16.4 && rm "$F/bin/checkov"
+check "RD-02 a missing tool is refused" fail "checkov: not installed \(want 3.3.21\)" -- env PATH="$F/bin:$HERE/stubs:/usr/bin:/bin" "$IT" --verify --dir "$F"
+
+# A download whose digest differs from the lock is refused and nothing is installed from it.
+CS="$TMP/curl.stub" && mkdir -p "$CS"
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = "-o" ] && { echo tampered >"$2"; shift; }; shift; done\n' >"$CS/curl"
+chmod +x "$CS/curl"
+D="$TMP/tools.tampered"
+check "RD-02 a download with the wrong SHA-256 is refused" fail "does not match the pinned" -- env PATH="$CS:$PATH" TF_STUB_DIR="$TMP" "$IT" --dir "$D"
+# shellcheck disable=SC2016 # $0 belongs to the inner shell
+check "  ... and nothing is installed from it" ok "^absent$" -- bash -c '[[ ! -e "$0/bin/terraform" ]] && echo absent' "$D"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then

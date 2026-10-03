@@ -1,31 +1,48 @@
 # Veda staging infrastructure (AUT-001). Run from the repository root with `make -C infra <target>`.
 # Tools can be overridden, e.g. `make -C infra check TERRAFORM=/path/to/terraform`.
+# `make -C infra tools` installs the pinned versions (infra/tools/tools.lock, SHA-256 verified) into infra/.tools;
+# they come first on PATH. `check` refuses to run with any other version (RD-02), so a pass in CI is reproducible on
+# a clean workstation.
 #
 # Static checks never touch AWS. Only bootstrap-plan / bootstrap-apply / discover need AWS credentials, and
 # they refuse any account other than EXPECTED_ACCOUNT_ID.
 
 SHELL      := /bin/bash
-TERRAFORM  ?= terraform
-TFLINT     ?= tflint
-CHECKOV    ?= checkov
-SHELLCHECK ?= shellcheck
-ACTIONLINT ?= actionlint
+TOOLS_DIR  ?= $(CURDIR)/.tools
+# The pinned tool when it is installed, else the one on PATH (tool-versions then refuses any other version). Named
+# explicitly because make may run a simple recipe without a shell, using the PATH it started with.
+export PATH := $(TOOLS_DIR)/bin:$(PATH)
+tool = $(firstword $(wildcard $(TOOLS_DIR)/bin/$(1)) $(1))
+TERRAFORM  ?= $(call tool,terraform)
+TFLINT     ?= $(call tool,tflint)
+CHECKOV    ?= $(call tool,checkov)
+SHELLCHECK ?= $(call tool,shellcheck)
+ACTIONLINT ?= $(call tool,actionlint)
 
 ROOTS      := terraform/bootstrap
 SCRIPTS    := $(wildcard scripts/*.sh)
-WORKFLOWS  := $(wildcard ../.github/workflows/0*.yml)
+WORKFLOWS  := $(wildcard ../.github/workflows/*.yml)
 
 # Offline checks run with credentials disabled so they can never reach an AWS account by accident.
 OFFLINE_ENV := AWS_PROFILE= AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= AWS_SESSION_TOKEN= \
                AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true
 
-.PHONY: help check manifest-check inventory fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
+.PHONY: help check tools tool-versions prerequisites manifest-check inventory fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
         discover bootstrap-plan bootstrap-apply github-environments github-verify github-variables clean
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-22s %s\n", $$1, $$2}'
 
-check: manifest-check fmt-check validate test test-scripts lint ## All offline checks (no AWS access)
+check: tool-versions prerequisites fmt-check validate test test-scripts lint ## All offline checks (no AWS access)
+
+tools: ## Install the pinned check tools into infra/.tools (SHA-256 verified; no AWS access)
+	scripts/install-tools.sh --dir $(TOOLS_DIR)
+
+tool-versions: ## Fail unless every check tool on PATH is the pinned version
+	scripts/install-tools.sh --verify --dir $(TOOLS_DIR)
+
+prerequisites: manifest-check ## Bootstrap prerequisites that need no AWS access: the manifest is complete (PB-01)
+	scripts/check-manifest.sh --complete
 
 manifest-check: ## Account manifest schema and owner decisions (PB-01; --complete is required before any AWS call)
 	scripts/check-manifest.sh
@@ -63,7 +80,7 @@ checkov: ## checkov (every skip is inline and justified)
 shellcheck: ## shellcheck the scripts and their tests
 	$(SHELLCHECK) $(SCRIPTS) tests/run.sh tests/stubs/aws tests/stubs/gh tests/stubs/terraform
 
-actionlint: ## actionlint the infra workflows
+actionlint: ## actionlint every workflow (infra and CI)
 	$(ACTIONLINT) $(WORKFLOWS)
 
 inventory: ## PB-02 evidence: all-region, read-only account inventory (needs EXPECTED_ACCOUNT_ID and a region-guarded session)
