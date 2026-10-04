@@ -146,7 +146,7 @@ re-run. All 8 are detected.
 ## 8. First proof: `10-infra-plan` against the empty `staging-core`
 
 **Result: passed** on 2026-10-04. Run
-[37173741130](https://github.com/slaggala/veda-spaces/actions/runs/37173741130), commit `c1cd92f`, job
+[37173741130](https://github.com/slaggala/veda-spaces/actions/runs/37173741130) (the head of PR #17 at the time; the run records the commit), job
 `plan (staging-core)`: success.
 
 | Check | Log line (UTC) |
