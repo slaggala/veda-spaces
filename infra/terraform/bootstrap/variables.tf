@@ -74,10 +74,18 @@ variable "github_repo" {
     condition     = "${var.github_owner}/${var.github_repo}" == try(local.manifest.repository, "")
     error_message = "github_owner/github_repo is not the repository approved in infra/config/staging-account.json."
   }
+
+  # RR-A: the OIDC subjects also carry the owner's and the repository's numeric IDs from the manifest.
+  validation {
+    condition = (var.github_repo != ""
+      && can(regex("^[1-9][0-9]*$", tostring(local.manifest.repository_owner_id)))
+    && can(regex("^[1-9][0-9]*$", tostring(local.manifest.repository_id))))
+    error_message = "infra/config/staging-account.json must give repository_owner_id and repository_id (numeric GitHub IDs) for the OIDC subjects."
+  }
 }
 
 variable "github_environments" {
-  description = "GitHub environment trusted by each role. The OIDC subject is pinned to repo:<owner>/<repo>:environment:<name>."
+  description = "GitHub environment trusted by each role. The OIDC subject is pinned to repo:<owner>@<owner id>/<repo>@<repo id>:environment:<name>."
   type = object({
     plan     = string
     apply    = string

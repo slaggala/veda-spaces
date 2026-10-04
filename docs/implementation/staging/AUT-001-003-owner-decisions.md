@@ -23,7 +23,7 @@
 
 | ID | Item | Gate |
 |---|---|---|
-| RR-A | The repository will not be renamed, transferred or deleted while the OIDC roles trust `repo:slaggala/veda-spaces:…` by name. The bootstrap scripts and workflow now also check the repository's numeric ID (1392733148), but the AWS trust policies still match on the name | Before AUT-301 (move to a custom OIDC `sub` claim that includes `repository_id`) |
+| RR-A | The repository will not be renamed, transferred or deleted while the OIDC roles trust `repo:slaggala/veda-spaces:…` by name. The bootstrap scripts and workflow now also check the repository's numeric ID (1392733148), but the AWS trust policies still match on the name. **2026-10-04: resolved in code by adopting GitHub's immutable subject (`repo:slaggala@37840263/veda-spaces@1392733148:…`), which the repository already issues; effective once the bootstrap is re-applied ([AUT-002-trust-subject-reapply.md](AUT-002-trust-subject-reapply.md))** | Before AUT-301 (move to a custom OIDC `sub` claim that includes `repository_id`) |
 | RR-C | With the member account, an SCP or RCP from the management account can close the AUT-301 trust-writing gap; choosing and applying one is part of OD-B7 | Before AUT-301 |
 | RR-I | The boundary uses 5,947 of the 6,144 characters IAM allows. Any addition must compress or replace a statement | Before any boundary change |
 
