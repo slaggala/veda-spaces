@@ -21,7 +21,7 @@ the account alias and the owner identities, not Veda infrastructure.
 | 6 | `manage_account_guardrails` | `true` for a new account (default) | manifest |
 
 Nothing else. `region`, `organizations_mode` (`member`), `organization_id` (`o-q9ji0hj18c`),
-`management_account_id` (`749251636763`), `repository`, `repository_id` (1392733148) and
+`management_account_id` (`749251636763`), `repository`, `repository_id` (1392733148), `repository_owner_id` (37840263) and
 `max_owner_session_seconds` (3600) are fixed owner decisions, already set.
 
 None of these values is a secret. **Never** put an access key, secret key, session token, password or MFA seed in
@@ -40,7 +40,8 @@ the repository.
 | `organization_id` | string | `o-q9ji0hj18c` | `check-manifest.sh`, discovery (the account must belong to exactly this organization) |
 | `management_account_id` | string | `749251636763`; never equal to `account_id` | `check-manifest.sh`, discovery (the organization must have this management account) |
 | `repository` | string | `slaggala/veda-spaces` | `check-manifest.sh`, Terraform `github_repo`, scripts, workflow |
-| `repository_id` | number | `1392733148` (GitHub's ID for this repository) | scripts and workflow |
+| `repository_id` | number | `1392733148` (GitHub's ID for this repository) | scripts and workflow; the OIDC trust subject |
+| `repository_owner_id` | number | `37840263` (GitHub's ID for the owner `slaggala`) | the OIDC trust subject: GitHub's immutable subject is `repo:slaggala@37840263/veda-spaces@1392733148:environment:<env>` |
 | `max_owner_session_seconds` | number | 900–3600 (set: 3600) | `check-manifest.sh`, discovery (owner role `MaxSessionDuration`) |
 | `manage_account_guardrails` | boolean | `true` | `check-manifest.sh`, Terraform |
 | `bootstrap_principal_arns` | list of strings | exactly `["arn:aws:iam::<ACCOUNT_ID>:role/<OWNER_ROLE_NAME>"]`: roles only, exact ARN with path, no wildcard, no `veda-*`, this account | `--complete`, Terraform preconditions, discovery |

@@ -14,7 +14,10 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 # One trust policy per role: the exact repository AND the exact GitHub environment. Branch, pull-request
-# and fork tokens carry a different subject and are refused.
+# and fork tokens carry a different subject and are refused. The subject is GitHub's immutable form, which names
+# the owner and the repository by numeric ID as well (repo:<owner>@<owner id>/<repo>@<repo id>:environment:<env>), so a
+# renamed, transferred or re-registered repository never matches (RR-A). The repository uses it
+# (use_immutable_subject, checked by github-setup.sh --verify).
 data "aws_iam_policy_document" "github_trust" {
   for_each = var.github_environments
 
@@ -33,7 +36,7 @@ data "aws_iam_policy_document" "github_trust" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_host}:sub"
-      values   = ["repo:${var.github_owner}/${var.github_repo}:environment:${each.value}"]
+      values   = ["${local.oidc_subject_prefix}:environment:${each.value}"]
     }
   }
 }

@@ -97,7 +97,7 @@ run "defaults" {
   # Each role is trusted by exactly its own environment and nothing broader.
   assert {
     condition = alltrue([for k, env in { plan = "staging-plan", apply = "staging-infra", deploy = "staging", evidence = "staging-evidence" } :
-      strcontains(data.aws_iam_policy_document.github_trust[k].json, "\"repo:example-org/veda-spaces:environment:${env}\"")
+      strcontains(data.aws_iam_policy_document.github_trust[k].json, "\"repo:example-org@4242/veda-spaces@424242:environment:${env}\"")
     ])
     error_message = "Trust subject must pin repository and environment."
   }

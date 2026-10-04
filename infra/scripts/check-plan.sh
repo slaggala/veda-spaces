@@ -9,7 +9,8 @@
 #     OIDC provider, or uses NotAction/NotPrincipal in a trust policy; GitHub trust is accepted only on the four
 #     <prefix>-gh-* roles, each only from its own protected environment (plan: staging-plan, apply: staging-infra,
 #     deploy: staging, evidence: staging-evidence; RR-03/RR-07), as the single exact subject
-#     repo:<owner>/<repo>:environment:<that environment>, audience sts.amazonaws.com, action
+#     repo:<owner>@<owner id>/<repo>@<repo id>:environment:<that environment> (GitHub's immutable subject, IDs from the
+#     manifest), audience sts.amazonaws.com, action
 #     sts:AssumeRoleWithWebIdentity only;
 #   - attaches a privileged AWS managed policy (AdministratorAccess*, PowerUserAccess, IAMFullAccess,
 #     AWSOrganizationsFullAccess, job-function/*), or creates IAM users, groups, access keys, login profiles,
@@ -48,6 +49,8 @@ require_tools jq
 [[ -f "$PLAN_JSON" ]] || die "plan JSON not found: $PLAN_JSON"
 require_account_id "$ACCOUNT"
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "--repo must be owner/repo"
+[[ "$REPO" == "$(manifest_get .repository)" ]] || die "--repo $REPO is not the repository the manifest approves"
+SUBJECT_PREFIX="$(oidc_subject_prefix)"
 # An empty or foreign file has no resource changes to refuse; it must not pass as a clean plan.
 jq -e 'type == "object" and (.format_version | type) == "string"' "$PLAN_JSON" >/dev/null 2>&1 ||
   die "$PLAN_JSON is not a Terraform plan (terraform show -json output); refusing"
@@ -56,7 +59,7 @@ jq -e 'type == "object" and (.format_version | type) == "string"' "$PLAN_JSON" >
 GH_ENVS="$(for spec in $VEDA_GH_ROLE_ENVIRONMENTS; do printf '%s\n' "$spec"; done |
   jq -R --arg prefix "$PREFIX" 'split(":") | {key: "\($prefix)-gh-\(.[0])", value: .[1]}' | jq -s from_entries)"
 
-violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg prefix "$PREFIX" --arg region "$VEDA_REGION" --argjson ghenv "$GH_ENVS" '
+violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUBJECT_PREFIX" --arg prefix "$PREFIX" --arg region "$VEDA_REGION" --argjson ghenv "$GH_ENVS" '
   def arr: if type == "array" then . elif . == null then [] else [.] end;
   def esc: gsub("(?<c>[.+*?()\\[\\]{}|^$\\\\])"; "\\\(.c)");
   def own: tostring | (. == $acct) or test("^arn:aws[a-z-]*:(iam|sts)::" + $acct + ":");
@@ -94,8 +97,8 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg prefix "$PREF
                elif ($c | to_entries | map(select(.key != "StringEquals") | .value | keys[]) | map(select(startswith("token.actions"))) | length) > 0
                  then "\($addr): GitHub claims must use StringEquals only"
                elif ($subs | length) == 0 then "\($addr): GitHub trust without a subject"
-               elif $subs != ["repo:\($repo):environment:\($env)"]
-                 then "\($addr): \($name) must trust exactly repo:\($repo):environment:\($env), its protected environment (got \($subs | join(",")))"
+               elif $subs != ["\($subject):environment:\($env)"]
+                 then "\($addr): \($name) must trust exactly \($subject):environment:\($env), its protected environment (got \($subs | join(",")))"
                elif $aud != ["sts.amazonaws.com"] then "\($addr): GitHub audience must be sts.amazonaws.com"
                else empty end)
           else "\($addr): trusts \(.t) \(.v)" end

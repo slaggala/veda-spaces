@@ -37,7 +37,7 @@ Nothing else is created: no VPC, no instance, no bucket other than the state buc
 Terraform variable validation refuse to run while `account_id` is `null`, or for any other account (F3), and
 `infra/scripts/check-manifest.sh --complete` must pass (PB-01). The fixed fields (`schema_version`, `region` =
 `ap-south-1`, `organizations_mode` = `member` with `organization_id` and `management_account_id`, `repository` =
-`slaggala/veda-spaces`, `repository_id`,
+`slaggala/veda-spaces`, `repository_id`, `repository_owner_id`,
 `max_owner_session_seconds` = 3600) record the owner decisions and are checked on every run.
 
 | Field | Value |
@@ -188,6 +188,9 @@ record, that a reviewer approved it for `bootstrap` before it reads any secret.
    - any IAM role, policy or instance profile under a path, or not named `veda-*` (RR-03);
    - any trust in another account, in everyone, or in an identity provider other than GitHub, or with
      `NotAction`/`NotPrincipal`;
+   - GitHub trust whose subject is not GitHub's immutable form, `repo:<owner>@<owner id>/<repo>@<repo id>:environment:<env>`,
+     with the IDs from the manifest (RR-A; the repository issues it, `use_immutable_subject`, checked by
+     `github-setup.sh --verify` and `--verify-environments`);
    - GitHub trust on any role but the four `veda-gh-*` roles, or from any environment but the role's own protected
      one (`plan`→`staging-plan`, `apply`→`staging-infra`, `deploy`→`staging`, `evidence`→`staging-evidence`), with
      any action but `sts:AssumeRoleWithWebIdentity` (RR-03);
@@ -222,7 +225,7 @@ aws kms get-key-policy --key-id <state key ARN> --policy-name default           
 aws s3api get-public-access-block      --bucket veda-tfstate-<ACCOUNT_ID>        # all true
 aws s3api head-object --bucket veda-tfstate-<ACCOUNT_ID> --key bootstrap/terraform.tfstate
 aws iam get-role --role-name veda-gh-apply --query 'Role.[PermissionsBoundary.PermissionsBoundaryArn,MaxSessionDuration]'
-aws iam get-role --role-name veda-gh-plan  --query Role.AssumeRolePolicyDocument   # sub = repo:<owner>/<repo>:environment:staging-plan
+aws iam get-role --role-name veda-gh-plan  --query Role.AssumeRolePolicyDocument   # sub = repo:slaggala@37840263/veda-spaces@1392733148:environment:staging-plan
 aws iam get-policy-version --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/veda-boundary --version-id v1  # matches terraform output policy_documents
 aws ec2 get-ebs-encryption-by-default                                            # true
 aws ec2 get-instance-metadata-defaults                                           # HttpTokens required, hop limit 2
