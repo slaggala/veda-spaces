@@ -4,8 +4,10 @@
 - **Scope:** the infrastructure workflows that every staging stack (AUT-101 onward) goes through, and the empty
   `staging-core` root they act on. Nothing is applied and no AWS resource is created by this change. The apply workflow
   is **disabled** (fails closed) until owner decision OD-B7 and gate N-04-S are recorded.
-- **Base:** `main` after PR #16 (the bootstrap, AUT-002, applied on 2026-10-03; evidence in
-  [`docs/release-evidence/AUT-002/`](../../release-evidence/AUT-002/README.md)).
+- **Base:** `main` after PR #18 (the bootstrap, AUT-002, applied on 2026-10-03, evidence in
+  [`docs/release-evidence/AUT-002/`](../../release-evidence/AUT-002/README.md); its trust policies re-applied on
+  2026-10-04 with GitHub's immutable OIDC subject,
+  [AUT-002-trust-subject-reapply.md](AUT-002-trust-subject-reapply.md)).
 - **Runbook:** [`staging-infra-workflows.md`](../../operations/staging-infra-workflows.md).
 
 ## 1. Files
@@ -143,7 +145,27 @@ re-run. All 8 are detected.
 
 ## 8. First proof: `10-infra-plan` against the empty `staging-core`
 
-_Filled in after the run (runbook §4)._
+**Result: passed** on 2026-10-04. Run
+[37173741130](https://github.com/slaggala/veda-spaces/actions/runs/37173741130), commit `c1cd92f`, job
+`plan (staging-core)`: success.
+
+| Check | Log line (UTC) |
+|---|---|
+| Approval | 16:56:36 run 37173741130 was approved for environment 'staging-plan' by: slaggala |
+| GitHub settings | 16:56:39 GitHub settings for slaggala/veda-spaces match the bootstrap rules |
+| OIDC session | 16:56:42 `arn:aws:sts::813238078849:assumed-role/veda-gh-plan/gh-37173741130-1-plan` (1 h) |
+| Account and region | 16:56:45 session confined to ap-south-1 by IAM (us-east-1 denied); session in account 813238078849 |
+| Backend | 16:56:55 `s3://veda-tfstate-813238078849/staging/core.tfstate` (state key, native lock) |
+| Plan guard | 16:57:04 no destroy, everything in ap-south-1, every role bounded at path /, GitHub trust only from each role's protected environment, no trust or resource policy outside account 813238078849 |
+| Plan summary | 16:57:04 No changes. Your infrastructure matches the configuration. |
+| Plan digest | `e9af4976b7ccfc4ce23fb37a27fe3269dbc9047af082f66e5d8b5fba994acd2e` |
+| Plan mode | 16:57:04 nothing was created |
+| Publication | Not published: the repository is public and N-04-S is UNDECIDED |
+
+The earlier run (37149305740, same day) was refused by AWS (`AccessDenied` on `AssumeRoleWithWebIdentity`): the roles
+trusted the name-only subject, while the repository issues the immutable one. That was fixed by PR #18 and the owner's
+re-apply of the four trust policies (0 to add, 4 to change, 0 to destroy; `assume_role_policy` subject only).
+Nothing was planned or created by the refused run.
 
 ## 9. Owner decisions this review prepares
 
