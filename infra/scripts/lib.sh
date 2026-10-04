@@ -80,6 +80,9 @@ manifest_problems() {
          then "account_id is the management account: Veda staging must be a member account" else empty end),
       (if (.repository | type) != "string" or (.repository | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$") | not) then "repository must be owner/repo" else empty end),
       (if (.repository_id | type) != "number" or .repository_id <= 0 then "repository_id must be the numeric GitHub repository ID" else empty end),
+      # The immutable GitHub OIDC subject names the owner and the repository by numeric ID as well.
+      (if (.repository_owner_id | type) != "number" or .repository_owner_id <= 0
+         then "repository_owner_id must be the numeric GitHub ID of the repository owner" else empty end),
       (if (.max_owner_session_seconds | type) != "number" or .max_owner_session_seconds < 900 or .max_owner_session_seconds > 3600
          then "max_owner_session_seconds must be 900-3600" else empty end),
       (if (.manage_account_guardrails | type) != "boolean" then "manage_account_guardrails must be true or false" else empty end),
@@ -122,6 +125,18 @@ require_approved_account() {
     die "account $expected is not the approved staging account ($approved) in ${VEDA_ACCOUNT_MANIFEST#"$REPO_ROOT"/}; refusing"
   problems="$(manifest_problems complete)"
   [[ -z "$problems" ]] || die "the account manifest is not complete: $(tr '\n' ';' <<<"$problems" | sed 's/;$//'); refusing"
+}
+
+# The OIDC subject GitHub issues for this repository (immutable subject: owner and repository by name AND numeric ID,
+# so a renamed or re-registered repository never matches; RR-A). Every veda-gh-* trust is <prefix>:environment:<env>.
+oidc_subject_prefix() {
+  local repo owner_id repo_id
+  repo="$(manifest_get .repository)"
+  owner_id="$(manifest_get .repository_owner_id)"
+  repo_id="$(manifest_get .repository_id)"
+  [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$owner_id" =~ ^[1-9][0-9]*$ && "$repo_id" =~ ^[1-9][0-9]*$ ]] ||
+    die "the manifest needs repository, repository_owner_id and repository_id to build the OIDC subject"
+  echo "repo:${repo%%/*}@$owner_id/${repo#*/}@$repo_id"
 }
 
 # PB-01 / N-11: the repository is the one the manifest approves, by name and by its numeric ID (a deleted and

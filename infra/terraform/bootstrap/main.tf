@@ -12,6 +12,8 @@ locals {
   manifest_path       = var.account_manifest_path != "" ? var.account_manifest_path : "${path.module}/../../config/staging-account.json"
   manifest            = jsondecode(file(local.manifest_path))
   approved_account_id = try(regex("^[0-9]{12}$", local.manifest.account_id), "")
+  # GitHub's immutable OIDC subject prefix: the owner and the repository by name and numeric ID (RR-A).
+  oidc_subject_prefix = "repo:${var.github_owner}@${try(tostring(local.manifest.repository_owner_id), "")}/${var.github_repo}@${try(tostring(local.manifest.repository_id), "")}"
   manage_guardrails   = try(local.manifest.manage_account_guardrails, true) == true
 
   # RR-01/RR-02: the only principals that may read or write bootstrap state, change the state bucket or administer

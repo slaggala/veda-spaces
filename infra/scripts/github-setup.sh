@@ -26,6 +26,7 @@
 # "Variables: write" permission, so GH_ADMIN_TOKEN never needs "Environments" or "Administration" (F10). A role
 # ARN is not a secret: AWS enforces the environment through the OIDC trust.
 #
+# Both also check the repository issues the immutable OIDC subject the role trusts expect (RR-A).
 # --verify-environments is the gate bootstrap.sh and 00-bootstrap run before any apply (RR-07). It reads only what a
 # workflow's GITHUB_TOKEN (actions: read, contents: read) can: each environment's reviewers, admin bypass and branch
 # policy, and whether main is protected. --verify also reads the protection details (needs admin).
@@ -109,6 +110,19 @@ if ((VERIFY || VERIFY_ENVIRONMENTS)); then
     while IFS= read -r c; do [[ -n "$c" ]] && problems+=("main: required status check '$c' missing"); done < <(missing_checks <<<"$protection")
   else
     problems+=("main: branch not protected")
+  fi
+  # RR-A: the veda-gh-* trusts expect GitHub's immutable OIDC subject (owner and repository by numeric ID). A repository
+  # that issues another subject format would be refused by AWS at every workflow run; report it here instead.
+  want_prefix="$(oidc_subject_prefix)"
+  if oidc="$(gh api "repos/$REPO/actions/oidc/customization/sub" 2>/dev/null)"; then
+    jq -e '.use_immutable_subject == true' <<<"$oidc" >/dev/null ||
+      problems+=("oidc: the repository does not issue the immutable OIDC subject the role trusts expect")
+    jq -e '.use_default == true' <<<"$oidc" >/dev/null ||
+      problems+=("oidc: a customized OIDC subject template is set; the role trusts expect the default (immutable) subject")
+    [[ "$(jq -r '.sub_claim_prefix // empty' <<<"$oidc")" == "$want_prefix" ]] ||
+      problems+=("oidc: subject prefix is '$(jq -r '.sub_claim_prefix // "?"' <<<"$oidc")', the role trusts expect '$want_prefix'")
+  else
+    problems+=("oidc: cannot read the OIDC subject customization of $REPO")
   fi
   if ((${#problems[@]})); then
     for p in "${problems[@]}"; do log "DRIFT: $p"; done

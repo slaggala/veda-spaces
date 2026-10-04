@@ -148,6 +148,7 @@ gh_compliant() {
   done
   echo '{"name":"main","protected":true,"protection":{"enabled":true,"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]}}}' >"$d/repos_example-org_veda-spaces_branches_main.json"
   echo '{"id":424242,"full_name":"example-org/veda-spaces","private":true}' >"$d/repos_example-org_veda-spaces.json"
+  echo '{"use_default":true,"use_immutable_subject":true,"sub_claim_prefix":"repo:example-org@4242/veda-spaces@424242"}' >"$d/repos_example-org_veda-spaces_actions_oidc_customization_sub.json"
   echo '{"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
     >"$d/repos_example-org_veda-spaces_branches_main_protection.json"
   echo "$d"
@@ -261,7 +262,7 @@ role() { # role <address> <name> <trust JSON string> [boundary]
     '{address: $a, type: "aws_iam_role", change: {actions: ["create"], after: {name: $n, assume_role_policy: $t, permissions_boundary: $b}, after_unknown: {}}}'
 }
 GH_PRINCIPAL="{\"Federated\":\"$OIDC\"}"
-GH_OK_COND='{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:environment:staging-infra"}}'
+GH_OK_COND='{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:example-org@4242/veda-spaces@424242:environment:staging-infra"}}'
 GH_ROLE="$(role 'aws_iam_role.github["apply"]' veda-gh-apply "$(trust "$GH_PRINCIPAL" "$GH_OK_COND")")"
 guard() { "$T/infra/scripts/check-plan.sh" --plan-json "$1" --account $ACCT --repo example-org/veda-spaces; }
 P="$TMP/plan"
@@ -300,10 +301,10 @@ check "R2 non-veda-gh role trusting GitHub" fail "only the bootstrap GitHub role
 plan_json "$P.like" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},"StringLike":{"token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:*"}}')")]"
 check "R2 wildcard GitHub subject" fail "must use StringEquals only" -- guard "$P.like"
 plan_json "$P.pr" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:pull_request"}}')")]"
-check "R2 pull_request subject" fail "must trust exactly repo:example-org/veda-spaces:environment:staging-plan" -- guard "$P.pr"
+check "R2 pull_request subject" fail "must trust exactly repo:example-org@4242/veda-spaces@424242:environment:staging-plan" -- guard "$P.pr"
 plan_json "$P.repo" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:attacker/veda-spaces:environment:staging-plan"}}')")]"
-check "R2 another repository" fail "must trust exactly repo:example-org/veda-spaces:environment:staging-plan.*got repo:attacker" -- guard "$P.repo"
-plan_json "$P.aud" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:sub":"repo:example-org/veda-spaces:environment:staging-plan"}}')")]"
+check "R2 another repository" fail "must trust exactly repo:example-org@4242/veda-spaces@424242:environment:staging-plan.*got repo:attacker" -- guard "$P.repo"
+plan_json "$P.aud" "[$(role 'aws_iam_role.github["plan"]' veda-gh-plan "$(trust "$GH_PRINCIPAL" '{"StringEquals":{"token.actions.githubusercontent.com:sub":"repo:example-org@4242/veda-spaces@424242:environment:staging-plan"}}')")]"
 check "R2 GitHub trust without audience" fail "audience must be sts.amazonaws.com" -- guard "$P.aud"
 
 res() { # res <type> <address> <after JSON> [after_unknown JSON]
@@ -460,6 +461,7 @@ for env in bootstrap staging-plan staging-infra staging staging-evidence; do
 done
 echo '{"required_status_checks":{"contexts":["api (sqlite)","api (postgresql)","app","security","browser e2e + axe","infra"],"checks":[{"context":"api (sqlite)","app_id":15368},{"context":"api (postgresql)","app_id":15368},{"context":"app","app_id":15368},{"context":"security","app_id":15368},{"context":"browser e2e + axe","app_id":15368},{"context":"infra","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}' \
   >"$V/repos_example-org_veda-spaces_branches_main_protection.json"
+echo '{"use_default":true,"use_immutable_subject":true,"sub_claim_prefix":"repo:example-org@4242/veda-spaces@424242"}' >"$V/repos_example-org_veda-spaces_actions_oidc_customization_sub.json"
 verify() { GH_STUB_DIR="$1" "$GS" --repo example-org/veda-spaces --verify; }
 check "F10 compliant repository verifies" ok "match the bootstrap rules" -- verify "$V"
 drift() { # drift <name> <file suffix> <jq>
@@ -559,15 +561,15 @@ plan_json "$P.ipp" "[$(iam aws_iam_instance_profile aws_iam_instance_profile.x '
 check "RR-03 instance profile under a path" fail "IAM instance profile under path /x/" -- guard "$P.ipp"
 
 gh_role() { iam_role "aws_iam_role.github[\"$1\"]" "$2" / "$3"; }
-plan_json "$P.envx" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org/veda-spaces:environment:staging-plan)")]"
-check "RR-03 apply role trusted by the plan environment" fail "veda-gh-apply must trust exactly repo:example-org/veda-spaces:environment:staging-infra" -- guard "$P.envx"
-plan_json "$P.envu" "[$(gh_role deploy veda-gh-deploy "$(gh_trust repo:example-org/veda-spaces:environment:unprotected)")]"
-check "RR-03 role trusted by an unprotected environment" fail "veda-gh-deploy must trust exactly repo:example-org/veda-spaces:environment:staging, .*got repo:example-org/veda-spaces:environment:unprotected" -- guard "$P.envu"
-plan_json "$P.ghx" "[$(gh_role extra veda-gh-extra "$(gh_trust repo:example-org/veda-spaces:environment:staging-infra)")]"
+plan_json "$P.envx" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org@4242/veda-spaces@424242:environment:staging-plan)")]"
+check "RR-03 apply role trusted by the plan environment" fail "veda-gh-apply must trust exactly repo:example-org@4242/veda-spaces@424242:environment:staging-infra" -- guard "$P.envx"
+plan_json "$P.envu" "[$(gh_role deploy veda-gh-deploy "$(gh_trust repo:example-org@4242/veda-spaces@424242:environment:unprotected)")]"
+check "RR-03 role trusted by an unprotected environment" fail "veda-gh-deploy must trust exactly repo:example-org@4242/veda-spaces@424242:environment:staging, .*got repo:example-org@4242/veda-spaces@424242:environment:unprotected" -- guard "$P.envu"
+plan_json "$P.ghx" "[$(gh_role extra veda-gh-extra "$(gh_trust repo:example-org@4242/veda-spaces@424242:environment:staging-infra)")]"
 check "RR-03 a new veda-gh-* role trusting GitHub" fail "only the bootstrap GitHub roles" -- guard "$P.ghx"
-plan_json "$P.sub2" "[$(gh_role plan veda-gh-plan "$(jq -cn --arg p "$OIDC" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "sts:AssumeRoleWithWebIdentity", Principal: {Federated: $p}, Condition: {StringEquals: {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com", "token.actions.githubusercontent.com:sub": ["repo:example-org/veda-spaces:environment:staging-plan", "repo:example-org/veda-spaces:environment:dev"]}}}]} | tojson')")]"
+plan_json "$P.sub2" "[$(gh_role plan veda-gh-plan "$(jq -cn --arg p "$OIDC" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "sts:AssumeRoleWithWebIdentity", Principal: {Federated: $p}, Condition: {StringEquals: {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com", "token.actions.githubusercontent.com:sub": ["repo:example-org@4242/veda-spaces@424242:environment:staging-plan", "repo:example-org@4242/veda-spaces@424242:environment:dev"]}}}]} | tojson')")]"
 check "RR-03 a second subject beside the protected environment" fail "must trust exactly" -- guard "$P.sub2"
-plan_json "$P.tag" "[$(gh_role plan veda-gh-plan "$(gh_trust repo:example-org/veda-spaces:environment:staging-plan '["sts:AssumeRoleWithWebIdentity","sts:TagSession"]')")]"
+plan_json "$P.tag" "[$(gh_role plan veda-gh-plan "$(gh_trust repo:example-org@4242/veda-spaces@424242:environment:staging-plan '["sts:AssumeRoleWithWebIdentity","sts:TagSession"]')")]"
 check "RR-03 GitHub trust with sts:TagSession" fail "sts:AssumeRoleWithWebIdentity only" -- guard "$P.tag"
 plan_json "$P.na" "[$(iam_role aws_iam_role.x veda-x / "$(jq -cn '{Statement: [{Effect: "Allow", NotAction: "iam:*", Principal: {Service: "ec2.amazonaws.com"}}]} | tojson')")]"
 check "RR-03 trust with NotAction" fail "trust with NotAction" -- guard "$P.na"
@@ -1146,6 +1148,28 @@ D="$TMP/tools.tampered"
 check "RD-02 a download with the wrong SHA-256 is refused" fail "does not match the pinned" -- env PATH="$CS:$PATH" TF_STUB_DIR="$TMP" "$IT" --dir "$D"
 # shellcheck disable=SC2016 # $0 belongs to the inner shell
 check "  ... and nothing is installed from it" ok "^absent$" -- bash -c '[[ ! -e "$0/bin/terraform" ]] && echo absent' "$D"
+
+echo "== RR-A: the role trusts use GitHub's immutable OIDC subject (owner and repository by numeric ID)"
+T="$(new_tree)"
+OLD_SUBJECT="repo:example-org/veda-spaces:environment:staging-infra"
+plan_json "$P.legacy" "[$(gh_role apply veda-gh-apply "$(gh_trust "$OLD_SUBJECT")")]"
+check "RR-A the name-only subject is refused (it never matches the issued token)" fail "veda-gh-apply must trust exactly repo:example-org@4242/veda-spaces@424242:environment:staging-infra" -- guard "$P.legacy"
+plan_json "$P.ownerid" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org@9999/veda-spaces@424242:environment:staging-infra)")]"
+check "RR-A another owner ID is refused" fail "got repo:example-org@9999/veda-spaces@424242" -- guard "$P.ownerid"
+plan_json "$P.repoid" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org@4242/veda-spaces@1:environment:staging-infra)")]"
+check "RR-A another repository ID (re-registered name) is refused" fail "got repo:example-org@4242/veda-spaces@1:" -- guard "$P.repoid"
+plan_json "$P.immutable" "[$(gh_role apply veda-gh-apply "$(gh_trust repo:example-org@4242/veda-spaces@424242:environment:staging-infra)")]"
+check "RR-A the exact immutable subject passes the guard" ok "plan guard: no destroy" -- guard "$P.immutable"
+check "RR-A the guard refuses a repository the manifest does not approve" fail "is not the repository the manifest approves" -- "$T/infra/scripts/check-plan.sh" --plan-json "$P.immutable" --account $ACCT --repo attacker/veda-spaces
+check "RR-A the manifest must give the owner ID" fail "repository_owner_id must be the numeric GitHub ID" -- "$(man 'del(.repository_owner_id)')/infra/scripts/check-manifest.sh"
+check "RR-A the owner ID must be a number" fail "repository_owner_id must be the numeric GitHub ID" -- "$(man '.repository_owner_id = "4242"')/infra/scripts/check-manifest.sh"
+GS="$T/infra/scripts/github-setup.sh" # venv() (RR-07 section) calls $GS
+check "RR-A a repository issuing the immutable subject verifies" ok "match the bootstrap rules" -- venv "$GHV"
+check "RR-A a repository issuing the name-only subject is drift" fail "does not issue the immutable OIDC subject" -- venv "$(gh_drift actions_oidc_customization_sub '.use_immutable_subject = false')"
+check "RR-A a customized subject template is drift" fail "customized OIDC subject template" -- venv "$(gh_drift actions_oidc_customization_sub '.use_default = false')"
+check "RR-A another subject prefix (renamed or transferred repository) is drift" fail "the role trusts expect 'repo:example-org@4242/veda-spaces@424242'" -- venv "$(gh_drift actions_oidc_customization_sub '.sub_claim_prefix = "repo:other@1/veda-spaces@424242"')"
+check "RR-A unreadable OIDC settings fail closed" fail "cannot read the OIDC subject customization" -- venv "$(gh_drift actions_oidc_customization_sub DELETE)"
+check "RR-A the admin --verify checks it too" fail "does not issue the immutable OIDC subject" -- verify "$(drift i actions_oidc_customization_sub '.use_immutable_subject = false')"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
