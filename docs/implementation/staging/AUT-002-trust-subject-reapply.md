@@ -1,7 +1,7 @@
 # AUT-002 follow-up: re-apply the bootstrap with GitHub's immutable OIDC subject
 
 - **Date:** 2026-10-04
-- **Status:** **authorized and executed** on 2026-10-04 (approval of plan digest `d977a40b…24ea78` at 16:29:27Z):
+- **Status:** **authorized and executed** on 2026-10-04 (approval of plan digest `d977a40bd27d062efda5e837bb7953875c2a200937aae7ae4a2a4ca8af24ea78` at 16:29:27Z):
   0 to add, 4 to change, 0 to destroy, `assume_role_policy` subject only. The roles now use immutable GitHub subject
   ID trust, and RR-A is closed. The AUT-301 plan proof that followed passed (AUT-301 review package §8).
 
