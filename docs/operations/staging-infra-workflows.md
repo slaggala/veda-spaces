@@ -19,8 +19,10 @@ GitHub OIDC: no AWS key is stored in GitHub, and no owner credential is used.
 | `10-infra-plan` | Pull request touching the stack, its modules, `infra/scripts` or `infra/config`; push to `main` touching the stack or modules; manual | `staging-plan` (required, any branch) | `veda-gh-plan` | Read the account (minus data); read `staging/*` state; write only `staging/*.tflock` |
 | `11-infra-apply` | Manual only, from `main` | `staging-infra` (required, main only) | `veda-gh-apply` | Create the staging stacks within `veda-boundary` (runbook staging-bootstrap §7) |
 
-Each role trusts exactly `repo:slaggala/veda-spaces:environment:<its environment>` (bootstrap, RR-03). A job outside
-that environment cannot get the role, and a fork's pull request gets no OIDC token.
+Each role trusts exactly `repo:slaggala@37840263/veda-spaces@1392733148:environment:<its environment>`: immutable
+GitHub subject ID trust, by owner and repository numeric ID (bootstrap, RR-03; RR-A closed by the re-apply of
+2026-10-04). A job outside that environment, or a renamed, transferred or re-registered repository, cannot get the
+role, and a fork's pull request gets no OIDC token.
 
 ## 2. Plan (`10-infra-plan`)
 
@@ -86,7 +88,10 @@ On the AUT-301 pull request, `10-infra-plan` starts automatically and waits for 
 - the backend is `s3://veda-tfstate-813238078849/staging/core.tfstate`;
 - `plan summary: No changes.`, then the plan guard passes, then `plan mode: nothing was created`.
 
-The summary says the plan text is not published (N-04-S). No resource is created, and no state object is written; only
+The summary says the plan text is not published (N-04-S). A pull-request run uploads no artifact, so it proves the
+OIDC session, the region confinement and the plan guards, but **not** artifact digest binding: that needs a plan on
+`main` with an uploaded artifact (N-04-S decided) and an apply run (OD-B7 decided). Proof of 2026-10-04: review package
+§8. No resource is created, and no state object is written; only
 a lock file appears while the plan runs and is removed after it. CloudTrail records `AssumeRoleWithWebIdentity` and
 read calls only.
 
@@ -94,7 +99,7 @@ read calls only.
 
 | Situation | Action |
 |---|---|
-| `AssumeRoleWithWebIdentity` refused | The job is not in the role's environment, or the repository or role changed. Check `vars.AWS_ROLE_ARN_*` against the bootstrap outputs. Never widen the trust from a workflow |
+| `AssumeRoleWithWebIdentity` refused | The job is not in the role's environment, the repository no longer issues the immutable subject (`make -C infra github-verify`), or the repository or role changed. Check `vars.AWS_ROLE_ARN_*` against the bootstrap outputs. Never widen the trust from a workflow |
 | "the session can act in us-east-1" | The role lost `veda-boundary`. Stop: investigate with CloudTrail before any further run |
 | Plan guard refuses | The plan wants something the rules forbid (destroy, other region, unbounded role, external trust). Fix the code; never bypass the guard |
 | "Error acquiring the state lock" | Another plan or apply is running; wait. A stale `staging/core.tfstate.tflock` after a crashed run: confirm nothing runs, then remove it with an owner session |

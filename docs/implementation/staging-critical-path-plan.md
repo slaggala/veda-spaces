@@ -89,7 +89,7 @@ Token: a scoped token for these stories only (Zone:Read, DNS:Edit on `vedaspaces
 | O3 | Workstation with Terraform 1.16.4, tflint 0.64.0, checkov, shellcheck, actionlint, `aws` v2, `jq`, `gh`; run `make -C infra check` on a clean clone | Bootstrap | Now |
 | O4 | Written authorization and a time window for the bootstrap run | Bootstrap | After O1–O3 |
 | O5 | Authorize the staging infrastructure and code work of this plan (§2 code work C1–C4, infrastructure work I1–I17) | All engineering below | Now |
-| O6 | OD-B7: close or accept the `veda-gh-apply` trust-writing gap. RR-C proposes an SCP from management account `749251636763` that lets only `veda-gh-apply` write trust policies; RR-A: acknowledge the name-based OIDC trust, or move to a `repository_id` claim | **Every stack apply** (F1) | Before the first apply |
+| O6 | OD-B7: close or accept the `veda-gh-apply` trust-writing gap. RR-C proposes an SCP from management account `749251636763` that lets only `veda-gh-apply` write trust policies; RR-A is closed by immutable GitHub subject ID trust (PR #18, re-applied 2026-10-04) | **Every stack apply** (F1) | Before the first apply |
 | O7 | D5: anchor writer/reader separation option | C2, I8 | Before C2 |
 | O8 | D6: staging Object Lock retention | I5 | Before the AUT-103 apply |
 | O9 | D7 and D8: staging host names and Turnstile choice | I15 seeding, I18 | Before the first start |

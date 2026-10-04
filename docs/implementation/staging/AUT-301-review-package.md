@@ -62,12 +62,13 @@
 | R1 | `veda-gh-apply` administers the account (bootstrap R1). Once enabled, a reviewed plan can do anything the boundary allows | High (by design) | OD-B7 (trust-writing gap) with RR-C (SCP) before enabling; reviewer approval of each digest |
 | R2 | The `staging-plan` reviewer approves pull-request plans of unmerged code; `ReadOnlyAccess` minus the data denies is readable by that code | Medium | Reviewer required (F9); plan role denied data reads; only `main` dispatch plans are applyable |
 | R3 | Plan text unavailable for review in a public repository (N-04-S undecided) | Low (blocks applies) | Owner decision: make the repository private, or accept publishing staging plan text |
-| R4 | Name-based OIDC trust (RR-A): a re-registered repository name would match | Low | Acknowledge, or move to a `repository_id` claim (a bootstrap change) before enabling applies |
+| R4 | ~~Repository-name OIDC trust (RR-A)~~ | Closed | Immutable GitHub subject ID trust: every role trusts only `repo:slaggala@37840263/veda-spaces@1392733148:environment:<env>` (owner and repository numeric IDs; PR #18, re-applied 2026-10-04). A renamed, transferred or re-registered repository cannot match |
 | R5 | Single owner approves their own runs (OD-B5) | Accepted | Revisit before a second collaborator |
 
 ## 5. Tests
 
-`infra/tests/run.sh` has **94 new checks**, giving 427 passed and 0 failed (it was 333):
+`infra/tests/run.sh` has **94 new checks**, giving **440 passed** and 0 failed (346 on `main`, which includes the 13 checks
+of the immutable-subject fix, PR #18):
 - **Workflow contract:**
   - triggers;
   - environments;
@@ -138,14 +139,14 @@ re-run. All 8 are detected.
 
 | Check | Result |
 |---|---|
-| `make -C infra check` | Exit 0: tool versions pinned; manifest complete; fmt; validate (bootstrap, staging-core); `terraform test` 33 + 2 passed; script tests **427 passed, 0 failed**; tflint clean; checkov 178/0/23 (bootstrap) and 1/0/0 (staging-core); shellcheck clean; actionlint clean on every workflow |
+| `make -C infra check` | Exit 0: tool versions pinned; manifest complete; fmt; validate (bootstrap, staging-core); `terraform test` 33 + 2 passed; script tests **440 passed, 0 failed**; tflint clean; checkov 178/0/23 (bootstrap) and 1/0/0 (staging-core); shellcheck clean; actionlint clean on every workflow |
 | `api/tests/unit/test_governance_docs.py` | Passes |
 | Secret scan | No new candidates (the one fake STS secret in the tests carries an allowlist pragma) |
 | CI | See the pull request |
 
 ## 8. First proof: `10-infra-plan` against the empty `staging-core`
 
-**Result: passed** on 2026-10-04. Run
+**Result: passed** on 2026-10-04, within the scope below. Run
 [37173741130](https://github.com/slaggala/veda-spaces/actions/runs/37173741130) (the head of PR #17 at the time; the run records the commit), job
 `plan (staging-core)`: success.
 
@@ -162,8 +163,23 @@ re-run. All 8 are detected.
 | Plan mode | 16:57:04 nothing was created |
 | Publication | Not published: the repository is public and N-04-S is UNDECIDED |
 
+**Scope of the proof.**
+
+| Control | Proven live by this run |
+|---|---|
+| OIDC session (`veda-gh-plan` from `staging-plan`, immutable GitHub subject ID trust) | **Yes** |
+| Region confinement (us-east-1 denied to the session) | **Yes** |
+| Plan guards (`check-plan.sh` on the plan; "No changes"; nothing created) | **Yes** |
+| Approval proof and environment verification before the session | **Yes** |
+| Artifact digest binding (plan run → uploaded artifact → approved digest → `11-infra-apply`, RR-05) | **No** |
+
+The proof was a `pull_request` run, and no artifact was uploaded (N-04-S is undecided and the repository is public).
+Therefore **artifact digest binding has not yet been proven live**. It is covered only by the offline tests (§5,
+`verify-run.sh --stack`; mutations M5 and M6). It can first be proven by a `10-infra-plan` run on `main` that uploads
+its artifact, which needs N-04-S decided, and then only by an `11-infra-apply` run, which needs OD-B7 decided.
+
 The earlier run (37149305740, same day) was refused by AWS (`AccessDenied` on `AssumeRoleWithWebIdentity`): the roles
-trusted the name-only subject, while the repository issues the immutable one. That was fixed by PR #18 and the owner's
+did not yet use immutable GitHub subject ID trust, while the repository issues the immutable subject. That was fixed by PR #18 and the owner's
 re-apply of the four trust policies (0 to add, 4 to change, 0 to destroy; `assume_role_policy` subject only).
 Nothing was planned or created by the refused run.
 
@@ -172,5 +188,5 @@ Nothing was planned or created by the refused run.
 | Decision | Options | Gate value |
 |---|---|---|
 | **OD-B7**, the trust-writing gap of `veda-gh-apply` | (a) close it with an SCP from management account `749251636763` that denies `iam:CreateRole` and `iam:UpdateAssumeRolePolicy` to every principal but `veda-gh-apply`, and limits it as the plan guard does (RR-C); (b) accept it, with per-digest review as the control | `CLOSED` or `ACCEPTED`, with the decision record |
-| **RR-A**, repository-name OIDC trust | Acknowledge, or move the trust to a `repository_id` claim (bootstrap change, owner session) | Recorded with OD-B7 |
+| ~~RR-A~~ | **Closed:** immutable GitHub subject ID trust (PR #18; the owner re-applied the four trust policies on 2026-10-04) | None; no longer part of OD-B7 |
 | **N-04-S**, staging plan text in a public repository | Make the repository private, or accept publishing staging plan text (no secrets are Terraform-managed, AUT-107/302) | `PRIVATE_REPOSITORY` or `ACCEPTED`, with the decision record |

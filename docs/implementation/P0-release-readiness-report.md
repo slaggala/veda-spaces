@@ -148,7 +148,7 @@ workflow refuses to run (N-04).
 | SES (sandbox, then production access), DKIM | PG-EMAIL, break-glass notifications | AUT-111 | Production access is an AWS support request and can take days |
 | Budgets | Cost control | AUT-112 | |
 | Cloudflare tunnel, DNS, Turnstile, Pages, WAF | Staging reachability, AM-7 Turnstile checks | AUT-201…AUT-205 | Needs a scoped Cloudflare token (owner decision; OD-B3 covers only the bootstrap) |
-| Infra workflows (plan/apply with digest binding) | Applying every stack | AUT-301 | Gated by OD-B7 (trust-writing gap), RR-A and RR-C |
+| Infra workflows (plan/apply with digest binding) | Applying every stack | AUT-301 | Gated by OD-B7 (trust-writing gap) and RR-C; RR-A closed (immutable GitHub subject ID trust, 2026-10-04) |
 | Evidence collectors | Every gate's evidence | AUT-401 | Summaries with SHA-256 under `docs/release-evidence/` |
 
 AUT-101 to AUT-112, AUT-201 to AUT-205, AUT-301, AUT-302 and AUT-401 have **not started** (`infra/README.md`). This
@@ -162,7 +162,7 @@ is the critical path (RD-01): FC-01 evidence, the RR-09 rehearsal and every stag
 | 2 | Give `bootstrap-operator` an MFA device and temporary credentials, and delete them afterwards | Owner (action) | Bootstrap | RD-03 |
 | 3 | Independent review of the pre-bootstrap closure and the member-account change, or a recorded waiver | Owner | Bootstrap | RD-04 |
 | 4 | Authorize starting the staging infrastructure stories (AUT-101…AUT-112, AUT-2xx, AUT-301, AUT-302, AUT-401) | Owner | All staging evidence | RD-01 |
-| 5 | AUT-301 gate: the `veda-gh-apply` trust-writing gap (OD-B7), with an SCP/RCP from the management account (RR-C); repository-name trust acknowledgement (RR-A) | Owner / Security | Any workflow assuming `veda-gh-apply` | Owner decisions doc |
+| 5 | AUT-301 gate: the `veda-gh-apply` trust-writing gap (OD-B7), with an SCP/RCP from the management account (RR-C). RR-A is closed: immutable GitHub subject ID trust, re-applied 2026-10-04 | Owner / Security | Any workflow assuming `veda-gh-apply` | Owner decisions doc |
 | 6 | A scoped Cloudflare token for the edge stacks (zone, DNS records, tunnel, Turnstile) | Owner | AUT-201…AUT-205, AM-7 checks | OD-B3 |
 | 7 | OD-6: the custodian credential model (assume-role with MFA per command, as proposed in runbook §7) | Security Owner | RR-09, PG-BG | RR-09 |
 | 8 | Confirm AM-4 option (a) (database guard) and the "no earlier version after a withdrawal" rule | Architecture Owner, Data Protection lead | RR-12 closure | AM-4 |
