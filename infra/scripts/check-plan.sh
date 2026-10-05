@@ -66,6 +66,9 @@
 #   - creates an SNS topic without KMS encryption, a subscription other than email or an SQS queue of the account in
 #     the region, an SQS queue without encryption, an alarm whose actions are anything but SNS topics of the account in
 #     the region, or a log subscription filter, log destination, metric stream or cross-account sink (AUT-110);
+#   - creates an EC2 instance (AUT-108) without IMDSv2 required, with an unencrypted root or inline volume, with a key
+#     pair, or with source/destination checking off; an unencrypted EBS volume; a key pair or serial-console access; a
+#     snapshot lifecycle policy that copies across regions or shares snapshots with another account;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -84,7 +87,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,72p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,75p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -359,7 +362,21 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
            then "\($addr): route to a target other than the internet gateway or a VPC endpoint" else empty end)
       elif .type == "aws_instance" then
         (if ($after.subnet_id // null) == null and $unknown.subnet_id != true and (($after.network_interface // []) | length) == 0
-           then "\($addr): instance without a subnet would land in the default VPC (AUT-101: only the staging subnet)" else empty end)
+           then "\($addr): instance without a subnet would land in the default VPC (AUT-101: only the staging subnet)" else empty end),
+        (if [($after.metadata_options // [])[] | select(.http_tokens == "required")] | length == 0
+           then "\($addr): instance without IMDSv2 required (http_tokens)" else empty end),
+        (if [($after.root_block_device // [])[] | select(.encrypted != true)] | length > 0 or (($after.root_block_device // []) | length) == 0
+           then "\($addr): instance root volume not encrypted" else empty end),
+        (if [($after.ebs_block_device // [])[] | select(.encrypted != true)] | length > 0 then "\($addr): unencrypted inline EBS volume" else empty end),
+        (if ($after.key_name // "") != "" then "\($addr): key pair \($after.key_name) (the host is managed through SSM only)" else empty end),
+        (if $after.source_dest_check == false then "\($addr): source/destination check off (no NAT or router instances; egress model A)" else empty end)
+      elif .type == "aws_ebs_volume" then
+        (if $after.encrypted != true then "\($addr): unencrypted EBS volume" else empty end)
+      elif .type | IN("aws_key_pair", "aws_ec2_serial_console_access") then
+        "\($addr): \(.type) is not allowed (the host is managed through SSM only; AUT-108)"
+      elif .type == "aws_dlm_lifecycle_policy" then
+        (($after.policy_details // [])[].schedule[]? | select(((.cross_region_copy_rule // []) | length) > 0 or ((.share_rule // []) | length) > 0)
+         | "\($addr): snapshot schedule \(.name // "?") copies across regions or shares snapshots (Mumbai only, F7)")
       elif .type == "aws_subnet" then
         (if $after.map_public_ip_on_launch == true then "\($addr): the subnet assigns public addresses (the host asks for its own, AUT-108)" else empty end),
         (if ($after.ipv6_cidr_block // "") != "" or $after.assign_ipv6_address_on_creation == true then "\($addr): IPv6 subnet (the staging network is IPv4 only)" else empty end)

@@ -35,7 +35,7 @@ locals {
     "audit-tampering"       = { ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
   }
 
-  host_alarms = var.instance_id == null ? {} : {
+  host_alarms = !var.host_alarms_enabled ? {} : {
     "host-status-check" = { ns = "AWS/EC2", metric = "StatusCheckFailed", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "breaching", what = "Instance or system status check failed (EC2 recovers it automatically)" }
     "host-cpu"          = { ns = "AWS/EC2", metric = "CPUUtilization", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.cpu_percent, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "CPU high for 15 minutes" }
     "host-memory"       = { ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }

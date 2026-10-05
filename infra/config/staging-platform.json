@@ -61,5 +61,14 @@
       "data_disk_percent": 80,
       "root_disk_percent": 85
     }
+  },
+  "compute": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: t4g.small (N2, decided) with burst credits capped (standard); 12 GB root and 20 GB data volumes (gp3, data key); 7 daily snapshots of the data volume; the AMI is the latest Amazon Linux 2023 arm64 at the first plan and is then pinned here (ami_id).",
+    "instance_type": "t4g.small",
+    "root_volume_gb": 12,
+    "data_volume_gb": 20,
+    "snapshot_retain_count": 7,
+    "ami_id": null
   }
 }

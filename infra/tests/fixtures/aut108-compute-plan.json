@@ -1,0 +1,1028 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "compute": {
+          "source": "../../modules/compute",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "ami_id": {
+              "references": [
+                "local.platform.compute.ami_id",
+                "local.platform.compute",
+                "local.platform"
+              ]
+            },
+            "app_log_group": {
+              "references": [
+                "module.monitoring.app_log_group",
+                "module.monitoring"
+              ]
+            },
+            "data_key_arn": {
+              "references": [
+                "module.kms.data_key_arn",
+                "module.kms"
+              ]
+            },
+            "data_volume_gb": {
+              "references": [
+                "local.platform.compute.data_volume_gb",
+                "local.platform.compute",
+                "local.platform"
+              ]
+            },
+            "instance_profile_name": {
+              "references": [
+                "module.runtime_iam.instance_profile_name",
+                "module.runtime_iam"
+              ]
+            },
+            "instance_type": {
+              "references": [
+                "local.platform.compute.instance_type",
+                "local.platform.compute",
+                "local.platform"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "permissions_boundary_arn": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "root_volume_gb": {
+              "references": [
+                "local.platform.compute.root_volume_gb",
+                "local.platform.compute",
+                "local.platform"
+              ]
+            },
+            "security_group_id": {
+              "references": [
+                "module.network.host_security_group_id",
+                "module.network"
+              ]
+            },
+            "snapshot_retain_count": {
+              "references": [
+                "local.platform.compute.snapshot_retain_count",
+                "local.platform.compute",
+                "local.platform"
+              ]
+            },
+            "subnet_id": {
+              "references": [
+                "module.network.public_subnet_id",
+                "module.network"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "ami_id": {
+                "expression": {
+                  "references": [
+                    "local.ami_id"
+                  ]
+                },
+                "description": "The AMI planned (record it in staging-platform.json compute.ami_id after the first plan)."
+              },
+              "data_volume_id": {
+                "expression": {
+                  "references": [
+                    "aws_ebs_volume.data.id",
+                    "aws_ebs_volume.data"
+                  ]
+                },
+                "description": "The data volume (/var/lib/veda)."
+              },
+              "instance_id": {
+                "expression": {
+                  "references": [
+                    "aws_instance.host.id",
+                    "aws_instance.host"
+                  ]
+                },
+                "description": "The host."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_dlm_lifecycle_policy.data",
+                "mode": "managed",
+                "type": "aws_dlm_lifecycle_policy",
+                "name": "data",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "description": {
+                    "constant_value": "Veda staging data volume daily"
+                  },
+                  "execution_role_arn": {
+                    "references": [
+                      "aws_iam_role.dlm.arn",
+                      "aws_iam_role.dlm"
+                    ]
+                  },
+                  "policy_details": [
+                    {
+                      "resource_types": {
+                        "constant_value": [
+                          "VOLUME"
+                        ]
+                      },
+                      "schedule": [
+                        {
+                          "copy_tags": {
+                            "constant_value": true
+                          },
+                          "create_rule": [
+                            {
+                              "interval": {
+                                "constant_value": 24
+                              },
+                              "interval_unit": {
+                                "constant_value": "HOURS"
+                              },
+                              "times": {
+                                "constant_value": [
+                                  "20:30"
+                                ]
+                              }
+                            }
+                          ],
+                          "name": {
+                            "constant_value": "daily"
+                          },
+                          "retain_rule": [
+                            {
+                              "count": {
+                                "references": [
+                                  "var.snapshot_retain_count"
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "target_tags": {
+                        "constant_value": {
+                          "veda-backup": "daily"
+                        }
+                      }
+                    }
+                  ],
+                  "state": {
+                    "constant_value": "ENABLED"
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_ebs_volume.data",
+                "mode": "managed",
+                "type": "aws_ebs_volume",
+                "name": "data",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "availability_zone": {
+                    "references": [
+                      "aws_instance.host.availability_zone",
+                      "aws_instance.host"
+                    ]
+                  },
+                  "encrypted": {
+                    "constant_value": true
+                  },
+                  "kms_key_id": {
+                    "references": [
+                      "var.data_key_arn"
+                    ]
+                  },
+                  "size": {
+                    "references": [
+                      "var.data_volume_gb"
+                    ]
+                  },
+                  "tags": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "type": {
+                    "constant_value": "gp3"
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_iam_role.dlm",
+                "mode": "managed",
+                "type": "aws_iam_role",
+                "name": "dlm",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "assume_role_policy": {
+                    "references": [
+                      "var.account_id"
+                    ]
+                  },
+                  "description": {
+                    "constant_value": "Data Lifecycle Manager snapshots of the Veda staging data volume (AUT-108)"
+                  },
+                  "max_session_duration": {
+                    "constant_value": 3600
+                  },
+                  "name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "permissions_boundary": {
+                    "references": [
+                      "var.permissions_boundary_arn"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_iam_role_policy_attachment.dlm",
+                "mode": "managed",
+                "type": "aws_iam_role_policy_attachment",
+                "name": "dlm",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "policy_arn": {
+                    "constant_value": "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
+                  },
+                  "role": {
+                    "references": [
+                      "aws_iam_role.dlm.name",
+                      "aws_iam_role.dlm"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_instance.host",
+                "mode": "managed",
+                "type": "aws_instance",
+                "name": "host",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "ami": {
+                    "references": [
+                      "local.ami_id"
+                    ]
+                  },
+                  "associate_public_ip_address": {
+                    "constant_value": true
+                  },
+                  "credit_specification": [
+                    {
+                      "cpu_credits": {
+                        "constant_value": "standard"
+                      }
+                    }
+                  ],
+                  "disable_api_termination": {
+                    "constant_value": true
+                  },
+                  "ebs_optimized": {
+                    "constant_value": true
+                  },
+                  "iam_instance_profile": {
+                    "references": [
+                      "var.instance_profile_name"
+                    ]
+                  },
+                  "instance_type": {
+                    "references": [
+                      "var.instance_type"
+                    ]
+                  },
+                  "maintenance_options": [
+                    {
+                      "auto_recovery": {
+                        "constant_value": "default"
+                      }
+                    }
+                  ],
+                  "metadata_options": [
+                    {
+                      "http_endpoint": {
+                        "constant_value": "enabled"
+                      },
+                      "http_put_response_hop_limit": {
+                        "constant_value": 2
+                      },
+                      "http_tokens": {
+                        "constant_value": "required"
+                      },
+                      "instance_metadata_tags": {
+                        "constant_value": "disabled"
+                      }
+                    }
+                  ],
+                  "monitoring": {
+                    "constant_value": false
+                  },
+                  "root_block_device": [
+                    {
+                      "delete_on_termination": {
+                        "constant_value": true
+                      },
+                      "encrypted": {
+                        "constant_value": true
+                      },
+                      "kms_key_id": {
+                        "references": [
+                          "var.data_key_arn"
+                        ]
+                      },
+                      "volume_size": {
+                        "references": [
+                          "var.root_volume_gb"
+                        ]
+                      },
+                      "volume_type": {
+                        "constant_value": "gp3"
+                      }
+                    }
+                  ],
+                  "subnet_id": {
+                    "references": [
+                      "var.subnet_id"
+                    ]
+                  },
+                  "tags": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "user_data": {
+                    "references": [
+                      "local.user_data"
+                    ]
+                  },
+                  "user_data_replace_on_change": {
+                    "constant_value": false
+                  },
+                  "vpc_security_group_ids": {
+                    "references": [
+                      "var.security_group_id"
+                    ]
+                  }
+                },
+                "schema_version": 2
+              },
+              {
+                "address": "aws_volume_attachment.data",
+                "mode": "managed",
+                "type": "aws_volume_attachment",
+                "name": "data",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "device_name": {
+                    "constant_value": "/dev/sdf"
+                  },
+                  "instance_id": {
+                    "references": [
+                      "aws_instance.host.id",
+                      "aws_instance.host"
+                    ]
+                  },
+                  "volume_id": {
+                    "references": [
+                      "aws_ebs_volume.data.id",
+                      "aws_ebs_volume.data"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "data.aws_ssm_parameter.al2023_arm64",
+                "mode": "data",
+                "type": "aws_ssm_parameter",
+                "name": "al2023_arm64",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "name": {
+                    "constant_value": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
+                  }
+                },
+                "schema_version": 0
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account."
+              },
+              "ami_id": {
+                "default": null,
+                "description": "Pinned AMI (recorded after the first plan) or null for the latest Amazon Linux 2023 arm64 at plan time. Changing it never replaces the host: AMI updates are a rebuild (runbook)."
+              },
+              "app_log_group": {
+                "description": "AUT-110 application log group (Docker awslogs)."
+              },
+              "data_key_arn": {
+                "description": "AUT-102 data key (EBS)."
+              },
+              "data_volume_gb": {
+                "description": "Data volume size (/var/lib/veda: SQLite, WAL, local snapshots)."
+              },
+              "instance_profile_name": {
+                "description": "AUT-106 instance profile."
+              },
+              "instance_type": {
+                "description": "Host instance type (owner decision N2)."
+              },
+              "name_prefix": {
+                "description": "Prefix of every name (veda-stg)."
+              },
+              "permissions_boundary_arn": {
+                "description": "veda-boundary (the snapshot-lifecycle role)."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "root_volume_gb": {
+                "description": "Root volume size (OS, Docker images, logs)."
+              },
+              "security_group_id": {
+                "description": "AUT-101 host security group (no inbound)."
+              },
+              "snapshot_retain_count": {
+                "description": "Daily EBS snapshots of the data volume kept (DLM)."
+              },
+              "subnet_id": {
+                "description": "AUT-101 host subnet."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.compute.aws_dlm_lifecycle_policy.data",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_dlm_lifecycle_policy",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "default_policy": null,
+          "description": "Veda staging data volume daily",
+          "policy_details": [
+            {
+              "action": [],
+              "copy_tags": false,
+              "create_interval": 1,
+              "event_source": [],
+              "exclusions": [],
+              "extend_deletion": false,
+              "parameters": [],
+              "policy_type": "EBS_SNAPSHOT_MANAGEMENT",
+              "resource_type": null,
+              "resource_types": [
+                "VOLUME"
+              ],
+              "retain_interval": 7,
+              "schedule": [
+                {
+                  "archive_rule": [],
+                  "copy_tags": true,
+                  "create_rule": [
+                    {
+                      "cron_expression": null,
+                      "interval": 24,
+                      "interval_unit": "HOURS",
+                      "scripts": [],
+                      "times": [
+                        "20:30"
+                      ]
+                    }
+                  ],
+                  "cross_region_copy_rule": [],
+                  "deprecate_rule": [],
+                  "fast_restore_rule": [],
+                  "name": "daily",
+                  "retain_rule": [
+                    {
+                      "count": 7,
+                      "interval": null,
+                      "interval_unit": null
+                    }
+                  ],
+                  "share_rule": [],
+                  "tags_to_add": null,
+                  "variable_tags": null
+                }
+              ],
+              "target_tags": {
+                "veda-backup": "daily"
+              }
+            }
+          ],
+          "region": "ap-south-1",
+          "state": "ENABLED",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "execution_role_arn": true,
+          "id": true,
+          "policy_details": [
+            {
+              "action": [],
+              "event_source": [],
+              "exclusions": [],
+              "parameters": [],
+              "policy_language": true,
+              "resource_locations": true,
+              "resource_types": [
+                false
+              ],
+              "schedule": [
+                {
+                  "archive_rule": [],
+                  "create_rule": [
+                    {
+                      "location": true,
+                      "scripts": [],
+                      "times": [
+                        false
+                      ]
+                    }
+                  ],
+                  "cross_region_copy_rule": [],
+                  "deprecate_rule": [],
+                  "fast_restore_rule": [],
+                  "retain_rule": [
+                    {}
+                  ],
+                  "share_rule": []
+                }
+              ],
+              "target_tags": {}
+            }
+          ],
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "policy_details": [
+            {
+              "action": [],
+              "event_source": [],
+              "exclusions": [],
+              "parameters": [],
+              "resource_locations": [],
+              "resource_types": [
+                false
+              ],
+              "schedule": [
+                {
+                  "archive_rule": [],
+                  "create_rule": [
+                    {
+                      "scripts": [],
+                      "times": [
+                        false
+                      ]
+                    }
+                  ],
+                  "cross_region_copy_rule": [],
+                  "deprecate_rule": [],
+                  "fast_restore_rule": [],
+                  "retain_rule": [
+                    {}
+                  ],
+                  "share_rule": []
+                }
+              ],
+              "target_tags": {}
+            }
+          ],
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.compute.aws_ebs_volume.data",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_ebs_volume",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "encrypted": true,
+          "final_snapshot": false,
+          "multi_attach_enabled": null,
+          "outpost_arn": null,
+          "region": "ap-south-1",
+          "size": 20,
+          "tags": {
+            "Name": "veda-stg-data",
+            "veda-backup": "daily"
+          },
+          "tags_all": {
+            "Name": "veda-stg-data",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core",
+            "veda-backup": "daily"
+          },
+          "timeouts": null,
+          "type": "gp3",
+          "volume_initialization_rate": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "availability_zone": true,
+          "create_time": true,
+          "id": true,
+          "iops": true,
+          "kms_key_id": true,
+          "snapshot_id": true,
+          "tags": {},
+          "tags_all": {},
+          "throughput": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.compute.aws_iam_role.dlm",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "dlm",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"dlm.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+          "description": "Data Lifecycle Manager snapshots of the Veda staging data volume (AUT-108)",
+          "force_detach_policies": false,
+          "max_session_duration": 3600,
+          "name": "veda-stg-dlm",
+          "path": "/",
+          "permissions_boundary": "arn:aws:iam::111122223333:policy/veda-boundary",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "create_date": true,
+          "id": true,
+          "inline_policy": true,
+          "managed_policy_arns": true,
+          "name_prefix": true,
+          "tags_all": {},
+          "unique_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "inline_policy": [],
+          "managed_policy_arns": [],
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null
+        }
+      }
+    },
+    {
+      "address": "module.compute.aws_iam_role_policy_attachment.dlm",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "dlm",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole",
+          "role": "veda-stg-dlm"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "policy_arn": null,
+          "role": null
+        }
+      }
+    },
+    {
+      "address": "module.compute.aws_instance.host",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "host",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "ami": "ami-07bc21e8b40dfc36f",
+          "associate_public_ip_address": true,
+          "credit_specification": [
+            {
+              "cpu_credits": "standard"
+            }
+          ],
+          "disable_api_termination": true,
+          "ebs_optimized": true,
+          "force_destroy": false,
+          "get_password_data": false,
+          "hibernation": null,
+          "iam_instance_profile": "veda-stg-host",
+          "instance_type": "t4g.small",
+          "launch_template": [],
+          "maintenance_options": [
+            {
+              "auto_recovery": "default"
+            }
+          ],
+          "metadata_options": [
+            {
+              "http_endpoint": "enabled",
+              "http_protocol_ipv6": "disabled",
+              "http_put_response_hop_limit": 2,
+              "http_tokens": "required",
+              "instance_metadata_tags": "disabled"
+            }
+          ],
+          "monitoring": false,
+          "region": "ap-south-1",
+          "root_block_device": [
+            {
+              "delete_on_termination": true,
+              "encrypted": true,
+              "tags": null,
+              "volume_size": 12,
+              "volume_type": "gp3"
+            }
+          ],
+          "source_dest_check": true,
+          "tags": {
+            "Name": "veda-stg-host"
+          },
+          "tags_all": {
+            "Name": "veda-stg-host",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null,
+          "user_data": "#!/bin/bash\n# Veda staging host boot (AUT-108). No secret is written here: configuration comes from SSM at deploy time.\nset -euo pipefail\ndnf install -y docker amazon-cloudwatch-agent\nmkdir -p /etc/docker /var/log/veda /var/lib/veda\ncat >/etc/docker/daemon.json <<'JSON'\n{\"log-driver\": \"awslogs\", \"log-opts\": {\"awslogs-region\": \"ap-south-1\", \"awslogs-group\": \"/veda/staging/app\", \"awslogs-create-group\": \"false\", \"tag\": \"{{.Name}}/{{.ID}}\"}}\nJSON\nsystemctl enable --now docker\n",
+          "user_data_replace_on_change": false,
+          "volume_tags": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "availability_zone": true,
+          "capacity_reservation_specification": true,
+          "cpu_options": true,
+          "credit_specification": [
+            {}
+          ],
+          "disable_api_stop": true,
+          "ebs_block_device": true,
+          "enable_primary_ipv6": true,
+          "enclave_options": true,
+          "ephemeral_block_device": true,
+          "host_id": true,
+          "host_resource_group_arn": true,
+          "id": true,
+          "instance_initiated_shutdown_behavior": true,
+          "instance_lifecycle": true,
+          "instance_market_options": true,
+          "instance_state": true,
+          "ipv6_address_count": true,
+          "ipv6_addresses": true,
+          "key_name": true,
+          "launch_template": [],
+          "maintenance_options": [
+            {}
+          ],
+          "metadata_options": [
+            {}
+          ],
+          "network_interface": true,
+          "outpost_arn": true,
+          "password_data": true,
+          "placement_group": true,
+          "placement_group_id": true,
+          "placement_partition_number": true,
+          "primary_network_interface": true,
+          "primary_network_interface_id": true,
+          "private_dns": true,
+          "private_dns_name_options": true,
+          "private_ip": true,
+          "public_dns": true,
+          "public_ip": true,
+          "root_block_device": [
+            {
+              "device_name": true,
+              "iops": true,
+              "kms_key_id": true,
+              "tags_all": true,
+              "throughput": true,
+              "volume_id": true
+            }
+          ],
+          "secondary_network_interface": true,
+          "secondary_private_ips": true,
+          "security_groups": true,
+          "spot_instance_request_id": true,
+          "subnet_id": true,
+          "tags": {},
+          "tags_all": {},
+          "tenancy": true,
+          "user_data_base64": true,
+          "vpc_security_group_ids": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "capacity_reservation_specification": [],
+          "cpu_options": [],
+          "credit_specification": [
+            {}
+          ],
+          "ebs_block_device": [],
+          "enclave_options": [],
+          "ephemeral_block_device": [],
+          "instance_market_options": [],
+          "ipv6_addresses": [],
+          "launch_template": [],
+          "maintenance_options": [
+            {}
+          ],
+          "metadata_options": [
+            {}
+          ],
+          "network_interface": [],
+          "primary_network_interface": [],
+          "private_dns_name_options": [],
+          "root_block_device": [
+            {
+              "tags_all": {}
+            }
+          ],
+          "secondary_network_interface": [],
+          "secondary_private_ips": [],
+          "security_groups": [],
+          "tags": {},
+          "tags_all": {},
+          "vpc_security_group_ids": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.compute.aws_volume_attachment.data",
+      "module_address": "module.compute",
+      "mode": "managed",
+      "type": "aws_volume_attachment",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "device_name": "/dev/sdf",
+          "force_detach": null,
+          "region": "ap-south-1",
+          "skip_destroy": null,
+          "stop_instance_before_detaching": null,
+          "timeouts": null
+        },
+        "after_unknown": {
+          "id": true,
+          "instance_id": true,
+          "volume_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "device_name": null,
+          "instance_id": null,
+          "region": null,
+          "volume_id": null
+        }
+      }
+    }
+  ]
+}

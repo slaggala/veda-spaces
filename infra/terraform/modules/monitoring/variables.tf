@@ -59,8 +59,14 @@ variable "tampering_metric" {
   type        = object({ namespace = string, name = string })
 }
 
+variable "host_alarms_enabled" {
+  description = "Create the host alarms (AUT-108). A known boolean: the instance id itself is unknown until apply."
+  type        = bool
+  default     = false
+}
+
 variable "instance_id" {
-  description = "The host (AUT-108). Host alarms exist only once it is known; null before AUT-108."
+  description = "The host (AUT-108), used as the alarm dimension when host_alarms_enabled."
   type        = string
   default     = null
 }

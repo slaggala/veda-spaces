@@ -85,7 +85,8 @@ run "host_alarms_with_the_instance" {
   command = plan
 
   variables {
-    instance_id = "i-0123456789abcdef0"
+    host_alarms_enabled = true
+    instance_id         = "i-0123456789abcdef0"
   }
 
   assert {

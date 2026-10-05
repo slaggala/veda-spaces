@@ -180,5 +180,27 @@ module "monitoring" {
   trail_log_group_name = module.cloudtrail.log_group_name
   tampering_metric     = module.cloudtrail.tampering_metric
   thresholds           = local.platform.monitoring.thresholds
+  host_alarms_enabled  = true
+  instance_id          = module.compute.instance_id
+}
+
+# AUT-108: the host, its data volume and daily snapshots.
+module "compute" {
+  source = "../../modules/compute"
+
+  name_prefix              = local.name_prefix
+  account_id               = local.account_id
+  region                   = var.aws_region
+  permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/veda-boundary"
+  instance_type            = local.platform.compute.instance_type
+  ami_id                   = local.platform.compute.ami_id
+  subnet_id                = module.network.public_subnet_id
+  security_group_id        = module.network.host_security_group_id
+  instance_profile_name    = module.runtime_iam.instance_profile_name
+  data_key_arn             = module.kms.data_key_arn
+  root_volume_gb           = local.platform.compute.root_volume_gb
+  data_volume_gb           = local.platform.compute.data_volume_gb
+  snapshot_retain_count    = local.platform.compute.snapshot_retain_count
+  app_log_group            = module.monitoring.app_log_group
 }
 

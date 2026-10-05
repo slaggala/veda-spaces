@@ -51,6 +51,7 @@ flowchart LR
 | 5 | Runtime IAM | AUT-106 | Least privilege (05 §9.6, F1), RR-03 (bounded roles at path `/`), FC-01 (anchors never altered), RR-09 (the host is not a custodian) |
 | 6 | SSM | AUT-107 | SEC-005 and PLAT-008 (no secret in code or Git), F6 (staging start configuration), RR-09 (session transcripts) |
 | 7 | Monitoring foundations | AUT-110 | LOG-005/006 and 02 §9 alerts, RG-5, RR-14 (snapshot heartbeat), FC-01 (anchor failures), NOTIF-008 (notification failures visible, lead kept), cost (bounded metrics) |
+| 8 | Compute and EBS | AUT-108 | ADR-008 (one host), OPS-006/007 (single instance, dedicated encrypted volume, daily snapshots), IMDSv2 (F6), SSM-only access, egress model A, cost (credits capped) |
 
 ## 3. Decisions
 
@@ -67,6 +68,7 @@ session); a malformed decision file also refuses.
 | `ecr` | **PROPOSED** | Keep the last 30 tagged images; untagged expire after 7 days |
 | `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `127.0.0.1/32` (cloudflared on the host network); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
 | `monitoring` | **PROPOSED** | Logs 30 days; 5xx ≥ 5 per 5 minutes; CPU 80 %, memory 85 %, data disk 80 %, root disk 85 % |
+| `compute` | **PROPOSED** | t4g.small (N2), credits capped; 12 GB root, 20 GB data (gp3); 7 daily snapshots; AMI pinned after the first plan |
 | `anchor_retention` | **PROPOSED** | D6: the application locks each anchor for **3650 days** in COMPLIANCE mode (`anchor_store.py`); accept, or change the application first |
 
 ## 4. Modules
@@ -183,4 +185,18 @@ refuses).
 | Agent configuration | SSM parameter `/veda/staging/cloudwatch-agent` (not under `config/`, so it is not rendered into the application environment) |
 | Plan guard | Refuses an unencrypted topic; any subscription other than email or an SQS queue of the account; an unencrypted queue; an alarm action that is not an SNS topic of the account in Mumbai (no EC2 stop or terminate actions); log subscription filters, log destinations and deliveries, metric streams and cross-account observability links |
 | Tests | `modules/monitoring`: 6 (logs encrypted and expiring; a bounded set of filters; alarms on the encrypted topic, silence alarms, publish policy, drill queue; no host alarm before the host; host alarms with it; another prefix refused). `run.sh`: 16, from a real sandboxed plan, including that the plan text shows the subscription address only as `(sensitive value)` |
+
+### 4.8 AUT-108 compute and EBS (`modules/compute`)
+
+| Item | Implementation |
+|---|---|
+| Host | `veda-stg-host`: t4g.small (N2), Amazon Linux 2023 arm64 (latest at the first plan, then pinned in `compute.ami_id`; AMI and boot-script changes are ignored, so they can never replace the host); the AUT-101 subnet and no-inbound security group; its own public IPv4 (egress model A); instance profile `veda-stg-host` (AUT-106) |
+| Hardening | **IMDSv2 required**, hop limit 2 (containers reach the role; the account default is the same, guardrails); **no key pair** (SSM only; the guard refuses one); **termination protection**; detailed monitoring off (paid); **burst credits capped (`standard`)**, so a runaway process slows down instead of adding cost; EC2 **automatic recovery** on system-check failure |
+| Volumes | Root 12 GB gp3 and data 20 GB gp3, both encrypted with the data key. The data volume (`/var/lib/veda`: SQLite, WAL, local snapshots) is a separate resource with `prevent_destroy`, never deleted with the instance (OPS-007) |
+| Snapshots | DLM policy, daily at 02:00 IST, 7 kept, on volumes tagged `veda-backup=daily`; role `veda-stg-dlm` (bounded, assumable by DLM for this account only, AWS managed `AWSDataLifecycleManagerServiceRole`, allow-listed). Backups are threefold: Litestream (continuous), the nightly Object-Locked snapshot (application), and the EBS snapshot (DLM) |
+| Boot script | Installs Docker and the CloudWatch agent, and points Docker's logs at `/veda/staging/app` (`awslogs`). No secret; no mount; no application start. The deploy document (§4.10) mounts the volume, installs the pinned Compose plugin, renders the configuration and starts the containers |
+| Host alarms | Now on (AUT-110): status check, CPU, memory, data disk, root disk, API health heartbeat (a known boolean enables them: the instance id is unknown until apply) |
+| No foreign dependency | Nothing references Aurion or swing-trader-vm; a check asserts no planned resource does |
+| Plan guard | Refuses an instance without IMDSv2 required, with an unencrypted root or inline volume, a key pair, or source/destination checking off (a NAT host would break model A); an unencrypted EBS volume; key pairs and serial-console access; snapshot schedules that copy across regions or share snapshots |
+| Tests | `modules/compute`: 6 (hardened host; encrypted and kept volumes, daily snapshots; boot script without secrets; bounded DLM role; pinned AMI wins; other instance types refused). `run.sh`: 16, from a real sandboxed plan |
 

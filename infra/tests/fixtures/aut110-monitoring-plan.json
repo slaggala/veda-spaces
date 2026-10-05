@@ -64,6 +64,15 @@
                 "module.kms"
               ]
             },
+            "host_alarms_enabled": {
+              "constant_value": true
+            },
+            "instance_id": {
+              "references": [
+                "module.compute.instance_id",
+                "module.compute"
+              ]
+            },
             "log_group_prefix": {
               "references": [
                 "local.log_group_prefix"
@@ -142,7 +151,7 @@
                 "expression": {
                   "references": [
                     "local.filters",
-                    "var.instance_id"
+                    "var.host_alarms_enabled"
                   ]
                 },
                 "description": "Billed custom metrics this monitoring creates (cost report): the log filters, the tampering metric, the agent's memory and two disks, and the health metric."
@@ -699,9 +708,13 @@
               "audit_key_arn": {
                 "description": "AUT-102 audit key (log groups)."
               },
+              "host_alarms_enabled": {
+                "default": false,
+                "description": "Create the host alarms (AUT-108). A known boolean: the instance id itself is unknown until apply."
+              },
               "instance_id": {
                 "default": null,
-                "description": "The host (AUT-108). Host alarms exist only once it is known; null before AUT-108."
+                "description": "The host (AUT-108), used as the alarm dimension when host_alarms_enabled."
               },
               "log_group_prefix": {
                 "description": "/veda/staging"
@@ -1878,6 +1891,528 @@
           "alarm_actions": [
             false
           ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"api-health\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "api-health",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "/health/ready failing or not reporting (uptime)",
+          "alarm_name": "veda-stg-api-health",
+          "comparison_operator": "LessThanThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "HealthReady",
+          "metric_query": [],
+          "namespace": "Veda/Host",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Minimum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"host-cpu\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "host-cpu",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "CPU high for 15 minutes",
+          "alarm_name": "veda-stg-host-cpu",
+          "comparison_operator": "GreaterThanThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "CPUUtilization",
+          "metric_query": [],
+          "namespace": "AWS/EC2",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 900,
+          "region": "ap-south-1",
+          "statistic": "Average",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 80,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"host-data-disk\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "host-data-disk",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Data volume (/var/lib/veda) filling up",
+          "alarm_name": "veda-stg-host-data-disk",
+          "comparison_operator": "GreaterThanThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "disk_used_percent",
+          "metric_query": [],
+          "namespace": "CWAgent",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Maximum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 80,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"host-memory\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "host-memory",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Memory high (or the agent stopped reporting)",
+          "alarm_name": "veda-stg-host-memory",
+          "comparison_operator": "GreaterThanThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "mem_used_percent",
+          "metric_query": [],
+          "namespace": "CWAgent",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Average",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 85,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"host-root-disk\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "host-root-disk",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Root volume filling up (images, logs)",
+          "alarm_name": "veda-stg-host-root-disk",
+          "comparison_operator": "GreaterThanThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "disk_used_percent",
+          "metric_query": [],
+          "namespace": "CWAgent",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Maximum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 85,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.host[\"host-status-check\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "host",
+      "index": "host-status-check",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Instance or system status check failed (EC2 recovers it automatically)",
+          "alarm_name": "veda-stg-host-status-check",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "StatusCheckFailed",
+          "metric_query": [],
+          "namespace": "AWS/EC2",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Maximum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
           "evaluation_criteria": [],
           "metric_query": [],
           "ok_actions": [

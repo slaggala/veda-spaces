@@ -25,5 +25,5 @@ output "alarm_names" {
 
 output "custom_metric_count" {
   description = "Billed custom metrics this monitoring creates (cost report): the log filters, the tampering metric, the agent's memory and two disks, and the health metric."
-  value       = length(local.filters) + 1 + (var.instance_id == null ? 0 : 4)
+  value       = length(local.filters) + 1 + (var.host_alarms_enabled ? 4 : 0)
 }

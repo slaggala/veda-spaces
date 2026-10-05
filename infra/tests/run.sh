@@ -1581,7 +1581,7 @@ for t in aws_networkmanager_vpc_attachment aws_vpclattice_service_network_vpc_as
   check "AUT-101 minor 9 $t is refused" fail "$t is not part of the staging network" -- guard "$(addres "$t" x '{}')"
 done
 check "AUT-101 minor 10 an instance without a subnet (default VPC) is refused" fail "instance without a subnet would land in the default VPC" -- guard "$(addres aws_instance host '{"instance_type":"t4g.small","subnet_id":null,"network_interface":[]}')"
-check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: []}, after_unknown: {subnet_id: true}}}]')"
+check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: [], metadata_options: [{http_tokens: "required"}], root_block_device: [{encrypted: true}]}, after_unknown: {subnet_id: true}}}]')"
 # The committed decision and the bootstrap's one change.
 NET_CFG="$INFRA/config/staging-network.json"
 check "AUT-101 committed decision: egress model A, t4g.small, 10.60.0.0/20 (N1, N2, N4)" ok '^"A","t4g.small","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
@@ -1772,6 +1772,28 @@ for t in aws_cloudwatch_log_subscription_filter aws_cloudwatch_log_destination a
 done
 check "AUT-110 the alert address is not in the plan text (sensitive; the owner's subscription as Terraform shows it)" ok '^ +\+ endpoint += \(sensitive value\)$' -- cat "$HERE/fixtures/aut110-plan-text-endpoint.txt"
 check "AUT-110 committed decision: thresholds and 30-day logs (PROPOSED)" ok '^PROPOSED 30 5 80$' -- jq -r '"\(.monitoring.status) \(.monitoring.log_retention_days) \(.monitoring.thresholds.server_errors_per_5min) \(.monitoring.thresholds.data_disk_percent)"' "$PLATFORM"
+
+echo "== AUT-108: compute and EBS (IMDSv2, encrypted volumes, SSM only, no NAT host, snapshots stay in Mumbai)"
+EC2PLAN="$HERE/fixtures/aut108-compute-plan.json"
+ec2mod() { local f="$TMP/ec2.$RANDOM$RANDOM.json"; jq --arg a "module.compute.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$EC2PLAN" >"$f"; echo "$f"; }
+check "AUT-108 the real compute plan passes the guard" ok "plan guard: no destroy" -- guard "$EC2PLAN"
+check "  ... a t4g.small with IMDSv2 required, its own public IPv4, no key pair, termination protection" ok '^t4g.small required true null true$' -- jq -r '.resource_changes[] | select(.address == "module.compute.aws_instance.host") | .change.after | "\(.instance_type) \(.metadata_options[0].http_tokens) \(.associate_public_ip_address) \(.key_name) \(.disable_api_termination)"' "$EC2PLAN"
+check "  ... burst credits capped and automatic recovery" ok '^standard default$' -- jq -r '.resource_changes[] | select(.address == "module.compute.aws_instance.host") | .change.after | "\(.credit_specification[0].cpu_credits) \(.maintenance_options[0].auto_recovery)"' "$EC2PLAN"
+check "AUT-108 IMDSv1 is refused" fail "instance without IMDSv2 required" -- guard "$(ec2mod aws_instance.host '.after.metadata_options[0].http_tokens = "optional"')"
+check "AUT-108 an unencrypted root volume is refused" fail "instance root volume not encrypted" -- guard "$(ec2mod aws_instance.host '.after.root_block_device[0].encrypted = false')"
+check "AUT-108 a key pair is refused (SSM only)" fail "key pair ops-key" -- guard "$(ec2mod aws_instance.host '.after.key_name = "ops-key"')"
+check "AUT-108 a NAT-style host (source/destination check off) is refused" fail "source/destination check off" -- guard "$(ec2mod aws_instance.host '.after.source_dest_check = false')"
+check "AUT-108 an unencrypted data volume is refused" fail "unencrypted EBS volume" -- guard "$(ec2mod aws_ebs_volume.data '.after.encrypted = false')"
+check "AUT-108 snapshots copied to another region are refused" fail "copies across regions or shares snapshots" -- guard "$(ec2mod aws_dlm_lifecycle_policy.data '.after.policy_details[0].schedule[0].cross_region_copy_rule = [{"target":"us-east-1","encrypted":true}]')"
+check "AUT-108 snapshots shared with another account are refused" fail "copies across regions or shares snapshots" -- guard "$(ec2mod aws_dlm_lifecycle_policy.data '.after.policy_details[0].schedule[0].share_rule = [{"target_accounts":["999999999999"]}]')"
+for t in aws_key_pair aws_ec2_serial_console_access; do
+  check "AUT-108 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ec2.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-108 the data volume is kept and snapshotted daily, seven kept" ok '^daily 7$' -- jq -r '[(.resource_changes[] | select(.address == "module.compute.aws_ebs_volume.data") | .change.after.tags["veda-backup"]), (.resource_changes[] | select(.address == "module.compute.aws_dlm_lifecycle_policy.data") | .change.after.policy_details[0].schedule[0].retain_rule[0].count | tostring)] | join(" ")' "$EC2PLAN"
+check "AUT-108 the host alarms exist with the host (status, CPU, memory, both disks, health)" ok '^6$' -- jq '[.resource_changes[] | select(.address | startswith("module.monitoring.aws_cloudwatch_metric_alarm.host"))] | length' "$MONPLAN"
+absent "AUT-108 no planned resource refers to another workload (Aurion, swing-trader-vm)" "[Aa]urion|swing-trader" "$(cat "$HERE"/fixtures/aut1*-plan.json)"
+check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots (PROPOSED)" ok '^PROPOSED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
+check "  ... the same instance type as the network decision (AZ check)" ok '^t4g.small$' -- jq -r .host_instance_type "$INFRA/config/staging-network.json"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
