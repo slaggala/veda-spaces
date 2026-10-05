@@ -18,7 +18,7 @@
 | `infra/config/staging-budget.json` | The decision: name `veda-staging-monthly-cost`, `monthly_limit_usd: null` (undecided), `forecast_alert_thresholds_percent: [80, 100]`. **No email address** |
 | `infra/terraform/envs/staging-core/tests/core.tftest.hcl`, `tests/fixtures/budget*.json` | 5 new offline Terraform tests (§5) |
 | `infra/scripts/check-plan.sh` | Plan guard: budget rules (§3) |
-| `.github/workflows/10-infra-plan.yml` | The plan step passes `TF_VAR_budget_alert_email` from the `staging-plan` environment secret `BUDGET_ALERT_EMAIL`; a push to `main` that changes the budget decision is planned |
+| `.github/workflows/10-infra-plan.yml` | The plan step sets `TF_VAR_budget_alert_email` from `BUDGET_ALERT_EMAIL`, stored on the `staging-plan` environment (B3); a push to `main` that changes the budget decision is planned |
 | `infra/Makefile` | tflint and checkov also scan `terraform/modules/*` (checkov does not follow local module calls from a root) |
 | `infra/tests/run.sh` | 25 new checks (§5) |
 | `docs/operations/staging-infra-workflows.md`, `infra/README.md`, `envs/staging-core/README.md`, `modules/README.md`, `staging-critical-path-plan.md` | Runbook §6 (inputs), status, O16 |
