@@ -16,7 +16,7 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | AUT-002 Terraform bootstrap | `terraform/bootstrap/`: **applied to `veda-staging` (813238078849) on 2026-10-03**; evidence in `docs/release-evidence/AUT-002/` |
 | AUT-003 bootstrap workflow | `scripts/` run locally (Option A) for the first bootstrap; `.github/workflows/00-bootstrap.yml` **not run** (public repository) |
 | AUT-301 infra workflows | `.github/workflows/10-infra-plan.yml` (OIDC plan, live) and `11-infra-apply.yml` (**disabled** until OD-B7: `config/apply-gate.json`); `scripts/stack.sh`, `scripts/oidc-session.sh`; runbook `docs/operations/staging-infra-workflows.md` |
-| AUT-112 budget | `terraform/modules/budgets/` in `envs/staging-core/`: monthly cost budget, forecast alerts at 80% and 100% (O16); decision in `config/staging-budget.json` (**limit undecided**), recipient from the `staging-plan` secret `BUDGET_ALERT_EMAIL`. Written and tested offline; **not applied** |
+| AUT-112 budget | `terraform/modules/budgets/` in `envs/staging-core/`: monthly cost budget, forecast alerts at 80% and 100% (O16); decision in `config/staging-budget.json` (limit 25 USD), recipient from the `staging-plan` secret `BUDGET_ALERT_EMAIL`. Written and tested offline; **not applied** |
 | AUT-101 … AUT-111 | not started (see `terraform/modules/README.md`) |
 
 ## Layout

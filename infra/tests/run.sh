@@ -1446,7 +1446,7 @@ check "AUT-112 a budget notifying the account's own topic in Mumbai passes" ok "
 BUDGET_CFG="$INFRA/config/staging-budget.json"
 check "AUT-112 committed decision: forecast alerts at 80% and 100% (O16)" ok "^\[80,100\]$" -- jq -c .forecast_alert_thresholds_percent "$BUDGET_CFG"
 check "AUT-112 committed budget is veda-*" ok "^veda-staging-monthly-cost$" -- jq -r .name "$BUDGET_CFG"
-check "AUT-112 the limit stays undecided until the owner records it (no invented amount)" ok "^null$" -- jq -c .monthly_limit_usd "$BUDGET_CFG"
+check "AUT-112 committed decision: monthly limit 25 USD (O16)" ok "^25$" -- jq -c .monthly_limit_usd "$BUDGET_CFG"
 absent "AUT-112 no email address is committed in the budget decision" "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" "$(cat "$BUDGET_CFG")"
 absent "AUT-112 no email address in the budget module or the staging-core root" "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[a-z]{2,}" \
   "$(cat "$INFRA"/terraform/modules/budgets/*.tf "$INFRA"/terraform/envs/staging-core/*.tf)"

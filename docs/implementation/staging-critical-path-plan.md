@@ -99,7 +99,7 @@ Token: a scoped token for these stories only (Zone:Read, DNS:Edit on `vedaspaces
 | O13 | OWNER-INPUT-004: name **two different humans** (F3); create their IAM users with MFA in a `veda-break-glass` group with an owner session; add the users to `allowed_foreign_resources` in a reviewed manifest PR; register the custodian-to-human mapping | RR-09, PG-BG | Before the rehearsal |
 | O14 | AM-9: choose R, (a) or (b) for break-glass cancellation | Rehearsal step 3 | Before the rehearsal |
 | O15 | A Cloudflare token scoped as in §4.2 | Browser-reachable staging | When I18 starts |
-| O16 | Budget threshold and alert address (AUT-112); SNS alarm recipients (AUT-110) | I12, I14 | Before those applies. **2026-10-05:** forecast alerts at 80% and 100% and the recipient decided; the monthly limit is still open (`infra/config/staging-budget.json`) |
+| O16 | Budget threshold and alert address (AUT-112); SNS alarm recipients (AUT-110) | I12, I14 | Before those applies. **2026-10-05:** monthly limit 25 USD, forecast alerts at 80% and 100%, recipient decided (`infra/config/staging-budget.json`; recipient in the `staging-plan` secret) |
 
 ## 6. Dependency graph
 

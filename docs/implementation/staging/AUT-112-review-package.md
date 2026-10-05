@@ -5,7 +5,7 @@
   the owner. Code, tests, plan guard and documentation only. **Nothing is applied and no AWS resource is created by
   this change.** Applies stay disabled until OD-B7 and N-04-S are decided (`infra/config/apply-gate.json`).
 - **Owner decision (O16, 2026-10-05):** forecast alerts at **80%** and **100%** of the monthly limit, by email to the
-  owner's address. The **monthly limit is not decided yet**.
+  owner's address; **monthly limit 25 USD** (alerts at forecast spend above 20 USD and 25 USD).
 - **Base:** `main` after PR #17 (AUT-301).
 - **Runbook:** [`staging-infra-workflows.md`](../../operations/staging-infra-workflows.md) §6.
 
@@ -15,7 +15,7 @@
 |---|---|
 | `infra/terraform/modules/budgets/` (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md`) | One `aws_budgets_budget`: `COST`, `MONTHLY`, USD, one `FORECASTED` / `GREATER_THAN` / `PERCENTAGE` notification per threshold, one email subscriber. No budget action, no SNS topic, no provider configuration |
 | `infra/terraform/envs/staging-core/main.tf`, `variables.tf`, `outputs.tf` | Calls the module with the reviewed decision and the sensitive variable `budget_alert_email`; output `budget` whose precondition stops the plan while the limit is undecided |
-| `infra/config/staging-budget.json` | The decision: name `veda-staging-monthly-cost`, `monthly_limit_usd: null` (undecided), `forecast_alert_thresholds_percent: [80, 100]`. **No email address** |
+| `infra/config/staging-budget.json` | The decision: name `veda-staging-monthly-cost`, `monthly_limit_usd: 25`, `forecast_alert_thresholds_percent: [80, 100]`. **No email address** |
 | `infra/terraform/envs/staging-core/tests/core.tftest.hcl`, `tests/fixtures/budget*.json` | 5 new offline Terraform tests (§5) |
 | `infra/scripts/check-plan.sh` | Plan guard: budget rules (§3) |
 | `.github/workflows/10-infra-plan.yml` | The plan step sets `TF_VAR_budget_alert_email` from `BUDGET_ALERT_EMAIL`, stored on the `staging-plan` environment (B3); a push to `main` that changes the budget decision is planned |
@@ -74,7 +74,7 @@ Unchanged: no destroy; Mumbai only for every regional resource; IAM, trust and r
 - **Plan guard:** the decided budget passes as a global resource; refused: a budget action, a name outside `veda-*`,
   another account, a billing view, no limit, another currency, no notification, an SNS topic in another account, an
   SNS topic outside Mumbai; the account's own topic in Mumbai passes.
-- **Committed decision:** thresholds `[80,100]`; name `veda-*`; limit still `null` (no invented amount); no email
+- **Committed decision:** thresholds `[80,100]`; name `veda-*`; limit `25` (O16); no email
   address in the decision, the module or the root.
 - **Wiring:** the root calls the module; the recipient variable is sensitive; the module creates no budget action;
   `make check` lints and scans the module.
@@ -107,8 +107,8 @@ All 13 are detected.
 
 ## 7. Plan proof expectations
 
-The plan proof needs the two owner inputs first: the monthly limit committed in `infra/config/staging-budget.json` (a
-reviewed pull request), and the secret `BUDGET_ALERT_EMAIL` set on the `staging-plan` environment. Then a
+Inputs: the monthly limit (25 USD) is committed in `infra/config/staging-budget.json`, and `BUDGET_ALERT_EMAIL` is set
+on the `staging-plan` environment (2026-10-05, at the owner's request; the value is not recorded here). A
 `10-infra-plan` run (pull request or `main`) must show:
 
 | Check | Expected |
@@ -116,12 +116,12 @@ reviewed pull request), and the secret `BUDGET_ALERT_EMAIL` set on the `staging-
 | OIDC session | `assumed-role/veda-gh-plan/gh-<run>-<attempt>-plan`; confined to ap-south-1 |
 | Backend | `s3://veda-tfstate-813238078849/staging/core.tfstate` |
 | Plan summary | **`Plan: 1 to add, 0 to change, 0 to destroy.`** |
-| The one resource | `module.budget.aws_budgets_budget.this` (create): name `veda-staging-monthly-cost`, `budget_type = "COST"`, `time_unit = "MONTHLY"`, `limit_amount = "<limit>.00"`, `limit_unit = "USD"`, two notifications (`FORECASTED`, `GREATER_THAN`, 80 and 100, `PERCENTAGE`), subscriber shown as `(sensitive value)`, the default tags |
+| The one resource | `module.budget.aws_budgets_budget.this` (create): name `veda-staging-monthly-cost`, `budget_type = "COST"`, `time_unit = "MONTHLY"`, `limit_amount = "25.00"`, `limit_unit = "USD"`, two notifications (`FORECASTED`, `GREATER_THAN`, 80 and 100, `PERCENTAGE`), subscriber shown as `(sensitive value)`, the default tags |
 | Plan guard | passes ("no destroy, everything in ap-south-1, …") |
 | Plan mode | `nothing was created` |
 
-Before the limit is decided, a plan run **fails** with the O16 message ("monthly_limit_usd … is undecided"), and before
-the secret is set it fails with the recipient message. Both are expected and create nothing.
+Fail-closed behaviour (offline tests): a `null` limit fails the plan with the O16 message, and a missing or malformed
+recipient fails it with the recipient message. Both create nothing.
 
 **After OD-B7 and N-04-S are decided** (not part of this change), the first apply is:
 1. `10-infra-plan` by workflow_dispatch on `main`; review the artifact's plan text; note run ID and plan SHA-256.
@@ -136,8 +136,8 @@ the secret is set it fails with the recipient message. Both are expected and cre
 
 | Decision | Options | Needed for |
 |---|---|---|
-| **O16, monthly limit** | An amount in USD | The plan proof (§7) |
-| **O16, recipient secret** | Set `BUDGET_ALERT_EMAIL` on `staging-plan` | The plan proof |
+| ~~O16, monthly limit~~ | **Decided 2026-10-05: 25 USD** | — |
+| ~~O16, recipient secret~~ | **Set 2026-10-05** on `staging-plan` | — |
 | **O16, actual-spend alert** (R1) | Keep forecast-only, or add `ACTUAL` at 100% | Optional; before the first apply |
 | **OD-B7** | Close (SCP, RR-C) or accept the `veda-gh-apply` trust-writing gap | The first apply |
 | **N-04-S** | `PRIVATE_REPOSITORY` (recommended here, R2) or `ACCEPTED` | The first apply |
