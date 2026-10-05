@@ -35,6 +35,7 @@ module "network" {
   vpc_cidr                 = local.network.vpc_cidr
   public_subnet_cidr       = local.network.public_subnet_cidr
   az_id_preference         = local.network.az_id_preference
+  az_id                    = try(local.network.az_id, null)
   host_instance_type       = local.network.host_instance_type
   flow_log_traffic_type    = local.network.flow_logs.traffic_type
   flow_log_retention_days  = local.network.flow_logs.retention_days

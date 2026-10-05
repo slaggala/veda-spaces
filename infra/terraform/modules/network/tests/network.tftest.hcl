@@ -24,7 +24,7 @@ variables {
   flow_log_traffic_type    = "ALL"
   flow_log_retention_days  = 30
   tunnel_egress_cidrs      = ["198.41.192.0/24", "198.41.200.0/24"]
-  aws_owned_s3_object_arns = ["arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*", "arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*"]
+  aws_owned_s3_object_arns = ["arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*", "arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*", "arn:aws:s3:::amazon-ssm-ap-south-1/*"]
 }
 
 run "vpc_and_subnet" {
@@ -115,7 +115,7 @@ run "s3_endpoint_policy_is_restricted" {
   assert {
     condition = (
       jsondecode(aws_vpc_endpoint.s3.policy).Statement[1].Action == "s3:GetObject" &&
-      jsondecode(aws_vpc_endpoint.s3.policy).Statement[1].Resource == ["arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*", "arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*"]
+      jsondecode(aws_vpc_endpoint.s3.policy).Statement[1].Resource == ["arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*", "arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*", "arn:aws:s3:::amazon-ssm-ap-south-1/*"]
     )
     error_message = "AWS-owned buckets are read-only and named"
   }
@@ -159,6 +159,47 @@ run "next_preferred_az_when_the_first_lacks_the_type" {
   assert {
     condition     = aws_subnet.public.availability_zone_id == "aps1-az3"
     error_message = "the second preference (aps1-az3) when aps1-az1 does not offer the type"
+  }
+}
+
+run "pinned_az_is_used" {
+  command = plan
+
+  variables {
+    az_id = "aps1-az2"
+  }
+
+  assert {
+    condition     = aws_subnet.public.availability_zone_id == "aps1-az2"
+    error_message = "a pinned AZ ID overrides the preference list (no replacement when offerings change)"
+  }
+}
+
+run "pinned_az_without_the_type_refused" {
+  command = plan
+
+  variables {
+    az_id = "aps1-az2"
+  }
+
+  override_data {
+    target = data.aws_ec2_instance_type_offerings.host
+    values = { locations = ["aps1-az1"] }
+  }
+
+  expect_failures = [aws_subnet.public]
+}
+
+run "nacl_rules_are_keyed_by_range" {
+  command = plan
+
+  variables {
+    tunnel_egress_cidrs = ["198.41.200.0/24", "198.41.192.0/24"]
+  }
+
+  assert {
+    condition     = aws_network_acl_rule.public["out-udp-7844-198.41.192.0/24"].rule_number == 300 && aws_network_acl_rule.public["out-udp-7844-198.41.200.0/24"].rule_number == 301
+    error_message = "rules are keyed and numbered by range, whatever the order of the list"
   }
 }
 

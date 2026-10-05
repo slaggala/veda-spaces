@@ -1513,7 +1513,7 @@ check "AUT-101 outbound on all protocols is refused" fail "outbound -1/" -- guar
 check "AUT-101 outbound to another port is refused" fail "outbound tcp/22-22" -- guard "$(mod 'aws_vpc_security_group_egress_rule.https' '.after.from_port = 22 | .after.to_port = 22')"
 check "AUT-101 the tunnel opened to everyone is refused" fail "outbound udp/7844-7844 to 0.0.0.0/0" -- guard "$(mod 'aws_vpc_security_group_egress_rule.tunnel["udp-198.41.192.0/24"]' '.after.cidr_ipv4 = "0.0.0.0/0"')"
 check "AUT-101 IPv6 outbound is refused" fail "is not TCP 443 or the tunnel" -- guard "$(mod 'aws_vpc_security_group_egress_rule.https' '.after.cidr_ipv4 = null | .after.cidr_ipv6 = "::/0"')"
-check "AUT-101 an inline outbound rule to another port is refused" fail "outbound tcp/25-25 is not TCP 443" -- guard "$(mod 'aws_security_group.host' '.after.egress = [{protocol: "tcp", from_port: 25, to_port: 25, cidr_blocks: ["0.0.0.0/0"]}] | .after_unknown.egress = false')"
+check "AUT-101 an inline outbound rule to another port is refused" fail "outbound tcp/25-25 to 0.0.0.0/0 is not TCP 443" -- guard "$(mod 'aws_security_group.host' '.after.egress = [{protocol: "tcp", from_port: 25, to_port: 25, cidr_blocks: ["0.0.0.0/0"]}] | .after_unknown.egress = false')"
 check "AUT-101 a legacy outbound rule on 443 passes" ok "plan guard: no destroy" -- guard "$(addres aws_security_group_rule https '{"type":"egress","protocol":"tcp","from_port":443,"to_port":443,"cidr_blocks":["0.0.0.0/0"]}')"
 # Network ACLs.
 check "AUT-101 a NACL allowing inbound SSH is refused" fail "NACL allows inbound to port 22" -- guard "$(mod 'aws_network_acl_rule.public["in-tcp-ephemeral"]' '.after.from_port = 22')"
@@ -1544,13 +1544,44 @@ check "AUT-101 reading another bucket through the endpoint is refused" fail "Aws
 check "AUT-101 writing to an AWS-owned bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Action = ["s3:GetObject","s3:PutObject"]')"
 check "AUT-101 an endpoint policy with NotResource is refused" fail "uses NotAction/NotResource/NotPrincipal" -- guard "$(eppol '.Statement[1] |= (del(.Resource) | .NotResource = "arn:aws:s3:::x/*")')"
 check "AUT-101 another region's ECR layer bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::prod-us-east-1-starport-layer-bucket/*"]')"
+# Review fixes (AUT-101 independent review, 2026-10-05).
+# M1: an update of the host group lists its rules inline; a prefix-list rule has no CIDR. It must pass, not crash.
+INLINE_EGRESS='[{"protocol":"tcp","from_port":443,"to_port":443,"cidr_blocks":["0.0.0.0/0"],"prefix_list_ids":[],"security_groups":[],"self":false,"ipv6_cidr_blocks":[]},
+ {"protocol":"tcp","from_port":443,"to_port":443,"cidr_blocks":[],"prefix_list_ids":["pl-78a54011"],"security_groups":[],"self":false,"ipv6_cidr_blocks":[]},
+ {"protocol":"tcp","from_port":7844,"to_port":7844,"cidr_blocks":["198.41.192.0/24","198.41.200.0/24"],"prefix_list_ids":[],"security_groups":[],"self":false,"ipv6_cidr_blocks":[]},
+ {"protocol":"udp","from_port":7844,"to_port":7844,"cidr_blocks":["198.41.192.0/24","198.41.200.0/24"],"prefix_list_ids":[],"security_groups":[],"self":false,"ipv6_cidr_blocks":[]}]'
+SGUPD="$(mod 'aws_security_group.host' ".actions = [\"update\"] | .after.egress = $INLINE_EGRESS | .after.ingress = [] | .after_unknown = {}")"
+check "AUT-101 M1 an update of the host group (rules inline, a prefix-list rule without CIDR) passes" ok "plan guard: no destroy" -- guard "$SGUPD"
+check "AUT-101 minor 1 an inline tunnel rule with a second, open range is refused" fail "outbound udp/7844-7844 to 0.0.0.0/0" -- guard "$(mod 'aws_security_group.host' ".actions = [\"update\"] | .after.egress = ($INLINE_EGRESS | .[3].cidr_blocks += [\"0.0.0.0/0\"]) | .after_unknown = {}")"
+# minor 2, 3: what the configuration sets, even when the plan cannot know it.
+cfgadd() { netfix ".configuration.root_module.module_calls.network.module.resources += [$1]"; }
+check "AUT-101 minor 2 a route into the main route table is refused" fail "route into the main or default route table" -- guard "$(cfgadd '{"address":"aws_route.main","mode":"managed","type":"aws_route","expressions":{"route_table_id":{"references":["aws_vpc.this.main_route_table_id","aws_vpc.this"]},"destination_cidr_block":{"constant_value":"0.0.0.0/0"},"gateway_id":{"references":["aws_internet_gateway.this.id"]}}}')"
+check "AUT-101 minor 2 a route to a network interface (unknown at plan time) is refused" fail "route sets network_interface_id" -- guard "$(cfgadd '{"address":"aws_route.eni","mode":"managed","type":"aws_route","expressions":{"route_table_id":{"references":["aws_route_table.public.id"]},"destination_cidr_block":{"constant_value":"10.0.0.0/8"},"network_interface_id":{"references":["aws_network_interface.x.id"]}}}')"
+check "AUT-101 minor 2 an IPv6 or prefix-list route is refused" fail "route sets destination_ipv6_cidr_block" -- guard "$(cfgadd '{"address":"aws_route.v6","mode":"managed","type":"aws_route","expressions":{"route_table_id":{"references":["aws_route_table.public.id"]},"destination_ipv6_cidr_block":{"constant_value":"::/0"},"gateway_id":{"references":["aws_internet_gateway.this.id"]}}}')"
+check "AUT-101 minor 2 inline routes in a route table are refused (configuration)" fail "inline routes are not allowed" -- guard "$(cfgadd '{"address":"aws_route_table.inline","mode":"managed","type":"aws_route_table","expressions":{"vpc_id":{"references":["aws_vpc.this.id"]},"route":[{"cidr_block":{"constant_value":"0.0.0.0/0"},"network_interface_id":{"references":["aws_network_interface.x.id"]}}]}}')"
+check "AUT-101 minor 2 inline routes in a route table are refused (plan)" fail "inline routes are not allowed" -- guard "$(mod 'aws_route_table.public' '.after.route = [{"cidr_block":"0.0.0.0/0","network_interface_id":"eni-1"}] | .after_unknown.route = false')"
+check "AUT-101 minor 2 a main route table association is refused" fail "aws_main_route_table_association is not part of the staging network" -- guard "$(addres aws_main_route_table_association x '{}')"
+check "AUT-101 minor 3 a rule attached to the default security group is refused" fail "rule attached to the default security group" -- guard "$(cfgadd '{"address":"aws_vpc_security_group_egress_rule.dflt","mode":"managed","type":"aws_vpc_security_group_egress_rule","expressions":{"security_group_id":{"references":["aws_default_security_group.this.id","aws_default_security_group.this"]},"ip_protocol":{"constant_value":"tcp"},"from_port":{"constant_value":443},"to_port":{"constant_value":443},"cidr_ipv4":{"constant_value":"0.0.0.0/0"}}}')"
+# minor 4: the flow-log role is assumable only for the account's flow logs.
+check "AUT-101 minor 4 a flow-log role without aws:SourceAccount is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition = {} | tojson)')"
+check "AUT-101 minor 4 a flow-log role for another account is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition.StringEquals["aws:SourceAccount"] = "999999999999" | tojson)')"
+# minor 5 and M2: exactly the named AWS-owned buckets of the region.
+check "AUT-101 M2 the SSM buckets (agent, documents, Distributor) are allowed" ok "plan guard: no destroy" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::amazon-ssm-ap-south-1/*","arn:aws:s3:::aws-ssm-ap-south-1/*","arn:aws:s3:::ap-south-1-birdwatcher-prod/*"]')"
+check "AUT-101 minor 5 a look-alike Amazon Linux bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::al2023-repos-ap-south-1-attacker/*"]')"
+check "AUT-101 minor 5 another region's SSM bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::amazon-ssm-us-east-1/*"]')"
+# minor 9, 10: other paths, and instances outside the staging subnet.
+for t in aws_networkmanager_vpc_attachment aws_vpclattice_service_network_vpc_association aws_ec2_instance_connect_endpoint aws_dx_transit_virtual_interface aws_dx_hosted_private_virtual_interface_accepter; do
+  check "AUT-101 minor 9 $t is refused" fail "$t is not part of the staging network" -- guard "$(addres "$t" x '{}')"
+done
+check "AUT-101 minor 10 an instance without a subnet (default VPC) is refused" fail "instance without a subnet would land in the default VPC" -- guard "$(addres aws_instance host '{"instance_type":"t4g.small","subnet_id":null,"network_interface":[]}')"
+check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: []}, after_unknown: {subnet_id: true}}}]')"
 # The committed decision and the bootstrap's one change.
 NET_CFG="$INFRA/config/staging-network.json"
 check "AUT-101 committed decision: egress model A, t4g.small, 10.60.0.0/20 (N1, N2, N4)" ok '^"A","t4g.small","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
 check "AUT-101 committed decision: flow logs ALL, 30 days (N6)" ok '^ALL 30$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.retention_days)"' "$NET_CFG"
 check "AUT-101 committed decision: tunnel egress to Cloudflare's two ranges only (N8)" ok '^\["198.41.192.0/24","198.41.200.0/24"\]$' -- jq -c .tunnel_egress_cidrs "$NET_CFG"
 check "AUT-101 staging-core plans the network module" ok 'source = "../../modules/network"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
-check "AUT-101 the apply role may pass Veda roles to VPC flow logs (bootstrap change, owner re-apply)" ok '"vpc-flow-logs.amazonaws.com"' -- cat "$INFRA/terraform/bootstrap/roles.tf"
+check "AUT-101 the apply role may pass Veda roles to VPC flow logs (bootstrap change, owner re-apply)" ok '"vpc-flow-logs.amazonaws.com"' -- awk '/sid *= "PassVedaRolesToStagingServices"/{p=1} p && /^  }/{exit} p' "$INFRA/terraform/bootstrap/roles.tf"
 # shellcheck disable=SC2016 # a make variable, expanded by make
 check "AUT-101 make test runs the network module's own tests" ok "terraform/modules/network" -- make -s -C "$INFRA" -f Makefile -f <(printf 'print-test-dirs:\n\t@printf "%%s\\n" $(patsubst %%/tests/,%%,$(dir $(wildcard terraform/modules/*/tests/)))\n') print-test-dirs
 

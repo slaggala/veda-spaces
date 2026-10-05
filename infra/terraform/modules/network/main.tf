@@ -15,8 +15,9 @@ data "aws_ec2_instance_type_offerings" "host" {
 }
 
 locals {
-  offered_az_ids = [for z in var.az_id_preference : z if contains(data.aws_ec2_instance_type_offerings.host.locations, z)]
-  az_id          = try(local.offered_az_ids[0], var.az_id_preference[0])
+  candidate_az_ids = var.az_id != null ? [var.az_id] : var.az_id_preference
+  offered_az_ids   = [for z in local.candidate_az_ids : z if contains(data.aws_ec2_instance_type_offerings.host.locations, z)]
+  az_id            = try(local.offered_az_ids[0], local.candidate_az_ids[0])
 }
 
 # --- VPC and its defaults, managed empty --------------------------------------------------------------------------
@@ -68,7 +69,7 @@ resource "aws_subnet" "public" {
   lifecycle {
     precondition {
       condition     = length(local.offered_az_ids) > 0
-      error_message = "None of the preferred AZ IDs (${join(", ", var.az_id_preference)}) offers ${var.host_instance_type} (owner decisions N2, N5)."
+      error_message = "None of the AZ IDs (${join(", ", local.candidate_az_ids)}) offers ${var.host_instance_type} (owner decisions N2, N5)."
     }
     precondition {
       # The subnet's network, read with the VPC's mask, is the VPC's network, and the subnet is no larger.
@@ -142,15 +143,17 @@ resource "aws_network_acl" "public" {
 
 locals {
   # Inbound: replies to the host's own connections only (ephemeral ports); nothing below 1024 is ever allowed in.
-  # Outbound: TCP 443 anywhere; TCP and UDP 7844 to the tunnel edge.
+  # Outbound: TCP 443 anywhere; TCP and UDP 7844 to the tunnel edge. Keyed by range, so a reordered list changes
+  # nothing; a rule number is the range's position in the sorted list (adding a range can renumber, a reviewed plan).
+  tunnel_cidrs = sort(var.tunnel_egress_cidrs)
   nacl_rules = merge(
     {
       "in-tcp-ephemeral" = { egress = false, rule_number = 100, protocol = "tcp", cidr = "0.0.0.0/0", from = 1024, to = 65535 }
       "out-tcp-443"      = { egress = true, rule_number = 100, protocol = "tcp", cidr = "0.0.0.0/0", from = 443, to = 443 }
     },
-    { for i, c in var.tunnel_egress_cidrs : "in-udp-ephemeral-${i}" => { egress = false, rule_number = 200 + i, protocol = "udp", cidr = c, from = 1024, to = 65535 } },
-    { for i, c in var.tunnel_egress_cidrs : "out-tcp-7844-${i}" => { egress = true, rule_number = 200 + i, protocol = "tcp", cidr = c, from = 7844, to = 7844 } },
-    { for i, c in var.tunnel_egress_cidrs : "out-udp-7844-${i}" => { egress = true, rule_number = 300 + i, protocol = "udp", cidr = c, from = 7844, to = 7844 } },
+    { for i, c in local.tunnel_cidrs : "in-udp-ephemeral-${c}" => { egress = false, rule_number = 200 + i, protocol = "udp", cidr = c, from = 1024, to = 65535 } },
+    { for i, c in local.tunnel_cidrs : "out-tcp-7844-${c}" => { egress = true, rule_number = 200 + i, protocol = "tcp", cidr = c, from = 7844, to = 7844 } },
+    { for i, c in local.tunnel_cidrs : "out-udp-7844-${c}" => { egress = true, rule_number = 300 + i, protocol = "udp", cidr = c, from = 7844, to = 7844 } },
   )
 }
 

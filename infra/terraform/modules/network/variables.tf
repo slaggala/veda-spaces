@@ -63,6 +63,17 @@ variable "az_id_preference" {
   }
 }
 
+variable "az_id" {
+  description = "The pinned AZ ID of the host subnet (recorded after the first plan), or null to choose from az_id_preference. Pinning keeps a change of offerings or preferences from replacing the subnet."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.az_id == null || can(regex("^aps1-az[0-9]$", var.az_id))
+    error_message = "az_id must be null or an ap-south-1 AZ ID (aps1-azN)."
+  }
+}
+
 variable "host_instance_type" {
   description = "Instance type of the host (owner decision N2); the subnet's AZ must offer it."
   type        = string
