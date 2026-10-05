@@ -261,7 +261,43 @@ All offline; nothing reached AWS.
 
 ## 6. Mutation check
 
-_Filled in from the consolidated mutation run._
+One mutation per key control, each in a fresh copy of the committed tree (`git archive` of the last commit), then
+the suite that should notice: `infra/tests/run.sh` for guard rules, gates and scripts, the module's `terraform test`
+for module controls. **All 31 are detected.**
+
+| # | Control removed | Suite result |
+|---|---|---|
+| K1 | KMS rotation | 740 passed, 1 failed |
+| K2 | KMS cross-account deny | 727 passed, 14 failed |
+| S1 | bucket needs its public access block | 721 passed, 20 failed |
+| S2 | Transfer Acceleration | 740 passed, 1 failed |
+| S3 | COMPLIANCE-only default lock | 740 passed, 1 failed |
+| C1 | multi-region trail | 740 passed, 1 failed |
+| C2 | no trail selectors | 740 passed, 1 failed |
+| E1 | immutable image tags | 740 passed, 1 failed |
+| I1 | reviewed managed policies | 740 passed, 1 failed |
+| I2 | no whole-service Allow | 738 passed, 3 failed |
+| P1 | no SecureString through Terraform | 740 passed, 1 failed |
+| P2 | no SSM associations | 740 passed, 1 failed |
+| M1 | encrypted SNS topics | 740 passed, 1 failed |
+| M2 | alarm actions only own topics | 739 passed, 2 failed |
+| X1 | IMDSv2 required | 740 passed, 1 failed |
+| X2 | no key pair | 740 passed, 1 failed |
+| X3 | snapshots stay in Mumbai | 740 passed, 1 failed |
+| SE1 | SES suppression | 740 passed, 1 failed |
+| G1 | decision gate | 738 passed, 3 failed |
+| D1 | deploy refuses HIGH/CRITICAL findings | 739 passed, 2 failed |
+| D2 | deploy tag must be the commit | 740 passed, 1 failed |
+| D3 | deploy session must be veda-gh-deploy | 740 passed, 1 failed |
+| EV1 | evidence session must be veda-gh-evidence | 740 passed, 1 failed |
+| W1 | 12-deploy checks deploy.enabled | 740 passed, 1 failed |
+| T1 | module: KMS rotation | 3 passed, 1 failed |
+| T2 | module: bucket public policy block | 6 passed, 1 failed |
+| T3 | module: host deny of IAM | 5 passed, 1 failed |
+| T4 | module: IMDSv2 | 5 passed, 1 failed |
+| T5 | module: SES bounce suppression | 3 passed, 1 failed |
+| T6 | module: silent snapshot alarms | 5 passed, 1 failed |
+| T7 | module: deploy verifies the bundle | 4 passed, 1 failed |
 
 ## 7. Cost
 
