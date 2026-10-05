@@ -15,7 +15,7 @@ Reusable modules for the staging stacks. Empty until the items below. Every modu
 | `compute` (EC2, data volume, recovery, DLM) | AUT-108 |
 | `observability` | AUT-110 |
 | `ses` | AUT-111 |
-| `budgets` | AUT-112 |
+| `budgets` | AUT-112 (**written**: [budgets/README.md](budgets/README.md)) |
 | `cf-tunnel`, `cf-dns`, `cf-turnstile`, `cf-pages`, `cf-waf` | AUT-201 … AUT-205 |
 
 Rules for every module: roles are created with the `veda-boundary` permissions boundary (the apply role

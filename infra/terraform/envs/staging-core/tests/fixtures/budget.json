@@ -1,0 +1,10 @@
+{
+  "description": "Offline test fixture of infra/config/staging-budget.json (AUT-112).",
+  "name": "veda-staging-monthly-cost",
+  "monthly_limit_usd": 50,
+  "forecast_alert_thresholds_percent": [
+    80,
+    100
+  ],
+  "decision": "Test fixture: limit 50 USD."
+}

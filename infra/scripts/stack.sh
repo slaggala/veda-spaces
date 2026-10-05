@@ -194,5 +194,12 @@ terraform -chdir="$STACK_DIR" show -no-color "$PLAN" >"$PLAN_DIR/applying-plan.t
 terraform -chdir="$STACK_DIR" show -json "$PLAN" >"$PLAN_DIR/applying-plan.json"
 guard "$PLAN_DIR/applying-plan.json"
 log "approved plan verified: sha256 $sum, plan run $PLAN_RUN, commit $COMMIT, stack $STACK"
-terraform -chdir="$STACK_DIR" apply -input=false -lock-timeout=5m "$PLAN"
+# The apply output stays in a file, like the plan output (N-04-S): it can carry planned values, and AWS errors can
+# repeat them (the AUT-112 recipient is masked only in the plan job). The log shows the result line, or on failure the
+# last lines with every email address redacted.
+if ! terraform -chdir="$STACK_DIR" apply -input=false -lock-timeout=5m -no-color "$PLAN" >"$PLAN_DIR/apply.log" 2>&1; then
+  tail -n 40 "$PLAN_DIR/apply.log" | sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/<redacted email>/g' >&2
+  die "terraform apply failed (output in $PLAN_DIR/apply.log)"
+fi
+log "$(grep -E '^Apply complete!' "$PLAN_DIR/apply.log" | tail -n 1 || true)"
 log "applied the approved plan of run $PLAN_RUN to $STATE_KEY"

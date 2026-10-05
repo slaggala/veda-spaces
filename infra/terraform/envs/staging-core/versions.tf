@@ -1,4 +1,4 @@
-# Staging core root (AUT-101 … AUT-112), planned and applied only through GitHub OIDC (AUT-301). The S3 backend is
+# Staging core root (AUT-101 … AUT-112; AUT-112 budget first), planned and applied only through GitHub OIDC (AUT-301). The S3 backend is
 # configured at init by infra/scripts/stack.sh (bucket, key staging/core.tfstate, state key, use_lockfile).
 terraform {
   required_version = ">= 1.10.0, < 2.0.0" # 1.10+: S3 native state locking (use_lockfile)

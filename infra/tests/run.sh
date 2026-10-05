@@ -1189,7 +1189,7 @@ check "AUT-301 apply job fetches the approved plan before any session" ok "in or
 check "AUT-301 apply job assumes veda-gh-apply" ok "oidc-session.sh --role apply" -- printf '%s\n' "$APPJOB"
 # shellcheck disable=SC2016 # matched literally in the workflow
 check "AUT-301 apply job applies only the approved digest of the approved run" ok '--plan-sha256 "\$PLAN_SHA256" --plan-run-id "\$PLAN_RUN_ID"' -- printf '%s\n' "$APPJOB"
-absent "AUT-301 no stored secret in either workflow" 'secrets\.' "$PWT$AWT"
+absent "AUT-301 no stored secret in the apply workflow" 'secrets\.' "$AWT"
 absent "AUT-301 every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$PWT$AWT"
 absent "AUT-301 checkouts keep no credentials" "persist-credentials: true" "$PWT$AWT"
 check "AUT-301 every checkout drops the token" ok "^3$" -- grep -c "persist-credentials: false" <<<"$PWT$AWT"
@@ -1291,7 +1291,7 @@ pdrift() { # pdrift <jq>: a copy of the reviewed plan dir with its metadata chan
 }
 TFA="$(tf_plan_stub "$NOOP")"
 check "AUT-301 the approved plan is applied" ok "applied the approved plan of run 100 to staging/core.tfstate" -- sapply "$PD" "$(wf_session apply)" "$TFA"
-check "  ... exactly that plan file" ok "apply -input=false -lock-timeout=5m $PD/core.tfplan" -- cat "$TFA/calls.log"
+check "  ... exactly that plan file" ok "apply -input=false -lock-timeout=5m -no-color $PD/core.tfplan" -- cat "$TFA/calls.log"
 TFA="$(tf_plan_stub "$NOOP")"
 check "AUT-301 apply refused by the committed gate (OD-B7 undecided)" fail "staging applies are disabled" -- sapply "$PD" "$(wf_session apply)" "$TFA" VEDA_APPLY_GATE="$INFRA/config/apply-gate.json"
 absent "  ... before Terraform runs at all" "^(init|apply) " "$(cat "$TFA/calls.log" 2>/dev/null || true)"
@@ -1407,6 +1407,83 @@ check "RR-A a customized subject template is drift" fail "customized OIDC subjec
 check "RR-A another subject prefix (renamed or transferred repository) is drift" fail "the role trusts expect 'repo:example-org@4242/veda-spaces@424242'" -- venv "$(gh_drift actions_oidc_customization_sub '.sub_claim_prefix = "repo:other@1/veda-spaces@424242"')"
 check "RR-A unreadable OIDC settings fail closed" fail "cannot read the OIDC subject customization" -- venv "$(gh_drift actions_oidc_customization_sub DELETE)"
 check "RR-A the admin --verify checks it too" fail "does not issue the immutable OIDC subject" -- verify "$(drift i actions_oidc_customization_sub '.use_immutable_subject = false')"
+
+echo "== AUT-112: staging cost budget (forecast alerts, plan guard, recipient kept out of the repository)"
+# A budget as `terraform show -json` plans it: global (no region), account_id computed, the address sensitive.
+BUDGET_AFTER='{"name":"veda-staging-monthly-cost","budget_type":"COST","time_unit":"MONTHLY","limit_amount":"50.00","limit_unit":"USD",
+  "billing_view_arn":null,"notification":[
+  {"notification_type":"FORECASTED","comparison_operator":"GREATER_THAN","threshold":80,"threshold_type":"PERCENTAGE",
+   "subscriber_email_addresses":["owner@example.com"],"subscriber_sns_topic_arns":[]},
+  {"notification_type":"FORECASTED","comparison_operator":"GREATER_THAN","threshold":100,"threshold_type":"PERCENTAGE",
+   "subscriber_email_addresses":["owner@example.com"],"subscriber_sns_topic_arns":[]}]}'
+# after_unknown as Terraform plans the budget (computed attributes and the notification set, element by element).
+BUDGET_UNKNOWN='{"account_id":true,"id":true,"arn":true,"cost_filter":true,"cost_types":true,"time_period_start":true,
+  "tags_all":{},"notification":[{"subscriber_email_addresses":[false]},{"subscriber_email_addresses":[false]}]}'
+budget() { # budget [jq filter applied to the clean budget] [after_unknown JSON]
+  res aws_budgets_budget module.budget.aws_budgets_budget.this "$(jq -c "${1:-.}" <<<"$BUDGET_AFTER")" "${2:-$BUDGET_UNKNOWN}"
+}
+plan_json "$P.budget" "[$(budget)]"
+check "AUT-112 the decided budget passes the guard (global: no region)" ok "plan guard: no destroy" -- guard "$P.budget"
+plan_json "$P.baction" "[$(budget), $(res aws_budgets_budget_action aws_budgets_budget_action.stop '{"action_type":"RUN_SSM_DOCUMENTS"}')]"
+check "AUT-112 a budget action is refused" fail "aws_budgets_budget_action.stop: budget actions are not allowed" -- guard "$P.baction"
+plan_json "$P.bname" "[$(budget '.name = "staging-monthly"')]"
+check "AUT-112 a budget outside veda-* is refused" fail "budget name staging-monthly is not veda-\*" -- guard "$P.bname"
+plan_json "$P.bacct" "[$(budget '.account_id = "999999999999"' '{"id":true}')]"
+check "AUT-112 a budget for another account is refused" fail "budget for account 999999999999" -- guard "$P.bacct"
+plan_json "$P.bview" "[$(budget '.billing_view_arn = "arn:aws:billing::999999999999:billingview/x"')]"
+check "AUT-112 a budget on a billing view is refused" fail "budget on a billing view" -- guard "$P.bview"
+plan_json "$P.blimit" "[$(budget '.limit_amount = null')]"
+check "AUT-112 a budget without a limit (O16 undecided) is refused" fail "budget without a known limit in USD" -- guard "$P.blimit"
+plan_json "$P.bunit" "[$(budget '.limit_unit = "EUR"')]"
+check "AUT-112 a budget in another currency is refused" fail "budget without a known limit in USD" -- guard "$P.bunit"
+plan_json "$P.bsilent" "[$(budget '.notification = []')]"
+check "AUT-112 a budget that alerts no one is refused" fail "budget without a notification alerts no one" -- guard "$P.bsilent"
+plan_json "$P.bsns" "[$(budget '.notification[0].subscriber_sns_topic_arns = ["arn:aws:sns:ap-south-1:999999999999:alerts"]')]"
+check "AUT-112 a budget notifying another account's topic is refused" fail "budget notifies arn:aws:sns:ap-south-1:999999999999:alerts, outside account" -- guard "$P.bsns"
+plan_json "$P.bsnsr" "[$(budget ".notification[0].subscriber_sns_topic_arns = [\"arn:aws:sns:us-east-1:$ACCT:alerts\"]")]"
+check "AUT-112 a budget notifying a topic outside Mumbai is refused" fail "budget notifies arn:aws:sns:us-east-1:$ACCT:alerts" -- guard "$P.bsnsr"
+plan_json "$P.bsnsunk" "[$(budget 'del(.notification[0].subscriber_sns_topic_arns)' "$(jq -c '.notification[0].subscriber_sns_topic_arns = true' <<<"$BUDGET_UNKNOWN")")]"
+check "AUT-112 a budget notifying an SNS list unknown at plan time is refused (never skipped)" fail "budget notifies an SNS topic not known at plan time" -- guard "$P.bsnsunk"
+plan_json "$P.bsnsunk1" "[$(budget ".notification[0].subscriber_sns_topic_arns = [\"arn:aws:sns:ap-south-1:$ACCT:veda-stg-alarms\", null]" "$(jq -c '.notification[0].subscriber_sns_topic_arns = [false, true]' <<<"$BUDGET_UNKNOWN")")]"
+check "AUT-112 a budget notifying one SNS topic unknown at plan time is refused with a clear message" fail "budget notifies an SNS topic not known at plan time" -- guard "$P.bsnsunk1"
+plan_json "$P.bnotunk" "[$(budget 'del(.notification)' "$(jq -c '.notification = true' <<<"$BUDGET_UNKNOWN")")]"
+check "AUT-112 budget notifications unknown at plan time are refused" fail "budget notifications not known at plan time" -- guard "$P.bnotunk"
+plan_json "$P.bupdate" "[$(budget '.notification = []' | jq -c '.change.actions = ["update"]')]"
+check "AUT-112 an update that drops every alert is refused" fail "budget without a notification alerts no one" -- guard "$P.bupdate"
+plan_json "$P.bsnsok" "[$(budget ".notification[0].subscriber_sns_topic_arns = [\"arn:aws:sns:ap-south-1:$ACCT:veda-stg-alarms\"]")]"
+check "AUT-112 a budget notifying the account's own topic in Mumbai passes" ok "plan guard: no destroy" -- guard "$P.bsnsok"
+
+BUDGET_CFG="$INFRA/config/staging-budget.json"
+check "AUT-112 committed decision: forecast alerts at 80% and 100% (O16)" ok "^\[80,100\]$" -- jq -c .forecast_alert_thresholds_percent "$BUDGET_CFG"
+check "AUT-112 committed budget is veda-*" ok "^veda-staging-monthly-cost$" -- jq -r .name "$BUDGET_CFG"
+check "AUT-112 committed decision: monthly limit 25 USD (O16)" ok "^25$" -- jq -c .monthly_limit_usd "$BUDGET_CFG"
+absent "AUT-112 no email address is committed in the budget decision" "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" "$(cat "$BUDGET_CFG")"
+absent "AUT-112 no email address in the budget module or the staging-core root" "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[a-z]{2,}" \
+  "$(cat "$INFRA"/terraform/modules/budgets/*.tf "$INFRA"/terraform/envs/staging-core/*.tf)"
+check "AUT-112 staging-core plans the budget module" ok 'source = "../../modules/budgets"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+check "AUT-112 the recipient is a sensitive root variable" ok "sensitive *= true" -- awk '/^variable "budget_alert_email"/{p=1} p' "$INFRA/terraform/envs/staging-core/variables.tf"
+# shellcheck disable=SC2016 # a make variable, expanded by make
+check "AUT-112 make check lints and scans the budgets module" ok "^terraform/modules/budgets$" -- make -s -C "$INFRA" -f Makefile -f <(printf 'print-modules:\n\t@printf "%%s\\n" $(MODULES)\n') print-modules
+absent "AUT-112 the module creates no budget action" 'resource "aws_budgets_budget_action"' "$(cat "$INFRA"/terraform/modules/budgets/*.tf)"
+PLANSTEP="$(awk '/- name: Plan and plan guard/{p=1;print;next} p && /^      - name:/{exit} p' "$PW")"
+check "AUT-112 the plan step reads the recipient from the staging-plan environment secret" ok 'TF_VAR_budget_alert_email: \$\{\{ secrets.BUDGET_ALERT_EMAIL \}\}' -- printf '%s\n' "$PLANSTEP"
+absent "AUT-112 the only stored secret in either workflow is the budget recipient (OIDC for AWS)" 'secrets\.' "${PWT//secrets.BUDGET_ALERT_EMAIL/}$AWT"
+check "  ... used once, in the plan step only" ok "^1$" -- grep -c "secrets\." <<<"$PWT"
+absent "AUT-112 the recipient never reaches a plain variable (vars are printed in the public job log)" "vars\.BUDGET" "$PWT$AWT"
+check "AUT-112 the plan text shows the alerts without the recipient (root output budget)" ok "alerts *= module.budget.alerts" -- cat "$INFRA/terraform/envs/staging-core/outputs.tf"
+check "AUT-112 the published plan artifact is named as holding the recipient" ok "Upload the plan for review and apply \(the plan file holds the budget recipient" -- printf '%s\n' "$PWT"
+# stack.sh apply keeps Terraform's output off the public log, and redacts addresses from a failure's tail.
+TFA="$(tf_plan_stub "$NOOP")" && printf 'module.budget.aws_budgets_budget.this: Creating... owner@example.com\nApply complete! Resources: 1 added, 0 changed, 0 destroyed.\n' >"$TFA/apply.stdout"
+out_apply="$(sapply "$PD" "$(wf_session apply)" "$TFA" 2>&1)"
+check "AUT-112 apply shows the result line" ok "Apply complete! Resources: 1 added, 0 changed, 0 destroyed\." -- printf '%s\n' "$out_apply"
+absent "AUT-112 apply output stays off the job log (it can carry planned values)" "owner@example\.com|Creating\.\.\." "$out_apply"
+check "  ... and is kept in the apply log file" ok "owner@example.com" -- cat "$PD/apply.log"
+TFA="$(tf_plan_stub "$NOOP")" && printf 'Error: creating Budget subscriber owner@example.com: AccessDenied\n' >"$TFA/apply.stdout" && : >"$TFA/apply.fail"
+out_apply="$(sapply "$PD" "$(wf_session apply)" "$TFA" 2>&1)"
+check "AUT-112 a failed apply shows its error with addresses redacted" ok "creating Budget subscriber <redacted email>: AccessDenied" -- printf '%s\n' "$out_apply"
+absent "  ... never the address" "owner@example\.com" "$out_apply"
+check "  ... and fails" fail "terraform apply failed" -- sapply "$PD" "$(wf_session apply)" "$TFA"
+check "AUT-112 a change of the budget decision is planned on main" ok "^      - infra/config/staging-budget.json$" -- awk '/^  push:/{p=1} /^  workflow_dispatch:/{p=0} p' "$PW"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
