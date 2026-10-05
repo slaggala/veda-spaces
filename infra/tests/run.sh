@@ -1170,6 +1170,8 @@ check "AUT-301 plan job proves its staging-plan approval" ok "verify-run.sh appr
 check "AUT-301 plan job assumes veda-gh-plan through OIDC" ok "oidc-session.sh --role plan" -- printf '%s\n' "$PLANJOB"
 check "AUT-301 plan job plans through stack.sh (plan guard, no plan text in the log)" ok "stack.sh plan --stack core" -- printf '%s\n' "$PLANJOB"
 check "AUT-301 plan artifact only when publishing is allowed (N-04-S)" ok "if: steps.publish.outputs.publish == 'true'" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 the published plan artifact is kept 7 days (N-04-S accepted for staging)" ok "^ +retention-days: 7$" -- printf '%s\n' "$PLANJOB"
+check "  ... and it is the plan job's only retention setting" ok "^1$" -- grep -cE "^ +retention-days:" <<<"$PLANJOB"
 order_ok() { # order_ok <text> <first> <second>: the first pattern appears before the second
   local a b
   a="$(grep -n -- "$2" <<<"$1" | head -1 | cut -d: -f1)"
@@ -1196,7 +1198,7 @@ absent "AUT-301 every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$PWT$AWT"
 absent "AUT-301 checkouts keep no credentials" "persist-credentials: true" "$PWT$AWT"
 check "AUT-301 every checkout drops the token" ok "^3$" -- grep -c "persist-credentials: false" <<<"$PWT$AWT"
 
-# The committed gate: OD-B7 accepted for staging, N-04-S private repository, both with the committed record.
+# The committed gate: OD-B7 and N-04-S accepted for staging, both with the committed record.
 T="$(new_tree)"
 cp -R "$INFRA/config/apply-gate.json" "$T/infra/config/apply-gate.json"
 SK="$T/infra/scripts/stack.sh"
@@ -1204,7 +1206,7 @@ GATE_RECORD="$(jq -r '.gates["OD-B7"].record' "$INFRA/config/apply-gate.json")"
 check "AUT-301 committed apply gate: OD-B7 and N-04-S share one owner decision record" ok "^docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md 1$" -- jq -r '"\(.gates["OD-B7"].record) \([.gates[].record] | unique | length)"' "$INFRA/config/apply-gate.json"
 check "AUT-301 committed apply gate refuses while its record is absent" fail "record $GATE_RECORD does not exist" -- "$SK" gate
 mkdir -p "$T/$(dirname "$GATE_RECORD")" && cp "$INFRA/../$GATE_RECORD" "$T/$GATE_RECORD"
-check "AUT-301 committed apply gate is decided (OD-B7 accepted, N-04-S private repository)" ok "apply gates decided: OD-B7=ACCEPTED, N-04-S=PRIVATE_REPOSITORY" -- "$SK" gate
+check "AUT-301 committed apply gate is decided (OD-B7 and N-04-S accepted for staging)" ok "apply gates decided: OD-B7=ACCEPTED, N-04-S=ACCEPTED" -- "$SK" gate
 gatefix() { # gatefix <jq>: an apply gate derived from the committed one
   local f="$TMP/gate.$RANDOM$RANDOM.json"
   jq "$1" "$INFRA/config/apply-gate.json" >"$f"

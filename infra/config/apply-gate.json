@@ -8,7 +8,7 @@
     },
     "N-04-S": {
       "title": "Staging plan text in a public repository: plan artifacts are uploaded (and so reviewable for apply) only from a private repository unless the owner accepts publishing them",
-      "status": "PRIVATE_REPOSITORY",
+      "status": "ACCEPTED",
       "record": "docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md"
     }
   }
