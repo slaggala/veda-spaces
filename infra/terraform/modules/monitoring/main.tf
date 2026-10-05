@@ -4,6 +4,9 @@
 # is a billed custom metric, which alone could exceed the 25 USD budget (cost report). The filters bound the count.
 # Alarms notify the encrypted topic veda-stg-alarms: the owner's address by email, and the queue veda-stg-alarm-capture
 # that drills read (bootstrap deploy role). Host alarms are added once the instance exists (AUT-108).
+# Alarms fed by the deployed application, the CloudWatch agent or the heartbeat ("deployed = true") keep their actions
+# off until deployment is enabled (deployment_alarms_enabled = deploy.enabled, review R4): before the first deploy they
+# would only report missing data. The audit, trail, EC2 status, CPU and SES alarms are always active.
 
 locals {
   p          = var.name_prefix
@@ -25,23 +28,23 @@ locals {
 
   # name => metric, statistic, threshold, comparison, period, missing-data treatment, description
   app_alarms = {
-    "app-5xx"               = { ns = "Veda/App", metric = "ServerErrors", stat = "Sum", threshold = var.thresholds.server_errors_per_5min, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "API 5xx responses" }
-    "lead-intake-failures"  = { ns = "Veda/App", metric = "LeadIntakeFailures", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Public lead submissions failing (5xx)" }
-    "notification-failures" = { ns = "Veda/App", metric = "NotificationFailures", stat = "Sum", threshold = 3, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "Email and other outbox handlers failing (the lead stays committed, NOTIF-008)" }
-    "outbox-dead"           = { ns = "Veda/App", metric = "OutboxDead", stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Outbox events dead-lettered" }
-    "scheduled-job-failed"  = { ns = "Veda/App", metric = "ScheduledJobFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A scheduled job failed" }
-    "snapshot-missing"      = { ns = "Veda/App", metric = "SnapshotCompleted", stat = "Sum", threshold = 1, cmp = "LessThanThreshold", period = 86400, missing = "breaching", what = "No completed snapshot in 24 hours (RR-14)" }
-    "chain-anchor-failed"   = { ns = "Veda/App", metric = "ChainAnchorFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A security-chain anchor failed (FC-01)" }
-    "audit-tampering"       = { ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
+    "app-5xx"               = { deployed = true, ns = "Veda/App", metric = "ServerErrors", stat = "Sum", threshold = var.thresholds.server_errors_per_5min, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "API 5xx responses" }
+    "lead-intake-failures"  = { deployed = true, ns = "Veda/App", metric = "LeadIntakeFailures", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Public lead submissions failing (5xx)" }
+    "notification-failures" = { deployed = true, ns = "Veda/App", metric = "NotificationFailures", stat = "Sum", threshold = 3, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "Email and other outbox handlers failing (the lead stays committed, NOTIF-008)" }
+    "outbox-dead"           = { deployed = true, ns = "Veda/App", metric = "OutboxDead", stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Outbox events dead-lettered" }
+    "scheduled-job-failed"  = { deployed = true, ns = "Veda/App", metric = "ScheduledJobFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A scheduled job failed" }
+    "snapshot-missing"      = { deployed = true, ns = "Veda/App", metric = "SnapshotCompleted", stat = "Sum", threshold = 1, cmp = "LessThanThreshold", period = 86400, missing = "breaching", what = "No completed snapshot in 24 hours (RR-14)" }
+    "chain-anchor-failed"   = { deployed = true, ns = "Veda/App", metric = "ChainAnchorFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A security-chain anchor failed (FC-01)" }
+    "audit-tampering"       = { deployed = false, ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
   }
 
   host_alarms = !var.host_alarms_enabled ? {} : {
-    "host-status-check" = { ns = "AWS/EC2", metric = "StatusCheckFailed", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "breaching", what = "Instance or system status check failed (EC2 recovers it automatically)" }
-    "host-cpu"          = { ns = "AWS/EC2", metric = "CPUUtilization", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.cpu_percent, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "CPU high for 15 minutes" }
-    "host-memory"       = { ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }
-    "host-data-disk"    = { ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/var/lib/veda" }, stat = "Maximum", threshold = var.thresholds.data_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Data volume (/var/lib/veda) filling up" }
-    "host-root-disk"    = { ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/" }, stat = "Maximum", threshold = var.thresholds.root_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Root volume filling up (images, logs)" }
-    "api-health"        = { ns = "Veda/Host", metric = "HealthReady", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, missing = "breaching", what = "/health/ready failing or not reporting (uptime)" }
+    "host-status-check" = { deployed = false, ns = "AWS/EC2", metric = "StatusCheckFailed", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "breaching", what = "Instance or system status check failed (EC2 recovers it automatically)" }
+    "host-cpu"          = { deployed = false, ns = "AWS/EC2", metric = "CPUUtilization", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.cpu_percent, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "CPU high for 15 minutes" }
+    "host-memory"       = { deployed = true, ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }
+    "host-data-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/var/lib/veda" }, stat = "Maximum", threshold = var.thresholds.data_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Data volume (/var/lib/veda) filling up" }
+    "host-root-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/" }, stat = "Maximum", threshold = var.thresholds.root_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Root volume filling up (images, logs)" }
+    "api-health"        = { deployed = true, ns = "Veda/Host", metric = "HealthReady", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, missing = "breaching", what = "/health/ready failing or not reporting (uptime)" }
   }
 }
 
@@ -129,6 +132,7 @@ resource "aws_cloudwatch_metric_alarm" "app" {
   for_each = local.app_alarms
 
   alarm_name          = "${local.p}-${each.key}"
+  actions_enabled     = !each.value.deployed || var.deployment_alarms_enabled
   alarm_description   = each.value.what
   namespace           = each.value.ns
   metric_name         = each.value.metric
@@ -147,6 +151,7 @@ resource "aws_cloudwatch_metric_alarm" "app" {
 # The trail's CloudWatch copy stops arriving: delivery failed or the trail stopped (AUT-104).
 resource "aws_cloudwatch_metric_alarm" "trail_delivery" {
   alarm_name          = "${local.p}-trail-delivery"
+  actions_enabled     = true # always active (review R4)
   alarm_description   = "No CloudTrail events reached ${var.trail_log_group_name} for an hour (AUT-104)"
   namespace           = "AWS/Logs"
   metric_name         = "IncomingLogEvents"
@@ -167,6 +172,7 @@ resource "aws_cloudwatch_metric_alarm" "host" {
   for_each = local.host_alarms
 
   alarm_name          = "${local.p}-${each.key}"
+  actions_enabled     = !each.value.deployed || var.deployment_alarms_enabled
   alarm_description   = each.value.what
   namespace           = each.value.ns
   metric_name         = each.value.metric
@@ -210,37 +216,5 @@ resource "aws_cloudwatch_dashboard" "staging" {
         }
       },
     ]
-  })
-}
-
-# The CloudWatch agent configuration the host loads (AUT-108): memory and the two disks, and the host logs.
-resource "aws_ssm_parameter" "agent_config" {
-  #checkov:skip=CKV2_AWS_34:The CloudWatch agent configuration is not secret (metrics and log paths)
-  name        = "${var.log_group_prefix}/cloudwatch-agent"
-  description = "CloudWatch agent configuration of the Veda staging host (AUT-110)"
-  type        = "String"
-  tier        = "Standard"
-  value = jsonencode({
-    agent = { metrics_collection_interval = 60, run_as_user = "root" }
-    metrics = {
-      namespace         = "CWAgent"
-      append_dimensions = { InstanceId = "$${aws:InstanceId}" }
-      metrics_collected = {
-        mem  = { measurement = ["mem_used_percent"] }
-        disk = { measurement = ["used_percent"], resources = ["/", "/var/lib/veda"], drop_device = true, ignore_file_system_types = ["sysfs", "devtmpfs", "tmpfs", "overlay"] }
-      }
-      aggregation_dimensions = [["InstanceId"], ["InstanceId", "path"]]
-    }
-    logs = {
-      logs_collected = {
-        files = {
-          collect_list = [
-            { file_path = "/var/log/messages", log_group_name = local.host_group, log_stream_name = "{instance_id}/messages" },
-            { file_path = "/var/log/cloud-init-output.log", log_group_name = local.host_group, log_stream_name = "{instance_id}/cloud-init" },
-            { file_path = "/var/log/veda/*.log", log_group_name = local.host_group, log_stream_name = "{instance_id}/veda" },
-          ]
-        }
-      }
-    }
   })
 }

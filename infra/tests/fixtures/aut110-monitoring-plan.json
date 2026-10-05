@@ -64,6 +64,13 @@
                 "module.kms"
               ]
             },
+            "deployment_alarms_enabled": {
+              "references": [
+                "local.platform.deploy.enabled",
+                "local.platform.deploy",
+                "local.platform"
+              ]
+            },
             "host_alarms_enabled": {
               "constant_value": true
             },
@@ -117,15 +124,6 @@
           },
           "module": {
             "outputs": {
-              "agent_config_parameter": {
-                "expression": {
-                  "references": [
-                    "aws_ssm_parameter.agent_config.name",
-                    "aws_ssm_parameter.agent_config"
-                  ]
-                },
-                "description": "SSM parameter holding the CloudWatch agent configuration."
-              },
               "alarm_names": {
                 "expression": {
                   "references": [
@@ -292,6 +290,13 @@
                 "name": "app",
                 "provider_config_key": "aws",
                 "expressions": {
+                  "actions_enabled": {
+                    "references": [
+                      "each.value.deployed",
+                      "each.value",
+                      "var.deployment_alarms_enabled"
+                    ]
+                  },
                   "alarm_actions": {
                     "references": [
                       "local.topic_arn"
@@ -377,6 +382,13 @@
                 "name": "host",
                 "provider_config_key": "aws",
                 "expressions": {
+                  "actions_enabled": {
+                    "references": [
+                      "each.value.deployed",
+                      "each.value",
+                      "var.deployment_alarms_enabled"
+                    ]
+                  },
                   "alarm_actions": {
                     "references": [
                       "local.topic_arn"
@@ -468,6 +480,9 @@
                 "name": "trail_delivery",
                 "provider_config_key": "aws",
                 "expressions": {
+                  "actions_enabled": {
+                    "constant_value": true
+                  },
                   "alarm_actions": {
                     "references": [
                       "local.topic_arn"
@@ -661,37 +676,6 @@
                   }
                 },
                 "schema_version": 1
-              },
-              {
-                "address": "aws_ssm_parameter.agent_config",
-                "mode": "managed",
-                "type": "aws_ssm_parameter",
-                "name": "agent_config",
-                "provider_config_key": "aws",
-                "expressions": {
-                  "description": {
-                    "constant_value": "CloudWatch agent configuration of the Veda staging host (AUT-110)"
-                  },
-                  "name": {
-                    "references": [
-                      "var.log_group_prefix"
-                    ]
-                  },
-                  "tier": {
-                    "constant_value": "Standard"
-                  },
-                  "type": {
-                    "constant_value": "String"
-                  },
-                  "value": {
-                    "references": [
-                      "local.host_group",
-                      "local.host_group",
-                      "local.host_group"
-                    ]
-                  }
-                },
-                "schema_version": 0
               }
             ],
             "variables": {
@@ -707,6 +691,10 @@
               },
               "audit_key_arn": {
                 "description": "AUT-102 audit key (log groups)."
+              },
+              "deployment_alarms_enabled": {
+                "default": false,
+                "description": "Actions of the alarms fed by the deployed application, the agent or the heartbeat (deploy.enabled; review R4). False: those alarms exist but notify no one."
               },
               "host_alarms_enabled": {
                 "default": false,
@@ -1232,7 +1220,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1404,7 +1392,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1490,7 +1478,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1576,7 +1564,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1662,7 +1650,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1748,7 +1736,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1834,7 +1822,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -1920,7 +1908,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -2094,7 +2082,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -2181,7 +2169,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -2268,7 +2256,7 @@
         ],
         "before": null,
         "after": {
-          "actions_enabled": true,
+          "actions_enabled": false,
           "alarm_actions": [
             "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
           ],
@@ -2775,61 +2763,6 @@
         "after_sensitive": {},
         "after_identity": {
           "queue_url": null
-        }
-      }
-    },
-    {
-      "address": "module.monitoring.aws_ssm_parameter.agent_config",
-      "module_address": "module.monitoring",
-      "mode": "managed",
-      "type": "aws_ssm_parameter",
-      "name": "agent_config",
-      "provider_name": "registry.terraform.io/hashicorp/aws",
-      "change": {
-        "actions": [
-          "create"
-        ],
-        "before": null,
-        "after": {
-          "allowed_pattern": null,
-          "description": "CloudWatch agent configuration of the Veda staging host (AUT-110)",
-          "name": "/veda/staging/cloudwatch-agent",
-          "overwrite": null,
-          "region": "ap-south-1",
-          "tags": null,
-          "tags_all": {
-            "env": "staging",
-            "managed-by": "terraform",
-            "project": "veda-spaces",
-            "repository": "example-org/veda-spaces",
-            "stack": "core"
-          },
-          "tier": "Standard",
-          "type": "String",
-          "value": "{\"agent\":{\"metrics_collection_interval\":60,\"run_as_user\":\"root\"},\"logs\":{\"logs_collected\":{\"files\":{\"collect_list\":[{\"file_path\":\"/var/log/messages\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/messages\"},{\"file_path\":\"/var/log/cloud-init-output.log\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/cloud-init\"},{\"file_path\":\"/var/log/veda/*.log\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/veda\"}]}}},\"metrics\":{\"aggregation_dimensions\":[[\"InstanceId\"],[\"InstanceId\",\"path\"]],\"append_dimensions\":{\"InstanceId\":\"${aws:InstanceId}\"},\"metrics_collected\":{\"disk\":{\"drop_device\":true,\"ignore_file_system_types\":[\"sysfs\",\"devtmpfs\",\"tmpfs\",\"overlay\"],\"measurement\":[\"used_percent\"],\"resources\":[\"/\",\"/var/lib/veda\"]},\"mem\":{\"measurement\":[\"mem_used_percent\"]}},\"namespace\":\"CWAgent\"}}",
-          "value_wo": null,
-          "value_wo_version": null
-        },
-        "after_unknown": {
-          "arn": true,
-          "data_type": true,
-          "has_value_wo": true,
-          "id": true,
-          "insecure_value": true,
-          "key_id": true,
-          "tags_all": {},
-          "version": true
-        },
-        "before_sensitive": false,
-        "after_sensitive": {
-          "tags_all": {},
-          "value": true,
-          "value_wo": true
-        },
-        "after_identity": {
-          "account_id": null,
-          "name": null,
-          "region": null
         }
       }
     }

@@ -11,7 +11,7 @@
 
 ## Summary
 
-**`Plan: 159 to add, 0 to change, 0 to destroy.`** The plan guard passes: no destroy, everything in ap-south-1,
+**`Plan: 158 to add, 0 to change, 0 to destroy.`** (After the review remediation; it was 159 with the agent-configuration parameter, R2.) The plan guard passes: no destroy, everything in ap-south-1,
 every role bounded at path `/`, no trust or resource policy outside the account.
 
 | Module | AUT | Resources |
@@ -24,20 +24,20 @@ every role bounded at path `/`, no trust or resource policy outside the account.
 | ecr | AUT-105 | 2 |
 | runtime_iam | AUT-106 | 5 |
 | ssm | AUT-107 | 27 |
-| monitoring | AUT-110 | 32 |
+| monitoring | AUT-110 | 31 |
 | compute | AUT-108 | 6 |
 | ses | AUT-111 | 5 |
 | deploy | wiring | 2 |
-| **Total** | | **159 (all create)** |
+| **Total** | | **158 (all create)** |
 
 ## Required properties
 
 | Property | Result |
 |---|---|
-| Zero destroys | 0 delete, 0 replace (159 create) |
+| Zero destroys | 0 delete, 0 replace (158 create) |
 | Only approved changes | Every resource is one of the reviewed modules; nothing outside `module.*` |
 | No public inbound access | **0** security-group ingress rules; NACL inbound only TCP 1024–65535 (replies) and UDP 1024–65535 from the two tunnel ranges; default security group, route table and NACL emptied |
-| Region | 149 resources in ap-south-1; 10 global: IAM roles, policies, attachments, the instance profile, the budget |
+| Region | 148 resources in ap-south-1; 10 global: IAM roles, policies, attachments, the instance profile, the budget |
 | No Aurion or swing-trader-vm dependency | No planned resource names or references either (checked in `run.sh`) |
 | Public intake disabled | No tunnel, DNS or Turnstile resource (AUT-201 … 203 not built); `deploy.enabled` is false; nothing is deployed |
 

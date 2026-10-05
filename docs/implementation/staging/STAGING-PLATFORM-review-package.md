@@ -252,7 +252,7 @@ All offline; nothing reached AWS.
 | `terraform validate` | bootstrap and staging-core valid |
 | `terraform test` | bootstrap 33; staging-core 8; modules: network 14, kms 4, storage 7, cloudtrail 3, ecr 4, runtime-iam 6, ssm 4, monitoring 6, compute 6, ses 4, deploy 5 (**104**) |
 | `infra/tests/run.sh` | **741 passed, 0 failed** (545 on `main` after AUT-101; 196 new across the sections listed in §4) |
-| Plan guard on the real sandboxed plan | Passes (159 resources); each module's part is a fixture; each guard rule has a refusing check built from it |
+| Plan guard on the real sandboxed plan | Passes (158 resources); each module's part is a fixture; each guard rule has a refusing check built from it |
 | checkov | 0 failed; every skip inline and justified (listed per module) |
 | tflint, shellcheck, actionlint | Clean (modules, host scripts, both new workflows) |
 | Secret scan | No new candidates; reviewed false positives recorded (§4.6, the Compose checksum pragma) |
@@ -308,8 +308,8 @@ capped credits, fixed log metric filters instead of EMF.
 
 ## 8. Plan proof
 
-[STAGING-PLATFORM-plan-proof.md](STAGING-PLATFORM-plan-proof.md): **159 to add, 0 to change, 0 to destroy**; no public
-inbound; 149 resources in ap-south-1 and 10 global (IAM, budget); 11 protected resources; three bounded roles; no
+[STAGING-PLATFORM-plan-proof.md](STAGING-PLATFORM-plan-proof.md): **158 to add, 0 to change, 0 to destroy**; no public
+inbound; 148 resources in ap-south-1 and 10 global (IAM, budget); 11 protected resources; three bounded roles; no
 Aurion or swing-trader-vm reference; public intake disabled. The live `10-infra-plan` run of the pull request is
 approval-gated and is not approved or applied here.
 
@@ -359,3 +359,22 @@ of the sandbox; Sentry DSN; the production gates of the gate registry.
 
 Each row is CERTIFIED, CERTIFIED WITH CONDITIONS or NOT CERTIFIED; a finding in one module does not reopen another.
 
+## 12. Remediation of the consolidated review (R1–R4)
+
+The independent consolidated review returned **NOT CERTIFIED** with four findings; the architecture and the security
+model were accepted. Only R1–R4 are remediated; no module is redesigned and nothing is added.
+
+| # | Finding | Fix | Tests |
+|---|---|---|---|
+| R1 | The flow log could be created before the logs bucket and its delivery policy | `module.storage` output `flow_log_destination_arn` now `depends_on` the logs bucket, its policy, its encryption and its public access block; the flow log takes its destination from that output, so Terraform orders it after them | `run.sh`: the output's `depends_on` (from the real plan configuration) and the network reference |
+| R2 | The plan role could not read the CloudWatch agent configuration (`/veda/staging/cloudwatch-agent`; the plan role reads only `/veda/staging/config`), so every plan after the first apply would fail its refresh | The configuration ships in the deploy bundle (`infra/host/cloudwatch-agent.json`); `veda-deploy` installs it from the verified bundle; `host-setup.sh` loads it as a file; the SSM parameter is removed. The plan guard now refuses any parameter outside `/veda/staging/config/`, so the defect cannot return | `run.sh`: no parameter outside `config/` is planned; the guard refuses one; the file's content; the document and the script use it. `modules/deploy` test updated |
+| R3 | The owner-added data events would show as drift (and an apply would try to remove them, which the boundary denies) | `lifecycle { ignore_changes = [event_selector, advanced_event_selector, insight_selector] }` on the trail; the guard refuses selectors only at **creation**, and accepts an existing trail carrying the owner's selectors | `run.sh`: `ignore_changes` present; an updated trail with owner selectors passes; selectors at creation still refused |
+| R4 | Alarms fed by the application, the agent or the heartbeat would alarm (missing data) before anything is deployed | `actions_enabled` of those alarms = `deploy.enabled` (`deployment_alarms_enabled`); audit tampering, trail delivery, EC2 status, CPU and SES alarms stay active. Runbook §0, §1 (an apply turns the actions on before the first deploy) and §3 | `modules/monitoring`: 2 new runs (silent before deployment; all active after). `run.sh`: from the real plan, the deployment alarms have actions off and the others on; the root wiring; the runbook step |
+
+Resources: 158 (the agent-configuration parameter is gone); the plan proof is updated. Validation after the remediation:
+`terraform test` **106** (monitoring 8, two new); `infra/tests/run.sh` **757 passed, 0 failed** (16 new); checkov, tflint,
+shellcheck and actionlint clean; secret scan and governance doc test pass; the remediation mutations are in §13.
+
+## 13. Remediation mutations
+
+_Filled in from the run._

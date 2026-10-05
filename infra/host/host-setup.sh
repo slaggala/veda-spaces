@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Veda staging host setup (AUT-108, deployment wiring). Run as root by the veda-deploy SSM document before every
-# deploy; idempotent. Arguments: <data volume device, e.g. /dev/sdf> <region> <cloudwatch agent parameter>.
+# deploy; idempotent. Arguments: <data volume device, e.g. /dev/sdf> <region> <cloudwatch agent configuration file>.
 # 1. Mounts the encrypted data volume at /var/lib/veda (formats it only when it carries no filesystem).
 # 2. Installs the pinned Docker Compose plugin (SHA-256 verified).
-# 3. Loads the CloudWatch agent configuration from SSM and starts the agent.
+# 3. Loads the CloudWatch agent configuration shipped in the deploy bundle (infra/host/cloudwatch-agent.json) and starts
+#    the agent. A file, not an SSM parameter: the plan role may read only /veda/staging/config (review R2).
 # 4. Installs the health heartbeat (every minute: /health/ready -> Veda/Host HealthReady).
 set -euo pipefail
-DEVICE="${1:?data volume device}" REGION="${2:?region}" AGENT_PARAM="${3:?agent parameter}"
+DEVICE="${1:?data volume device}" REGION="${2:?region}" AGENT_CONFIG="${3:?agent configuration file}"
+[[ -f "$AGENT_CONFIG" ]] || { echo "agent configuration $AGENT_CONFIG not found" >&2; exit 2; }
 [[ "$DEVICE" =~ ^/dev/sd[f-p]$ ]] || { echo "invalid data device: $DEVICE" >&2; exit 2; }
 COMPOSE_VERSION="v5.6.0"
 COMPOSE_SHA256="733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2" # docker-compose-linux-aarch64 (published checksum)  # pragma: allowlist secret
@@ -43,7 +45,7 @@ fi
 docker compose version
 
 # 3. CloudWatch agent.
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c "ssm:$AGENT_PARAM"
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c "file:$AGENT_CONFIG"
 
 # 4. Health heartbeat.
 install -m 0755 /opt/veda/host/health.sh /usr/local/bin/veda-health

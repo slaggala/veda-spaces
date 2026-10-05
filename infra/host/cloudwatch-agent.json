@@ -1,0 +1,67 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "metrics_collected": {
+      "mem": {
+        "measurement": [
+          "mem_used_percent"
+        ]
+      },
+      "disk": {
+        "measurement": [
+          "used_percent"
+        ],
+        "resources": [
+          "/",
+          "/var/lib/veda"
+        ],
+        "drop_device": true,
+        "ignore_file_system_types": [
+          "sysfs",
+          "devtmpfs",
+          "tmpfs",
+          "overlay"
+        ]
+      }
+    },
+    "aggregation_dimensions": [
+      [
+        "InstanceId"
+      ],
+      [
+        "InstanceId",
+        "path"
+      ]
+    ]
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "/veda/staging/host",
+            "log_stream_name": "{instance_id}/messages"
+          },
+          {
+            "file_path": "/var/log/cloud-init-output.log",
+            "log_group_name": "/veda/staging/host",
+            "log_stream_name": "{instance_id}/cloud-init"
+          },
+          {
+            "file_path": "/var/log/veda/*.log",
+            "log_group_name": "/veda/staging/host",
+            "log_stream_name": "{instance_id}/veda"
+          }
+        ]
+      }
+    }
+  }
+}

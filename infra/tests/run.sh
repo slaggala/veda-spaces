@@ -1741,8 +1741,8 @@ check "  ... every configuration parameter is plain text under /veda/staging/con
 check "  ... no secret name among them" ok '^0$' -- jq '[.resource_changes[] | select(.type == "aws_ssm_parameter") | .change.after.name | select(test("SECRET|PRIVATE|HMAC|TOKEN_KEY|CHAIN_KEY$"))] | length' "$SSMPLAN"
 check "  ... the KMS setting is the data key alias (known at plan time)" ok '^arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data$' -- jq -r '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_KMS_KEY_ARN\"]") | .change.after.value' "$SSMPLAN"
 check "AUT-107 a SecureString through Terraform is refused" fail "SecureString parameters are seeded by the owner" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.type = "SecureString"')"
-check "AUT-107 a parameter under the secret app/ path is refused" fail "is outside /veda/staging/ or under its secret app/ path" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/veda/staging/app/VEDA_ENV"')"
-check "AUT-107 a parameter outside /veda/staging is refused" fail "parameter /other/x is outside" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/other/x"')"
+check "AUT-107 a parameter under the secret app/ path is refused" fail "is outside /veda/staging/config/" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/veda/staging/app/VEDA_ENV"')"
+check "AUT-107 a parameter outside /veda/staging is refused" fail "parameter /other/x is outside /veda/staging/config/" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/other/x"')"
 check "AUT-107 Session Manager without encrypted transcripts is refused" fail "transcripts must go to an encrypted CloudWatch log group" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.cloudWatchEncryptionEnabled = false | tojson)')"
 check "AUT-107 Session Manager run-as is refused" fail "run-as is not allowed" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.runAsEnabled = true | tojson)')"
 check "AUT-107 a document outside veda-* is refused" fail "SSM document ops-run is not veda-\*" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"ops-run","document_type":"Command","permissions":{}}')]"; echo "$f")"
@@ -1917,6 +1917,31 @@ check "EVIDENCE a failed collection fails the run" fail "veda-collect ended Fail
 check "EVIDENCE a collection without an evidence object fails the run" fail "reported no evidence object" -- evc "$(ev_stub Success "nothing filed")"
 check "EVIDENCE veda-collect never reads the rendered environment" ok '^0$' -- jq '[.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.collect") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[] | select(test("/etc/veda/api.env"))] | length' "$DEPDOC"
 check "RUNBOOKS deployment, backup and recovery, monitoring, SES readiness, evidence, owner steps, apply sequence, e2e lead flow" ok '^8$' -- grep -cE "^## [1-8]\. " "$INFRA/../docs/operations/staging-platform-runbooks.md"
+
+echo "== Review remediation R1-R4 (consolidated staging review)"
+FULLPLAN="$HERE/fixtures/staging-core-config.json"
+# R1: flow logs are created only after the logs bucket, its policy, encryption and public access block.
+# shellcheck disable=SC2016 # jq variable / literal match
+check "R1 the flow-log destination output waits for the logs bucket policy" ok '^true$' -- jq '.configuration.root_module.module_calls.storage.module.outputs.flow_log_destination_arn.depends_on as $d | ["aws_s3_bucket.this[\"logs\"]", "aws_s3_bucket_policy.this[\"logs\"]", "aws_s3_bucket_server_side_encryption_configuration.this[\"logs\"]", "aws_s3_bucket_public_access_block.this[\"logs\"]"] | all(. as $x | $d | index($x))' "$FULLPLAN"
+check "  ... in the storage module source as well" ok 'aws_s3_bucket_policy.this\["logs"\],' -- awk '/^output "flow_log_destination_arn"/{p=1} p && /^}/{exit} p' "$INFRA/terraform/modules/storage/outputs.tf"
+check "  ... and the flow log takes its destination from that output" ok 'module.storage.flow_log_destination_arn' -- jq -r '.configuration.root_module.module_calls.network.expressions.flow_log_destination_arn.references[]' "$FULLPLAN"
+# R2: the agent configuration ships in the deploy bundle; no parameter outside the path the plan role can read.
+check "R2 no SSM parameter outside /veda/staging/config/ is planned (every module)" ok '^0$' -- bash -c 'cat "$@" | jq -s "[.[].resource_changes[] | select(.type == \"aws_ssm_parameter\") | .change.after.name | select(startswith(\"/veda/staging/config/\") | not)] | length"' _ "$HERE"/fixtures/aut1*-plan.json "$HERE"/fixtures/deploy-plan.json
+check "  ... the plan guard refuses one (the plan role could not refresh it)" fail "is outside /veda/staging/config/ \(the only path the plan role can read" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/veda/staging/cloudwatch-agent"')"
+check "  ... the plan role still reads only /veda/staging/config (bootstrap unchanged)" ok 'DenyParameterValuesOutsideConfig' -- cat "$INFRA/terraform/bootstrap/roles.tf"
+check "R2 the agent configuration file collects memory, both disks and the host logs" ok '^mem_used_percent /,/var/lib/veda /veda/staging/host$' -- jq -r '"\(.metrics.metrics_collected.mem.measurement[0]) \(.metrics.metrics_collected.disk.resources | join(",")) \(.logs.logs_collected.files.collect_list | map(.log_group_name) | unique | join(","))"' "$INFRA/host/cloudwatch-agent.json"
+check "  ... veda-deploy installs it from the verified bundle and hands it to host-setup" ok 'host-setup.sh /dev/sdf ap-south-1 /opt/veda/host/cloudwatch-agent.json' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[]' "$DEPDOC"
+# shellcheck disable=SC2016 # jq variable / literal match
+check "  ... and host-setup loads it as a file" ok 'fetch-config -m ec2 -s -c "file:\$AGENT_CONFIG"' -- cat "$INFRA/host/host-setup.sh"
+# R3: the owner-set data events are not drift.
+check "R3 the trail ignores selector changes (owner-set data events)" ok 'ignore_changes = \[event_selector, advanced_event_selector, insight_selector\]' -- tr -s ' ' <"$INFRA/terraform/modules/cloudtrail/main.tf"
+check "R3 an existing trail carrying the owner's data events passes the guard" ok "plan guard: no destroy" -- guard "$(ctmod aws_cloudtrail.this '.actions = ["update"] | .after.advanced_event_selector = [{"name":"Anchor and evidence objects","field_selector":[{"field":"eventCategory","equals":["Data"]}]}]')"
+check "R3 selectors at creation are still refused" fail "trail selectors are set by the owner session" -- guard "$(ctmod aws_cloudtrail.this '.after.advanced_event_selector = [{"name":"x","field_selector":[{"field":"eventCategory","equals":["Data"]}]}]')"
+# R4: alarms of the deployed application notify no one until deploy.enabled.
+check "R4 with deployment disabled, the application, agent and heartbeat alarms have their actions off" ok '^false$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | select(.alarm_name | test("app-5xx|lead-intake|notification-failures|outbox-dead|scheduled-job|snapshot-missing|chain-anchor|host-memory|host-data-disk|host-root-disk|api-health")) | .actions_enabled] | unique | .[0]' "$MONPLAN"
+check "  ... while the audit, trail, EC2 status and CPU alarms stay active" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | select(.alarm_name | test("audit-tampering|trail-delivery|host-status-check|host-cpu")) | .actions_enabled] | unique | .[0]' "$MONPLAN"
+check "  ... the root ties them to deploy.enabled" ok 'deployment_alarms_enabled = local.platform.deploy.enabled' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+check "R4 the runbook enables alarm actions with an apply before the first deploy" ok 'alarm actions' -- cat "$INFRA/../docs/operations/staging-platform-runbooks.md"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

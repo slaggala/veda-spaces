@@ -51,15 +51,15 @@
 #   - creates a CloudTrail trail (AUT-104) that is not multi-region, omits global events or log-file validation, is not
 #     logging, has no KMS key, writes outside a <prefix>-* bucket, or sets event, advanced or Insights selectors
 #     (veda-boundary denies PutEventSelectors; data events are an owner-session step); a CloudTrail Lake event data
-#     store or channel; a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
+#     store or channel (selectors are refused at creation; afterwards they are the owner's and ignored, review R3); a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
 #   - creates an ECR repository (AUT-105) outside <prefix>-*, with mutable tags, without scan on push, without KMS
 #     encryption, or force-deletable; a public repository, replication, pull-through cache or registry policy;
 #   - attaches an AWS managed policy outside the reviewed list (AmazonSSMManagedInstanceCore, the DLM service role
 #     policy; ReadOnlyAccess and SecurityAudit for the bootstrap plan and evidence roles); or gives, in a policy of a
 #     role other than the bootstrap veda-gh-* roles (or the veda-boundary ceiling), an Allow on "*" or on a whole
 #     service ("<service>:*"), or a policy unknown at plan time (AUT-106);
-#   - creates an SSM SecureString (secrets are seeded by the owner, AUT-302) or a parameter outside /<prefix>/staging/
-#     or under its app/ path; an SSM document other than <prefix>-* or the Session Manager preferences, of a type other
+#   - creates an SSM SecureString (secrets are seeded by the owner, AUT-302) or a parameter outside
+#     /<prefix>/staging/config/, the only path the plan role may read (review R2); an SSM document other than <prefix>-* or the Session Manager preferences, of a type other
 #     than Command or Session, or shared with another account; Session Manager preferences without encrypted
 #     CloudWatch transcripts or with run-as; State Manager associations, hybrid activations, maintenance windows or
 #     patch baselines (commands run only through the reviewed <prefix>-* documents) (AUT-107);
@@ -424,8 +424,8 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         "\($addr): \(.type) is not allowed (logs and metrics stay in the account; AUT-110)"
       elif .type == "aws_ssm_parameter" then
         (if $after.type == "SecureString" then "\($addr): SecureString parameters are seeded by the owner, never by Terraform (AUT-302)" else empty end),
-        (if (($after.name // "") | startswith("/\($prefix)/staging/") | not) or (($after.name // "") | startswith("/\($prefix)/staging/app/"))
-           then "\($addr): parameter \($after.name // "?") is outside /\($prefix)/staging/ or under its secret app/ path" else empty end)
+        (if (($after.name // "") | startswith("/\($prefix)/staging/config/") | not)
+           then "\($addr): parameter \($after.name // "?") is outside /\($prefix)/staging/config/ (the only path the plan role can read; secrets are under app/) (review R2)" else empty end)
       elif .type == "aws_ssm_document" then
         (if (($after.name // "") | startswith($prefix + "-")) or $after.name == "SSM-SessionManagerRunShell" then empty
          else "\($addr): SSM document \($after.name // "?") is not \($prefix)-* (or the Session Manager preferences)" end),
@@ -456,7 +456,8 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         (if ($after.kms_key_id // "") == "" and $unknown.kms_key_id != true then "\($addr): trail without a KMS key" else empty end),
         (if (($after.s3_bucket_name // "") | startswith($prefix + "-") | not) and $unknown.s3_bucket_name != true
            then "\($addr): trail writes to \($after.s3_bucket_name // "?"), not a \($prefix)-* bucket" else empty end),
-        (if ([$after.event_selector, $after.advanced_event_selector, $after.insight_selector] | map(. // [] | length) | add) > 0
+        # At creation only: the owner session adds the data events afterwards and Terraform ignores them (review R3).
+        (if (.change.actions | index("create")) != null and ([$after.event_selector, $after.advanced_event_selector, $after.insight_selector] | map(. // [] | length) | add) > 0
            then "\($addr): trail selectors are set by the owner session (veda-boundary denies PutEventSelectors to every role)" else empty end)
       elif .type | IN("aws_cloudtrail_event_data_store", "aws_cloudtrail_channel", "aws_cloudtrail_organization_delegated_admin_account") then
         "\($addr): \(.type) is not allowed (one trail; no CloudTrail Lake; AUT-104)"

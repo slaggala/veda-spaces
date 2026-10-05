@@ -184,7 +184,9 @@ module "monitoring" {
   tampering_metric     = module.cloudtrail.tampering_metric
   thresholds           = local.platform.monitoring.thresholds
   host_alarms_enabled  = true
-  instance_id          = module.compute.instance_id
+  # Review R4: the alarms of the deployed application stay silent until deployment is enabled.
+  deployment_alarms_enabled = local.platform.deploy.enabled
+  instance_id               = module.compute.instance_id
 }
 
 # AUT-108: the host, its data volume and daily snapshots.
@@ -225,12 +227,11 @@ module "ses" {
 module "deploy" {
   source = "../../modules/deploy"
 
-  name_prefix            = "veda"
-  region                 = var.aws_region
-  artifacts_bucket       = module.storage.bucket_names["artifacts"]
-  evidence_bucket        = module.storage.bucket_names["evidence"]
-  repository_url         = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${module.ecr.repository_name}"
-  data_device            = module.compute.data_device
-  agent_config_parameter = module.monitoring.agent_config_parameter
+  name_prefix      = "veda"
+  region           = var.aws_region
+  artifacts_bucket = module.storage.bucket_names["artifacts"]
+  evidence_bucket  = module.storage.bucket_names["evidence"]
+  repository_url   = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${module.ecr.repository_name}"
+  data_device      = module.compute.data_device
 }
 

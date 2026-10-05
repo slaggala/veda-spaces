@@ -1894,7 +1894,7 @@
           "description": "HTTPS to S3 through the gateway endpoint",
           "from_port": 443,
           "ip_protocol": "tcp",
-          "prefix_list_id": "pl-c38a3df2dc6200d5d",
+          "prefix_list_id": "pl-04e12c5fc32c83f47",
           "referenced_security_group_id": null,
           "region": "ap-south-1",
           "tags": null,

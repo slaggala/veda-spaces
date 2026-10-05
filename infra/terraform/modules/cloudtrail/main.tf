@@ -69,6 +69,9 @@ resource "aws_cloudtrail" "this" {
 
   lifecycle {
     prevent_destroy = true
+    # The owner session adds the S3 data events after the first apply (runbook §6.2); Terraform must neither remove
+    # them nor try to (UpdateTrail and PutEventSelectors are denied to every role). Review R3.
+    ignore_changes = [event_selector, advanced_event_selector, insight_selector]
   }
 }
 
