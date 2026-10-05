@@ -1,8 +1,12 @@
 # Design package: AUT-101 (staging network foundation)
 
 - **Date:** 2026-10-05
-- **Status:** design for review. **Nothing is implemented, planned against AWS, applied or created.** Implementation
-  starts once the owner decisions of §10 are recorded; applies stay disabled until OD-B7 and N-04-S are decided.
+- **Status:** owner decisions N1–N8 recorded on 2026-10-05; **implemented in PR #21**, which also carries this design
+  (PR #20 is superseded by it). The implementation deviates from this design in five recorded points, listed in the
+  [review package](AUT-101-review-package.md) §10: 30 resources instead of the 15–17 estimated here; interface
+  endpoints at the verified 9.49 USD/month instead of ~8; a bootstrap line for the flow-log role; inbound UDP replies
+  limited to the tunnel ranges; the NACL attached to the subnet inline. Applies stay disabled until OD-B7 and N-04-S
+  are decided.
 - **Scope:** the network of the single staging host (ADR-008): VPC, subnet, routes, security group, network ACL,
   endpoints, egress, flow logs. The host itself (AUT-108), keys (AUT-102), buckets (AUT-103) and the Cloudflare tunnel
   (AUT-201) are other stories; this package states what the network must give them.

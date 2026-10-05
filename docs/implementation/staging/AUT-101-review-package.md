@@ -4,7 +4,11 @@
 - **Scope:** the network module and its wiring into `envs/staging-core`, the plan-guard rules for the network, tests,
   and one bootstrap policy line (§3, B8). **Nothing is applied and no AWS resource is created by this change.** Applies
   stay disabled until OD-B7 and N-04-S are decided.
-- **Design:** [AUT-101-design-package.md](AUT-101-design-package.md) (PR #20).
+- **Design:** [AUT-101-design-package.md](AUT-101-design-package.md). This pull request (#21) contains PR #20's only
+  commit (`ea1b151`) unchanged; the design document is identical, and the one other file of PR #20
+  (`infra/terraform/modules/README.md`) is updated here from "designed" to "written". **PR #20 is superseded** and
+  should be closed without merging. The design was not reviewed separately: this review covers design and
+  implementation together.
 - **Owner decisions (2026-10-05):** N1 egress model **A** (public subnet, no inbound access, outbound-only Cloudflare
   tunnel); N2 host **t4g.small**; N3 budget stays **25 USD**; N4–N8 the design's defaults.
 
@@ -193,3 +197,14 @@ exactly that count.
 **To verify on the first host (AUT-108):** the Amazon Linux 2023 repository bucket of ap-south-1. AWS documents the
 form `al2023-repos-<region>-de612dc2`; the policy uses `al2023-repos-ap-south-1-de612dc2`. If `dnf` fails through the
 endpoint, the decision file is corrected in a reviewed pull request.
+
+## 10. Deviations from the design package
+
+| # | Design | Implementation | Why |
+|---|---|---|---|
+| D1 | "About 15–17 to add" (§12) | 30 resources | Every NACL and security-group rule is its own resource (B3, B4); counted from a real sandbox plan |
+| D2 | Interface endpoints ~8 USD/month (§5, §9) | 9.49 USD/month (0.013 USD/h) | Verified price (§7); model A uses none, so no cost effect |
+| D3 | Flow-log role "bounded by veda-boundary" (§1) | Same, plus one bootstrap line (B8) | The apply role could not pass a role to `vpc-flow-logs.amazonaws.com`; found while implementing |
+| D4 | NACL inbound TCP and UDP 1024–65535 from anywhere (§4) | UDP replies only from the two tunnel ranges | UDP is only the tunnel (QUIC); narrower |
+| D5 | Separate NACL association | Subnet attached on the NACL (`subnet_ids`) | Checkov CKV2_AWS_1 recognises only the inline form; one resource fewer |
+
