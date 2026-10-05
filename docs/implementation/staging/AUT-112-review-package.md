@@ -133,6 +133,27 @@ on the `staging-plan` environment (2026-10-05, at the owner's request; the value
 | Plan guard | passes ("no destroy, everything in ap-south-1, …") |
 | Plan mode | `nothing was created` |
 
+**Proof: passed** on 2026-10-05. Run [37258214443](https://github.com/slaggala/veda-spaces/actions/runs/37258214443)
+(the head of PR #19 after the independent review; the run records the commit), job `plan (staging-core)`: success.
+
+| Check | Log line (UTC) |
+|---|---|
+| Approval | 03:09:50 run 37258214443 was approved for environment 'staging-plan' by: slaggala |
+| GitHub settings | 03:09:54 GitHub settings for slaggala/veda-spaces match the bootstrap rules |
+| OIDC session | 03:09:57 `arn:aws:sts::813238078849:assumed-role/veda-gh-plan/gh-37258214443-1-plan` (1 h) |
+| Region | 03:10:00 session confined to ap-south-1 by IAM (us-east-1 denied) |
+| Recipient | `TF_VAR_budget_alert_email: ***` (masked); the address appears nowhere in the job log |
+| Backend | 03:10:10 `s3://veda-tfstate-813238078849/staging/core.tfstate` (state key, native lock) |
+| Plan guard | 03:10:21 passed (no destroy, everything in ap-south-1, …) |
+| Plan summary | 03:10:21 **Plan: 1 to add, 0 to change, 0 to destroy.** |
+| Plan digest | `9b7787d7a9b44eba9c5dab5bfe69d0ee8ac570a0828311dc8ac671803eebe5b5` |
+| Plan mode | 03:10:21 nothing was created |
+| Publication | Not published (public repository, N-04-S undecided): this run cannot be applied |
+
+The plan text stays off the public log by design (N-04-S), so the run proves the count, not the attributes. The
+attributes are proven by the offline Terraform tests (§5) and by the reviewer's sandbox plan of the same root (§9):
+the one resource is `module.budget.aws_budgets_budget.this` with the values above.
+
 Fail-closed behaviour (offline tests): a `null` limit fails the plan with the O16 message, and a missing or malformed
 recipient fails it with the recipient message. Both create nothing.
 
