@@ -1,0 +1,1472 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.network.aws_cloudwatch_log_group.flow",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_group",
+      "name": "flow",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "kms_key_id": null,
+          "name": "/veda/staging/vpc-flow",
+          "region": "ap-south-1",
+          "retention_in_days": 30,
+          "skip_destroy": false,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "deletion_protection_enabled": true,
+          "id": true,
+          "log_group_class": true,
+          "name_prefix": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_default_network_acl.this",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_default_network_acl",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "egress": [],
+          "ingress": [],
+          "region": "ap-south-1",
+          "subnet_ids": null,
+          "tags": {
+            "Name": "veda-stg-default-unused"
+          },
+          "tags_all": {
+            "Name": "veda-stg-default-unused",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "default_network_acl_id": true,
+          "egress": [],
+          "id": true,
+          "ingress": [],
+          "owner_id": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "egress": [],
+          "ingress": [],
+          "tags": {},
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_default_route_table.this",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_default_route_table",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "propagating_vgws": null,
+          "region": "ap-south-1",
+          "route": [],
+          "tags": {
+            "Name": "veda-stg-default-unused"
+          },
+          "tags_all": {
+            "Name": "veda-stg-default-unused",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "default_route_table_id": true,
+          "id": true,
+          "owner_id": true,
+          "route": [],
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "route": [],
+          "tags": {},
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_default_security_group.this",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_default_security_group",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "region": "ap-south-1",
+          "revoke_rules_on_delete": false,
+          "tags": {
+            "Name": "veda-stg-default-unused"
+          },
+          "tags_all": {
+            "Name": "veda-stg-default-unused",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "description": true,
+          "egress": true,
+          "id": true,
+          "ingress": true,
+          "name": true,
+          "name_prefix": true,
+          "owner_id": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "egress": [],
+          "ingress": [],
+          "tags": {},
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_flow_log.vpc",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_flow_log",
+      "name": "vpc",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "deliver_cross_account_role": null,
+          "destination_options": [],
+          "eni_id": null,
+          "log_destination_type": "cloud-watch-logs",
+          "max_aggregation_interval": 600,
+          "region": "ap-south-1",
+          "regional_nat_gateway_id": null,
+          "subnet_id": null,
+          "tag_field_specification": [],
+          "tags": {
+            "Name": "veda-stg-vpc-flow"
+          },
+          "tags_all": {
+            "Name": "veda-stg-vpc-flow",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "traffic_type": "ALL",
+          "transit_gateway_attachment_id": null,
+          "transit_gateway_id": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "destination_options": [],
+          "iam_role_arn": true,
+          "id": true,
+          "log_destination": true,
+          "log_format": true,
+          "tag_field_specification": [],
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "destination_options": [],
+          "tag_field_specification": [],
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_iam_role.flow_logs",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "flow_logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Condition\":{\"ArnLike\":{\"aws:SourceArn\":\"arn:aws:ec2:ap-south-1:111122223333:vpc-flow-log/*\"},\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"vpc-flow-logs.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+          "description": "VPC flow logs to /veda/staging/vpc-flow (AUT-101)",
+          "force_detach_policies": false,
+          "max_session_duration": 3600,
+          "name": "veda-stg-vpc-flow-logs",
+          "path": "/",
+          "permissions_boundary": "arn:aws:iam::111122223333:policy/veda-boundary",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "create_date": true,
+          "id": true,
+          "inline_policy": true,
+          "managed_policy_arns": true,
+          "name_prefix": true,
+          "tags_all": {},
+          "unique_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "inline_policy": [],
+          "managed_policy_arns": [],
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_iam_role_policy.flow_logs",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "flow_logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "write-vpc-flow-log-group"
+        },
+        "after_unknown": {
+          "id": true,
+          "name_prefix": true,
+          "policy": true,
+          "role": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "role": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_internet_gateway.this",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_internet_gateway",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-igw"
+          },
+          "tags_all": {
+            "Name": "veda-stg-igw",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "owner_id": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl.public",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl",
+      "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-public"
+          },
+          "tags_all": {
+            "Name": "veda-stg-public",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "egress": true,
+          "id": true,
+          "ingress": true,
+          "owner_id": true,
+          "subnet_ids": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "egress": [],
+          "ingress": [],
+          "subnet_ids": [],
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"in-tcp-ephemeral\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "in-tcp-ephemeral",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "0.0.0.0/0",
+          "egress": false,
+          "from_port": 1024,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "tcp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 100,
+          "to_port": 65535
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"in-udp-ephemeral-0\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "in-udp-ephemeral-0",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.192.0/24",
+          "egress": false,
+          "from_port": 1024,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "udp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 200,
+          "to_port": 65535
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"in-udp-ephemeral-1\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "in-udp-ephemeral-1",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.200.0/24",
+          "egress": false,
+          "from_port": 1024,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "udp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 201,
+          "to_port": 65535
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"out-tcp-443\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "out-tcp-443",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "0.0.0.0/0",
+          "egress": true,
+          "from_port": 443,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "tcp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 100,
+          "to_port": 443
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"out-tcp-7844-0\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "out-tcp-7844-0",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.192.0/24",
+          "egress": true,
+          "from_port": 7844,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "tcp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 200,
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"out-tcp-7844-1\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "out-tcp-7844-1",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.200.0/24",
+          "egress": true,
+          "from_port": 7844,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "tcp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 201,
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"out-udp-7844-0\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "out-udp-7844-0",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.192.0/24",
+          "egress": true,
+          "from_port": 7844,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "udp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 300,
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_network_acl_rule.public[\"out-udp-7844-1\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_network_acl_rule",
+      "name": "public",
+      "index": "out-udp-7844-1",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_block": "198.41.200.0/24",
+          "egress": true,
+          "from_port": 7844,
+          "icmp_code": null,
+          "icmp_type": null,
+          "ipv6_cidr_block": null,
+          "protocol": "udp",
+          "region": "ap-south-1",
+          "rule_action": "allow",
+          "rule_number": 301,
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "id": true,
+          "network_acl_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "egress": null,
+          "network_acl_id": null,
+          "protocol": null,
+          "region": null,
+          "rule_number": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_route.internet",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_route",
+      "name": "internet",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "carrier_gateway_id": null,
+          "core_network_arn": null,
+          "destination_cidr_block": "0.0.0.0/0",
+          "destination_ipv6_cidr_block": null,
+          "destination_prefix_list_id": null,
+          "egress_only_gateway_id": null,
+          "local_gateway_id": null,
+          "nat_gateway_id": null,
+          "odb_network_arn": null,
+          "region": "ap-south-1",
+          "timeouts": null,
+          "transit_gateway_id": null,
+          "vpc_endpoint_id": null,
+          "vpc_peering_connection_id": null
+        },
+        "after_unknown": {
+          "gateway_id": true,
+          "id": true,
+          "instance_id": true,
+          "instance_owner_id": true,
+          "network_interface_id": true,
+          "origin": true,
+          "route_table_id": true,
+          "state": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "destination_cidr_block": null,
+          "destination_ipv6_cidr_block": null,
+          "destination_prefix_list_id": null,
+          "region": null,
+          "route_table_id": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_route_table.public",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_route_table",
+      "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-public"
+          },
+          "tags_all": {
+            "Name": "veda-stg-public",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "owner_id": true,
+          "propagating_vgws": true,
+          "route": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "propagating_vgws": [],
+          "route": [],
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_route_table_association.public",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_route_table_association",
+      "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "gateway_id": null,
+          "region": "ap-south-1",
+          "timeouts": null
+        },
+        "after_unknown": {
+          "id": true,
+          "route_table_id": true,
+          "subnet_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_security_group.host",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "host",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "description": "Veda staging host: no inbound; outbound HTTPS and the Cloudflare tunnel only (AUT-101)",
+          "name": "veda-stg-host",
+          "region": "ap-south-1",
+          "revoke_rules_on_delete": false,
+          "tags": {
+            "Name": "veda-stg-host"
+          },
+          "tags_all": {
+            "Name": "veda-stg-host",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "egress": true,
+          "id": true,
+          "ingress": true,
+          "name_prefix": true,
+          "owner_id": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "egress": [],
+          "ingress": [],
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_subnet.public",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_subnet",
+      "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "assign_ipv6_address_on_creation": false,
+          "availability_zone_id": "aps1-az1",
+          "cidr_block": "10.60.0.0/24",
+          "customer_owned_ipv4_pool": null,
+          "enable_dns64": false,
+          "enable_lni_at_device_index": null,
+          "enable_resource_name_dns_a_record_on_launch": false,
+          "enable_resource_name_dns_aaaa_record_on_launch": false,
+          "ipv4_ipam_pool_id": null,
+          "ipv4_netmask_length": null,
+          "ipv6_ipam_pool_id": null,
+          "ipv6_native": false,
+          "ipv6_netmask_length": null,
+          "map_customer_owned_ip_on_launch": null,
+          "map_public_ip_on_launch": false,
+          "outpost_arn": null,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-public-a"
+          },
+          "tags_all": {
+            "Name": "veda-stg-public-a",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "availability_zone": true,
+          "id": true,
+          "ipv6_cidr_block": true,
+          "ipv6_cidr_block_association_id": true,
+          "owner_id": true,
+          "private_dns_hostname_type_on_launch": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc.this",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "assign_generated_ipv6_cidr_block": null,
+          "cidr_block": "10.60.0.0/20",
+          "enable_dns_hostnames": true,
+          "enable_dns_support": true,
+          "instance_tenancy": "default",
+          "ipv4_ipam_pool_id": null,
+          "ipv4_netmask_length": null,
+          "ipv6_ipam_pool_id": null,
+          "ipv6_netmask_length": null,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-vpc"
+          },
+          "tags_all": {
+            "Name": "veda-stg-vpc",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "default_network_acl_id": true,
+          "default_route_table_id": true,
+          "default_security_group_id": true,
+          "dhcp_options_id": true,
+          "enable_network_address_usage_metrics": true,
+          "id": true,
+          "ipv6_association_id": true,
+          "ipv6_cidr_block": true,
+          "ipv6_cidr_block_network_border_group": true,
+          "main_route_table_id": true,
+          "owner_id": true,
+          "tags": {},
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_endpoint.s3",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_endpoint",
+      "name": "s3",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "auto_accept": null,
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"StringEquals\":{\"aws:ResourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":\"*\",\"Resource\":\"*\",\"Sid\":\"OwnAccountBuckets\"},{\"Action\":\"s3:GetObject\",\"Effect\":\"Allow\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*\",\"arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*\"],\"Sid\":\"AwsOwnedObjectsReadOnly\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1",
+          "resource_configuration_arn": null,
+          "service_name": "com.amazonaws.ap-south-1.s3",
+          "service_network_arn": null,
+          "tags": {
+            "Name": "veda-stg-s3"
+          },
+          "tags_all": {
+            "Name": "veda-stg-s3",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null,
+          "vpc_endpoint_type": "Gateway"
+        },
+        "after_unknown": {
+          "arn": true,
+          "cidr_blocks": true,
+          "dns_entry": true,
+          "dns_options": true,
+          "id": true,
+          "ip_address_type": true,
+          "network_interface_ids": true,
+          "owner_id": true,
+          "prefix_list_id": true,
+          "private_dns_enabled": true,
+          "requester_managed": true,
+          "route_table_ids": true,
+          "security_group_ids": true,
+          "service_region": true,
+          "state": true,
+          "subnet_configuration": true,
+          "subnet_ids": true,
+          "tags": {},
+          "tags_all": {},
+          "vpc_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cidr_blocks": [],
+          "dns_entry": [],
+          "dns_options": [],
+          "network_interface_ids": [],
+          "route_table_ids": [],
+          "security_group_ids": [],
+          "subnet_configuration": [],
+          "subnet_ids": [],
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.https",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "https",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": "0.0.0.0/0",
+          "cidr_ipv6": null,
+          "description": "HTTPS: AWS APIs, Cloudflare API, Turnstile, package repositories",
+          "from_port": 443,
+          "ip_protocol": "tcp",
+          "prefix_list_id": null,
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 443
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.https_s3",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "https_s3",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": null,
+          "cidr_ipv6": null,
+          "description": "HTTPS to S3 through the gateway endpoint",
+          "from_port": 443,
+          "ip_protocol": "tcp",
+          "prefix_list_id": "pl-dcf1fc6b418c61565",
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 443
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.tunnel[\"tcp-198.41.192.0/24\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "tunnel",
+      "index": "tcp-198.41.192.0/24",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": "198.41.192.0/24",
+          "cidr_ipv6": null,
+          "description": "Cloudflare tunnel edge (TCP 7844)",
+          "from_port": 7844,
+          "ip_protocol": "tcp",
+          "prefix_list_id": null,
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.tunnel[\"tcp-198.41.200.0/24\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "tunnel",
+      "index": "tcp-198.41.200.0/24",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": "198.41.200.0/24",
+          "cidr_ipv6": null,
+          "description": "Cloudflare tunnel edge (TCP 7844)",
+          "from_port": 7844,
+          "ip_protocol": "tcp",
+          "prefix_list_id": null,
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.tunnel[\"udp-198.41.192.0/24\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "tunnel",
+      "index": "udp-198.41.192.0/24",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": "198.41.192.0/24",
+          "cidr_ipv6": null,
+          "description": "Cloudflare tunnel edge (UDP 7844)",
+          "from_port": 7844,
+          "ip_protocol": "udp",
+          "prefix_list_id": null,
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.network.aws_vpc_security_group_egress_rule.tunnel[\"udp-198.41.200.0/24\"]",
+      "module_address": "module.network",
+      "mode": "managed",
+      "type": "aws_vpc_security_group_egress_rule",
+      "name": "tunnel",
+      "index": "udp-198.41.200.0/24",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "cidr_ipv4": "198.41.200.0/24",
+          "cidr_ipv6": null,
+          "description": "Cloudflare tunnel edge (UDP 7844)",
+          "from_port": 7844,
+          "ip_protocol": "udp",
+          "prefix_list_id": null,
+          "referenced_security_group_id": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "to_port": 7844
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "security_group_id": true,
+          "security_group_rule_id": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        }
+      }
+    }
+  ]
+}

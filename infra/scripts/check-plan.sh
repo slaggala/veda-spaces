@@ -26,6 +26,13 @@
 #     <prefix>-*, is for another account or a billing view, has no known limit, alerts no one, or notifies an SNS
 #     topic that is unknown at plan time or outside the account and ap-south-1. Budgets is a global service: a budget
 #     has no region;
+#   - breaks the staging network model A (AUT-101, owner decision N1): any security-group inbound rule; outbound rules
+#     other than TCP 443, or TCP/UDP 7844 to a range narrower than 0.0.0.0/0 (the tunnel); IPv6 rules or ranges; a NACL
+#     rule allowing inbound below port 1024 or all protocols, or any allow rule in the default NACL; rules in the
+#     default security group or routes in the default route table; a subnet that assigns public or IPv6 addresses; a
+#     VPC with IPv6; NAT gateways, elastic IPs, peering, VPN, Direct Connect, transit gateways, client VPN, egress-only
+#     gateways; a VPC endpoint other than the S3 gateway, or an S3 endpoint whose policy is unknown, the AWS default
+#     (full access), uses Not* elements, or allows S3 beyond the account's buckets and the named AWS-owned objects;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -44,7 +51,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,32p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -116,6 +123,29 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
     "aws_iam_user_login_profile", "aws_iam_user_ssh_key", "aws_iam_access_key", "aws_iam_group", "aws_iam_group_policy",
     "aws_iam_group_policy_attachment", "aws_iam_group_membership", "aws_iam_saml_provider", "aws_iam_account_password_policy",
     "aws_iam_account_alias", "aws_iam_signing_certificate", "aws_iam_virtual_mfa_device", "aws_iam_service_specific_credential");
+  # AUT-101 network model A. Types that open another path in or out of the VPC.
+  def network_forbidden_type: IN("aws_nat_gateway", "aws_eip", "aws_eip_association", "aws_vpc_peering_connection",
+    "aws_vpc_peering_connection_accepter", "aws_vpc_peering_connection_options", "aws_vpn_connection", "aws_vpn_gateway",
+    "aws_vpn_gateway_attachment", "aws_customer_gateway", "aws_egress_only_internet_gateway",
+    "aws_vpc_ipv6_cidr_block_association", "aws_vpc_endpoint_policy", "aws_vpc_endpoint_subnet_association",
+    "aws_ec2_client_vpn_endpoint", "aws_ec2_client_vpn_network_association", "aws_ec2_client_vpn_authorization_rule",
+    "aws_dx_gateway", "aws_dx_gateway_association", "aws_dx_connection", "aws_dx_private_virtual_interface")
+    or startswith("aws_ec2_transit_gateway");
+  def tcp: tostring | IN("tcp", "6");
+  def udp: tostring | IN("udp", "17");
+  # An outbound rule of model A: TCP 443 anywhere (IPv4), or TCP/UDP 7844 to a known range that is not everything.
+  def egress_ok($proto; $from; $to; $cidr; $v6):
+    ($v6 // "") == "" and $from == $to and
+    ((($proto | tcp) and $from == 443) or ((($proto | tcp) or ($proto | udp)) and $from == 7844 and ($cidr // "") != "" and $cidr != "0.0.0.0/0"));
+  def statements: (.Statement | arr)[];
+  def owned_object($r): $r | tostring
+    | test("^arn:aws:s3:::(prod-" + ($region | esc) + "-starport-layer-bucket|al2023-repos-" + ($region | esc) + "-[a-z0-9]+)/\\*$");
+  def endpoint_policy_findings($addr):
+    statements | select(.Effect == "Allow") as $s
+    | if $s.NotAction or $s.NotResource or $s.NotPrincipal then "\($addr): S3 endpoint policy uses NotAction/NotResource/NotPrincipal"
+      elif ((($s.Condition // {}).StringEquals // {})["aws:ResourceAccount"] | arr) == [$acct] then empty
+      elif ($s.Action | arr) == ["s3:GetObject"] and (($s.Resource | arr) | length) > 0 and all(($s.Resource | arr)[]; owned_object(.)) then empty
+      else "\($addr): S3 endpoint policy allows S3 beyond the buckets of the account and the named AWS-owned objects (\($s.Sid // "unnamed statement"))" end;
   # Dedicated policy resources always carry an explicit policy, so an unknown one is refused. An inline policy
   # attribute (aws_kms_key, aws_sns_topic, ...) is Optional+Computed: unknown there means the AWS default, which
   # stays inside the account, so it is checked only when known.
@@ -177,6 +207,58 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         (if ($after.account_id // "") == $acct then empty else "\($addr): shares with \($after.account_id // $after.group // "?")" end)
       elif .type == "aws_kms_grant" then
         (if ($after.grantee_principal | tostring | own) then empty else "\($addr): KMS grant to \($after.grantee_principal)" end)
+      elif (.type | network_forbidden_type) then
+        "\($addr): \(.type) is not part of the staging network (egress model A, AUT-101 N1)"
+      elif .type == "aws_vpc_security_group_ingress_rule" or (.type == "aws_security_group_rule" and $after.type == "ingress") then
+        "\($addr): no inbound security-group rule in staging (AUT-101: access is SSM and the outbound tunnel)"
+      elif .type == "aws_vpc_security_group_egress_rule" then
+        (if egress_ok($after.ip_protocol; $after.from_port; $after.to_port; ($after.cidr_ipv4 // (if $after.prefix_list_id != null or $unknown.prefix_list_id == true then "prefix-list" else null end)); $after.cidr_ipv6)
+           then empty else "\($addr): outbound \($after.ip_protocol)/\($after.from_port)-\($after.to_port) to \($after.cidr_ipv4 // $after.cidr_ipv6 // "?") is not TCP 443 or the tunnel (TCP/UDP 7844 to its ranges)" end)
+      elif .type == "aws_security_group_rule" then
+        (if (($after.cidr_blocks // []) | length) == 0 and ($after.prefix_list_ids // [] | length) == 0 then "\($addr): outbound rule without a known destination"
+         else (((($after.cidr_blocks // []) | if length == 0 then ["prefix-list"] else . end)[]) as $c
+           | if egress_ok($after.protocol; $after.from_port; $after.to_port; $c; (($after.ipv6_cidr_blocks // []) | join(","))) then empty
+             else "\($addr): outbound \($after.protocol)/\($after.from_port)-\($after.to_port) to \($c) is not TCP 443 or the tunnel" end) end)
+      elif .type == "aws_security_group" or .type == "aws_default_security_group" then
+        (if $unknown.ingress != true and (($after.ingress // []) | length) > 0 then "\($addr): no inbound security-group rule in staging (AUT-101)" else empty end),
+        (if .type == "aws_default_security_group" and $unknown.egress != true and (($after.egress // []) | length) > 0
+           then "\($addr): the default security group must have no rule" else empty end),
+        (if .type == "aws_security_group" and $unknown.egress != true then
+           (($after.egress // [])[] | select(egress_ok(.protocol; .from_port; .to_port; ((.cidr_blocks // []) | first // (if (.prefix_list_ids // []) | length > 0 then "prefix-list" else null end)); ((.ipv6_cidr_blocks // []) | join(","))) | not)
+            | "\($addr): outbound \(.protocol)/\(.from_port)-\(.to_port) is not TCP 443 or the tunnel")
+         else empty end)
+      elif .type == "aws_network_acl_rule" then
+        (if ($after.ipv6_cidr_block // "") != "" then "\($addr): IPv6 NACL rule (the staging network is IPv4 only)"
+         elif $after.rule_action != "allow" then empty
+         elif ($after.protocol | tostring | IN("-1", "all")) then "\($addr): NACL allow rule for all protocols"
+         elif $after.egress != true and (($after.from_port // 0) < 1024) then "\($addr): NACL allows inbound to port \($after.from_port) (only replies on ports 1024 and above)"
+         else empty end)
+      elif .type == "aws_network_acl" or .type == "aws_default_network_acl" then
+        ((($after.ingress // []) + ($after.egress // []))[] | select(.action == "allow") as $r
+         | if $rc.type == "aws_default_network_acl" then "\($addr): the default network ACL must allow nothing"
+           elif ($r.protocol | tostring | IN("-1", "all")) then "\($addr): NACL allow rule for all protocols"
+           else empty end),
+        (($after.ingress // [])[] | select(.action == "allow" and (.from_port // 0) < 1024 and $rc.type != "aws_default_network_acl")
+         | "\($addr): NACL allows inbound to port \(.from_port) (only replies on ports 1024 and above)")
+      elif .type == "aws_default_route_table" then
+        (if $unknown.route != true and (($after.route // []) | length) > 0 then "\($addr): the default route table must have no route" else empty end)
+      elif .type == "aws_route" then
+        (if ($after.destination_ipv6_cidr_block // "") != "" then "\($addr): IPv6 route (the staging network is IPv4 only)"
+         elif ([$after.nat_gateway_id, $after.vpc_peering_connection_id, $after.transit_gateway_id, $after.egress_only_gateway_id,
+                $after.carrier_gateway_id, $after.local_gateway_id, $after.core_network_arn, $after.network_interface_id] | map(select(. != null and . != "")) | length) > 0
+           then "\($addr): route to a target other than the internet gateway or a VPC endpoint" else empty end)
+      elif .type == "aws_subnet" then
+        (if $after.map_public_ip_on_launch == true then "\($addr): the subnet assigns public addresses (the host asks for its own, AUT-108)" else empty end),
+        (if ($after.ipv6_cidr_block // "") != "" or $after.assign_ipv6_address_on_creation == true then "\($addr): IPv6 subnet (the staging network is IPv4 only)" else empty end)
+      elif .type == "aws_vpc" then
+        (if $after.assign_generated_ipv6_cidr_block == true or ($after.ipv6_ipam_pool_id // "") != "" or ($after.ipv6_cidr_block // "") != ""
+           then "\($addr): IPv6 VPC (the staging network is IPv4 only)" else empty end)
+      elif .type == "aws_vpc_endpoint" then
+        (if ($after.vpc_endpoint_type // "Gateway") != "Gateway" or $after.service_name != "com.amazonaws.\($region).s3"
+           then "\($addr): only the S3 gateway endpoint is part of egress model A (got \($after.vpc_endpoint_type // "?") \($after.service_name // "?"))"
+         elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
+         elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
+         else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
       elif .type == "aws_budgets_budget_action" then
         "\($addr): budget actions are not allowed (they apply IAM or SCP policies or stop instances automatically; AUT-112)"
       elif .type == "aws_budgets_budget" then

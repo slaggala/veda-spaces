@@ -17,7 +17,8 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | AUT-003 bootstrap workflow | `scripts/` run locally (Option A) for the first bootstrap; `.github/workflows/00-bootstrap.yml` **not run** (public repository) |
 | AUT-301 infra workflows | `.github/workflows/10-infra-plan.yml` (OIDC plan, live) and `11-infra-apply.yml` (**disabled** until OD-B7: `config/apply-gate.json`); `scripts/stack.sh`, `scripts/oidc-session.sh`; runbook `docs/operations/staging-infra-workflows.md` |
 | AUT-112 budget | `terraform/modules/budgets/` in `envs/staging-core/`: monthly cost budget, forecast alerts at 80% and 100% (O16); decision in `config/staging-budget.json` (limit 25 USD), recipient from the `staging-plan` secret `BUDGET_ALERT_EMAIL`. Written and tested offline; **not applied** |
-| AUT-101 … AUT-111 | not started (see `terraform/modules/README.md`) |
+| AUT-101 network | `terraform/modules/network/` in `envs/staging-core/`: egress model A (public subnet, no inbound, outbound 443 and the tunnel), S3 gateway endpoint, flow logs; decision in `config/staging-network.json`. Written and tested offline; **not applied** (needs a bootstrap re-apply for the flow-log role, review package §3 B8) |
+| AUT-102 … AUT-111 | not started (see `terraform/modules/README.md`) |
 
 ## Layout
 
@@ -29,6 +30,7 @@ infra/
     staging-account.json   the approved staging account and the owners of its bootstrap state (reviewed change only;
                            null/empty until the owner commits it)
     staging-budget.json    AUT-112 budget decision (O16): name, monthly limit, forecast thresholds; no recipient
+    staging-network.json   AUT-101 network decision (N1-N8): egress model, CIDRs, AZ preference, host type, flow logs, tunnel ranges
   scripts/
     lib.sh                 shared guards (region, approved account, account identity, fail-closed lookups)
     discover.sh            read-only auto-discovery → generated/discovered.json

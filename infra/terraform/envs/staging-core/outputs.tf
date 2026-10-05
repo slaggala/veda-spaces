@@ -10,3 +10,14 @@ output "budget" {
     error_message = "Owner decision O16: monthly_limit_usd in infra/config/staging-budget.json is undecided or not a positive number. Nothing is planned until it is decided."
   }
 }
+
+# AUT-101: what the network plan creates, readable in the plan text, and the IDs AUT-108 attaches the host to.
+output "network" {
+  description = "Staging network summary and IDs."
+  value = merge(module.network.summary, {
+    vpc_id                 = module.network.vpc_id
+    public_subnet_id       = module.network.public_subnet_id
+    host_security_group_id = module.network.host_security_group_id
+  })
+}
+

@@ -1,6 +1,11 @@
 # Offline tests of the staging core root (AUT-301, AUT-112). The provider is mocked: nothing reaches AWS.
 mock_provider "aws" {}
 
+override_data {
+  target = module.network.data.aws_ec2_instance_type_offerings.host
+  values = { locations = ["aps1-az1", "aps1-az2", "aps1-az3"] }
+}
+
 variables {
   account_manifest_path = "../../bootstrap/tests/fixtures/account.json"
   budget_config_path    = "tests/fixtures/budget.json"
@@ -103,3 +108,18 @@ run "budget_with_two_recipients_refused" {
 
   expect_failures = [var.budget_alert_email]
 }
+
+# AUT-101: the committed network decision (N1-N8) reaches the module.
+run "network_from_the_committed_decision" {
+  command = plan
+
+  assert {
+    condition = (
+      output.network.egress_model == "A" && output.network.vpc_cidr == "10.60.0.0/20" &&
+      output.network.public_subnet_cidr == "10.60.0.0/24" && output.network.availability_zone_id == "aps1-az1" &&
+      output.network.flow_logs == "ALL, 30 days"
+    )
+    error_message = "the network must follow infra/config/staging-network.json"
+  }
+}
+

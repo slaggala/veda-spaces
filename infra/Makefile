@@ -65,8 +65,8 @@ validate: ## terraform init (no backend) + validate for every root
 	  (cd $$r && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) validate) || exit 1; \
 	done
 
-test: ## terraform test (offline, overridden provider values; creates nothing)
-	@for r in $(ROOTS); do \
+test: ## terraform test (offline, overridden provider values; creates nothing): every root, and every module with tests
+	@for r in $(ROOTS) $(patsubst %/tests/,%,$(dir $(wildcard terraform/modules/*/tests/))); do \
 	  echo "== test $$r"; \
 	  (cd $$r && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) test) || exit 1; \
 	done
