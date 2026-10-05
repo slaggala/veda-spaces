@@ -5,6 +5,7 @@ variables {
   name_prefix            = "veda"
   region                 = "ap-south-1"
   artifacts_bucket       = "veda-stg-artifacts-111122223333"
+  evidence_bucket        = "veda-evidence-111122223333"
   repository_url         = "111122223333.dkr.ecr.ap-south-1.amazonaws.com/veda-api"
   data_device            = "/dev/sdf"
   agent_config_parameter = "/veda/staging/cloudwatch-agent"
@@ -41,6 +42,30 @@ run "bundle_verified_image_by_digest_then_deploy_sh" {
       anytrue([for c in jsondecode(aws_ssm_document.deploy.content).mainSteps[0].inputs.runCommand : strcontains(c, want)])
     ])
     error_message = "verify the bundle, set up the host, render the configuration, pull by digest, run deploy.sh"
+  }
+}
+
+run "collector_records_facts_into_the_evidence_bucket" {
+  command = plan
+
+  assert {
+    condition     = aws_ssm_document.collect.name == "veda-collect" && jsondecode(aws_ssm_document.collect.content).parameters.label.allowedPattern == "^[a-z0-9][a-z0-9-]{0,39}$"
+    error_message = "veda-collect (the bootstrap evidence role is scoped to it), with a constrained label"
+  }
+
+  assert {
+    condition     = anytrue([for c in jsondecode(aws_ssm_document.collect.content).mainSteps[0].inputs.runCommand : strcontains(c, "s3://veda-evidence-111122223333/$KEY")]) && anytrue([for c in jsondecode(aws_ssm_document.collect.content).mainSteps[0].inputs.runCommand : strcontains(c, "sha256sum")])
+    error_message = "the tarball and its SHA-256 go to the evidence bucket"
+  }
+
+  assert {
+    condition     = !anytrue([for c in jsondecode(aws_ssm_document.collect.content).mainSteps[0].inputs.runCommand : strcontains(c, "/etc/veda/api.env")])
+    error_message = "the collector never reads the rendered environment (secrets)"
+  }
+
+  assert {
+    condition     = length(regexall("[{][{]", aws_ssm_document.collect.content)) == 1
+    error_message = "the only {{ }} is the label parameter (SSM would read any other as a parameter)"
   }
 }
 

@@ -54,6 +54,7 @@ flowchart LR
 | 8 | Compute and EBS | AUT-108 | ADR-008 (one host), OPS-006/007 (single instance, dedicated encrypted volume, daily snapshots), IMDSv2 (F6), SSM-only access, egress model A, cost (credits capped) |
 | 9 | SES | AUT-111 | NOTIF-* (email through SES in staging, F6), NOTIF-008 (a failed email never rolls back a lead), sender reputation (bounce and complaint suppression) |
 | 10 | Deployment and integration wiring | AUT-108, AUT-107, AUT-301 follow-up | 02 §12.4 and OPS-004 (single deploy procedure), IR-13 (the scanned image is the deployed image), RR-17 (floors kept: `deploy.sh` unchanged), SEC-005 (secrets only from SSM), public intake disabled |
+| 11 | Evidence and runbooks | AUT-401 foundation, all | Evidence without secrets or personal data, locked (RR-* evidence), runbooks for every procedure, cost report, plan proof |
 
 ## 3. Decisions
 
@@ -230,4 +231,95 @@ refuses).
 | Container startup, health, readiness | Unchanged application behaviour: `deploy.sh` waits for `/health/ready` with the expected migrations state; restart policy `unless-stopped` (`docker-compose.yml`); the heartbeat and the `api-health` alarm watch it afterwards |
 | Not deployed | `deploy.enabled` is false; no tunnel, no DNS (AUT-201/202 out of scope): **no public path to the API exists, so public intake stays disabled** |
 | Tests | `modules/deploy`: 4. `run.sh`: 36: workflow contract (manual only, gates first, no credentials in the preflight, `staging` environment, approval before the session, deploy role, no secrets, pinned, no persisted credentials, deploy disabled), `oidc-session` roles, `stack.sh decisions`, `deploy.sh` offline with stub AWS and Docker (success path with the exact `send-command`; HIGH findings refused before any upload; wrong role; tag not the commit; a different existing bundle; a failed command), the document's verification and parameter patterns, the host scripts' secret check, pinned Compose, format-only-empty, no secret in the scripts |
+
+### 4.11 Evidence and runbooks
+
+| Piece | Implementation |
+|---|---|
+| `veda-collect` (SSM, `modules/deploy`) | Run by the bootstrap's `veda-gh-evidence` on the tagged host only. Records facts: versions, image digests, containers, readiness and schema state (read inside the API container), listening sockets, the data mount, disk, timers, the deploy-log tail; a `MANIFEST.sha256`; the tarball goes to `veda-evidence-<acct>/host/<date>/<instance>/` (COMPLIANCE-locked). Never reads `/etc/veda/api.env`; the label parameter accepts `[a-z0-9-]` only; the only `{{ }}` in the document is that parameter |
+| `13-evidence.yml` and `collect-evidence.sh` | Manual, main only; credential-free preflight (apply gates, recorded decisions); `staging-evidence` environment, approval proven before the session; `veda-gh-evidence` through OIDC; prints `evidence s3://… sha256 …` for the summary in `docs/release-evidence/` |
+| Runbooks | [staging-platform-runbooks.md](../../operations/staging-platform-runbooks.md): gates; deployment and rollback; backup and recovery (three layers, host rebuild); monitoring (every alarm, first action, drill); SES readiness; evidence; owner-session steps (bootstrap verification C2, CloudTrail data events, secrets AUT-302, pins); **staging apply sequence**; **end-to-end lead-flow validation plan** |
+| Cost report | [STAGING-PLATFORM-cost-report.md](STAGING-PLATFORM-cost-report.md) |
+| Plan proof | [STAGING-PLATFORM-plan-proof.md](STAGING-PLATFORM-plan-proof.md) |
+| Tests | `modules/deploy`: 5 (with the collector). `run.sh`: 15: workflow contract, `collect-evidence.sh` offline (success; label injection refused; wrong role; failed command; no evidence object), the collector never reads the environment, the runbooks cover the eight procedures |
+
+## 5. Validation (consolidated)
+
+All offline; nothing reached AWS.
+
+| Check | Result |
+|---|---|
+| `terraform validate` | bootstrap and staging-core valid |
+| `terraform test` | bootstrap 33; staging-core 8; modules: network 14, kms 4, storage 7, cloudtrail 3, ecr 4, runtime-iam 6, ssm 4, monitoring 6, compute 6, ses 4, deploy 5 (**104**) |
+| `infra/tests/run.sh` | **741 passed, 0 failed** (545 on `main` after AUT-101; 196 new across the sections listed in §4) |
+| Plan guard on the real sandboxed plan | Passes (159 resources); each module's part is a fixture; each guard rule has a refusing check built from it |
+| checkov | 0 failed; every skip inline and justified (listed per module) |
+| tflint, shellcheck, actionlint | Clean (modules, host scripts, both new workflows) |
+| Secret scan | No new candidates; reviewed false positives recorded (§4.6, the Compose checksum pragma) |
+| Governance docs test | Passes |
+| Mutation check | §6 |
+
+## 6. Mutation check
+
+_Filled in from the consolidated mutation run._
+
+## 7. Cost
+
+**≈ 19.5–20.5 USD/month with the CloudWatch always-free allowance; ≈ 24.5–25.5 USD at list prices** (details and
+drivers: [cost report](STAGING-PLATFORM-cost-report.md)). It fits the 25 USD budget only with the allowance, so the 80 %
+forecast alert is expected to fire (C1 keeps it). The levers already used: model A instead of NAT, two keys, t4g.small,
+capped credits, fixed log metric filters instead of EMF.
+
+## 8. Plan proof
+
+[STAGING-PLATFORM-plan-proof.md](STAGING-PLATFORM-plan-proof.md): **159 to add, 0 to change, 0 to destroy**; no public
+inbound; 149 resources in ap-south-1 and 10 global (IAM, budget); 11 protected resources; three bounded roles; no
+Aurion or swing-trader-vm reference; public intake disabled. The live `10-infra-plan` run of the pull request is
+approval-gated and is not approved or applied here.
+
+## 9. Owner decisions remaining
+
+| # | Decision | Section | Needed before |
+|---|---|---|---|
+| D6 | **Anchor retention**: accept the application's 10-year COMPLIANCE lock in staging, or a reviewed application change first | `anchor_retention` | First apply (the bucket) and the first anchor |
+| D7 | Staging host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com) | `ssm` | First apply |
+| — | Trusted proxy `172.30.0.1/32`, session limits, Litestream 7 days | `ssm` | First apply |
+| — | Lifecycle periods; evidence locked 30 days (COMPLIANCE) | `storage` | First apply |
+| — | CloudWatch copy 30 days; data events by the owner session | `cloudtrail` | First apply |
+| — | ECR history (30 tagged, 7 days untagged) | `ecr` | First apply |
+| — | Alarm thresholds, logs 30 days | `monitoring` | First apply |
+| — | Volume sizes, snapshots kept, AMI pin | `compute` | First apply |
+| — | Sender `no-reply@staging.vedaspaces.com`, bounce threshold | `ses` | First apply |
+| OD-B7, N-04-S | Apply gate (existing) | `apply-gate.json` | Any apply |
+| D8, AUT-302 | Turnstile widget; seeding the eight secrets | runbook §6.3 | First deploy |
+| — | `deploy.enabled` | `deploy` | First deploy |
+| O11, O12, O13, D5 | Rehearsal recipients; custodians (two people); anchor writer separation (application change) | — | RR-09 rehearsal, FC-01 |
+
+## 10. Blockers
+
+**Staging (before a usable staging):** OD-B7 and N-04-S; every PROPOSED decision (§9); the apply sequence (runbook §7)
+with the owner-session steps; AUT-302 secrets; AUT-201 … 204 (tunnel, DNS with the DKIM records, Turnstile, the SPA)
+for any browser or public path; `deploy.enabled`.
+
+**Production (not addressed here):** a production account and bootstrap; production decisions (egress model for a
+private subnet, budget, retention); custodians and the RR-09 rehearsal; D5 writer separation (application); SES out
+of the sandbox; Sentry DSN; the production gates of the gate registry.
+
+## 11. Module verdicts (for the independent reviewer)
+
+| Module | Verdict | Conditions |
+|---|---|---|
+| AUT-102 KMS | | |
+| AUT-103 buckets and Object Lock (with the AUT-101 flow-log change) | | |
+| AUT-104 CloudTrail | | |
+| AUT-105 ECR | | |
+| AUT-106 runtime IAM | | |
+| AUT-107 SSM | | |
+| AUT-110 monitoring | | |
+| AUT-108 compute and EBS | | |
+| AUT-111 SES | | |
+| Deployment wiring | | |
+| Evidence and runbooks | | |
+
+Each row is CERTIFIED, CERTIFIED WITH CONDITIONS or NOT CERTIFIED; a finding in one module does not reopen another.
 

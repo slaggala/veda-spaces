@@ -1884,6 +1884,40 @@ check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a
 check "DEPLOY the data volume is formatted only when it carries no filesystem" ok 'if ! blkid "\$DEVICE"' -- cat "$INFRA/host/host-setup.sh"
 absent "DEPLOY no secret value in the host scripts" "BEGIN (EC )?PRIVATE KEY|AKIA[0-9A-Z]{16}" "$(cat "$INFRA"/host/*.sh)"
 
+echo "== Evidence: 13-evidence and veda-collect (facts only, into the locked evidence bucket)"
+EW="$INFRA/../.github/workflows/13-evidence.yml"
+EWT="$(cat "$EW")"
+EPRE="$(awk '/^  preflight:/{p=1} /^  collect:/{p=0} p' "$EW")"
+EJOB="$(awk '/^  collect:/{p=1} p' "$EW")"
+check "EVIDENCE 13-evidence runs manually only" ok "^  workflow_dispatch:$" -- printf '%s\n' "$EWT"
+absent "  ... no other trigger" "^  (pull_request|pull_request_target|push|schedule|workflow_run|repository_dispatch):" "$EWT"
+check "EVIDENCE the preflight checks main, the apply gates and the recorded decisions" ok "stack.sh decisions" -- printf '%s\n' "$EPRE"
+absent "EVIDENCE the preflight holds no environment, secret or OIDC token" "environment:|secrets\.|id-token" "$EPRE"
+check "EVIDENCE the collect job runs in staging-evidence after the preflight" ok "^    environment: staging-evidence$" -- printf '%s\n' "$EJOB"
+check "EVIDENCE the approval is proven before any AWS session" ok "in order" -- order_ok "$EJOB" "verify-run.sh approval .* --environment staging-evidence" "oidc-session.sh --role evidence"
+absent "EVIDENCE no stored secret; actions pinned; no persisted credentials" 'secrets\.|uses: [^@]+@v[0-9]|persist-credentials: true' "$EWT"
+ev_stub() { # ev_stub [status] [output]
+  local d="$TMP/aws.ev.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-evidence/gh-100-1-evidence\"}" >"$d/sts_get-caller-identity.json"
+  echo '{"Command":{"CommandId":"c-2"}}' >"$d/ssm_send-command.json"
+  jq -n --arg s "${1:-Success}" --arg o "${2:-evidence s3://veda-evidence-$ACCT/host/2026-10-05/i-1/x-20261005T000000Z.tgz sha256 $(printf 'c%.0s' {1..64})}" \
+    '{CommandInvocations: [{InstanceId: "i-1", Status: $s, CommandPlugins: [{Output: $o}]}]}' >"$d/ssm_list-command-invocations.json"
+  echo "$d"
+}
+EV="$TMP/evtree.$RANDOM" && mkdir -p "$EV" && rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$EV/infra/" && cp "$FIXTURE_MANIFEST" "$EV/infra/config/staging-account.json"
+evc() { env AWS_STUB_DIR="$1" "$EV/infra/scripts/collect-evidence.sh" --label "${2:-e2e-lead-flow}"; }
+ED="$(ev_stub)"
+check "EVIDENCE collect-evidence prints the evidence object and its SHA-256" ok "evidence: evidence s3://veda-evidence-$ACCT/host/.* sha256 [0-9a-f]{64}" -- evc "$ED"
+check "  ... after running veda-collect on the tagged host with the label" ok "send-command .*--document-name veda-collect --targets Key=tag:project,Values=veda-spaces Key=tag:env,Values=staging .*--parameters label=e2e-lead-flow" -- cat "$ED/calls.log"
+check "EVIDENCE a label that could carry a command is refused" fail "--label must be lowercase" -- evc "$(ev_stub)" 'x;rm -rf /'
+ED="$(ev_stub)" && sed -i.bak 's/veda-gh-evidence/veda-gh-deploy/' "$ED/sts_get-caller-identity.json"
+check "EVIDENCE a session other than veda-gh-evidence is refused" fail "not veda-gh-evidence; refusing" -- evc "$ED"
+check "EVIDENCE a failed collection fails the run" fail "veda-collect ended Failed" -- evc "$(ev_stub Failed)"
+check "EVIDENCE a collection without an evidence object fails the run" fail "reported no evidence object" -- evc "$(ev_stub Success "nothing filed")"
+check "EVIDENCE veda-collect never reads the rendered environment" ok '^0$' -- jq '[.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.collect") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[] | select(test("/etc/veda/api.env"))] | length' "$DEPDOC"
+check "RUNBOOKS deployment, backup and recovery, monitoring, SES readiness, evidence, owner steps, apply sequence, e2e lead flow" ok '^8$' -- grep -cE "^## [1-8]\. " "$INFRA/../docs/operations/staging-platform-runbooks.md"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then

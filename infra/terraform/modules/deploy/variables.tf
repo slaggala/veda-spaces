@@ -18,6 +18,11 @@ variable "artifacts_bucket" {
   type        = string
 }
 
+variable "evidence_bucket" {
+  description = "AUT-103 evidence bucket (veda-collect output)."
+  type        = string
+}
+
 variable "repository_url" {
   description = "AUT-105 repository URL built from the account and region (known at plan time); the image is pulled by digest."
   type        = string
