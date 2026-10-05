@@ -13,11 +13,6 @@ output "host_log_group" {
   value       = aws_cloudwatch_log_group.this["host"].name
 }
 
-output "agent_config_parameter" {
-  description = "SSM parameter holding the CloudWatch agent configuration."
-  value       = aws_ssm_parameter.agent_config.name
-}
-
 output "alarm_names" {
   description = "Every alarm."
   value       = sort(concat([for a in aws_cloudwatch_metric_alarm.app : a.alarm_name], [aws_cloudwatch_metric_alarm.trail_delivery.alarm_name], [for a in aws_cloudwatch_metric_alarm.host : a.alarm_name]))

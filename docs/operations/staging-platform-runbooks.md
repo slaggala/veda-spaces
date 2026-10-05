@@ -15,19 +15,23 @@ Roles: **owner session** = the bootstrap owner role (MFA, Mumbai-only session po
 | Apply gate | `infra/config/apply-gate.json` (OD-B7, N-04-S) | Both decided with a committed record |
 | Decision gate | `infra/config/staging-*.json`: no section `PROPOSED` (`stack.sh decisions`) | The owner records every proposed value |
 | Deploy gate | `staging-platform.json` `deploy.enabled` | The owner sets it true in a reviewed pull request |
+| Deployment alarm actions | The same `deploy.enabled`: the alarms fed by the application, the agent or the heartbeat exist but notify no one (review R4) | The plan and apply that follow the `deploy.enabled` change |
 | Public path | No tunnel, DNS or Turnstile widget (AUT-201 … 203, out of scope) | Those stories are built |
 
 ## 1. Deployment
 
 **First deploy** (after the apply sequence, §7, and the secrets, §6.3):
 1. Set `deploy.enabled: true` in `infra/config/staging-platform.json` (reviewed pull request, merged to `main`).
-2. Actions → `12-deploy` → Run workflow on `main`. Approve the `staging` environment.
-3. The job builds the image of this commit, pushes `veda-api:<12-hex>`, waits for the scan (stops on HIGH or
+2. Plan and apply `staging-core` (`10-infra-plan` → `11-infra-apply`): the only change is the **alarm actions** of the
+   deployment alarms turning on (`actions_enabled`, review R4). Until then those alarms report missing data silently.
+3. Actions → `12-deploy` → Run workflow on `main`. Approve the `staging` environment.
+4. The job builds the image of this commit, pushes `veda-api:<12-hex>`, waits for the scan (stops on HIGH or
    CRITICAL), uploads `deploy/<tag>/bundle.tgz` with its SHA-256, and runs `veda-deploy` on the host:
    bundle verified → `host-setup.sh` (mount, Compose, agent, heartbeat) → `render-env.sh` (refuses until every secret
    is seeded) → pull by digest → `api/deploy/deploy.sh <tag>` (floors, snapshot, quiesce, expand-only migration,
-   readiness, resume; [api-runbooks §1](api-runbooks.md)).
-4. Pass: the job ends `deployed <tag> (<digest>) to staging`; `veda-stg-api-health` is OK within 5 minutes.
+   readiness, resume; [api-runbooks §1](api-runbooks.md)). The CloudWatch agent configuration comes from the bundle
+   (`infra/host/cloudwatch-agent.json`), not from SSM (review R2).
+5. Pass: the job ends `deployed <tag> (<digest>) to staging`; `veda-stg-api-health` is OK within 5 minutes.
 
 **Later deploys:** the same, from the new commit. **Rollback** to N-1 follows [api-runbooks §2](api-runbooks.md)
 (`deploy.sh --rollback <n-1-tag>`), run on the host through an owner Session Manager session in
@@ -62,6 +66,10 @@ an **owner-session** procedure, because the plan guard refuses a replace in the 
 
 Every alarm notifies `veda-stg-alarms` (owner email, after the one-time subscription confirmation) and the drill queue
 `veda-stg-alarm-capture`. Dashboard: CloudWatch → `veda-stg-overview`.
+
+**Before deployment** (`deploy.enabled: false`) only the audit-tampering, trail-delivery, EC2 status-check, CPU and SES
+alarms notify; the others (application, agent, heartbeat: `actions_enabled = false`) would only report missing data
+and stay silent until the apply of §1 step 2 (review R4).
 
 | Alarm | Meaning | First action |
 |---|---|---|
@@ -118,7 +126,8 @@ aws cloudtrail put-event-selectors --region ap-south-1 --trail-name veda-stg-tra
   {"Field":"resources.type","Equals":["AWS::S3::Object"]},
   {"Field":"resources.ARN","StartsWith":["arn:aws:s3:::veda-stg-anchor-813238078849/","arn:aws:s3:::veda-evidence-813238078849/"]}]}]'
 ```
-Evidence: `aws cloudtrail get-event-selectors --trail-name veda-stg-trail`.
+Evidence: `aws cloudtrail get-event-selectors --trail-name veda-stg-trail`. Terraform ignores selector changes on the
+trail (`ignore_changes`, review R3), so later plans neither show these data events as drift nor try to remove them.
 
 ### 6.3 Secrets (AUT-302)
 Generate and write, with the owner session, the eight `SecureString` parameters under `/veda/staging/app/`

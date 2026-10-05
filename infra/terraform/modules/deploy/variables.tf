@@ -43,7 +43,13 @@ variable "data_device" {
   }
 }
 
-variable "agent_config_parameter" {
-  description = "AUT-110 CloudWatch agent configuration parameter."
+variable "agent_config_file" {
+  description = "Path on the host of the CloudWatch agent configuration from the deploy bundle (review R2: not an SSM parameter, which the plan role could not read)."
   type        = string
+  default     = "/opt/veda/host/cloudwatch-agent.json"
+
+  validation {
+    condition     = startswith(var.agent_config_file, "/opt/veda/host/")
+    error_message = "The agent configuration comes from the verified deploy bundle under /opt/veda/host/."
+  }
 }

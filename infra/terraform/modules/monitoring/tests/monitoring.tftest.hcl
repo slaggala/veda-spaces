@@ -105,6 +105,40 @@ run "host_alarms_with_the_instance" {
   }
 }
 
+run "deployment_alarms_silent_until_deployment_is_enabled" {
+  command = plan
+
+  variables {
+    host_alarms_enabled = true
+    instance_id         = "i-0123456789abcdef0"
+  }
+
+  assert {
+    condition     = !aws_cloudwatch_metric_alarm.app["snapshot-missing"].actions_enabled && !aws_cloudwatch_metric_alarm.app["app-5xx"].actions_enabled && !aws_cloudwatch_metric_alarm.host["api-health"].actions_enabled && !aws_cloudwatch_metric_alarm.host["host-memory"].actions_enabled
+    error_message = "alarms fed by the deployed application, the agent or the heartbeat notify no one before deployment (review R4)"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.app["audit-tampering"].actions_enabled && aws_cloudwatch_metric_alarm.trail_delivery.actions_enabled && aws_cloudwatch_metric_alarm.host["host-status-check"].actions_enabled && aws_cloudwatch_metric_alarm.host["host-cpu"].actions_enabled
+    error_message = "the audit, trail, EC2 status and CPU alarms are always active"
+  }
+}
+
+run "deployment_alarms_active_once_deployment_is_enabled" {
+  command = plan
+
+  variables {
+    host_alarms_enabled       = true
+    instance_id               = "i-0123456789abcdef0"
+    deployment_alarms_enabled = true
+  }
+
+  assert {
+    condition     = alltrue([for a in aws_cloudwatch_metric_alarm.app : a.actions_enabled]) && alltrue([for a in aws_cloudwatch_metric_alarm.host : a.actions_enabled])
+    error_message = "every alarm is active once deployment is enabled"
+  }
+}
+
 run "another_prefix_refused" {
   command = plan
 

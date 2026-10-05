@@ -59,6 +59,12 @@ variable "tampering_metric" {
   type        = object({ namespace = string, name = string })
 }
 
+variable "deployment_alarms_enabled" {
+  description = "Actions of the alarms fed by the deployed application, the agent or the heartbeat (deploy.enabled; review R4). False: those alarms exist but notify no one."
+  type        = bool
+  default     = false
+}
+
 variable "host_alarms_enabled" {
   description = "Create the host alarms (AUT-108). A known boolean: the instance id itself is unknown until apply."
   type        = bool
