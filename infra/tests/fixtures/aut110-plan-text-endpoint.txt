@@ -1,0 +1,16 @@
+  # module.monitoring.aws_sns_topic_subscription.owner will be created
+  + resource "aws_sns_topic_subscription" "owner" {
+      + arn                             = (known after apply)
+      + confirmation_timeout_in_minutes = 1
+      + confirmation_was_authenticated  = (known after apply)
+      + endpoint                        = (sensitive value)
+      + endpoint_auto_confirms          = false
+      + filter_policy_scope             = (known after apply)
+      + id                              = (known after apply)
+      + owner_id                        = (known after apply)
+      + pending_confirmation            = (known after apply)
+      + protocol                        = "email"
+      + raw_message_delivery            = false
+      + region                          = "ap-south-1"
+      + topic_arn                       = (known after apply)
+    }

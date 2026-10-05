@@ -320,7 +320,7 @@ plan_json "$P.xacct" "[$(res aws_kms_key aws_kms_key.data "{\"policy\":$(policy 
 check "F7 key policy for another account" fail "Allow to another account \(arn:aws:iam::999999999999:root\)" -- guard "$P.xacct"
 plan_json "$P.sqs" "[$(res aws_sqs_queue_policy aws_sqs_queue_policy.q "{\"policy\":\"\"}" '{"policy":true}')]"
 check "F7 resource policy unknown at plan time" fail "policy not known at plan time" -- guard "$P.sqs"
-plan_json "$P.topic" "[$(res aws_sns_topic aws_sns_topic.alarms '{"name":"veda-stg-alarms"}' '{"policy":true}')]"
+plan_json "$P.topic" "[$(res aws_sns_topic aws_sns_topic.alarms '{"name":"veda-stg-alarms","kms_master_key_id":"alias/veda-stg-audit"}' '{"policy":true}')]"
 check "default (computed) topic policy is not a finding" ok "plan guard: no destroy" -- guard "$P.topic"
 plan_json "$P.lp" "[$(res aws_lambda_permission aws_lambda_permission.x '{"principal":"999999999999"}')]"
 check "F7 Lambda permission for another account" fail "Lambda permission for 999999999999" -- guard "$P.lp"
@@ -816,8 +816,10 @@ check "PB-06 real plan: module with its own provider refused" fail "provider mod
 check "PB-06 real plan: resource through the alias refused" fail "aws_sns_topic.alias: planned in us-east-1" -- rguard "$REAL"
 check "PB-06 real plan: per-resource region argument refused" fail "aws_sns_topic.arg: planned in eu-west-1" -- rguard "$REAL"
 check "PB-06 real plan: resource in a module refused" fail "module.m.aws_sns_topic.mod: planned in sa-east-1" -- rguard "$REAL"
+# The recorded topic has no key; AUT-110 requires SNS encryption, which is not what this check is about.
 jq 'del(.configuration.provider_config["aws.use1"], .configuration.provider_config["module.m:aws"])
-    | .resource_changes |= map(select(.address == "aws_sns_topic.home" or .address == "aws_iam_policy.global"))' "$REAL" >"$P.mumbai"
+    | .resource_changes |= map(select(.address == "aws_sns_topic.home" or .address == "aws_iam_policy.global"))
+    | (.resource_changes[] | select(.address == "aws_sns_topic.home") | .change.after.kms_master_key_id) = "alias/veda-stg-audit"' "$REAL" >"$P.mumbai"
 check "PB-06 real plan: Mumbai resource and a global IAM policy pass" ok "everything in ap-south-1" -- rguard "$P.mumbai"
 jq '.variables.aws_region.value = "eu-west-1"' "$P.mumbai" >"$P.var"
 check "PB-06 aws_region variable other than Mumbai refused" fail "variable aws_region is \"eu-west-1\"" -- rguard "$P.var"
@@ -1751,6 +1753,25 @@ for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_s
 done
 check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
 check "AUT-107 committed decision: staging host names, trusted proxy loopback (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 127.0.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+
+echo "== AUT-110: monitoring (bounded metrics, alarms to the encrypted topic, nothing leaves the account)"
+MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"
+monmod() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq --arg a "module.monitoring.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$MONPLAN" >"$f"; echo "$f"; }
+monadd() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq ".resource_changes += [{address: \"module.monitoring.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]" "$MONPLAN" >"$f"; echo "$f"; }
+check "AUT-110 the real monitoring plan passes the guard" ok "plan guard: no destroy" -- guard "$MONPLAN"
+check "  ... seven log metric filters, all in Veda/App (no EMF: bounded custom metrics)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
+check "  ... every alarm is veda-stg-* and notifies only the alarm topic (known at plan time)" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | (.alarm_name | startswith("veda-stg-")) and .alarm_actions == ["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"] and .ok_actions == .alarm_actions] | all' "$MONPLAN"
+check "AUT-110 an unencrypted topic is refused" fail "SNS topic without KMS encryption" -- guard "$(monmod aws_sns_topic.alarms '.after.kms_master_key_id = null | .after_unknown.kms_master_key_id = false')"
+check "AUT-110 an HTTPS subscription is refused (data could leave)" fail "subscription protocol https" -- guard "$(monmod aws_sns_topic_subscription.owner '.after.protocol = "https" | .after.endpoint = "https://example.com/hook"')"
+check "AUT-110 an SQS subscription to another account is refused" fail "SQS subscription to arn:aws:sqs:ap-south-1:999999999999:x outside account" -- guard "$(monmod aws_sns_topic_subscription.capture '.after.endpoint = "arn:aws:sqs:ap-south-1:999999999999:x" | .after_unknown.endpoint = false')"
+check "AUT-110 an unencrypted queue is refused" fail "SQS queue without encryption" -- guard "$(monmod aws_sqs_queue.alarm_capture '.after.sqs_managed_sse_enabled = false')"
+check "AUT-110 an alarm acting on EC2 is refused" fail "alarm action arn:aws:automate:ap-south-1:ec2:terminate is not an SNS topic" -- guard "$(monmod 'aws_cloudwatch_metric_alarm.app["app-5xx"]' '.after.alarm_actions = ["arn:aws:automate:ap-south-1:ec2:terminate"]')"
+check "AUT-110 an alarm notifying another account is refused" fail "is not an SNS topic of account" -- guard "$(monmod aws_cloudwatch_metric_alarm.trail_delivery '.after.ok_actions = ["arn:aws:sns:ap-south-1:999999999999:t"]')"
+for t in aws_cloudwatch_log_subscription_filter aws_cloudwatch_log_destination aws_cloudwatch_metric_stream aws_oam_link; do
+  check "AUT-110 $t is refused" fail "$t is not allowed" -- guard "$(monadd "$t" x '{}')"
+done
+check "AUT-110 the alert address is not in the plan text (sensitive; the owner's subscription as Terraform shows it)" ok '^ +\+ endpoint += \(sensitive value\)$' -- cat "$HERE/fixtures/aut110-plan-text-endpoint.txt"
+check "AUT-110 committed decision: thresholds and 30-day logs (PROPOSED)" ok '^PROPOSED 30 5 80$' -- jq -r '"\(.monitoring.status) \(.monitoring.log_retention_days) \(.monitoring.thresholds.server_errors_per_5min) \(.monitoring.thresholds.data_disk_percent)"' "$PLATFORM"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

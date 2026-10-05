@@ -27,7 +27,7 @@ variable "budget_config_path" {
 }
 
 variable "budget_alert_email" {
-  description = "Recipient of the budget alerts (O16). From the BUDGET_ALERT_EMAIL secret of the staging-plan environment; never committed (public repository)."
+  description = "The owner's alert address (O16): budget alerts (AUT-112), the alarm topic (AUT-110) and the SES sandbox recipient (AUT-111). From the BUDGET_ALERT_EMAIL secret of the staging-plan environment; never committed (public repository)."
   type        = string
   default     = ""
   sensitive   = true

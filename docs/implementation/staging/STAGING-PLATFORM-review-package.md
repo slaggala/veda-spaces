@@ -50,6 +50,7 @@ flowchart LR
 | 4 | ECR | AUT-105 | IR-13 and SEC-007 (the tested image is the deployed image), RR-14 (deploy and rollback by tag) |
 | 5 | Runtime IAM | AUT-106 | Least privilege (05 §9.6, F1), RR-03 (bounded roles at path `/`), FC-01 (anchors never altered), RR-09 (the host is not a custodian) |
 | 6 | SSM | AUT-107 | SEC-005 and PLAT-008 (no secret in code or Git), F6 (staging start configuration), RR-09 (session transcripts) |
+| 7 | Monitoring foundations | AUT-110 | LOG-005/006 and 02 §9 alerts, RG-5, RR-14 (snapshot heartbeat), FC-01 (anchor failures), NOTIF-008 (notification failures visible, lead kept), cost (bounded metrics) |
 
 ## 3. Decisions
 
@@ -65,6 +66,7 @@ session); a malformed decision file also refuses.
 | `cloudtrail` | **PROPOSED** | CloudWatch copy 30 days; S3 data events on anchor and evidence added by the owner session |
 | `ecr` | **PROPOSED** | Keep the last 30 tagged images; untagged expire after 7 days |
 | `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `127.0.0.1/32` (cloudflared on the host network); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
+| `monitoring` | **PROPOSED** | Logs 30 days; 5xx ≥ 5 per 5 minutes; CPU 80 %, memory 85 %, data disk 80 %, root disk 85 % |
 | `anchor_retention` | **PROPOSED** | D6: the application locks each anchor for **3650 days** in COMPLIANCE mode (`anchor_store.py`); accept, or change the application first |
 
 ## 4. Modules
@@ -167,4 +169,18 @@ refuses).
 | Host access to it | `logs:DescribeLogGroups` added to the runtime role (Session Manager checks its group exists); reading parameters was already there (AUT-106) |
 | Plan guard | Refuses any `SecureString` parameter, any parameter outside `/veda/staging/` or under `app/`; any document other than `veda-*` or the preferences, of a type other than Command or Session, or shared with another account; preferences without encrypted CloudWatch transcripts or with run-as; associations, hybrid activations, maintenance windows, patch baselines and service settings |
 | Tests | `modules/ssm`: 4 (plain text under `config/`; transcripts encrypted and sessions bounded; a secret refused; another path refused). `run.sh`: 18, from a real sandboxed plan |
+| Scanner notes | checkov CKV2_AWS_34 ("SSM parameter should be encrypted") is skipped inline on the configuration parameters: they are non-secret by design and the guard refuses SecureString there. The secret scanner read the parameter *names* in the plan fixture (`/veda/staging/config/LITESTREAM_BUCKET`, …) as high-entropy strings: 9 entries of `infra/tests/fixtures/aut107-ssm-plan.json` are recorded in `.secrets.baseline` (reviewed false positives; no value) |
+
+### 4.7 AUT-110 monitoring (`modules/monitoring`)
+
+| Item | Implementation |
+|---|---|
+| Logs | `/veda/staging/app` (container output through Docker's `awslogs` driver, configured on the host) and `/veda/staging/host` (CloudWatch agent: system log, cloud-init, `/var/log/veda/*.log`); audit key; 30 days. With `/veda/staging/cloudtrail` (AUT-104) and `/veda/staging/ssm-sessions` (AUT-107), every log group is under `/veda/staging`, encrypted and expiring |
+| Metrics | **A fixed set of log metric filters, not EMF.** The application writes CloudWatch Embedded Metric Format, but its request metrics carry `Route` × `StatusClass` dimensions: every combination would be a billed custom metric (0.30 USD each), enough to exceed the budget. Docker ships the logs as plain JSON, and 7 filters (`Veda/App`) read them: `ServerErrors` (request status ≥ 500), `LeadIntakeFailures` (`/api/v1/public/leads` ≥ 500), `NotificationFailures` (`outbox_handler_failed*`), `OutboxDead`, `ScheduledJobFailed`, `SnapshotCompleted`, `ChainAnchorFailed`. Host: CWAgent memory and two disks, `Veda/Host HealthReady` (AUT-108). Total custom metrics: 12 with the host |
+| Alarms | 9 now: 5xx, lead-intake failures, notification failures, dead outbox events, scheduled-job failures, **snapshot missing for 24 h** (silence alarms), chain-anchor failures, audit tampering (AUT-104), **trail delivery** (no events reached the trail group for an hour; silence alarms). 6 more with the host (AUT-108): status check, CPU, memory, data disk, root disk, **API health** (silence alarms). SES alarms come with AUT-111 |
+| Notification path | `veda-stg-alarms` topic, audit key; its policy admits only CloudWatch of this account to publish (principals of the account act through IAM); every alarm action is the topic ARN built from its name, so the guard checks it at plan time; the owner's address by email (the `BUDGET_ALERT_EMAIL` secret, sensitive in the plan; AWS sends one confirmation link); the queue `veda-stg-alarm-capture` (SQS-managed encryption, 1 day) that the bootstrap's deploy role reads during drills |
+| Dashboard | `veda-stg-overview`: every alarm, the application counters, the latest API errors (Logs Insights widget) |
+| Agent configuration | SSM parameter `/veda/staging/cloudwatch-agent` (not under `config/`, so it is not rendered into the application environment) |
+| Plan guard | Refuses an unencrypted topic; any subscription other than email or an SQS queue of the account; an unencrypted queue; an alarm action that is not an SNS topic of the account in Mumbai (no EC2 stop or terminate actions); log subscription filters, log destinations and deliveries, metric streams and cross-account observability links |
+| Tests | `modules/monitoring`: 6 (logs encrypted and expiring; a bounded set of filters; alarms on the encrypted topic, silence alarms, publish policy, drill queue; no host alarm before the host; host alarms with it; another prefix refused). `run.sh`: 16, from a real sandboxed plan, including that the plan text shows the subscription address only as `(sensitive value)` |
 

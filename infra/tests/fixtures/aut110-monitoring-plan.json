@@ -1,0 +1,2302 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "monitoring": {
+          "source": "../../modules/monitoring",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "alert_email": {
+              "references": [
+                "var.budget_alert_email"
+              ]
+            },
+            "audit_key_alias": {
+              "references": [
+                "module.kms.aliases[\"audit\"]",
+                "module.kms.aliases",
+                "module.kms"
+              ]
+            },
+            "audit_key_arn": {
+              "references": [
+                "module.kms.audit_key_arn",
+                "module.kms"
+              ]
+            },
+            "log_group_prefix": {
+              "references": [
+                "local.log_group_prefix"
+              ]
+            },
+            "log_retention_days": {
+              "references": [
+                "local.platform.monitoring.log_retention_days",
+                "local.platform.monitoring",
+                "local.platform"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "tampering_metric": {
+              "references": [
+                "module.cloudtrail.tampering_metric",
+                "module.cloudtrail"
+              ]
+            },
+            "thresholds": {
+              "references": [
+                "local.platform.monitoring.thresholds",
+                "local.platform.monitoring",
+                "local.platform"
+              ]
+            },
+            "trail_log_group_name": {
+              "references": [
+                "module.cloudtrail.log_group_name",
+                "module.cloudtrail"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "agent_config_parameter": {
+                "expression": {
+                  "references": [
+                    "aws_ssm_parameter.agent_config.name",
+                    "aws_ssm_parameter.agent_config"
+                  ]
+                },
+                "description": "SSM parameter holding the CloudWatch agent configuration."
+              },
+              "alarm_names": {
+                "expression": {
+                  "references": [
+                    "aws_cloudwatch_metric_alarm.app",
+                    "aws_cloudwatch_metric_alarm.trail_delivery.alarm_name",
+                    "aws_cloudwatch_metric_alarm.trail_delivery",
+                    "aws_cloudwatch_metric_alarm.host"
+                  ]
+                },
+                "description": "Every alarm."
+              },
+              "app_log_group": {
+                "expression": {
+                  "references": [
+                    "aws_cloudwatch_log_group.this[\"app\"].name",
+                    "aws_cloudwatch_log_group.this[\"app\"]",
+                    "aws_cloudwatch_log_group.this"
+                  ]
+                },
+                "description": "Application container logs (Docker awslogs)."
+              },
+              "custom_metric_count": {
+                "expression": {
+                  "references": [
+                    "local.filters",
+                    "var.instance_id"
+                  ]
+                },
+                "description": "Billed custom metrics this monitoring creates (cost report): the log filters, the tampering metric, the agent's memory and two disks, and the health metric."
+              },
+              "host_log_group": {
+                "expression": {
+                  "references": [
+                    "aws_cloudwatch_log_group.this[\"host\"].name",
+                    "aws_cloudwatch_log_group.this[\"host\"]",
+                    "aws_cloudwatch_log_group.this"
+                  ]
+                },
+                "description": "Host system and deploy logs (CloudWatch agent)."
+              },
+              "topic_arn": {
+                "expression": {
+                  "references": [
+                    "local.topic_arn"
+                  ]
+                },
+                "description": "The alarm topic."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_cloudwatch_dashboard.staging",
+                "mode": "managed",
+                "type": "aws_cloudwatch_dashboard",
+                "name": "staging",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "dashboard_body": {
+                    "references": [
+                      "aws_cloudwatch_metric_alarm.app",
+                      "aws_cloudwatch_metric_alarm.trail_delivery.arn",
+                      "aws_cloudwatch_metric_alarm.trail_delivery",
+                      "aws_cloudwatch_metric_alarm.host",
+                      "var.region",
+                      "var.region",
+                      "local.app_group"
+                    ]
+                  },
+                  "dashboard_name": {
+                    "references": [
+                      "local.p"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_cloudwatch_log_group.this",
+                "mode": "managed",
+                "type": "aws_cloudwatch_log_group",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "kms_key_id": {
+                    "references": [
+                      "var.audit_key_arn"
+                    ]
+                  },
+                  "name": {
+                    "references": [
+                      "each.value"
+                    ]
+                  },
+                  "retention_in_days": {
+                    "references": [
+                      "var.log_retention_days"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.app_group",
+                    "local.host_group"
+                  ]
+                }
+              },
+              {
+                "address": "aws_cloudwatch_log_metric_filter.app",
+                "mode": "managed",
+                "type": "aws_cloudwatch_log_metric_filter",
+                "name": "app",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "log_group_name": {
+                    "references": [
+                      "aws_cloudwatch_log_group.this[\"app\"].name",
+                      "aws_cloudwatch_log_group.this[\"app\"]",
+                      "aws_cloudwatch_log_group.this"
+                    ]
+                  },
+                  "metric_transformation": [
+                    {
+                      "name": {
+                        "references": [
+                          "each.key"
+                        ]
+                      },
+                      "namespace": {
+                        "constant_value": "Veda/App"
+                      },
+                      "value": {
+                        "references": [
+                          "each.value.value",
+                          "each.value"
+                        ]
+                      }
+                    }
+                  ],
+                  "name": {
+                    "references": [
+                      "local.p",
+                      "each.key"
+                    ]
+                  },
+                  "pattern": {
+                    "references": [
+                      "each.value.pattern",
+                      "each.value"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.filters"
+                  ]
+                }
+              },
+              {
+                "address": "aws_cloudwatch_metric_alarm.app",
+                "mode": "managed",
+                "type": "aws_cloudwatch_metric_alarm",
+                "name": "app",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "alarm_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "alarm_description": {
+                    "references": [
+                      "each.value.what",
+                      "each.value"
+                    ]
+                  },
+                  "alarm_name": {
+                    "references": [
+                      "local.p",
+                      "each.key"
+                    ]
+                  },
+                  "comparison_operator": {
+                    "references": [
+                      "each.value.cmp",
+                      "each.value"
+                    ]
+                  },
+                  "evaluation_periods": {
+                    "constant_value": 1
+                  },
+                  "metric_name": {
+                    "references": [
+                      "each.value.metric",
+                      "each.value"
+                    ]
+                  },
+                  "namespace": {
+                    "references": [
+                      "each.value.ns",
+                      "each.value"
+                    ]
+                  },
+                  "ok_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "period": {
+                    "references": [
+                      "each.value.period",
+                      "each.value"
+                    ]
+                  },
+                  "statistic": {
+                    "references": [
+                      "each.value.stat",
+                      "each.value"
+                    ]
+                  },
+                  "threshold": {
+                    "references": [
+                      "each.value.threshold",
+                      "each.value"
+                    ]
+                  },
+                  "treat_missing_data": {
+                    "references": [
+                      "each.value.missing",
+                      "each.value"
+                    ]
+                  }
+                },
+                "schema_version": 1,
+                "for_each_expression": {
+                  "references": [
+                    "local.app_alarms"
+                  ]
+                },
+                "depends_on": [
+                  "aws_sns_topic.alarms"
+                ]
+              },
+              {
+                "address": "aws_cloudwatch_metric_alarm.host",
+                "mode": "managed",
+                "type": "aws_cloudwatch_metric_alarm",
+                "name": "host",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "alarm_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "alarm_description": {
+                    "references": [
+                      "each.value.what",
+                      "each.value"
+                    ]
+                  },
+                  "alarm_name": {
+                    "references": [
+                      "local.p",
+                      "each.key"
+                    ]
+                  },
+                  "comparison_operator": {
+                    "references": [
+                      "each.value.cmp",
+                      "each.value"
+                    ]
+                  },
+                  "dimensions": {
+                    "references": [
+                      "each.value.dims",
+                      "each.value"
+                    ]
+                  },
+                  "evaluation_periods": {
+                    "constant_value": 1
+                  },
+                  "metric_name": {
+                    "references": [
+                      "each.value.metric",
+                      "each.value"
+                    ]
+                  },
+                  "namespace": {
+                    "references": [
+                      "each.value.ns",
+                      "each.value"
+                    ]
+                  },
+                  "ok_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "period": {
+                    "references": [
+                      "each.value.period",
+                      "each.value"
+                    ]
+                  },
+                  "statistic": {
+                    "references": [
+                      "each.value.stat",
+                      "each.value"
+                    ]
+                  },
+                  "threshold": {
+                    "references": [
+                      "each.value.threshold",
+                      "each.value"
+                    ]
+                  },
+                  "treat_missing_data": {
+                    "references": [
+                      "each.value.missing",
+                      "each.value"
+                    ]
+                  }
+                },
+                "schema_version": 1,
+                "for_each_expression": {
+                  "references": [
+                    "local.host_alarms"
+                  ]
+                },
+                "depends_on": [
+                  "aws_sns_topic.alarms"
+                ]
+              },
+              {
+                "address": "aws_cloudwatch_metric_alarm.trail_delivery",
+                "mode": "managed",
+                "type": "aws_cloudwatch_metric_alarm",
+                "name": "trail_delivery",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "alarm_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "alarm_description": {
+                    "references": [
+                      "var.trail_log_group_name"
+                    ]
+                  },
+                  "alarm_name": {
+                    "references": [
+                      "local.p"
+                    ]
+                  },
+                  "comparison_operator": {
+                    "constant_value": "LessThanThreshold"
+                  },
+                  "dimensions": {
+                    "references": [
+                      "var.trail_log_group_name"
+                    ]
+                  },
+                  "evaluation_periods": {
+                    "constant_value": 1
+                  },
+                  "metric_name": {
+                    "constant_value": "IncomingLogEvents"
+                  },
+                  "namespace": {
+                    "constant_value": "AWS/Logs"
+                  },
+                  "ok_actions": {
+                    "references": [
+                      "local.topic_arn"
+                    ]
+                  },
+                  "period": {
+                    "constant_value": 3600
+                  },
+                  "statistic": {
+                    "constant_value": "Sum"
+                  },
+                  "threshold": {
+                    "constant_value": 1
+                  },
+                  "treat_missing_data": {
+                    "constant_value": "breaching"
+                  }
+                },
+                "schema_version": 1,
+                "depends_on": [
+                  "aws_sns_topic.alarms"
+                ]
+              },
+              {
+                "address": "aws_sns_topic.alarms",
+                "mode": "managed",
+                "type": "aws_sns_topic",
+                "name": "alarms",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "kms_master_key_id": {
+                    "references": [
+                      "var.audit_key_alias"
+                    ]
+                  },
+                  "name": {
+                    "references": [
+                      "local.p"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sns_topic_policy.alarms",
+                "mode": "managed",
+                "type": "aws_sns_topic_policy",
+                "name": "alarms",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "arn": {
+                    "references": [
+                      "aws_sns_topic.alarms.arn",
+                      "aws_sns_topic.alarms"
+                    ]
+                  },
+                  "policy": {
+                    "references": [
+                      "local.topic_arn",
+                      "var.account_id"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sns_topic_subscription.capture",
+                "mode": "managed",
+                "type": "aws_sns_topic_subscription",
+                "name": "capture",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "endpoint": {
+                    "references": [
+                      "aws_sqs_queue.alarm_capture.arn",
+                      "aws_sqs_queue.alarm_capture"
+                    ]
+                  },
+                  "protocol": {
+                    "constant_value": "sqs"
+                  },
+                  "raw_message_delivery": {
+                    "constant_value": true
+                  },
+                  "topic_arn": {
+                    "references": [
+                      "aws_sns_topic.alarms.arn",
+                      "aws_sns_topic.alarms"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sns_topic_subscription.owner",
+                "mode": "managed",
+                "type": "aws_sns_topic_subscription",
+                "name": "owner",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "endpoint": {
+                    "references": [
+                      "var.alert_email"
+                    ]
+                  },
+                  "protocol": {
+                    "constant_value": "email"
+                  },
+                  "topic_arn": {
+                    "references": [
+                      "aws_sns_topic.alarms.arn",
+                      "aws_sns_topic.alarms"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sqs_queue.alarm_capture",
+                "mode": "managed",
+                "type": "aws_sqs_queue",
+                "name": "alarm_capture",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "message_retention_seconds": {
+                    "constant_value": 86400
+                  },
+                  "name": {
+                    "references": [
+                      "local.p"
+                    ]
+                  },
+                  "sqs_managed_sse_enabled": {
+                    "constant_value": true
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sqs_queue_policy.alarm_capture",
+                "mode": "managed",
+                "type": "aws_sqs_queue_policy",
+                "name": "alarm_capture",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "policy": {
+                    "references": [
+                      "var.region",
+                      "var.account_id",
+                      "local.p",
+                      "local.topic_arn"
+                    ]
+                  },
+                  "queue_url": {
+                    "references": [
+                      "aws_sqs_queue.alarm_capture.id",
+                      "aws_sqs_queue.alarm_capture"
+                    ]
+                  }
+                },
+                "schema_version": 1
+              },
+              {
+                "address": "aws_ssm_parameter.agent_config",
+                "mode": "managed",
+                "type": "aws_ssm_parameter",
+                "name": "agent_config",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "description": {
+                    "constant_value": "CloudWatch agent configuration of the Veda staging host (AUT-110)"
+                  },
+                  "name": {
+                    "references": [
+                      "var.log_group_prefix"
+                    ]
+                  },
+                  "tier": {
+                    "constant_value": "Standard"
+                  },
+                  "type": {
+                    "constant_value": "String"
+                  },
+                  "value": {
+                    "references": [
+                      "local.host_group",
+                      "local.host_group",
+                      "local.host_group"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account."
+              },
+              "alert_email": {
+                "description": "Owner address subscribed to the alarm topic (the BUDGET_ALERT_EMAIL secret of staging-plan). Sensitive.",
+                "sensitive": true
+              },
+              "audit_key_alias": {
+                "description": "AUT-102 audit key alias (the alarm topic)."
+              },
+              "audit_key_arn": {
+                "description": "AUT-102 audit key (log groups)."
+              },
+              "instance_id": {
+                "default": null,
+                "description": "The host (AUT-108). Host alarms exist only once it is known; null before AUT-108."
+              },
+              "log_group_prefix": {
+                "description": "/veda/staging"
+              },
+              "log_retention_days": {
+                "description": "Retention of the application and host log groups."
+              },
+              "name_prefix": {
+                "description": "Prefix of every name (veda-stg); the bootstrap deploy role may set the state of veda-stg-* alarms (drills)."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "tampering_metric": {
+                "description": "AUT-104 tampering metric."
+              },
+              "thresholds": {
+                "description": "Alarm thresholds (staging-platform.json monitoring)."
+              },
+              "trail_log_group_name": {
+                "description": "AUT-104 trail log group (delivery alarm)."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.monitoring.aws_cloudwatch_dashboard.staging",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_dashboard",
+      "name": "staging",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "dashboard_name": "veda-stg-overview",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "dashboard_arn": true,
+          "dashboard_body": true,
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "dashboard_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_group.this[\"app\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_group",
+      "name": "this",
+      "index": "app",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "/veda/staging/app",
+          "region": "ap-south-1",
+          "retention_in_days": 30,
+          "skip_destroy": false,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "deletion_protection_enabled": true,
+          "id": true,
+          "kms_key_id": true,
+          "log_group_class": true,
+          "name_prefix": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_group.this[\"host\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_group",
+      "name": "this",
+      "index": "host",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "/veda/staging/host",
+          "region": "ap-south-1",
+          "retention_in_days": 30,
+          "skip_destroy": false,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "deletion_protection_enabled": true,
+          "id": true,
+          "kms_key_id": true,
+          "log_group_class": true,
+          "name_prefix": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"ChainAnchorFailed\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "ChainAnchorFailed",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "ChainAnchorFailed",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-chain-anchor-failed",
+          "pattern": "{ $.ChainAnchorFailed >= 1 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"LeadIntakeFailures\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "LeadIntakeFailures",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "LeadIntakeFailures",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-lead-intake-failures",
+          "pattern": "{ $.event = \"request\" && $.route = \"/api/v1/public/leads\" && $.status >= 500 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"NotificationFailures\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "NotificationFailures",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "NotificationFailures",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-notification-failures",
+          "pattern": "{ $.event = \"outbox_handler_failed*\" }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"OutboxDead\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "OutboxDead",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "OutboxDead",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "$.OutboxDead"
+            }
+          ],
+          "name": "veda-stg-outbox-dead",
+          "pattern": "{ $.OutboxDead >= 1 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"ScheduledJobFailed\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "ScheduledJobFailed",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "ScheduledJobFailed",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-scheduled-job-failed",
+          "pattern": "{ $.ScheduledJobFailed >= 1 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"ServerErrors\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "ServerErrors",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "ServerErrors",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-server-errors",
+          "pattern": "{ $.event = \"request\" && $.status >= 500 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_log_metric_filter.app[\"SnapshotCompleted\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "app",
+      "index": "SnapshotCompleted",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/app",
+          "metric_transformation": [
+            {
+              "default_value": null,
+              "dimensions": null,
+              "name": "SnapshotCompleted",
+              "namespace": "Veda/App",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-snapshot-completed",
+          "pattern": "{ $.SnapshotCompleted >= 1 }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"app-5xx\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "app-5xx",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "API 5xx responses",
+          "alarm_name": "veda-stg-app-5xx",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "ServerErrors",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 5,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"audit-tampering\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "audit-tampering",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Trail, key or bucket protection changed (AUT-104)",
+          "alarm_name": "veda-stg-audit-tampering",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "AuditTampering",
+          "metric_query": [],
+          "namespace": "Veda/Audit",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"chain-anchor-failed\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "chain-anchor-failed",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "A security-chain anchor failed (FC-01)",
+          "alarm_name": "veda-stg-chain-anchor-failed",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "ChainAnchorFailed",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"lead-intake-failures\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "lead-intake-failures",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Public lead submissions failing (5xx)",
+          "alarm_name": "veda-stg-lead-intake-failures",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "LeadIntakeFailures",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"notification-failures\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "notification-failures",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Email and other outbox handlers failing (the lead stays committed, NOTIF-008)",
+          "alarm_name": "veda-stg-notification-failures",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "NotificationFailures",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 900,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 3,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"outbox-dead\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "outbox-dead",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "Outbox events dead-lettered",
+          "alarm_name": "veda-stg-outbox-dead",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "OutboxDead",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Maximum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"scheduled-job-failed\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "scheduled-job-failed",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "A scheduled job failed",
+          "alarm_name": "veda-stg-scheduled-job-failed",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "ScheduledJobFailed",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 300,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.app[\"snapshot-missing\"]",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "app",
+      "index": "snapshot-missing",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "No completed snapshot in 24 hours (RR-14)",
+          "alarm_name": "veda-stg-snapshot-missing",
+          "comparison_operator": "LessThanThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "SnapshotCompleted",
+          "metric_query": [],
+          "namespace": "Veda/App",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 86400,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_cloudwatch_metric_alarm.trail_delivery",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "trail_delivery",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "No CloudTrail events reached /veda/staging/cloudtrail for an hour (AUT-104)",
+          "alarm_name": "veda-stg-trail-delivery",
+          "comparison_operator": "LessThanThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": {
+            "LogGroupName": "/veda/staging/cloudtrail"
+          },
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "IncomingLogEvents",
+          "metric_query": [],
+          "namespace": "AWS/Logs",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 3600,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "breaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "dimensions": {},
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "dimensions": {},
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sns_topic.alarms",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sns_topic",
+      "name": "alarms",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "application_failure_feedback_role_arn": null,
+          "application_success_feedback_role_arn": null,
+          "application_success_feedback_sample_rate": null,
+          "archive_policy": null,
+          "content_based_deduplication": false,
+          "delivery_policy": null,
+          "display_name": null,
+          "fifo_topic": false,
+          "firehose_failure_feedback_role_arn": null,
+          "firehose_success_feedback_role_arn": null,
+          "firehose_success_feedback_sample_rate": null,
+          "http_failure_feedback_role_arn": null,
+          "http_success_feedback_role_arn": null,
+          "http_success_feedback_sample_rate": null,
+          "kms_master_key_id": "alias/veda-stg-audit",
+          "lambda_failure_feedback_role_arn": null,
+          "lambda_success_feedback_role_arn": null,
+          "lambda_success_feedback_sample_rate": null,
+          "name": "veda-stg-alarms",
+          "region": "ap-south-1",
+          "sqs_failure_feedback_role_arn": null,
+          "sqs_success_feedback_role_arn": null,
+          "sqs_success_feedback_sample_rate": null,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "beginning_archive_time": true,
+          "fifo_throughput_scope": true,
+          "id": true,
+          "name_prefix": true,
+          "owner": true,
+          "policy": true,
+          "signature_version": true,
+          "tags_all": {},
+          "tracing_config": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "arn": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sns_topic_policy.alarms",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sns_topic_policy",
+      "name": "alarms",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "policy": "{\"Statement\":[{\"Action\":\"sns:Publish\",\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudwatch.amazonaws.com\"},\"Resource\":\"arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms\",\"Sid\":\"CloudWatchAlarmsOfThisAccount\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "owner": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "arn": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sns_topic_subscription.capture",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sns_topic_subscription",
+      "name": "capture",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "confirmation_timeout_in_minutes": 1,
+          "delivery_policy": null,
+          "endpoint_auto_confirms": false,
+          "filter_policy": null,
+          "protocol": "sqs",
+          "raw_message_delivery": true,
+          "redrive_policy": null,
+          "region": "ap-south-1",
+          "replay_policy": null,
+          "subscription_role_arn": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "confirmation_was_authenticated": true,
+          "endpoint": true,
+          "filter_policy_scope": true,
+          "id": true,
+          "owner_id": true,
+          "pending_confirmation": true,
+          "topic_arn": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "arn": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sns_topic_subscription.owner",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sns_topic_subscription",
+      "name": "owner",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "confirmation_timeout_in_minutes": 1,
+          "delivery_policy": null,
+          "endpoint": "owner@example.com",
+          "endpoint_auto_confirms": false,
+          "filter_policy": null,
+          "protocol": "email",
+          "raw_message_delivery": false,
+          "redrive_policy": null,
+          "region": "ap-south-1",
+          "replay_policy": null,
+          "subscription_role_arn": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "confirmation_was_authenticated": true,
+          "filter_policy_scope": true,
+          "id": true,
+          "owner_id": true,
+          "pending_confirmation": true,
+          "topic_arn": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "endpoint": true
+        },
+        "after_identity": {
+          "arn": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sqs_queue.alarm_capture",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sqs_queue",
+      "name": "alarm_capture",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "content_based_deduplication": false,
+          "delay_seconds": 0,
+          "fifo_queue": false,
+          "kms_data_key_reuse_period_seconds": 0,
+          "kms_master_key_id": null,
+          "max_message_size": 262144,
+          "message_retention_seconds": 86400,
+          "name": "veda-stg-alarm-capture",
+          "receive_wait_time_seconds": 0,
+          "region": "ap-south-1",
+          "sqs_managed_sse_enabled": true,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null,
+          "visibility_timeout_seconds": 30
+        },
+        "after_unknown": {
+          "arn": true,
+          "deduplication_scope": true,
+          "fifo_throughput_limit": true,
+          "id": true,
+          "name_prefix": true,
+          "policy": true,
+          "redrive_allow_policy": true,
+          "redrive_policy": true,
+          "tags_all": {},
+          "url": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "url": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_sqs_queue_policy.alarm_capture",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_sqs_queue_policy",
+      "name": "alarm_capture",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "policy": "{\"Statement\":[{\"Action\":\"sqs:SendMessage\",\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Resource\":\"arn:aws:sqs:ap-south-1:111122223333:veda-stg-alarm-capture\",\"Sid\":\"AlarmTopicOnly\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true,
+          "queue_url": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "queue_url": null
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.aws_ssm_parameter.agent_config",
+      "module_address": "module.monitoring",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "agent_config",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "allowed_pattern": null,
+          "description": "CloudWatch agent configuration of the Veda staging host (AUT-110)",
+          "name": "/veda/staging/cloudwatch-agent",
+          "overwrite": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "tier": "Standard",
+          "type": "String",
+          "value": "{\"agent\":{\"metrics_collection_interval\":60,\"run_as_user\":\"root\"},\"logs\":{\"logs_collected\":{\"files\":{\"collect_list\":[{\"file_path\":\"/var/log/messages\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/messages\"},{\"file_path\":\"/var/log/cloud-init-output.log\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/cloud-init\"},{\"file_path\":\"/var/log/veda/*.log\",\"log_group_name\":\"/veda/staging/host\",\"log_stream_name\":\"{instance_id}/veda\"}]}}},\"metrics\":{\"aggregation_dimensions\":[[\"InstanceId\"],[\"InstanceId\",\"path\"]],\"append_dimensions\":{\"InstanceId\":\"${aws:InstanceId}\"},\"metrics_collected\":{\"disk\":{\"drop_device\":true,\"ignore_file_system_types\":[\"sysfs\",\"devtmpfs\",\"tmpfs\",\"overlay\"],\"measurement\":[\"used_percent\"],\"resources\":[\"/\",\"/var/lib/veda\"]},\"mem\":{\"measurement\":[\"mem_used_percent\"]}},\"namespace\":\"CWAgent\"}}",
+          "value_wo": null,
+          "value_wo_version": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "data_type": true,
+          "has_value_wo": true,
+          "id": true,
+          "insecure_value": true,
+          "key_id": true,
+          "tags_all": {},
+          "version": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {},
+          "value": true,
+          "value_wo": true
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    }
+  ]
+}

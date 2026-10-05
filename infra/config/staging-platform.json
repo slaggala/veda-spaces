@@ -49,5 +49,17 @@
     "session_log_retention_days": 90,
     "idle_session_timeout_minutes": 20,
     "max_session_duration_minutes": 60
+  },
+  "monitoring": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue.",
+    "log_retention_days": 30,
+    "thresholds": {
+      "server_errors_per_5min": 5,
+      "cpu_percent": 80,
+      "memory_percent": 85,
+      "data_disk_percent": 80,
+      "root_disk_percent": 85
+    }
   }
 }

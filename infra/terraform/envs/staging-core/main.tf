@@ -165,3 +165,20 @@ module "ssm" {
   max_session_duration_minutes = local.platform.ssm.max_session_duration_minutes
 }
 
+# AUT-110: logs, metric filters, alarms, the alarm topic and the drill queue (host alarms once AUT-108 exists).
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  name_prefix          = local.name_prefix
+  account_id           = local.account_id
+  region               = var.aws_region
+  audit_key_arn        = module.kms.audit_key_arn
+  audit_key_alias      = module.kms.aliases["audit"]
+  log_group_prefix     = local.log_group_prefix
+  log_retention_days   = local.platform.monitoring.log_retention_days
+  alert_email          = var.budget_alert_email
+  trail_log_group_name = module.cloudtrail.log_group_name
+  tampering_metric     = module.cloudtrail.tampering_metric
+  thresholds           = local.platform.monitoring.thresholds
+}
+

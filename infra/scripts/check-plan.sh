@@ -63,6 +63,9 @@
 #     than Command or Session, or shared with another account; Session Manager preferences without encrypted
 #     CloudWatch transcripts or with run-as; State Manager associations, hybrid activations, maintenance windows or
 #     patch baselines (commands run only through the reviewed <prefix>-* documents) (AUT-107);
+#   - creates an SNS topic without KMS encryption, a subscription other than email or an SQS queue of the account in
+#     the region, an SQS queue without encryption, an alarm whose actions are anything but SNS topics of the account in
+#     the region, or a log subscription filter, log destination, metric stream or cross-account sink (AUT-110);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -81,7 +84,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,69p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,72p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -369,6 +372,25 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type == "aws_sns_topic" then
+        (if ($after.kms_master_key_id // "") == "" and $unknown.kms_master_key_id != true then "\($addr): SNS topic without KMS encryption" else empty end)
+      elif .type == "aws_sns_topic_subscription" then
+        (if $after.protocol == "email" then empty
+         elif $after.protocol == "sqs" and $unknown.endpoint != true and (($after.endpoint // "") | test("^arn:aws:sqs:" + ($region | esc) + ":" + $acct + ":") | not)
+           then "\($addr): SQS subscription to \($after.endpoint) outside account \($acct) in \($region)"
+         elif $after.protocol == "sqs" then empty
+         else "\($addr): subscription protocol \($after.protocol // "?") (email or an SQS queue of the account only)" end)
+      elif .type == "aws_sqs_queue" then
+        (if $after.sqs_managed_sse_enabled != true and ($after.kms_master_key_id // "") == "" and $unknown.kms_master_key_id != true
+           then "\($addr): SQS queue without encryption" else empty end)
+      elif .type == "aws_cloudwatch_metric_alarm" or .type == "aws_cloudwatch_composite_alarm" then
+        ((($after.alarm_actions // []) + ($after.ok_actions // []) + ($after.insufficient_data_actions // []))[] | tostring
+         | select(test("^arn:aws:sns:" + ($region | esc) + ":" + $acct + ":") | not)
+         | "\($addr): alarm action \(.) is not an SNS topic of account \($acct) in \($region)")
+      elif .type | IN("aws_cloudwatch_log_subscription_filter", "aws_cloudwatch_log_destination", "aws_cloudwatch_log_destination_policy",
+                      "aws_cloudwatch_metric_stream", "aws_oam_link", "aws_oam_sink", "aws_oam_sink_policy", "aws_cloudwatch_log_delivery",
+                      "aws_cloudwatch_log_delivery_destination", "aws_cloudwatch_log_account_policy") then
+        "\($addr): \(.type) is not allowed (logs and metrics stay in the account; AUT-110)"
       elif .type == "aws_ssm_parameter" then
         (if $after.type == "SecureString" then "\($addr): SecureString parameters are seeded by the owner, never by Terraform (AUT-302)" else empty end),
         (if (($after.name // "") | startswith("/\($prefix)/staging/") | not) or (($after.name // "") | startswith("/\($prefix)/staging/app/"))
