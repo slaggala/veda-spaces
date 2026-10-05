@@ -79,3 +79,21 @@ module "storage" {
   }
 }
 
+# AUT-104: CloudTrail (management events; data events by the owner session).
+module "cloudtrail" {
+  source = "../../modules/cloudtrail"
+
+  name_prefix              = local.name_prefix
+  account_id               = local.account_id
+  region                   = var.aws_region
+  trail_name               = local.trail_name
+  logs_bucket_name         = module.storage.bucket_names["logs"]
+  audit_key_arn            = module.kms.audit_key_arn
+  log_group_prefix         = local.log_group_prefix
+  log_group_retention_days = local.platform.cloudtrail.log_group_retention_days
+  permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/veda-boundary"
+
+  # The bucket policy must admit CloudTrail before the trail is created.
+  depends_on = [module.storage]
+}
+

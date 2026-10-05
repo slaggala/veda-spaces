@@ -48,6 +48,10 @@
 #     (the bootstrap state bucket excepted); any bucket ACL, a public access block not fully on, suspended
 #     versioning, SSE other than KMS, a GOVERNANCE or over-a-year default lock, replication, website hosting,
 #     Transfer Acceleration, CORS, access points or Multi-Region Access Points (they bypass the S3 endpoint policy);
+#   - creates a CloudTrail trail (AUT-104) that is not multi-region, omits global events or log-file validation, is not
+#     logging, has no KMS key, writes outside a <prefix>-* bucket, or sets event, advanced or Insights selectors
+#     (veda-boundary denies PutEventSelectors; data events are an owner-session step); a CloudTrail Lake event data
+#     store or channel; a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -66,7 +70,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,54p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,58p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -334,6 +338,22 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type == "aws_cloudtrail" then
+        (if $after.is_multi_region_trail != true then "\($addr): trail is not multi-region (activity in other regions would go unrecorded)" else empty end),
+        (if $after.include_global_service_events == false then "\($addr): trail omits global service events (IAM, STS)" else empty end),
+        (if $after.enable_log_file_validation != true then "\($addr): trail without log-file validation (tampering would be undetectable)" else empty end),
+        (if $after.enable_logging == false then "\($addr): trail created with logging off" else empty end),
+        (if ($after.kms_key_id // "") == "" and $unknown.kms_key_id != true then "\($addr): trail without a KMS key" else empty end),
+        (if (($after.s3_bucket_name // "") | startswith($prefix + "-") | not) and $unknown.s3_bucket_name != true
+           then "\($addr): trail writes to \($after.s3_bucket_name // "?"), not a \($prefix)-* bucket" else empty end),
+        (if ([$after.event_selector, $after.advanced_event_selector, $after.insight_selector] | map(. // [] | length) | add) > 0
+           then "\($addr): trail selectors are set by the owner session (veda-boundary denies PutEventSelectors to every role)" else empty end)
+      elif .type | IN("aws_cloudtrail_event_data_store", "aws_cloudtrail_channel", "aws_cloudtrail_organization_delegated_admin_account") then
+        "\($addr): \(.type) is not allowed (one trail; no CloudTrail Lake; AUT-104)"
+      elif .type == "aws_cloudwatch_log_group" then
+        (if (($after.name // "") | startswith("/" + $prefix + "/") | not) then "\($addr): log group \($after.name // "?") is not under /\($prefix)/" else empty end),
+        (if ($after.kms_key_id // "") == "" and $unknown.kms_key_id != true then "\($addr): log group without a KMS key" else empty end),
+        (if ($after.retention_in_days // 0) == 0 then "\($addr): log group with unlimited retention" else empty end)
       elif .type | IN("aws_s3_bucket_acl", "aws_s3_bucket_replication_configuration", "aws_s3_bucket_website_configuration",
                       "aws_s3_bucket_cors_configuration", "aws_s3_access_point", "aws_s3control_access_point_policy",
                       "aws_s3control_multi_region_access_point", "aws_s3control_multi_region_access_point_policy",

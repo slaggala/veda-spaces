@@ -22,5 +22,14 @@
     "status": "PROPOSED",
     "decision": "D6. The application locks every anchor in COMPLIANCE mode for 3650 days (api/veda/platform/anchor_store.py RETENTION). In staging that keeps each anchor, and the bucket, for ten years: nobody can delete them, the root user included. Options: (a) accept 10 years in staging; (b) a reviewed application change making the retention configurable, then a short staging value. The bucket has Object Lock enabled with no default retention either way.",
     "application_retention_days": 3650
+  },
+  "cloudtrail": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: one multi-region trail of management events, log-file validation, audit key, copy in CloudWatch Logs kept 30 days (the S3 copy follows storage.logs_cloudtrail_expire_days). veda-boundary denies every role cloudtrail:Put*Selectors and UpdateTrail, so the S3 data events on the anchor and evidence buckets (FC-01, RR-09 attribution) are added once by the owner session after the first apply (runbook).",
+    "log_group_retention_days": 30,
+    "owner_session_data_event_buckets": [
+      "anchor",
+      "evidence"
+    ]
   }
 }

@@ -1665,6 +1665,30 @@ check "AUT-103 the anchor retention the decision states is the application's" ok
 check "AUT-103 staging-core plans the storage module" ok 'source = "../../modules/storage"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 check "AUT-103 C3 VPC flow logs go to the logs bucket" ok 'flow_log_destination_arn = module.storage.flow_log_destination_arn' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 
+echo "== AUT-104: CloudTrail (multi-region, validated, encrypted; selectors by the owner session; tampering metric)"
+CTPLAN="$HERE/fixtures/aut104-cloudtrail-plan.json"
+ctmod() { # ctmod <address in module.cloudtrail> <jq filter on its .change>
+  local f="$TMP/ct.$RANDOM$RANDOM.json"
+  jq --arg a "module.cloudtrail.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$CTPLAN" >"$f"
+  echo "$f"
+}
+check "AUT-104 the real trail plan passes the guard (trail, log group, role, policy, tampering filter)" ok "plan guard: no destroy" -- guard "$CTPLAN"
+check "AUT-104 a single-region trail is refused" fail "trail is not multi-region" -- guard "$(ctmod aws_cloudtrail.this '.after.is_multi_region_trail = false')"
+check "AUT-104 a trail without global events is refused" fail "trail omits global service events" -- guard "$(ctmod aws_cloudtrail.this '.after.include_global_service_events = false')"
+check "AUT-104 a trail without log-file validation is refused" fail "trail without log-file validation" -- guard "$(ctmod aws_cloudtrail.this '.after.enable_log_file_validation = false')"
+check "AUT-104 a trail created with logging off is refused" fail "trail created with logging off" -- guard "$(ctmod aws_cloudtrail.this '.after.enable_logging = false')"
+check "AUT-104 a trail without a KMS key is refused" fail "trail without a KMS key" -- guard "$(ctmod aws_cloudtrail.this '.after.kms_key_id = null | .after_unknown.kms_key_id = false')"
+check "AUT-104 a trail writing outside veda-* is refused" fail "trail writes to audit-sink" -- guard "$(ctmod aws_cloudtrail.this '.after.s3_bucket_name = "audit-sink" | .after_unknown.s3_bucket_name = false')"
+check "AUT-104 trail selectors are refused (owner session)" fail "trail selectors are set by the owner session" -- guard "$(ctmod aws_cloudtrail.this '.after.event_selector = [{"read_write_type":"All","include_management_events":true}]')"
+check "AUT-104 a CloudTrail Lake event data store is refused" fail "aws_cloudtrail_event_data_store is not allowed" -- guard "$(f="$TMP/ct.$RANDOM.json"; plan_json "$f" "[$(res aws_cloudtrail_event_data_store x '{}')]"; echo "$f")"
+check "AUT-104 a log group outside /veda/ is refused" fail "log group /aws/x is not under /veda/" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.name = "/aws/x"')"
+check "AUT-104 a log group without a KMS key is refused" fail "log group without a KMS key" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.kms_key_id = null | .after_unknown.kms_key_id = false')"
+check "AUT-104 a log group kept forever is refused" fail "log group with unlimited retention" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.retention_in_days = 0')"
+check "AUT-104 the trail's delivery role trusts CloudTrail for this trail only" ok '"aws:SourceArn":"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail"' -- jq -r '.resource_changes[] | select(.address == "module.cloudtrail.aws_iam_role.trail_logs") | .change.after.assume_role_policy' "$CTPLAN"
+check "AUT-104 the boundary still denies stopping, deleting and re-scoping trails" ok '"cloudtrail:StopLogging", "cloudtrail:DeleteTrail", "cloudtrail:UpdateTrail", "cloudtrail:Put\*Selectors"' -- cat "$INFRA/terraform/bootstrap/boundary.tf"
+check "AUT-104 the logs bucket admits CloudTrail for the Veda trail only" ok '^arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail$' -- jq -r '.resource_changes[] | select(.address == "module.storage.aws_s3_bucket_policy.this[\"logs\"]") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "CloudTrailWrite") | .Condition.StringEquals["aws:SourceArn"]' "$S3PLAN"
+check "AUT-104 committed decision: data events are an owner-session step on the anchor and evidence buckets" ok '^PROPOSED anchor,evidence 30$' -- jq -r '"\(.cloudtrail.status) \(.cloudtrail.owner_session_data_event_buckets | join(",")) \(.cloudtrail.log_group_retention_days)"' "$PLATFORM"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then
