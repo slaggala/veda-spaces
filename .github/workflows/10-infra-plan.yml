@@ -11,7 +11,9 @@
 # plan's SHA-256.
 #
 # AWS access is OIDC only. The one stored secret is BUDGET_ALERT_EMAIL of the staging-plan environment (AUT-112): the
-# budget alert recipient, kept as a secret so that it is masked in this public log, never as a credential.
+# budget alert recipient, kept as a secret so that it is masked in this public log, never as a credential. The saved
+# plan file holds it like every planned value, so a published artifact (N-04-S) would publish it; and approving a
+# pull-request plan run lets that pull request's code read it (runbook §6).
 name: 10-infra-plan
 run-name: "10-infra-plan (core)"
 
@@ -95,7 +97,7 @@ jobs:
           if [[ "$REPOSITORY_PRIVATE" == "true" || "$status" == "ACCEPTED" ]]; then echo "publish=true" >>"$GITHUB_OUTPUT"
           else echo "publish=false" >>"$GITHUB_OUTPUT"; fi
 
-      - name: Upload the plan for review and apply (no secrets)
+      - name: Upload the plan for review and apply (the plan file holds the budget recipient; runbook §6)
         id: upload
         if: steps.publish.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

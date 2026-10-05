@@ -1,7 +1,9 @@
-# AUT-112: the budget as planned. The precondition stops the plan while the owner's limit is undecided (O16).
+# AUT-112: the budget as planned. Terraform hides each notification block of the resource (it holds the sensitive
+# address), so this output is where the plan text shows the alerts to the reviewer. The precondition stops the plan
+# while the owner's limit is undecided (O16).
 output "budget" {
-  description = "Name and monthly limit of the staging cost budget."
-  value       = { name = module.budget.name, limit = module.budget.limit }
+  description = "Name, monthly limit and alerts (without the recipient) of the staging cost budget."
+  value       = { name = module.budget.name, limit = module.budget.limit, alerts = module.budget.alerts }
 
   precondition {
     condition     = try(local.budget.monthly_limit_usd > 0, false)

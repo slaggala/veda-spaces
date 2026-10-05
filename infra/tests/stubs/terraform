@@ -9,7 +9,13 @@ printf '%s\n' "$*" >>"$TF_STUB_DIR/calls.log"
 # "-chdir=DIR <command>" (stack.sh, AUT-301): the directory is logged with the call, then the command is handled.
 [[ "${1:-}" == -chdir=* ]] && shift
 case "${1:-}" in
-  init | apply) exit 0 ;;
+  init) exit 0 ;;
+  apply)
+    # What terraform apply prints ($TF_STUB_DIR/apply.stdout), and a failure when $TF_STUB_DIR/apply.fail exists.
+    [[ -f "$TF_STUB_DIR/apply.stdout" ]] && cat "$TF_STUB_DIR/apply.stdout"
+    [[ -f "$TF_STUB_DIR/apply.fail" ]] && exit 1
+    exit 0
+    ;;
   plan)
     for a in "$@"; do [[ "$a" == -out=* ]] && echo "stub plan" >"${a#-out=}"; done
     # What terraform plan prints, like the real one (AUT-301 checks it never reaches the job log).

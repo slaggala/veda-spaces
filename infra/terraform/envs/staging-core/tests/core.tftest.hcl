@@ -49,6 +49,17 @@ run "budget_monthly_cost_with_forecast_alerts" {
 run "budget_alerts_are_forecasts_by_email_only" {
   command = plan
 
+  # The reviewable summary (output budget) shows the alerts without the address.
+  assert {
+    condition = jsonencode(output.budget.alerts) == jsonencode([
+      for t in [80, 100] : {
+        comparison_operator = "GREATER_THAN", email_recipients = 1, notification_type = "FORECASTED",
+        sns_topic_arns      = [], threshold = t, threshold_type = "PERCENTAGE"
+      }
+    ])
+    error_message = "the plan text must show both alerts (type, comparison, threshold, no SNS topic, one recipient)"
+  }
+
   assert {
     condition = alltrue([for n in module.budget.notifications : (
       n.notification_type == "FORECASTED" && n.comparison_operator == "GREATER_THAN" && n.threshold_type == "PERCENTAGE" &&

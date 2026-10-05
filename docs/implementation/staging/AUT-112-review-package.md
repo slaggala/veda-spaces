@@ -14,13 +14,14 @@
 | File | What it is |
 |---|---|
 | `infra/terraform/modules/budgets/` (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md`) | One `aws_budgets_budget`: `COST`, `MONTHLY`, USD, one `FORECASTED` / `GREATER_THAN` / `PERCENTAGE` notification per threshold, one email subscriber. No budget action, no SNS topic, no provider configuration |
-| `infra/terraform/envs/staging-core/main.tf`, `variables.tf`, `outputs.tf` | Calls the module with the reviewed decision and the sensitive variable `budget_alert_email`; output `budget` whose precondition stops the plan while the limit is undecided |
+| `infra/terraform/envs/staging-core/main.tf`, `variables.tf`, `outputs.tf` | Calls the module with the reviewed decision and the sensitive variable `budget_alert_email`; output `budget` (name, limit and the **alerts without the recipient**, so the plan text shows them) whose precondition stops the plan while the limit is undecided |
 | `infra/config/staging-budget.json` | The decision: name `veda-staging-monthly-cost`, `monthly_limit_usd: 25`, `forecast_alert_thresholds_percent: [80, 100]`. **No email address** |
 | `infra/terraform/envs/staging-core/tests/core.tftest.hcl`, `tests/fixtures/budget*.json` | 5 new offline Terraform tests (§5) |
 | `infra/scripts/check-plan.sh` | Plan guard: budget rules (§3) |
 | `.github/workflows/10-infra-plan.yml` | The plan step sets `TF_VAR_budget_alert_email` from `BUDGET_ALERT_EMAIL`, stored on the `staging-plan` environment (B3); a push to `main` that changes the budget decision is planned |
 | `infra/Makefile` | tflint and checkov also scan `terraform/modules/*` (checkov does not follow local module calls from a root) |
-| `infra/tests/run.sh` | 25 new checks (§5) |
+| `infra/scripts/stack.sh` | `apply` keeps Terraform's output in `apply.log`, off the public job log; a failure shows the last lines with email addresses redacted (review finding m1) |
+| `infra/tests/run.sh`, `infra/tests/stubs/terraform` | 37 new checks (§5); the stub's `apply` can print output and fail |
 | `docs/operations/staging-infra-workflows.md`, `infra/README.md`, `envs/staging-core/README.md`, `modules/README.md`, `staging-critical-path-plan.md` | Runbook §6 (inputs), status, O16 |
 
 ## 2. Design decisions for review
@@ -29,7 +30,7 @@
 |---|---|---|
 | B1 | A **cost** budget, **monthly**, in **USD**, with **forecast** alerts only (80%, 100%) | Owner decision O16. See residual risk R1 for what forecast-only alerts do not cover |
 | B2 | Email subscriber directly on the budget; **no SNS topic** | The smallest set of resources (one), and no monitoring infrastructure (out of scope; AUT-110 owns SNS) |
-| B3 | The recipient is **never committed**. It is the `staging-plan` **environment secret** `BUDGET_ALERT_EMAIL`, passed as `TF_VAR_budget_alert_email`, and a **sensitive** Terraform variable | The repository is public. GitHub prints a step's plain variables (`vars.*`) in the public job log, but masks secrets. The address is not a credential; the secret store is used only for masking. AWS access stays OIDC only. This is the workflows' **only** stored secret, scoped to the reviewer-protected environment and to the plan step |
+| B3 | The recipient is **never committed**. It is the `staging-plan` **environment secret** `BUDGET_ALERT_EMAIL`, passed as `TF_VAR_budget_alert_email`, and a **sensitive** Terraform variable | The repository is public. GitHub prints a step's plain variables (`vars.*`) in the public job log, but masks secrets. The address is not a credential; the secret store is used only for masking. AWS access stays OIDC only. This is the workflows' **only** stored secret, scoped to the reviewer-protected environment and to the plan step. Masking is not confinement: approving a pull-request plan run lets that pull request's code read the address (R6) |
 | B4 | The decided values (name, limit, thresholds) live in a **reviewed JSON file**, not in workflow variables | Every change to the budget is a pull request, and a push to `main` changing it triggers a plan |
 | B5 | An **undecided limit stops the plan** (`limit: null` → output precondition, O16 message), and the plan guard refuses a budget without a known USD limit | No invented amount; nothing is planned or applied without the owner's number |
 | B6 | Budgets is a **global** service: the resource has no `region` (confirmed in the AWS provider 6.66 schema) | The guard's Mumbai rule accepts a resource without a region as global. `veda-boundary` already lists `budgets:*` among the global actions, and `veda-gh-apply` already has `budgets:*`: **no bootstrap change** |
@@ -44,7 +45,9 @@ Refused on create or update:
 - a budget on a billing view (`billing_view_arn` set or unknown): a view can span other accounts;
 - a budget without a known limit in USD;
 - a budget without a notification (it alerts no one);
-- a notification to an SNS topic outside the approved account and ap-south-1.
+- notifications unknown at plan time;
+- a notification to an SNS topic that is unknown at plan time (the whole list or one element: refused, never skipped)
+  or outside the approved account and ap-south-1.
 
 Unchanged: no destroy; Mumbai only for every regional resource; IAM, trust and resource-policy rules.
 
@@ -57,6 +60,8 @@ Unchanged: no destroy; Mumbai only for every regional resource; IAM, trust and r
 | R3 | After the first apply, the plan role must read the budget on refresh (`budgets:ViewBudget`, `budgets:ListTagsForResource`) through `ReadOnlyAccess` | Low | Proven by the first plan after the apply: "No changes", no AccessDenied (§7, step 6) |
 | R4 | Budget email subscribers need no confirmation, so a mistyped address fails silently; delivery also depends on the mailbox (spam filtering) | Low | The owner sets the secret themselves and checks the first alert, or the alert history in the AWS Budgets console |
 | R5 | A missing or mistyped secret stops the plan | Accepted (fails closed) | The variable validation names the secret; nothing is planned |
+| R6 | Masking does not confine the address: a same-repository pull request whose plan run the `staging-plan` reviewer approves runs its own code with the secret, and could print it transformed | Low | Approving a pull-request plan run already grants that code read access to the account; the reviewer approves only reviewed pull requests (runbook §6) |
+| R7 | The budget name forces a replacement, which the guard refuses: a rename cannot go through automation | Accepted | Keep the name; a rename is an owner session task (runbook §6) |
 
 ## 5. Tests
 
@@ -65,29 +70,33 @@ Unchanged: no destroy; Mumbai only for every regional resource; IAM, trust and r
 | Run | Proves |
 |---|---|
 | `budget_monthly_cost_with_forecast_alerts` | Name from the decision; limit `50.00` USD (fixture); thresholds exactly 80 and 100 |
-| `budget_alerts_are_forecasts_by_email_only` | Exactly two alerts; each `FORECASTED`, `GREATER_THAN`, `PERCENTAGE`, one email address, no SNS topic |
+| `budget_alerts_are_forecasts_by_email_only` | Exactly two alerts; each `FORECASTED`, `GREATER_THAN`, `PERCENTAGE`, one email address, no SNS topic; the root output shows both alerts (80 then 100) without the address |
 | `budget_with_an_undecided_limit_refused` | `monthly_limit_usd: null` stops the plan (output precondition) |
 | `budget_without_a_recipient_refused` | An empty recipient (secret not set) stops the plan |
 | `budget_with_two_recipients_refused` | A list of addresses is refused: one recipient only |
 
-**`infra/tests/run.sh`: 465 passed, 0 failed** (440 on `main`; 25 new):
+**`infra/tests/run.sh`: 477 passed, 0 failed** (440 on `main`; 37 new):
 - **Plan guard:** the decided budget passes as a global resource; refused: a budget action, a name outside `veda-*`,
   another account, a billing view, no limit, another currency, no notification, an SNS topic in another account, an
-  SNS topic outside Mumbai; the account's own topic in Mumbai passes.
+  SNS topic outside Mumbai, an SNS list or element unknown at plan time, notifications unknown at plan time, an
+  update that drops every alert; the account's own topic in Mumbai passes. The fixtures use the `after_unknown`
+  shape Terraform plans for the budget.
 - **Committed decision:** thresholds `[80,100]`; name `veda-*`; limit `25` (O16); no email
   address in the decision, the module or the root.
 - **Wiring:** the root calls the module; the recipient variable is sensitive; the module creates no budget action;
-  `make check` lints and scans the module.
+  `make check` lints and scans the module; the root output carries the alert summary.
+- **Apply log:** `stack.sh apply` shows the result line, keeps the output (with a planted address) off the job log
+  and in `apply.log`; a failed apply shows its error with the address redacted, and fails.
 - **Workflow contract:** the plan step reads the recipient from `secrets.BUDGET_ALERT_EMAIL`; it is the only stored
   secret in either workflow, used once; it never reaches a plain variable; the apply workflow has no secret; a change
-  of the budget decision is planned on `main`.
+  of the budget decision is planned on `main`; the upload step says the plan file holds the recipient.
 
 **Mutation check:** each control was removed on its own, in a copy of the repository tree, and the suites re-run
 (§6).
 
 ## 6. Mutation results
 
-All 13 are detected.
+All 16 are detected (M14–M16 after the independent review, §9).
 
 | # | Control removed | Detected by |
 |---|---|---|
@@ -104,6 +113,9 @@ All 13 are detected.
 | M11 | Plan stops while the limit is undecided (output precondition always true) | 1 Terraform test |
 | M12 | Recipient validation (always true) | 1 Terraform test |
 | M13 | Committed thresholds 80/100 (mutated to 90/100) | 1 check |
+| M14 | Guard refuses SNS subscribers unknown at plan time | 2 checks |
+| M15 | Apply output kept off the job log (mutated to `tee`) | 2 checks |
+| M16 | Addresses redacted from a failed apply's tail | 2 checks |
 
 ## 7. Plan proof expectations
 
@@ -116,7 +128,8 @@ on the `staging-plan` environment (2026-10-05, at the owner's request; the value
 | OIDC session | `assumed-role/veda-gh-plan/gh-<run>-<attempt>-plan`; confined to ap-south-1 |
 | Backend | `s3://veda-tfstate-813238078849/staging/core.tfstate` |
 | Plan summary | **`Plan: 1 to add, 0 to change, 0 to destroy.`** |
-| The one resource | `module.budget.aws_budgets_budget.this` (create): name `veda-staging-monthly-cost`, `budget_type = "COST"`, `time_unit = "MONTHLY"`, `limit_amount = "25.00"`, `limit_unit = "USD"`, two notifications (`FORECASTED`, `GREATER_THAN`, 80 and 100, `PERCENTAGE`), subscriber shown as `(sensitive value)`, the default tags |
+| The one resource | `module.budget.aws_budgets_budget.this` (create): name `veda-staging-monthly-cost`, `budget_type = "COST"`, `time_unit = "MONTHLY"`, `limit_amount = "25.00"`, `limit_unit = "USD"`, the default tags. Terraform **hides each `notification` block** (it holds the sensitive address) |
+| Changes to outputs | `budget = { name = "veda-staging-monthly-cost", limit = { amount = "25.00", unit = "USD" }, alerts = [ … 80 …, … 100 … ] }`: each alert `FORECASTED`, `GREATER_THAN`, `PERCENTAGE`, `sns_topic_arns = []`, `email_recipients = 1`. This is where the approver reads the alerts |
 | Plan guard | passes ("no destroy, everything in ap-south-1, …") |
 | Plan mode | `nothing was created` |
 
@@ -141,3 +154,27 @@ recipient fails it with the recipient message. Both create nothing.
 | **O16, actual-spend alert** (R1) | Keep forecast-only, or add `ACTUAL` at 100% | Optional; before the first apply |
 | **OD-B7** | Close (SCP, RR-C) or accept the `veda-gh-apply` trust-writing gap | The first apply |
 | **N-04-S** | `PRIVATE_REPOSITORY` (recommended here, R2) or `ACCEPTED` | The first apply |
+
+## 9. Independent review (2026-10-05)
+
+A fresh-context reviewer read the change against this package, ran `make check`, read the provider 6.66 schema, and
+planned the committed root in a sandbox (local backend, fake credentials, `-refresh=false`): `Plan: 1 to add, 0 to
+change, 0 to destroy.`, and `check-plan.sh` passed on that real plan JSON. It confirmed `ReadOnlyAccess` covers the
+refresh (`budgets:Describe*`, `budgets:View*`, `budgets:ListTagsForResource`; R3) and that the provider suppresses the
+`25.00`/`25.0` limit difference. Verdict: **certifiable with conditions**. Findings and their handling:
+
+| # | Finding | Handling |
+|---|---|---|
+| M1 (major) | The plan text hides each notification block (sensitive address); §7 claimed it showed the alerts | **Fixed:** root output `budget` carries the alerts without the address; §7 corrected; Terraform test |
+| M2 (major) | The guard skipped an SNS subscriber list unknown at plan time (fail-open), and crashed on one unknown element | **Fixed:** both refused with a clear message; fixtures with the real `after_unknown` shape; mutation M14 |
+| m1 | The apply job could print the address if an AWS error repeated it (no mask there) | **Fixed:** apply output to `apply.log`; a failure's tail is shown with addresses redacted; mutations M15, M16 |
+| m2 | Masking does not confine the address from an approved pull request's code | **Documented:** B3, R6, runbook §6 |
+| m3 | Upload step still named "(no secrets)" | **Fixed:** renamed; workflow header notes the plan file holds the recipient |
+| m4 | §3 and the guard comment overstated SNS coverage | **Fixed** with M2 |
+| n1 | A rename is a replace, which the guard refuses | **Documented:** R7, runbook §6 |
+| n2 | `account_id` unknown passes | Accepted: computed when unset, and a member account cannot budget another account |
+| n3 | `cost_filter`, `filter_expression`, `planned_limit` unchecked | Accepted: harmless in a member account; a planned limit without `limit_amount` is already refused |
+| n4 | Fixture text said "undecided" | **Fixed** |
+| n5 | No test for an unknown SNS list | **Fixed** with M2 |
+| n6 | R1 forecast-only alerts | Owner choice before the first apply (§8) |
+

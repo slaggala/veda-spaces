@@ -124,5 +124,13 @@ OIDC only. Terraform marks it sensitive, so the plan text shows `(sensitive valu
 holds every planned value: if N-04-S is decided as `ACCEPTED` (publish the plan artifact from the public repository),
 the address becomes public with the artifact. `PRIVATE_REPOSITORY` avoids that.
 
-Changing the recipient: update the secret, then plan and apply again (an in-place update of the budget).
+Masking is not confinement: a same-repository pull request whose plan run the `staging-plan` reviewer approves runs
+its own code with the secret, and could print it in a transformed form. Approve plan runs only for pull requests you
+have reviewed (the same rule already protects the account's read access).
+
+Changing the recipient: update the secret, then plan and apply again (an in-place update of the budget). Renaming the
+budget is a replacement, which the plan guard refuses: keep the name.
+
+`stack.sh apply` keeps Terraform's apply output in `apply.log` (it can carry planned values); the job log shows the
+result line, or a failure's last lines with email addresses redacted.
 

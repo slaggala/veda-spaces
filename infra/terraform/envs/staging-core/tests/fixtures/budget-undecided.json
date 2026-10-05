@@ -1,10 +1,10 @@
 {
-  "description": "Staging cost budget (AUT-112, owner decision O16), planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request. The alert recipient is NOT stored here: it is the BUDGET_ALERT_EMAIL secret of the staging-plan environment, because the repository is public and GitHub prints plain variables in job logs. The plan refuses to run while monthly_limit_usd is null (undecided).",
+  "description": "Offline test fixture of infra/config/staging-budget.json (AUT-112).",
   "name": "veda-staging-monthly-cost",
   "monthly_limit_usd": null,
   "forecast_alert_thresholds_percent": [
     80,
     100
   ],
-  "decision": "O16, 2026-10-05: forecast alerts at 80% and 100% of the monthly limit, by email to the owner's address. The monthly limit is undecided."
+  "decision": "Test fixture: limit undecided."
 }
