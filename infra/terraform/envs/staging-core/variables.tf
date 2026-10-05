@@ -38,3 +38,10 @@ variable "budget_alert_email" {
     error_message = "budget_alert_email is not one email address: set the BUDGET_ALERT_EMAIL secret of the staging-plan environment (docs/operations/staging-infra-workflows.md)."
   }
 }
+
+variable "network_config_path" {
+  description = "Path of the network decision (AUT-101). Empty means infra/config/staging-network.json; only the offline tests override it."
+  type        = string
+  default     = ""
+}
+
