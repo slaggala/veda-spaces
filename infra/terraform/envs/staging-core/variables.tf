@@ -45,3 +45,8 @@ variable "network_config_path" {
   default     = ""
 }
 
+variable "platform_config_path" {
+  description = "Path of the platform decisions (AUT-102 … AUT-111). Empty means infra/config/staging-platform.json; only the offline tests override it."
+  type        = string
+  default     = ""
+}

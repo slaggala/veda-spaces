@@ -39,6 +39,10 @@
 #     endpoint other than the S3 gateway, or an S3 endpoint whose policy is unknown, the AWS default (full access),
 #     uses Not* elements, or allows S3 beyond the account's buckets and the named AWS-owned buckets of the region
 #     (ECR layers, Amazon Linux 2023 repositories, SSM Agent, SSM documents, Distributor);
+#   - creates a KMS key (AUT-102) without rotation, with a deletion window under 30 days, multi-region, not symmetric
+#     encrypt/decrypt, with the policy lockout check bypassed, with a policy unknown at plan time, or without a Deny of
+#     every caller outside the account (kms:CallerAccount); any replica, external or custom-store key, a separate key
+#     policy resource, or an alias outside alias/<prefix>-*;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -57,7 +61,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,45p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,49p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -299,6 +303,23 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type | IN("aws_kms_replica_key", "aws_kms_external_key", "aws_kms_replica_external_key", "aws_kms_custom_key_store", "aws_kms_key_policy") then
+        "\($addr): \(.type) is not allowed (keys are single-region, AWS-generated, with their policy on the key; AUT-102)"
+      elif .type == "aws_kms_alias" then
+        (if ($after.name // "") | startswith("alias/" + $prefix + "-") then empty else "\($addr): KMS alias \($after.name // "(unknown)") is not alias/\($prefix)-*" end)
+      elif .type == "aws_kms_key" then
+        (if $after.enable_key_rotation != true then "\($addr): KMS key without automatic rotation" else empty end),
+        (if ($after.deletion_window_in_days // 30) < 30 then "\($addr): KMS key deletion window \($after.deletion_window_in_days) days (30 required)" else empty end),
+        (if $after.multi_region == true then "\($addr): multi-region KMS key" else empty end),
+        (if ($after.key_usage // "ENCRYPT_DECRYPT") != "ENCRYPT_DECRYPT" or ($after.customer_master_key_spec // "SYMMETRIC_DEFAULT") != "SYMMETRIC_DEFAULT"
+           then "\($addr): KMS key is not a symmetric encrypt/decrypt key" else empty end),
+        (if $after.bypass_policy_lockout_safety_check == true then "\($addr): KMS key bypasses the policy lockout safety check" else empty end),
+        (if $unknown.policy == true or ($after.policy // "") == "" then "\($addr): KMS key policy unknown or absent (the default policy is not reviewed)"
+         else ($after.policy | fromjson) as $p
+           | (if [($p.Statement | arr)[] | select(.Effect == "Deny" and ((.Action | arr) | index("kms:*")) != null
+                    and ((((.Condition // {}).StringNotEquals // {})["kms:CallerAccount"]) | arr) == [$acct])] | length > 0
+              then empty else "\($addr): KMS key policy does not deny callers outside account \($acct) (kms:CallerAccount)" end),
+             ($p | open_statements($addr)) end)
       elif .type == "aws_budgets_budget_action" then
         "\($addr): budget actions are not allowed (they apply IAM or SCP policies or stop instances automatically; AUT-112)"
       elif .type == "aws_budgets_budget" then

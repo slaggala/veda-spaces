@@ -272,7 +272,7 @@ BOUNDARY_RES="$(jq -cn '{address: "aws_iam_policy.boundary", type: "aws_iam_poli
 plan_json "$P.ok" "[$GH_ROLE, $BOUNDARY_RES,
   $(role aws_iam_role.host veda-host "$(trust '{"Service":"ec2.amazonaws.com"}')"),
   {\"address\":\"aws_s3_bucket_policy.state\",\"type\":\"aws_s3_bucket_policy\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn '{Statement:[{Effect:"Deny",Principal:"*",Action:"s3:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
-  {\"address\":\"aws_kms_key.state\",\"type\":\"aws_kms_key\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn --arg a "arn:aws:iam::$ACCT:root" '{Statement:[{Effect:"Allow",Principal:{AWS:$a},Action:"kms:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
+  {\"address\":\"aws_kms_key.state\",\"type\":\"aws_kms_key\",\"change\":{\"actions\":[\"create\"],\"after\":{\"enable_key_rotation\":true,\"deletion_window_in_days\":30,\"policy\":$(jq -cn --arg a "arn:aws:iam::$ACCT:root" --arg acct "$ACCT" '{Statement:[{Effect:"Allow",Principal:{AWS:$a},Action:"kms:*",Resource:"*"},{Effect:"Deny",Principal:"*",Action:["kms:*"],Resource:"*",Condition:{StringNotEquals:{"kms:CallerAccount":$acct}}}]}|tojson')},\"after_unknown\":{}}},
   {\"address\":\"aws_sns_topic_policy.alarms\",\"type\":\"aws_sns_topic_policy\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn --arg a "$ACCT" '{Statement:[{Effect:"Allow",Principal:"*",Action:"sns:Publish",Resource:"*",Condition:{StringEquals:{"aws:SourceAccount":$a}}}]}|tojson')},\"after_unknown\":{}}},
   {\"address\":\"aws_lambda_permission.events\",\"type\":\"aws_lambda_permission\",\"change\":{\"actions\":[\"create\"],\"after\":{\"principal\":\"events.amazonaws.com\"},\"after_unknown\":{}}}]"
 check "clean bootstrap-shaped plan passes" ok "plan guard: no destroy" -- guard "$P.ok"
@@ -1584,6 +1584,32 @@ check "AUT-101 staging-core plans the network module" ok 'source = "../../module
 check "AUT-101 the apply role may pass Veda roles to VPC flow logs (bootstrap change, owner re-apply)" ok '"vpc-flow-logs.amazonaws.com"' -- awk '/sid *= "PassVedaRolesToStagingServices"/{p=1} p && /^  }/{exit} p' "$INFRA/terraform/bootstrap/roles.tf"
 # shellcheck disable=SC2016 # a make variable, expanded by make
 check "AUT-101 make test runs the network module's own tests" ok "terraform/modules/network" -- make -s -C "$INFRA" -f Makefile -f <(printf 'print-test-dirs:\n\t@printf "%%s\\n" $(patsubst %%/tests/,%%,$(dir $(wildcard terraform/modules/*/tests/)))\n') print-test-dirs
+
+echo "== AUT-102: KMS keys (rotation, deletion window, no caller outside the account)"
+KMS_OK="$(jq -cn --arg acct "$ACCT" '{enable_key_rotation: true, rotation_period_in_days: 365, deletion_window_in_days: 30, multi_region: false,
+  key_usage: "ENCRYPT_DECRYPT", customer_master_key_spec: "SYMMETRIC_DEFAULT",
+  policy: ({Version: "2012-10-17", Statement: [
+    {Sid: "AccountIamPolicies", Effect: "Allow", Principal: {AWS: "arn:aws:iam::\($acct):root"}, Action: "kms:*", Resource: "*"},
+    {Sid: "DenyOtherAccounts", Effect: "Deny", Principal: "*", Action: "kms:*", Resource: "*",
+     Condition: {StringNotEquals: {"kms:CallerAccount": $acct}, Bool: {"aws:PrincipalIsAWSService": "false"}}},
+    {Sid: "CloudTrailForTheVedaTrail", Effect: "Allow", Principal: {Service: "cloudtrail.amazonaws.com"}, Action: ["kms:GenerateDataKey*"], Resource: "*",
+     Condition: {StringEquals: {"aws:SourceArn": "arn:aws:cloudtrail:ap-south-1:\($acct):trail/veda-stg-trail"}}}]} | tojson)}')"
+kmsplan() { local f="$TMP/kms.$RANDOM$RANDOM.json"; plan_json "$f" "[$(res aws_kms_key module.kms.aws_kms_key.this "$(jq -c "${1:-.}" <<<"$KMS_OK")" "${2:-}")]"; echo "$f"; }
+check "AUT-102 the reviewed key shape passes" ok "plan guard: no destroy" -- guard "$(kmsplan)"
+check "AUT-102 a key without rotation is refused" fail "KMS key without automatic rotation" -- guard "$(kmsplan '.enable_key_rotation = false')"
+check "AUT-102 a short deletion window is refused" fail "deletion window 7 days" -- guard "$(kmsplan '.deletion_window_in_days = 7')"
+check "AUT-102 a multi-region key is refused" fail "multi-region KMS key" -- guard "$(kmsplan '.multi_region = true')"
+check "AUT-102 an asymmetric key is refused" fail "not a symmetric encrypt/decrypt key" -- guard "$(kmsplan '.customer_master_key_spec = "RSA_2048"')"
+check "AUT-102 a lockout-check bypass is refused" fail "bypasses the policy lockout safety check" -- guard "$(kmsplan '.bypass_policy_lockout_safety_check = true')"
+check "AUT-102 a key with the default (unreviewed) policy is refused" fail "KMS key policy unknown or absent" -- guard "$(kmsplan '.policy = null' '{"policy":true}')"
+check "AUT-102 a key without the cross-account Deny is refused" fail "does not deny callers outside account" -- guard "$(kmsplan '.policy = (.policy | fromjson | del(.Statement[1]) | tojson)')"
+check "AUT-102 a key usable by another account is refused" fail "Allow to another account" -- guard "$(kmsplan '.policy = (.policy | fromjson | .Statement += [{Effect: "Allow", Principal: {AWS: "arn:aws:iam::999999999999:root"}, Action: "kms:Decrypt", Resource: "*"}] | tojson)')"
+for t in aws_kms_replica_key aws_kms_external_key aws_kms_key_policy; do
+  check "AUT-102 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/kms.$RANDOM.json"; plan_json "$f" "[$(res $t x '{}')]"; echo "$f")"
+done
+check "AUT-102 an alias outside alias/veda-* is refused" fail "KMS alias alias/data is not alias/veda-" -- guard "$(f="$TMP/kms.$RANDOM.json"; plan_json "$f" "[$(res aws_kms_alias a '{"name":"alias/data"}')]"; echo "$f")"
+check "AUT-102 committed decision: 30-day deletion window, yearly rotation" ok "^30 365$" -- jq -r '"\(.kms.deletion_window_days) \(.kms.rotation_period_days)"' "$INFRA/config/staging-platform.json"
+check "AUT-102 staging-core plans the KMS module" ok 'source = "../../modules/kms"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

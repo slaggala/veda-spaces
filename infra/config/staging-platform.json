@@ -1,0 +1,9 @@
+{
+  "description": "Staging platform decisions (AUT-102 to AUT-111), planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request. An entry whose status is PROPOSED has not been decided by the owner: plans run with the proposed value, and stack.sh apply refuses while any PROPOSED entry remains. Secrets and personal addresses are never stored here.",
+  "kms": {
+    "status": "DECIDED",
+    "decision": "Integrated workstream 2026-10-05: two customer-managed keys (data, audit) instead of three, for cost (cost report); yearly rotation; 30-day deletion window.",
+    "deletion_window_days": 30,
+    "rotation_period_days": 365
+  }
+}

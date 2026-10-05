@@ -11,6 +11,14 @@ locals {
   # AUT-101: the reviewed network decision (N1-N8).
   network_path = var.network_config_path != "" ? var.network_config_path : "${path.module}/../../../config/staging-network.json"
   network      = jsondecode(file(local.network_path))
+
+  # AUT-102 … AUT-111: the reviewed platform decisions.
+  platform_path = var.platform_config_path != "" ? var.platform_config_path : "${path.module}/../../../config/staging-platform.json"
+  platform      = jsondecode(file(local.platform_path))
+
+  name_prefix      = "veda-stg"
+  log_group_prefix = "/veda/staging"
+  trail_name       = "veda-stg-trail"
 }
 
 # AUT-112: monthly cost budget with forecast alerts to the owner. Global service, no region.
@@ -41,5 +49,18 @@ module "network" {
   flow_log_retention_days  = local.network.flow_logs.retention_days
   tunnel_egress_cidrs      = local.network.tunnel_egress_cidrs
   aws_owned_s3_object_arns = local.network.aws_owned_s3_object_arns
+}
+
+# AUT-102: customer-managed keys (data, audit).
+module "kms" {
+  source = "../../modules/kms"
+
+  name_prefix          = local.name_prefix
+  account_id           = local.account_id
+  region               = var.aws_region
+  log_group_prefix     = local.log_group_prefix
+  trail_name           = local.trail_name
+  deletion_window_days = local.platform.kms.deletion_window_days
+  rotation_period_days = local.platform.kms.rotation_period_days
 }
 
