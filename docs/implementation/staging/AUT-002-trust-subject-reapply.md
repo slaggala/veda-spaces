@@ -1,8 +1,9 @@
 # AUT-002 follow-up: re-apply the bootstrap with GitHub's immutable OIDC subject
 
 - **Date:** 2026-10-04
-- **Status:** prepared. **Not authorized and not run.** The re-apply needs the owner's written authorization, like
-  the first bootstrap ([AUT-002-bootstrap-authorization.md](AUT-002-bootstrap-authorization.md) §2).
+- **Status:** **authorized and executed** on 2026-10-04 (approval of plan digest `d977a40bd27d062efda5e837bb7953875c2a200937aae7ae4a2a4ca8af24ea78` at 16:29:27Z):
+  0 to add, 4 to change, 0 to destroy, `assume_role_policy` subject only. The roles now use immutable GitHub subject
+  ID trust, and RR-A is closed. The AUT-301 plan proof that followed passed (AUT-301 review package §8).
 
 ## 1. Why
 
@@ -68,6 +69,6 @@ Then re-run the `10-infra-plan` job on PR #17 (AUT-301): it must reach "No chang
 
 | Field | Value |
 |---|---|
-| Decision | **Pending owner authorization** |
+| Decision | **Approved by the owner and executed, 2026-10-04** |
 | Scope | Re-apply of the bootstrap root to update the four trust policies only (§3), by the controlled local procedure |
 | Security requirements | As for the first bootstrap: `bootstrap-owner` only, MFA, a temporary key created and deleted on the run day, no root credentials, no permanent credentials |

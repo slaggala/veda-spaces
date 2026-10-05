@@ -19,13 +19,16 @@ CHECKOV    ?= $(call tool,checkov)
 SHELLCHECK ?= $(call tool,shellcheck)
 ACTIONLINT ?= $(call tool,actionlint)
 
-ROOTS      := terraform/bootstrap
+ROOTS      := terraform/bootstrap terraform/envs/staging-core
 SCRIPTS    := $(wildcard scripts/*.sh)
 WORKFLOWS  := $(wildcard ../.github/workflows/*.yml)
 
 # Offline checks run with credentials disabled so they can never reach an AWS account by accident.
 OFFLINE_ENV := AWS_PROFILE= AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= AWS_SESSION_TOKEN= \
                AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true
+# Their own Terraform data directory per root (gitignored generated/), so a root that a real run initialised with
+# the S3 backend (bootstrap.sh, stack.sh) is still checked offline, and the checks never touch that run's .terraform.
+CHECK_DATA = TF_DATA_DIR=$(CURDIR)/generated/tf-check/$$(tr / _ <<<"$$r")
 
 .PHONY: help check tools tool-versions prerequisites manifest-check inventory fmt fmt-check validate test test-scripts lint tflint checkov shellcheck actionlint \
         discover bootstrap-plan bootstrap-apply github-environments github-verify github-variables clean
@@ -56,13 +59,13 @@ fmt-check: ## Fail on unformatted Terraform
 validate: ## terraform init (no backend) + validate for every root
 	@for r in $(ROOTS); do \
 	  echo "== validate $$r"; \
-	  (cd $$r && $(OFFLINE_ENV) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(TERRAFORM) validate) || exit 1; \
+	  (cd $$r && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) validate) || exit 1; \
 	done
 
 test: ## terraform test (offline, overridden provider values; creates nothing)
 	@for r in $(ROOTS); do \
 	  echo "== test $$r"; \
-	  (cd $$r && $(OFFLINE_ENV) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(TERRAFORM) test) || exit 1; \
+	  (cd $$r && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) init -backend=false -input=false >/dev/null && $(OFFLINE_ENV) $(CHECK_DATA) $(TERRAFORM) test) || exit 1; \
 	done
 
 test-scripts: ## Script, plan-guard, workflow and negative Terraform tests (offline; stubbed aws/gh)
@@ -107,4 +110,4 @@ github-variables: ## Dry run of the GitHub variables from bootstrap outputs (APP
 	scripts/github-setup.sh --outputs generated/bootstrap-outputs.json --variables-only $(if $(APPLY),--apply)
 
 clean: ## Remove local Terraform working files and generated output (never state in S3)
-	rm -rf generated terraform/*/.terraform terraform/*/generated.auto.tfvars.json terraform/*/backend_s3.tf
+	rm -rf generated terraform/*/.terraform terraform/envs/*/.terraform terraform/*/generated.auto.tfvars.json terraform/*/backend_s3.tf

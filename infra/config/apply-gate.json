@@ -1,0 +1,15 @@
+{
+  "description": "Gate for applying staging stacks through 11-infra-apply (AUT-301). Every apply refuses to start unless every gate below is decided and its record exists in the repository. Changed only through a reviewed pull request; see docs/operations/staging-infra-workflows.md.",
+  "gates": {
+    "OD-B7": {
+      "title": "veda-gh-apply trust-writing gap (RR-D, with RR-C: SCP or RCP from the management account)",
+      "status": "UNDECIDED",
+      "record": null
+    },
+    "N-04-S": {
+      "title": "Staging plan text in a public repository: plan artifacts are uploaded (and so reviewable for apply) only from a private repository unless the owner accepts publishing them",
+      "status": "UNDECIDED",
+      "record": null
+    }
+  }
+}

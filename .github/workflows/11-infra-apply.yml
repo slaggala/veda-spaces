@@ -1,0 +1,138 @@
+# Apply of an approved staging core plan through GitHub OIDC (AUT-301; runbook docs/operations/staging-infra-workflows.md).
+#
+# DISABLED until owner decision OD-B7 (the veda-gh-apply trust-writing gap) and gate N-04-S are recorded in
+# infra/config/apply-gate.json through a reviewed pull request. Until then the credential-free preflight refuses every
+# run, so the apply job never starts, never requests the staging-infra environment and never receives an OIDC token;
+# the apply job and stack.sh check the gate again.
+#
+# Once enabled: run it with plan_run_id = a successful workflow_dispatch run of 10-infra-plan on main for this same
+# commit and plan_sha256 = the digest in that run's summary. The run name shows both, so the staging-infra reviewer
+# approves that exact digest. The apply job proves the approval, binds the artifact to the digest GitHub recorded at
+# upload and to the approved plan digest (verify-run.sh), assumes veda-gh-apply, re-renders the plan text, runs the
+# plan guard again and applies only that file. Terraform refuses it if the state changed since.
+name: 11-infra-apply
+run-name: "11-infra-apply (core: plan run ${{ inputs.plan_run_id }}, plan sha256 ${{ inputs.plan_sha256 }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      plan_run_id:
+        description: "Run ID of the reviewed 10-infra-plan run (workflow_dispatch, main, this commit)"
+        type: string
+        required: true
+      plan_sha256:
+        description: "The reviewed plan's SHA-256, from that run's summary (the digest you approve)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read # read runs, approvals, environments and the reviewed plan artifact
+
+concurrency:
+  group: infra-apply-core
+  cancel-in-progress: false
+
+env:
+  PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+  PLAN_SHA256: ${{ inputs.plan_sha256 }}
+  AWS_REGION: ap-south-1
+  AWS_DEFAULT_REGION: ap-south-1
+  TF_IN_AUTOMATION: "1"
+  TF_INPUT: "0"
+
+jobs:
+  # No environment, no secret, no OIDC token: nothing here can reach AWS, and it gates the job that can.
+  preflight:
+    name: preflight (no credentials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Apply gates (OD-B7, N-04-S) — fails closed while undecided
+        run: infra/scripts/stack.sh gate
+
+      - name: Inputs, approved repository, this workflow on protected main
+        run: |
+          [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::plan_run_id must be a run ID"; exit 1; }
+          [[ "$PLAN_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::plan_sha256 must be the 64-hex plan digest"; exit 1; }
+          [[ "$GITHUB_REPOSITORY" == "$(jq -r .repository infra/config/staging-account.json)" &&
+             "$GITHUB_REPOSITORY_ID" == "$(jq -r .repository_id infra/config/staging-account.json)" ]] ||
+            { echo "::error::$GITHUB_REPOSITORY ($GITHUB_REPOSITORY_ID) is not the repository the manifest approves"; exit 1; }
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::11-infra-apply runs from main only"; exit 1; }
+          [[ "$GITHUB_WORKFLOW_REF" == "$GITHUB_REPOSITORY/.github/workflows/11-infra-apply.yml@refs/heads/main" ]] ||
+            { echo "::error::this is $GITHUB_WORKFLOW_REF, not 11-infra-apply.yml on main"; exit 1; }
+
+      - name: Environment protection (RR-07, before the environment is used)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+
+      - name: Approved plan binding (RR-05)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh plan-run --stack core --repo "$GITHUB_REPOSITORY" --run-id "$PLAN_RUN_ID" \
+            --this-run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA" --plan-sha256 "$PLAN_SHA256" --out infra/generated/reviewed
+
+  apply:
+    name: apply (staging-core)
+    needs: preflight
+    runs-on: ubuntu-24.04
+    environment: staging-infra
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      id-token: write # OIDC: veda-gh-apply, trusted only for environment staging-infra
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Apply gates again (defence in depth)
+        run: infra/scripts/stack.sh gate
+
+      - name: Install the pinned Terraform (SHA-256 verified)
+        run: |
+          infra/scripts/install-tools.sh --only terraform
+          echo "$PWD/infra/.tools/bin" >>"$GITHUB_PATH"
+
+      - name: Approved deployment and environment protection (RR-07)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment staging-infra
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+
+      # Downloaded again here (jobs share no files) and verified again: same run, same artifact digest, same plan digest.
+      - name: Fetch the approved plan (RR-05)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh plan-run --stack core --repo "$GITHUB_REPOSITORY" --run-id "$PLAN_RUN_ID" \
+            --this-run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA" --plan-sha256 "$PLAN_SHA256" --out infra/generated/reviewed
+
+      - name: OIDC session (veda-gh-apply)
+        env:
+          AWS_ROLE_ARN_APPLY: ${{ vars.AWS_ROLE_ARN_APPLY }}
+        run: infra/scripts/oidc-session.sh --role apply
+
+      - name: Apply the approved plan
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_KMS_KEY_ARN: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+        run: |
+          infra/scripts/stack.sh apply --stack core --plan-dir infra/generated/reviewed \
+            --plan-sha256 "$PLAN_SHA256" --plan-run-id "$PLAN_RUN_ID"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 11-infra-apply (core)"
+            echo "Plan run $PLAN_RUN_ID, approved plan sha256 \`$PLAN_SHA256\`."
+          } >>"$GITHUB_STEP_SUMMARY"

@@ -36,7 +36,7 @@ ap-south-1; and the only account referenced is 813238078849.
 |---|---|
 | State (8) | Bucket `veda-tfstate-813238078849` (`force_destroy` false) with versioning, SSE-KMS, ownership controls, public-access block, policy and lifecycle; KMS key `e7422777-f464-4789-9825-0f7aa0c7da37` (rotation 365 days, 30-day deletion window) with alias `alias/veda-tfstate` |
 | GitHub OIDC (1) | `token.actions.githubusercontent.com` |
-| IAM (17) | `veda-gh-plan`, `veda-gh-apply`, `veda-gh-deploy`, `veda-gh-evidence`: path `/`, 3600 s, boundary `veda-boundary`; each trusts only `repo:slaggala/veda-spaces:environment:` + `staging-plan` / `staging-infra` / `staging` / `staging-evidence`; 6 policies (`veda-boundary` and the 5 role policies); 7 attachments |
+| IAM (17) | `veda-gh-plan`, `veda-gh-apply`, `veda-gh-deploy`, `veda-gh-evidence`: path `/`, 3600 s, boundary `veda-boundary`; each trusts only `repo:slaggala/veda-spaces:environment:` + `staging-plan` / `staging-infra` / `staging` / `staging-evidence` as applied on 2026-10-03 (since 2026-10-04: immutable GitHub subject ID trust, `repo:slaggala@37840263/veda-spaces@1392733148:environment:<env>`, [AUT-002-trust-subject-reapply.md](../../implementation/staging/AUT-002-trust-subject-reapply.md)); 6 policies (`veda-boundary` and the 5 role policies); 7 attachments |
 | Account guardrails (6) | S3 account public-access block; EBS encryption by default; EBS snapshot and AMI public-access blocks; instance metadata defaults (IMDSv2 required, hop limit 2); IAM Access Analyzer `veda-account-analyzer` |
 
 State bucket policy: deny insecure transport, any other KMS key and access points. Only `role/bootstrap-owner` and the
@@ -122,5 +122,5 @@ these events for 90 days, until about 2027-01-01 (OD-B6).
 
 - **Unblocked:** the infrastructure workflows (AUT-301) can now assume the `veda-gh-*` roles through OIDC, using the
   repository variables.
-- **Still gated:** no workflow may assume `veda-gh-apply` until OD-B7 (the trust-writing gap) is decided; RR-A
-  and RR-C come before AUT-301. AUT-101 onward has not started.
+- **Still gated:** no workflow may assume `veda-gh-apply` until OD-B7 (the trust-writing gap) is decided; RR-C
+  comes before AUT-301. RR-A is closed by immutable GitHub subject ID trust (re-applied 2026-10-04). AUT-101 onward has not started.

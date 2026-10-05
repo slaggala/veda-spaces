@@ -1149,6 +1149,243 @@ check "RD-02 a download with the wrong SHA-256 is refused" fail "does not match 
 # shellcheck disable=SC2016 # $0 belongs to the inner shell
 check "  ... and nothing is installed from it" ok "^absent$" -- bash -c '[[ ! -e "$0/bin/terraform" ]] && echo absent' "$D"
 
+echo "== AUT-301: staging plan and apply workflows (OIDC, plan guard, digest binding, apply gate)"
+PW="$INFRA/../.github/workflows/10-infra-plan.yml"
+AW="$INFRA/../.github/workflows/11-infra-apply.yml"
+PWT="$(cat "$PW")"
+AWT="$(cat "$AW")"
+PLANJOB="$(awk '/^  plan:/{p=1} p' "$PW")"
+PREJOB="$(awk '/^  preflight:/{p=1} /^  apply:/{p=0} p' "$AW")"
+APPJOB="$(awk '/^  apply:/{p=1} p' "$AW")"
+check "AUT-301 plan workflow: pull request, push to main and manual runs" ok "workflow_dispatch:" -- printf '%s\n' "$PWT"
+absent "AUT-301 plan workflow never runs with pull_request_target" "pull_request_target" "$PWT$AWT"
+check "AUT-301 plan job runs in the staging-plan environment" ok "^    environment: staging-plan$" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 plan job may request an OIDC token" ok "id-token: write" -- printf '%s\n' "$PLANJOB"
+absent "AUT-301 no OIDC token at workflow level (plan)" "id-token" "$(awk '/^jobs:/{exit} {print}' "$PW")"
+absent "AUT-301 no OIDC token at workflow level (apply)" "id-token" "$(awk '/^jobs:/{exit} {print}' "$AW")"
+check "AUT-301 fork pull requests are not planned" ok "head.repo.full_name == github.repository" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 plan job proves its staging-plan approval" ok "verify-run.sh approval .* --environment staging-plan" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 plan job assumes veda-gh-plan through OIDC" ok "oidc-session.sh --role plan" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 plan job plans through stack.sh (plan guard, no plan text in the log)" ok "stack.sh plan --stack core" -- printf '%s\n' "$PLANJOB"
+check "AUT-301 plan artifact only when publishing is allowed (N-04-S)" ok "if: steps.publish.outputs.publish == 'true'" -- printf '%s\n' "$PLANJOB"
+order_ok() { # order_ok <text> <first> <second>: the first pattern appears before the second
+  local a b
+  a="$(grep -n -- "$2" <<<"$1" | head -1 | cut -d: -f1)"
+  b="$(grep -n -- "$3" <<<"$1" | head -1 | cut -d: -f1)"
+  [[ -n "$a" && -n "$b" && "$a" -lt "$b" ]] && echo "in order"
+}
+check "AUT-301 the approval is proven before any AWS session (plan)" ok "in order" -- order_ok "$PLANJOB" "verify-run.sh approval" "oidc-session.sh"
+check "AUT-301 apply workflow: manual runs only" ok "^  workflow_dispatch:$" -- printf '%s\n' "$AWT"
+absent "  ... no other trigger" "^  (pull_request|push|schedule|workflow_run|repository_dispatch):" "$AWT"
+check "AUT-301 the run name shows the plan run and the digest the reviewer approves" ok 'run-name: .*plan run \$\{\{ inputs.plan_run_id \}\}, plan sha256 \$\{\{ inputs.plan_sha256 \}\}' -- printf '%s\n' "$AWT"
+absent "AUT-301 preflight holds no environment, secret or OIDC token" "environment:|secrets\.|id-token" "$PREJOB"
+check "AUT-301 preflight checks the apply gates first" ok "in order" -- order_ok "$PREJOB" "stack.sh gate" "verify-run.sh plan-run"
+check "AUT-301 preflight binds the approved plan run (stack core)" ok "verify-run.sh plan-run --stack core" -- printf '%s\n' "$PREJOB"
+check "AUT-301 apply job needs the preflight" ok "needs: preflight" -- printf '%s\n' "$APPJOB"
+check "AUT-301 apply job runs in the staging-infra environment" ok "^    environment: staging-infra$" -- printf '%s\n' "$APPJOB"
+check "AUT-301 apply job checks the gates again before any session" ok "in order" -- order_ok "$APPJOB" "stack.sh gate" "oidc-session.sh"
+check "AUT-301 apply job proves its staging-infra approval before any session" ok "in order" -- order_ok "$APPJOB" "verify-run.sh approval .* --environment staging-infra" "oidc-session.sh"
+check "AUT-301 apply job fetches the approved plan before any session" ok "in order" -- order_ok "$APPJOB" "verify-run.sh plan-run --stack core" "oidc-session.sh"
+check "AUT-301 apply job assumes veda-gh-apply" ok "oidc-session.sh --role apply" -- printf '%s\n' "$APPJOB"
+# shellcheck disable=SC2016 # matched literally in the workflow
+check "AUT-301 apply job applies only the approved digest of the approved run" ok '--plan-sha256 "\$PLAN_SHA256" --plan-run-id "\$PLAN_RUN_ID"' -- printf '%s\n' "$APPJOB"
+absent "AUT-301 no stored secret in either workflow" 'secrets\.' "$PWT$AWT"
+absent "AUT-301 every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$PWT$AWT"
+absent "AUT-301 checkouts keep no credentials" "persist-credentials: true" "$PWT$AWT"
+check "AUT-301 every checkout drops the token" ok "^3$" -- grep -c "persist-credentials: false" <<<"$PWT$AWT"
+
+# The committed gate keeps every apply disabled (OD-B7 and N-04-S undecided).
+T="$(new_tree)"
+cp -R "$INFRA/config/apply-gate.json" "$T/infra/config/apply-gate.json"
+SK="$T/infra/scripts/stack.sh"
+check "AUT-301 committed apply gate refuses (OD-B7 undecided)" fail "OD-B7: .* is UNDECIDED" -- "$SK" gate
+check "  ... and N-04-S undecided" fail "N-04-S: .* is UNDECIDED" -- "$SK" gate
+gatefix() { # gatefix <jq>: an apply gate derived from the committed one
+  local f="$TMP/gate.$RANDOM$RANDOM.json"
+  jq "$1" "$INFRA/config/apply-gate.json" >"$f"
+  echo "$f"
+}
+mkdir -p "$T/docs" && echo "decision" >"$T/docs/od-b7.md"
+DECIDED='.gates["OD-B7"] |= (.status = "CLOSED" | .record = "docs/od-b7.md") | .gates["N-04-S"] |= (.status = "PRIVATE_REPOSITORY" | .record = "docs/od-b7.md")'
+check "AUT-301 decided gates with records open the gate" ok "apply gates decided: OD-B7=CLOSED, N-04-S=PRIVATE_REPOSITORY" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED")" "$SK" gate
+check "AUT-301 a decision without a record is refused" fail "OD-B7: decided without a record" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].record = null")" "$SK" gate
+check "AUT-301 a record that does not exist is refused" fail "record docs/none.md does not exist" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].record = \"docs/none.md\"")" "$SK" gate
+check "AUT-301 a status the gate does not allow is refused" fail "status OPEN is not one of CLOSED, ACCEPTED" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].status = \"OPEN\"")" "$SK" gate
+check "AUT-301 a missing gate is refused" fail "OD-B7: gate missing" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | del(.gates[\"OD-B7\"])")" "$SK" gate
+check "AUT-301 an unknown gate is refused" fail "X-1: unknown gate" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED"' | .gates["X-1"] = {status: "CLOSED", record: "docs/od-b7.md"}')" "$SK" gate
+: >"$TMP/gate.empty.json"
+check "AUT-301 an empty gate file is refused (never read as no problems)" fail "not a JSON object with a gates object" -- env VEDA_APPLY_GATE="$TMP/gate.empty.json" "$SK" gate
+echo '{"gates": [' >"$TMP/gate.broken.json"
+check "AUT-301 a malformed gate file is refused" fail "not a JSON object with a gates object" -- env VEDA_APPLY_GATE="$TMP/gate.broken.json" "$SK" gate
+echo '{"gates": []}' >"$TMP/gate.array.json"
+check "AUT-301 a gate file without a gates object is refused" fail "not a JSON object with a gates object" -- env VEDA_APPLY_GATE="$TMP/gate.array.json" "$SK" gate
+check "AUT-301 a missing gate file is refused" fail "apply gate file not found" -- env VEDA_APPLY_GATE="$TMP/none.json" "$SK" gate
+
+# stack.sh plan: an OIDC plan session in the approved account, confined to Mumbai; the bootstrap's state bucket.
+mkdir -p "$T/infra/terraform/envs/staging-core"
+NOOP='{"format_version":"1.2","terraform_version":"1.16.4","variables":{"aws_region":{"value":"ap-south-1"}},"planned_values":{"root_module":{}},"configuration":{"provider_config":{"aws":{"name":"aws","full_name":"registry.terraform.io/hashicorp/aws","expressions":{"region":{"references":["var.aws_region"]}}}},"root_module":{}}}'
+wf_session() { # wf_session <role>: AWS answers for a veda-gh-<role> OIDC session
+  local d="$TMP/aws.wf.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-$1/gh-100-1-$1\"}" >"$d/sts_get-caller-identity.json"
+  echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
+  echo "$d"
+}
+tf_plan_stub() { # tf_plan_stub <plan json>
+  local d="$TMP/tf.plan.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  printf '%s\n' "$1" >"$d/plan.json"
+  printf 'No changes. Your infrastructure matches the configuration.\nDETAIL-THAT-STAYS-OFF-THE-LOG\n' >"$d/plan.txt"
+  printf 'PLAN-OUTPUT-THAT-STAYS-OFF-THE-LOG\n' >"$d/plan.stdout"
+  echo "$d"
+}
+splan() { # splan <aws dir> <tf dir> [env...]; the plan lands in $SPLAN_OUT (default: a new directory)
+  local a="$1" t="$2"
+  shift 2
+  env AWS_STUB_DIR="$a" TF_STUB_DIR="$t" GITHUB_SHA=$C TF_STATE_BUCKET=veda-tfstate-$ACCT TF_STATE_KMS_KEY_ARN="$KEY" "$@" \
+    "$SK" plan --stack core --out "${SPLAN_OUT:-$TMP/core.$RANDOM$RANDOM}"
+}
+TFP="$(tf_plan_stub "$NOOP")"
+META_DIR="$TMP/core.first"
+out_plan="$(SPLAN_OUT="$META_DIR" splan "$(wf_session plan)" "$TFP" 2>&1)"
+check "AUT-301 empty staging-core: plan shows No changes" ok "plan summary: No changes\." -- printf '%s\n' "$out_plan"
+check "  ... prints the digest to approve" ok "plan sha256 \(the digest an apply must be approved for\): [0-9a-f]{64}" -- printf '%s\n' "$out_plan"
+check "  ... and creates nothing" ok "plan mode: nothing was created" -- printf '%s\n' "$out_plan"
+check "  ... after the plan guard" ok "plan guard: no destroy" -- printf '%s\n' "$out_plan"
+absent "AUT-301 the plan text stays off the job log (N-04-S)" "DETAIL-THAT-STAYS-OFF-THE-LOG" "$out_plan"
+absent "AUT-301 terraform plan's own output stays off the job log (N-04-S)" "PLAN-OUTPUT-THAT-STAYS-OFF-THE-LOG" "$out_plan"
+check "  ... and is kept in the plan log file instead" ok "PLAN-OUTPUT-THAT-STAYS-OFF-THE-LOG" -- cat "$META_DIR/core-plan.log"
+check "AUT-301 backend: the bootstrap state bucket, staging/core.tfstate, state key, native lock" ok "init -input=false -reconfigure -backend-config=bucket=veda-tfstate-$ACCT -backend-config=key=staging/core.tfstate -backend-config=region=ap-south-1 -backend-config=encrypt=true -backend-config=kms_key_id=$KEY -backend-config=use_lockfile=true" -- cat "$TFP/calls.log"
+check "AUT-301 plan with a lock timeout into a saved file" ok "plan -input=false -lock-timeout=5m -no-color -out=" -- cat "$TFP/calls.log"
+# shellcheck disable=SC2016 # the inner shell expands them
+check "AUT-301 plan metadata binds stack, commit, account, state key and digests" ok '^ok$' -- bash -c 'jq -e --arg c "$1" --arg a "$2" --arg s "$(shasum -a 256 "$0/core.tfplan" | cut -d" " -f1)" ".stack == \"core\" and .commit == \$c and .account_id == \$a and .state_key == \"staging/core.tfstate\" and .plan_sha256 == \$s and .changes == {}" "$0/core-plan.meta.json" >/dev/null && echo ok' "$META_DIR" "$C" "$ACCT"
+check "AUT-301 plan refused with an apply session" fail "not veda-gh-plan" -- splan "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+D="$(wf_session plan)" && rm "$D/ec2_describe-availability-zones@us-east-1.fail" && echo '{}' >"$D/ec2_describe-availability-zones.json"
+check "AUT-301 plan refused when the session can act outside Mumbai (no boundary)" fail "can act in us-east-1" -- splan "$D" "$(tf_plan_stub "$NOOP")"
+D="$(wf_session plan)" && sed -i.bak "s/$ACCT/999988887777/g" "$D/sts_get-caller-identity.json"
+check "AUT-301 plan refused in another account" fail "not veda-gh-plan in account $ACCT" -- splan "$D" "$(tf_plan_stub "$NOOP")"
+check "AUT-301 another state bucket in the repository variables is refused" fail "TF_STATE_BUCKET is veda-tfstate-999988887777" -- splan "$(wf_session plan)" "$(tf_plan_stub "$NOOP")" TF_STATE_BUCKET=veda-tfstate-999988887777
+check "AUT-301 a state key of another account is refused" fail "TF_STATE_KMS_KEY_ARN must be the state key" -- splan "$(wf_session plan)" "$(tf_plan_stub "$NOOP")" TF_STATE_KMS_KEY_ARN="arn:aws:kms:ap-south-1:999988887777:key/00000000-0000-0000-0000-000000000000"
+check "AUT-301 an unknown stack is refused" fail "unknown stack edge" -- env AWS_STUB_DIR="$(wf_session plan)" TF_STUB_DIR="$TFP" "$SK" plan --stack edge
+DEL="$(jq -c '. + {resource_changes: [{address: "aws_s3_bucket.x", type: "aws_s3_bucket", change: {actions: ["delete"], before: {}, after: null}}]}' <<<"$NOOP")"
+check "AUT-301 the plan guard refuses a destroy in a staging plan" fail "delete|destroy" -- splan "$(wf_session plan)" "$(tf_plan_stub "$DEL")"
+
+# stack.sh apply: only with decided gates, only in 11-infra-apply on main, only the approved digest of plan run 100.
+GOOD_GATE="$(gatefix "$DECIDED")"
+PD="$TMP/reviewed.core"
+mkdir -p "$PD" && cp "$META_DIR"/core.tfplan "$META_DIR"/core-plan.txt "$PD/"
+jq '.workflow_ref = "example-org/veda-spaces/.github/workflows/10-infra-plan.yml@refs/heads/main" | .run_id = "100"' "$META_DIR/core-plan.meta.json" >"$PD/core-plan.meta.json"
+APPROVED_CORE="$(sha "$PD/core.tfplan")"
+sapply() { # sapply <plan dir> <aws dir> <tf dir> [env...]
+  local pd="$1" a="$2" t="$3"
+  shift 3
+  env AWS_STUB_DIR="$a" TF_STUB_DIR="$t" GITHUB_SHA=$C TF_STATE_BUCKET=veda-tfstate-$ACCT TF_STATE_KMS_KEY_ARN="$KEY" \
+    GITHUB_WORKFLOW_REF="example-org/veda-spaces/.github/workflows/11-infra-apply.yml@refs/heads/main" VEDA_APPLY_GATE="$GOOD_GATE" "$@" \
+    "$SK" apply --stack core --plan-dir "$pd" --plan-sha256 "$APPROVED_CORE" --plan-run-id 100
+}
+pdrift() { # pdrift <jq>: a copy of the reviewed plan dir with its metadata changed
+  local d="$TMP/reviewed.$RANDOM$RANDOM"
+  cp -R "$PD" "$d"
+  jq "$1" "$PD/core-plan.meta.json" >"$d/core-plan.meta.json"
+  echo "$d"
+}
+TFA="$(tf_plan_stub "$NOOP")"
+check "AUT-301 the approved plan is applied" ok "applied the approved plan of run 100 to staging/core.tfstate" -- sapply "$PD" "$(wf_session apply)" "$TFA"
+check "  ... exactly that plan file" ok "apply -input=false -lock-timeout=5m $PD/core.tfplan" -- cat "$TFA/calls.log"
+TFA="$(tf_plan_stub "$NOOP")"
+check "AUT-301 apply refused by the committed gate (OD-B7 undecided)" fail "staging applies are disabled" -- sapply "$PD" "$(wf_session apply)" "$TFA" VEDA_APPLY_GATE="$INFRA/config/apply-gate.json"
+absent "  ... before Terraform runs at all" "^(init|apply) " "$(cat "$TFA/calls.log" 2>/dev/null || true)"
+check "AUT-301 apply outside 11-infra-apply on main refused" fail "applied only by .github/workflows/11-infra-apply.yml on main" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")" GITHUB_WORKFLOW_REF=local
+D="$TMP/reviewed.alt" && cp -R "$PD" "$D" && echo "another plan" >"$D/core.tfplan"
+check "AUT-301 a plan file other than the approved digest refused" fail "is not the approved plan" -- sapply "$D" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+check "AUT-301 a plan made locally (not 10-infra-plan on main) refused" fail "was made by local" -- sapply "$(pdrift '.workflow_ref = "local"')" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+check "AUT-301 a plan of another run refused" fail "is from run 99, not the approved run 100" -- sapply "$(pdrift '.run_id = "99"')" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+check "AUT-301 a plan of another commit refused" fail "was made from commit badc0de" -- sapply "$(pdrift '.commit = "badc0de"')" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+check "AUT-301 a plan of another stack refused" fail "is for stack edge" -- sapply "$(pdrift '.stack = "edge"')" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+D="$TMP/reviewed.text" && cp -R "$PD" "$D" && echo "changed" >>"$D/core-plan.txt"
+check "AUT-301 a reviewed text replaced beside the plan refused" fail "not the text recorded at plan time" -- sapply "$D" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+TFV="$(tf_plan_stub "$NOOP")" && echo 1.15.0 >"$TFV/version"
+check "AUT-301 another Terraform version refused" fail "was made with Terraform 1.16.4, this is 1.15.0" -- sapply "$PD" "$(wf_session apply)" "$TFV"
+TFR="$(tf_plan_stub "$NOOP")" && echo "a different rendering" >"$TFR/plan.txt"
+check "AUT-301 a plan file that renders another text refused" fail "renders a different text" -- sapply "$PD" "$(wf_session apply)" "$TFR"
+check "AUT-301 apply refused with a plan session" fail "not veda-gh-apply" -- sapply "$PD" "$(wf_session plan)" "$(tf_plan_stub "$NOOP")"
+
+# oidc-session.sh: the job's OIDC token for veda-gh-<role> in the approved account, exported masked.
+OS="$T/infra/scripts/oidc-session.sh"
+FAKE_STS_SECRET="s3cr3t-value" # pragma: allowlist secret (fake, offline test only)
+oidc_stubs() { # oidc_stubs <role> [access key prefix]: curl and aws answers for an OIDC exchange
+  local d="$TMP/oidc.$RANDOM$RANDOM"
+  mkdir -p "$d/bin"
+  printf '#!/bin/sh\necho "$*" >>"%s/curl.log"\necho "{\\"value\\":\\"TOKEN-NEVER-PRINTED\\"}"\n' "$d" >"$d/bin/curl"
+  chmod +x "$d/bin/curl"
+  jq -n --arg k "${2:-ASIA}EXAMPLE" --arg s "$FAKE_STS_SECRET" '{Credentials: {AccessKeyId: $k, SecretAccessKey: $s, SessionToken: "sess-value", Expiration: "2026-10-04T00:00:00Z"}}' \
+    >"$d/sts_assume-role-with-web-identity.json"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-$1/gh-100-1-$1\"}" >"$d/sts_get-caller-identity.json"
+  : >"$d/github_env"
+  echo "$d"
+}
+oidc() { # oidc <stub dir> <role> [env...]
+  local d="$1" r="$2"
+  shift 2
+  env PATH="$d/bin:$PATH" AWS_STUB_DIR="$d" GITHUB_ENV="$d/github_env" GITHUB_RUN_ID=100 GITHUB_RUN_ATTEMPT=1 \
+    ACTIONS_ID_TOKEN_REQUEST_URL="https://token.example/x?y=1" ACTIONS_ID_TOKEN_REQUEST_TOKEN=req "$@" "$OS" --role "$r"
+}
+O="$(oidc_stubs plan)"
+out_oidc="$(oidc "$O" plan 2>&1)"
+check "AUT-301 OIDC session for veda-gh-plan" ok "OIDC session: arn:aws:sts::$ACCT:assumed-role/veda-gh-plan/gh-100-1-plan" -- printf '%s\n' "$out_oidc"
+check "  ... token requested for audience sts.amazonaws.com" ok "audience=sts.amazonaws.com" -- cat "$O/curl.log"
+check "  ... exchanged for the approved account's role" ok "assume-role-with-web-identity --region ap-south-1 --role-arn arn:aws:iam::$ACCT:role/veda-gh-plan --role-session-name gh-100-1-plan" -- cat "$O/calls.log"
+check "  ... secret and session token masked" ok "::add-mask::s3cr3t-value" -- printf '%s\n' "$out_oidc"
+check "  ... exported to later steps" ok "^AWS_SESSION_TOKEN=sess-value$" -- cat "$O/github_env"
+absent "  ... the OIDC token itself is never printed" "TOKEN-NEVER-PRINTED" "$out_oidc"
+check "AUT-301 no OIDC token (id-token permission missing) refused" fail "needs 'permissions: id-token: write'" -- oidc "$(oidc_stubs plan)" plan ACTIONS_ID_TOKEN_REQUEST_URL=
+check "AUT-301 a repository variable naming another role refused" fail "AWS_ROLE_ARN_PLAN is arn:aws:iam::$ACCT:role/veda-gh-apply" -- oidc "$(oidc_stubs plan)" plan AWS_ROLE_ARN_PLAN="arn:aws:iam::$ACCT:role/veda-gh-apply"
+check "AUT-301 long-term keys from STS refused" fail "holds no temporary credentials" -- oidc "$(oidc_stubs plan AKIA)" plan
+check "AUT-301 a session of another role refused" fail "not veda-gh-apply" -- oidc "$(oidc_stubs plan)" apply
+check "AUT-301 an unknown role refused" fail "--role must be plan or apply" -- oidc "$(oidc_stubs plan)" deploy
+
+# verify-run.sh --stack core: the plan run is 10-infra-plan on main, the apply run is 11-infra-apply.
+VR="$T/infra/scripts/verify-run.sh"
+core_run_stub() {
+  local d="$TMP/ghcore.$RANDOM$RANDOM" z="$TMP/zipc.$RANDOM$RANDOM"
+  mkdir -p "$d" "$z"
+  echo "reviewed plan bytes" >"$z/core.tfplan"
+  echo "stub plan text" >"$z/core-plan.txt"
+  jq -n --arg sum "$(sha "$z/core.tfplan")" --arg text "$(sha "$z/core-plan.txt")" --arg c $C \
+    '{mode: "plan", stack: "core", commit: $c, workflow_ref: "example-org/veda-spaces/.github/workflows/10-infra-plan.yml@refs/heads/main",
+      run_id: "100", plan_sha256: $sum, plan_text_sha256: $text}' >"$z/core-plan.meta.json"
+  (cd "$z" && zip -q -X "$d/repos_example-org_veda-spaces_actions_artifacts_777_zip.json" core.tfplan core-plan.meta.json core-plan.txt)
+  jq -n --arg c $C '{id: 100, path: ".github/workflows/10-infra-plan.yml", workflow_id: 10, head_sha: $c, head_branch: "main",
+    event: "workflow_dispatch", status: "completed", conclusion: "success", display_title: "10-infra-plan (core)",
+    repository: {full_name: "example-org/veda-spaces"}, head_repository: {full_name: "example-org/veda-spaces"}}' \
+    >"$d/repos_example-org_veda-spaces_actions_runs_100.json"
+  echo '{"id":200,"path":".github/workflows/11-infra-apply.yml","workflow_id":11}' >"$d/repos_example-org_veda-spaces_actions_runs_200.json"
+  jq -n --arg c $C --arg dg "sha256:$(sha "$d/repos_example-org_veda-spaces_actions_artifacts_777_zip.json")" \
+    '{artifacts: [{id: 777, name: "core-plan-100", expired: false, digest: $dg, workflow_run: {id: 100, head_sha: $c}}]}' \
+    >"$d/repos_example-org_veda-spaces_actions_runs_100_artifacts?per_page=100.json"
+  echo "$d"
+}
+cbind() { GH_STUB_DIR="$1" "$VR" plan-run --stack core --repo example-org/veda-spaces --run-id 100 --this-run-id 200 --commit $C --plan-sha256 "$APPROVED" --out "$TMP/cout.$RANDOM"; }
+core_drift() {
+  local d
+  d="$(core_run_stub)"
+  jq "$2" "$d/repos_example-org_veda-spaces_$1.json" >"$d/x" && mv "$d/x" "$d/repos_example-org_veda-spaces_$1.json"
+  echo "$d"
+}
+check "AUT-301 approved core plan of a 10-infra-plan run is bound" ok "approved plan bound: run 100, artifact sha256:" -- cbind "$(core_run_stub)"
+check "AUT-301 a 00-bootstrap plan run cannot be applied as a stack plan" fail "was made by .github/workflows/00-bootstrap.yml, not .github/workflows/10-infra-plan.yml" -- cbind "$(core_drift actions_runs_100 '.path = ".github/workflows/00-bootstrap.yml"')"
+check "AUT-301 the apply run must be 11-infra-apply" fail "this apply run is .github/workflows/00-bootstrap.yml, not .github/workflows/11-infra-apply.yml" -- cbind "$(core_drift actions_runs_200 '.path = ".github/workflows/00-bootstrap.yml"')"
+check "AUT-301 a pull-request plan run cannot be applied" fail "was triggered by pull_request" -- cbind "$(core_drift actions_runs_100 '.event = "pull_request"')"
+check "AUT-301 a plan run on another branch cannot be applied" fail "ran on feature, not main" -- cbind "$(core_drift actions_runs_100 '.head_branch = "feature"')"
+# shellcheck disable=SC2016 # the inner shell expands them
+check "AUT-301 the bootstrap mode is unchanged (core run refused there)" fail "not .github/workflows/00-bootstrap.yml" -- bash -c 'GH_STUB_DIR="$0" "$1" plan-run --repo example-org/veda-spaces --run-id 100 --this-run-id 200 --commit "$2" --plan-sha256 "$3" --out "$4"' "$(core_run_stub)" "$VR" $C "$APPROVED" "$TMP/bout.$RANDOM"
+
+# Tooling: the plan and apply jobs install only the pinned Terraform; the Makefile checks the new root.
+check "AUT-301 install-tools --only refuses an unknown tool" fail "unknown tool bogus" -- "$INFRA/scripts/install-tools.sh" --only bogus
+check "AUT-301 make check covers staging-core" ok "terraform/envs/staging-core" -- grep -E "^ROOTS" "$INFRA/Makefile"
+check "AUT-301 staging-core has a committed provider lock file" ok "registry.terraform.io/hashicorp/aws" -- cat "$INFRA/terraform/envs/staging-core/.terraform.lock.hcl"
+check "AUT-301 staging-core backend is configured at init only (no bucket in code)" ok '^  backend "s3" \{\}$' -- cat "$INFRA/terraform/envs/staging-core/versions.tf"
+check "AUT-301 staging-core provider pinned to the manifest account" ok "allowed_account_ids = \[local.account_id\]" -- cat "$INFRA/terraform/envs/staging-core/versions.tf"
 echo "== RR-A: the role trusts use GitHub's immutable OIDC subject (owner and repository by numeric ID)"
 T="$(new_tree)"
 OLD_SUBJECT="repo:example-org/veda-spaces:environment:staging-infra"
