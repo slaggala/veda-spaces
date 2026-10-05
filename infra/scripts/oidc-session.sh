@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GitHub OIDC session for a staging workflow role (AUT-301). No stored AWS credential exists for these roles.
 #
-#   infra/scripts/oidc-session.sh --role plan|apply
+#   infra/scripts/oidc-session.sh --role plan|apply|deploy|evidence
 #
 # Requests the job's OIDC token (audience sts.amazonaws.com; the job needs "id-token: write" and the role's protected
 # environment), exchanges it for a one-hour session of veda-gh-<role> in the approved account, checks the session is
@@ -20,7 +20,7 @@ while (($#)); do
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ "$ROLE" == plan || "$ROLE" == apply ]] || die "--role must be plan or apply"
+[[ "$ROLE" =~ ^(plan|apply|deploy|evidence)$ ]] || die "--role must be plan, apply, deploy or evidence"
 
 require_tools aws jq curl
 require_region

@@ -53,6 +53,7 @@ flowchart LR
 | 7 | Monitoring foundations | AUT-110 | LOG-005/006 and 02 §9 alerts, RG-5, RR-14 (snapshot heartbeat), FC-01 (anchor failures), NOTIF-008 (notification failures visible, lead kept), cost (bounded metrics) |
 | 8 | Compute and EBS | AUT-108 | ADR-008 (one host), OPS-006/007 (single instance, dedicated encrypted volume, daily snapshots), IMDSv2 (F6), SSM-only access, egress model A, cost (credits capped) |
 | 9 | SES | AUT-111 | NOTIF-* (email through SES in staging, F6), NOTIF-008 (a failed email never rolls back a lead), sender reputation (bounce and complaint suppression) |
+| 10 | Deployment and integration wiring | AUT-108, AUT-107, AUT-301 follow-up | 02 §12.4 and OPS-004 (single deploy procedure), IR-13 (the scanned image is the deployed image), RR-17 (floors kept: `deploy.sh` unchanged), SEC-005 (secrets only from SSM), public intake disabled |
 
 ## 3. Decisions
 
@@ -67,10 +68,11 @@ session); a malformed decision file also refuses.
 | `storage` | **PROPOSED** | Lifecycle periods; evidence locked in COMPLIANCE mode for 30 days |
 | `cloudtrail` | **PROPOSED** | CloudWatch copy 30 days; S3 data events on anchor and evidence added by the owner session |
 | `ecr` | **PROPOSED** | Keep the last 30 tagged images; untagged expire after 7 days |
-| `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `127.0.0.1/32` (cloudflared on the host network); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
+| `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `172.30.0.1/32` (the Compose network gateway, the peer the API sees; Docker address pool `172.30.0.0/16`, AUT-001 host design); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
 | `monitoring` | **PROPOSED** | Logs 30 days; 5xx ≥ 5 per 5 minutes; CPU 80 %, memory 85 %, data disk 80 %, root disk 85 % |
 | `compute` | **PROPOSED** | t4g.small (N2), credits capped; 12 GB root, 20 GB data (gp3); 7 daily snapshots; AMI pinned after the first plan |
 | `ses` | **PROPOSED** | Sender `no-reply@staging.vedaspaces.com` (subdomain; DKIM by AUT-202); sandbox with the owner's address; bounce-rate alarm above 5 % |
+| `deploy` | DECIDED | **`enabled: false`**: Veda is not deployed; public intake disabled (owner, 2026-10-05). 12-deploy refuses until the owner sets it true |
 | `anchor_retention` | **PROPOSED** | D6: the application locks each anchor for **3650 days** in COMPLIANCE mode (`anchor_store.py`); accept, or change the application first |
 
 ## 4. Modules
@@ -214,4 +216,18 @@ refuses).
 | Wiring | The host may send only from `no-reply@staging.vedaspaces.com` through the identity and the configuration set (AUT-106 `ses:FromAddress`); the application gets `VEDA_EMAIL_SENDER` and `VEDA_SES_CONFIGURATION_SET` (AUT-107) |
 | Plan guard | Refuses inbound email (receipt rules and sets, filters), dedicated IPs and Virtual Deliverability Manager (cost), a configuration set without bounce and complaint suppression or without required TLS, and the apex domain as an identity |
 | Tests | `modules/ses`: 4 (subdomain with DKIM; suppression, TLS, reputation; failure alarms; apex refused). `run.sh`: 14, from a real sandboxed plan, including the host's From-address condition and the application's NOTIF-008 test |
+
+### 4.10 Deployment and integration wiring
+
+| Piece | Implementation |
+|---|---|
+| `12-deploy.yml` | **Manual, from `main` only, disabled.** A preflight job with no environment, secret or token refuses unless the apply gates are decided (`stack.sh gate`), no owner decision is PROPOSED (`stack.sh decisions`, new) and `deploy.enabled` is true (**false**). The deploy job runs in the `staging` environment (reviewer), proves its approval and the environments' protection before any AWS session, then assumes `veda-gh-deploy` through OIDC (`oidc-session.sh` now accepts the deploy and evidence roles); no stored secret; actions pinned; checkouts keep no credentials |
+| `infra/scripts/deploy.sh` | Requires a `veda-gh-deploy` session confined to Mumbai and a tag equal to the commit. Builds the image (arm64) from this commit, pushes `veda-api:<tag>` (immutable), reads the digest, **waits for the scan and refuses HIGH or CRITICAL findings**, uploads the bundle (`git archive` of `api/deploy` and `infra/host`: what is committed) with its SHA-256 (an existing bundle for the tag must be the same bytes), runs `veda-deploy` on the instance tagged `project=veda-spaces, env=staging`, waits, prints the result, fails unless `Success` |
+| `veda-deploy` (SSM, `modules/deploy`) | **Known at plan time** (the data device `/dev/sdf` and the repository URL are built from constants), so the reviewer reads every command. Parameters accept only a tag, a digest and a SHA-256 (patterns refuse anything else). Steps: download the bundle, **verify its SHA-256**, install the host scripts from it, `host-setup.sh`, `render-env.sh`, ECR login, **pull by digest**, tag `veda-api:<tag>`, run the unchanged `api/deploy/deploy.sh` (floors, snapshot, quiesce, expand-only migration, readiness gate, resume) |
+| Host scripts (`infra/host`) | `host-setup.sh` (mount the attachment device, never the root disk, format only an empty volume, pinned Compose v5.6.0 by SHA-256, CloudWatch agent from SSM, health timer); `render-env.sh` (`/etc/veda/api.env` 0600 from SSM; **refuses while any of the 8 secrets is not seeded**; keeps a declared `VEDA_SCHEMA_AHEAD_ACCEPTED`); `health.sh` (heartbeat) |
+| Docker | Address pool `172.30.0.0/16` (Compose gateway `172.30.0.1` = trusted proxy) and non-blocking `awslogs` to `/veda/staging/app` (boot script, AUT-108) |
+| KMS (AUT-102 change) | The artifacts bucket (data key) and evidence bucket (audit key) are SSE-KMS, and the bootstrap's deploy and evidence roles have no KMS permission. Two key-policy statements grant exactly `veda-gh-deploy` (data key) and `veda-gh-evidence` (audit key) `GenerateDataKey`/`Decrypt`, **only through S3 and only for their bucket** (encryption context). No bootstrap change |
+| Container startup, health, readiness | Unchanged application behaviour: `deploy.sh` waits for `/health/ready` with the expected migrations state; restart policy `unless-stopped` (`docker-compose.yml`); the heartbeat and the `api-health` alarm watch it afterwards |
+| Not deployed | `deploy.enabled` is false; no tunnel, no DNS (AUT-201/202 out of scope): **no public path to the API exists, so public intake stays disabled** |
+| Tests | `modules/deploy`: 4. `run.sh`: 36: workflow contract (manual only, gates first, no credentials in the preflight, `staging` environment, approval before the session, deploy role, no secrets, pinned, no persisted credentials, deploy disabled), `oidc-session` roles, `stack.sh decisions`, `deploy.sh` offline with stub AWS and Docker (success path with the exact `send-command`; HIGH findings refused before any upload; wrong role; tag not the commit; a different existing bundle; a failed command), the document's verification and parameter patterns, the host scripts' secret check, pinned Compose, format-only-empty, no secret in the scripts |
 

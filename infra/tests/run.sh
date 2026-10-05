@@ -4,7 +4,7 @@
 # Run: make -C infra test-scripts   (the policy findings F1, F2, F6, F7, F9 and the policy side of RR-01..RR-03 are
 # in terraform/bootstrap/tests).
 #
-# The scripts run from a temporary copy of infra/ with stub aws, gh and terraform commands first on PATH, so no
+# The scripts run from a temporary copy of infra/ with stub aws, gh, terraform and docker commands first on PATH, so no
 # AWS, GitHub or Cloudflare API is reached and the working tree is never touched. The negative Terraform tests
 # (prevent_destroy) use the real terraform with a mock provider.
 set -uo pipefail
@@ -1344,7 +1344,7 @@ check "AUT-301 no OIDC token (id-token permission missing) refused" fail "needs 
 check "AUT-301 a repository variable naming another role refused" fail "AWS_ROLE_ARN_PLAN is arn:aws:iam::$ACCT:role/veda-gh-apply" -- oidc "$(oidc_stubs plan)" plan AWS_ROLE_ARN_PLAN="arn:aws:iam::$ACCT:role/veda-gh-apply"
 check "AUT-301 long-term keys from STS refused" fail "holds no temporary credentials" -- oidc "$(oidc_stubs plan AKIA)" plan
 check "AUT-301 a session of another role refused" fail "not veda-gh-apply" -- oidc "$(oidc_stubs plan)" apply
-check "AUT-301 an unknown role refused" fail "--role must be plan or apply" -- oidc "$(oidc_stubs plan)" deploy
+check "AUT-301 an unknown role refused" fail "--role must be plan, apply, deploy or evidence" -- oidc "$(oidc_stubs plan)" admin
 
 # verify-run.sh --stack core: the plan run is 10-infra-plan on main, the apply run is 11-infra-apply.
 VR="$T/infra/scripts/verify-run.sh"
@@ -1752,7 +1752,7 @@ for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_s
   check "AUT-107 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
 done
 check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
-check "AUT-107 committed decision: staging host names, trusted proxy loopback (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 127.0.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+check "AUT-107 committed decision: staging host names, trusted proxy the Compose gateway (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 172.30.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
 
 echo "== AUT-110: monitoring (bounded metrics, alarms to the encrypted topic, nothing leaves the account)"
 MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"
@@ -1810,6 +1810,79 @@ check "AUT-111 the host sends only as the staging sender" ok '^no-reply@staging.
 check "AUT-111 the application is configured with the sender and the configuration set" ok '^Veda Spaces Staging <no-reply@staging.vedaspaces.com> veda-stg$' -- jq -r '[(.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_EMAIL_SENDER\"]") | .change.after.value), (.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]") | .change.after.value)] | join(" ")' "$SSMPLAN"
 check "AUT-111 an email failure never rolls back a committed lead (NOTIF-008, application test)" ok 'email failure never affects the committed lead \(NOTIF-008\)' -- cat "$INFRA/../api/tests/integration/test_leads.py"
 check "AUT-111 committed decision: sender, bounce threshold (PROPOSED)" ok '^PROPOSED staging.vedaspaces.com no-reply 0.05$' -- jq -r '"\(.ses.status) \(.ses.sender_domain) \(.ses.sender_local_part) \(.ses.bounce_rate_threshold)"' "$PLATFORM"
+
+echo "== Deployment wiring: 12-deploy (gated, OIDC deploy role, immutable image, scan gate, verified bundle, SSM only)"
+DW="$INFRA/../.github/workflows/12-deploy.yml"
+DWT="$(cat "$DW")"
+DPRE="$(awk '/^  preflight:/{p=1} /^  deploy:/{p=0} p' "$DW")"
+DJOB="$(awk '/^  deploy:/{p=1} p' "$DW")"
+check "DEPLOY 12-deploy runs manually only" ok "^  workflow_dispatch:$" -- printf '%s\n' "$DWT"
+absent "  ... no other trigger" "^  (pull_request|pull_request_target|push|schedule|workflow_run|repository_dispatch):" "$DWT"
+check "DEPLOY the preflight checks main, the apply gates, the recorded decisions and deploy.enabled" ok "in order" -- order_ok "$DPRE" "refs/heads/main" "deploy.enabled == true"
+check "  ... including the apply gates and the decisions" ok "stack.sh decisions" -- printf '%s\n' "$DPRE"
+absent "DEPLOY the preflight holds no environment, secret or OIDC token" "environment:|secrets\.|id-token" "$DPRE"
+check "DEPLOY the deploy job needs the preflight and runs in the staging environment" ok "^    environment: staging$" -- printf '%s\n' "$DJOB"
+check "  ... after the preflight" ok "needs: preflight" -- printf '%s\n' "$DJOB"
+check "DEPLOY the approval is proven before any AWS session" ok "in order" -- order_ok "$DJOB" "verify-run.sh approval .* --environment staging" "oidc-session.sh --role deploy"
+check "DEPLOY the job assumes veda-gh-deploy through OIDC" ok "oidc-session.sh --role deploy" -- printf '%s\n' "$DJOB"
+absent "DEPLOY no stored secret, no OIDC token at workflow level" "secrets\.|^permissions:.*id-token" "$DWT"
+absent "DEPLOY every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$DWT"
+absent "DEPLOY checkouts keep no credentials" "persist-credentials: true" "$DWT"
+check "DEPLOY deploys stay disabled: deploy.enabled is false in the committed decision" ok '^false$' -- jq -r '.deploy.enabled' "$INFRA/config/staging-platform.json"
+check "DEPLOY oidc-session names the deploy and evidence roles among the accepted ones" fail "plan, apply, deploy or evidence" -- "$INFRA/scripts/oidc-session.sh" --role bogus
+check "DEPLOY stack.sh decisions refuses the committed PROPOSED decisions" fail "is PROPOSED" -- env VEDA_DECISIONS_DIR="$INFRA/config" "$INFRA/scripts/stack.sh" decisions
+
+# deploy.sh, offline: a git checkout of infra and api/deploy, stub aws and docker.
+DG="$TMP/deploygit.$RANDOM"
+mkdir -p "$DG/api" && rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$DG/infra/" && cp -R "$INFRA/../api/deploy" "$DG/api/deploy"
+cp "$FIXTURE_MANIFEST" "$DG/infra/config/staging-account.json"
+git -C "$DG" init -q && git -C "$DG" add -A && git -C "$DG" -c user.name=t -c user.email=t@example.invalid commit -qm base
+DSHA="$(git -C "$DG" rev-parse HEAD)" && DTAG="${DSHA:0:12}"
+DIGEST="sha256:$(printf 'a%.0s' {1..64})"
+deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum]: AWS answers for one deploy
+  local d="$TMP/aws.dep.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-deploy/gh-100-1-deploy\"}" >"$d/sts_get-caller-identity.json"
+  echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
+  echo "token" >"$d/ecr_get-login-password.json"
+  echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$d/ecr_describe-images.json"
+  : >"$d/ecr_wait.json"
+  echo "{\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}}}}" >"$d/ecr_describe-image-scan-findings.json"
+  if [[ -n "${3:-}" ]]; then echo "{\"Metadata\":{\"sha256\":\"$3\"}}" >"$d/s3api_head-object.json"; else echo "Not Found" >"$d/s3api_head-object.fail"; fi
+  : >"$d/s3_cp.json"
+  echo '{"Command":{"CommandId":"c-1"}}' >"$d/ssm_send-command.json"
+  echo "{\"Commands\":[{\"Status\":\"${2:-Success}\"}]}" >"$d/ssm_list-commands.json"
+  echo "{\"CommandInvocations\":[{\"InstanceId\":\"i-1\",\"Status\":\"${2:-Success}\",\"CommandPlugins\":[{\"Output\":\"done\"}]}]}" >"$d/ssm_list-command-invocations.json"
+  echo "$d"
+}
+dep() { # dep <aws dir> [tag]
+  local d="$TMP/docker.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  env AWS_STUB_DIR="$1" DOCKER_STUB_DIR="$d" GITHUB_SHA="$DSHA" "$DG/infra/scripts/deploy.sh" --tag "${2:-$DTAG}"
+}
+DA="$(deploy_stub)"
+out_dep="$(dep "$DA" 2>&1)"
+check "DEPLOY a clean image is pushed, its bundle uploaded and veda-deploy run" ok "deployed $DTAG \($DIGEST\) to staging" -- printf '%s\n' "$out_dep"
+check "  ... veda-deploy gets the tag, the digest and the bundle SHA-256, on the tagged host only" ok "send-command .*--document-name veda-deploy --targets Key=tag:project,Values=veda-spaces Key=tag:env,Values=staging .*releaseTag=$DTAG,imageDigest=$DIGEST,bundleSha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
+check "  ... the bundle is the committed api/deploy and infra/host, with its SHA-256 as metadata" ok "s3 cp .*bundle-$DTAG.tgz s3://veda-stg-artifacts-$ACCT/deploy/$DTAG/bundle.tgz --metadata sha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
+DA="$(deploy_stub 1)"
+check "DEPLOY an image with HIGH findings is refused" fail "HIGH or CRITICAL findings; refusing" -- dep "$DA"
+absent "  ... before any upload or command" "s3 cp|send-command" "$(cat "$DA/calls.log")"
+DA="$(deploy_stub)" && sed -i.bak 's/veda-gh-deploy/veda-gh-plan/' "$DA/sts_get-caller-identity.json"
+check "DEPLOY a session other than veda-gh-deploy is refused" fail "not veda-gh-deploy; refusing" -- dep "$DA"
+check "DEPLOY a tag that is not this commit is refused" fail "is not this commit" -- dep "$(deploy_stub)" "0123456789ab"
+check "DEPLOY a different bundle already uploaded for the tag is refused" fail "a different bundle already exists" -- dep "$(deploy_stub 0 Success "$(printf 'b%.0s' {1..64})")"
+check "DEPLOY a failed veda-deploy fails the run" fail "veda-deploy ended Failed" -- dep "$(deploy_stub 0 Failed)"
+
+# The deploy document and the host scripts.
+DEPDOC="$HERE/fixtures/deploy-plan.json"
+check "DEPLOY the veda-deploy document verifies the bundle SHA-256 and pulls the image by digest" ok 'sha256sum -c' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content' "$DEPDOC"
+check "  ... its parameters only accept a tag, a digest and a SHA-256" ok '^\^sha256:\[0-9a-f\]\{64\}\$$' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content | fromjson | .parameters.imageDigest.allowedPattern' "$DEPDOC"
+check "DEPLOY the host renders the environment only with every secret seeded (AUT-302)" ok "refusing: secrets not seeded" -- cat "$INFRA/host/render-env.sh"
+check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
+# shellcheck disable=SC2016 # matched literally in the script
+check "DEPLOY the data volume is formatted only when it carries no filesystem" ok 'if ! blkid "\$DEVICE"' -- cat "$INFRA/host/host-setup.sh"
+absent "DEPLOY no secret value in the host scripts" "BEGIN (EC )?PRIVATE KEY|AKIA[0-9A-Z]{16}" "$(cat "$INFRA"/host/*.sh)"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

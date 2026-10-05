@@ -40,11 +40,11 @@
   },
   "ssm": {
     "status": "PROPOSED",
-    "decision": "Proposed 2026-10-05: D7 staging host names; the trusted proxy is cloudflared on the host network (loopback); Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302).",
+    "decision": "Proposed 2026-10-05: D7 staging host names; the trusted proxy is the Compose network gateway 172.30.0.1 (Docker address pool 172.30.0.0/16, AUT-001 host design): the peer the API sees for every request published on 127.0.0.1:8000; Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302).",
     "app_origin": "https://app-staging.vedaspaces.com",
     "api_base_url": "https://api-staging.vedaspaces.com",
     "public_site_origins": "https://staging.vedaspaces.com",
-    "trusted_proxy_cidrs": "127.0.0.1/32",
+    "trusted_proxy_cidrs": "172.30.0.1/32",
     "litestream_retention": "168h",
     "session_log_retention_days": 90,
     "idle_session_timeout_minutes": 20,
@@ -77,5 +77,11 @@
     "sender_domain": "staging.vedaspaces.com",
     "sender_local_part": "no-reply",
     "bounce_rate_threshold": 0.05
+  },
+  "deploy": {
+    "status": "DECIDED",
+    "decision": "2026-10-05 (owner): do not deploy Veda; public lead intake stays disabled. 12-deploy refuses while enabled is false.",
+    "enabled": false,
+    "public_intake": "disabled"
   }
 }

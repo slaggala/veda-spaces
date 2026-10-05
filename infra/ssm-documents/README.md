@@ -1,5 +1,7 @@
 # ssm-documents
 
-SSM Command documents registered by the `ssm` module (AUT-107): `veda-deploy`, `veda-collect`,
-`veda-drill-*`, `veda-seed-fixtures`. The GitHub deploy and evidence roles may run only these documents,
-and only on the instance tagged project=veda-spaces, env=staging (enforced since AUT-002). Not created yet.
+The SSM Command documents are defined in Terraform: `veda-deploy` and `veda-collect` in
+`terraform/modules/deploy` (the Session Manager preferences in `terraform/modules/ssm`). The GitHub deploy and
+evidence roles may run only `veda-deploy`, `veda-drill-*`, `veda-seed-fixtures` and `veda-collect`, and only on the
+instance tagged project=veda-spaces, env=staging (enforced since AUT-002). `veda-drill-*` and `veda-seed-fixtures`
+belong to the rehearsals (RR-09) and are not created yet.

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Offline stand-in for docker (infra/tests only): logs every call to $DOCKER_STUB_DIR/calls.log and succeeds; "login"
+# reads its password from stdin like the real one. Nothing is built, pushed or pulled.
+set -euo pipefail
+: "${DOCKER_STUB_DIR:?DOCKER_STUB_DIR must be set}"
+printf '%s\n' "$*" >>"$DOCKER_STUB_DIR/calls.log"
+[[ "${1:-}" == login ]] && cat >/dev/null
+exit 0

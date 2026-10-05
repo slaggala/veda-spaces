@@ -22,7 +22,7 @@ locals {
     dnf install -y docker amazon-cloudwatch-agent
     mkdir -p /etc/docker /var/log/veda /var/lib/veda
     cat >/etc/docker/daemon.json <<'JSON'
-    {"log-driver": "awslogs", "log-opts": {"awslogs-region": "${var.region}", "awslogs-group": "${var.app_log_group}", "awslogs-create-group": "false", "tag": "{{.Name}}/{{.ID}}"}}
+    {"default-address-pools": [{"base": "172.30.0.0/16", "size": 24}], "log-driver": "awslogs", "log-opts": {"mode": "non-blocking", "awslogs-region": "${var.region}", "awslogs-group": "${var.app_log_group}", "awslogs-create-group": "false", "tag": "{{.Name}}/{{.ID}}"}}
     JSON
     systemctl enable --now docker
     EOT

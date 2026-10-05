@@ -137,6 +137,15 @@
                 },
                 "description": "The AMI planned (record it in staging-platform.json compute.ami_id after the first plan)."
               },
+              "data_device": {
+                "expression": {
+                  "references": [
+                    "aws_volume_attachment.data.device_name",
+                    "aws_volume_attachment.data"
+                  ]
+                },
+                "description": "Device name of the data volume attachment (the deploy document mounts it)."
+              },
               "data_volume_id": {
                 "expression": {
                   "references": [
@@ -879,7 +888,7 @@
             "stack": "core"
           },
           "timeouts": null,
-          "user_data": "#!/bin/bash\n# Veda staging host boot (AUT-108). No secret is written here: configuration comes from SSM at deploy time.\nset -euo pipefail\ndnf install -y docker amazon-cloudwatch-agent\nmkdir -p /etc/docker /var/log/veda /var/lib/veda\ncat >/etc/docker/daemon.json <<'JSON'\n{\"log-driver\": \"awslogs\", \"log-opts\": {\"awslogs-region\": \"ap-south-1\", \"awslogs-group\": \"/veda/staging/app\", \"awslogs-create-group\": \"false\", \"tag\": \"{{.Name}}/{{.ID}}\"}}\nJSON\nsystemctl enable --now docker\n",
+          "user_data": "#!/bin/bash\n# Veda staging host boot (AUT-108). No secret is written here: configuration comes from SSM at deploy time.\nset -euo pipefail\ndnf install -y docker amazon-cloudwatch-agent\nmkdir -p /etc/docker /var/log/veda /var/lib/veda\ncat >/etc/docker/daemon.json <<'JSON'\n{\"default-address-pools\": [{\"base\": \"172.30.0.0/16\", \"size\": 24}], \"log-driver\": \"awslogs\", \"log-opts\": {\"mode\": \"non-blocking\", \"awslogs-region\": \"ap-south-1\", \"awslogs-group\": \"/veda/staging/app\", \"awslogs-create-group\": \"false\", \"tag\": \"{{.Name}}/{{.ID}}\"}}\nJSON\nsystemctl enable --now docker\n",
           "user_data_replace_on_change": false,
           "volume_tags": null
         },

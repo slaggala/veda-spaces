@@ -41,8 +41,13 @@ run "no_caller_outside_the_account" {
   }
 
   assert {
-    condition     = length(jsondecode(aws_kms_key.this["data"].policy).Statement) == 2
-    error_message = "the data key admits no AWS service directly (EBS, S3 and ECR use it through IAM callers)"
+    condition     = length(jsondecode(aws_kms_key.this["data"].policy).Statement) == 3
+    error_message = "the data key admits no AWS service directly (EBS, S3 and ECR use it through IAM callers), and the deploy role only through S3"
+  }
+
+  assert {
+    condition     = one([for s in jsondecode(aws_kms_key.this["data"].policy).Statement : s.Condition.StringEquals["kms:ViaService"] if s.Sid == "DeployRoleArtifactsThroughS3"]) == "s3.ap-south-1.amazonaws.com" && one([for s in jsondecode(aws_kms_key.this["data"].policy).Statement : s.Condition.StringLike["kms:EncryptionContext:aws:s3:arn"] if s.Sid == "DeployRoleArtifactsThroughS3"]) == ["arn:aws:s3:::veda-stg-artifacts-111122223333", "arn:aws:s3:::veda-stg-artifacts-111122223333/*"]
+    error_message = "the deploy role uses the data key only through S3, only for the artifacts bucket"
   }
 }
 

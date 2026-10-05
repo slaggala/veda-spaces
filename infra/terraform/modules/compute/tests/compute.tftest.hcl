@@ -74,7 +74,7 @@ run "boot_script_holds_no_secret" {
   command = plan
 
   assert {
-    condition     = !strcontains(local.user_data, "SECRET") && !strcontains(local.user_data, "PRIVATE KEY") && strcontains(local.user_data, "\"log-driver\": \"awslogs\"")
+    condition     = !strcontains(local.user_data, "SECRET") && !strcontains(local.user_data, "PRIVATE KEY") && strcontains(local.user_data, "\"log-driver\": \"awslogs\"") && strcontains(local.user_data, "172.30.0.0/16")
     error_message = "the boot script installs Docker and points its logs at CloudWatch; no secret"
   }
 }

@@ -73,9 +73,36 @@ locals {
     },
   ]
 
+  # The bootstrap's deploy and evidence roles write their own bucket (SSE-KMS with a bucket key, so the context is the
+  # bucket ARN); their identity policies grant no KMS use, so these statements are the only grant, through S3 only.
+  role_bucket_statements = {
+    data = [{
+      Sid       = "DeployRoleArtifactsThroughS3"
+      Effect    = "Allow"
+      Principal = { AWS = "arn:aws:iam::${var.account_id}:role/veda-gh-deploy" }
+      Action    = ["kms:GenerateDataKey", "kms:Decrypt"]
+      Resource  = "*"
+      Condition = {
+        StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" }
+        StringLike   = { "kms:EncryptionContext:aws:s3:arn" = ["arn:aws:s3:::${var.name_prefix}-artifacts-${var.account_id}", "arn:aws:s3:::${var.name_prefix}-artifacts-${var.account_id}/*"] }
+      }
+    }]
+    audit = [{
+      Sid       = "EvidenceRoleEvidenceThroughS3"
+      Effect    = "Allow"
+      Principal = { AWS = "arn:aws:iam::${var.account_id}:role/veda-gh-evidence" }
+      Action    = ["kms:GenerateDataKey", "kms:Decrypt"]
+      Resource  = "*"
+      Condition = {
+        StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" }
+        StringLike   = { "kms:EncryptionContext:aws:s3:arn" = ["arn:aws:s3:::veda-evidence-${var.account_id}", "arn:aws:s3:::veda-evidence-${var.account_id}/*"] }
+      }
+    }]
+  }
+
   keys = {
-    data  = { description = "Veda staging data: MFA secrets, EBS, data buckets, ECR (AUT-102)", statements = local.base_statements }
-    audit = { description = "Veda staging audit: CloudTrail, logs, evidence, CloudWatch Logs, alarms (AUT-102)", statements = concat(local.base_statements, local.audit_service_statements) }
+    data  = { description = "Veda staging data: MFA secrets, EBS, data buckets, ECR (AUT-102)", statements = concat(local.base_statements, local.role_bucket_statements.data) }
+    audit = { description = "Veda staging audit: CloudTrail, logs, evidence, CloudWatch Logs, alarms (AUT-102)", statements = concat(local.base_statements, local.audit_service_statements, local.role_bucket_statements.audit) }
   }
 }
 

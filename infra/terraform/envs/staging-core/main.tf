@@ -221,3 +221,15 @@ module "ses" {
   bounce_rate_threshold = local.platform.ses.bounce_rate_threshold
 }
 
+# Deployment wiring: veda-deploy, the only way code reaches the host (run by 12-deploy with veda-gh-deploy).
+module "deploy" {
+  source = "../../modules/deploy"
+
+  name_prefix            = "veda"
+  region                 = var.aws_region
+  artifacts_bucket       = module.storage.bucket_names["artifacts"]
+  repository_url         = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${module.ecr.repository_name}"
+  data_device            = module.compute.data_device
+  agent_config_parameter = module.monitoring.agent_config_parameter
+}
+

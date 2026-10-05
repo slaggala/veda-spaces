@@ -1,0 +1,219 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "deploy": {
+          "source": "../../modules/deploy",
+          "expressions": {
+            "agent_config_parameter": {
+              "references": [
+                "module.monitoring.agent_config_parameter",
+                "module.monitoring"
+              ]
+            },
+            "artifacts_bucket": {
+              "references": [
+                "module.storage.bucket_names[\"artifacts\"]",
+                "module.storage.bucket_names",
+                "module.storage"
+              ]
+            },
+            "data_device": {
+              "references": [
+                "module.compute.data_device",
+                "module.compute"
+              ]
+            },
+            "name_prefix": {
+              "constant_value": "veda"
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "repository_url": {
+              "references": [
+                "local.account_id",
+                "var.aws_region",
+                "module.ecr.repository_name",
+                "module.ecr"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "deploy_document": {
+                "expression": {
+                  "references": [
+                    "aws_ssm_document.deploy.name",
+                    "aws_ssm_document.deploy"
+                  ]
+                },
+                "description": "The deploy document."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_ssm_document.deploy",
+                "mode": "managed",
+                "type": "aws_ssm_document",
+                "name": "deploy",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "content": {
+                    "references": [
+                      "var.region",
+                      "var.artifacts_bucket",
+                      "var.data_device",
+                      "var.region",
+                      "var.agent_config_parameter",
+                      "var.region",
+                      "var.region",
+                      "var.repository_url",
+                      "var.repository_url",
+                      "var.repository_url"
+                    ]
+                  },
+                  "document_format": {
+                    "constant_value": "JSON"
+                  },
+                  "document_type": {
+                    "constant_value": "Command"
+                  },
+                  "name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              }
+            ],
+            "variables": {
+              "agent_config_parameter": {
+                "description": "AUT-110 CloudWatch agent configuration parameter."
+              },
+              "artifacts_bucket": {
+                "description": "AUT-103 artifacts bucket (deploy bundles)."
+              },
+              "data_device": {
+                "description": "Device name of the data volume attachment (AUT-108); Amazon Linux links it to the NVMe device. A constant, so the document is known at plan time."
+              },
+              "name_prefix": {
+                "description": "Document prefix (veda): the bootstrap deploy role may run veda-deploy, the evidence role veda-collect."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "repository_url": {
+                "description": "AUT-105 repository URL built from the account and region (known at plan time); the image is pulled by digest."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.deploy.aws_ssm_document.deploy",
+      "module_address": "module.deploy",
+      "mode": "managed",
+      "type": "aws_ssm_document",
+      "name": "deploy",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "attachments_source": [],
+          "content": "{\"description\":\"Deploy a Veda release to the staging host (bundle verified by SHA-256, image by digest)\",\"mainSteps\":[{\"action\":\"aws:runShellScript\",\"inputs\":{\"runCommand\":[\"set -euo pipefail\",\"TAG='{{ releaseTag }}' DIGEST='{{ imageDigest }}' SUM='{{ bundleSha256 }}'\",\"REL=/opt/veda/releases/$TAG; mkdir -p \\\"$REL\\\" /var/log/veda\",\"exec \\u003e \\u003e(tee -a /var/log/veda/deploy.log) 2\\u003e\\u00261\",\"echo \\\"veda-deploy $TAG $(date -u +%FT%TZ)\\\"\",\"aws s3 cp --region ap-south-1 \\\"s3://veda-stg-artifacts-111122223333/deploy/$TAG/bundle.tgz\\\" \\\"$REL.tgz\\\"\",\"echo \\\"$SUM  $REL.tgz\\\" | sha256sum -c -\",\"tar -xzf \\\"$REL.tgz\\\" -C \\\"$REL\\\"\",\"install -d /opt/veda/host \\u0026\\u0026 install -m 0755 \\\"$REL\\\"/infra/host/*.sh /opt/veda/host/\",\"/opt/veda/host/host-setup.sh /dev/sdf ap-south-1 /veda/staging/cloudwatch-agent\",\"/opt/veda/host/render-env.sh ap-south-1\",\"aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 111122223333.dkr.ecr.ap-south-1.amazonaws.com\",\"docker pull \\\"111122223333.dkr.ecr.ap-south-1.amazonaws.com/veda-api@$DIGEST\\\"\",\"docker tag \\\"111122223333.dkr.ecr.ap-south-1.amazonaws.com/veda-api@$DIGEST\\\" \\\"veda-api:$TAG\\\"\",\"cd \\\"$REL/api/deploy\\\" \\u0026\\u0026 ./deploy.sh \\\"$TAG\\\"\"],\"timeoutSeconds\":\"1800\"},\"name\":\"deploy\"}],\"parameters\":{\"bundleSha256\":{\"allowedPattern\":\"^[0-9a-f]{64}$\",\"description\":\"SHA-256 of deploy/\\u003ctag\\u003e/bundle.tgz\",\"type\":\"String\"},\"imageDigest\":{\"allowedPattern\":\"^sha256:[0-9a-f]{64}$\",\"description\":\"Image digest pushed by 12-deploy\",\"type\":\"String\"},\"releaseTag\":{\"allowedPattern\":\"^[0-9a-f]{12}$|^r[0-9]+(\\\\.[0-9]+){0,2}$\",\"description\":\"Release tag (the image tag)\",\"type\":\"String\"}},\"schemaVersion\":\"2.2\"}",
+          "document_format": "JSON",
+          "document_type": "Command",
+          "name": "veda-deploy",
+          "permissions": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "target_type": null,
+          "version_name": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "attachments_source": [],
+          "created_date": true,
+          "default_version": true,
+          "description": true,
+          "document_version": true,
+          "hash": true,
+          "hash_type": true,
+          "id": true,
+          "latest_version": true,
+          "owner": true,
+          "parameter": true,
+          "platform_types": true,
+          "schema_version": true,
+          "status": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "attachments_source": [],
+          "parameter": [],
+          "platform_types": [],
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    }
+  ]
+}

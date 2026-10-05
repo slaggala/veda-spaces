@@ -17,13 +17,16 @@
 #
 #   infra/scripts/stack.sh gate
 #       Fails (exit 1) unless every apply gate is decided and its record exists. 11-infra-apply runs it first.
+#
+#   infra/scripts/stack.sh decisions
+#       Fails (exit 1) while any owner decision in infra/config/staging-*.json is PROPOSED. 12-deploy runs it.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
 CMD="${1:-}"
-if [[ "$CMD" == -h || "$CMD" == --help ]]; then sed -n '2,24p' "$0"; exit 0; fi
-[[ "$CMD" == plan || "$CMD" == apply || "$CMD" == gate ]] || die "usage: stack.sh plan|apply|gate ... (see --help)"
+if [[ "$CMD" == -h || "$CMD" == --help ]]; then sed -n '2,27p' "$0"; exit 0; fi
+[[ "$CMD" == plan || "$CMD" == apply || "$CMD" == gate || "$CMD" == decisions ]] || die "usage: stack.sh plan|apply|gate|decisions ... (see --help)"
 shift
 STACK="" OUT="" PLAN_DIR="" APPROVED_SHA="" PLAN_RUN=""
 while (($#)); do
@@ -33,7 +36,7 @@ while (($#)); do
     --plan-dir) PLAN_DIR="${2:-}"; shift 2 ;;
     --plan-sha256) APPROVED_SHA="${2:-}"; shift 2 ;;
     --plan-run-id) PLAN_RUN="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,27p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -93,6 +96,12 @@ require_decisions_recorded() {
 if [[ "$CMD" == gate ]]; then
   require_tools jq
   require_apply_gate
+  exit 0
+fi
+
+if [[ "$CMD" == decisions ]]; then
+  require_tools jq
+  require_decisions_recorded
   exit 0
 fi
 

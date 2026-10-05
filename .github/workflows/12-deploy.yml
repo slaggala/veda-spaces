@@ -1,0 +1,73 @@
+# Deploy a Veda release to the staging host (deployment wiring of the staging platform; runbook
+# docs/operations/staging-platform-runbooks.md §1).
+#
+# DISABLED until the owner enables it: the preflight refuses unless every apply gate is decided (OD-B7, N-04-S), no
+# owner decision in infra/config/staging-*.json is still PROPOSED, and deploy.enabled is true in staging-platform.json
+# (false today: Veda is not deployed and public intake stays disabled).
+#
+# Manual, from main only. The deploy job runs in the "staging" environment (required reviewer) and assumes
+# veda-gh-deploy through OIDC: it builds the image from this commit, pushes it to veda-api with an immutable tag,
+# waits for the scan and stops on HIGH or CRITICAL findings, uploads the deploy bundle (api/deploy and infra/host) with
+# its SHA-256, and runs the SSM document veda-deploy on the instance tagged project=veda-spaces, env=staging, pulling
+# the image by digest. No stored secret; no AWS key.
+name: 12-deploy
+run-name: "12-deploy (staging, ${{ github.sha }})"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: preflight (gates, no credentials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Deploys only from main
+        run: |
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::12-deploy runs from main only"; exit 1; }
+      - name: Apply gates, recorded decisions, deploy enabled
+        run: |
+          infra/scripts/stack.sh gate
+          infra/scripts/stack.sh decisions
+          jq -e '.deploy.enabled == true' infra/config/staging-platform.json >/dev/null ||
+            { echo "::error::deploy.enabled is false in infra/config/staging-platform.json (owner decision)"; exit 1; }
+
+  deploy:
+    name: deploy (staging)
+    needs: preflight
+    runs-on: ubuntu-24.04-arm
+    environment: staging
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read # approval proof (RR-07)
+      id-token: write # OIDC: veda-gh-deploy, trusted only for environment staging
+    env:
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Approved run and protected environments (RR-07)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment staging
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+      - name: OIDC session (veda-gh-deploy)
+        env:
+          AWS_ROLE_ARN_DEPLOY: ${{ vars.AWS_ROLE_ARN_DEPLOY }}
+        run: infra/scripts/oidc-session.sh --role deploy
+      - name: Build, push, scan, upload, deploy
+        run: infra/scripts/deploy.sh --tag "${GITHUB_SHA:0:12}"
