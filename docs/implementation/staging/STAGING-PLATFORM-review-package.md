@@ -391,7 +391,7 @@ Each remediation was removed on its own in a fresh copy of the remediation commi
 
 ## 14. Live plan of the reviewed head
 
-PR #22 was merged at its pre-remediation head (`87b9ba9`) before re-certification; the remediation
+PR #22 was merged at its pre-remediation head (its last commit, the mutation record) before re-certification; the remediation
 is a separate pull request. The approved `10-infra-plan` run of that head (run 37307022876, 2026-10-05) planned
 `staging-core` in the real staging account through `veda-gh-plan`, confined to ap-south-1:
 **`Plan: 159 to add, 0 to change, 0 to destroy.`**, the plan guard passed, nothing was created. It matches the
