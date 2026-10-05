@@ -1,0 +1,748 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "ses": {
+          "source": "../../modules/ses",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "alarm_topic_arn": {
+              "references": [
+                "module.monitoring.topic_arn",
+                "module.monitoring"
+              ]
+            },
+            "bounce_rate_threshold": {
+              "references": [
+                "local.platform.ses.bounce_rate_threshold",
+                "local.platform.ses",
+                "local.platform"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "sandbox_recipient": {
+              "references": [
+                "var.budget_alert_email"
+              ]
+            },
+            "sender_domain": {
+              "references": [
+                "local.platform.ses.sender_domain",
+                "local.platform.ses",
+                "local.platform"
+              ]
+            },
+            "sender_local_part": {
+              "references": [
+                "local.platform.ses.sender_local_part",
+                "local.platform.ses",
+                "local.platform"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "configuration_set": {
+                "expression": {
+                  "references": [
+                    "aws_sesv2_configuration_set.this.configuration_set_name",
+                    "aws_sesv2_configuration_set.this"
+                  ]
+                },
+                "description": "VEDA_SES_CONFIGURATION_SET."
+              },
+              "dkim_tokens": {
+                "expression": {
+                  "references": [
+                    "aws_sesv2_email_identity.sender.dkim_signing_attributes[0].tokens",
+                    "aws_sesv2_email_identity.sender.dkim_signing_attributes[0]",
+                    "aws_sesv2_email_identity.sender.dkim_signing_attributes",
+                    "aws_sesv2_email_identity.sender"
+                  ]
+                },
+                "description": "Easy DKIM tokens: AUT-202 publishes <token>._domainkey.<domain> CNAME <token>.dkim.amazonses.com."
+              },
+              "from_address": {
+                "expression": {
+                  "references": [
+                    "var.sender_local_part",
+                    "var.sender_domain"
+                  ]
+                },
+                "description": "The only From address the host may use."
+              },
+              "send_resources": {
+                "expression": {
+                  "references": [
+                    "var.region",
+                    "var.account_id",
+                    "var.sender_domain",
+                    "var.region",
+                    "var.account_id",
+                    "var.name_prefix"
+                  ]
+                },
+                "description": "Resources the host may send through (AUT-106): the sender identity and the configuration set."
+              },
+              "sender": {
+                "expression": {
+                  "references": [
+                    "var.sender_local_part",
+                    "var.sender_domain"
+                  ]
+                },
+                "description": "VEDA_EMAIL_SENDER."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_cloudwatch_metric_alarm.bounce_rate",
+                "mode": "managed",
+                "type": "aws_cloudwatch_metric_alarm",
+                "name": "bounce_rate",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "alarm_actions": {
+                    "references": [
+                      "var.alarm_topic_arn"
+                    ]
+                  },
+                  "alarm_description": {
+                    "references": [
+                      "var.bounce_rate_threshold"
+                    ]
+                  },
+                  "alarm_name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "comparison_operator": {
+                    "constant_value": "GreaterThanThreshold"
+                  },
+                  "evaluation_periods": {
+                    "constant_value": 1
+                  },
+                  "metric_name": {
+                    "constant_value": "Reputation.BounceRate"
+                  },
+                  "namespace": {
+                    "constant_value": "AWS/SES"
+                  },
+                  "ok_actions": {
+                    "references": [
+                      "var.alarm_topic_arn"
+                    ]
+                  },
+                  "period": {
+                    "constant_value": 3600
+                  },
+                  "statistic": {
+                    "constant_value": "Maximum"
+                  },
+                  "threshold": {
+                    "references": [
+                      "var.bounce_rate_threshold"
+                    ]
+                  },
+                  "treat_missing_data": {
+                    "constant_value": "notBreaching"
+                  }
+                },
+                "schema_version": 1
+              },
+              {
+                "address": "aws_cloudwatch_metric_alarm.rejects",
+                "mode": "managed",
+                "type": "aws_cloudwatch_metric_alarm",
+                "name": "rejects",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "alarm_actions": {
+                    "references": [
+                      "var.alarm_topic_arn"
+                    ]
+                  },
+                  "alarm_description": {
+                    "constant_value": "SES rejected a message (AUT-111)"
+                  },
+                  "alarm_name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "comparison_operator": {
+                    "constant_value": "GreaterThanOrEqualToThreshold"
+                  },
+                  "evaluation_periods": {
+                    "constant_value": 1
+                  },
+                  "metric_name": {
+                    "constant_value": "Reject"
+                  },
+                  "namespace": {
+                    "constant_value": "AWS/SES"
+                  },
+                  "ok_actions": {
+                    "references": [
+                      "var.alarm_topic_arn"
+                    ]
+                  },
+                  "period": {
+                    "constant_value": 3600
+                  },
+                  "statistic": {
+                    "constant_value": "Sum"
+                  },
+                  "threshold": {
+                    "constant_value": 1
+                  },
+                  "treat_missing_data": {
+                    "constant_value": "notBreaching"
+                  }
+                },
+                "schema_version": 1
+              },
+              {
+                "address": "aws_sesv2_configuration_set.this",
+                "mode": "managed",
+                "type": "aws_sesv2_configuration_set",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "configuration_set_name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "delivery_options": [
+                    {
+                      "tls_policy": {
+                        "constant_value": "REQUIRE"
+                      }
+                    }
+                  ],
+                  "reputation_options": [
+                    {
+                      "reputation_metrics_enabled": {
+                        "constant_value": true
+                      }
+                    }
+                  ],
+                  "sending_options": [
+                    {
+                      "sending_enabled": {
+                        "constant_value": true
+                      }
+                    }
+                  ],
+                  "suppression_options": [
+                    {
+                      "suppressed_reasons": {
+                        "constant_value": [
+                          "BOUNCE",
+                          "COMPLAINT"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sesv2_email_identity.sandbox_recipient",
+                "mode": "managed",
+                "type": "aws_sesv2_email_identity",
+                "name": "sandbox_recipient",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "email_identity": {
+                    "references": [
+                      "var.sandbox_recipient"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_sesv2_email_identity.sender",
+                "mode": "managed",
+                "type": "aws_sesv2_email_identity",
+                "name": "sender",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "dkim_signing_attributes": [
+                    {
+                      "next_signing_key_length": {
+                        "constant_value": "RSA_2048_BIT"
+                      }
+                    }
+                  ],
+                  "email_identity": {
+                    "references": [
+                      "var.sender_domain"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account."
+              },
+              "alarm_topic_arn": {
+                "description": "AUT-110 alarm topic."
+              },
+              "bounce_rate_threshold": {
+                "description": "Alarm when the account bounce rate exceeds this fraction (AWS reviews accounts above 0.05)."
+              },
+              "name_prefix": {
+                "description": "Prefix of every name (veda-stg)."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "sandbox_recipient": {
+                "description": "Owner address verified as a sandbox recipient (the BUDGET_ALERT_EMAIL secret). Sensitive.",
+                "sensitive": true
+              },
+              "sender_domain": {
+                "description": "Staging sending domain (DKIM records published by AUT-202). A subdomain, so the apex records never change."
+              },
+              "sender_local_part": {
+                "description": "Local part of the From address (e.g. no-reply)."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.ses.aws_cloudwatch_metric_alarm.bounce_rate",
+      "module_address": "module.ses",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "bounce_rate",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "SES account bounce rate above 0.05 (AUT-111)",
+          "alarm_name": "veda-stg-ses-bounce-rate",
+          "comparison_operator": "GreaterThanThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "Reputation.BounceRate",
+          "metric_query": [],
+          "namespace": "AWS/SES",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 3600,
+          "region": "ap-south-1",
+          "statistic": "Maximum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 0.05,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.ses.aws_cloudwatch_metric_alarm.rejects",
+      "module_address": "module.ses",
+      "mode": "managed",
+      "type": "aws_cloudwatch_metric_alarm",
+      "name": "rejects",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "actions_enabled": true,
+          "alarm_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "alarm_description": "SES rejected a message (AUT-111)",
+          "alarm_name": "veda-stg-ses-rejects",
+          "comparison_operator": "GreaterThanOrEqualToThreshold",
+          "datapoints_to_alarm": null,
+          "dimensions": null,
+          "evaluation_criteria": [],
+          "evaluation_interval": null,
+          "evaluation_periods": 1,
+          "extended_statistic": null,
+          "insufficient_data_actions": null,
+          "metric_name": "Reject",
+          "metric_query": [],
+          "namespace": "AWS/SES",
+          "ok_actions": [
+            "arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"
+          ],
+          "period": 3600,
+          "region": "ap-south-1",
+          "statistic": "Sum",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "threshold": 1,
+          "threshold_metric_id": null,
+          "treat_missing_data": "notBreaching",
+          "unit": null,
+          "warm_up_configuration": []
+        },
+        "after_unknown": {
+          "alarm_actions": [
+            false
+          ],
+          "arn": true,
+          "evaluate_low_sample_count_percentiles": true,
+          "evaluation_criteria": [],
+          "id": true,
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "alarm_actions": [
+            false
+          ],
+          "evaluation_criteria": [],
+          "metric_query": [],
+          "ok_actions": [
+            false
+          ],
+          "tags_all": {},
+          "warm_up_configuration": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "alarm_name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.ses.aws_sesv2_configuration_set.this",
+      "module_address": "module.ses",
+      "mode": "managed",
+      "type": "aws_sesv2_configuration_set",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "configuration_set_name": "veda-stg",
+          "delivery_options": [
+            {
+              "max_delivery_seconds": null,
+              "sending_pool_name": null,
+              "tls_policy": "REQUIRE"
+            }
+          ],
+          "region": "ap-south-1",
+          "reputation_options": [
+            {
+              "reputation_metrics_enabled": true
+            }
+          ],
+          "sending_options": [
+            {
+              "sending_enabled": true
+            }
+          ],
+          "suppression_options": [
+            {
+              "suppressed_reasons": [
+                "BOUNCE",
+                "COMPLAINT"
+              ]
+            }
+          ],
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "tracking_options": [],
+          "vdm_options": []
+        },
+        "after_unknown": {
+          "arn": true,
+          "delivery_options": [
+            {}
+          ],
+          "id": true,
+          "reputation_options": [
+            {
+              "last_fresh_start": true
+            }
+          ],
+          "sending_options": [
+            {}
+          ],
+          "suppression_options": [
+            {
+              "suppressed_reasons": [
+                false,
+                false
+              ]
+            }
+          ],
+          "tags_all": {},
+          "tracking_options": [],
+          "vdm_options": []
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "delivery_options": [
+            {}
+          ],
+          "reputation_options": [
+            {}
+          ],
+          "sending_options": [
+            {}
+          ],
+          "suppression_options": [
+            {
+              "suppressed_reasons": [
+                false,
+                false
+              ]
+            }
+          ],
+          "tags_all": {},
+          "tracking_options": [],
+          "vdm_options": []
+        }
+      }
+    },
+    {
+      "address": "module.ses.aws_sesv2_email_identity.sandbox_recipient",
+      "module_address": "module.ses",
+      "mode": "managed",
+      "type": "aws_sesv2_email_identity",
+      "name": "sandbox_recipient",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "configuration_set_name": null,
+          "email_identity": "owner@example.com",
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "dkim_signing_attributes": true,
+          "id": true,
+          "identity_type": true,
+          "tags_all": {},
+          "verification_status": true,
+          "verified_for_sending_status": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "dkim_signing_attributes": [],
+          "email_identity": true,
+          "tags_all": {}
+        }
+      }
+    },
+    {
+      "address": "module.ses.aws_sesv2_email_identity.sender",
+      "module_address": "module.ses",
+      "mode": "managed",
+      "type": "aws_sesv2_email_identity",
+      "name": "sender",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "configuration_set_name": null,
+          "dkim_signing_attributes": [
+            {
+              "domain_signing_private_key": null,
+              "domain_signing_selector": null,
+              "next_signing_key_length": "RSA_2048_BIT"
+            }
+          ],
+          "email_identity": "staging.vedaspaces.com",
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "dkim_signing_attributes": [
+            {
+              "current_signing_key_length": true,
+              "last_key_generation_timestamp": true,
+              "signing_attributes_origin": true,
+              "status": true,
+              "tokens": true
+            }
+          ],
+          "id": true,
+          "identity_type": true,
+          "tags_all": {},
+          "verification_status": true,
+          "verified_for_sending_status": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "dkim_signing_attributes": [
+            {
+              "domain_signing_private_key": true,
+              "tokens": []
+            }
+          ],
+          "tags_all": {}
+        }
+      }
+    }
+  ]
+}

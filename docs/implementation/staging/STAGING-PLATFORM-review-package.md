@@ -52,6 +52,7 @@ flowchart LR
 | 6 | SSM | AUT-107 | SEC-005 and PLAT-008 (no secret in code or Git), F6 (staging start configuration), RR-09 (session transcripts) |
 | 7 | Monitoring foundations | AUT-110 | LOG-005/006 and 02 §9 alerts, RG-5, RR-14 (snapshot heartbeat), FC-01 (anchor failures), NOTIF-008 (notification failures visible, lead kept), cost (bounded metrics) |
 | 8 | Compute and EBS | AUT-108 | ADR-008 (one host), OPS-006/007 (single instance, dedicated encrypted volume, daily snapshots), IMDSv2 (F6), SSM-only access, egress model A, cost (credits capped) |
+| 9 | SES | AUT-111 | NOTIF-* (email through SES in staging, F6), NOTIF-008 (a failed email never rolls back a lead), sender reputation (bounce and complaint suppression) |
 
 ## 3. Decisions
 
@@ -69,6 +70,7 @@ session); a malformed decision file also refuses.
 | `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `127.0.0.1/32` (cloudflared on the host network); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
 | `monitoring` | **PROPOSED** | Logs 30 days; 5xx ≥ 5 per 5 minutes; CPU 80 %, memory 85 %, data disk 80 %, root disk 85 % |
 | `compute` | **PROPOSED** | t4g.small (N2), credits capped; 12 GB root, 20 GB data (gp3); 7 daily snapshots; AMI pinned after the first plan |
+| `ses` | **PROPOSED** | Sender `no-reply@staging.vedaspaces.com` (subdomain; DKIM by AUT-202); sandbox with the owner's address; bounce-rate alarm above 5 % |
 | `anchor_retention` | **PROPOSED** | D6: the application locks each anchor for **3650 days** in COMPLIANCE mode (`anchor_store.py`); accept, or change the application first |
 
 ## 4. Modules
@@ -199,4 +201,17 @@ refuses).
 | No foreign dependency | Nothing references Aurion or swing-trader-vm; a check asserts no planned resource does |
 | Plan guard | Refuses an instance without IMDSv2 required, with an unencrypted root or inline volume, a key pair, or source/destination checking off (a NAT host would break model A); an unencrypted EBS volume; key pairs and serial-console access; snapshot schedules that copy across regions or share snapshots |
 | Tests | `modules/compute`: 6 (hardened host; encrypted and kept volumes, daily snapshots; boot script without secrets; bounded DLM role; pinned AMI wins; other instance types refused). `run.sh`: 16, from a real sandboxed plan |
+
+### 4.9 AUT-111 SES (`modules/ses`)
+
+| Item | Implementation |
+|---|---|
+| Sender | Domain identity `staging.vedaspaces.com`, Easy DKIM 2048-bit. A **subdomain**, so the apex records (SPF, MX, Google verification) are never touched; the three DKIM CNAMEs (`module.ses` output `dkim_tokens`) are published by AUT-202 in Cloudflare. Until then SES reports the identity pending and refuses to send |
+| Sandbox | The account stays in the SES sandbox: it sends only to verified addresses. The owner's address (the `BUDGET_ALERT_EMAIL` secret, sensitive in the plan) is verified as a recipient; AWS mails one verification link. Rehearsal recipients are added the same way (O11). Production access is an owner request to AWS, not Terraform |
+| Configuration set | `veda-stg`: TLS required to the receiving server; reputation metrics; **suppression of bounces and complaints** (a suppressed address is not sent to again) |
+| Failure tracking | Alarms on the free account metrics `AWS/SES` `Reputation.BounceRate` (above 5 %) and `Reject`; application-side, `NotificationFailures` and `OutboxDead` (AUT-110) |
+| Failure isolation | The application sends after commit through the outbox; a provider failure marks the event FAILED and retries, and **never rolls back the lead** (NOTIF-008, `api/tests/integration/test_leads.py`); the check is part of `run.sh` |
+| Wiring | The host may send only from `no-reply@staging.vedaspaces.com` through the identity and the configuration set (AUT-106 `ses:FromAddress`); the application gets `VEDA_EMAIL_SENDER` and `VEDA_SES_CONFIGURATION_SET` (AUT-107) |
+| Plan guard | Refuses inbound email (receipt rules and sets, filters), dedicated IPs and Virtual Deliverability Manager (cost), a configuration set without bounce and complaint suppression or without required TLS, and the apex domain as an identity |
+| Tests | `modules/ses`: 4 (subdomain with DKIM; suppression, TLS, reputation; failure alarms; apex refused). `run.sh`: 14, from a real sandboxed plan, including the host's From-address condition and the application's NOTIF-008 test |
 

@@ -41,11 +41,6 @@
         "ssm": {
           "source": "../../modules/ssm",
           "expressions": {
-            "account_id": {
-              "references": [
-                "local.account_id"
-              ]
-            },
             "audit_key_arn": {
               "references": [
                 "module.kms.audit_key_arn",
@@ -73,11 +68,6 @@
             },
             "parameter_path": {
               "constant_value": "/veda/staging"
-            },
-            "region": {
-              "references": [
-                "var.aws_region"
-              ]
             },
             "session_key_alias": {
               "references": [
@@ -218,9 +208,6 @@
               }
             ],
             "variables": {
-              "account_id": {
-                "description": "The approved account."
-              },
               "audit_key_arn": {
                 "description": "AUT-102 audit key: encrypts the session log group."
               },
@@ -235,9 +222,6 @@
               },
               "parameter_path": {
                 "description": "Root of the staging parameters (/veda/staging). Terraform writes only <path>/config/*; <path>/app/* is seeded by the owner (AUT-302)."
-              },
-              "region": {
-                "description": "Deployment region (ap-south-1)."
               },
               "session_key_alias": {
                 "description": "KMS key alias that encrypts Session Manager session data (the data key)."
@@ -1037,6 +1021,62 @@
       }
     },
     {
+      "address": "module.ssm.aws_ssm_parameter.config[\"VEDA_EMAIL_SENDER\"]",
+      "module_address": "module.ssm",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "config",
+      "index": "VEDA_EMAIL_SENDER",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "allowed_pattern": null,
+          "description": "Veda staging configuration (non-secret, AUT-107)",
+          "name": "/veda/staging/config/VEDA_EMAIL_SENDER",
+          "overwrite": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "tier": "Standard",
+          "type": "String",
+          "value": "Veda Spaces Staging <no-reply@staging.vedaspaces.com>",
+          "value_wo": null,
+          "value_wo_version": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "data_type": true,
+          "has_value_wo": true,
+          "id": true,
+          "insecure_value": true,
+          "key_id": true,
+          "tags_all": {},
+          "version": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {},
+          "value": true,
+          "value_wo": true
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
       "address": "module.ssm.aws_ssm_parameter.config[\"VEDA_ENV\"]",
       "module_address": "module.ssm",
       "mode": "managed",
@@ -1402,6 +1442,62 @@
           "tier": "Standard",
           "type": "String",
           "value": "true",
+          "value_wo": null,
+          "value_wo_version": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "data_type": true,
+          "has_value_wo": true,
+          "id": true,
+          "insecure_value": true,
+          "key_id": true,
+          "tags_all": {},
+          "version": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {},
+          "value": true,
+          "value_wo": true
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]",
+      "module_address": "module.ssm",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "config",
+      "index": "VEDA_SES_CONFIGURATION_SET",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "allowed_pattern": null,
+          "description": "Veda staging configuration (non-secret, AUT-107)",
+          "name": "/veda/staging/config/VEDA_SES_CONFIGURATION_SET",
+          "overwrite": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "tier": "Standard",
+          "type": "String",
+          "value": "veda-stg",
           "value_wo": null,
           "value_wo_version": null
         },

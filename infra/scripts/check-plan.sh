@@ -69,6 +69,9 @@
 #   - creates an EC2 instance (AUT-108) without IMDSv2 required, with an unencrypted root or inline volume, with a key
 #     pair, or with source/destination checking off; an unencrypted EBS volume; a key pair or serial-console access; a
 #     snapshot lifecycle policy that copies across regions or shares snapshots with another account;
+#   - creates SES inbound email (receipt rules and rule sets), dedicated IPs or Virtual Deliverability Manager (cost),
+#     a configuration set that does not suppress bounces and complaints or does not require TLS, or a domain identity
+#     that is the apex of vedaspaces.com (its records must never change) (AUT-111);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -87,7 +90,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,75p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,78p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -389,6 +392,17 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type | IN("aws_ses_receipt_rule", "aws_ses_receipt_rule_set", "aws_ses_active_receipt_rule_set", "aws_ses_receipt_filter",
+                      "aws_sesv2_dedicated_ip_pool", "aws_sesv2_dedicated_ip_assignment", "aws_sesv2_account_vdm_attributes") then
+        "\($addr): \(.type) is not allowed (no inbound email, dedicated IPs or Virtual Deliverability Manager; AUT-111)"
+      elif .type == "aws_sesv2_configuration_set" then
+        (if (([($after.suppression_options // [])[].suppressed_reasons[]?]) | (index("BOUNCE") != null and index("COMPLAINT") != null)) | not
+           then "\($addr): configuration set does not suppress bounces and complaints" else empty end),
+        (if [($after.delivery_options // [])[] | select(.tls_policy == "REQUIRE")] | length == 0
+           then "\($addr): configuration set does not require TLS" else empty end)
+      elif .type == "aws_sesv2_email_identity" or .type == "aws_ses_domain_identity" then
+        (if ($after.email_identity // $after.domain // "") == "vedaspaces.com"
+           then "\($addr): the apex vedaspaces.com is not a staging sender (its SPF, MX and verification records must not change)" else empty end)
       elif .type == "aws_sns_topic" then
         (if ($after.kms_master_key_id // "") == "" and $unknown.kms_master_key_id != true then "\($addr): SNS topic without KMS encryption" else empty end)
       elif .type == "aws_sns_topic_subscription" then

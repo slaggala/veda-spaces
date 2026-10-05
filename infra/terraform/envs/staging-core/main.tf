@@ -121,34 +121,37 @@ module "runtime_iam" {
   repository_name          = module.ecr.repository_name
   log_group_prefix         = local.log_group_prefix
   parameter_path           = "/veda/staging"
+  ses_send                 = { resources = module.ses.send_resources, from_address = module.ses.from_address }
 }
 
 # AUT-107: non-secret configuration and Session Manager preferences.
 locals {
   app_config = {
-    VEDA_ENV                  = "staging"
-    VEDA_AWS_REGION           = var.aws_region
-    VEDA_LOG_LEVEL            = "INFO"
-    VEDA_KMS_PROVIDER         = "aws"
-    VEDA_KMS_KEY_ARN          = "arn:aws:kms:${var.aws_region}:${local.account_id}:${module.kms.aliases["data"]}"
-    VEDA_DATABASE_URL         = "sqlite:////var/lib/veda/veda.db"
-    VEDA_SNAPSHOT_DIR         = "/var/lib/veda/snapshots"
-    VEDA_SNAPSHOT_BUCKET      = module.storage.bucket_names["snapshots"]
-    VEDA_ANCHOR_BUCKET        = module.storage.bucket_names["anchor"]
-    LITESTREAM_BUCKET         = module.storage.bucket_names["litestream"]
-    LITESTREAM_REGION         = var.aws_region
-    LITESTREAM_RETENTION      = local.platform.ssm.litestream_retention
-    VEDA_EMAIL_PROVIDER       = "ses"
-    VEDA_TURNSTILE_MODE       = "cloudflare"
-    VEDA_COOKIE_SECURE        = "true"
-    VEDA_RATE_LIMITS_ENABLED  = "true"
-    VEDA_BREAK_GLASS_IDENTITY = "sts"
-    VEDA_TRUSTED_PROXY_CIDRS  = local.platform.ssm.trusted_proxy_cidrs
-    VEDA_APP_ORIGIN           = local.platform.ssm.app_origin
-    VEDA_APP_BASE_URL         = local.platform.ssm.app_origin
-    VEDA_API_BASE_URL         = local.platform.ssm.api_base_url
-    VEDA_JWT_ISSUER           = local.platform.ssm.api_base_url
-    VEDA_PUBLIC_SITE_ORIGINS  = local.platform.ssm.public_site_origins
+    VEDA_ENV                   = "staging"
+    VEDA_AWS_REGION            = var.aws_region
+    VEDA_LOG_LEVEL             = "INFO"
+    VEDA_KMS_PROVIDER          = "aws"
+    VEDA_KMS_KEY_ARN           = "arn:aws:kms:${var.aws_region}:${local.account_id}:${module.kms.aliases["data"]}"
+    VEDA_DATABASE_URL          = "sqlite:////var/lib/veda/veda.db"
+    VEDA_SNAPSHOT_DIR          = "/var/lib/veda/snapshots"
+    VEDA_SNAPSHOT_BUCKET       = module.storage.bucket_names["snapshots"]
+    VEDA_ANCHOR_BUCKET         = module.storage.bucket_names["anchor"]
+    LITESTREAM_BUCKET          = module.storage.bucket_names["litestream"]
+    LITESTREAM_REGION          = var.aws_region
+    LITESTREAM_RETENTION       = local.platform.ssm.litestream_retention
+    VEDA_EMAIL_PROVIDER        = "ses"
+    VEDA_EMAIL_SENDER          = module.ses.sender
+    VEDA_SES_CONFIGURATION_SET = module.ses.configuration_set
+    VEDA_TURNSTILE_MODE        = "cloudflare"
+    VEDA_COOKIE_SECURE         = "true"
+    VEDA_RATE_LIMITS_ENABLED   = "true"
+    VEDA_BREAK_GLASS_IDENTITY  = "sts"
+    VEDA_TRUSTED_PROXY_CIDRS   = local.platform.ssm.trusted_proxy_cidrs
+    VEDA_APP_ORIGIN            = local.platform.ssm.app_origin
+    VEDA_APP_BASE_URL          = local.platform.ssm.app_origin
+    VEDA_API_BASE_URL          = local.platform.ssm.api_base_url
+    VEDA_JWT_ISSUER            = local.platform.ssm.api_base_url
+    VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
   }
 }
 
@@ -202,5 +205,19 @@ module "compute" {
   data_volume_gb           = local.platform.compute.data_volume_gb
   snapshot_retain_count    = local.platform.compute.snapshot_retain_count
   app_log_group            = module.monitoring.app_log_group
+}
+
+# AUT-111: email delivery (SES sandbox): staging sender with DKIM, configuration set, failure alarms.
+module "ses" {
+  source = "../../modules/ses"
+
+  name_prefix           = local.name_prefix
+  account_id            = local.account_id
+  region                = var.aws_region
+  sender_domain         = local.platform.ses.sender_domain
+  sender_local_part     = local.platform.ses.sender_local_part
+  sandbox_recipient     = var.budget_alert_email
+  alarm_topic_arn       = module.monitoring.topic_arn
+  bounce_rate_threshold = local.platform.ses.bounce_rate_threshold
 }
 

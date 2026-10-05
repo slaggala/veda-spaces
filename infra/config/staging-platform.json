@@ -70,5 +70,12 @@
     "data_volume_gb": 20,
     "snapshot_retain_count": 7,
     "ami_id": null
+  },
+  "ses": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: sender no-reply@staging.vedaspaces.com (a subdomain, so the apex records never change; DKIM CNAMEs published by AUT-202); sandbox, with the owner's address verified as recipient (more rehearsal recipients: O11); alarm when the bounce rate exceeds 5 %.",
+    "sender_domain": "staging.vedaspaces.com",
+    "sender_local_part": "no-reply",
+    "bounce_rate_threshold": 0.05
   }
 }

@@ -1795,6 +1795,22 @@ absent "AUT-108 no planned resource refers to another workload (Aurion, swing-tr
 check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots (PROPOSED)" ok '^PROPOSED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
 check "  ... the same instance type as the network decision (AZ check)" ok '^t4g.small$' -- jq -r .host_instance_type "$INFRA/config/staging-network.json"
 
+echo "== AUT-111: SES (staging sender, sandbox, suppression and TLS, failure alarms, lead never rolled back)"
+SESPLAN="$HERE/fixtures/aut111-ses-plan.json"
+sesmod() { local f="$TMP/ses.$RANDOM$RANDOM.json"; jq --arg a "module.ses.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$SESPLAN" >"$f"; echo "$f"; }
+check "AUT-111 the real SES plan passes the guard" ok "plan guard: no destroy" -- guard "$SESPLAN"
+check "  ... sender staging.vedaspaces.com with 2048-bit DKIM" ok '^staging.vedaspaces.com RSA_2048_BIT$' -- jq -r '.resource_changes[] | select(.address == "module.ses.aws_sesv2_email_identity.sender") | .change.after | "\(.email_identity) \(.dkim_signing_attributes[0].next_signing_key_length)"' "$SESPLAN"
+check "AUT-111 a configuration set without bounce suppression is refused" fail "does not suppress bounces and complaints" -- guard "$(sesmod aws_sesv2_configuration_set.this '.after.suppression_options[0].suppressed_reasons = ["COMPLAINT"]')"
+check "AUT-111 a configuration set without required TLS is refused" fail "does not require TLS" -- guard "$(sesmod aws_sesv2_configuration_set.this '.after.delivery_options[0].tls_policy = "OPTIONAL"')"
+check "AUT-111 the apex domain as sender is refused" fail "the apex vedaspaces.com is not a staging sender" -- guard "$(sesmod aws_sesv2_email_identity.sender '.after.email_identity = "vedaspaces.com"')"
+for t in aws_ses_receipt_rule_set aws_ses_active_receipt_rule_set aws_sesv2_dedicated_ip_pool aws_sesv2_account_vdm_attributes; do
+  check "AUT-111 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ses.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-111 the host sends only as the staging sender" ok '^no-reply@staging.vedaspaces.com$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "SendAsTheStagingSender") | .Condition.StringEquals["ses:FromAddress"]' "$IAMPLAN"
+check "AUT-111 the application is configured with the sender and the configuration set" ok '^Veda Spaces Staging <no-reply@staging.vedaspaces.com> veda-stg$' -- jq -r '[(.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_EMAIL_SENDER\"]") | .change.after.value), (.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]") | .change.after.value)] | join(" ")' "$SSMPLAN"
+check "AUT-111 an email failure never rolls back a committed lead (NOTIF-008, application test)" ok 'email failure never affects the committed lead \(NOTIF-008\)' -- cat "$INFRA/../api/tests/integration/test_leads.py"
+check "AUT-111 committed decision: sender, bounce threshold (PROPOSED)" ok '^PROPOSED staging.vedaspaces.com no-reply 0.05$' -- jq -r '"\(.ses.status) \(.ses.sender_domain) \(.ses.sender_local_part) \(.ses.bounce_rate_threshold)"' "$PLATFORM"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then
