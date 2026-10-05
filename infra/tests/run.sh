@@ -996,8 +996,8 @@ echo "== N-05 / PB-08: a plan is made only from a clean checkout (ignored files 
 git_tree() { # a git checkout of a copy of infra/ with one commit
   local g="$TMP/git.$RANDOM$RANDOM"
   mkdir -p "$g"
-  cp -R "$INFRA" "$g/infra"
-  rm -rf "$g/infra/terraform/bootstrap/.terraform" "$g/infra/generated"
+  # Ignored caches (tools, providers, generated) are left out: they are large, and the clean-tree rule ignores them.
+  rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$g/infra/"
   cp "$FIXTURE_MANIFEST" "$g/infra/config/staging-account.json"
   git -C "$g" init -q && git -C "$g" add -A && git -C "$g" -c user.name=t -c user.email=t@example.invalid commit -qm base
   echo "$g"
@@ -1706,6 +1706,30 @@ check "AUT-105 the planned repository is veda-api" ok '^veda-api$' -- jq -r '.re
 # shellcheck disable=SC2016 # matched literally in the bootstrap
 check "  ... the repository the bootstrap scopes the deploy role to" ok 'ecr_repository = "\$\{local.prefix\}-api"' -- tr -s ' ' <"$INFRA/terraform/bootstrap/main.tf"
 check "AUT-105 committed decision: keep 30 tagged images, untagged expire after 7 days" ok '^30 7$' -- jq -r '"\(.ecr.keep_tagged_images) \(.ecr.expire_untagged_days)"' "$PLATFORM"
+
+echo "== AUT-106: runtime IAM (bounded host role, exact resources, explicit deny of administration)"
+IAMPLAN="$HERE/fixtures/aut106-runtime-iam-plan.json"
+iammod() { local f="$TMP/iam.$RANDOM$RANDOM.json"; jq --arg a "module.runtime_iam.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$IAMPLAN" >"$f"; echo "$f"; }
+RTPOL="$TMP/runtime-policy.json"
+jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy' "$IAMPLAN" >"$RTPOL"
+check "AUT-106 the real runtime-IAM plan passes the guard" ok "plan guard: no destroy" -- guard "$IAMPLAN"
+check "  ... the runtime policy is known at plan time (the reviewer reads it)" ok '^false$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | (.change.after_unknown.policy // false)' "$IAMPLAN"
+check "AUT-106 a host role without the boundary is refused" fail "without the veda-boundary" -- guard "$(iammod aws_iam_role.host '.after.permissions_boundary = null')"
+check "AUT-106 an AWS managed policy outside the reviewed list is refused" fail "AWS managed policy arn:aws:iam::aws:policy/AmazonS3FullAccess is not in the reviewed list" -- guard "$(iammod aws_iam_role_policy_attachment.ssm_core '.after.policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"')"
+check "AUT-106 an administrator policy is refused" fail "privileged managed policy arn:aws:iam::aws:policy/AdministratorAccess" -- guard "$(iammod aws_iam_role_policy_attachment.ssm_core '.after.policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"')"
+check "AUT-106 an Allow on a whole service is refused" fail 'Allow on s3:\* \(a whole service\)' -- guard "$(iammod aws_iam_policy.runtime '.after.policy = (.after.policy | fromjson | .Statement += [{Sid: "Wide", Effect: "Allow", Action: "s3:*", Resource: "*"}] | tojson)')"
+check "AUT-106 an Allow on everything is refused" fail 'Allow on \* \(a whole service\)' -- guard "$(iammod aws_iam_policy.runtime '.after.policy = (.after.policy | fromjson | .Statement += [{Sid: "All", Effect: "Allow", Action: "*", Resource: "*"}] | tojson)')"
+check "AUT-106 a policy unknown at plan time is refused" fail "IAM policy unknown at plan time" -- guard "$(iammod aws_iam_policy.runtime '.after.policy = null | .after_unknown.policy = true')"
+INLINE_WIDE="$TMP/iam.inline.json"
+jq --argjson p "$(policy '[{"Effect":"Allow","Action":"kms:*","Resource":"*"}]')" \
+  '.resource_changes += [{address: "module.runtime_iam.aws_iam_role_policy.extra", type: "aws_iam_role_policy", change: {actions: ["create"], after: {role: "veda-stg-host", policy: $p}, after_unknown: {}}}]' \
+  "$IAMPLAN" >"$INLINE_WIDE"
+check "AUT-106 an inline role policy on a whole service is refused" fail 'Allow on kms:\*' -- guard "$INLINE_WIDE"
+check "AUT-106 the bootstrap boundary ceiling stays accepted" ok "plan guard: no destroy" -- guard "$P.ok"
+check "AUT-106 the host never deletes snapshots, anchors or evidence" ok '^\["arn:aws:s3:::veda-stg-litestream-111122223333/\*"\]$' -- jq -c '[.Statement[] | select(.Effect == "Allow" and ((.Action | if type == "array" then . else [.] end) | index("s3:DeleteObject"))) | .Resource] | flatten' "$RTPOL"
+# shellcheck disable=SC2016 # jq variables
+check "AUT-106 the explicit deny covers IAM, role assumption, the trail, key deletion, bucket settings, EC2 and SSM commands" ok '^true$' -- jq '.Statement[] | select(.Sid == "DenyAdministration") | .Action as $a | ["iam:*", "sts:AssumeRole", "cloudtrail:*", "kms:ScheduleKeyDeletion", "s3:PutBucket*", "ec2:Run*", "ssm:SendCommand"] | all(. as $x | $a | index($x))' "$RTPOL"
+check "AUT-106 keys are matched by alias (data key; audit key only through S3)" ok '^alias/veda-stg-data alias/veda-stg-audit s3.ap-south-1.amazonaws.com$' -- jq -r '[(.Statement[] | select(.Sid == "DataKey") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0]), (.Statement[] | select(.Sid == "AuditKeyThroughS3Only") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0], .Condition.StringEquals["kms:ViaService"])] | join(" ")' "$RTPOL"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

@@ -54,6 +54,10 @@
 #     store or channel; a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
 #   - creates an ECR repository (AUT-105) outside <prefix>-*, with mutable tags, without scan on push, without KMS
 #     encryption, or force-deletable; a public repository, replication, pull-through cache or registry policy;
+#   - attaches an AWS managed policy outside the reviewed list (AmazonSSMManagedInstanceCore, the DLM service role
+#     policy; ReadOnlyAccess and SecurityAudit for the bootstrap plan and evidence roles); or gives, in a policy of a
+#     role other than the bootstrap veda-gh-* roles (or the veda-boundary ceiling), an Allow on "*" or on a whole
+#     service ("<service>:*"), or a policy unknown at plan time (AUT-106);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -72,7 +76,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,60p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,64p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -185,6 +189,13 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
      "aws_sns_topic_policy": "policy", "aws_sns_topic": "policy", "aws_ecr_repository_policy": "policy",
      "aws_cloudwatch_log_resource_policy": "policy_document", "aws_secretsmanager_secret_policy": "policy", # pragma: allowlist secret
      "aws_secretsmanager_secret": "policy", "aws_ssm_resource_policy": "policy", "aws_lambda_layer_version_permission": "policy"}[.]; # pragma: allowlist secret
+  # AUT-106: AWS managed policies a Veda role may carry.
+  def reviewed_managed: tostring | IN("arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole", "arn:aws:iam::aws:policy/ReadOnlyAccess",
+    "arn:aws:iam::aws:policy/SecurityAudit");
+  def broad_allows($addr):
+    (.Statement | arr)[] | select(.Effect == "Allow") | (.Action | arr)[] | tostring | select(. == "*" or endswith(":*"))
+    | "\($addr): Allow on \(.) (a whole service): name the actions (AUT-106)";
   def aws_provider: ((.provider_name // "") | test("(^|/)hashicorp/aws$")) or ((.type // "") | startswith("aws_"));
   # Mumbai only: every AWS provider configuration pins the approved region, at the root, either as the constant or as
   # the validated root variable; the planned region of a resource (AWS provider v6) must be that region or absent (global).
@@ -264,11 +275,24 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         (if $unknown.assume_role_policy == true then "\($addr): trust policy not known at plan time"
          else ($after.assume_role_policy | fromjson | trust_statements($addr; $after.name // "")) end),
         (($after.managed_policy_arns // []) | arr[] | select(privileged) | "\($addr): privileged managed policy \(.)")
-      elif .type == "aws_iam_policy" then iam_name_path($addr; "policy"; $after; $unknown)
+      elif .type == "aws_iam_policy" then iam_name_path($addr; "policy"; $after; $unknown),
+        # veda-boundary of the bootstrap (a ceiling: Allow * capped by its Denies) and veda-gh-* policies are reviewed there.
+        (if (($after.name // "") | startswith($prefix + "-gh-")) or $after.name == "\($prefix)-boundary" then empty
+         elif $unknown.policy == true then "\($addr): IAM policy unknown at plan time (build ARNs from names so the reviewer sees it)"
+         elif ($after.policy // "") == "" then empty
+         else ($after.policy | fromjson | broad_allows($addr)) end)
       elif .type == "aws_iam_instance_profile" then iam_name_path($addr; "instance profile"; $after; $unknown)
       elif .type == "aws_iam_role_policy_attachment" or .type == "aws_iam_policy_attachment" or .type == "aws_iam_role_policy_attachments_exclusive" then
         (([$after.policy_arn] + ($after.policy_arns // [])) | map(select(. != null))[] | select(privileged)
-         | "\($addr): privileged managed policy \(.)")
+         | "\($addr): privileged managed policy \(.)"),
+        (([$after.policy_arn] + ($after.policy_arns // [])) | map(select(. != null))[]
+         | select(startswith("arn:aws:iam::aws:policy/") and (privileged | not) and (reviewed_managed | not))
+         | "\($addr): AWS managed policy \(.) is not in the reviewed list (AUT-106)")
+      elif .type == "aws_iam_role_policy" then
+        (if (($after.role // "") | startswith($prefix + "-gh-")) then empty
+         elif $unknown.policy == true then "\($addr): IAM policy unknown at plan time (build ARNs from names so the reviewer sees it)"
+         elif ($after.policy // "") == "" then empty
+         else ($after.policy | fromjson | broad_allows($addr)) end)
       elif .type == "aws_lambda_permission" then
         (if ($after.principal | tostring | test("\\.amazonaws\\.com$")) or ($after.principal | own) then empty
          else "\($addr): Lambda permission for \($after.principal)" end)

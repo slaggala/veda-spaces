@@ -107,3 +107,19 @@ module "ecr" {
   expire_untagged_days = local.platform.ecr.expire_untagged_days
 }
 
+# AUT-106: runtime identity of the host.
+module "runtime_iam" {
+  source = "../../modules/runtime-iam"
+
+  name_prefix              = local.name_prefix
+  account_id               = local.account_id
+  region                   = var.aws_region
+  permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/veda-boundary"
+  data_key_alias           = module.kms.aliases["data"]
+  audit_key_alias          = module.kms.aliases["audit"]
+  bucket_arns              = module.storage.bucket_arns
+  repository_name          = module.ecr.repository_name
+  log_group_prefix         = local.log_group_prefix
+  parameter_path           = "/veda/staging"
+}
+
