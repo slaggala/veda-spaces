@@ -39,6 +39,39 @@
 #     endpoint other than the S3 gateway, or an S3 endpoint whose policy is unknown, the AWS default (full access),
 #     uses Not* elements, or allows S3 beyond the account's buckets and the named AWS-owned buckets of the region
 #     (ECR layers, Amazon Linux 2023 repositories, SSM Agent, SSM documents, Distributor);
+#   - creates a KMS key (AUT-102) without rotation, with a deletion window under 30 days, multi-region, not symmetric
+#     encrypt/decrypt, with the policy lockout check bypassed, with a policy unknown at plan time, or without a Deny of
+#     every caller outside the account (kms:CallerAccount); any replica, external or custom-store key, a separate key
+#     policy resource, or an alias outside alias/<prefix>-*;
+#   - creates an S3 bucket (AUT-103) not named <prefix>-*, or without, in the same plan and naming it by its name: all
+#     four public access blocks, BucketOwnerEnforced ownership, versioning, SSE-KMS and a policy denying plain HTTP
+#     (the bootstrap state bucket excepted); any bucket ACL, a public access block not fully on, suspended
+#     versioning, SSE other than KMS, a GOVERNANCE or over-a-year default lock, replication, website hosting,
+#     Transfer Acceleration, CORS, access points or Multi-Region Access Points (they bypass the S3 endpoint policy);
+#   - creates a CloudTrail trail (AUT-104) that is not multi-region, omits global events or log-file validation, is not
+#     logging, has no KMS key, writes outside a <prefix>-* bucket, or sets event, advanced or Insights selectors
+#     (veda-boundary denies PutEventSelectors; data events are an owner-session step); a CloudTrail Lake event data
+#     store or channel; a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
+#   - creates an ECR repository (AUT-105) outside <prefix>-*, with mutable tags, without scan on push, without KMS
+#     encryption, or force-deletable; a public repository, replication, pull-through cache or registry policy;
+#   - attaches an AWS managed policy outside the reviewed list (AmazonSSMManagedInstanceCore, the DLM service role
+#     policy; ReadOnlyAccess and SecurityAudit for the bootstrap plan and evidence roles); or gives, in a policy of a
+#     role other than the bootstrap veda-gh-* roles (or the veda-boundary ceiling), an Allow on "*" or on a whole
+#     service ("<service>:*"), or a policy unknown at plan time (AUT-106);
+#   - creates an SSM SecureString (secrets are seeded by the owner, AUT-302) or a parameter outside /<prefix>/staging/
+#     or under its app/ path; an SSM document other than <prefix>-* or the Session Manager preferences, of a type other
+#     than Command or Session, or shared with another account; Session Manager preferences without encrypted
+#     CloudWatch transcripts or with run-as; State Manager associations, hybrid activations, maintenance windows or
+#     patch baselines (commands run only through the reviewed <prefix>-* documents) (AUT-107);
+#   - creates an SNS topic without KMS encryption, a subscription other than email or an SQS queue of the account in
+#     the region, an SQS queue without encryption, an alarm whose actions are anything but SNS topics of the account in
+#     the region, or a log subscription filter, log destination, metric stream or cross-account sink (AUT-110);
+#   - creates an EC2 instance (AUT-108) without IMDSv2 required, with an unencrypted root or inline volume, with a key
+#     pair, or with source/destination checking off; an unencrypted EBS volume; a key pair or serial-console access; a
+#     snapshot lifecycle policy that copies across regions or shares snapshots with another account;
+#   - creates SES inbound email (receipt rules and rule sets), dedicated IPs or Virtual Deliverability Manager (cost),
+#     a configuration set that does not suppress bounces and complaints or does not require TLS, or a domain identity
+#     that is the apex of vedaspaces.com (its records must never change) (AUT-111);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -57,7 +90,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,45p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,78p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -170,6 +203,13 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
      "aws_sns_topic_policy": "policy", "aws_sns_topic": "policy", "aws_ecr_repository_policy": "policy",
      "aws_cloudwatch_log_resource_policy": "policy_document", "aws_secretsmanager_secret_policy": "policy", # pragma: allowlist secret
      "aws_secretsmanager_secret": "policy", "aws_ssm_resource_policy": "policy", "aws_lambda_layer_version_permission": "policy"}[.]; # pragma: allowlist secret
+  # AUT-106: AWS managed policies a Veda role may carry.
+  def reviewed_managed: tostring | IN("arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole", "arn:aws:iam::aws:policy/ReadOnlyAccess",
+    "arn:aws:iam::aws:policy/SecurityAudit");
+  def broad_allows($addr):
+    (.Statement | arr)[] | select(.Effect == "Allow") | (.Action | arr)[] | tostring | select(. == "*" or endswith(":*"))
+    | "\($addr): Allow on \(.) (a whole service): name the actions (AUT-106)";
   def aws_provider: ((.provider_name // "") | test("(^|/)hashicorp/aws$")) or ((.type // "") | startswith("aws_"));
   # Mumbai only: every AWS provider configuration pins the approved region, at the root, either as the constant or as
   # the validated root variable; the planned region of a resource (AWS provider v6) must be that region or absent (global).
@@ -209,7 +249,33 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
        | select(.expressions.security_group_id | refs | any(test("default_security_group_id|aws_default_security_group")))
        | "\(.address): rule attached to the default security group (it must have no rule)");
 
-  [ region_findings ] + [ config_findings ] + [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
+  # AUT-103: every new bucket comes with its controls, matched by bucket name (known at plan time).
+  def bucket_findings:
+    (.resource_changes // []) as $all
+    | [$all[] | select(.change.actions | index("create") or index("update"))] as $live
+    | $all[] | select(.type == "aws_s3_bucket" and ((.change.actions | index("create")) != null)) | .address as $addr
+    | (.change.after.bucket // null) as $name
+    | if $name == null then "\($addr): bucket name unknown at plan time"
+      elif $name == "\($prefix)-tfstate-\($acct)" then empty
+      elif ($name | startswith($prefix + "-") | not) then "\($addr): bucket \($name) is not \($prefix)-*"
+      else
+        [$live[] | select(.change.after.bucket == $name)] as $c
+        | (if [$c[] | select(.type == "aws_s3_bucket_public_access_block") | .change.after
+               | select(.block_public_acls and .block_public_policy and .ignore_public_acls and .restrict_public_buckets)] | length == 0
+             then "\($addr): bucket \($name) has no public access block with all four settings on" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_ownership_controls") | .change.after.rule[]? | select(.object_ownership == "BucketOwnerEnforced")] | length == 0
+             then "\($addr): bucket \($name) has no BucketOwnerEnforced ownership (ACLs must be disabled)" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_versioning") | .change.after.versioning_configuration[]? | select(.status == "Enabled")] | length == 0
+             then "\($addr): bucket \($name) has no versioning" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_server_side_encryption_configuration") | .change.after.rule[]?.apply_server_side_encryption_by_default[]?
+               | select(.sse_algorithm | IN("aws:kms", "aws:kms:dsse"))] | length == 0
+             then "\($addr): bucket \($name) has no SSE-KMS encryption" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_policy") | .change.after.policy // "" | select(. != "") | fromjson | (.Statement | arr)[]
+               | select(.Effect == "Deny" and (((.Condition // {}).Bool // {})["aws:SecureTransport"] | tostring) == "false")] | length == 0
+             then "\($addr): bucket \($name) has no policy denying plain HTTP (aws:SecureTransport)" else empty end)
+      end;
+
+  [ region_findings ] + [ config_findings ] + [ bucket_findings ] + [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
     | if (.change.actions - ["create", "update", "read", "no-op"]) | length > 0 then
         "\($addr): plan \(.change.actions | join("+")) (the bootstrap never applies a destroy, replace or forget)"
       elif (.change.actions | index("create") or index("update")) | not then empty
@@ -223,11 +289,24 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         (if $unknown.assume_role_policy == true then "\($addr): trust policy not known at plan time"
          else ($after.assume_role_policy | fromjson | trust_statements($addr; $after.name // "")) end),
         (($after.managed_policy_arns // []) | arr[] | select(privileged) | "\($addr): privileged managed policy \(.)")
-      elif .type == "aws_iam_policy" then iam_name_path($addr; "policy"; $after; $unknown)
+      elif .type == "aws_iam_policy" then iam_name_path($addr; "policy"; $after; $unknown),
+        # veda-boundary of the bootstrap (a ceiling: Allow * capped by its Denies) and veda-gh-* policies are reviewed there.
+        (if (($after.name // "") | startswith($prefix + "-gh-")) or $after.name == "\($prefix)-boundary" then empty
+         elif $unknown.policy == true then "\($addr): IAM policy unknown at plan time (build ARNs from names so the reviewer sees it)"
+         elif ($after.policy // "") == "" then empty
+         else ($after.policy | fromjson | broad_allows($addr)) end)
       elif .type == "aws_iam_instance_profile" then iam_name_path($addr; "instance profile"; $after; $unknown)
       elif .type == "aws_iam_role_policy_attachment" or .type == "aws_iam_policy_attachment" or .type == "aws_iam_role_policy_attachments_exclusive" then
         (([$after.policy_arn] + ($after.policy_arns // [])) | map(select(. != null))[] | select(privileged)
-         | "\($addr): privileged managed policy \(.)")
+         | "\($addr): privileged managed policy \(.)"),
+        (([$after.policy_arn] + ($after.policy_arns // [])) | map(select(. != null))[]
+         | select(startswith("arn:aws:iam::aws:policy/") and (privileged | not) and (reviewed_managed | not))
+         | "\($addr): AWS managed policy \(.) is not in the reviewed list (AUT-106)")
+      elif .type == "aws_iam_role_policy" then
+        (if (($after.role // "") | startswith($prefix + "-gh-")) then empty
+         elif $unknown.policy == true then "\($addr): IAM policy unknown at plan time (build ARNs from names so the reviewer sees it)"
+         elif ($after.policy // "") == "" then empty
+         else ($after.policy | fromjson | broad_allows($addr)) end)
       elif .type == "aws_lambda_permission" then
         (if ($after.principal | tostring | test("\\.amazonaws\\.com$")) or ($after.principal | own) then empty
          else "\($addr): Lambda permission for \($after.principal)" end)
@@ -286,7 +365,21 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
            then "\($addr): route to a target other than the internet gateway or a VPC endpoint" else empty end)
       elif .type == "aws_instance" then
         (if ($after.subnet_id // null) == null and $unknown.subnet_id != true and (($after.network_interface // []) | length) == 0
-           then "\($addr): instance without a subnet would land in the default VPC (AUT-101: only the staging subnet)" else empty end)
+           then "\($addr): instance without a subnet would land in the default VPC (AUT-101: only the staging subnet)" else empty end),
+        (if [($after.metadata_options // [])[] | select(.http_tokens == "required")] | length == 0
+           then "\($addr): instance without IMDSv2 required (http_tokens)" else empty end),
+        (if [($after.root_block_device // [])[] | select(.encrypted != true)] | length > 0 or (($after.root_block_device // []) | length) == 0
+           then "\($addr): instance root volume not encrypted" else empty end),
+        (if [($after.ebs_block_device // [])[] | select(.encrypted != true)] | length > 0 then "\($addr): unencrypted inline EBS volume" else empty end),
+        (if ($after.key_name // "") != "" then "\($addr): key pair \($after.key_name) (the host is managed through SSM only)" else empty end),
+        (if $after.source_dest_check == false then "\($addr): source/destination check off (no NAT or router instances; egress model A)" else empty end)
+      elif .type == "aws_ebs_volume" then
+        (if $after.encrypted != true then "\($addr): unencrypted EBS volume" else empty end)
+      elif .type | IN("aws_key_pair", "aws_ec2_serial_console_access") then
+        "\($addr): \(.type) is not allowed (the host is managed through SSM only; AUT-108)"
+      elif .type == "aws_dlm_lifecycle_policy" then
+        (($after.policy_details // [])[].schedule[]? | select(((.cross_region_copy_rule // []) | length) > 0 or ((.share_rule // []) | length) > 0)
+         | "\($addr): snapshot schedule \(.name // "?") copies across regions or shares snapshots (Mumbai only, F7)")
       elif .type == "aws_subnet" then
         (if $after.map_public_ip_on_launch == true then "\($addr): the subnet assigns public addresses (the host asks for its own, AUT-108)" else empty end),
         (if ($after.ipv6_cidr_block // "") != "" or $after.assign_ipv6_address_on_creation == true then "\($addr): IPv6 subnet (the staging network is IPv4 only)" else empty end)
@@ -299,6 +392,116 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type | IN("aws_ses_receipt_rule", "aws_ses_receipt_rule_set", "aws_ses_active_receipt_rule_set", "aws_ses_receipt_filter",
+                      "aws_sesv2_dedicated_ip_pool", "aws_sesv2_dedicated_ip_assignment", "aws_sesv2_account_vdm_attributes") then
+        "\($addr): \(.type) is not allowed (no inbound email, dedicated IPs or Virtual Deliverability Manager; AUT-111)"
+      elif .type == "aws_sesv2_configuration_set" then
+        (if (([($after.suppression_options // [])[].suppressed_reasons[]?]) | (index("BOUNCE") != null and index("COMPLAINT") != null)) | not
+           then "\($addr): configuration set does not suppress bounces and complaints" else empty end),
+        (if [($after.delivery_options // [])[] | select(.tls_policy == "REQUIRE")] | length == 0
+           then "\($addr): configuration set does not require TLS" else empty end)
+      elif .type == "aws_sesv2_email_identity" or .type == "aws_ses_domain_identity" then
+        (if ($after.email_identity // $after.domain // "") == "vedaspaces.com"
+           then "\($addr): the apex vedaspaces.com is not a staging sender (its SPF, MX and verification records must not change)" else empty end)
+      elif .type == "aws_sns_topic" then
+        (if ($after.kms_master_key_id // "") == "" and $unknown.kms_master_key_id != true then "\($addr): SNS topic without KMS encryption" else empty end)
+      elif .type == "aws_sns_topic_subscription" then
+        (if $after.protocol == "email" then empty
+         elif $after.protocol == "sqs" and $unknown.endpoint != true and (($after.endpoint // "") | test("^arn:aws:sqs:" + ($region | esc) + ":" + $acct + ":") | not)
+           then "\($addr): SQS subscription to \($after.endpoint) outside account \($acct) in \($region)"
+         elif $after.protocol == "sqs" then empty
+         else "\($addr): subscription protocol \($after.protocol // "?") (email or an SQS queue of the account only)" end)
+      elif .type == "aws_sqs_queue" then
+        (if $after.sqs_managed_sse_enabled != true and ($after.kms_master_key_id // "") == "" and $unknown.kms_master_key_id != true
+           then "\($addr): SQS queue without encryption" else empty end)
+      elif .type == "aws_cloudwatch_metric_alarm" or .type == "aws_cloudwatch_composite_alarm" then
+        ((($after.alarm_actions // []) + ($after.ok_actions // []) + ($after.insufficient_data_actions // []))[] | tostring
+         | select(test("^arn:aws:sns:" + ($region | esc) + ":" + $acct + ":") | not)
+         | "\($addr): alarm action \(.) is not an SNS topic of account \($acct) in \($region)")
+      elif .type | IN("aws_cloudwatch_log_subscription_filter", "aws_cloudwatch_log_destination", "aws_cloudwatch_log_destination_policy",
+                      "aws_cloudwatch_metric_stream", "aws_oam_link", "aws_oam_sink", "aws_oam_sink_policy", "aws_cloudwatch_log_delivery",
+                      "aws_cloudwatch_log_delivery_destination", "aws_cloudwatch_log_account_policy") then
+        "\($addr): \(.type) is not allowed (logs and metrics stay in the account; AUT-110)"
+      elif .type == "aws_ssm_parameter" then
+        (if $after.type == "SecureString" then "\($addr): SecureString parameters are seeded by the owner, never by Terraform (AUT-302)" else empty end),
+        (if (($after.name // "") | startswith("/\($prefix)/staging/") | not) or (($after.name // "") | startswith("/\($prefix)/staging/app/"))
+           then "\($addr): parameter \($after.name // "?") is outside /\($prefix)/staging/ or under its secret app/ path" else empty end)
+      elif .type == "aws_ssm_document" then
+        (if (($after.name // "") | startswith($prefix + "-")) or $after.name == "SSM-SessionManagerRunShell" then empty
+         else "\($addr): SSM document \($after.name // "?") is not \($prefix)-* (or the Session Manager preferences)" end),
+        (if ($after.document_type // "") | IN("Command", "Session") | not then "\($addr): SSM document type \($after.document_type // "?") (Command or Session only)" else empty end),
+        (if (($after.permissions // {}) | length) > 0 then "\($addr): SSM document shared with another account" else empty end),
+        (if $after.name == "SSM-SessionManagerRunShell" then
+           (($after.content // "{}") | fromjson | .inputs // {}) as $i
+           | (if $i.cloudWatchEncryptionEnabled != true or ($i.cloudWatchLogGroupName // "") == "" then "\($addr): Session Manager transcripts must go to an encrypted CloudWatch log group" else empty end),
+             (if $i.runAsEnabled == true then "\($addr): Session Manager run-as is not allowed" else empty end)
+         else empty end)
+      elif .type | IN("aws_ssm_association", "aws_ssm_activation", "aws_ssm_maintenance_window", "aws_ssm_maintenance_window_task",
+                      "aws_ssm_maintenance_window_target", "aws_ssm_patch_baseline", "aws_ssm_default_patch_baseline", "aws_ssm_service_setting") then
+        "\($addr): \(.type) is not allowed (commands run only through the reviewed \($prefix)-* documents; AUT-107)"
+      elif .type == "aws_ecr_repository" then
+        (if (($after.name // "") | startswith($prefix + "-") | not) then "\($addr): repository \($after.name // "?") is not \($prefix)-*" else empty end),
+        (if $after.image_tag_mutability != "IMMUTABLE" then "\($addr): image tags are \($after.image_tag_mutability // "?"), not IMMUTABLE (a tag must always mean one image)" else empty end),
+        (if [($after.image_scanning_configuration // [])[] | select(.scan_on_push == true)] | length == 0 then "\($addr): images are not scanned on push" else empty end),
+        (if [($after.encryption_configuration // [])[] | select(.encryption_type == "KMS")] | length == 0 then "\($addr): repository not encrypted with KMS" else empty end),
+        (if $after.force_delete == true then "\($addr): force_delete would delete every image with the repository" else empty end)
+      elif .type | IN("aws_ecrpublic_repository", "aws_ecrpublic_repository_policy", "aws_ecr_replication_configuration",
+                      "aws_ecr_pull_through_cache_rule", "aws_ecr_registry_policy", "aws_ecr_repository_creation_template") then
+        "\($addr): \(.type) is not allowed (one private repository; no public, replicated or pull-through images; AUT-105)"
+      elif .type == "aws_cloudtrail" then
+        (if $after.is_multi_region_trail != true then "\($addr): trail is not multi-region (activity in other regions would go unrecorded)" else empty end),
+        (if $after.include_global_service_events == false then "\($addr): trail omits global service events (IAM, STS)" else empty end),
+        (if $after.enable_log_file_validation != true then "\($addr): trail without log-file validation (tampering would be undetectable)" else empty end),
+        (if $after.enable_logging == false then "\($addr): trail created with logging off" else empty end),
+        (if ($after.kms_key_id // "") == "" and $unknown.kms_key_id != true then "\($addr): trail without a KMS key" else empty end),
+        (if (($after.s3_bucket_name // "") | startswith($prefix + "-") | not) and $unknown.s3_bucket_name != true
+           then "\($addr): trail writes to \($after.s3_bucket_name // "?"), not a \($prefix)-* bucket" else empty end),
+        (if ([$after.event_selector, $after.advanced_event_selector, $after.insight_selector] | map(. // [] | length) | add) > 0
+           then "\($addr): trail selectors are set by the owner session (veda-boundary denies PutEventSelectors to every role)" else empty end)
+      elif .type | IN("aws_cloudtrail_event_data_store", "aws_cloudtrail_channel", "aws_cloudtrail_organization_delegated_admin_account") then
+        "\($addr): \(.type) is not allowed (one trail; no CloudTrail Lake; AUT-104)"
+      elif .type == "aws_cloudwatch_log_group" then
+        (if (($after.name // "") | startswith("/" + $prefix + "/") | not) then "\($addr): log group \($after.name // "?") is not under /\($prefix)/" else empty end),
+        (if ($after.kms_key_id // "") == "" and $unknown.kms_key_id != true then "\($addr): log group without a KMS key" else empty end),
+        (if ($after.retention_in_days // 0) == 0 then "\($addr): log group with unlimited retention" else empty end)
+      elif .type | IN("aws_s3_bucket_acl", "aws_s3_bucket_replication_configuration", "aws_s3_bucket_website_configuration",
+                      "aws_s3_bucket_cors_configuration", "aws_s3_access_point", "aws_s3control_access_point_policy",
+                      "aws_s3control_multi_region_access_point", "aws_s3control_multi_region_access_point_policy",
+                      "aws_s3control_object_lambda_access_point", "aws_s3_directory_bucket") then
+        "\($addr): \(.type) is not allowed (ACLs are disabled; no replication, website, CORS or access points; AUT-103)"
+      elif .type == "aws_s3_bucket_accelerate_configuration" then
+        (if $after.status == "Enabled" then "\($addr): S3 Transfer Acceleration bypasses the S3 endpoint policy" else empty end)
+      elif .type == "aws_s3_bucket_public_access_block" then
+        (if ($after.block_public_acls and $after.block_public_policy and $after.ignore_public_acls and $after.restrict_public_buckets) | not
+           then "\($addr): public access block with a setting off" else empty end)
+      elif .type == "aws_s3_bucket_ownership_controls" then
+        (if [($after.rule // [])[] | select(.object_ownership == "BucketOwnerEnforced")] | length == 0
+           then "\($addr): bucket ownership other than BucketOwnerEnforced (ACLs must stay disabled)" else empty end)
+      elif .type == "aws_s3_bucket_versioning" then
+        (if [($after.versioning_configuration // [])[] | select(.status == "Enabled")] | length == 0 then "\($addr): bucket versioning not enabled" else empty end)
+      elif .type == "aws_s3_bucket_server_side_encryption_configuration" then
+        (if [($after.rule // [])[].apply_server_side_encryption_by_default[]? | select(.sse_algorithm | IN("aws:kms", "aws:kms:dsse") | not)] | length > 0
+           then "\($addr): bucket encryption other than SSE-KMS" else empty end)
+      elif .type == "aws_s3_bucket_object_lock_configuration" then
+        (($after.rule // [])[].default_retention[]? | select(.mode != "COMPLIANCE" or ((.days // 0) > 365) or ((.years // 0) > 1))
+         | "\($addr): default Object Lock \(.mode) for \(.days // 0) days \(.years // 0) years (COMPLIANCE, at most a year)")
+      elif .type | IN("aws_kms_replica_key", "aws_kms_external_key", "aws_kms_replica_external_key", "aws_kms_custom_key_store", "aws_kms_key_policy") then
+        "\($addr): \(.type) is not allowed (keys are single-region, AWS-generated, with their policy on the key; AUT-102)"
+      elif .type == "aws_kms_alias" then
+        (if ($after.name // "") | startswith("alias/" + $prefix + "-") then empty else "\($addr): KMS alias \($after.name // "(unknown)") is not alias/\($prefix)-*" end)
+      elif .type == "aws_kms_key" then
+        (if $after.enable_key_rotation != true then "\($addr): KMS key without automatic rotation" else empty end),
+        (if ($after.deletion_window_in_days // 30) < 30 then "\($addr): KMS key deletion window \($after.deletion_window_in_days) days (30 required)" else empty end),
+        (if $after.multi_region == true then "\($addr): multi-region KMS key" else empty end),
+        (if ($after.key_usage // "ENCRYPT_DECRYPT") != "ENCRYPT_DECRYPT" or ($after.customer_master_key_spec // "SYMMETRIC_DEFAULT") != "SYMMETRIC_DEFAULT"
+           then "\($addr): KMS key is not a symmetric encrypt/decrypt key" else empty end),
+        (if $after.bypass_policy_lockout_safety_check == true then "\($addr): KMS key bypasses the policy lockout safety check" else empty end),
+        (if $unknown.policy == true or ($after.policy // "") == "" then "\($addr): KMS key policy unknown or absent (the default policy is not reviewed)"
+         else ($after.policy | fromjson) as $p
+           | (if [($p.Statement | arr)[] | select(.Effect == "Deny" and ((.Action | arr) | index("kms:*")) != null
+                    and ((((.Condition // {}).StringNotEquals // {})["kms:CallerAccount"]) | arr) == [$acct])] | length > 0
+              then empty else "\($addr): KMS key policy does not deny callers outside account \($acct) (kms:CallerAccount)" end),
+             ($p | open_statements($addr)) end)
       elif .type == "aws_budgets_budget_action" then
         "\($addr): budget actions are not allowed (they apply IAM or SCP policies or stop instances automatically; AUT-112)"
       elif .type == "aws_budgets_budget" then

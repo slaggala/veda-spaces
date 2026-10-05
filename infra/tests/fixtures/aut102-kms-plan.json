@@ -1,0 +1,413 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "kms": {
+          "source": "../../modules/kms",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "deletion_window_days": {
+              "references": [
+                "local.platform.kms.deletion_window_days",
+                "local.platform.kms",
+                "local.platform"
+              ]
+            },
+            "log_group_prefix": {
+              "references": [
+                "local.log_group_prefix"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "rotation_period_days": {
+              "references": [
+                "local.platform.kms.rotation_period_days",
+                "local.platform.kms",
+                "local.platform"
+              ]
+            },
+            "trail_name": {
+              "references": [
+                "local.trail_name"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "aliases": {
+                "expression": {
+                  "references": [
+                    "aws_kms_alias.this"
+                  ]
+                },
+                "description": "Key aliases."
+              },
+              "audit_key_arn": {
+                "expression": {
+                  "references": [
+                    "aws_kms_key.this[\"audit\"].arn",
+                    "aws_kms_key.this[\"audit\"]",
+                    "aws_kms_key.this"
+                  ]
+                },
+                "description": "Audit key: CloudTrail, logs and evidence buckets, CloudWatch Logs, the alarm topic."
+              },
+              "data_key_arn": {
+                "expression": {
+                  "references": [
+                    "aws_kms_key.this[\"data\"].arn",
+                    "aws_kms_key.this[\"data\"]",
+                    "aws_kms_key.this"
+                  ]
+                },
+                "description": "Data key: MFA secrets (VEDA_KMS_KEY_ARN), EBS, data buckets, ECR."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_kms_alias.this",
+                "mode": "managed",
+                "type": "aws_kms_alias",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "name": {
+                    "references": [
+                      "var.name_prefix",
+                      "each.key"
+                    ]
+                  },
+                  "target_key_id": {
+                    "references": [
+                      "aws_kms_key.this",
+                      "each.key"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.keys"
+                  ]
+                }
+              },
+              {
+                "address": "aws_kms_key.this",
+                "mode": "managed",
+                "type": "aws_kms_key",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "customer_master_key_spec": {
+                    "constant_value": "SYMMETRIC_DEFAULT"
+                  },
+                  "deletion_window_in_days": {
+                    "references": [
+                      "var.deletion_window_days"
+                    ]
+                  },
+                  "description": {
+                    "references": [
+                      "each.value.description",
+                      "each.value"
+                    ]
+                  },
+                  "enable_key_rotation": {
+                    "constant_value": true
+                  },
+                  "key_usage": {
+                    "constant_value": "ENCRYPT_DECRYPT"
+                  },
+                  "multi_region": {
+                    "constant_value": false
+                  },
+                  "policy": {
+                    "references": [
+                      "each.value.statements",
+                      "each.value"
+                    ]
+                  },
+                  "rotation_period_in_days": {
+                    "references": [
+                      "var.rotation_period_days"
+                    ]
+                  },
+                  "tags": {
+                    "references": [
+                      "var.name_prefix",
+                      "each.key"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.keys"
+                  ]
+                }
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account; no other account may use the keys."
+              },
+              "deletion_window_days": {
+                "description": "Waiting period before a scheduled key deletion takes effect."
+              },
+              "log_group_prefix": {
+                "description": "CloudWatch Logs groups the audit key may encrypt (e.g. /veda/staging)."
+              },
+              "name_prefix": {
+                "description": "Prefix of every name, e.g. veda-stg."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "rotation_period_days": {
+                "description": "Automatic rotation period."
+              },
+              "trail_name": {
+                "description": "The CloudTrail trail the audit key may encrypt for (AUT-104)."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.kms.aws_kms_alias.this[\"audit\"]",
+      "module_address": "module.kms",
+      "mode": "managed",
+      "type": "aws_kms_alias",
+      "name": "this",
+      "index": "audit",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "alias/veda-stg-audit",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "name_prefix": true,
+          "target_key_arn": true,
+          "target_key_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.kms.aws_kms_alias.this[\"data\"]",
+      "module_address": "module.kms",
+      "mode": "managed",
+      "type": "aws_kms_alias",
+      "name": "this",
+      "index": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "alias/veda-stg-data",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "name_prefix": true,
+          "target_key_arn": true,
+          "target_key_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.kms.aws_kms_key.this[\"audit\"]",
+      "module_address": "module.kms",
+      "mode": "managed",
+      "type": "aws_kms_key",
+      "name": "this",
+      "index": "audit",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bypass_policy_lockout_safety_check": false,
+          "custom_key_store_id": null,
+          "customer_master_key_spec": "SYMMETRIC_DEFAULT",
+          "deletion_window_in_days": 30,
+          "description": "Veda staging audit: CloudTrail, logs, evidence, CloudWatch Logs, alarms (AUT-102)",
+          "enable_key_rotation": true,
+          "is_enabled": true,
+          "key_usage": "ENCRYPT_DECRYPT",
+          "multi_region": false,
+          "policy": "{\"Statement\":[{\"Action\":\"kms:*\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::111122223333:root\"},\"Resource\":\"*\",\"Sid\":\"AccountIamPolicies\"},{\"Action\":\"kms:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"kms:CallerAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"*\",\"Sid\":\"DenyOtherAccounts\"},{\"Action\":[\"kms:Encrypt*\",\"kms:Decrypt*\",\"kms:ReEncrypt*\",\"kms:GenerateDataKey*\",\"kms:Describe*\"],\"Condition\":{\"ArnLike\":{\"kms:EncryptionContext:aws:logs:arn\":\"arn:aws:logs:ap-south-1:111122223333:log-group:/veda/staging/*\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"logs.ap-south-1.amazonaws.com\"},\"Resource\":\"*\",\"Sid\":\"CloudWatchLogsForVedaGroups\"},{\"Action\":[\"kms:GenerateDataKey*\",\"kms:DescribeKey\"],\"Condition\":{\"StringEquals\":{\"aws:SourceArn\":\"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail\"},\"StringLike\":{\"kms:EncryptionContext:aws:cloudtrail:arn\":\"arn:aws:cloudtrail:*:111122223333:trail/veda-stg-trail\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudtrail.amazonaws.com\"},\"Resource\":\"*\",\"Sid\":\"CloudTrailForTheVedaTrail\"},{\"Action\":[\"kms:Encrypt\",\"kms:Decrypt\",\"kms:ReEncrypt*\",\"kms:GenerateDataKey*\",\"kms:DescribeKey\"],\"Condition\":{\"ArnLike\":{\"aws:SourceArn\":\"arn:aws:logs:ap-south-1:111122223333:*\"},\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"delivery.logs.amazonaws.com\"},\"Resource\":\"*\",\"Sid\":\"LogDeliveryForFlowLogs\"},{\"Action\":[\"kms:Decrypt\",\"kms:GenerateDataKey*\"],\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudwatch.amazonaws.com\"},\"Resource\":\"*\",\"Sid\":\"CloudWatchAlarmsToTheAlarmTopic\"},{\"Action\":[\"kms:GenerateDataKey\",\"kms:Decrypt\"],\"Condition\":{\"StringEquals\":{\"kms:ViaService\":\"s3.ap-south-1.amazonaws.com\"},\"StringLike\":{\"kms:EncryptionContext:aws:s3:arn\":[\"arn:aws:s3:::veda-evidence-111122223333\",\"arn:aws:s3:::veda-evidence-111122223333/*\"]}},\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::111122223333:role/veda-gh-evidence\"},\"Resource\":\"*\",\"Sid\":\"EvidenceRoleEvidenceThroughS3\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1",
+          "rotation_period_in_days": 365,
+          "tags": {
+            "Name": "veda-stg-audit"
+          },
+          "tags_all": {
+            "Name": "veda-stg-audit",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null,
+          "xks_key_id": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "key_id": true,
+          "tags": {},
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.kms.aws_kms_key.this[\"data\"]",
+      "module_address": "module.kms",
+      "mode": "managed",
+      "type": "aws_kms_key",
+      "name": "this",
+      "index": "data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bypass_policy_lockout_safety_check": false,
+          "custom_key_store_id": null,
+          "customer_master_key_spec": "SYMMETRIC_DEFAULT",
+          "deletion_window_in_days": 30,
+          "description": "Veda staging data: MFA secrets, EBS, data buckets, ECR (AUT-102)",
+          "enable_key_rotation": true,
+          "is_enabled": true,
+          "key_usage": "ENCRYPT_DECRYPT",
+          "multi_region": false,
+          "policy": "{\"Statement\":[{\"Action\":\"kms:*\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::111122223333:root\"},\"Resource\":\"*\",\"Sid\":\"AccountIamPolicies\"},{\"Action\":\"kms:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"kms:CallerAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"*\",\"Sid\":\"DenyOtherAccounts\"},{\"Action\":[\"kms:GenerateDataKey\",\"kms:Decrypt\"],\"Condition\":{\"StringEquals\":{\"kms:ViaService\":\"s3.ap-south-1.amazonaws.com\"},\"StringLike\":{\"kms:EncryptionContext:aws:s3:arn\":[\"arn:aws:s3:::veda-stg-artifacts-111122223333\",\"arn:aws:s3:::veda-stg-artifacts-111122223333/*\"]}},\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::111122223333:role/veda-gh-deploy\"},\"Resource\":\"*\",\"Sid\":\"DeployRoleArtifactsThroughS3\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1",
+          "rotation_period_in_days": 365,
+          "tags": {
+            "Name": "veda-stg-data"
+          },
+          "tags_all": {
+            "Name": "veda-stg-data",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null,
+          "xks_key_id": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "key_id": true,
+          "tags": {},
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags": {},
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "id": null,
+          "region": null
+        }
+      }
+    }
+  ]
+}

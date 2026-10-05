@@ -282,8 +282,6 @@ data "aws_iam_policy_document" "apply_iam" {
       values = [
         "ec2.amazonaws.com", "lambda.amazonaws.com", "cloudtrail.amazonaws.com", "dlm.amazonaws.com",
         "ssm.amazonaws.com", "synthetics.amazonaws.com",
-        # AUT-101: VPC flow logs deliver to CloudWatch Logs through the bounded role veda-stg-vpc-flow-logs.
-        "vpc-flow-logs.amazonaws.com",
       ]
     }
   }

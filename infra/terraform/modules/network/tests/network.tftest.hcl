@@ -15,14 +15,13 @@ variables {
   name_prefix              = "veda-stg"
   account_id               = "111122223333"
   region                   = "ap-south-1"
-  permissions_boundary_arn = "arn:aws:iam::111122223333:policy/veda-boundary"
   egress_model             = "A"
   vpc_cidr                 = "10.60.0.0/20"
   public_subnet_cidr       = "10.60.0.0/24"
   az_id_preference         = ["aps1-az1", "aps1-az3", "aps1-az2"]
   host_instance_type       = "t4g.small"
   flow_log_traffic_type    = "ALL"
-  flow_log_retention_days  = 30
+  flow_log_destination_arn = "arn:aws:s3:::veda-stg-logs-111122223333/vpc-flow"
   tunnel_egress_cidrs      = ["198.41.192.0/24", "198.41.200.0/24"]
   aws_owned_s3_object_arns = ["arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*", "arn:aws:s3:::al2023-repos-ap-south-1-de612dc2/*", "arn:aws:s3:::amazon-ssm-ap-south-1/*"]
 }
@@ -126,25 +125,15 @@ run "s3_endpoint_policy_is_restricted" {
   }
 }
 
-run "flow_logs_through_a_bounded_service_role" {
+run "flow_logs_to_the_logs_bucket" {
   command = plan
 
   assert {
-    condition     = aws_flow_log.vpc.traffic_type == "ALL" && aws_cloudwatch_log_group.flow.retention_in_days == 30
-    error_message = "all traffic, 30 days (N6)"
-  }
-
-  assert {
-    condition     = aws_iam_role.flow_logs.name == "veda-stg-vpc-flow-logs" && aws_iam_role.flow_logs.permissions_boundary == "arn:aws:iam::111122223333:policy/veda-boundary"
-    error_message = "the flow-log role is veda-* and carries veda-boundary"
-  }
-
-  assert {
     condition = (
-      jsondecode(aws_iam_role.flow_logs.assume_role_policy).Statement[0].Principal == { Service = "vpc-flow-logs.amazonaws.com" } &&
-      jsondecode(aws_iam_role.flow_logs.assume_role_policy).Statement[0].Condition.StringEquals["aws:SourceAccount"] == "111122223333"
+      aws_flow_log.vpc.traffic_type == "ALL" && aws_flow_log.vpc.log_destination_type == "s3" &&
+      aws_flow_log.vpc.log_destination == "arn:aws:s3:::veda-stg-logs-111122223333/vpc-flow" && aws_flow_log.vpc.iam_role_arn == null
     )
-    error_message = "the flow-log role is trusted by the flow-logs service of this account only"
+    error_message = "all traffic to the logs bucket (C3), with no role passed"
   }
 }
 

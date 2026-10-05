@@ -26,6 +26,6 @@ output "summary" {
     public_subnet_cidr   = var.public_subnet_cidr
     availability_zone_id = local.az_id
     host_egress          = concat(["tcp/443 0.0.0.0/0", "tcp/443 s3-prefix-list"], [for k, r in aws_vpc_security_group_egress_rule.tunnel : "${r.ip_protocol}/7844 ${r.cidr_ipv4}"])
-    flow_logs            = "${var.flow_log_traffic_type}, ${var.flow_log_retention_days} days"
+    flow_logs            = "${var.flow_log_traffic_type} to ${var.flow_log_destination_arn}"
   }
 }

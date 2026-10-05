@@ -1,6 +1,6 @@
 # Staging network, egress model A (AUT-101, owner decision N1): one VPC, one public subnet in one AZ, no inbound
 # access at all, outbound only on TCP 443 and to the Cloudflare tunnel edge on TCP/UDP 7844, in-region S3 through a
-# gateway endpoint with a restricted policy, and flow logs. The host (AUT-108) attaches host_security_group_id and asks
+# gateway endpoint with a restricted policy, and flow logs to the logs bucket (C3). The host (AUT-108) attaches host_security_group_id and asks
 # for its own public IPv4; nothing here gives an address to anything. Design: docs/implementation/staging/
 # AUT-101-design-package.md.
 
@@ -214,62 +214,18 @@ resource "aws_vpc_security_group_egress_rule" "tunnel" {
   cidr_ipv4         = each.value.cidr
 }
 
-# --- Flow logs (N6): CloudWatch Logs through a bounded role trusted only by the flow-logs service -------------------
-resource "aws_cloudwatch_log_group" "flow" {
-  #checkov:skip=CKV_AWS_158:Encrypted with the CloudWatch Logs service key until the customer-managed keys of AUT-102 exist
-  #checkov:skip=CKV_AWS_338:Retention is owner decision N6 (30 days for staging), not one year
-  name              = "/veda/staging/vpc-flow"
-  retention_in_days = var.flow_log_retention_days
-}
-
-resource "aws_iam_role" "flow_logs" {
-  name                 = "${var.name_prefix}-vpc-flow-logs"
-  description          = "VPC flow logs to /veda/staging/vpc-flow (AUT-101)"
-  permissions_boundary = var.permissions_boundary_arn
-  max_session_duration = 3600
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "vpc-flow-logs.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-      Condition = {
-        StringEquals = { "aws:SourceAccount" = var.account_id }
-        ArnLike      = { "aws:SourceArn" = "arn:aws:ec2:${var.region}:${var.account_id}:vpc-flow-log/*" }
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "flow_logs" {
-  name = "write-vpc-flow-log-group"
-  role = aws_iam_role.flow_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
-        Resource = "${aws_cloudwatch_log_group.flow.arn}:*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = "logs:DescribeLogGroups"
-        Resource = "arn:aws:logs:${var.region}:${var.account_id}:log-group:*"
-      },
-    ]
-  })
-}
-
+# --- Flow logs (N6, owner decision C3): delivered to the logs bucket (AUT-103), no role passed ----------------------
 resource "aws_flow_log" "vpc" {
   vpc_id                   = aws_vpc.this.id
   traffic_type             = var.flow_log_traffic_type
-  log_destination_type     = "cloud-watch-logs"
-  log_destination          = aws_cloudwatch_log_group.flow.arn
-  iam_role_arn             = aws_iam_role.flow_logs.arn
+  log_destination_type     = "s3"
+  log_destination          = var.flow_log_destination_arn
   max_aggregation_interval = 600
+
+  destination_options {
+    file_format        = "plain-text"
+    per_hour_partition = true
+  }
 
   tags = { Name = "${var.name_prefix}-vpc-flow" }
 }

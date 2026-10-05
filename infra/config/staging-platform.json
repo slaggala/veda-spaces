@@ -1,0 +1,87 @@
+{
+  "description": "Staging platform decisions (AUT-102 to AUT-111), planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request. An entry whose status is PROPOSED has not been decided by the owner: plans run with the proposed value, and stack.sh apply refuses while any PROPOSED entry remains. Secrets and personal addresses are never stored here.",
+  "kms": {
+    "status": "DECIDED",
+    "decision": "Integrated workstream 2026-10-05: two customer-managed keys (data, audit) instead of three, for cost (cost report); yearly rotation; 30-day deletion window.",
+    "deletion_window_days": 30,
+    "rotation_period_days": 365
+  },
+  "storage": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05 for owner decision D6 and the retention periods. Lifecycle values are reversible; Object Lock retention is not.",
+    "litestream_noncurrent_days": 7,
+    "snapshots_expire_days": 42,
+    "artifacts_expire_days": 90,
+    "artifacts_noncurrent_days": 30,
+    "logs_cloudtrail_expire_days": 90,
+    "logs_flow_expire_days": 30,
+    "evidence_lock_mode": "COMPLIANCE",
+    "evidence_lock_days": 30
+  },
+  "anchor_retention": {
+    "status": "PROPOSED",
+    "decision": "D6. The application locks every anchor in COMPLIANCE mode for 3650 days (api/veda/platform/anchor_store.py RETENTION). In staging that keeps each anchor, and the bucket, for ten years: nobody can delete them, the root user included. Options: (a) accept 10 years in staging; (b) a reviewed application change making the retention configurable, then a short staging value. The bucket has Object Lock enabled with no default retention either way.",
+    "application_retention_days": 3650
+  },
+  "cloudtrail": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: one multi-region trail of management events, log-file validation, audit key, copy in CloudWatch Logs kept 30 days (the S3 copy follows storage.logs_cloudtrail_expire_days). veda-boundary denies every role cloudtrail:Put*Selectors and UpdateTrail, so the S3 data events on the anchor and evidence buckets (FC-01, RR-09 attribution) are added once by the owner session after the first apply (runbook).",
+    "log_group_retention_days": 30,
+    "owner_session_data_event_buckets": [
+      "anchor",
+      "evidence"
+    ]
+  },
+  "ecr": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: one repository veda-api (the bootstrap deploy role pushes only there), immutable tags, basic scan on push, data key; keep the last 30 tagged images, expire untagged images after 7 days. Litestream and cloudflared keep coming from Docker Hub, pinned by digest (the deploy role cannot push other repositories).",
+    "keep_tagged_images": 30,
+    "expire_untagged_days": 7
+  },
+  "ssm": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: D7 staging host names; the trusted proxy is the Compose network gateway 172.30.0.1 (Docker address pool 172.30.0.0/16, AUT-001 host design): the peer the API sees for every request published on 127.0.0.1:8000; Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302).",
+    "app_origin": "https://app-staging.vedaspaces.com",
+    "api_base_url": "https://api-staging.vedaspaces.com",
+    "public_site_origins": "https://staging.vedaspaces.com",
+    "trusted_proxy_cidrs": "172.30.0.1/32",
+    "litestream_retention": "168h",
+    "session_log_retention_days": 90,
+    "idle_session_timeout_minutes": 20,
+    "max_session_duration_minutes": 60
+  },
+  "monitoring": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue.",
+    "log_retention_days": 30,
+    "thresholds": {
+      "server_errors_per_5min": 5,
+      "cpu_percent": 80,
+      "memory_percent": 85,
+      "data_disk_percent": 80,
+      "root_disk_percent": 85
+    }
+  },
+  "compute": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: t4g.small (N2, decided) with burst credits capped (standard); 12 GB root and 20 GB data volumes (gp3, data key); 7 daily snapshots of the data volume; the AMI is the latest Amazon Linux 2023 arm64 at the first plan and is then pinned here (ami_id).",
+    "instance_type": "t4g.small",
+    "root_volume_gb": 12,
+    "data_volume_gb": 20,
+    "snapshot_retain_count": 7,
+    "ami_id": null
+  },
+  "ses": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: sender no-reply@staging.vedaspaces.com (a subdomain, so the apex records never change; DKIM CNAMEs published by AUT-202); sandbox, with the owner's address verified as recipient (more rehearsal recipients: O11); alarm when the bounce rate exceeds 5 %.",
+    "sender_domain": "staging.vedaspaces.com",
+    "sender_local_part": "no-reply",
+    "bounce_rate_threshold": 0.05
+  },
+  "deploy": {
+    "status": "DECIDED",
+    "decision": "2026-10-05 (owner): do not deploy Veda; public lead intake stays disabled. 12-deploy refuses while enabled is false.",
+    "enabled": false,
+    "public_intake": "disabled"
+  }
+}

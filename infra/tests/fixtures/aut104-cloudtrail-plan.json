@@ -1,0 +1,578 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "cloudtrail": {
+          "source": "../../modules/cloudtrail",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "audit_key_arn": {
+              "references": [
+                "module.kms.audit_key_arn",
+                "module.kms"
+              ]
+            },
+            "log_group_prefix": {
+              "references": [
+                "local.log_group_prefix"
+              ]
+            },
+            "log_group_retention_days": {
+              "references": [
+                "local.platform.cloudtrail.log_group_retention_days",
+                "local.platform.cloudtrail",
+                "local.platform"
+              ]
+            },
+            "logs_bucket_name": {
+              "references": [
+                "module.storage.bucket_names[\"logs\"]",
+                "module.storage.bucket_names",
+                "module.storage"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "permissions_boundary_arn": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "trail_name": {
+              "references": [
+                "local.trail_name"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "log_group_name": {
+                "expression": {
+                  "references": [
+                    "aws_cloudwatch_log_group.trail.name",
+                    "aws_cloudwatch_log_group.trail"
+                  ]
+                },
+                "description": "The trail's CloudWatch Logs copy (delivery alarm: AWS/Logs IncomingLogEvents)."
+              },
+              "tampering_metric": {
+                "expression": {
+                  "constant_value": {
+                    "name": "AuditTampering",
+                    "namespace": "Veda/Audit"
+                  }
+                },
+                "description": "Namespace and name of the tampering metric (alarm in AUT-110)."
+              },
+              "trail_arn": {
+                "expression": {
+                  "references": [
+                    "local.trail_arn"
+                  ]
+                },
+                "description": "The trail."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_cloudtrail.this",
+                "mode": "managed",
+                "type": "aws_cloudtrail",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "cloud_watch_logs_group_arn": {
+                    "references": [
+                      "local.log_group_arn"
+                    ]
+                  },
+                  "cloud_watch_logs_role_arn": {
+                    "references": [
+                      "aws_iam_role.trail_logs.arn",
+                      "aws_iam_role.trail_logs"
+                    ]
+                  },
+                  "enable_log_file_validation": {
+                    "constant_value": true
+                  },
+                  "enable_logging": {
+                    "constant_value": true
+                  },
+                  "include_global_service_events": {
+                    "constant_value": true
+                  },
+                  "is_multi_region_trail": {
+                    "constant_value": true
+                  },
+                  "kms_key_id": {
+                    "references": [
+                      "var.audit_key_arn"
+                    ]
+                  },
+                  "name": {
+                    "references": [
+                      "var.trail_name"
+                    ]
+                  },
+                  "s3_bucket_name": {
+                    "references": [
+                      "var.logs_bucket_name"
+                    ]
+                  },
+                  "s3_key_prefix": {
+                    "constant_value": "cloudtrail"
+                  }
+                },
+                "schema_version": 1,
+                "depends_on": [
+                  "aws_iam_role_policy.trail_logs",
+                  "aws_cloudwatch_log_group.trail"
+                ]
+              },
+              {
+                "address": "aws_cloudwatch_log_group.trail",
+                "mode": "managed",
+                "type": "aws_cloudwatch_log_group",
+                "name": "trail",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "kms_key_id": {
+                    "references": [
+                      "var.audit_key_arn"
+                    ]
+                  },
+                  "name": {
+                    "references": [
+                      "local.log_group_name"
+                    ]
+                  },
+                  "retention_in_days": {
+                    "references": [
+                      "var.log_group_retention_days"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_cloudwatch_log_metric_filter.tampering",
+                "mode": "managed",
+                "type": "aws_cloudwatch_log_metric_filter",
+                "name": "tampering",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "log_group_name": {
+                    "references": [
+                      "aws_cloudwatch_log_group.trail.name",
+                      "aws_cloudwatch_log_group.trail"
+                    ]
+                  },
+                  "metric_transformation": [
+                    {
+                      "default_value": {
+                        "constant_value": "0"
+                      },
+                      "name": {
+                        "constant_value": "AuditTampering"
+                      },
+                      "namespace": {
+                        "constant_value": "Veda/Audit"
+                      },
+                      "value": {
+                        "constant_value": "1"
+                      }
+                    }
+                  ],
+                  "name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "pattern": {}
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_iam_role.trail_logs",
+                "mode": "managed",
+                "type": "aws_iam_role",
+                "name": "trail_logs",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "assume_role_policy": {
+                    "references": [
+                      "var.account_id",
+                      "local.trail_arn"
+                    ]
+                  },
+                  "description": {
+                    "references": [
+                      "var.trail_name",
+                      "local.log_group_name"
+                    ]
+                  },
+                  "max_session_duration": {
+                    "constant_value": 3600
+                  },
+                  "name": {
+                    "references": [
+                      "var.name_prefix"
+                    ]
+                  },
+                  "permissions_boundary": {
+                    "references": [
+                      "var.permissions_boundary_arn"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_iam_role_policy.trail_logs",
+                "mode": "managed",
+                "type": "aws_iam_role_policy",
+                "name": "trail_logs",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "name": {
+                    "constant_value": "write-trail-log-group"
+                  },
+                  "policy": {
+                    "references": [
+                      "local.log_group_arn"
+                    ]
+                  },
+                  "role": {
+                    "references": [
+                      "aws_iam_role.trail_logs.id",
+                      "aws_iam_role.trail_logs"
+                    ]
+                  }
+                },
+                "schema_version": 0
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account."
+              },
+              "audit_key_arn": {
+                "description": "AUT-102 audit key."
+              },
+              "log_group_prefix": {
+                "description": "CloudWatch Logs prefix (/veda/staging)."
+              },
+              "log_group_retention_days": {
+                "description": "Retention of the trail's CloudWatch Logs copy."
+              },
+              "logs_bucket_name": {
+                "description": "AUT-103 logs bucket (prefix cloudtrail/)."
+              },
+              "name_prefix": {
+                "description": "Prefix of every name (veda-stg)."
+              },
+              "permissions_boundary_arn": {
+                "description": "veda-boundary."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "trail_name": {
+                "description": "Trail name; the audit key and the logs bucket admit CloudTrail for this trail only."
+              }
+            }
+          },
+          "depends_on": [
+            "module.storage"
+          ]
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.cloudtrail.aws_cloudtrail.this",
+      "module_address": "module.cloudtrail",
+      "mode": "managed",
+      "type": "aws_cloudtrail",
+      "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "advanced_event_selector": [],
+          "cloud_watch_logs_group_arn": "arn:aws:logs:ap-south-1:111122223333:log-group:/veda/staging/cloudtrail:*",
+          "enable_log_file_validation": true,
+          "enable_logging": true,
+          "event_selector": [],
+          "include_global_service_events": true,
+          "insight_selector": [],
+          "is_multi_region_trail": true,
+          "is_organization_trail": false,
+          "name": "veda-stg-trail",
+          "region": "ap-south-1",
+          "s3_bucket_name": "veda-stg-logs-111122223333",
+          "s3_key_prefix": "cloudtrail",
+          "sns_topic_name": null,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "advanced_event_selector": [],
+          "arn": true,
+          "cloud_watch_logs_role_arn": true,
+          "event_selector": [],
+          "home_region": true,
+          "id": true,
+          "insight_selector": [],
+          "kms_key_id": true,
+          "sns_topic_arn": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "advanced_event_selector": [],
+          "event_selector": [],
+          "insight_selector": [],
+          "tags_all": {}
+        },
+        "after_identity": {
+          "arn": null
+        }
+      }
+    },
+    {
+      "address": "module.cloudtrail.aws_cloudwatch_log_group.trail",
+      "module_address": "module.cloudtrail",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_group",
+      "name": "trail",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "/veda/staging/cloudtrail",
+          "region": "ap-south-1",
+          "retention_in_days": 30,
+          "skip_destroy": false,
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "deletion_protection_enabled": true,
+          "id": true,
+          "kms_key_id": true,
+          "log_group_class": true,
+          "name_prefix": true,
+          "tags_all": {}
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.cloudtrail.aws_cloudwatch_log_metric_filter.tampering",
+      "module_address": "module.cloudtrail",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_metric_filter",
+      "name": "tampering",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "log_group_name": "/veda/staging/cloudtrail",
+          "metric_transformation": [
+            {
+              "default_value": "0",
+              "dimensions": null,
+              "name": "AuditTampering",
+              "namespace": "Veda/Audit",
+              "unit": "None",
+              "value": "1"
+            }
+          ],
+          "name": "veda-stg-audit-tampering",
+          "pattern": "{ ($.eventSource = cloudtrail.amazonaws.com && ($.eventName = StopLogging || $.eventName = DeleteTrail || $.eventName = UpdateTrail || $.eventName = PutEventSelectors || $.eventName = PutInsightSelectors)) || ($.eventSource = kms.amazonaws.com && ($.eventName = ScheduleKeyDeletion || $.eventName = DisableKey || $.eventName = PutKeyPolicy)) || ($.eventSource = s3.amazonaws.com && ($.eventName = PutBucketPolicy || $.eventName = DeleteBucketPolicy || $.eventName = PutBucketPublicAccessBlock || $.eventName = DeleteBucketPublicAccessBlock || $.eventName = PutObjectLockConfiguration)) }",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "apply_on_transformed_logs": true,
+          "id": true,
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "metric_transformation": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "log_group_name": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.cloudtrail.aws_iam_role.trail_logs",
+      "module_address": "module.cloudtrail",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "trail_logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Condition\":{\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\",\"aws:SourceArn\":\"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudtrail.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+          "description": "CloudTrail delivery of veda-stg-trail to /veda/staging/cloudtrail (AUT-104)",
+          "force_detach_policies": false,
+          "max_session_duration": 3600,
+          "name": "veda-stg-cloudtrail-logs",
+          "path": "/",
+          "permissions_boundary": "arn:aws:iam::111122223333:policy/veda-boundary",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "create_date": true,
+          "id": true,
+          "inline_policy": true,
+          "managed_policy_arns": true,
+          "name_prefix": true,
+          "tags_all": {},
+          "unique_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "inline_policy": [],
+          "managed_policy_arns": [],
+          "tags_all": {}
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null
+        }
+      }
+    },
+    {
+      "address": "module.cloudtrail.aws_iam_role_policy.trail_logs",
+      "module_address": "module.cloudtrail",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "trail_logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "name": "write-trail-log-group",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:logs:ap-south-1:111122223333:log-group:/veda/staging/cloudtrail:log-stream:*\"}]}"
+        },
+        "after_unknown": {
+          "id": true,
+          "name_prefix": true,
+          "role": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "role": null
+        }
+      }
+    }
+  ]
+}

@@ -84,7 +84,7 @@ checkov: ## checkov (every skip is inline and justified)
 	@for r in $(ROOTS) $(MODULES); do $(CHECKOV) -d $$r --framework terraform --compact --quiet --skip-download || exit 1; done
 
 shellcheck: ## shellcheck the scripts and their tests
-	$(SHELLCHECK) $(SCRIPTS) tests/run.sh tests/stubs/aws tests/stubs/gh tests/stubs/terraform
+	$(SHELLCHECK) $(SCRIPTS) $(wildcard host/*.sh) tests/run.sh tests/stubs/aws tests/stubs/gh tests/stubs/terraform tests/stubs/docker
 
 actionlint: ## actionlint every workflow (infra and CI)
 	$(ACTIONLINT) $(WORKFLOWS)

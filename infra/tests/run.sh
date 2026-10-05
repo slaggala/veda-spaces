@@ -4,7 +4,7 @@
 # Run: make -C infra test-scripts   (the policy findings F1, F2, F6, F7, F9 and the policy side of RR-01..RR-03 are
 # in terraform/bootstrap/tests).
 #
-# The scripts run from a temporary copy of infra/ with stub aws, gh and terraform commands first on PATH, so no
+# The scripts run from a temporary copy of infra/ with stub aws, gh, terraform and docker commands first on PATH, so no
 # AWS, GitHub or Cloudflare API is reached and the working tree is never touched. The negative Terraform tests
 # (prevent_destroy) use the real terraform with a mock provider.
 set -uo pipefail
@@ -272,7 +272,7 @@ BOUNDARY_RES="$(jq -cn '{address: "aws_iam_policy.boundary", type: "aws_iam_poli
 plan_json "$P.ok" "[$GH_ROLE, $BOUNDARY_RES,
   $(role aws_iam_role.host veda-host "$(trust '{"Service":"ec2.amazonaws.com"}')"),
   {\"address\":\"aws_s3_bucket_policy.state\",\"type\":\"aws_s3_bucket_policy\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn '{Statement:[{Effect:"Deny",Principal:"*",Action:"s3:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
-  {\"address\":\"aws_kms_key.state\",\"type\":\"aws_kms_key\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn --arg a "arn:aws:iam::$ACCT:root" '{Statement:[{Effect:"Allow",Principal:{AWS:$a},Action:"kms:*",Resource:"*"}]}|tojson')},\"after_unknown\":{}}},
+  {\"address\":\"aws_kms_key.state\",\"type\":\"aws_kms_key\",\"change\":{\"actions\":[\"create\"],\"after\":{\"enable_key_rotation\":true,\"deletion_window_in_days\":30,\"policy\":$(jq -cn --arg a "arn:aws:iam::$ACCT:root" --arg acct "$ACCT" '{Statement:[{Effect:"Allow",Principal:{AWS:$a},Action:"kms:*",Resource:"*"},{Effect:"Deny",Principal:"*",Action:["kms:*"],Resource:"*",Condition:{StringNotEquals:{"kms:CallerAccount":$acct}}}]}|tojson')},\"after_unknown\":{}}},
   {\"address\":\"aws_sns_topic_policy.alarms\",\"type\":\"aws_sns_topic_policy\",\"change\":{\"actions\":[\"create\"],\"after\":{\"policy\":$(jq -cn --arg a "$ACCT" '{Statement:[{Effect:"Allow",Principal:"*",Action:"sns:Publish",Resource:"*",Condition:{StringEquals:{"aws:SourceAccount":$a}}}]}|tojson')},\"after_unknown\":{}}},
   {\"address\":\"aws_lambda_permission.events\",\"type\":\"aws_lambda_permission\",\"change\":{\"actions\":[\"create\"],\"after\":{\"principal\":\"events.amazonaws.com\"},\"after_unknown\":{}}}]"
 check "clean bootstrap-shaped plan passes" ok "plan guard: no destroy" -- guard "$P.ok"
@@ -320,7 +320,7 @@ plan_json "$P.xacct" "[$(res aws_kms_key aws_kms_key.data "{\"policy\":$(policy 
 check "F7 key policy for another account" fail "Allow to another account \(arn:aws:iam::999999999999:root\)" -- guard "$P.xacct"
 plan_json "$P.sqs" "[$(res aws_sqs_queue_policy aws_sqs_queue_policy.q "{\"policy\":\"\"}" '{"policy":true}')]"
 check "F7 resource policy unknown at plan time" fail "policy not known at plan time" -- guard "$P.sqs"
-plan_json "$P.topic" "[$(res aws_sns_topic aws_sns_topic.alarms '{"name":"veda-stg-alarms"}' '{"policy":true}')]"
+plan_json "$P.topic" "[$(res aws_sns_topic aws_sns_topic.alarms '{"name":"veda-stg-alarms","kms_master_key_id":"alias/veda-stg-audit"}' '{"policy":true}')]"
 check "default (computed) topic policy is not a finding" ok "plan guard: no destroy" -- guard "$P.topic"
 plan_json "$P.lp" "[$(res aws_lambda_permission aws_lambda_permission.x '{"principal":"999999999999"}')]"
 check "F7 Lambda permission for another account" fail "Lambda permission for 999999999999" -- guard "$P.lp"
@@ -816,8 +816,10 @@ check "PB-06 real plan: module with its own provider refused" fail "provider mod
 check "PB-06 real plan: resource through the alias refused" fail "aws_sns_topic.alias: planned in us-east-1" -- rguard "$REAL"
 check "PB-06 real plan: per-resource region argument refused" fail "aws_sns_topic.arg: planned in eu-west-1" -- rguard "$REAL"
 check "PB-06 real plan: resource in a module refused" fail "module.m.aws_sns_topic.mod: planned in sa-east-1" -- rguard "$REAL"
+# The recorded topic has no key; AUT-110 requires SNS encryption, which is not what this check is about.
 jq 'del(.configuration.provider_config["aws.use1"], .configuration.provider_config["module.m:aws"])
-    | .resource_changes |= map(select(.address == "aws_sns_topic.home" or .address == "aws_iam_policy.global"))' "$REAL" >"$P.mumbai"
+    | .resource_changes |= map(select(.address == "aws_sns_topic.home" or .address == "aws_iam_policy.global"))
+    | (.resource_changes[] | select(.address == "aws_sns_topic.home") | .change.after.kms_master_key_id) = "alias/veda-stg-audit"' "$REAL" >"$P.mumbai"
 check "PB-06 real plan: Mumbai resource and a global IAM policy pass" ok "everything in ap-south-1" -- rguard "$P.mumbai"
 jq '.variables.aws_region.value = "eu-west-1"' "$P.mumbai" >"$P.var"
 check "PB-06 aws_region variable other than Mumbai refused" fail "variable aws_region is \"eu-west-1\"" -- rguard "$P.var"
@@ -996,8 +998,8 @@ echo "== N-05 / PB-08: a plan is made only from a clean checkout (ignored files 
 git_tree() { # a git checkout of a copy of infra/ with one commit
   local g="$TMP/git.$RANDOM$RANDOM"
   mkdir -p "$g"
-  cp -R "$INFRA" "$g/infra"
-  rm -rf "$g/infra/terraform/bootstrap/.terraform" "$g/infra/generated"
+  # Ignored caches (tools, providers, generated) are left out: they are large, and the clean-tree rule ignores them.
+  rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$g/infra/"
   cp "$FIXTURE_MANIFEST" "$g/infra/config/staging-account.json"
   git -C "$g" init -q && git -C "$g" add -A && git -C "$g" -c user.name=t -c user.email=t@example.invalid commit -qm base
   echo "$g"
@@ -1342,7 +1344,7 @@ check "AUT-301 no OIDC token (id-token permission missing) refused" fail "needs 
 check "AUT-301 a repository variable naming another role refused" fail "AWS_ROLE_ARN_PLAN is arn:aws:iam::$ACCT:role/veda-gh-apply" -- oidc "$(oidc_stubs plan)" plan AWS_ROLE_ARN_PLAN="arn:aws:iam::$ACCT:role/veda-gh-apply"
 check "AUT-301 long-term keys from STS refused" fail "holds no temporary credentials" -- oidc "$(oidc_stubs plan AKIA)" plan
 check "AUT-301 a session of another role refused" fail "not veda-gh-apply" -- oidc "$(oidc_stubs plan)" apply
-check "AUT-301 an unknown role refused" fail "--role must be plan or apply" -- oidc "$(oidc_stubs plan)" deploy
+check "AUT-301 an unknown role refused" fail "--role must be plan, apply, deploy or evidence" -- oidc "$(oidc_stubs plan)" admin
 
 # verify-run.sh --stack core: the plan run is 10-infra-plan on main, the apply run is 11-infra-apply.
 VR="$T/infra/scripts/verify-run.sh"
@@ -1501,8 +1503,8 @@ mod() { # mod <address in module.network> <jq filter applied to its .change>: a 
 addres() { # addres <type> <name> <after JSON>: a plan with one more resource
   netfix ".resource_changes += [{address: \"module.network.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]"
 }
-check "AUT-101 the real network plan passes the guard (30 resources, no region outside Mumbai)" ok "plan guard: no destroy" -- guard "$NETPLAN"
-check "  ... and has the expected 30 creates" ok "^30$" -- jq '[.resource_changes[] | select(.change.actions == ["create"])] | length' "$NETPLAN"
+check "AUT-101 the real network plan passes the guard (27 resources, no region outside Mumbai)" ok "plan guard: no destroy" -- guard "$NETPLAN"
+check "  ... and has the expected 27 creates (flow logs to S3, C3: no role, policy or log group)" ok "^27$" -- jq '[.resource_changes[] | select(.change.actions == ["create"])] | length' "$NETPLAN"
 # Inbound: none, in any form.
 check "AUT-101 an inbound security-group rule is refused" fail "no inbound security-group rule in staging" -- guard "$(addres aws_vpc_security_group_ingress_rule ssh '{"security_group_id":"sg-1","ip_protocol":"tcp","from_port":22,"to_port":22,"cidr_ipv4":"10.0.0.0/8"}')"
 check "AUT-101 a legacy inbound rule is refused" fail "no inbound security-group rule in staging" -- guard "$(addres aws_security_group_rule web '{"type":"ingress","protocol":"tcp","from_port":443,"to_port":443,"cidr_blocks":["0.0.0.0/0"]}')"
@@ -1563,8 +1565,13 @@ check "AUT-101 minor 2 inline routes in a route table are refused (plan)" fail "
 check "AUT-101 minor 2 a main route table association is refused" fail "aws_main_route_table_association is not part of the staging network" -- guard "$(addres aws_main_route_table_association x '{}')"
 check "AUT-101 minor 3 a rule attached to the default security group is refused" fail "rule attached to the default security group" -- guard "$(cfgadd '{"address":"aws_vpc_security_group_egress_rule.dflt","mode":"managed","type":"aws_vpc_security_group_egress_rule","expressions":{"security_group_id":{"references":["aws_default_security_group.this.id","aws_default_security_group.this"]},"ip_protocol":{"constant_value":"tcp"},"from_port":{"constant_value":443},"to_port":{"constant_value":443},"cidr_ipv4":{"constant_value":"0.0.0.0/0"}}}')"
 # minor 4: the flow-log role is assumable only for the account's flow logs.
-check "AUT-101 minor 4 a flow-log role without aws:SourceAccount is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition = {} | tojson)')"
-check "AUT-101 minor 4 a flow-log role for another account is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition.StringEquals["aws:SourceAccount"] = "999999999999" | tojson)')"
+FLOWROLE() { # a role the flow-logs service may assume, with the given condition
+  local t; t="$(jq -cn --argjson c "$1" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Principal: {Service: "vpc-flow-logs.amazonaws.com"}, Action: "sts:AssumeRole", Condition: $c}]} | tojson')"
+  netfix ".resource_changes += [$(role aws_iam_role.flow veda-stg-flow "$t")]"
+}
+check "AUT-101 minor 4 a flow-log role without aws:SourceAccount is refused" fail "flow-logs service may assume the role only for account" -- guard "$(FLOWROLE '{}')"
+check "AUT-101 minor 4 a flow-log role for another account is refused" fail "flow-logs service may assume the role only for account" -- guard "$(FLOWROLE '{"StringEquals":{"aws:SourceAccount":"999999999999"}}')"
+check "AUT-101 minor 4 a flow-log role for this account passes" ok "plan guard: no destroy" -- guard "$(FLOWROLE '{"StringEquals":{"aws:SourceAccount":"111122223333"}}')"
 # minor 5 and M2: exactly the named AWS-owned buckets of the region.
 check "AUT-101 M2 the SSM buckets (agent, documents, Distributor) are allowed" ok "plan guard: no destroy" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::amazon-ssm-ap-south-1/*","arn:aws:s3:::aws-ssm-ap-south-1/*","arn:aws:s3:::ap-south-1-birdwatcher-prod/*"]')"
 check "AUT-101 minor 5 a look-alike Amazon Linux bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::al2023-repos-ap-south-1-attacker/*"]')"
@@ -1574,16 +1581,342 @@ for t in aws_networkmanager_vpc_attachment aws_vpclattice_service_network_vpc_as
   check "AUT-101 minor 9 $t is refused" fail "$t is not part of the staging network" -- guard "$(addres "$t" x '{}')"
 done
 check "AUT-101 minor 10 an instance without a subnet (default VPC) is refused" fail "instance without a subnet would land in the default VPC" -- guard "$(addres aws_instance host '{"instance_type":"t4g.small","subnet_id":null,"network_interface":[]}')"
-check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: []}, after_unknown: {subnet_id: true}}}]')"
+check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: [], metadata_options: [{http_tokens: "required"}], root_block_device: [{encrypted: true}]}, after_unknown: {subnet_id: true}}}]')"
 # The committed decision and the bootstrap's one change.
 NET_CFG="$INFRA/config/staging-network.json"
 check "AUT-101 committed decision: egress model A, t4g.small, 10.60.0.0/20 (N1, N2, N4)" ok '^"A","t4g.small","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
-check "AUT-101 committed decision: flow logs ALL, 30 days (N6)" ok '^ALL 30$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.retention_days)"' "$NET_CFG"
+check "AUT-101 committed decision: flow logs ALL to S3 (N6, C3)" ok '^ALL s3$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.destination)"' "$NET_CFG"
 check "AUT-101 committed decision: tunnel egress to Cloudflare's two ranges only (N8)" ok '^\["198.41.192.0/24","198.41.200.0/24"\]$' -- jq -c .tunnel_egress_cidrs "$NET_CFG"
 check "AUT-101 staging-core plans the network module" ok 'source = "../../modules/network"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
-check "AUT-101 the apply role may pass Veda roles to VPC flow logs (bootstrap change, owner re-apply)" ok '"vpc-flow-logs.amazonaws.com"' -- awk '/sid *= "PassVedaRolesToStagingServices"/{p=1} p && /^  }/{exit} p' "$INFRA/terraform/bootstrap/roles.tf"
+absent "AUT-101 C3 the apply role passes no role to VPC flow logs (the bootstrap stays as applied)" "vpc-flow-logs" "$(cat "$INFRA/terraform/bootstrap/roles.tf")"
 # shellcheck disable=SC2016 # a make variable, expanded by make
 check "AUT-101 make test runs the network module's own tests" ok "terraform/modules/network" -- make -s -C "$INFRA" -f Makefile -f <(printf 'print-test-dirs:\n\t@printf "%%s\\n" $(patsubst %%/tests/,%%,$(dir $(wildcard terraform/modules/*/tests/)))\n') print-test-dirs
+
+echo "== AUT-102: KMS keys (rotation, deletion window, no caller outside the account)"
+KMS_OK="$(jq -cn --arg acct "$ACCT" '{enable_key_rotation: true, rotation_period_in_days: 365, deletion_window_in_days: 30, multi_region: false,
+  key_usage: "ENCRYPT_DECRYPT", customer_master_key_spec: "SYMMETRIC_DEFAULT",
+  policy: ({Version: "2012-10-17", Statement: [
+    {Sid: "AccountIamPolicies", Effect: "Allow", Principal: {AWS: "arn:aws:iam::\($acct):root"}, Action: "kms:*", Resource: "*"},
+    {Sid: "DenyOtherAccounts", Effect: "Deny", Principal: "*", Action: "kms:*", Resource: "*",
+     Condition: {StringNotEquals: {"kms:CallerAccount": $acct}, Bool: {"aws:PrincipalIsAWSService": "false"}}},
+    {Sid: "CloudTrailForTheVedaTrail", Effect: "Allow", Principal: {Service: "cloudtrail.amazonaws.com"}, Action: ["kms:GenerateDataKey*"], Resource: "*",
+     Condition: {StringEquals: {"aws:SourceArn": "arn:aws:cloudtrail:ap-south-1:\($acct):trail/veda-stg-trail"}}}]} | tojson)}')"
+kmsplan() { local f="$TMP/kms.$RANDOM$RANDOM.json"; plan_json "$f" "[$(res aws_kms_key module.kms.aws_kms_key.this "$(jq -c "${1:-.}" <<<"$KMS_OK")" "${2:-}")]"; echo "$f"; }
+check "AUT-102 the reviewed key shape passes" ok "plan guard: no destroy" -- guard "$(kmsplan)"
+check "AUT-102 a key without rotation is refused" fail "KMS key without automatic rotation" -- guard "$(kmsplan '.enable_key_rotation = false')"
+check "AUT-102 a short deletion window is refused" fail "deletion window 7 days" -- guard "$(kmsplan '.deletion_window_in_days = 7')"
+check "AUT-102 a multi-region key is refused" fail "multi-region KMS key" -- guard "$(kmsplan '.multi_region = true')"
+check "AUT-102 an asymmetric key is refused" fail "not a symmetric encrypt/decrypt key" -- guard "$(kmsplan '.customer_master_key_spec = "RSA_2048"')"
+check "AUT-102 a lockout-check bypass is refused" fail "bypasses the policy lockout safety check" -- guard "$(kmsplan '.bypass_policy_lockout_safety_check = true')"
+check "AUT-102 a key with the default (unreviewed) policy is refused" fail "KMS key policy unknown or absent" -- guard "$(kmsplan '.policy = null' '{"policy":true}')"
+check "AUT-102 a key without the cross-account Deny is refused" fail "does not deny callers outside account" -- guard "$(kmsplan '.policy = (.policy | fromjson | del(.Statement[1]) | tojson)')"
+check "AUT-102 a key usable by another account is refused" fail "Allow to another account" -- guard "$(kmsplan '.policy = (.policy | fromjson | .Statement += [{Effect: "Allow", Principal: {AWS: "arn:aws:iam::999999999999:root"}, Action: "kms:Decrypt", Resource: "*"}] | tojson)')"
+for t in aws_kms_replica_key aws_kms_external_key aws_kms_key_policy; do
+  check "AUT-102 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/kms.$RANDOM.json"; plan_json "$f" "[$(res $t x '{}')]"; echo "$f")"
+done
+check "AUT-102 an alias outside alias/veda-* is refused" fail "KMS alias alias/data is not alias/veda-" -- guard "$(f="$TMP/kms.$RANDOM.json"; plan_json "$f" "[$(res aws_kms_alias a '{"name":"alias/data"}')]"; echo "$f")"
+check "AUT-102 committed decision: 30-day deletion window, yearly rotation" ok "^30 365$" -- jq -r '"\(.kms.deletion_window_days) \(.kms.rotation_period_days)"' "$INFRA/config/staging-platform.json"
+check "AUT-102 staging-core plans the KMS module" ok 'source = "../../modules/kms"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+
+echo "== AUT-103: buckets and Object Lock (every bucket private, encrypted, versioned, TLS only; decision gate)"
+S3PLAN="$HERE/fixtures/aut103-storage-plan.json"
+s3mod() { # s3mod <address in module.storage> <jq filter on its .change>
+  local f="$TMP/s3.$RANDOM$RANDOM.json"
+  jq --arg a "module.storage.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$S3PLAN" >"$f"
+  echo "$f"
+}
+s3drop() { local f="$TMP/s3.$RANDOM$RANDOM.json"; jq --arg a "module.storage.$1" 'del(.resource_changes[] | select(.address == $a))' "$S3PLAN" >"$f"; echo "$f"; }
+s3add() { local f="$TMP/s3.$RANDOM$RANDOM.json"; jq ".resource_changes += [{address: \"module.storage.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]" "$S3PLAN" >"$f"; echo "$f"; }
+check "AUT-103 the real storage plan passes the guard" ok "plan guard: no destroy" -- guard "$S3PLAN"
+check "  ... six buckets, 43 resources" ok "^6 43$" -- jq -r '"\([.resource_changes[] | select(.type == "aws_s3_bucket")] | length) \(.resource_changes | length)"' "$S3PLAN"
+check "AUT-103 a bucket without its public access block is refused" fail "veda-stg-anchor-111122223333 has no public access block" -- guard "$(s3drop 'aws_s3_bucket_public_access_block.this["anchor"]')"
+check "AUT-103 a public access block with a setting off is refused" fail "public access block with a setting off" -- guard "$(s3mod 'aws_s3_bucket_public_access_block.this["logs"]' '.after.restrict_public_buckets = false')"
+check "AUT-103 a bucket without ownership controls is refused" fail "has no BucketOwnerEnforced ownership" -- guard "$(s3drop 'aws_s3_bucket_ownership_controls.this["evidence"]')"
+check "AUT-103 ACLs re-enabled are refused" fail "bucket ownership other than BucketOwnerEnforced" -- guard "$(s3mod 'aws_s3_bucket_ownership_controls.this["artifacts"]' '.after.rule[0].object_ownership = "ObjectWriter"')"
+check "AUT-103 a bucket ACL is refused" fail "aws_s3_bucket_acl is not allowed" -- guard "$(s3add aws_s3_bucket_acl x '{"acl":"public-read"}')"
+check "AUT-103 a bucket without versioning is refused" fail "veda-stg-litestream-111122223333 has no versioning" -- guard "$(s3drop 'aws_s3_bucket_versioning.this["litestream"]')"
+check "AUT-103 suspended versioning is refused" fail "bucket versioning not enabled" -- guard "$(s3mod 'aws_s3_bucket_versioning.this["snapshots"]' '.after.versioning_configuration[0].status = "Suspended"')"
+check "AUT-103 SSE-S3 instead of KMS is refused" fail "bucket encryption other than SSE-KMS" -- guard "$(s3mod 'aws_s3_bucket_server_side_encryption_configuration.this["anchor"]' '.after.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm = "AES256"')"
+check "AUT-103 a bucket without encryption is refused" fail "has no SSE-KMS encryption" -- guard "$(s3drop 'aws_s3_bucket_server_side_encryption_configuration.this["evidence"]')"
+check "AUT-103 a bucket without its TLS-only policy is refused" fail "has no policy denying plain HTTP" -- guard "$(s3drop 'aws_s3_bucket_policy.this["artifacts"]')"
+check "AUT-103 a public bucket policy is refused" fail "Allow to \* without an account condition" -- guard "$(s3mod 'aws_s3_bucket_policy.this["artifacts"]' '.after.policy = (.after.policy | fromjson | .Statement += [{Effect: "Allow", Principal: "*", Action: "s3:GetObject", Resource: "arn:aws:s3:::veda-stg-artifacts-111122223333/*"}] | tojson)')"
+check "AUT-103 a bucket outside veda-* is refused" fail "bucket data-lake is not veda-\*" -- guard "$(s3mod 'aws_s3_bucket.this["artifacts"]' '.after.bucket = "data-lake"')"
+check "AUT-103 a GOVERNANCE default lock is refused" fail "default Object Lock GOVERNANCE" -- guard "$(s3mod 'aws_s3_bucket_object_lock_configuration.evidence' '.after.rule[0].default_retention[0].mode = "GOVERNANCE"')"
+check "AUT-103 a default lock over a year is refused" fail "for 3650 days" -- guard "$(s3mod 'aws_s3_bucket_object_lock_configuration.evidence' '.after.rule[0].default_retention[0].days = 3650')"
+check "AUT-103 Transfer Acceleration is refused (bypasses the endpoint policy)" fail "Transfer Acceleration bypasses the S3 endpoint policy" -- guard "$(s3add aws_s3_bucket_accelerate_configuration x '{"status":"Enabled"}')"
+for t in aws_s3_bucket_replication_configuration aws_s3_bucket_website_configuration aws_s3_access_point aws_s3control_multi_region_access_point; do
+  check "AUT-103 $t is refused" fail "$t is not allowed" -- guard "$(s3add "$t" x '{}')"
+done
+# The decision gate: an apply refuses while any committed decision is PROPOSED.
+T="$(new_tree)"
+cp "$INFRA/config/apply-gate.json" "$INFRA/config/staging-platform.json" "$INFRA/config/staging-network.json" "$INFRA/config/staging-budget.json" "$T/infra/config/"
+SK="$T/infra/scripts/stack.sh"
+mkdir -p "$T/infra/terraform/envs/staging-core" "$T/docs" && echo "decision" >"$T/docs/od-b7.md"
+check "AUT-103 the committed decisions refuse the apply (storage and anchor_retention PROPOSED)" fail "DECISION: staging-platform.json: anchor_retention is PROPOSED" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+jq '(.[] | objects | select(.status == "PROPOSED") | .status) = "DECIDED"' "$INFRA/config/staging-platform.json" >"$T/infra/config/staging-platform.json"
+TFA="$(tf_plan_stub "$NOOP")"
+check "AUT-103 recorded decisions open the decision gate" ok "owner decisions recorded: no PROPOSED entry" -- sapply "$PD" "$(wf_session apply)" "$TFA"
+echo '[' >"$T/infra/config/staging-broken.json"
+check "AUT-103 a malformed decision file refuses the apply" fail "is not valid JSON; refusing" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+rm "$T/infra/config/staging-broken.json"
+# The committed decision.
+PLATFORM="$INFRA/config/staging-platform.json"
+check "AUT-103 committed decision: evidence COMPLIANCE 30 days, snapshots expire after their 35-day lock" ok '^COMPLIANCE 30 42$' -- jq -r '"\(.storage.evidence_lock_mode) \(.storage.evidence_lock_days) \(.storage.snapshots_expire_days)"' "$PLATFORM"
+check "AUT-103 the 10-year anchor lock is an open owner decision (D6)" ok '^PROPOSED 3650$' -- jq -r '"\(.anchor_retention.status) \(.anchor_retention.application_retention_days)"' "$PLATFORM"
+check "AUT-103 the anchor retention the decision states is the application's" ok "RETENTION = timedelta\(days=3650\)" -- cat "$INFRA/../api/veda/platform/anchor_store.py"
+check "AUT-103 staging-core plans the storage module" ok 'source = "../../modules/storage"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+check "AUT-103 C3 VPC flow logs go to the logs bucket" ok 'flow_log_destination_arn = module.storage.flow_log_destination_arn' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+
+echo "== AUT-104: CloudTrail (multi-region, validated, encrypted; selectors by the owner session; tampering metric)"
+CTPLAN="$HERE/fixtures/aut104-cloudtrail-plan.json"
+ctmod() { # ctmod <address in module.cloudtrail> <jq filter on its .change>
+  local f="$TMP/ct.$RANDOM$RANDOM.json"
+  jq --arg a "module.cloudtrail.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$CTPLAN" >"$f"
+  echo "$f"
+}
+check "AUT-104 the real trail plan passes the guard (trail, log group, role, policy, tampering filter)" ok "plan guard: no destroy" -- guard "$CTPLAN"
+check "AUT-104 a single-region trail is refused" fail "trail is not multi-region" -- guard "$(ctmod aws_cloudtrail.this '.after.is_multi_region_trail = false')"
+check "AUT-104 a trail without global events is refused" fail "trail omits global service events" -- guard "$(ctmod aws_cloudtrail.this '.after.include_global_service_events = false')"
+check "AUT-104 a trail without log-file validation is refused" fail "trail without log-file validation" -- guard "$(ctmod aws_cloudtrail.this '.after.enable_log_file_validation = false')"
+check "AUT-104 a trail created with logging off is refused" fail "trail created with logging off" -- guard "$(ctmod aws_cloudtrail.this '.after.enable_logging = false')"
+check "AUT-104 a trail without a KMS key is refused" fail "trail without a KMS key" -- guard "$(ctmod aws_cloudtrail.this '.after.kms_key_id = null | .after_unknown.kms_key_id = false')"
+check "AUT-104 a trail writing outside veda-* is refused" fail "trail writes to audit-sink" -- guard "$(ctmod aws_cloudtrail.this '.after.s3_bucket_name = "audit-sink" | .after_unknown.s3_bucket_name = false')"
+check "AUT-104 trail selectors are refused (owner session)" fail "trail selectors are set by the owner session" -- guard "$(ctmod aws_cloudtrail.this '.after.event_selector = [{"read_write_type":"All","include_management_events":true}]')"
+check "AUT-104 a CloudTrail Lake event data store is refused" fail "aws_cloudtrail_event_data_store is not allowed" -- guard "$(f="$TMP/ct.$RANDOM.json"; plan_json "$f" "[$(res aws_cloudtrail_event_data_store x '{}')]"; echo "$f")"
+check "AUT-104 a log group outside /veda/ is refused" fail "log group /aws/x is not under /veda/" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.name = "/aws/x"')"
+check "AUT-104 a log group without a KMS key is refused" fail "log group without a KMS key" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.kms_key_id = null | .after_unknown.kms_key_id = false')"
+check "AUT-104 a log group kept forever is refused" fail "log group with unlimited retention" -- guard "$(ctmod aws_cloudwatch_log_group.trail '.after.retention_in_days = 0')"
+check "AUT-104 the trail's delivery role trusts CloudTrail for this trail only" ok '"aws:SourceArn":"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail"' -- jq -r '.resource_changes[] | select(.address == "module.cloudtrail.aws_iam_role.trail_logs") | .change.after.assume_role_policy' "$CTPLAN"
+check "AUT-104 the boundary still denies stopping, deleting and re-scoping trails" ok '"cloudtrail:StopLogging", "cloudtrail:DeleteTrail", "cloudtrail:UpdateTrail", "cloudtrail:Put\*Selectors"' -- cat "$INFRA/terraform/bootstrap/boundary.tf"
+check "AUT-104 the logs bucket admits CloudTrail for the Veda trail only" ok '^arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail$' -- jq -r '.resource_changes[] | select(.address == "module.storage.aws_s3_bucket_policy.this[\"logs\"]") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "CloudTrailWrite") | .Condition.StringEquals["aws:SourceArn"]' "$S3PLAN"
+check "AUT-104 committed decision: data events are an owner-session step on the anchor and evidence buckets" ok '^PROPOSED anchor,evidence 30$' -- jq -r '"\(.cloudtrail.status) \(.cloudtrail.owner_session_data_event_buckets | join(",")) \(.cloudtrail.log_group_retention_days)"' "$PLATFORM"
+
+echo "== AUT-105: ECR (immutable, scanned, encrypted, private)"
+ECRPLAN="$HERE/fixtures/aut105-ecr-plan.json"
+ecrmod() { local f="$TMP/ecr.$RANDOM$RANDOM.json"; jq --arg a "module.ecr.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$ECRPLAN" >"$f"; echo "$f"; }
+check "AUT-105 the real repository plan passes the guard" ok "plan guard: no destroy" -- guard "$ECRPLAN"
+check "AUT-105 mutable tags are refused" fail "image tags are MUTABLE, not IMMUTABLE" -- guard "$(ecrmod aws_ecr_repository.api '.after.image_tag_mutability = "MUTABLE"')"
+check "AUT-105 a repository without scan on push is refused" fail "images are not scanned on push" -- guard "$(ecrmod aws_ecr_repository.api '.after.image_scanning_configuration[0].scan_on_push = false')"
+check "AUT-105 a repository without KMS encryption is refused" fail "repository not encrypted with KMS" -- guard "$(ecrmod aws_ecr_repository.api '.after.encryption_configuration[0].encryption_type = "AES256"')"
+check "AUT-105 a force-deletable repository is refused" fail "force_delete would delete every image" -- guard "$(ecrmod aws_ecr_repository.api '.after.force_delete = true')"
+check "AUT-105 a repository outside veda-* is refused" fail "repository api is not veda-\*" -- guard "$(ecrmod aws_ecr_repository.api '.after.name = "api"')"
+check "AUT-105 a cross-account repository policy is refused" fail "Allow to another account" -- guard "$(f="$TMP/ecr.$RANDOM.json"; plan_json "$f" "[$(res aws_ecr_repository_policy p "{\"policy\":$(policy '[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::999999999999:root"},"Action":"ecr:BatchGetImage","Resource":"*"}]')}")]"; echo "$f")"
+for t in aws_ecrpublic_repository aws_ecr_replication_configuration aws_ecr_pull_through_cache_rule aws_ecr_registry_policy; do
+  check "AUT-105 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ecr.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-105 the planned repository is veda-api" ok '^veda-api$' -- jq -r '.resource_changes[] | select(.type == "aws_ecr_repository") | .change.after.name' "$ECRPLAN"
+# shellcheck disable=SC2016 # matched literally in the bootstrap
+check "  ... the repository the bootstrap scopes the deploy role to" ok 'ecr_repository = "\$\{local.prefix\}-api"' -- tr -s ' ' <"$INFRA/terraform/bootstrap/main.tf"
+check "AUT-105 committed decision: keep 30 tagged images, untagged expire after 7 days" ok '^30 7$' -- jq -r '"\(.ecr.keep_tagged_images) \(.ecr.expire_untagged_days)"' "$PLATFORM"
+
+echo "== AUT-106: runtime IAM (bounded host role, exact resources, explicit deny of administration)"
+IAMPLAN="$HERE/fixtures/aut106-runtime-iam-plan.json"
+iammod() { local f="$TMP/iam.$RANDOM$RANDOM.json"; jq --arg a "module.runtime_iam.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$IAMPLAN" >"$f"; echo "$f"; }
+RTPOL="$TMP/runtime-policy.json"
+jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy' "$IAMPLAN" >"$RTPOL"
+check "AUT-106 the real runtime-IAM plan passes the guard" ok "plan guard: no destroy" -- guard "$IAMPLAN"
+check "  ... the runtime policy is known at plan time (the reviewer reads it)" ok '^false$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | (.change.after_unknown.policy // false)' "$IAMPLAN"
+check "AUT-106 a host role without the boundary is refused" fail "without the veda-boundary" -- guard "$(iammod aws_iam_role.host '.after.permissions_boundary = null')"
+check "AUT-106 an AWS managed policy outside the reviewed list is refused" fail "AWS managed policy arn:aws:iam::aws:policy/AmazonS3FullAccess is not in the reviewed list" -- guard "$(iammod aws_iam_role_policy_attachment.ssm_core '.after.policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"')"
+check "AUT-106 an administrator policy is refused" fail "privileged managed policy arn:aws:iam::aws:policy/AdministratorAccess" -- guard "$(iammod aws_iam_role_policy_attachment.ssm_core '.after.policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"')"
+check "AUT-106 an Allow on a whole service is refused" fail 'Allow on s3:\* \(a whole service\)' -- guard "$(iammod aws_iam_policy.runtime '.after.policy = (.after.policy | fromjson | .Statement += [{Sid: "Wide", Effect: "Allow", Action: "s3:*", Resource: "*"}] | tojson)')"
+check "AUT-106 an Allow on everything is refused" fail 'Allow on \* \(a whole service\)' -- guard "$(iammod aws_iam_policy.runtime '.after.policy = (.after.policy | fromjson | .Statement += [{Sid: "All", Effect: "Allow", Action: "*", Resource: "*"}] | tojson)')"
+check "AUT-106 a policy unknown at plan time is refused" fail "IAM policy unknown at plan time" -- guard "$(iammod aws_iam_policy.runtime '.after.policy = null | .after_unknown.policy = true')"
+INLINE_WIDE="$TMP/iam.inline.json"
+jq --argjson p "$(policy '[{"Effect":"Allow","Action":"kms:*","Resource":"*"}]')" \
+  '.resource_changes += [{address: "module.runtime_iam.aws_iam_role_policy.extra", type: "aws_iam_role_policy", change: {actions: ["create"], after: {role: "veda-stg-host", policy: $p}, after_unknown: {}}}]' \
+  "$IAMPLAN" >"$INLINE_WIDE"
+check "AUT-106 an inline role policy on a whole service is refused" fail 'Allow on kms:\*' -- guard "$INLINE_WIDE"
+check "AUT-106 the bootstrap boundary ceiling stays accepted" ok "plan guard: no destroy" -- guard "$P.ok"
+check "AUT-106 the host never deletes snapshots, anchors or evidence" ok '^\["arn:aws:s3:::veda-stg-litestream-111122223333/\*"\]$' -- jq -c '[.Statement[] | select(.Effect == "Allow" and ((.Action | if type == "array" then . else [.] end) | index("s3:DeleteObject"))) | .Resource] | flatten' "$RTPOL"
+# shellcheck disable=SC2016 # jq variables
+check "AUT-106 the explicit deny covers IAM, role assumption, the trail, key deletion, bucket settings, EC2 and SSM commands" ok '^true$' -- jq '.Statement[] | select(.Sid == "DenyAdministration") | .Action as $a | ["iam:*", "sts:AssumeRole", "cloudtrail:*", "kms:ScheduleKeyDeletion", "s3:PutBucket*", "ec2:Run*", "ssm:SendCommand"] | all(. as $x | $a | index($x))' "$RTPOL"
+check "AUT-106 keys are matched by alias (data key; audit key only through S3)" ok '^alias/veda-stg-data alias/veda-stg-audit s3.ap-south-1.amazonaws.com$' -- jq -r '[(.Statement[] | select(.Sid == "DataKey") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0]), (.Statement[] | select(.Sid == "AuditKeyThroughS3Only") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0], .Condition.StringEquals["kms:ViaService"])] | join(" ")' "$RTPOL"
+
+echo "== AUT-107: SSM (non-secret configuration only; Session Manager transcripts; no side channels for commands)"
+SSMPLAN="$HERE/fixtures/aut107-ssm-plan.json"
+ssmmod() { local f="$TMP/ssm.$RANDOM$RANDOM.json"; jq --arg a "module.ssm.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$SSMPLAN" >"$f"; echo "$f"; }
+check "AUT-107 the real SSM plan passes the guard" ok "plan guard: no destroy" -- guard "$SSMPLAN"
+check "  ... every configuration parameter is plain text under /veda/staging/config/" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_ssm_parameter") | .change.after | (.type == "String" and (.name | startswith("/veda/staging/config/")))] | all' "$SSMPLAN"
+check "  ... no secret name among them" ok '^0$' -- jq '[.resource_changes[] | select(.type == "aws_ssm_parameter") | .change.after.name | select(test("SECRET|PRIVATE|HMAC|TOKEN_KEY|CHAIN_KEY$"))] | length' "$SSMPLAN"
+check "  ... the KMS setting is the data key alias (known at plan time)" ok '^arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data$' -- jq -r '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_KMS_KEY_ARN\"]") | .change.after.value' "$SSMPLAN"
+check "AUT-107 a SecureString through Terraform is refused" fail "SecureString parameters are seeded by the owner" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.type = "SecureString"')"
+check "AUT-107 a parameter under the secret app/ path is refused" fail "is outside /veda/staging/ or under its secret app/ path" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/veda/staging/app/VEDA_ENV"')"
+check "AUT-107 a parameter outside /veda/staging is refused" fail "parameter /other/x is outside" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/other/x"')"
+check "AUT-107 Session Manager without encrypted transcripts is refused" fail "transcripts must go to an encrypted CloudWatch log group" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.cloudWatchEncryptionEnabled = false | tojson)')"
+check "AUT-107 Session Manager run-as is refused" fail "run-as is not allowed" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.runAsEnabled = true | tojson)')"
+check "AUT-107 a document outside veda-* is refused" fail "SSM document ops-run is not veda-\*" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"ops-run","document_type":"Command","permissions":{}}')]"; echo "$f")"
+check "AUT-107 an Automation document is refused" fail "SSM document type Automation" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"veda-x","document_type":"Automation","permissions":{}}')]"; echo "$f")"
+check "AUT-107 a document shared with another account is refused" fail "SSM document shared with another account" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"veda-x","document_type":"Command","permissions":{"type":"Share","account_ids":"999999999999"}}')]"; echo "$f")"
+for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_ssm_patch_baseline; do
+  check "AUT-107 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
+check "AUT-107 committed decision: staging host names, trusted proxy the Compose gateway (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 172.30.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+
+echo "== AUT-110: monitoring (bounded metrics, alarms to the encrypted topic, nothing leaves the account)"
+MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"
+monmod() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq --arg a "module.monitoring.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$MONPLAN" >"$f"; echo "$f"; }
+monadd() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq ".resource_changes += [{address: \"module.monitoring.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]" "$MONPLAN" >"$f"; echo "$f"; }
+check "AUT-110 the real monitoring plan passes the guard" ok "plan guard: no destroy" -- guard "$MONPLAN"
+check "  ... seven log metric filters, all in Veda/App (no EMF: bounded custom metrics)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
+check "  ... every alarm is veda-stg-* and notifies only the alarm topic (known at plan time)" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | (.alarm_name | startswith("veda-stg-")) and .alarm_actions == ["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"] and .ok_actions == .alarm_actions] | all' "$MONPLAN"
+check "AUT-110 an unencrypted topic is refused" fail "SNS topic without KMS encryption" -- guard "$(monmod aws_sns_topic.alarms '.after.kms_master_key_id = null | .after_unknown.kms_master_key_id = false')"
+check "AUT-110 an HTTPS subscription is refused (data could leave)" fail "subscription protocol https" -- guard "$(monmod aws_sns_topic_subscription.owner '.after.protocol = "https" | .after.endpoint = "https://example.com/hook"')"
+check "AUT-110 an SQS subscription to another account is refused" fail "SQS subscription to arn:aws:sqs:ap-south-1:999999999999:x outside account" -- guard "$(monmod aws_sns_topic_subscription.capture '.after.endpoint = "arn:aws:sqs:ap-south-1:999999999999:x" | .after_unknown.endpoint = false')"
+check "AUT-110 an unencrypted queue is refused" fail "SQS queue without encryption" -- guard "$(monmod aws_sqs_queue.alarm_capture '.after.sqs_managed_sse_enabled = false')"
+check "AUT-110 an alarm acting on EC2 is refused" fail "alarm action arn:aws:automate:ap-south-1:ec2:terminate is not an SNS topic" -- guard "$(monmod 'aws_cloudwatch_metric_alarm.app["app-5xx"]' '.after.alarm_actions = ["arn:aws:automate:ap-south-1:ec2:terminate"]')"
+check "AUT-110 an alarm notifying another account is refused" fail "is not an SNS topic of account" -- guard "$(monmod aws_cloudwatch_metric_alarm.trail_delivery '.after.ok_actions = ["arn:aws:sns:ap-south-1:999999999999:t"]')"
+for t in aws_cloudwatch_log_subscription_filter aws_cloudwatch_log_destination aws_cloudwatch_metric_stream aws_oam_link; do
+  check "AUT-110 $t is refused" fail "$t is not allowed" -- guard "$(monadd "$t" x '{}')"
+done
+check "AUT-110 the alert address is not in the plan text (sensitive; the owner's subscription as Terraform shows it)" ok '^ +\+ endpoint += \(sensitive value\)$' -- cat "$HERE/fixtures/aut110-plan-text-endpoint.txt"
+check "AUT-110 committed decision: thresholds and 30-day logs (PROPOSED)" ok '^PROPOSED 30 5 80$' -- jq -r '"\(.monitoring.status) \(.monitoring.log_retention_days) \(.monitoring.thresholds.server_errors_per_5min) \(.monitoring.thresholds.data_disk_percent)"' "$PLATFORM"
+
+echo "== AUT-108: compute and EBS (IMDSv2, encrypted volumes, SSM only, no NAT host, snapshots stay in Mumbai)"
+EC2PLAN="$HERE/fixtures/aut108-compute-plan.json"
+ec2mod() { local f="$TMP/ec2.$RANDOM$RANDOM.json"; jq --arg a "module.compute.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$EC2PLAN" >"$f"; echo "$f"; }
+check "AUT-108 the real compute plan passes the guard" ok "plan guard: no destroy" -- guard "$EC2PLAN"
+check "  ... a t4g.small with IMDSv2 required, its own public IPv4, no key pair, termination protection" ok '^t4g.small required true null true$' -- jq -r '.resource_changes[] | select(.address == "module.compute.aws_instance.host") | .change.after | "\(.instance_type) \(.metadata_options[0].http_tokens) \(.associate_public_ip_address) \(.key_name) \(.disable_api_termination)"' "$EC2PLAN"
+check "  ... burst credits capped and automatic recovery" ok '^standard default$' -- jq -r '.resource_changes[] | select(.address == "module.compute.aws_instance.host") | .change.after | "\(.credit_specification[0].cpu_credits) \(.maintenance_options[0].auto_recovery)"' "$EC2PLAN"
+check "AUT-108 IMDSv1 is refused" fail "instance without IMDSv2 required" -- guard "$(ec2mod aws_instance.host '.after.metadata_options[0].http_tokens = "optional"')"
+check "AUT-108 an unencrypted root volume is refused" fail "instance root volume not encrypted" -- guard "$(ec2mod aws_instance.host '.after.root_block_device[0].encrypted = false')"
+check "AUT-108 a key pair is refused (SSM only)" fail "key pair ops-key" -- guard "$(ec2mod aws_instance.host '.after.key_name = "ops-key"')"
+check "AUT-108 a NAT-style host (source/destination check off) is refused" fail "source/destination check off" -- guard "$(ec2mod aws_instance.host '.after.source_dest_check = false')"
+check "AUT-108 an unencrypted data volume is refused" fail "unencrypted EBS volume" -- guard "$(ec2mod aws_ebs_volume.data '.after.encrypted = false')"
+check "AUT-108 snapshots copied to another region are refused" fail "copies across regions or shares snapshots" -- guard "$(ec2mod aws_dlm_lifecycle_policy.data '.after.policy_details[0].schedule[0].cross_region_copy_rule = [{"target":"us-east-1","encrypted":true}]')"
+check "AUT-108 snapshots shared with another account are refused" fail "copies across regions or shares snapshots" -- guard "$(ec2mod aws_dlm_lifecycle_policy.data '.after.policy_details[0].schedule[0].share_rule = [{"target_accounts":["999999999999"]}]')"
+for t in aws_key_pair aws_ec2_serial_console_access; do
+  check "AUT-108 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ec2.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-108 the data volume is kept and snapshotted daily, seven kept" ok '^daily 7$' -- jq -r '[(.resource_changes[] | select(.address == "module.compute.aws_ebs_volume.data") | .change.after.tags["veda-backup"]), (.resource_changes[] | select(.address == "module.compute.aws_dlm_lifecycle_policy.data") | .change.after.policy_details[0].schedule[0].retain_rule[0].count | tostring)] | join(" ")' "$EC2PLAN"
+check "AUT-108 the host alarms exist with the host (status, CPU, memory, both disks, health)" ok '^6$' -- jq '[.resource_changes[] | select(.address | startswith("module.monitoring.aws_cloudwatch_metric_alarm.host"))] | length' "$MONPLAN"
+absent "AUT-108 no planned resource refers to another workload (Aurion, swing-trader-vm)" "[Aa]urion|swing-trader" "$(cat "$HERE"/fixtures/aut1*-plan.json)"
+check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots (PROPOSED)" ok '^PROPOSED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
+check "  ... the same instance type as the network decision (AZ check)" ok '^t4g.small$' -- jq -r .host_instance_type "$INFRA/config/staging-network.json"
+
+echo "== AUT-111: SES (staging sender, sandbox, suppression and TLS, failure alarms, lead never rolled back)"
+SESPLAN="$HERE/fixtures/aut111-ses-plan.json"
+sesmod() { local f="$TMP/ses.$RANDOM$RANDOM.json"; jq --arg a "module.ses.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$SESPLAN" >"$f"; echo "$f"; }
+check "AUT-111 the real SES plan passes the guard" ok "plan guard: no destroy" -- guard "$SESPLAN"
+check "  ... sender staging.vedaspaces.com with 2048-bit DKIM" ok '^staging.vedaspaces.com RSA_2048_BIT$' -- jq -r '.resource_changes[] | select(.address == "module.ses.aws_sesv2_email_identity.sender") | .change.after | "\(.email_identity) \(.dkim_signing_attributes[0].next_signing_key_length)"' "$SESPLAN"
+check "AUT-111 a configuration set without bounce suppression is refused" fail "does not suppress bounces and complaints" -- guard "$(sesmod aws_sesv2_configuration_set.this '.after.suppression_options[0].suppressed_reasons = ["COMPLAINT"]')"
+check "AUT-111 a configuration set without required TLS is refused" fail "does not require TLS" -- guard "$(sesmod aws_sesv2_configuration_set.this '.after.delivery_options[0].tls_policy = "OPTIONAL"')"
+check "AUT-111 the apex domain as sender is refused" fail "the apex vedaspaces.com is not a staging sender" -- guard "$(sesmod aws_sesv2_email_identity.sender '.after.email_identity = "vedaspaces.com"')"
+for t in aws_ses_receipt_rule_set aws_ses_active_receipt_rule_set aws_sesv2_dedicated_ip_pool aws_sesv2_account_vdm_attributes; do
+  check "AUT-111 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ses.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-111 the host sends only as the staging sender" ok '^no-reply@staging.vedaspaces.com$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "SendAsTheStagingSender") | .Condition.StringEquals["ses:FromAddress"]' "$IAMPLAN"
+check "AUT-111 the application is configured with the sender and the configuration set" ok '^Veda Spaces Staging <no-reply@staging.vedaspaces.com> veda-stg$' -- jq -r '[(.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_EMAIL_SENDER\"]") | .change.after.value), (.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]") | .change.after.value)] | join(" ")' "$SSMPLAN"
+check "AUT-111 an email failure never rolls back a committed lead (NOTIF-008, application test)" ok 'email failure never affects the committed lead \(NOTIF-008\)' -- cat "$INFRA/../api/tests/integration/test_leads.py"
+check "AUT-111 committed decision: sender, bounce threshold (PROPOSED)" ok '^PROPOSED staging.vedaspaces.com no-reply 0.05$' -- jq -r '"\(.ses.status) \(.ses.sender_domain) \(.ses.sender_local_part) \(.ses.bounce_rate_threshold)"' "$PLATFORM"
+
+echo "== Deployment wiring: 12-deploy (gated, OIDC deploy role, immutable image, scan gate, verified bundle, SSM only)"
+DW="$INFRA/../.github/workflows/12-deploy.yml"
+DWT="$(cat "$DW")"
+DPRE="$(awk '/^  preflight:/{p=1} /^  deploy:/{p=0} p' "$DW")"
+DJOB="$(awk '/^  deploy:/{p=1} p' "$DW")"
+check "DEPLOY 12-deploy runs manually only" ok "^  workflow_dispatch:$" -- printf '%s\n' "$DWT"
+absent "  ... no other trigger" "^  (pull_request|pull_request_target|push|schedule|workflow_run|repository_dispatch):" "$DWT"
+check "DEPLOY the preflight checks main, the apply gates, the recorded decisions and deploy.enabled" ok "in order" -- order_ok "$DPRE" "refs/heads/main" "deploy.enabled == true"
+check "  ... including the apply gates and the decisions" ok "stack.sh decisions" -- printf '%s\n' "$DPRE"
+absent "DEPLOY the preflight holds no environment, secret or OIDC token" "environment:|secrets\.|id-token" "$DPRE"
+check "DEPLOY the deploy job needs the preflight and runs in the staging environment" ok "^    environment: staging$" -- printf '%s\n' "$DJOB"
+check "  ... after the preflight" ok "needs: preflight" -- printf '%s\n' "$DJOB"
+check "DEPLOY the approval is proven before any AWS session" ok "in order" -- order_ok "$DJOB" "verify-run.sh approval .* --environment staging" "oidc-session.sh --role deploy"
+check "DEPLOY the job assumes veda-gh-deploy through OIDC" ok "oidc-session.sh --role deploy" -- printf '%s\n' "$DJOB"
+absent "DEPLOY no stored secret, no OIDC token at workflow level" "secrets\.|^permissions:.*id-token" "$DWT"
+absent "DEPLOY every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$DWT"
+absent "DEPLOY checkouts keep no credentials" "persist-credentials: true" "$DWT"
+check "DEPLOY deploys stay disabled: deploy.enabled is false in the committed decision" ok '^false$' -- jq -r '.deploy.enabled' "$INFRA/config/staging-platform.json"
+check "DEPLOY oidc-session names the deploy and evidence roles among the accepted ones" fail "plan, apply, deploy or evidence" -- "$INFRA/scripts/oidc-session.sh" --role bogus
+check "DEPLOY stack.sh decisions refuses the committed PROPOSED decisions" fail "is PROPOSED" -- env VEDA_DECISIONS_DIR="$INFRA/config" "$INFRA/scripts/stack.sh" decisions
+
+# deploy.sh, offline: a git checkout of infra and api/deploy, stub aws and docker.
+DG="$TMP/deploygit.$RANDOM"
+mkdir -p "$DG/api" && rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$DG/infra/" && cp -R "$INFRA/../api/deploy" "$DG/api/deploy"
+cp "$FIXTURE_MANIFEST" "$DG/infra/config/staging-account.json"
+git -C "$DG" init -q && git -C "$DG" add -A && git -C "$DG" -c user.name=t -c user.email=t@example.invalid commit -qm base
+DSHA="$(git -C "$DG" rev-parse HEAD)" && DTAG="${DSHA:0:12}"
+DIGEST="sha256:$(printf 'a%.0s' {1..64})"
+deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum]: AWS answers for one deploy
+  local d="$TMP/aws.dep.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-deploy/gh-100-1-deploy\"}" >"$d/sts_get-caller-identity.json"
+  echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
+  echo "token" >"$d/ecr_get-login-password.json"
+  echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$d/ecr_describe-images.json"
+  : >"$d/ecr_wait.json"
+  echo "{\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}}}}" >"$d/ecr_describe-image-scan-findings.json"
+  if [[ -n "${3:-}" ]]; then echo "{\"Metadata\":{\"sha256\":\"$3\"}}" >"$d/s3api_head-object.json"; else echo "Not Found" >"$d/s3api_head-object.fail"; fi
+  : >"$d/s3_cp.json"
+  echo '{"Command":{"CommandId":"c-1"}}' >"$d/ssm_send-command.json"
+  echo "{\"Commands\":[{\"Status\":\"${2:-Success}\"}]}" >"$d/ssm_list-commands.json"
+  echo "{\"CommandInvocations\":[{\"InstanceId\":\"i-1\",\"Status\":\"${2:-Success}\",\"CommandPlugins\":[{\"Output\":\"done\"}]}]}" >"$d/ssm_list-command-invocations.json"
+  echo "$d"
+}
+dep() { # dep <aws dir> [tag]
+  local d="$TMP/docker.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  env AWS_STUB_DIR="$1" DOCKER_STUB_DIR="$d" GITHUB_SHA="$DSHA" "$DG/infra/scripts/deploy.sh" --tag "${2:-$DTAG}"
+}
+DA="$(deploy_stub)"
+out_dep="$(dep "$DA" 2>&1)"
+check "DEPLOY a clean image is pushed, its bundle uploaded and veda-deploy run" ok "deployed $DTAG \($DIGEST\) to staging" -- printf '%s\n' "$out_dep"
+check "  ... veda-deploy gets the tag, the digest and the bundle SHA-256, on the tagged host only" ok "send-command .*--document-name veda-deploy --targets Key=tag:project,Values=veda-spaces Key=tag:env,Values=staging .*releaseTag=$DTAG,imageDigest=$DIGEST,bundleSha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
+check "  ... the bundle is the committed api/deploy and infra/host, with its SHA-256 as metadata" ok "s3 cp .*bundle-$DTAG.tgz s3://veda-stg-artifacts-$ACCT/deploy/$DTAG/bundle.tgz --metadata sha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
+DA="$(deploy_stub 1)"
+check "DEPLOY an image with HIGH findings is refused" fail "HIGH or CRITICAL findings; refusing" -- dep "$DA"
+absent "  ... before any upload or command" "s3 cp|send-command" "$(cat "$DA/calls.log")"
+DA="$(deploy_stub)" && sed -i.bak 's/veda-gh-deploy/veda-gh-plan/' "$DA/sts_get-caller-identity.json"
+check "DEPLOY a session other than veda-gh-deploy is refused" fail "not veda-gh-deploy; refusing" -- dep "$DA"
+check "DEPLOY a tag that is not this commit is refused" fail "is not this commit" -- dep "$(deploy_stub)" "0123456789ab"
+check "DEPLOY a different bundle already uploaded for the tag is refused" fail "a different bundle already exists" -- dep "$(deploy_stub 0 Success "$(printf 'b%.0s' {1..64})")"
+check "DEPLOY a failed veda-deploy fails the run" fail "veda-deploy ended Failed" -- dep "$(deploy_stub 0 Failed)"
+
+# The deploy document and the host scripts.
+DEPDOC="$HERE/fixtures/deploy-plan.json"
+check "DEPLOY the veda-deploy document verifies the bundle SHA-256 and pulls the image by digest" ok 'sha256sum -c' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content' "$DEPDOC"
+check "  ... its parameters only accept a tag, a digest and a SHA-256" ok '^\^sha256:\[0-9a-f\]\{64\}\$$' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content | fromjson | .parameters.imageDigest.allowedPattern' "$DEPDOC"
+check "DEPLOY the host renders the environment only with every secret seeded (AUT-302)" ok "refusing: secrets not seeded" -- cat "$INFRA/host/render-env.sh"
+check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
+# shellcheck disable=SC2016 # matched literally in the script
+check "DEPLOY the data volume is formatted only when it carries no filesystem" ok 'if ! blkid "\$DEVICE"' -- cat "$INFRA/host/host-setup.sh"
+absent "DEPLOY no secret value in the host scripts" "BEGIN (EC )?PRIVATE KEY|AKIA[0-9A-Z]{16}" "$(cat "$INFRA"/host/*.sh)"
+
+echo "== Evidence: 13-evidence and veda-collect (facts only, into the locked evidence bucket)"
+EW="$INFRA/../.github/workflows/13-evidence.yml"
+EWT="$(cat "$EW")"
+EPRE="$(awk '/^  preflight:/{p=1} /^  collect:/{p=0} p' "$EW")"
+EJOB="$(awk '/^  collect:/{p=1} p' "$EW")"
+check "EVIDENCE 13-evidence runs manually only" ok "^  workflow_dispatch:$" -- printf '%s\n' "$EWT"
+absent "  ... no other trigger" "^  (pull_request|pull_request_target|push|schedule|workflow_run|repository_dispatch):" "$EWT"
+check "EVIDENCE the preflight checks main, the apply gates and the recorded decisions" ok "stack.sh decisions" -- printf '%s\n' "$EPRE"
+absent "EVIDENCE the preflight holds no environment, secret or OIDC token" "environment:|secrets\.|id-token" "$EPRE"
+check "EVIDENCE the collect job runs in staging-evidence after the preflight" ok "^    environment: staging-evidence$" -- printf '%s\n' "$EJOB"
+check "EVIDENCE the approval is proven before any AWS session" ok "in order" -- order_ok "$EJOB" "verify-run.sh approval .* --environment staging-evidence" "oidc-session.sh --role evidence"
+absent "EVIDENCE no stored secret; actions pinned; no persisted credentials" 'secrets\.|uses: [^@]+@v[0-9]|persist-credentials: true' "$EWT"
+ev_stub() { # ev_stub [status] [output]
+  local d="$TMP/aws.ev.$RANDOM$RANDOM"
+  mkdir -p "$d"
+  echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-evidence/gh-100-1-evidence\"}" >"$d/sts_get-caller-identity.json"
+  echo '{"Command":{"CommandId":"c-2"}}' >"$d/ssm_send-command.json"
+  jq -n --arg s "${1:-Success}" --arg o "${2:-evidence s3://veda-evidence-$ACCT/host/2026-10-05/i-1/x-20261005T000000Z.tgz sha256 $(printf 'c%.0s' {1..64})}" \
+    '{CommandInvocations: [{InstanceId: "i-1", Status: $s, CommandPlugins: [{Output: $o}]}]}' >"$d/ssm_list-command-invocations.json"
+  echo "$d"
+}
+EV="$TMP/evtree.$RANDOM" && mkdir -p "$EV" && rsync -a --exclude .tools --exclude .terraform --exclude generated "$INFRA/" "$EV/infra/" && cp "$FIXTURE_MANIFEST" "$EV/infra/config/staging-account.json"
+evc() { env AWS_STUB_DIR="$1" "$EV/infra/scripts/collect-evidence.sh" --label "${2:-e2e-lead-flow}"; }
+ED="$(ev_stub)"
+check "EVIDENCE collect-evidence prints the evidence object and its SHA-256" ok "evidence: evidence s3://veda-evidence-$ACCT/host/.* sha256 [0-9a-f]{64}" -- evc "$ED"
+check "  ... after running veda-collect on the tagged host with the label" ok "send-command .*--document-name veda-collect --targets Key=tag:project,Values=veda-spaces Key=tag:env,Values=staging .*--parameters label=e2e-lead-flow" -- cat "$ED/calls.log"
+check "EVIDENCE a label that could carry a command is refused" fail "--label must be lowercase" -- evc "$(ev_stub)" 'x;rm -rf /'
+ED="$(ev_stub)" && sed -i.bak 's/veda-gh-evidence/veda-gh-deploy/' "$ED/sts_get-caller-identity.json"
+check "EVIDENCE a session other than veda-gh-evidence is refused" fail "not veda-gh-evidence; refusing" -- evc "$ED"
+check "EVIDENCE a failed collection fails the run" fail "veda-collect ended Failed" -- evc "$(ev_stub Failed)"
+check "EVIDENCE a collection without an evidence object fails the run" fail "reported no evidence object" -- evc "$(ev_stub Success "nothing filed")"
+check "EVIDENCE veda-collect never reads the rendered environment" ok '^0$' -- jq '[.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.collect") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[] | select(test("/etc/veda/api.env"))] | length' "$DEPDOC"
+check "RUNBOOKS deployment, backup and recovery, monitoring, SES readiness, evidence, owner steps, apply sequence, e2e lead flow" ok '^8$' -- grep -cE "^## [1-8]\. " "$INFRA/../docs/operations/staging-platform-runbooks.md"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

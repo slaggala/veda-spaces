@@ -89,13 +89,13 @@ variable "flow_log_traffic_type" {
   }
 }
 
-variable "flow_log_retention_days" {
-  description = "Owner decision N6."
-  type        = number
+variable "flow_log_destination_arn" {
+  description = "S3 destination of the VPC flow logs (owner decision C3): the AUT-103 logs bucket and its vpc-flow prefix."
+  type        = string
 
   validation {
-    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365], var.flow_log_retention_days)
-    error_message = "flow_log_retention_days must be a CloudWatch Logs retention value up to 365."
+    condition     = can(regex("^arn:aws:s3:::veda-[a-z0-9.-]+/vpc-flow$", var.flow_log_destination_arn))
+    error_message = "flow_log_destination_arn must be a veda-* bucket ARN with the vpc-flow prefix."
   }
 }
 
@@ -116,15 +116,5 @@ variable "aws_owned_s3_object_arns" {
   validation {
     condition     = alltrue([for a in var.aws_owned_s3_object_arns : can(regex("^arn:aws:s3:::[a-z0-9.-]+/\\*$", a))])
     error_message = "aws_owned_s3_object_arns must be S3 object ARNs of the form arn:aws:s3:::bucket/*."
-  }
-}
-
-variable "permissions_boundary_arn" {
-  description = "veda-boundary; every role carries it (the apply role cannot create a role without it)."
-  type        = string
-
-  validation {
-    condition     = can(regex("^arn:aws:iam::[0-9]{12}:policy/veda-boundary$", var.permissions_boundary_arn))
-    error_message = "permissions_boundary_arn must be the account's veda-boundary policy."
   }
 }

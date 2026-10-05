@@ -1,0 +1,63 @@
+# Collect staging host evidence (runbook docs/operations/staging-platform-runbooks.md §5). Manual, from main only.
+# The preflight refuses until the apply gates are decided and no owner decision is PROPOSED (the host exists only
+# after the applies). The job runs in "staging-evidence" (required reviewer) and assumes veda-gh-evidence through OIDC;
+# it runs the SSM document veda-collect on the staging host and prints the evidence object and its SHA-256.
+name: 13-evidence
+run-name: "13-evidence (staging, ${{ inputs.label }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Evidence label (lowercase letters, digits, hyphens), e.g. e2e-lead-flow"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: preflight (gates, no credentials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Main only, apply gates, recorded decisions
+        run: |
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "::error::13-evidence runs from main only"; exit 1; }
+          infra/scripts/stack.sh gate
+          infra/scripts/stack.sh decisions
+
+  collect:
+    name: collect (staging-evidence)
+    needs: preflight
+    runs-on: ubuntu-24.04
+    environment: staging-evidence
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read # approval proof (RR-07)
+      id-token: write # OIDC: veda-gh-evidence, trusted only for environment staging-evidence
+    env:
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+      LABEL: ${{ inputs.label }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Approved run and protected environments (RR-07)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          infra/scripts/verify-run.sh approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment staging-evidence
+          infra/scripts/github-setup.sh --repo "$GITHUB_REPOSITORY" --verify-environments
+      - name: OIDC session (veda-gh-evidence)
+        env:
+          AWS_ROLE_ARN_EVIDENCE: ${{ vars.AWS_ROLE_ARN_EVIDENCE }}
+        run: infra/scripts/oidc-session.sh --role evidence
+      - name: Run veda-collect
+        run: infra/scripts/collect-evidence.sh --label "$LABEL"
