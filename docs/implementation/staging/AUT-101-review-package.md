@@ -5,7 +5,7 @@
   and one bootstrap policy line (§3, B8). **Nothing is applied and no AWS resource is created by this change.** Applies
   stay disabled until OD-B7 and N-04-S are decided.
 - **Design:** [AUT-101-design-package.md](AUT-101-design-package.md). This pull request (#21) contains PR #20's only
-  commit (`ea1b151`) unchanged; the design document is identical, and the one other file of PR #20
+  commit unchanged (its first commit); the design document is identical, and the one other file of PR #20
   (`infra/terraform/modules/README.md`) is updated here from "designed" to "written". **PR #20 is superseded** and
   should be closed without merging. The design was not reviewed separately: this review covers design and
   implementation together.
