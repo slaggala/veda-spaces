@@ -5,7 +5,7 @@ Reusable modules for the staging stacks. Empty until the items below. Every modu
 
 | Module | Backlog item |
 |---|---|
-| `network` | AUT-101 |
+| `network` | AUT-101 (**designed**: [AUT-101 design package](../../../docs/implementation/staging/AUT-101-design-package.md)) |
 | `kms` | AUT-102 |
 | `storage` (buckets, Object Lock) | AUT-103 |
 | `cloudtrail` | AUT-104 |
