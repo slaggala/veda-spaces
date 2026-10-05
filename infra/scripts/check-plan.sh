@@ -52,6 +52,8 @@
 #     logging, has no KMS key, writes outside a <prefix>-* bucket, or sets event, advanced or Insights selectors
 #     (veda-boundary denies PutEventSelectors; data events are an owner-session step); a CloudTrail Lake event data
 #     store or channel; a CloudWatch log group outside /<prefix>/, without a KMS key or with unlimited retention;
+#   - creates an ECR repository (AUT-105) outside <prefix>-*, with mutable tags, without scan on push, without KMS
+#     encryption, or force-deletable; a public repository, replication, pull-through cache or registry policy;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -70,7 +72,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,58p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,60p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -338,6 +340,15 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type == "aws_ecr_repository" then
+        (if (($after.name // "") | startswith($prefix + "-") | not) then "\($addr): repository \($after.name // "?") is not \($prefix)-*" else empty end),
+        (if $after.image_tag_mutability != "IMMUTABLE" then "\($addr): image tags are \($after.image_tag_mutability // "?"), not IMMUTABLE (a tag must always mean one image)" else empty end),
+        (if [($after.image_scanning_configuration // [])[] | select(.scan_on_push == true)] | length == 0 then "\($addr): images are not scanned on push" else empty end),
+        (if [($after.encryption_configuration // [])[] | select(.encryption_type == "KMS")] | length == 0 then "\($addr): repository not encrypted with KMS" else empty end),
+        (if $after.force_delete == true then "\($addr): force_delete would delete every image with the repository" else empty end)
+      elif .type | IN("aws_ecrpublic_repository", "aws_ecrpublic_repository_policy", "aws_ecr_replication_configuration",
+                      "aws_ecr_pull_through_cache_rule", "aws_ecr_registry_policy", "aws_ecr_repository_creation_template") then
+        "\($addr): \(.type) is not allowed (one private repository; no public, replicated or pull-through images; AUT-105)"
       elif .type == "aws_cloudtrail" then
         (if $after.is_multi_region_trail != true then "\($addr): trail is not multi-region (activity in other regions would go unrecorded)" else empty end),
         (if $after.include_global_service_events == false then "\($addr): trail omits global service events (IAM, STS)" else empty end),

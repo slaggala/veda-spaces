@@ -31,5 +31,11 @@
       "anchor",
       "evidence"
     ]
+  },
+  "ecr": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: one repository veda-api (the bootstrap deploy role pushes only there), immutable tags, basic scan on push, data key; keep the last 30 tagged images, expire untagged images after 7 days. Litestream and cloudflared keep coming from Docker Hub, pinned by digest (the deploy role cannot push other repositories).",
+    "keep_tagged_images": 30,
+    "expire_untagged_days": 7
   }
 }

@@ -1689,6 +1689,24 @@ check "AUT-104 the boundary still denies stopping, deleting and re-scoping trail
 check "AUT-104 the logs bucket admits CloudTrail for the Veda trail only" ok '^arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail$' -- jq -r '.resource_changes[] | select(.address == "module.storage.aws_s3_bucket_policy.this[\"logs\"]") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "CloudTrailWrite") | .Condition.StringEquals["aws:SourceArn"]' "$S3PLAN"
 check "AUT-104 committed decision: data events are an owner-session step on the anchor and evidence buckets" ok '^PROPOSED anchor,evidence 30$' -- jq -r '"\(.cloudtrail.status) \(.cloudtrail.owner_session_data_event_buckets | join(",")) \(.cloudtrail.log_group_retention_days)"' "$PLATFORM"
 
+echo "== AUT-105: ECR (immutable, scanned, encrypted, private)"
+ECRPLAN="$HERE/fixtures/aut105-ecr-plan.json"
+ecrmod() { local f="$TMP/ecr.$RANDOM$RANDOM.json"; jq --arg a "module.ecr.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$ECRPLAN" >"$f"; echo "$f"; }
+check "AUT-105 the real repository plan passes the guard" ok "plan guard: no destroy" -- guard "$ECRPLAN"
+check "AUT-105 mutable tags are refused" fail "image tags are MUTABLE, not IMMUTABLE" -- guard "$(ecrmod aws_ecr_repository.api '.after.image_tag_mutability = "MUTABLE"')"
+check "AUT-105 a repository without scan on push is refused" fail "images are not scanned on push" -- guard "$(ecrmod aws_ecr_repository.api '.after.image_scanning_configuration[0].scan_on_push = false')"
+check "AUT-105 a repository without KMS encryption is refused" fail "repository not encrypted with KMS" -- guard "$(ecrmod aws_ecr_repository.api '.after.encryption_configuration[0].encryption_type = "AES256"')"
+check "AUT-105 a force-deletable repository is refused" fail "force_delete would delete every image" -- guard "$(ecrmod aws_ecr_repository.api '.after.force_delete = true')"
+check "AUT-105 a repository outside veda-* is refused" fail "repository api is not veda-\*" -- guard "$(ecrmod aws_ecr_repository.api '.after.name = "api"')"
+check "AUT-105 a cross-account repository policy is refused" fail "Allow to another account" -- guard "$(f="$TMP/ecr.$RANDOM.json"; plan_json "$f" "[$(res aws_ecr_repository_policy p "{\"policy\":$(policy '[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::999999999999:root"},"Action":"ecr:BatchGetImage","Resource":"*"}]')}")]"; echo "$f")"
+for t in aws_ecrpublic_repository aws_ecr_replication_configuration aws_ecr_pull_through_cache_rule aws_ecr_registry_policy; do
+  check "AUT-105 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ecr.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-105 the planned repository is veda-api" ok '^veda-api$' -- jq -r '.resource_changes[] | select(.type == "aws_ecr_repository") | .change.after.name' "$ECRPLAN"
+# shellcheck disable=SC2016 # matched literally in the bootstrap
+check "  ... the repository the bootstrap scopes the deploy role to" ok 'ecr_repository = "\$\{local.prefix\}-api"' -- tr -s ' ' <"$INFRA/terraform/bootstrap/main.tf"
+check "AUT-105 committed decision: keep 30 tagged images, untagged expire after 7 days" ok '^30 7$' -- jq -r '"\(.ecr.keep_tagged_images) \(.ecr.expire_untagged_days)"' "$PLATFORM"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then

@@ -97,3 +97,13 @@ module "cloudtrail" {
   depends_on = [module.storage]
 }
 
+# AUT-105: application image repository.
+module "ecr" {
+  source = "../../modules/ecr"
+
+  repository_name      = "veda-api"
+  data_key_arn         = module.kms.data_key_arn
+  keep_tagged_images   = local.platform.ecr.keep_tagged_images
+  expire_untagged_days = local.platform.ecr.expire_untagged_days
+}
+
