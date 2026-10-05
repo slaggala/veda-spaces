@@ -123,3 +123,45 @@ module "runtime_iam" {
   parameter_path           = "/veda/staging"
 }
 
+# AUT-107: non-secret configuration and Session Manager preferences.
+locals {
+  app_config = {
+    VEDA_ENV                  = "staging"
+    VEDA_AWS_REGION           = var.aws_region
+    VEDA_LOG_LEVEL            = "INFO"
+    VEDA_KMS_PROVIDER         = "aws"
+    VEDA_KMS_KEY_ARN          = "arn:aws:kms:${var.aws_region}:${local.account_id}:${module.kms.aliases["data"]}"
+    VEDA_DATABASE_URL         = "sqlite:////var/lib/veda/veda.db"
+    VEDA_SNAPSHOT_DIR         = "/var/lib/veda/snapshots"
+    VEDA_SNAPSHOT_BUCKET      = module.storage.bucket_names["snapshots"]
+    VEDA_ANCHOR_BUCKET        = module.storage.bucket_names["anchor"]
+    LITESTREAM_BUCKET         = module.storage.bucket_names["litestream"]
+    LITESTREAM_REGION         = var.aws_region
+    LITESTREAM_RETENTION      = local.platform.ssm.litestream_retention
+    VEDA_EMAIL_PROVIDER       = "ses"
+    VEDA_TURNSTILE_MODE       = "cloudflare"
+    VEDA_COOKIE_SECURE        = "true"
+    VEDA_RATE_LIMITS_ENABLED  = "true"
+    VEDA_BREAK_GLASS_IDENTITY = "sts"
+    VEDA_TRUSTED_PROXY_CIDRS  = local.platform.ssm.trusted_proxy_cidrs
+    VEDA_APP_ORIGIN           = local.platform.ssm.app_origin
+    VEDA_APP_BASE_URL         = local.platform.ssm.app_origin
+    VEDA_API_BASE_URL         = local.platform.ssm.api_base_url
+    VEDA_JWT_ISSUER           = local.platform.ssm.api_base_url
+    VEDA_PUBLIC_SITE_ORIGINS  = local.platform.ssm.public_site_origins
+  }
+}
+
+module "ssm" {
+  source = "../../modules/ssm"
+
+  parameter_path               = "/veda/staging"
+  config                       = local.app_config
+  session_log_group            = "${local.log_group_prefix}/ssm-sessions"
+  session_key_alias            = module.kms.aliases["data"]
+  audit_key_arn                = module.kms.audit_key_arn
+  session_log_retention_days   = local.platform.ssm.session_log_retention_days
+  idle_session_timeout_minutes = local.platform.ssm.idle_session_timeout_minutes
+  max_session_duration_minutes = local.platform.ssm.max_session_duration_minutes
+}
+

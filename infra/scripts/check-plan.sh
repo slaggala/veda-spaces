@@ -58,6 +58,11 @@
 #     policy; ReadOnlyAccess and SecurityAudit for the bootstrap plan and evidence roles); or gives, in a policy of a
 #     role other than the bootstrap veda-gh-* roles (or the veda-boundary ceiling), an Allow on "*" or on a whole
 #     service ("<service>:*"), or a policy unknown at plan time (AUT-106);
+#   - creates an SSM SecureString (secrets are seeded by the owner, AUT-302) or a parameter outside /<prefix>/staging/
+#     or under its app/ path; an SSM document other than <prefix>-* or the Session Manager preferences, of a type other
+#     than Command or Session, or shared with another account; Session Manager preferences without encrypted
+#     CloudWatch transcripts or with run-as; State Manager associations, hybrid activations, maintenance windows or
+#     patch baselines (commands run only through the reviewed <prefix>-* documents) (AUT-107);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -76,7 +81,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,64p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,69p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -364,6 +369,23 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type == "aws_ssm_parameter" then
+        (if $after.type == "SecureString" then "\($addr): SecureString parameters are seeded by the owner, never by Terraform (AUT-302)" else empty end),
+        (if (($after.name // "") | startswith("/\($prefix)/staging/") | not) or (($after.name // "") | startswith("/\($prefix)/staging/app/"))
+           then "\($addr): parameter \($after.name // "?") is outside /\($prefix)/staging/ or under its secret app/ path" else empty end)
+      elif .type == "aws_ssm_document" then
+        (if (($after.name // "") | startswith($prefix + "-")) or $after.name == "SSM-SessionManagerRunShell" then empty
+         else "\($addr): SSM document \($after.name // "?") is not \($prefix)-* (or the Session Manager preferences)" end),
+        (if ($after.document_type // "") | IN("Command", "Session") | not then "\($addr): SSM document type \($after.document_type // "?") (Command or Session only)" else empty end),
+        (if (($after.permissions // {}) | length) > 0 then "\($addr): SSM document shared with another account" else empty end),
+        (if $after.name == "SSM-SessionManagerRunShell" then
+           (($after.content // "{}") | fromjson | .inputs // {}) as $i
+           | (if $i.cloudWatchEncryptionEnabled != true or ($i.cloudWatchLogGroupName // "") == "" then "\($addr): Session Manager transcripts must go to an encrypted CloudWatch log group" else empty end),
+             (if $i.runAsEnabled == true then "\($addr): Session Manager run-as is not allowed" else empty end)
+         else empty end)
+      elif .type | IN("aws_ssm_association", "aws_ssm_activation", "aws_ssm_maintenance_window", "aws_ssm_maintenance_window_task",
+                      "aws_ssm_maintenance_window_target", "aws_ssm_patch_baseline", "aws_ssm_default_patch_baseline", "aws_ssm_service_setting") then
+        "\($addr): \(.type) is not allowed (commands run only through the reviewed \($prefix)-* documents; AUT-107)"
       elif .type == "aws_ecr_repository" then
         (if (($after.name // "") | startswith($prefix + "-") | not) then "\($addr): repository \($after.name // "?") is not \($prefix)-*" else empty end),
         (if $after.image_tag_mutability != "IMMUTABLE" then "\($addr): image tags are \($after.image_tag_mutability // "?"), not IMMUTABLE (a tag must always mean one image)" else empty end),

@@ -100,6 +100,13 @@ resource "aws_iam_policy" "runtime" {
         Resource = [local.logs_arn, "${local.logs_arn}:*"]
       },
       {
+        # Session Manager checks that its transcript log group exists before streaming to it (AUT-107).
+        Sid      = "FindLogGroups"
+        Effect   = "Allow"
+        Action   = "logs:DescribeLogGroups"
+        Resource = "arn:aws:logs:${var.region}:${var.account_id}:log-group:*"
+      },
+      {
         Sid       = "VedaMetrics"
         Effect    = "Allow"
         Action    = "cloudwatch:PutMetricData"

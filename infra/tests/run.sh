@@ -1731,6 +1731,27 @@ check "AUT-106 the host never deletes snapshots, anchors or evidence" ok '^\["ar
 check "AUT-106 the explicit deny covers IAM, role assumption, the trail, key deletion, bucket settings, EC2 and SSM commands" ok '^true$' -- jq '.Statement[] | select(.Sid == "DenyAdministration") | .Action as $a | ["iam:*", "sts:AssumeRole", "cloudtrail:*", "kms:ScheduleKeyDeletion", "s3:PutBucket*", "ec2:Run*", "ssm:SendCommand"] | all(. as $x | $a | index($x))' "$RTPOL"
 check "AUT-106 keys are matched by alias (data key; audit key only through S3)" ok '^alias/veda-stg-data alias/veda-stg-audit s3.ap-south-1.amazonaws.com$' -- jq -r '[(.Statement[] | select(.Sid == "DataKey") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0]), (.Statement[] | select(.Sid == "AuditKeyThroughS3Only") | .Condition["ForAnyValue:StringEquals"]["kms:ResourceAliases"][0], .Condition.StringEquals["kms:ViaService"])] | join(" ")' "$RTPOL"
 
+echo "== AUT-107: SSM (non-secret configuration only; Session Manager transcripts; no side channels for commands)"
+SSMPLAN="$HERE/fixtures/aut107-ssm-plan.json"
+ssmmod() { local f="$TMP/ssm.$RANDOM$RANDOM.json"; jq --arg a "module.ssm.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$SSMPLAN" >"$f"; echo "$f"; }
+check "AUT-107 the real SSM plan passes the guard" ok "plan guard: no destroy" -- guard "$SSMPLAN"
+check "  ... every configuration parameter is plain text under /veda/staging/config/" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_ssm_parameter") | .change.after | (.type == "String" and (.name | startswith("/veda/staging/config/")))] | all' "$SSMPLAN"
+check "  ... no secret name among them" ok '^0$' -- jq '[.resource_changes[] | select(.type == "aws_ssm_parameter") | .change.after.name | select(test("SECRET|PRIVATE|HMAC|TOKEN_KEY|CHAIN_KEY$"))] | length' "$SSMPLAN"
+check "  ... the KMS setting is the data key alias (known at plan time)" ok '^arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data$' -- jq -r '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_KMS_KEY_ARN\"]") | .change.after.value' "$SSMPLAN"
+check "AUT-107 a SecureString through Terraform is refused" fail "SecureString parameters are seeded by the owner" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.type = "SecureString"')"
+check "AUT-107 a parameter under the secret app/ path is refused" fail "is outside /veda/staging/ or under its secret app/ path" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/veda/staging/app/VEDA_ENV"')"
+check "AUT-107 a parameter outside /veda/staging is refused" fail "parameter /other/x is outside" -- guard "$(ssmmod 'aws_ssm_parameter.config["VEDA_ENV"]' '.after.name = "/other/x"')"
+check "AUT-107 Session Manager without encrypted transcripts is refused" fail "transcripts must go to an encrypted CloudWatch log group" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.cloudWatchEncryptionEnabled = false | tojson)')"
+check "AUT-107 Session Manager run-as is refused" fail "run-as is not allowed" -- guard "$(ssmmod aws_ssm_document.session_preferences '.after.content = (.after.content | fromjson | .inputs.runAsEnabled = true | tojson)')"
+check "AUT-107 a document outside veda-* is refused" fail "SSM document ops-run is not veda-\*" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"ops-run","document_type":"Command","permissions":{}}')]"; echo "$f")"
+check "AUT-107 an Automation document is refused" fail "SSM document type Automation" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"veda-x","document_type":"Automation","permissions":{}}')]"; echo "$f")"
+check "AUT-107 a document shared with another account is refused" fail "SSM document shared with another account" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res aws_ssm_document d '{"name":"veda-x","document_type":"Command","permissions":{"type":"Share","account_ids":"999999999999"}}')]"; echo "$f")"
+for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_ssm_patch_baseline; do
+  check "AUT-107 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
+done
+check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
+check "AUT-107 committed decision: staging host names, trusted proxy loopback (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 127.0.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"
 if ((${#FAILED[@]})); then

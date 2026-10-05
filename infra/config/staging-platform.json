@@ -37,5 +37,17 @@
     "decision": "Proposed 2026-10-05: one repository veda-api (the bootstrap deploy role pushes only there), immutable tags, basic scan on push, data key; keep the last 30 tagged images, expire untagged images after 7 days. Litestream and cloudflared keep coming from Docker Hub, pinned by digest (the deploy role cannot push other repositories).",
     "keep_tagged_images": 30,
     "expire_untagged_days": 7
+  },
+  "ssm": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05: D7 staging host names; the trusted proxy is cloudflared on the host network (loopback); Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302).",
+    "app_origin": "https://app-staging.vedaspaces.com",
+    "api_base_url": "https://api-staging.vedaspaces.com",
+    "public_site_origins": "https://staging.vedaspaces.com",
+    "trusted_proxy_cidrs": "127.0.0.1/32",
+    "litestream_retention": "168h",
+    "session_log_retention_days": 90,
+    "idle_session_timeout_minutes": 20,
+    "max_session_duration_minutes": 60
   }
 }

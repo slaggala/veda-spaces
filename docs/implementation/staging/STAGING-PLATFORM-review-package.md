@@ -49,6 +49,7 @@ flowchart LR
 | 3 | CloudTrail | AUT-104 | F6 (audit cannot be weakened), FC-01 and RR-09 attribution, LOG-* tamper evidence |
 | 4 | ECR | AUT-105 | IR-13 and SEC-007 (the tested image is the deployed image), RR-14 (deploy and rollback by tag) |
 | 5 | Runtime IAM | AUT-106 | Least privilege (05 §9.6, F1), RR-03 (bounded roles at path `/`), FC-01 (anchors never altered), RR-09 (the host is not a custodian) |
+| 6 | SSM | AUT-107 | SEC-005 and PLAT-008 (no secret in code or Git), F6 (staging start configuration), RR-09 (session transcripts) |
 
 ## 3. Decisions
 
@@ -63,6 +64,7 @@ session); a malformed decision file also refuses.
 | `storage` | **PROPOSED** | Lifecycle periods; evidence locked in COMPLIANCE mode for 30 days |
 | `cloudtrail` | **PROPOSED** | CloudWatch copy 30 days; S3 data events on anchor and evidence added by the owner session |
 | `ecr` | **PROPOSED** | Keep the last 30 tagged images; untagged expire after 7 days |
+| `ssm` | **PROPOSED** | D7 host names (`app-staging`, `api-staging`, `staging` .vedaspaces.com); trusted proxy `127.0.0.1/32` (cloudflared on the host network); Litestream 7 days; transcripts 90 days; sessions 20 idle / 60 total minutes |
 | `anchor_retention` | **PROPOSED** | D6: the application locks each anchor for **3650 days** in COMPLIANCE mode (`anchor_store.py`); accept, or change the application first |
 
 ## 4. Modules
@@ -154,4 +156,15 @@ refuses).
 | Not here | Custodian roles (`veda-custodian-a/-b`): they need two named humans (OWNER-INPUT-004, O12, O13) and stay out of this workstream |
 | Plan guard | AWS managed policies only from the reviewed list (SSM core, DLM service role, and the bootstrap's ReadOnlyAccess and SecurityAudit); no Allow on `*` or a whole service (`<service>:*`) in any Veda policy except the bootstrap's `veda-gh-*` policies and the `veda-boundary` ceiling; no Veda IAM policy unknown at plan time |
 | Tests | `modules/runtime-iam`: 6 (bounded role and profile; every Allow names its resources, no whole-service Allow, namespaces, keys by alias; no delete outside Litestream; the explicit Deny; SES only as the staging sender; no SES before AUT-111). `run.sh`: 13, from a real sandboxed plan |
+
+### 4.6 AUT-107 SSM (`modules/ssm`)
+
+| Item | Implementation |
+|---|---|
+| Configuration | 23 non-secret `String` parameters `/veda/staging/config/<NAME>`, one per environment variable the API, worker, scheduler and Litestream read: environment, region, KMS provider and **the data key alias ARN** (`VEDA_KMS_KEY_ARN`, accepted by the application's `_KMS_ARN` pattern and known at plan time), database URL and snapshot directory on the data volume, snapshot and anchor buckets, Litestream bucket/region/retention, SES as provider, Cloudflare Turnstile mode, secure cookies, rate limits, STS break-glass identity, trusted proxy, and the D7 origins. Each value satisfies `validate_environment` for staging; the sender and configuration set are added by AUT-111 |
+| Secrets | **Never Terraform, never Git.** The owner seeds `SecureString` parameters under `/veda/staging/app/` (AUT-302): `VEDA_JWT_PRIVATE_KEY_PEM`, `VEDA_JWT_KID`, `VEDA_CHAIN_KEY`, `VEDA_CHAIN_KEY_LABEL`, `VEDA_RECOVERY_CODE_HMAC_KEY`, `VEDA_EMAIL_HASH_HMAC_KEY`, `VEDA_ACTION_TOKEN_KEY`, `VEDA_TURNSTILE_SECRET`. The plan, deploy and evidence roles are denied reads of `app/*` by the bootstrap; the host reads both paths. The module's validation refuses a secret-looking name in the configuration map |
+| Session Manager | The account preferences document `SSM-SessionManagerRunShell`: transcripts streamed to `/veda/staging/ssm-sessions` (audit key, 90 days), session data encrypted with the data key, sessions end after 20 idle minutes and 60 minutes in all, no run-as |
+| Host access to it | `logs:DescribeLogGroups` added to the runtime role (Session Manager checks its group exists); reading parameters was already there (AUT-106) |
+| Plan guard | Refuses any `SecureString` parameter, any parameter outside `/veda/staging/` or under `app/`; any document other than `veda-*` or the preferences, of a type other than Command or Session, or shared with another account; preferences without encrypted CloudWatch transcripts or with run-as; associations, hybrid activations, maintenance windows, patch baselines and service settings |
+| Tests | `modules/ssm`: 4 (plain text under `config/`; transcripts encrypted and sessions bounded; a secret refused; another path refused). `run.sh`: 18, from a real sandboxed plan |
 
