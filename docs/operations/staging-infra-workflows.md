@@ -10,7 +10,8 @@ GitHub OIDC: no AWS key is stored in GitHub, and no owner credential is used.
   - workflows [`10-infra-plan.yml`](../../.github/workflows/10-infra-plan.yml) and [`11-infra-apply.yml`](../../.github/workflows/11-infra-apply.yml);
   - scripts [`stack.sh`](../../infra/scripts/stack.sh), [`oidc-session.sh`](../../infra/scripts/oidc-session.sh) and [`verify-run.sh`](../../infra/scripts/verify-run.sh) (`--stack`);
   - the root [`envs/staging-core`](../../infra/terraform/envs/staging-core).
-- **Review:** [AUT-301 review package](../implementation/staging/AUT-301-review-package.md).
+- **Review:** [AUT-301 review package](../implementation/staging/AUT-301-review-package.md);
+  [AUT-112 review package](../implementation/staging/AUT-112-review-package.md) (the first stack: the budget).
 
 ## 1. What runs where
 
@@ -35,6 +36,10 @@ role, and a fork's pull request gets no OIDC token.
    - initialises the backend: `veda-tfstate-<account>`, key `staging/core.tfstate`, the state key, native lock;
    - plans into a saved file;
    - runs the plan guard (`check-plan.sh`: no destroy, Mumbai only, roles bounded at path `/`, no GitHub or external trust).
+
+   The plan reads two inputs besides the code: the reviewed budget decision `infra/config/staging-budget.json` and
+   the alert recipient, from the `staging-plan` environment secret `BUDGET_ALERT_EMAIL` (§6). It stops while either
+   is missing.
 
    The plan text goes to a file, **never to the job log**. The job prints only the change summary ("No changes" or
    `Plan: …`) and the plan's SHA-256.
@@ -105,3 +110,19 @@ read calls only.
 | "Error acquiring the state lock" | Another plan or apply is running; wait. A stale `staging/core.tfstate.tflock` after a crashed run: confirm nothing runs, then remove it with an owner session |
 | Apply refused by the gates | Expected until OD-B7 and N-04-S are decided (§3) |
 | Apply refused: digest, run, commit or text mismatch | Plan again on the current `main` commit and approve the new digest |
+
+## 6. Inputs of the staging-core plan (AUT-112)
+
+| Input | Where | Who changes it |
+|---|---|---|
+| Budget name, monthly limit (USD), forecast alert thresholds | [`infra/config/staging-budget.json`](../../infra/config/staging-budget.json) | A reviewed pull request (owner decision O16). `monthly_limit_usd: null` means undecided: the plan stops with the O16 message |
+| Alert recipient | Secret `BUDGET_ALERT_EMAIL` of the **`staging-plan` environment** | The owner, once: `gh secret set BUDGET_ALERT_EMAIL --env staging-plan --repo slaggala/veda-spaces` (it prompts for the value; nothing is echoed) |
+
+The recipient is not a credential. It is a secret only so that GitHub masks it: the repository is public, and GitHub
+prints a step's plain variables (`vars.*`) in the job log. It is the workflows' only stored secret; AWS access stays
+OIDC only. Terraform marks it sensitive, so the plan text shows `(sensitive value)`. The saved plan file holds it, as it
+holds every planned value: if N-04-S is decided as `ACCEPTED` (publish the plan artifact from the public repository),
+the address becomes public with the artifact. `PRIVATE_REPOSITORY` avoids that.
+
+Changing the recipient: update the secret, then plan and apply again (an in-place update of the budget).
+

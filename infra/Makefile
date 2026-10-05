@@ -20,6 +20,9 @@ SHELLCHECK ?= $(call tool,shellcheck)
 ACTIONLINT ?= $(call tool,actionlint)
 
 ROOTS      := terraform/bootstrap terraform/envs/staging-core
+# Modules are planned through their root; lint and checkov also scan them on their own (checkov does not follow
+# local module calls from a root).
+MODULES    := $(patsubst %/,%,$(dir $(wildcard terraform/modules/*/main.tf)))
 SCRIPTS    := $(wildcard scripts/*.sh)
 WORKFLOWS  := $(wildcard ../.github/workflows/*.yml)
 
@@ -75,10 +78,10 @@ lint: tflint checkov shellcheck actionlint ## All linters
 
 tflint: ## tflint with the AWS ruleset
 	$(TFLINT) --config=$(CURDIR)/.tflint.hcl --init
-	@for r in $(ROOTS); do $(TFLINT) --config=$(CURDIR)/.tflint.hcl --chdir=$$r || exit 1; done
+	@for r in $(ROOTS) $(MODULES); do $(TFLINT) --config=$(CURDIR)/.tflint.hcl --chdir=$$r || exit 1; done
 
 checkov: ## checkov (every skip is inline and justified)
-	@for r in $(ROOTS); do $(CHECKOV) -d $$r --framework terraform --compact --quiet --skip-download || exit 1; done
+	@for r in $(ROOTS) $(MODULES); do $(CHECKOV) -d $$r --framework terraform --compact --quiet --skip-download || exit 1; done
 
 shellcheck: ## shellcheck the scripts and their tests
 	$(SHELLCHECK) $(SCRIPTS) tests/run.sh tests/stubs/aws tests/stubs/gh tests/stubs/terraform

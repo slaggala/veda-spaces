@@ -1,7 +1,11 @@
 # envs/staging-core
 
-AWS root for the staging account (AUT-101 … AUT-112). **AUT-301: the root exists and is empty.** Its first plan,
-through the `10-infra-plan` workflow and the `veda-gh-plan` role, must show "No changes".
+AWS root for the staging account (AUT-101 … AUT-112). AUT-301 created it empty (first plan: "No changes",
+2026-10-04). **AUT-112 adds its first resource:** the monthly cost budget (`module.budget`, `modules/budgets`).
+
+- Budget inputs: `infra/config/staging-budget.json` (reviewed decision O16; the plan stops while `monthly_limit_usd`
+  is null) and `budget_alert_email`, set by the workflow from the `staging-plan` environment secret
+  `BUDGET_ALERT_EMAIL` (sensitive; never committed: public repository).
 
 - Backend: the bootstrap state bucket (`veda-tfstate-<account>`), key `staging/core.tfstate`, SSE-KMS with the state
   key, S3 native locking (`use_lockfile`). Configured at `init` by `infra/scripts/stack.sh`; never committed.

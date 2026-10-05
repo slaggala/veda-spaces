@@ -9,6 +9,9 @@
 # metadata are uploaded as the artifact core-plan-<run> only from a private repository, or once the owner accepts
 # publishing them (gate N-04-S in infra/config/apply-gate.json); the summary always shows the change counts and the
 # plan's SHA-256.
+#
+# AWS access is OIDC only. The one stored secret is BUDGET_ALERT_EMAIL of the staging-plan environment (AUT-112): the
+# budget alert recipient, kept as a secret so that it is masked in this public log, never as a credential.
 name: 10-infra-plan
 run-name: "10-infra-plan (core)"
 
@@ -25,6 +28,7 @@ on:
     paths:
       - infra/terraform/envs/staging-core/**
       - infra/terraform/modules/**
+      - infra/config/staging-budget.json
   workflow_dispatch:
 
 permissions:
@@ -77,6 +81,9 @@ jobs:
         env:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
           TF_STATE_KMS_KEY_ARN: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+          # AUT-112 budget alert recipient. Not a credential: a secret of the staging-plan environment only so that
+          # GitHub masks it (plain variables are printed in this public job log). Sensitive in Terraform as well.
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: infra/scripts/stack.sh plan --stack core --out infra/generated/core
 
       - name: Publish the plan for review? (N-04-S)

@@ -22,6 +22,9 @@
 #     an aws_region variable other than ap-south-1, or a resource whose planned region (AWS provider v6 records it on
 #     every regional resource, whichever alias, module or per-resource region argument set it) is another region or
 #     unknown. Global resources (IAM) have no region;
+#   - creates a budget action (it would change the account automatically), or a budget (AUT-112) that is not named
+#     <prefix>-*, is for another account or a billing view, has no known limit, alerts no one, or notifies an SNS
+#     topic outside the account and ap-south-1. Budgets is a global service: a budget has no region;
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -40,7 +43,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,21p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,24p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -173,6 +176,21 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
         (if ($after.account_id // "") == $acct then empty else "\($addr): shares with \($after.account_id // $after.group // "?")" end)
       elif .type == "aws_kms_grant" then
         (if ($after.grantee_principal | tostring | own) then empty else "\($addr): KMS grant to \($after.grantee_principal)" end)
+      elif .type == "aws_budgets_budget_action" then
+        "\($addr): budget actions are not allowed (they apply IAM or SCP policies or stop instances automatically; AUT-112)"
+      elif .type == "aws_budgets_budget" then
+        (if $unknown.name == true or (($after.name // "") | startswith($prefix + "-") | not)
+           then "\($addr): budget name \($after.name // "(unknown)") is not \($prefix)-*" else empty end),
+        (if $unknown.account_id != true and ($after.account_id // $acct) != $acct
+           then "\($addr): budget for account \($after.account_id), not \($acct)" else empty end),
+        (if $unknown.billing_view_arn == true or ($after.billing_view_arn // null) != null
+           then "\($addr): budget on a billing view (\($after.billing_view_arn // "unknown")) is not allowed" else empty end),
+        (if $unknown.limit_amount == true or ($after.limit_amount // "") == "" or ($after.limit_unit // "") != "USD"
+           then "\($addr): budget without a known limit in USD (owner decision O16)" else empty end),
+        (if (($after.notification // []) | length) == 0 then "\($addr): budget without a notification alerts no one" else empty end),
+        (($after.notification // [])[] | (.subscriber_sns_topic_arns // [])[]
+         | select(test("^arn:aws:sns:" + ($region | esc) + ":" + $acct + ":[A-Za-z0-9_-]+$") | not)
+         | "\($addr): budget notifies \(.), outside account \($acct) in \($region)")
       elif (.type | policy_field) != null then
         (.type | policy_field) as $f
         | if $unknown[$f] == true then (if (.type | dedicated) then "\($addr): \($f) not known at plan time" else empty end)
