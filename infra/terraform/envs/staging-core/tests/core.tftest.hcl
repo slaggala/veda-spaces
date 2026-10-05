@@ -117,7 +117,7 @@ run "network_from_the_committed_decision" {
     condition = (
       output.network.egress_model == "A" && output.network.vpc_cidr == "10.60.0.0/20" &&
       output.network.public_subnet_cidr == "10.60.0.0/24" && output.network.availability_zone_id == "aps1-az1" &&
-      output.network.flow_logs == "ALL, 30 days"
+      output.network.flow_logs == "ALL to arn:aws:s3:::veda-stg-logs-111122223333/vpc-flow"
     )
     error_message = "the network must follow infra/config/staging-network.json"
   }

@@ -1,0 +1,3050 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.4",
+  "variables": {
+    "aws_region": {
+      "value": "ap-south-1"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 6.66",
+        "expressions": {
+          "allowed_account_ids": {
+            "references": [
+              "local.account_id"
+            ]
+          },
+          "default_tags": [
+            {
+              "tags": {
+                "references": [
+                  "local.manifest.repository",
+                  "local.manifest"
+                ]
+              }
+            }
+          ],
+          "region": {
+            "references": [
+              "var.aws_region"
+            ]
+          }
+        }
+      }
+    },
+    "root_module": {
+      "module_calls": {
+        "storage": {
+          "source": "../../modules/storage",
+          "expressions": {
+            "account_id": {
+              "references": [
+                "local.account_id"
+              ]
+            },
+            "audit_key_arn": {
+              "references": [
+                "module.kms.audit_key_arn",
+                "module.kms"
+              ]
+            },
+            "data_key_arn": {
+              "references": [
+                "module.kms.data_key_arn",
+                "module.kms"
+              ]
+            },
+            "name_prefix": {
+              "references": [
+                "local.name_prefix"
+              ]
+            },
+            "region": {
+              "references": [
+                "var.aws_region"
+              ]
+            },
+            "retention": {
+              "references": [
+                "local.platform.storage",
+                "local.platform"
+              ]
+            },
+            "trail_name": {
+              "references": [
+                "local.trail_name"
+              ]
+            }
+          },
+          "module": {
+            "outputs": {
+              "bucket_arns": {
+                "expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                },
+                "description": "Bucket ARNs by purpose."
+              },
+              "bucket_names": {
+                "expression": {
+                  "references": [
+                    "aws_s3_bucket.this"
+                  ]
+                },
+                "description": "Bucket names by purpose."
+              },
+              "flow_log_destination_arn": {
+                "expression": {
+                  "references": [
+                    "local.buckets.logs.name",
+                    "local.buckets.logs",
+                    "local.buckets"
+                  ]
+                },
+                "description": "Where the VPC flow logs are delivered (C3): the logs bucket, prefix vpc-flow/."
+              }
+            },
+            "resources": [
+              {
+                "address": "aws_s3_bucket.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "each.value.name",
+                      "each.value"
+                    ]
+                  },
+                  "object_lock_enabled": {
+                    "references": [
+                      "each.value.lock",
+                      "each.value"
+                    ]
+                  },
+                  "tags": {
+                    "references": [
+                      "each.value.name",
+                      "each.value",
+                      "each.key"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                }
+              },
+              {
+                "address": "aws_s3_bucket_lifecycle_configuration.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_lifecycle_configuration",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "rule": [
+                    {
+                      "abort_incomplete_multipart_upload": [
+                        {
+                          "days_after_initiation": {
+                            "constant_value": 7
+                          }
+                        }
+                      ],
+                      "filter": [
+                        {}
+                      ],
+                      "id": {
+                        "constant_value": "abort-incomplete-uploads"
+                      },
+                      "status": {
+                        "constant_value": "Enabled"
+                      }
+                    }
+                  ]
+                },
+                "schema_version": 1,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                },
+                "depends_on": [
+                  "aws_s3_bucket_versioning.this"
+                ]
+              },
+              {
+                "address": "aws_s3_bucket_object_lock_configuration.evidence",
+                "mode": "managed",
+                "type": "aws_s3_bucket_object_lock_configuration",
+                "name": "evidence",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this[\"evidence\"].bucket",
+                      "aws_s3_bucket.this[\"evidence\"]",
+                      "aws_s3_bucket.this"
+                    ]
+                  },
+                  "rule": [
+                    {
+                      "default_retention": [
+                        {
+                          "days": {
+                            "references": [
+                              "var.retention.evidence_lock_days",
+                              "var.retention"
+                            ]
+                          },
+                          "mode": {
+                            "references": [
+                              "var.retention.evidence_lock_mode",
+                              "var.retention"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "schema_version": 0
+              },
+              {
+                "address": "aws_s3_bucket_ownership_controls.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_ownership_controls",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "rule": [
+                    {
+                      "object_ownership": {
+                        "constant_value": "BucketOwnerEnforced"
+                      }
+                    }
+                  ]
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                }
+              },
+              {
+                "address": "aws_s3_bucket_policy.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_policy",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "policy": {
+                    "references": [
+                      "local.common_statements",
+                      "each.key",
+                      "local.lock_statements",
+                      "local.arn",
+                      "each.key",
+                      "each.key",
+                      "local.delivery_statements",
+                      "each.key"
+                    ]
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                },
+                "depends_on": [
+                  "aws_s3_bucket_public_access_block.this"
+                ]
+              },
+              {
+                "address": "aws_s3_bucket_public_access_block.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_public_access_block",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "block_public_acls": {
+                    "constant_value": true
+                  },
+                  "block_public_policy": {
+                    "constant_value": true
+                  },
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "ignore_public_acls": {
+                    "constant_value": true
+                  },
+                  "restrict_public_buckets": {
+                    "constant_value": true
+                  }
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                }
+              },
+              {
+                "address": "aws_s3_bucket_server_side_encryption_configuration.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_server_side_encryption_configuration",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "rule": [
+                    {
+                      "apply_server_side_encryption_by_default": [
+                        {
+                          "kms_master_key_id": {
+                            "references": [
+                              "each.value.key",
+                              "each.value"
+                            ]
+                          },
+                          "sse_algorithm": {
+                            "constant_value": "aws:kms"
+                          }
+                        }
+                      ],
+                      "bucket_key_enabled": {
+                        "constant_value": true
+                      }
+                    }
+                  ]
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                }
+              },
+              {
+                "address": "aws_s3_bucket_versioning.this",
+                "mode": "managed",
+                "type": "aws_s3_bucket_versioning",
+                "name": "this",
+                "provider_config_key": "aws",
+                "expressions": {
+                  "bucket": {
+                    "references": [
+                      "aws_s3_bucket.this",
+                      "each.key"
+                    ]
+                  },
+                  "versioning_configuration": [
+                    {
+                      "status": {
+                        "constant_value": "Enabled"
+                      }
+                    }
+                  ]
+                },
+                "schema_version": 0,
+                "for_each_expression": {
+                  "references": [
+                    "local.buckets"
+                  ]
+                }
+              }
+            ],
+            "variables": {
+              "account_id": {
+                "description": "The approved account (bucket names, policies)."
+              },
+              "audit_key_arn": {
+                "description": "AUT-102 audit key: logs (trail, flow logs) and evidence."
+              },
+              "data_key_arn": {
+                "description": "AUT-102 data key: Litestream, snapshots, anchors, artifacts."
+              },
+              "name_prefix": {
+                "description": "Prefix of the staging bucket names (veda-stg)."
+              },
+              "region": {
+                "description": "Deployment region (ap-south-1)."
+              },
+              "retention": {
+                "description": "Lifecycle and lock periods (infra/config/staging-platform.json, storage)."
+              },
+              "trail_name": {
+                "description": "The CloudTrail trail allowed to write to the logs bucket (AUT-104)."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": true,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-anchor-111122223333",
+            "purpose": "anchor"
+          },
+          "tags_all": {
+            "Name": "veda-stg-anchor-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "anchor",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": false,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-artifacts-111122223333",
+            "purpose": "artifacts"
+          },
+          "tags_all": {
+            "Name": "veda-stg-artifacts-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "artifacts",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": true,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-evidence-111122223333",
+            "purpose": "evidence"
+          },
+          "tags_all": {
+            "Name": "veda-evidence-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "evidence",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": false,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-litestream-111122223333",
+            "purpose": "litestream"
+          },
+          "tags_all": {
+            "Name": "veda-stg-litestream-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "litestream",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": false,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-logs-111122223333",
+            "purpose": "logs"
+          },
+          "tags_all": {
+            "Name": "veda-stg-logs-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "logs",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "force_destroy": false,
+          "object_lock_enabled": true,
+          "region": "ap-south-1",
+          "tags": {
+            "Name": "veda-stg-snapshots-111122223333",
+            "purpose": "snapshots"
+          },
+          "tags_all": {
+            "Name": "veda-stg-snapshots-111122223333",
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "purpose": "snapshots",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "timeouts": null
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_namespace": true,
+          "bucket_prefix": true,
+          "bucket_region": true,
+          "bucket_regional_domain_name": true,
+          "cors_rule": true,
+          "grant": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "lifecycle_rule": true,
+          "logging": true,
+          "object_lock_configuration": true,
+          "policy": true,
+          "replication_configuration": true,
+          "request_payer": true,
+          "server_side_encryption_configuration": true,
+          "tags": {},
+          "tags_all": {},
+          "versioning": true,
+          "website": true,
+          "website_domain": true,
+          "website_endpoint": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {
+                  "date": null,
+                  "days": 90,
+                  "expired_object_delete_marker": false
+                }
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "expire-artifacts",
+              "noncurrent_version_expiration": [
+                {
+                  "newer_noncurrent_versions": null,
+                  "noncurrent_days": 30
+                }
+              ],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "noncurrent-versions",
+              "noncurrent_version_expiration": [
+                {
+                  "newer_noncurrent_versions": null,
+                  "noncurrent_days": 7
+                }
+              ],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {
+                  "date": null,
+                  "days": 90,
+                  "expired_object_delete_marker": false
+                }
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "cloudtrail/",
+                  "tag": []
+                }
+              ],
+              "id": "expire-cloudtrail",
+              "noncurrent_version_expiration": [
+                {
+                  "newer_noncurrent_versions": null,
+                  "noncurrent_days": 1
+                }
+              ],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {
+                  "date": null,
+                  "days": 30,
+                  "expired_object_delete_marker": false
+                }
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "vpc-flow/",
+                  "tag": []
+                }
+              ],
+              "id": "expire-vpc-flow",
+              "noncurrent_version_expiration": [
+                {
+                  "newer_noncurrent_versions": null,
+                  "noncurrent_days": 1
+                }
+              ],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_lifecycle_configuration.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {
+                  "days_after_initiation": 7
+                }
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "abort-incomplete-uploads",
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {
+                  "date": null,
+                  "days": 42,
+                  "expired_object_delete_marker": false
+                }
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "object_size_greater_than": null,
+                  "object_size_less_than": null,
+                  "prefix": "",
+                  "tag": []
+                }
+              ],
+              "id": "expire-snapshots",
+              "noncurrent_version_expiration": [
+                {
+                  "newer_noncurrent_versions": null,
+                  "noncurrent_days": 1
+                }
+              ],
+              "noncurrent_version_transition": [],
+              "prefix": "",
+              "status": "Enabled",
+              "transition": []
+            }
+          ],
+          "timeouts": null,
+          "transition_default_minimum_object_size": "all_storage_classes_128K"
+        },
+        "after_unknown": {
+          "expected_bucket_owner": true,
+          "id": true,
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "abort_incomplete_multipart_upload": [
+                {}
+              ],
+              "expiration": [],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [],
+              "noncurrent_version_transition": [],
+              "transition": []
+            },
+            {
+              "abort_incomplete_multipart_upload": [],
+              "expiration": [
+                {}
+              ],
+              "filter": [
+                {
+                  "and": [],
+                  "tag": []
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {}
+              ],
+              "noncurrent_version_transition": [],
+              "transition": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_object_lock_configuration.evidence",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_object_lock_configuration",
+      "name": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "expected_bucket_owner": null,
+          "object_lock_enabled": "Enabled",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "default_retention": [
+                {
+                  "days": 30,
+                  "mode": "COMPLIANCE",
+                  "years": null
+                }
+              ]
+            }
+          ],
+          "token": null
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "default_retention": [
+                {}
+              ]
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "default_retention": [
+                {}
+              ]
+            }
+          ],
+          "token": true
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_ownership_controls.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "object_ownership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {}
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-anchor-111122223333\",\"arn:aws:s3:::veda-stg-anchor-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-anchor-111122223333\",\"arn:aws:s3:::veda-stg-anchor-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"},{\"Action\":\"s3:PutObject\",\"Condition\":{\"Null\":{\"s3:object-lock-mode\":\"true\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"arn:aws:s3:::veda-stg-anchor-111122223333/*\",\"Sid\":\"DenyUnlockedWrites\"},{\"Action\":[\"s3:DeleteObject\",\"s3:DeleteObjectVersion\"],\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"arn:aws:s3:::veda-stg-anchor-111122223333/*\",\"Sid\":\"DenyDeletes\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-artifacts-111122223333\",\"arn:aws:s3:::veda-stg-artifacts-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-artifacts-111122223333\",\"arn:aws:s3:::veda-stg-artifacts-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-evidence-111122223333\",\"arn:aws:s3:::veda-evidence-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-evidence-111122223333\",\"arn:aws:s3:::veda-evidence-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-litestream-111122223333\",\"arn:aws:s3:::veda-stg-litestream-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-litestream-111122223333\",\"arn:aws:s3:::veda-stg-litestream-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-logs-111122223333\",\"arn:aws:s3:::veda-stg-logs-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-logs-111122223333\",\"arn:aws:s3:::veda-stg-logs-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"},{\"Action\":\"s3:GetBucketAcl\",\"Condition\":{\"StringEquals\":{\"aws:SourceArn\":\"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudtrail.amazonaws.com\"},\"Resource\":\"arn:aws:s3:::veda-stg-logs-111122223333\",\"Sid\":\"CloudTrailAclCheck\"},{\"Action\":\"s3:PutObject\",\"Condition\":{\"StringEquals\":{\"aws:SourceArn\":\"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail\",\"s3:x-amz-acl\":\"bucket-owner-full-control\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudtrail.amazonaws.com\"},\"Resource\":\"arn:aws:s3:::veda-stg-logs-111122223333/cloudtrail/AWSLogs/111122223333/*\",\"Sid\":\"CloudTrailWrite\"},{\"Action\":[\"s3:GetBucketAcl\",\"s3:ListBucket\"],\"Condition\":{\"ArnLike\":{\"aws:SourceArn\":\"arn:aws:logs:ap-south-1:111122223333:*\"},\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"delivery.logs.amazonaws.com\"},\"Resource\":\"arn:aws:s3:::veda-stg-logs-111122223333\",\"Sid\":\"FlowLogDeliveryCheck\"},{\"Action\":\"s3:PutObject\",\"Condition\":{\"ArnLike\":{\"aws:SourceArn\":\"arn:aws:logs:ap-south-1:111122223333:*\"},\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\",\"s3:x-amz-acl\":\"bucket-owner-full-control\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"delivery.logs.amazonaws.com\"},\"Resource\":\"arn:aws:s3:::veda-stg-logs-111122223333/vpc-flow/AWSLogs/111122223333/*\",\"Sid\":\"FlowLogDeliveryWrite\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_policy.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "policy": "{\"Statement\":[{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-snapshots-111122223333\",\"arn:aws:s3:::veda-stg-snapshots-111122223333/*\"],\"Sid\":\"DenyInsecureTransport\"},{\"Action\":\"s3:*\",\"Condition\":{\"Bool\":{\"aws:PrincipalIsAWSService\":\"false\"},\"StringNotEquals\":{\"aws:PrincipalAccount\":\"111122223333\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":[\"arn:aws:s3:::veda-stg-snapshots-111122223333\",\"arn:aws:s3:::veda-stg-snapshots-111122223333/*\"],\"Sid\":\"DenyOtherAccounts\"},{\"Action\":\"s3:PutObject\",\"Condition\":{\"Null\":{\"s3:object-lock-mode\":\"true\"}},\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"arn:aws:s3:::veda-stg-snapshots-111122223333/*\",\"Sid\":\"DenyUnlockedWrites\"},{\"Action\":[\"s3:DeleteObject\",\"s3:DeleteObjectVersion\"],\"Effect\":\"Deny\",\"Principal\":\"*\",\"Resource\":\"arn:aws:s3:::veda-stg-snapshots-111122223333/*\",\"Sid\":\"DenyDeletes\"}],\"Version\":\"2012-10-17\"}",
+          "region": "ap-south-1"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-stg-anchor-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-stg-artifacts-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-evidence-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-stg-litestream-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-stg-logs-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_public_access_block.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "veda-stg-snapshots-111122223333",
+          "ignore_public_acls": true,
+          "region": "ap-south-1",
+          "restrict_public_buckets": true,
+          "skip_destroy": null
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {},
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_server_side_encryption_configuration.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "expected_bucket_owner": null,
+          "region": "ap-south-1",
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "sse_algorithm": "aws:kms"
+                }
+              ],
+              "bucket_key_enabled": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": true
+                }
+              ],
+              "blocked_encryption_types": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "rule": [
+            {
+              "apply_server_side_encryption_by_default": [
+                {}
+              ],
+              "blocked_encryption_types": []
+            }
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"anchor\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "anchor",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-anchor-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"artifacts\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "artifacts",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-artifacts-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"evidence\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "evidence",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-evidence-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"litestream\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "litestream",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-litestream-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"logs\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-logs-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    },
+    {
+      "address": "module.storage.aws_s3_bucket_versioning.this[\"snapshots\"]",
+      "module_address": "module.storage",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "index": "snapshots",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "bucket": "veda-stg-snapshots-111122223333",
+          "expected_bucket_owner": null,
+          "mfa": null,
+          "region": "ap-south-1",
+          "versioning_configuration": [
+            {
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "versioning_configuration": [
+            {
+              "mfa_delete": true
+            }
+          ]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "versioning_configuration": [
+            {}
+          ]
+        },
+        "after_identity": {
+          "account_id": null,
+          "bucket": null,
+          "region": null
+        }
+      }
+    }
+  ]
+}

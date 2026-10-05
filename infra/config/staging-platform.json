@@ -5,5 +5,22 @@
     "decision": "Integrated workstream 2026-10-05: two customer-managed keys (data, audit) instead of three, for cost (cost report); yearly rotation; 30-day deletion window.",
     "deletion_window_days": 30,
     "rotation_period_days": 365
+  },
+  "storage": {
+    "status": "PROPOSED",
+    "decision": "Proposed 2026-10-05 for owner decision D6 and the retention periods. Lifecycle values are reversible; Object Lock retention is not.",
+    "litestream_noncurrent_days": 7,
+    "snapshots_expire_days": 42,
+    "artifacts_expire_days": 90,
+    "artifacts_noncurrent_days": 30,
+    "logs_cloudtrail_expire_days": 90,
+    "logs_flow_expire_days": 30,
+    "evidence_lock_mode": "COMPLIANCE",
+    "evidence_lock_days": 30
+  },
+  "anchor_retention": {
+    "status": "PROPOSED",
+    "decision": "D6. The application locks every anchor in COMPLIANCE mode for 3650 days (api/veda/platform/anchor_store.py RETENTION). In staging that keeps each anchor, and the bucket, for ten years: nobody can delete them, the root user included. Options: (a) accept 10 years in staging; (b) a reviewed application change making the retention configurable, then a short staging value. The bucket has Object Lock enabled with no default retention either way.",
+    "application_retention_days": 3650
   }
 }

@@ -11,7 +11,7 @@
 #
 #   infra/scripts/stack.sh apply --stack core --plan-dir DIR --plan-sha256 D --plan-run-id N
 #       In 11-infra-apply with a veda-gh-apply session, and only once every gate of infra/config/apply-gate.json is
-#       decided (OD-B7, N-04-S). Applies exactly the approved plan: the file whose SHA-256 is D, made by plan run N of
+#       decided (OD-B7, N-04-S) and no owner decision in infra/config/staging-*.json is still PROPOSED. Applies exactly the approved plan: the file whose SHA-256 is D, made by plan run N of
 #       10-infra-plan on main for this commit, account, stack and Terraform version, whose text rendered again is the
 #       text recorded at plan time, and which passes the plan guard again. Terraform refuses it if the state changed.
 #
@@ -69,6 +69,25 @@ require_apply_gate() {
     die "staging applies are disabled until every gate in infra/config/apply-gate.json is decided (owner decision OD-B7); refusing"
   fi
   log "apply gates decided: $(jq -r '[.gates | to_entries[] | "\(.key)=\(.value.status)"] | join(", ")' "$APPLY_GATE")"
+}
+
+# Owner decisions: no committed decision may still be PROPOSED (staging-platform.json and the other decision files).
+DECISIONS_DIR="${VEDA_DECISIONS_DIR:-$INFRA_DIR/config}"
+require_decisions_recorded() {
+  local problems="" f
+  for f in "$DECISIONS_DIR"/staging-*.json; do
+    [[ -f "$f" ]] || continue
+    problems+="$(jq -r --arg f "$(basename "$f")" '
+      if type != "object" then "\($f): not a JSON object"
+      else to_entries[] | select((.value | type) == "object" and .value.status == "PROPOSED") | "\($f): \(.key) is PROPOSED" end' "$f")" ||
+      die "decision file $f is not valid JSON; refusing"
+    [[ -z "$problems" ]] || problems+=$'\n'
+  done
+  if [[ -n "${problems//$'\n'/}" ]]; then
+    while IFS= read -r p; do [[ -n "$p" ]] && log "DECISION: $p"; done <<<"$problems"
+    die "staging applies are disabled until every proposed owner decision is recorded (infra/config/staging-*.json); refusing"
+  fi
+  log "owner decisions recorded: no PROPOSED entry in $(basename "$DECISIONS_DIR")/staging-*.json"
 }
 
 if [[ "$CMD" == gate ]]; then
@@ -157,6 +176,7 @@ fi
 
 # --- apply -------------------------------------------------------------------------------------------------------
 require_apply_gate
+require_decisions_recorded
 [[ -n "$PLAN_DIR" && -n "$APPROVED_SHA" && -n "$PLAN_RUN" ]] ||
   die "apply needs --plan-dir, --plan-sha256 (the approved digest) and --plan-run-id"
 [[ "$APPROVED_SHA" =~ ^[0-9a-f]{64}$ ]] || die "--plan-sha256 must be the 64-hex SHA-256 of the approved plan file"

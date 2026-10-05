@@ -1,6 +1,6 @@
 {
   "description": "Staging network (AUT-101), owner decisions N1-N8 of docs/implementation/staging/AUT-101-design-package.md, planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request.",
-  "decision": "2026-10-05: N1 egress model A (public subnet, no inbound access, outbound-only Cloudflare tunnel); N2 host t4g.small; N3 budget stays 25 USD; N4-N8 the recommended defaults. Review 2026-10-05: the S3 endpoint also allows the SSM buckets (agent updates, document modules, Distributor); Patch Manager is not used (host patching by dnf, AUT-108); az_id is pinned once the first plan shows the chosen AZ.",
+  "decision": "2026-10-05: N1 egress model A (public subnet, no inbound access, outbound-only Cloudflare tunnel); N2 host t4g.small; N3 budget stays 25 USD; N4-N8 the recommended defaults. Review 2026-10-05: the S3 endpoint also allows the SSM buckets (agent updates, document modules, Distributor); Patch Manager is not used (host patching by dnf, AUT-108); az_id is pinned once the first plan shows the chosen AZ. C3 (2026-10-05): flow logs go to the logs bucket (vpc-flow/, 30 days, staging-platform.json storage.logs_flow_expire_days); no role is passed.",
   "egress_model": "A",
   "vpc_cidr": "10.60.0.0/20",
   "public_subnet_cidr": "10.60.0.0/24",
@@ -18,7 +18,7 @@
   "host_instance_type": "t4g.small",
   "flow_logs": {
     "traffic_type": "ALL",
-    "retention_days": 30
+    "destination": "s3"
   },
   "tunnel_egress_cidrs": [
     "198.41.192.0/24",

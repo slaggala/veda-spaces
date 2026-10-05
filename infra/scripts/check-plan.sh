@@ -43,6 +43,11 @@
 #     encrypt/decrypt, with the policy lockout check bypassed, with a policy unknown at plan time, or without a Deny of
 #     every caller outside the account (kms:CallerAccount); any replica, external or custom-store key, a separate key
 #     policy resource, or an alias outside alias/<prefix>-*;
+#   - creates an S3 bucket (AUT-103) not named <prefix>-*, or without, in the same plan and naming it by its name: all
+#     four public access blocks, BucketOwnerEnforced ownership, versioning, SSE-KMS and a policy denying plain HTTP
+#     (the bootstrap state bucket excepted); any bucket ACL, a public access block not fully on, suspended
+#     versioning, SSE other than KMS, a GOVERNANCE or over-a-year default lock, replication, website hosting,
+#     Transfer Acceleration, CORS, access points or Multi-Region Access Points (they bypass the S3 endpoint policy);
 #   - does anything but create, update, read or no-op (delete, replace, forget).
 # Offline and read-only: it only reads the JSON file. Used by bootstrap.sh; later stacks reuse it (AUT-301).
 #
@@ -61,7 +66,7 @@ while (($#)); do
     --account) ACCOUNT="${2:-}"; shift 2 ;;
     --repo) REPO="${2:-}"; shift 2 ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,49p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,54p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -213,7 +218,33 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
        | select(.expressions.security_group_id | refs | any(test("default_security_group_id|aws_default_security_group")))
        | "\(.address): rule attached to the default security group (it must have no rule)");
 
-  [ region_findings ] + [ config_findings ] + [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
+  # AUT-103: every new bucket comes with its controls, matched by bucket name (known at plan time).
+  def bucket_findings:
+    (.resource_changes // []) as $all
+    | [$all[] | select(.change.actions | index("create") or index("update"))] as $live
+    | $all[] | select(.type == "aws_s3_bucket" and ((.change.actions | index("create")) != null)) | .address as $addr
+    | (.change.after.bucket // null) as $name
+    | if $name == null then "\($addr): bucket name unknown at plan time"
+      elif $name == "\($prefix)-tfstate-\($acct)" then empty
+      elif ($name | startswith($prefix + "-") | not) then "\($addr): bucket \($name) is not \($prefix)-*"
+      else
+        [$live[] | select(.change.after.bucket == $name)] as $c
+        | (if [$c[] | select(.type == "aws_s3_bucket_public_access_block") | .change.after
+               | select(.block_public_acls and .block_public_policy and .ignore_public_acls and .restrict_public_buckets)] | length == 0
+             then "\($addr): bucket \($name) has no public access block with all four settings on" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_ownership_controls") | .change.after.rule[]? | select(.object_ownership == "BucketOwnerEnforced")] | length == 0
+             then "\($addr): bucket \($name) has no BucketOwnerEnforced ownership (ACLs must be disabled)" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_versioning") | .change.after.versioning_configuration[]? | select(.status == "Enabled")] | length == 0
+             then "\($addr): bucket \($name) has no versioning" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_server_side_encryption_configuration") | .change.after.rule[]?.apply_server_side_encryption_by_default[]?
+               | select(.sse_algorithm | IN("aws:kms", "aws:kms:dsse"))] | length == 0
+             then "\($addr): bucket \($name) has no SSE-KMS encryption" else empty end),
+          (if [$c[] | select(.type == "aws_s3_bucket_policy") | .change.after.policy // "" | select(. != "") | fromjson | (.Statement | arr)[]
+               | select(.Effect == "Deny" and (((.Condition // {}).Bool // {})["aws:SecureTransport"] | tostring) == "false")] | length == 0
+             then "\($addr): bucket \($name) has no policy denying plain HTTP (aws:SecureTransport)" else empty end)
+      end;
+
+  [ region_findings ] + [ config_findings ] + [ bucket_findings ] + [ .resource_changes[]? | . as $rc | .address as $addr | (.change.after // {}) as $after | (.change.after_unknown // {}) as $unknown
     | if (.change.actions - ["create", "update", "read", "no-op"]) | length > 0 then
         "\($addr): plan \(.change.actions | join("+")) (the bootstrap never applies a destroy, replace or forget)"
       elif (.change.actions | index("create") or index("update")) | not then empty
@@ -303,6 +334,27 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
          elif $unknown.policy == true then "\($addr): S3 endpoint policy not known at plan time"
          elif ($after.policy // "") == "" then "\($addr): S3 endpoint without a policy (the AWS default allows full access)"
          else ($after.policy | fromjson | endpoint_policy_findings($addr)) end)
+      elif .type | IN("aws_s3_bucket_acl", "aws_s3_bucket_replication_configuration", "aws_s3_bucket_website_configuration",
+                      "aws_s3_bucket_cors_configuration", "aws_s3_access_point", "aws_s3control_access_point_policy",
+                      "aws_s3control_multi_region_access_point", "aws_s3control_multi_region_access_point_policy",
+                      "aws_s3control_object_lambda_access_point", "aws_s3_directory_bucket") then
+        "\($addr): \(.type) is not allowed (ACLs are disabled; no replication, website, CORS or access points; AUT-103)"
+      elif .type == "aws_s3_bucket_accelerate_configuration" then
+        (if $after.status == "Enabled" then "\($addr): S3 Transfer Acceleration bypasses the S3 endpoint policy" else empty end)
+      elif .type == "aws_s3_bucket_public_access_block" then
+        (if ($after.block_public_acls and $after.block_public_policy and $after.ignore_public_acls and $after.restrict_public_buckets) | not
+           then "\($addr): public access block with a setting off" else empty end)
+      elif .type == "aws_s3_bucket_ownership_controls" then
+        (if [($after.rule // [])[] | select(.object_ownership == "BucketOwnerEnforced")] | length == 0
+           then "\($addr): bucket ownership other than BucketOwnerEnforced (ACLs must stay disabled)" else empty end)
+      elif .type == "aws_s3_bucket_versioning" then
+        (if [($after.versioning_configuration // [])[] | select(.status == "Enabled")] | length == 0 then "\($addr): bucket versioning not enabled" else empty end)
+      elif .type == "aws_s3_bucket_server_side_encryption_configuration" then
+        (if [($after.rule // [])[].apply_server_side_encryption_by_default[]? | select(.sse_algorithm | IN("aws:kms", "aws:kms:dsse") | not)] | length > 0
+           then "\($addr): bucket encryption other than SSE-KMS" else empty end)
+      elif .type == "aws_s3_bucket_object_lock_configuration" then
+        (($after.rule // [])[].default_retention[]? | select(.mode != "COMPLIANCE" or ((.days // 0) > 365) or ((.years // 0) > 1))
+         | "\($addr): default Object Lock \(.mode) for \(.days // 0) days \(.years // 0) years (COMPLIANCE, at most a year)")
       elif .type | IN("aws_kms_replica_key", "aws_kms_external_key", "aws_kms_replica_external_key", "aws_kms_custom_key_store", "aws_kms_key_policy") then
         "\($addr): \(.type) is not allowed (keys are single-region, AWS-generated, with their policy on the key; AUT-102)"
       elif .type == "aws_kms_alias" then

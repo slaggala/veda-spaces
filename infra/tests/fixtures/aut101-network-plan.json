@@ -70,11 +70,10 @@
                 "local.network"
               ]
             },
-            "flow_log_retention_days": {
+            "flow_log_destination_arn": {
               "references": [
-                "local.network.flow_logs.retention_days",
-                "local.network.flow_logs",
-                "local.network"
+                "module.storage.flow_log_destination_arn",
+                "module.storage"
               ]
             },
             "flow_log_traffic_type": {
@@ -92,11 +91,6 @@
             },
             "name_prefix": {
               "constant_value": "veda-stg"
-            },
-            "permissions_boundary_arn": {
-              "references": [
-                "local.account_id"
-              ]
             },
             "public_subnet_cidr": {
               "references": [
@@ -159,7 +153,7 @@
                     "local.az_id",
                     "aws_vpc_security_group_egress_rule.tunnel",
                     "var.flow_log_traffic_type",
-                    "var.flow_log_retention_days"
+                    "var.flow_log_destination_arn"
                   ]
                 },
                 "description": "What the plan creates, for the reviewer (the plan text)."
@@ -175,24 +169,6 @@
               }
             },
             "resources": [
-              {
-                "address": "aws_cloudwatch_log_group.flow",
-                "mode": "managed",
-                "type": "aws_cloudwatch_log_group",
-                "name": "flow",
-                "provider_config_key": "aws",
-                "expressions": {
-                  "name": {
-                    "constant_value": "/veda/staging/vpc-flow"
-                  },
-                  "retention_in_days": {
-                    "references": [
-                      "var.flow_log_retention_days"
-                    ]
-                  }
-                },
-                "schema_version": 0
-              },
               {
                 "address": "aws_default_network_acl.this",
                 "mode": "managed",
@@ -266,20 +242,23 @@
                 "name": "vpc",
                 "provider_config_key": "aws",
                 "expressions": {
-                  "iam_role_arn": {
-                    "references": [
-                      "aws_iam_role.flow_logs.arn",
-                      "aws_iam_role.flow_logs"
-                    ]
-                  },
+                  "destination_options": [
+                    {
+                      "file_format": {
+                        "constant_value": "plain-text"
+                      },
+                      "per_hour_partition": {
+                        "constant_value": true
+                      }
+                    }
+                  ],
                   "log_destination": {
                     "references": [
-                      "aws_cloudwatch_log_group.flow.arn",
-                      "aws_cloudwatch_log_group.flow"
+                      "var.flow_log_destination_arn"
                     ]
                   },
                   "log_destination_type": {
-                    "constant_value": "cloud-watch-logs"
+                    "constant_value": "s3"
                   },
                   "max_aggregation_interval": {
                     "constant_value": 600
@@ -302,66 +281,6 @@
                   }
                 },
                 "schema_version": 1
-              },
-              {
-                "address": "aws_iam_role.flow_logs",
-                "mode": "managed",
-                "type": "aws_iam_role",
-                "name": "flow_logs",
-                "provider_config_key": "aws",
-                "expressions": {
-                  "assume_role_policy": {
-                    "references": [
-                      "var.account_id",
-                      "var.region",
-                      "var.account_id"
-                    ]
-                  },
-                  "description": {
-                    "constant_value": "VPC flow logs to /veda/staging/vpc-flow (AUT-101)"
-                  },
-                  "max_session_duration": {
-                    "constant_value": 3600
-                  },
-                  "name": {
-                    "references": [
-                      "var.name_prefix"
-                    ]
-                  },
-                  "permissions_boundary": {
-                    "references": [
-                      "var.permissions_boundary_arn"
-                    ]
-                  }
-                },
-                "schema_version": 0
-              },
-              {
-                "address": "aws_iam_role_policy.flow_logs",
-                "mode": "managed",
-                "type": "aws_iam_role_policy",
-                "name": "flow_logs",
-                "provider_config_key": "aws",
-                "expressions": {
-                  "name": {
-                    "constant_value": "write-vpc-flow-log-group"
-                  },
-                  "policy": {
-                    "references": [
-                      "aws_cloudwatch_log_group.flow.arn",
-                      "aws_cloudwatch_log_group.flow",
-                      "var.region",
-                      "var.account_id"
-                    ]
-                  },
-                  "role": {
-                    "references": [
-                      "aws_iam_role.flow_logs.id",
-                      "aws_iam_role.flow_logs"
-                    ]
-                  }
-                },
-                "schema_version": 0
               },
               {
                 "address": "aws_internet_gateway.this",
@@ -837,8 +756,8 @@
               "egress_model": {
                 "description": "Owner decision N1. Only A is implemented: public subnet, no inbound access, outbound restricted to 443 and the tunnel."
               },
-              "flow_log_retention_days": {
-                "description": "Owner decision N6."
+              "flow_log_destination_arn": {
+                "description": "S3 destination of the VPC flow logs (owner decision C3): the AUT-103 logs bucket and its vpc-flow prefix."
               },
               "flow_log_traffic_type": {
                 "description": "Owner decision N6."
@@ -848,9 +767,6 @@
               },
               "name_prefix": {
                 "description": "Prefix of every resource name, e.g. veda-stg."
-              },
-              "permissions_boundary_arn": {
-                "description": "veda-boundary; every role carries it (the apply role cannot create a role without it)."
               },
               "public_subnet_cidr": {
                 "description": "The host subnet, inside vpc_cidr."
@@ -871,52 +787,6 @@
     }
   },
   "resource_changes": [
-    {
-      "address": "module.network.aws_cloudwatch_log_group.flow",
-      "module_address": "module.network",
-      "mode": "managed",
-      "type": "aws_cloudwatch_log_group",
-      "name": "flow",
-      "provider_name": "registry.terraform.io/hashicorp/aws",
-      "change": {
-        "actions": [
-          "create"
-        ],
-        "before": null,
-        "after": {
-          "kms_key_id": null,
-          "name": "/veda/staging/vpc-flow",
-          "region": "ap-south-1",
-          "retention_in_days": 30,
-          "skip_destroy": false,
-          "tags": null,
-          "tags_all": {
-            "env": "staging",
-            "managed-by": "terraform",
-            "project": "veda-spaces",
-            "repository": "example-org/veda-spaces",
-            "stack": "core"
-          }
-        },
-        "after_unknown": {
-          "arn": true,
-          "deletion_protection_enabled": true,
-          "id": true,
-          "log_group_class": true,
-          "name_prefix": true,
-          "tags_all": {}
-        },
-        "before_sensitive": false,
-        "after_sensitive": {
-          "tags_all": {}
-        },
-        "after_identity": {
-          "account_id": null,
-          "name": null,
-          "region": null
-        }
-      }
-    },
     {
       "address": "module.network.aws_default_network_acl.this",
       "module_address": "module.network",
@@ -1076,9 +946,17 @@
         "before": null,
         "after": {
           "deliver_cross_account_role": null,
-          "destination_options": [],
+          "destination_options": [
+            {
+              "file_format": "plain-text",
+              "hive_compatible_partitions": false,
+              "per_hour_partition": true
+            }
+          ],
           "eni_id": null,
-          "log_destination_type": "cloud-watch-logs",
+          "iam_role_arn": null,
+          "log_destination": "arn:aws:s3:::veda-stg-logs-111122223333/vpc-flow",
+          "log_destination_type": "s3",
           "max_aggregation_interval": 600,
           "region": "ap-south-1",
           "regional_nat_gateway_id": null,
@@ -1101,10 +979,10 @@
         },
         "after_unknown": {
           "arn": true,
-          "destination_options": [],
-          "iam_role_arn": true,
+          "destination_options": [
+            {}
+          ],
           "id": true,
-          "log_destination": true,
           "log_format": true,
           "tag_field_specification": [],
           "tags": {},
@@ -1113,7 +991,9 @@
         },
         "before_sensitive": false,
         "after_sensitive": {
-          "destination_options": [],
+          "destination_options": [
+            {}
+          ],
           "tag_field_specification": [],
           "tags": {},
           "tags_all": {}
@@ -1122,87 +1002,6 @@
           "account_id": null,
           "id": null,
           "region": null
-        }
-      }
-    },
-    {
-      "address": "module.network.aws_iam_role.flow_logs",
-      "module_address": "module.network",
-      "mode": "managed",
-      "type": "aws_iam_role",
-      "name": "flow_logs",
-      "provider_name": "registry.terraform.io/hashicorp/aws",
-      "change": {
-        "actions": [
-          "create"
-        ],
-        "before": null,
-        "after": {
-          "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Condition\":{\"ArnLike\":{\"aws:SourceArn\":\"arn:aws:ec2:ap-south-1:111122223333:vpc-flow-log/*\"},\"StringEquals\":{\"aws:SourceAccount\":\"111122223333\"}},\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"vpc-flow-logs.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
-          "description": "VPC flow logs to /veda/staging/vpc-flow (AUT-101)",
-          "force_detach_policies": false,
-          "max_session_duration": 3600,
-          "name": "veda-stg-vpc-flow-logs",
-          "path": "/",
-          "permissions_boundary": "arn:aws:iam::111122223333:policy/veda-boundary",
-          "tags": null,
-          "tags_all": {
-            "env": "staging",
-            "managed-by": "terraform",
-            "project": "veda-spaces",
-            "repository": "example-org/veda-spaces",
-            "stack": "core"
-          }
-        },
-        "after_unknown": {
-          "arn": true,
-          "create_date": true,
-          "id": true,
-          "inline_policy": true,
-          "managed_policy_arns": true,
-          "name_prefix": true,
-          "tags_all": {},
-          "unique_id": true
-        },
-        "before_sensitive": false,
-        "after_sensitive": {
-          "inline_policy": [],
-          "managed_policy_arns": [],
-          "tags_all": {}
-        },
-        "after_identity": {
-          "account_id": null,
-          "name": null
-        }
-      }
-    },
-    {
-      "address": "module.network.aws_iam_role_policy.flow_logs",
-      "module_address": "module.network",
-      "mode": "managed",
-      "type": "aws_iam_role_policy",
-      "name": "flow_logs",
-      "provider_name": "registry.terraform.io/hashicorp/aws",
-      "change": {
-        "actions": [
-          "create"
-        ],
-        "before": null,
-        "after": {
-          "name": "write-vpc-flow-log-group"
-        },
-        "after_unknown": {
-          "id": true,
-          "name_prefix": true,
-          "policy": true,
-          "role": true
-        },
-        "before_sensitive": false,
-        "after_sensitive": {},
-        "after_identity": {
-          "account_id": null,
-          "name": null,
-          "role": null
         }
       }
     },
@@ -2095,7 +1894,7 @@
           "description": "HTTPS to S3 through the gateway endpoint",
           "from_port": 443,
           "ip_protocol": "tcp",
-          "prefix_list_id": "pl-6ab40363935864b67",
+          "prefix_list_id": "pl-c38a3df2dc6200d5d",
           "referenced_security_group_id": null,
           "region": "ap-south-1",
           "tags": null,

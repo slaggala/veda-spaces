@@ -1501,8 +1501,8 @@ mod() { # mod <address in module.network> <jq filter applied to its .change>: a 
 addres() { # addres <type> <name> <after JSON>: a plan with one more resource
   netfix ".resource_changes += [{address: \"module.network.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]"
 }
-check "AUT-101 the real network plan passes the guard (30 resources, no region outside Mumbai)" ok "plan guard: no destroy" -- guard "$NETPLAN"
-check "  ... and has the expected 30 creates" ok "^30$" -- jq '[.resource_changes[] | select(.change.actions == ["create"])] | length' "$NETPLAN"
+check "AUT-101 the real network plan passes the guard (27 resources, no region outside Mumbai)" ok "plan guard: no destroy" -- guard "$NETPLAN"
+check "  ... and has the expected 27 creates (flow logs to S3, C3: no role, policy or log group)" ok "^27$" -- jq '[.resource_changes[] | select(.change.actions == ["create"])] | length' "$NETPLAN"
 # Inbound: none, in any form.
 check "AUT-101 an inbound security-group rule is refused" fail "no inbound security-group rule in staging" -- guard "$(addres aws_vpc_security_group_ingress_rule ssh '{"security_group_id":"sg-1","ip_protocol":"tcp","from_port":22,"to_port":22,"cidr_ipv4":"10.0.0.0/8"}')"
 check "AUT-101 a legacy inbound rule is refused" fail "no inbound security-group rule in staging" -- guard "$(addres aws_security_group_rule web '{"type":"ingress","protocol":"tcp","from_port":443,"to_port":443,"cidr_blocks":["0.0.0.0/0"]}')"
@@ -1563,8 +1563,13 @@ check "AUT-101 minor 2 inline routes in a route table are refused (plan)" fail "
 check "AUT-101 minor 2 a main route table association is refused" fail "aws_main_route_table_association is not part of the staging network" -- guard "$(addres aws_main_route_table_association x '{}')"
 check "AUT-101 minor 3 a rule attached to the default security group is refused" fail "rule attached to the default security group" -- guard "$(cfgadd '{"address":"aws_vpc_security_group_egress_rule.dflt","mode":"managed","type":"aws_vpc_security_group_egress_rule","expressions":{"security_group_id":{"references":["aws_default_security_group.this.id","aws_default_security_group.this"]},"ip_protocol":{"constant_value":"tcp"},"from_port":{"constant_value":443},"to_port":{"constant_value":443},"cidr_ipv4":{"constant_value":"0.0.0.0/0"}}}')"
 # minor 4: the flow-log role is assumable only for the account's flow logs.
-check "AUT-101 minor 4 a flow-log role without aws:SourceAccount is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition = {} | tojson)')"
-check "AUT-101 minor 4 a flow-log role for another account is refused" fail "flow-logs service may assume the role only for account" -- guard "$(mod 'aws_iam_role.flow_logs' '.after.assume_role_policy = (.after.assume_role_policy | fromjson | .Statement[0].Condition.StringEquals["aws:SourceAccount"] = "999999999999" | tojson)')"
+FLOWROLE() { # a role the flow-logs service may assume, with the given condition
+  local t; t="$(jq -cn --argjson c "$1" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Principal: {Service: "vpc-flow-logs.amazonaws.com"}, Action: "sts:AssumeRole", Condition: $c}]} | tojson')"
+  netfix ".resource_changes += [$(role aws_iam_role.flow veda-stg-flow "$t")]"
+}
+check "AUT-101 minor 4 a flow-log role without aws:SourceAccount is refused" fail "flow-logs service may assume the role only for account" -- guard "$(FLOWROLE '{}')"
+check "AUT-101 minor 4 a flow-log role for another account is refused" fail "flow-logs service may assume the role only for account" -- guard "$(FLOWROLE '{"StringEquals":{"aws:SourceAccount":"999999999999"}}')"
+check "AUT-101 minor 4 a flow-log role for this account passes" ok "plan guard: no destroy" -- guard "$(FLOWROLE '{"StringEquals":{"aws:SourceAccount":"111122223333"}}')"
 # minor 5 and M2: exactly the named AWS-owned buckets of the region.
 check "AUT-101 M2 the SSM buckets (agent, documents, Distributor) are allowed" ok "plan guard: no destroy" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::amazon-ssm-ap-south-1/*","arn:aws:s3:::aws-ssm-ap-south-1/*","arn:aws:s3:::ap-south-1-birdwatcher-prod/*"]')"
 check "AUT-101 minor 5 a look-alike Amazon Linux bucket is refused" fail "AwsOwnedObjectsReadOnly" -- guard "$(eppol '.Statement[1].Resource = ["arn:aws:s3:::al2023-repos-ap-south-1-attacker/*"]')"
@@ -1578,10 +1583,10 @@ check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "pl
 # The committed decision and the bootstrap's one change.
 NET_CFG="$INFRA/config/staging-network.json"
 check "AUT-101 committed decision: egress model A, t4g.small, 10.60.0.0/20 (N1, N2, N4)" ok '^"A","t4g.small","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
-check "AUT-101 committed decision: flow logs ALL, 30 days (N6)" ok '^ALL 30$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.retention_days)"' "$NET_CFG"
+check "AUT-101 committed decision: flow logs ALL to S3 (N6, C3)" ok '^ALL s3$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.destination)"' "$NET_CFG"
 check "AUT-101 committed decision: tunnel egress to Cloudflare's two ranges only (N8)" ok '^\["198.41.192.0/24","198.41.200.0/24"\]$' -- jq -c .tunnel_egress_cidrs "$NET_CFG"
 check "AUT-101 staging-core plans the network module" ok 'source = "../../modules/network"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
-check "AUT-101 the apply role may pass Veda roles to VPC flow logs (bootstrap change, owner re-apply)" ok '"vpc-flow-logs.amazonaws.com"' -- awk '/sid *= "PassVedaRolesToStagingServices"/{p=1} p && /^  }/{exit} p' "$INFRA/terraform/bootstrap/roles.tf"
+absent "AUT-101 C3 the apply role passes no role to VPC flow logs (the bootstrap stays as applied)" "vpc-flow-logs" "$(cat "$INFRA/terraform/bootstrap/roles.tf")"
 # shellcheck disable=SC2016 # a make variable, expanded by make
 check "AUT-101 make test runs the network module's own tests" ok "terraform/modules/network" -- make -s -C "$INFRA" -f Makefile -f <(printf 'print-test-dirs:\n\t@printf "%%s\\n" $(patsubst %%/tests/,%%,$(dir $(wildcard terraform/modules/*/tests/)))\n') print-test-dirs
 
@@ -1610,6 +1615,55 @@ done
 check "AUT-102 an alias outside alias/veda-* is refused" fail "KMS alias alias/data is not alias/veda-" -- guard "$(f="$TMP/kms.$RANDOM.json"; plan_json "$f" "[$(res aws_kms_alias a '{"name":"alias/data"}')]"; echo "$f")"
 check "AUT-102 committed decision: 30-day deletion window, yearly rotation" ok "^30 365$" -- jq -r '"\(.kms.deletion_window_days) \(.kms.rotation_period_days)"' "$INFRA/config/staging-platform.json"
 check "AUT-102 staging-core plans the KMS module" ok 'source = "../../modules/kms"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+
+echo "== AUT-103: buckets and Object Lock (every bucket private, encrypted, versioned, TLS only; decision gate)"
+S3PLAN="$HERE/fixtures/aut103-storage-plan.json"
+s3mod() { # s3mod <address in module.storage> <jq filter on its .change>
+  local f="$TMP/s3.$RANDOM$RANDOM.json"
+  jq --arg a "module.storage.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$S3PLAN" >"$f"
+  echo "$f"
+}
+s3drop() { local f="$TMP/s3.$RANDOM$RANDOM.json"; jq --arg a "module.storage.$1" 'del(.resource_changes[] | select(.address == $a))' "$S3PLAN" >"$f"; echo "$f"; }
+s3add() { local f="$TMP/s3.$RANDOM$RANDOM.json"; jq ".resource_changes += [{address: \"module.storage.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]" "$S3PLAN" >"$f"; echo "$f"; }
+check "AUT-103 the real storage plan passes the guard" ok "plan guard: no destroy" -- guard "$S3PLAN"
+check "  ... six buckets, 43 resources" ok "^6 43$" -- jq -r '"\([.resource_changes[] | select(.type == "aws_s3_bucket")] | length) \(.resource_changes | length)"' "$S3PLAN"
+check "AUT-103 a bucket without its public access block is refused" fail "veda-stg-anchor-111122223333 has no public access block" -- guard "$(s3drop 'aws_s3_bucket_public_access_block.this["anchor"]')"
+check "AUT-103 a public access block with a setting off is refused" fail "public access block with a setting off" -- guard "$(s3mod 'aws_s3_bucket_public_access_block.this["logs"]' '.after.restrict_public_buckets = false')"
+check "AUT-103 a bucket without ownership controls is refused" fail "has no BucketOwnerEnforced ownership" -- guard "$(s3drop 'aws_s3_bucket_ownership_controls.this["evidence"]')"
+check "AUT-103 ACLs re-enabled are refused" fail "bucket ownership other than BucketOwnerEnforced" -- guard "$(s3mod 'aws_s3_bucket_ownership_controls.this["artifacts"]' '.after.rule[0].object_ownership = "ObjectWriter"')"
+check "AUT-103 a bucket ACL is refused" fail "aws_s3_bucket_acl is not allowed" -- guard "$(s3add aws_s3_bucket_acl x '{"acl":"public-read"}')"
+check "AUT-103 a bucket without versioning is refused" fail "veda-stg-litestream-111122223333 has no versioning" -- guard "$(s3drop 'aws_s3_bucket_versioning.this["litestream"]')"
+check "AUT-103 suspended versioning is refused" fail "bucket versioning not enabled" -- guard "$(s3mod 'aws_s3_bucket_versioning.this["snapshots"]' '.after.versioning_configuration[0].status = "Suspended"')"
+check "AUT-103 SSE-S3 instead of KMS is refused" fail "bucket encryption other than SSE-KMS" -- guard "$(s3mod 'aws_s3_bucket_server_side_encryption_configuration.this["anchor"]' '.after.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm = "AES256"')"
+check "AUT-103 a bucket without encryption is refused" fail "has no SSE-KMS encryption" -- guard "$(s3drop 'aws_s3_bucket_server_side_encryption_configuration.this["evidence"]')"
+check "AUT-103 a bucket without its TLS-only policy is refused" fail "has no policy denying plain HTTP" -- guard "$(s3drop 'aws_s3_bucket_policy.this["artifacts"]')"
+check "AUT-103 a public bucket policy is refused" fail "Allow to \* without an account condition" -- guard "$(s3mod 'aws_s3_bucket_policy.this["artifacts"]' '.after.policy = (.after.policy | fromjson | .Statement += [{Effect: "Allow", Principal: "*", Action: "s3:GetObject", Resource: "arn:aws:s3:::veda-stg-artifacts-111122223333/*"}] | tojson)')"
+check "AUT-103 a bucket outside veda-* is refused" fail "bucket data-lake is not veda-\*" -- guard "$(s3mod 'aws_s3_bucket.this["artifacts"]' '.after.bucket = "data-lake"')"
+check "AUT-103 a GOVERNANCE default lock is refused" fail "default Object Lock GOVERNANCE" -- guard "$(s3mod 'aws_s3_bucket_object_lock_configuration.evidence' '.after.rule[0].default_retention[0].mode = "GOVERNANCE"')"
+check "AUT-103 a default lock over a year is refused" fail "for 3650 days" -- guard "$(s3mod 'aws_s3_bucket_object_lock_configuration.evidence' '.after.rule[0].default_retention[0].days = 3650')"
+check "AUT-103 Transfer Acceleration is refused (bypasses the endpoint policy)" fail "Transfer Acceleration bypasses the S3 endpoint policy" -- guard "$(s3add aws_s3_bucket_accelerate_configuration x '{"status":"Enabled"}')"
+for t in aws_s3_bucket_replication_configuration aws_s3_bucket_website_configuration aws_s3_access_point aws_s3control_multi_region_access_point; do
+  check "AUT-103 $t is refused" fail "$t is not allowed" -- guard "$(s3add "$t" x '{}')"
+done
+# The decision gate: an apply refuses while any committed decision is PROPOSED.
+T="$(new_tree)"
+cp "$INFRA/config/apply-gate.json" "$INFRA/config/staging-platform.json" "$INFRA/config/staging-network.json" "$INFRA/config/staging-budget.json" "$T/infra/config/"
+SK="$T/infra/scripts/stack.sh"
+mkdir -p "$T/infra/terraform/envs/staging-core" "$T/docs" && echo "decision" >"$T/docs/od-b7.md"
+check "AUT-103 the committed decisions refuse the apply (storage and anchor_retention PROPOSED)" fail "DECISION: staging-platform.json: anchor_retention is PROPOSED" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+jq '(.[] | objects | select(.status == "PROPOSED") | .status) = "DECIDED"' "$INFRA/config/staging-platform.json" >"$T/infra/config/staging-platform.json"
+TFA="$(tf_plan_stub "$NOOP")"
+check "AUT-103 recorded decisions open the decision gate" ok "owner decisions recorded: no PROPOSED entry" -- sapply "$PD" "$(wf_session apply)" "$TFA"
+echo '[' >"$T/infra/config/staging-broken.json"
+check "AUT-103 a malformed decision file refuses the apply" fail "is not valid JSON; refusing" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+rm "$T/infra/config/staging-broken.json"
+# The committed decision.
+PLATFORM="$INFRA/config/staging-platform.json"
+check "AUT-103 committed decision: evidence COMPLIANCE 30 days, snapshots expire after their 35-day lock" ok '^COMPLIANCE 30 42$' -- jq -r '"\(.storage.evidence_lock_mode) \(.storage.evidence_lock_days) \(.storage.snapshots_expire_days)"' "$PLATFORM"
+check "AUT-103 the 10-year anchor lock is an open owner decision (D6)" ok '^PROPOSED 3650$' -- jq -r '"\(.anchor_retention.status) \(.anchor_retention.application_retention_days)"' "$PLATFORM"
+check "AUT-103 the anchor retention the decision states is the application's" ok "RETENTION = timedelta\(days=3650\)" -- cat "$INFRA/../api/veda/platform/anchor_store.py"
+check "AUT-103 staging-core plans the storage module" ok 'source = "../../modules/storage"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
+check "AUT-103 C3 VPC flow logs go to the logs bucket" ok 'flow_log_destination_arn = module.storage.flow_log_destination_arn' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 
 echo
 echo "$PASS passed, ${#FAILED[@]} failed"

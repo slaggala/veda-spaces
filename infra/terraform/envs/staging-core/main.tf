@@ -38,7 +38,6 @@ module "network" {
   name_prefix              = "veda-stg"
   account_id               = local.account_id
   region                   = var.aws_region
-  permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/veda-boundary"
   egress_model             = local.network.egress_model
   vpc_cidr                 = local.network.vpc_cidr
   public_subnet_cidr       = local.network.public_subnet_cidr
@@ -46,7 +45,7 @@ module "network" {
   az_id                    = try(local.network.az_id, null)
   host_instance_type       = local.network.host_instance_type
   flow_log_traffic_type    = local.network.flow_logs.traffic_type
-  flow_log_retention_days  = local.network.flow_logs.retention_days
+  flow_log_destination_arn = module.storage.flow_log_destination_arn
   tunnel_egress_cidrs      = local.network.tunnel_egress_cidrs
   aws_owned_s3_object_arns = local.network.aws_owned_s3_object_arns
 }
@@ -62,5 +61,21 @@ module "kms" {
   trail_name           = local.trail_name
   deletion_window_days = local.platform.kms.deletion_window_days
   rotation_period_days = local.platform.kms.rotation_period_days
+}
+
+# AUT-103: buckets and Object Lock.
+module "storage" {
+  source = "../../modules/storage"
+
+  name_prefix   = local.name_prefix
+  account_id    = local.account_id
+  region        = var.aws_region
+  data_key_arn  = module.kms.data_key_arn
+  audit_key_arn = module.kms.audit_key_arn
+  trail_name    = local.trail_name
+  retention = {
+    for k in ["litestream_noncurrent_days", "snapshots_expire_days", "artifacts_expire_days", "artifacts_noncurrent_days",
+    "logs_cloudtrail_expire_days", "logs_flow_expire_days", "evidence_lock_mode", "evidence_lock_days"] : k => local.platform.storage[k]
+  }
 }
 
