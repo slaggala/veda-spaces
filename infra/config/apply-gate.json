@@ -3,13 +3,13 @@
   "gates": {
     "OD-B7": {
       "title": "veda-gh-apply trust-writing gap (RR-D, with RR-C: SCP or RCP from the management account)",
-      "status": "UNDECIDED",
-      "record": null
+      "status": "ACCEPTED",
+      "record": "docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md"
     },
     "N-04-S": {
       "title": "Staging plan text in a public repository: plan artifacts are uploaded (and so reviewable for apply) only from a private repository unless the owner accepts publishing them",
-      "status": "UNDECIDED",
-      "record": null
+      "status": "PRIVATE_REPOSITORY",
+      "record": "docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md"
     }
   }
 }

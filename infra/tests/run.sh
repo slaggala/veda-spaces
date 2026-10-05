@@ -1196,12 +1196,15 @@ absent "AUT-301 every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$PWT$AWT"
 absent "AUT-301 checkouts keep no credentials" "persist-credentials: true" "$PWT$AWT"
 check "AUT-301 every checkout drops the token" ok "^3$" -- grep -c "persist-credentials: false" <<<"$PWT$AWT"
 
-# The committed gate keeps every apply disabled (OD-B7 and N-04-S undecided).
+# The committed gate: OD-B7 accepted for staging, N-04-S private repository, both with the committed record.
 T="$(new_tree)"
 cp -R "$INFRA/config/apply-gate.json" "$T/infra/config/apply-gate.json"
 SK="$T/infra/scripts/stack.sh"
-check "AUT-301 committed apply gate refuses (OD-B7 undecided)" fail "OD-B7: .* is UNDECIDED" -- "$SK" gate
-check "  ... and N-04-S undecided" fail "N-04-S: .* is UNDECIDED" -- "$SK" gate
+GATE_RECORD="$(jq -r '.gates["OD-B7"].record' "$INFRA/config/apply-gate.json")"
+check "AUT-301 committed apply gate: OD-B7 and N-04-S share one owner decision record" ok "^docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md 1$" -- jq -r '"\(.gates["OD-B7"].record) \([.gates[].record] | unique | length)"' "$INFRA/config/apply-gate.json"
+check "AUT-301 committed apply gate refuses while its record is absent" fail "record $GATE_RECORD does not exist" -- "$SK" gate
+mkdir -p "$T/$(dirname "$GATE_RECORD")" && cp "$INFRA/../$GATE_RECORD" "$T/$GATE_RECORD"
+check "AUT-301 committed apply gate is decided (OD-B7 accepted, N-04-S private repository)" ok "apply gates decided: OD-B7=ACCEPTED, N-04-S=PRIVATE_REPOSITORY" -- "$SK" gate
 gatefix() { # gatefix <jq>: an apply gate derived from the committed one
   local f="$TMP/gate.$RANDOM$RANDOM.json"
   jq "$1" "$INFRA/config/apply-gate.json" >"$f"
@@ -1210,6 +1213,7 @@ gatefix() { # gatefix <jq>: an apply gate derived from the committed one
 mkdir -p "$T/docs" && echo "decision" >"$T/docs/od-b7.md"
 DECIDED='.gates["OD-B7"] |= (.status = "CLOSED" | .record = "docs/od-b7.md") | .gates["N-04-S"] |= (.status = "PRIVATE_REPOSITORY" | .record = "docs/od-b7.md")'
 check "AUT-301 decided gates with records open the gate" ok "apply gates decided: OD-B7=CLOSED, N-04-S=PRIVATE_REPOSITORY" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED")" "$SK" gate
+check "AUT-301 an undecided gate refuses" fail "OD-B7: .* is UNDECIDED" -- env VEDA_APPLY_GATE="$(gatefix '.gates["OD-B7"] |= (.status = "UNDECIDED" | .record = null)')" "$SK" gate
 check "AUT-301 a decision without a record is refused" fail "OD-B7: decided without a record" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].record = null")" "$SK" gate
 check "AUT-301 a record that does not exist is refused" fail "record docs/none.md does not exist" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].record = \"docs/none.md\"")" "$SK" gate
 check "AUT-301 a status the gate does not allow is refused" fail "status OPEN is not one of CLOSED, ACCEPTED" -- env VEDA_APPLY_GATE="$(gatefix "$DECIDED | .gates[\"OD-B7\"].status = \"OPEN\"")" "$SK" gate
@@ -1295,7 +1299,7 @@ TFA="$(tf_plan_stub "$NOOP")"
 check "AUT-301 the approved plan is applied" ok "applied the approved plan of run 100 to staging/core.tfstate" -- sapply "$PD" "$(wf_session apply)" "$TFA"
 check "  ... exactly that plan file" ok "apply -input=false -lock-timeout=5m -no-color $PD/core.tfplan" -- cat "$TFA/calls.log"
 TFA="$(tf_plan_stub "$NOOP")"
-check "AUT-301 apply refused by the committed gate (OD-B7 undecided)" fail "staging applies are disabled" -- sapply "$PD" "$(wf_session apply)" "$TFA" VEDA_APPLY_GATE="$INFRA/config/apply-gate.json"
+check "AUT-301 apply refused by an undecided gate (OD-B7)" fail "staging applies are disabled" -- sapply "$PD" "$(wf_session apply)" "$TFA" VEDA_APPLY_GATE="$(gatefix '.gates["OD-B7"] |= (.status = "UNDECIDED" | .record = null)')"
 absent "  ... before Terraform runs at all" "^(init|apply) " "$(cat "$TFA/calls.log" 2>/dev/null || true)"
 check "AUT-301 apply outside 11-infra-apply on main refused" fail "applied only by .github/workflows/11-infra-apply.yml on main" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")" GITHUB_WORKFLOW_REF=local
 D="$TMP/reviewed.alt" && cp -R "$PD" "$D" && echo "another plan" >"$D/core.tfplan"
@@ -1652,18 +1656,22 @@ T="$(new_tree)"
 cp "$INFRA/config/apply-gate.json" "$INFRA/config/staging-platform.json" "$INFRA/config/staging-network.json" "$INFRA/config/staging-budget.json" "$T/infra/config/"
 SK="$T/infra/scripts/stack.sh"
 mkdir -p "$T/infra/terraform/envs/staging-core" "$T/docs" && echo "decision" >"$T/docs/od-b7.md"
-check "AUT-103 the committed decisions refuse the apply (storage and anchor_retention PROPOSED)" fail "DECISION: staging-platform.json: anchor_retention is PROPOSED" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
-jq '(.[] | objects | select(.status == "PROPOSED") | .status) = "DECIDED"' "$INFRA/config/staging-platform.json" >"$T/infra/config/staging-platform.json"
+jq '.anchor_retention.status = "PROPOSED"' "$INFRA/config/staging-platform.json" >"$T/infra/config/staging-platform.json"
+check "AUT-103 a PROPOSED decision refuses the apply" fail "DECISION: staging-platform.json: anchor_retention is PROPOSED" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
+cp "$INFRA/config/staging-platform.json" "$T/infra/config/staging-platform.json"
 TFA="$(tf_plan_stub "$NOOP")"
-check "AUT-103 recorded decisions open the decision gate" ok "owner decisions recorded: no PROPOSED entry" -- sapply "$PD" "$(wf_session apply)" "$TFA"
+check "AUT-103 the committed decisions open the decision gate" ok "owner decisions recorded: no PROPOSED entry" -- sapply "$PD" "$(wf_session apply)" "$TFA"
 echo '[' >"$T/infra/config/staging-broken.json"
 check "AUT-103 a malformed decision file refuses the apply" fail "is not valid JSON; refusing" -- sapply "$PD" "$(wf_session apply)" "$(tf_plan_stub "$NOOP")"
 rm "$T/infra/config/staging-broken.json"
 # The committed decision.
 PLATFORM="$INFRA/config/staging-platform.json"
 check "AUT-103 committed decision: evidence COMPLIANCE 30 days, snapshots expire after their 35-day lock" ok '^COMPLIANCE 30 42$' -- jq -r '"\(.storage.evidence_lock_mode) \(.storage.evidence_lock_days) \(.storage.snapshots_expire_days)"' "$PLATFORM"
-check "AUT-103 the 10-year anchor lock is an open owner decision (D6)" ok '^PROPOSED 3650$' -- jq -r '"\(.anchor_retention.status) \(.anchor_retention.application_retention_days)"' "$PLATFORM"
-check "AUT-103 the anchor retention the decision states is the application's" ok "RETENTION = timedelta\(days=3650\)" -- cat "$INFRA/../api/veda/platform/anchor_store.py"
+check "AUT-103 committed decision D6: configurable anchor retention, 30 days in staging" ok '^DECIDED 30$' -- jq -r '"\(.anchor_retention.status) \(.anchor_retention.application_retention_days)"' "$PLATFORM"
+# D6 order: no deployment (no anchor) until the application's retention is the decided one.
+APP_RETENTION="$(sed -nE 's/^RETENTION = timedelta\(days=([0-9]+)\)$/\1/p' "$INFRA/../api/veda/platform/anchor_store.py")"
+# shellcheck disable=SC2016 # jq program
+check "AUT-103 D6 deploys stay disabled while the application's anchor retention differs from the decision" ok "^ok$" -- jq -r --arg app "${APP_RETENTION:-unknown}" 'if .deploy.enabled == true and ($app != (.anchor_retention.application_retention_days | tostring)) then "deploy.enabled with application retention \($app), decided \(.anchor_retention.application_retention_days)" else "ok" end' "$PLATFORM"
 check "AUT-103 staging-core plans the storage module" ok 'source = "../../modules/storage"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 check "AUT-103 C3 VPC flow logs go to the logs bucket" ok 'flow_log_destination_arn = module.storage.flow_log_destination_arn' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 
@@ -1689,7 +1697,7 @@ check "AUT-104 a log group kept forever is refused" fail "log group with unlimit
 check "AUT-104 the trail's delivery role trusts CloudTrail for this trail only" ok '"aws:SourceArn":"arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail"' -- jq -r '.resource_changes[] | select(.address == "module.cloudtrail.aws_iam_role.trail_logs") | .change.after.assume_role_policy' "$CTPLAN"
 check "AUT-104 the boundary still denies stopping, deleting and re-scoping trails" ok '"cloudtrail:StopLogging", "cloudtrail:DeleteTrail", "cloudtrail:UpdateTrail", "cloudtrail:Put\*Selectors"' -- cat "$INFRA/terraform/bootstrap/boundary.tf"
 check "AUT-104 the logs bucket admits CloudTrail for the Veda trail only" ok '^arn:aws:cloudtrail:ap-south-1:111122223333:trail/veda-stg-trail$' -- jq -r '.resource_changes[] | select(.address == "module.storage.aws_s3_bucket_policy.this[\"logs\"]") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "CloudTrailWrite") | .Condition.StringEquals["aws:SourceArn"]' "$S3PLAN"
-check "AUT-104 committed decision: data events are an owner-session step on the anchor and evidence buckets" ok '^PROPOSED anchor,evidence 30$' -- jq -r '"\(.cloudtrail.status) \(.cloudtrail.owner_session_data_event_buckets | join(",")) \(.cloudtrail.log_group_retention_days)"' "$PLATFORM"
+check "AUT-104 committed decision: data events are an owner-session step on the anchor and evidence buckets" ok '^DECIDED anchor,evidence 30$' -- jq -r '"\(.cloudtrail.status) \(.cloudtrail.owner_session_data_event_buckets | join(",")) \(.cloudtrail.log_group_retention_days)"' "$PLATFORM"
 
 echo "== AUT-105: ECR (immutable, scanned, encrypted, private)"
 ECRPLAN="$HERE/fixtures/aut105-ecr-plan.json"
@@ -1752,7 +1760,7 @@ for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_s
   check "AUT-107 $t is refused" fail "$t is not allowed" -- guard "$(f="$TMP/ssm.$RANDOM.json"; plan_json "$f" "[$(res "$t" x '{}')]"; echo "$f")"
 done
 check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
-check "AUT-107 committed decision: staging host names, trusted proxy the Compose gateway (D7, PROPOSED)" ok '^PROPOSED https://api-staging.vedaspaces.com 172.30.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+check "AUT-107 committed decision: staging host names, trusted proxy the Compose gateway (D7)" ok '^DECIDED https://api-staging.vedaspaces.com 172.30.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
 
 echo "== AUT-110: monitoring (bounded metrics, alarms to the encrypted topic, nothing leaves the account)"
 MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"
@@ -1771,7 +1779,7 @@ for t in aws_cloudwatch_log_subscription_filter aws_cloudwatch_log_destination a
   check "AUT-110 $t is refused" fail "$t is not allowed" -- guard "$(monadd "$t" x '{}')"
 done
 check "AUT-110 the alert address is not in the plan text (sensitive; the owner's subscription as Terraform shows it)" ok '^ +\+ endpoint += \(sensitive value\)$' -- cat "$HERE/fixtures/aut110-plan-text-endpoint.txt"
-check "AUT-110 committed decision: thresholds and 30-day logs (PROPOSED)" ok '^PROPOSED 30 5 80$' -- jq -r '"\(.monitoring.status) \(.monitoring.log_retention_days) \(.monitoring.thresholds.server_errors_per_5min) \(.monitoring.thresholds.data_disk_percent)"' "$PLATFORM"
+check "AUT-110 committed decision: thresholds and 30-day logs" ok '^DECIDED 30 5 80$' -- jq -r '"\(.monitoring.status) \(.monitoring.log_retention_days) \(.monitoring.thresholds.server_errors_per_5min) \(.monitoring.thresholds.data_disk_percent)"' "$PLATFORM"
 
 echo "== AUT-108: compute and EBS (IMDSv2, encrypted volumes, SSM only, no NAT host, snapshots stay in Mumbai)"
 EC2PLAN="$HERE/fixtures/aut108-compute-plan.json"
@@ -1792,7 +1800,7 @@ done
 check "AUT-108 the data volume is kept and snapshotted daily, seven kept" ok '^daily 7$' -- jq -r '[(.resource_changes[] | select(.address == "module.compute.aws_ebs_volume.data") | .change.after.tags["veda-backup"]), (.resource_changes[] | select(.address == "module.compute.aws_dlm_lifecycle_policy.data") | .change.after.policy_details[0].schedule[0].retain_rule[0].count | tostring)] | join(" ")' "$EC2PLAN"
 check "AUT-108 the host alarms exist with the host (status, CPU, memory, both disks, health)" ok '^6$' -- jq '[.resource_changes[] | select(.address | startswith("module.monitoring.aws_cloudwatch_metric_alarm.host"))] | length' "$MONPLAN"
 absent "AUT-108 no planned resource refers to another workload (Aurion, swing-trader-vm)" "[Aa]urion|swing-trader" "$(cat "$HERE"/fixtures/aut1*-plan.json)"
-check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots (PROPOSED)" ok '^PROPOSED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
+check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots" ok '^DECIDED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
 check "  ... the same instance type as the network decision (AZ check)" ok '^t4g.small$' -- jq -r .host_instance_type "$INFRA/config/staging-network.json"
 
 echo "== AUT-111: SES (staging sender, sandbox, suppression and TLS, failure alarms, lead never rolled back)"
@@ -1809,7 +1817,7 @@ done
 check "AUT-111 the host sends only as the staging sender" ok '^no-reply@staging.vedaspaces.com$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "SendAsTheStagingSender") | .Condition.StringEquals["ses:FromAddress"]' "$IAMPLAN"
 check "AUT-111 the application is configured with the sender and the configuration set" ok '^Veda Spaces Staging <no-reply@staging.vedaspaces.com> veda-stg$' -- jq -r '[(.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_EMAIL_SENDER\"]") | .change.after.value), (.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]") | .change.after.value)] | join(" ")' "$SSMPLAN"
 check "AUT-111 an email failure never rolls back a committed lead (NOTIF-008, application test)" ok 'email failure never affects the committed lead \(NOTIF-008\)' -- cat "$INFRA/../api/tests/integration/test_leads.py"
-check "AUT-111 committed decision: sender, bounce threshold (PROPOSED)" ok '^PROPOSED staging.vedaspaces.com no-reply 0.05$' -- jq -r '"\(.ses.status) \(.ses.sender_domain) \(.ses.sender_local_part) \(.ses.bounce_rate_threshold)"' "$PLATFORM"
+check "AUT-111 committed decision: sender, bounce threshold" ok '^DECIDED staging.vedaspaces.com no-reply 0.05$' -- jq -r '"\(.ses.status) \(.ses.sender_domain) \(.ses.sender_local_part) \(.ses.bounce_rate_threshold)"' "$PLATFORM"
 
 echo "== Deployment wiring: 12-deploy (gated, OIDC deploy role, immutable image, scan gate, verified bundle, SSM only)"
 DW="$INFRA/../.github/workflows/12-deploy.yml"
@@ -1830,7 +1838,7 @@ absent "DEPLOY every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$DWT"
 absent "DEPLOY checkouts keep no credentials" "persist-credentials: true" "$DWT"
 check "DEPLOY deploys stay disabled: deploy.enabled is false in the committed decision" ok '^false$' -- jq -r '.deploy.enabled' "$INFRA/config/staging-platform.json"
 check "DEPLOY oidc-session names the deploy and evidence roles among the accepted ones" fail "plan, apply, deploy or evidence" -- "$INFRA/scripts/oidc-session.sh" --role bogus
-check "DEPLOY stack.sh decisions refuses the committed PROPOSED decisions" fail "is PROPOSED" -- env VEDA_DECISIONS_DIR="$INFRA/config" "$INFRA/scripts/stack.sh" decisions
+check "DEPLOY stack.sh decisions accepts the committed decisions" ok "owner decisions recorded" -- env VEDA_DECISIONS_DIR="$INFRA/config" "$INFRA/scripts/stack.sh" decisions
 
 # deploy.sh, offline: a git checkout of infra and api/deploy, stub aws and docker.
 DG="$TMP/deploygit.$RANDOM"
