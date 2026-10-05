@@ -377,4 +377,23 @@ shellcheck and actionlint clean; secret scan and governance doc test pass; the r
 
 ## 13. Remediation mutations
 
-_Filled in from the run._
+Each remediation was removed on its own in a fresh copy of the remediation commit, and the suite re-run.
+**All 6 are detected.**
+
+| # | Control removed | Suite result |
+|---|---|---|
+| R1 | flow log waits for the logs bucket policy | 756 passed, 1 failed |
+| R2 | parameters only under config/ | 755 passed, 2 failed |
+| R3a | trail ignores selector changes | 756 passed, 1 failed |
+| R3b | selectors refused at creation only | 756 passed, 1 failed |
+| R4 | deployment alarms silent before deploy (module) | 7 passed, 1 failed |
+| R4 | deployment alarms tied to deploy.enabled (root) | 756 passed, 1 failed |
+
+## 14. Live plan of the reviewed head
+
+PR #22 was merged at its pre-remediation head (`87b9ba9`) before re-certification; the remediation
+is a separate pull request. The approved `10-infra-plan` run of that head (run 37307022876, 2026-10-05) planned
+`staging-core` in the real staging account through `veda-gh-plan`, confined to ap-south-1:
+**`Plan: 159 to add, 0 to change, 0 to destroy.`**, the plan guard passed, nothing was created. It matches the
+sandboxed plan (159), which supports the sandbox method; with the remediation the count is 158 (R2).
+
