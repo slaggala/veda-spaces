@@ -122,7 +122,7 @@ The recipient is not a credential. It is a secret only so that GitHub masks it: 
 prints a step's plain variables (`vars.*`) in the job log. It is the workflows' only stored secret; AWS access stays
 OIDC only. Terraform marks it sensitive, so the plan text shows `(sensitive value)`. The saved plan file holds it, as it
 holds every planned value: if N-04-S is decided as `ACCEPTED` (publish the plan artifact from the public repository),
-the address becomes public with the artifact. `PRIVATE_REPOSITORY` avoids that.
+the address becomes public with the artifact. `PRIVATE_REPOSITORY` avoids that. **Decided 2026-10-05: `ACCEPTED` for staging** (a private repository on this personal account would lose the required reviewers; [decision record](../implementation/staging/STAGING-PLATFORM-owner-decisions.md)).
 
 Masking is not confinement: a same-repository pull request whose plan run the `staging-plan` reviewer approves runs
 its own code with the secret, and could print it in a transformed form. Approve plan runs only for pull requests you
