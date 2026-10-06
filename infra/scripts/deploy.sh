@@ -48,9 +48,33 @@ DIGEST="$(aws ecr describe-images --region "$VEDA_REGION" --repository-name "$RE
 log "image $REPO@$DIGEST"
 
 log "2. image scan"
-aws ecr wait image-scan-complete --region "$VEDA_REGION" --repository-name "$REPO" --image-id "imageDigest=$DIGEST"
-counts="$(aws ecr describe-image-scan-findings --region "$VEDA_REGION" --repository-name "$REPO" --image-id "imageDigest=$DIGEST" \
-  --output json | jq -c '.imageScanFindings.findingSeverityCounts // {}')"
+# Scan on push registers the scan a few seconds after the push. Until then ECR answers ScanNotFoundException, which
+# the CLI waiter (ecr wait image-scan-complete) treats as a failure, so poll instead: "not found yet" and "in
+# progress" wait, a completed scan is read, and anything else (a failed or unsupported scan, another error, the time
+# limit) refuses the deploy. The deploy role cannot start a scan itself.
+SCAN_POLL_SECONDS="${VEDA_SCAN_POLL_SECONDS:-10}"
+SCAN_MAX_POLLS="${VEDA_SCAN_MAX_POLLS:-60}"
+scan_err="$(mktemp)"
+trap 'rm -f "$scan_err"' EXIT
+findings=""
+for ((i = 1; i <= SCAN_MAX_POLLS; i++)); do
+  if out="$(aws ecr describe-image-scan-findings --region "$VEDA_REGION" --repository-name "$REPO" \
+    --image-id "imageDigest=$DIGEST" --output json 2>"$scan_err")"; then
+    status="$(jq -r '.imageScanStatus.status // empty' <<<"$out")"
+    case "$status" in
+      COMPLETE) findings="$out"; break ;;
+      IN_PROGRESS | PENDING) ;;
+      *) die "image scan ended ${status:-without a status}: $(jq -r '.imageScanStatus.description // empty' <<<"$out"); refusing" ;;
+    esac
+  elif grep -q ScanNotFoundException "$scan_err"; then
+    status="not registered yet"
+  else
+    die "cannot read the image scan: $(tr '\n' ' ' <"$scan_err")"
+  fi
+  ((i < SCAN_MAX_POLLS)) && sleep "$SCAN_POLL_SECONDS"
+done
+[[ -n "$findings" ]] || die "image scan not complete after $SCAN_MAX_POLLS checks (last: $status); refusing"
+counts="$(jq -c '.imageScanFindings.findingSeverityCounts // {}' <<<"$findings")"
 log "scan findings: $counts"
 [[ "$(jq '(.CRITICAL // 0) + (.HIGH // 0)' <<<"$counts")" == 0 ]] || die "the image has HIGH or CRITICAL findings; refusing to deploy it"
 
