@@ -35,15 +35,15 @@
 
 The owner chose **option B**: the application's anchor retention becomes configurable, and staging uses **30 days**.
 
-- **Today the application still hard-codes 3,650 days.** The constant is `RETENTION` in
-  `api/veda/platform/anchor_store.py`.
-- **The infrastructure does not need the change.** The anchor bucket has Object Lock enabled with no default
-  retention, so the first apply is unaffected.
-- **The change must merge before the first anchor is written,** that is, before `deploy.enabled` becomes `true`. Any
-  anchor written first would be locked for ten years, irreversibly.
-- **A check enforces this order.** `infra/tests/run.sh` refuses `deploy.enabled: true` while the application's
-  retention differs from `anchor_retention.application_retention_days`.
-- **The change is a separate, reviewed application pull request.** It is not part of this record.
+- **Implemented by the D6 change** ([review package](D6-anchor-retention-review-package.md)):
+  - the application reads `VEDA_ANCHOR_RETENTION_DAYS` (whole days; anything else refuses to load);
+  - staging refuses to start without it, and production refuses anything below 3,650 days;
+  - the S3 anchor store locks every object until now plus that retention;
+  - `staging-core` plans `/veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS` from `anchor_retention.application_retention_days`.
+- **The infrastructure applied on 2026-10-06 did not need the change.** The anchor bucket has Object Lock enabled with
+  no default retention. The parameter is added by the plan and apply that follow `deploy.enabled` (runbook §1).
+- **The order is still enforced.** `infra/tests/run.sh` refuses `deploy.enabled: true` unless the application change,
+  the mapping and the planned parameter are all in place.
 
 ## D8: staging Turnstile
 

@@ -21,6 +21,11 @@ from urllib.parse import urlparse
 ENVIRONMENTS = ("local", "test", "staging", "production")
 DEPLOYED_ENVIRONMENTS = ("staging", "production")
 MIN_KEY_BYTES = 32
+# Anchor Object Lock retention (05 §9.6, D6). COMPLIANCE mode: nobody can shorten or remove it once written, so the
+# default is the ledger's ten years, production never goes below it, and staging must state its own value.
+ANCHOR_RETENTION_DEFAULT_DAYS = 3650
+ANCHOR_RETENTION_PRODUCTION_MIN_DAYS = 3650
+ANCHOR_RETENTION_MAX_DAYS = 36500  # S3 Object Lock's own ceiling (100 years)
 _KMS_ARN = re.compile(r"^arn:aws[a-z-]*:kms:[a-z0-9-]+:\d{12}:(key|alias)/[A-Za-z0-9/_-]+$")
 
 
@@ -48,6 +53,17 @@ def _bool(name: str, default: bool) -> bool:
 def _int(name: str, default: int | None) -> int | None:
     value = _env(name)
     return int(value) if value is not None else default
+
+
+def _days(name: str) -> int | None:
+    """A whole number of days, or None when unset. Anything else refuses to load: a mistyped retention must never
+    fall back to a default."""
+    value = _env(name)
+    if value is None:
+        return None
+    if not re.fullmatch(r"[0-9]+", value.strip()):
+        raise ConfigError(f"{name} must be a whole number of days (got {value!r})")
+    return int(value.strip())
 
 
 def _intd(name: str, default: int) -> int:
@@ -151,6 +167,9 @@ class Settings:
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
+    # Object Lock retention of every anchor object, in days (D6). None = not set: the store uses the default
+    # (ANCHOR_RETENTION_DEFAULT_DAYS); staging must set it, production may not go below the minimum.
+    anchor_retention_days: int | None = None
     # Nightly snapshots (OPS-002, IR-11): local directory, optional Object Lock bucket, local copies kept.
     snapshot_dir: str | None = None
     snapshot_bucket: str | None = None
@@ -167,6 +186,11 @@ class Settings:
     # Schema revisions newer than this image that the operator declared expand-only compatible (IR-10, AM-6).
     schema_ahead_accepted: list[str] = field(default_factory=list)
     testing: bool = False
+
+    @property
+    def anchor_retention(self) -> timedelta:
+        days = self.anchor_retention_days
+        return timedelta(days=ANCHOR_RETENTION_DEFAULT_DAYS if days is None else days)
 
     @property
     def is_production(self) -> bool:
@@ -261,6 +285,7 @@ def load_settings(**overrides) -> Settings:
         lead_retention_enabled=_bool("VEDA_LEAD_RETENTION_ENABLED", False),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
         anchor_bucket=_env("VEDA_ANCHOR_BUCKET"),
+        anchor_retention_days=_days("VEDA_ANCHOR_RETENTION_DAYS"),
         snapshot_dir=_env("VEDA_SNAPSHOT_DIR"),
         snapshot_bucket=_env("VEDA_SNAPSHOT_BUCKET"),
         snapshot_keep=_intd("VEDA_SNAPSHOT_KEEP", 7),
@@ -297,9 +322,15 @@ def validate_environment(settings: Settings) -> list[str]:
     if not versions or len(set(versions)) != len(versions):
         # Their order is the re-consent "later version" rule (AM-4, RR-12): oldest first, each version once.
         problems.append("VEDA_PUBLISHED_POLICY_VERSIONS must list each published notice once, oldest first")
+    days = settings.anchor_retention_days
+    if days is not None and not 1 <= days <= ANCHOR_RETENTION_MAX_DAYS:
+        problems.append(f"VEDA_ANCHOR_RETENTION_DAYS must be between 1 and {ANCHOR_RETENTION_MAX_DAYS} (got {days})")
     if not settings.is_deployed:
         return problems
     env = settings.env
+    if env == "staging" and days is None:
+        # Staging decides its own retention (D6): an unset value would lock every anchor for the ten-year default.
+        problems.append("VEDA_ANCHOR_RETENTION_DAYS is required in staging (D6)")
     required = {
         "VEDA_JWT_PRIVATE_KEY_PEM": settings.jwt_private_key_pem,
         "VEDA_TURNSTILE_SECRET": settings.turnstile_secret,
@@ -391,6 +422,10 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append("VEDA_SENTRY_DSN is required in production (LOG-004)")
         if not settings.anchor_bucket:
             problems.append("VEDA_ANCHOR_BUCKET is required in production (SEVT-007)")
+        if settings.anchor_retention.days < ANCHOR_RETENTION_PRODUCTION_MIN_DAYS:
+            problems.append(
+                f"VEDA_ANCHOR_RETENTION_DAYS must be at least {ANCHOR_RETENTION_PRODUCTION_MIN_DAYS} in production (D6)"
+            )
         if not settings.snapshot_bucket:
             problems.append("VEDA_SNAPSHOT_BUCKET is required in production (OPS-002)")
     return problems
