@@ -1873,7 +1873,9 @@ deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum
   echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
   echo "token" >"$d/ecr_get-login-password.json"
   echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$d/ecr_describe-images.json"
-  echo "{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}}}}" >"$d/ecr_describe-image-scan-findings.json"
+  local listed="[]"
+  [[ "${1:-0}" == 0 ]] || listed='[{"name":"CVE-2026-11111","severity":"HIGH","attributes":[{"key":"package_name","value":"openssl"},{"key":"package_version","value":"3.5.1-1"}]}]'
+  echo "{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}},\"findings\":$listed}}" >"$d/ecr_describe-image-scan-findings.json"
   if [[ -n "${3:-}" ]]; then echo "{\"Metadata\":{\"sha256\":\"$3\"}}" >"$d/s3api_head-object.json"; else echo "Not Found" >"$d/s3api_head-object.fail"; fi
   : >"$d/s3_cp.json"
   echo '{"Command":{"CommandId":"c-1"}}' >"$d/ssm_send-command.json"
@@ -1893,7 +1895,7 @@ check "DEPLOY a clean image is pushed, its bundle uploaded and veda-deploy run" 
 check "  ... veda-deploy gets the tag, the digest and the bundle SHA-256, on the tagged host only" ok "send-command .*--document-name veda-deploy --targets Key=tag:project,Values=veda-spaces Key=tag:env,Values=staging .*releaseTag=$DTAG,imageDigest=$DIGEST,bundleSha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
 check "  ... the bundle is the committed api/deploy and infra/host, with its SHA-256 as metadata" ok "s3 cp .*bundle-$DTAG.tgz s3://veda-stg-artifacts-$ACCT/deploy/$DTAG/bundle.tgz --metadata sha256=[0-9a-f]{64}" -- cat "$DA/calls.log"
 DA="$(deploy_stub 1)"
-check "DEPLOY an image with HIGH findings is refused" fail "HIGH or CRITICAL findings; refusing" -- dep "$DA"
+check "DEPLOY an image with HIGH findings is refused" fail "HIGH or CRITICAL findings not covered by a reviewed staging exception; refusing" -- dep "$DA"
 absent "  ... before any upload or command" "s3 cp|send-command" "$(cat "$DA/calls.log")"
 DA="$(deploy_stub)" && sed -i.bak 's/veda-gh-deploy/veda-gh-plan/' "$DA/sts_get-caller-identity.json"
 check "DEPLOY a session other than veda-gh-deploy is refused" fail "not veda-gh-deploy; refusing" -- dep "$DA"
@@ -1913,7 +1915,7 @@ case "$a" in
   denied) echo "An error occurred (AccessDeniedException) when calling the DescribeImageScanFindings operation" >&2; exit 254 ;;
   in-progress) echo '{"imageScanStatus":{"status":"IN_PROGRESS"}}' ;;
   failed) echo '{"imageScanStatus":{"status":"UNSUPPORTED_IMAGE","description":"unsupported image"}}' ;;
-  high) echo '{"imageScanStatus":{"status":"COMPLETE"},"imageScanFindings":{"findingSeverityCounts":{"HIGH":1}}}' ;;
+  high) echo '{"imageScanStatus":{"status":"COMPLETE"},"imageScanFindings":{"findingSeverityCounts":{"HIGH":1},"findings":[{"name":"CVE-2026-11111","severity":"HIGH","attributes":[{"key":"package_name","value":"openssl"},{"key":"package_version","value":"3.5.1-1"}]}]}}' ;;
   *) echo '{"imageScanStatus":{"status":"COMPLETE"},"imageScanFindings":{"findingSeverityCounts":{"MEDIUM":2}}}' ;;
 esac
 STUB
@@ -1925,7 +1927,7 @@ check "DEPLOY a scan not registered yet right after the push is waited for, not 
 check "  ... it polled until the scan completed (4 reads)" ok '^4$' -- grep -c "describe-image-scan-findings" "$DA/calls.log"
 absent "  ... and no CLI waiter is used (it fails on ScanNotFoundException)" "ecr wait" "$(cat "$DA/calls.log")"
 DA="$(scan_seq "$(deploy_stub)" not-found high)"
-check "DEPLOY HIGH findings found after waiting are still refused" fail "HIGH or CRITICAL findings; refusing" -- dep "$DA"
+check "DEPLOY HIGH findings found after waiting are still refused" fail "HIGH or CRITICAL findings not covered by a reviewed staging exception; refusing" -- dep "$DA"
 DA="$(scan_seq "$(deploy_stub)" not-found failed)"
 check "DEPLOY a scan that ends unsupported or failed is refused" fail "image scan ended UNSUPPORTED_IMAGE: unsupported image; refusing" -- dep "$DA"
 absent "  ... before any upload or command" "s3 cp|send-command" "$(cat "$DA/calls.log")"
@@ -1934,6 +1936,52 @@ check "DEPLOY any other scan error is refused at once" fail "cannot read the ima
 dep_polls3() { SCAN_POLLS=3 dep "$1"; }
 DA="$(scan_seq "$(deploy_stub)" not-found)"
 check "DEPLOY a scan that never appears is refused after the poll limit" fail "image scan not complete after 3 checks \(last: not registered yet\); refusing" -- dep_polls3 "$DA"
+
+# Image scan gate: HIGH and CRITICAL findings refuse the image unless a reviewed, unexpired staging exception covers
+# each one by exact vulnerability ID, package and version. Production has no exceptions.
+CIS="$INFRA/scripts/check-image-scan.sh"
+SCANEX="$INFRA/config/image-scan-exceptions.json"
+scanf() { # scanf <findings jq array> [counts jq object]: a findings file shaped like describe-image-scan-findings
+  local f="$TMP/scan.$RANDOM$RANDOM.json"
+  jq -n --argjson l "$1" --argjson c "${2:-null}" '{imageScanStatus: {status: "COMPLETE"}, imageScanFindings: {findings: $l,
+    findingSeverityCounts: ($c // ($l | map(.severity) | group_by(.) | map({key: .[0], value: length}) | from_entries))}}' >"$f"
+  echo "$f"
+}
+fnd() { # fnd <id> <package> <version> [severity]: one finding as ECR basic scanning reports it
+  printf '{"name":"%s","severity":"%s","attributes":[{"key":"package_version","value":"%s"},{"key":"package_name","value":"%s"},{"key":"CVSS3_SCORE","value":"7.5"}]}' "$1" "${4:-HIGH}" "$3" "$2"
+}
+APPROVED3="[$(fnd CVE-2026-95619 gcc-14 14.2.0-19),$(fnd CVE-2026-102010 gcc-14 14.2.0-19),$(fnd CVE-2026-85091 zlib 1.3.dfsg+really1.3.1-1)]"
+exfix() { local f="$TMP/scanex.$RANDOM$RANDOM.json"; jq "$1" "$SCANEX" >"$f"; echo "$f"; }
+cis() { "$CIS" --exceptions "$SCANEX" "$@"; }
+cisx() { "$CIS" --exceptions "$1" "${@:2}"; }
+# shellcheck disable=SC2016 # jq program
+check "SCAN the committed exceptions are exactly the three approved vulnerabilities, staging only, expiring 2026-12-31" ok '^CVE-2026-102010 gcc-14 14.2.0-19 staging 2026-10-06 2026-12-31,CVE-2026-85091 zlib 1.3.dfsg\+really1.3.1-1 staging 2026-10-06 2026-12-31,CVE-2026-95619 gcc-14 14.2.0-19 staging 2026-10-06 2026-12-31$' -- jq -r '[.exceptions[] | "\(.vulnerability) \(.package) \(.version) \(.environment) \(.approved_on) \(.expires)"] | sort | join(",")' "$SCANEX"
+check "SCAN staging: the three approved findings are covered" ok "3 HIGH or CRITICAL finding\(s\), all covered by reviewed exceptions" -- cis --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-10-06
+check "  ... still covered on the last day before expiry (2026-12-30)" ok "all covered by reviewed exceptions" -- cis --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-12-30
+check "SCAN expiry: on 2026-12-31 the exceptions no longer cover the findings" fail "CVE-2026-95619 gcc-14::14.2.0-19 \(its exception has expired\)" -- cis --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-12-31
+check "  ... nor at any later date" fail "not covered by a reviewed staging exception; refusing" -- cis --findings "$(scanf "$APPROVED3")" --environment staging --today 2027-03-01
+check "SCAN production: the same three findings are refused (no production exceptions)" fail "not covered by a reviewed production exception; refusing" -- cis --findings "$(scanf "$APPROVED3")" --environment production --today 2026-10-06
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "  ... each of them is named as blocking" ok '^3$' -- bash -c '"$0" --findings "$1" --environment production --today 2026-10-06 2>&1 | grep -c "^\[[0-9:]*\] BLOCKING: HIGH CVE-2026-"' "$CIS" "$(scanf "$APPROVED3")"
+check "SCAN another HIGH finding next to the approved three is refused" fail "BLOCKING: HIGH CVE-2026-11111 openssl::3.5.1-1" -- cis --findings "$(scanf "[$(fnd CVE-2026-11111 openssl 3.5.1-1),${APPROVED3:1}")" --environment staging --today 2026-10-06
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "  ... and only it is blocking" ok '^1$' -- bash -c '"$0" --findings "$1" --environment staging --today 2026-10-06 2>&1 | grep -c "BLOCKING"' "$CIS" "$(scanf "[$(fnd CVE-2026-11111 openssl 3.5.1-1),${APPROVED3:1}")"
+check "SCAN a CRITICAL finding is refused" fail "BLOCKING: CRITICAL CVE-2026-22222 libssl3::3.5.1-1" -- cis --findings "$(scanf "[$(fnd CVE-2026-22222 libssl3 3.5.1-1 CRITICAL)]")" --environment staging --today 2026-10-06
+check "SCAN another vulnerability in an approved package and version is refused (only the approved IDs are exempt)" fail "BLOCKING: HIGH CVE-2026-55555 gcc-14::14.2.0-19" -- cis --findings "$(scanf "[$(fnd CVE-2026-55555 gcc-14 14.2.0-19),${APPROVED3:1}")" --environment staging --today 2026-10-06
+check "  ... likewise in zlib" fail "BLOCKING: HIGH CVE-2026-66666 zlib::1.3.dfsg\+really1.3.1-1" -- cis --findings "$(scanf "[$(fnd CVE-2026-66666 zlib 1.3.dfsg+really1.3.1-1)]")" --environment staging --today 2026-10-06
+check "SCAN an approved vulnerability in another package version is refused" fail "BLOCKING: HIGH CVE-2026-95619 gcc-14::14.2.0-20" -- cis --findings "$(scanf "[$(fnd CVE-2026-95619 gcc-14 14.2.0-20)]")" --environment staging --today 2026-10-06
+check "SCAN an approved vulnerability in another package is refused" fail "BLOCKING: HIGH CVE-2026-85091 zlib-ng::1.3.dfsg\+really1.3.1-1" -- cis --findings "$(scanf "[$(fnd CVE-2026-85091 zlib-ng 1.3.dfsg+really1.3.1-1)]")" --environment staging --today 2026-10-06
+check "SCAN a finding without package attributes is never covered" fail "BLOCKING: HIGH CVE-2026-95619 ::" -- cis --findings "$(scanf '[{"name":"CVE-2026-95619","severity":"HIGH","attributes":[]}]')" --environment staging --today 2026-10-06
+check "SCAN counts that disagree with the listed findings are refused" fail "counts 4 HIGH or CRITICAL findings but lists 3; refusing" -- cis --findings "$(scanf "$APPROVED3" '{"HIGH":4}')" --environment staging --today 2026-10-06
+check "SCAN MEDIUM and LOW findings do not block" ok "0 HIGH or CRITICAL finding" -- cis --findings "$(scanf "[$(fnd CVE-2026-33333 bash 5.2-1 MEDIUM),$(fnd CVE-2026-44444 tar 1.35-1 LOW)]")" --environment staging --today 2026-10-06
+check "SCAN an exception that matches nothing is reported for removal" ok "image scan exception CVE-2026-95619 matches no finding: remove it" -- cis --findings "$(scanf "[]")" --environment staging --today 2026-10-06
+check "SCAN an exception for production is refused" fail "environment production; only staging may have exceptions" -- cisx "$(exfix '.exceptions[0].environment = "production"')" --findings "$(scanf "$APPROVED3")" --environment production --today 2026-10-06
+check "SCAN an exception lasting more than 90 days is refused" fail "must expire 1 to 90 days after approval" -- cisx "$(exfix '.exceptions[0].expires = "2027-06-30"')" --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-10-06
+check "SCAN an exception without compensating controls is refused" fail "compensating_controls are required" -- cisx "$(exfix '.exceptions[1].compensating_controls = []')" --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-10-06
+check "SCAN an exception without an exact version is refused" fail "missing version" -- cisx "$(exfix 'del(.exceptions[2].version)')" --findings "$(scanf "$APPROVED3")" --environment staging --today 2026-10-06
+# shellcheck disable=SC2016 # literal for the inner shell or the matched text
+check "SCAN deploy.sh applies the gate with the staging environment, after the scan completes" ok "in order" -- order_ok "$(cat "$INFRA/scripts/deploy.sh")" "COMPLETE) findings=" 'check-image-scan.sh" --findings "\$scan_json" --environment staging'
+absent "SCAN deploy.sh keeps no count-only HIGH/CRITICAL test that an exception could not reach" "CRITICAL // 0\) \+ \(.HIGH" "$(cat "$INFRA/scripts/deploy.sh")"
 
 # The deploy document and the host scripts.
 DEPDOC="$HERE/fixtures/deploy-plan.json"

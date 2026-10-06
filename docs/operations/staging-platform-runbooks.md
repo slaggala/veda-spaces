@@ -28,8 +28,9 @@ Roles: **owner session** = the bootstrap owner role (MFA, Mumbai-only session po
    the parameter `/veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS` = `30` is added (D6). Expect 1 to add, the alarm
    changes, 0 to destroy.
 3. Actions → `12-deploy` → Run workflow on `main`. Approve the `staging` environment.
-4. The job builds the image of this commit, pushes `veda-api:<12-hex>`, waits for the scan (stops on HIGH or
-   CRITICAL), uploads `deploy/<tag>/bundle.tgz` with its SHA-256, and runs `veda-deploy` on the host:
+4. The job builds the image of this commit, pushes `veda-api:<12-hex>`, waits for the scan (stops on any HIGH or
+   CRITICAL finding not covered by a reviewed staging exception, `infra/config/image-scan-exceptions.json`;
+   [policy](image-scan-exceptions.md)), uploads `deploy/<tag>/bundle.tgz` with its SHA-256, and runs `veda-deploy` on the host:
    bundle verified → `host-setup.sh` (mount, Compose, agent, heartbeat) → `render-env.sh` (refuses until every secret
    is seeded) → pull by digest → `api/deploy/deploy.sh <tag>` (floors, snapshot, quiesce, expand-only migration,
    readiness, resume; [api-runbooks §1](api-runbooks.md)). The CloudWatch agent configuration comes from the bundle

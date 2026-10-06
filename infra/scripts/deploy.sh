@@ -5,7 +5,8 @@
 #   infra/scripts/deploy.sh --tag <12 hex digits of the commit>
 #
 # 1. Builds the API image from this commit and pushes it to veda-api with the immutable tag.
-# 2. Waits for the image scan and refuses HIGH or CRITICAL findings.
+# 2. Waits for the image scan and refuses HIGH or CRITICAL findings not covered by a reviewed staging exception
+#    (check-image-scan.sh, infra/config/image-scan-exceptions.json).
 # 3. Uploads the deploy bundle (api/deploy and infra/host as committed: git archive) with its SHA-256; an existing
 #    bundle for the tag must be the same bytes.
 # 4. Runs the SSM document veda-deploy on the staging host (tags project=veda-spaces, env=staging) with the tag, the
@@ -18,7 +19,7 @@ TAG=""
 while (($#)); do
   case "$1" in
     --tag) TAG="${2:-}"; shift 2 ;;
-    -h | --help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,14p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -54,8 +55,8 @@ log "2. image scan"
 # limit) refuses the deploy. The deploy role cannot start a scan itself.
 SCAN_POLL_SECONDS="${VEDA_SCAN_POLL_SECONDS:-10}"
 SCAN_MAX_POLLS="${VEDA_SCAN_MAX_POLLS:-60}"
-scan_err="$(mktemp)"
-trap 'rm -f "$scan_err"' EXIT
+scan_err="$(mktemp)" scan_json="$(mktemp)"
+trap 'rm -f "$scan_err" "$scan_json"' EXIT
 findings=""
 for ((i = 1; i <= SCAN_MAX_POLLS; i++)); do
   if out="$(aws ecr describe-image-scan-findings --region "$VEDA_REGION" --repository-name "$REPO" \
@@ -76,7 +77,10 @@ done
 [[ -n "$findings" ]] || die "image scan not complete after $SCAN_MAX_POLLS checks (last: $status); refusing"
 counts="$(jq -c '.imageScanFindings.findingSeverityCounts // {}' <<<"$findings")"
 log "scan findings: $counts"
-[[ "$(jq '(.CRITICAL // 0) + (.HIGH // 0)' <<<"$counts")" == 0 ]] || die "the image has HIGH or CRITICAL findings; refusing to deploy it"
+# HIGH and CRITICAL findings refuse the image unless a reviewed, unexpired staging exception covers each one exactly
+# (infra/config/image-scan-exceptions.json).
+printf '%s' "$findings" >"$scan_json"
+"$(dirname "$0")/check-image-scan.sh" --findings "$scan_json" --environment staging
 
 log "3. deploy bundle s3://$BUCKET/$KEY"
 BUNDLE="$GENERATED_DIR/bundle-$TAG.tgz"
