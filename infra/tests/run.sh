@@ -139,7 +139,6 @@ gh_compliant() {
   mkdir -p "$d"
   for env in bootstrap staging-plan staging-infra staging staging-evidence; do
     reviewers='[{"type":"required_reviewers","reviewers":[{"type":"User","reviewer":{"id":1001}}]}]'
-    [[ "$env" == staging-evidence ]] && reviewers='[]'
     policy='{"protected_branches":false,"custom_branch_policies":true}'
     [[ "$env" == staging-plan ]] && policy=null
     jq -n --argjson r "$reviewers" --argjson p "$policy" '{can_admins_bypass: false, protection_rules: $r, deployment_branch_policy: $p}' \
@@ -452,7 +451,6 @@ absent "F10 no environment-scoped variable" "--env" "$out_var"
 V="$TMP/gh.verify" && mkdir -p "$V"
 for env in bootstrap staging-plan staging-infra staging staging-evidence; do
   reviewers='[{"type":"required_reviewers","reviewers":[{"type":"User","reviewer":{"id":1001}}]}]'
-  [[ "$env" == staging-evidence ]] && reviewers='[]'
   policy='{"protected_branches":false,"custom_branch_policies":true}'
   [[ "$env" == staging-plan ]] && policy=null
   jq -n --argjson r "$reviewers" --argjson p "$policy" '{can_admins_bypass: false, protection_rules: $r, deployment_branch_policy: $p}' \
@@ -472,6 +470,9 @@ drift() { # drift <name> <file suffix> <jq>
 }
 check "F10 admin bypass detected" fail "staging-infra: admins can bypass" -- verify "$(drift a environments_staging-infra '.can_admins_bypass = true')"
 check "F9 staging-plan without reviewers detected" fail "staging-plan: no required reviewers" -- verify "$(drift b environments_staging-plan '.protection_rules = []')"
+check "RR-07 staging-evidence requires a reviewer (13-evidence proves the approval)" ok "staging-evidence:yes:yes" -- cat "$INFRA/scripts/github-setup.sh"
+check "RR-07 staging-evidence without reviewers detected" fail "staging-evidence: no required reviewers" -- verify "$(drift e environments_staging-evidence '.protection_rules = []')"
+check "RR-07 setup gives staging-evidence the reviewer" ok 'environments/staging-evidence <<< .*"reviewers":\[\{"type":"User","id":1001\}\]' -- printf '%s\n' "$out_env"
 check "F10 bootstrap open to any branch detected" fail "bootstrap: not restricted to main" -- verify "$(drift c environments_bootstrap '.deployment_branch_policy = null')"
 check "F10 extra deployment branch detected" fail "staging: deployment branches are 'branch:feature/x,branch:main'" -- verify "$(drift d environments_staging_deployment-branch-policies '.branch_policies += [{"name":"feature/x","type":"branch"}]')"
 check "F10 force pushes on main detected" fail "main: force pushes allowed" -- verify "$(drift e branches_main_protection '.allow_force_pushes.enabled = true')"
