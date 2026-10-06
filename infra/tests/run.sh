@@ -1873,8 +1873,7 @@ deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum
   echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
   echo "token" >"$d/ecr_get-login-password.json"
   echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$d/ecr_describe-images.json"
-  : >"$d/ecr_wait.json"
-  echo "{\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}}}}" >"$d/ecr_describe-image-scan-findings.json"
+  echo "{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}}}}" >"$d/ecr_describe-image-scan-findings.json"
   if [[ -n "${3:-}" ]]; then echo "{\"Metadata\":{\"sha256\":\"$3\"}}" >"$d/s3api_head-object.json"; else echo "Not Found" >"$d/s3api_head-object.fail"; fi
   : >"$d/s3_cp.json"
   echo '{"Command":{"CommandId":"c-1"}}' >"$d/ssm_send-command.json"
@@ -1885,7 +1884,8 @@ deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum
 dep() { # dep <aws dir> [tag]
   local d="$TMP/docker.$RANDOM$RANDOM"
   mkdir -p "$d"
-  env AWS_STUB_DIR="$1" DOCKER_STUB_DIR="$d" GITHUB_SHA="$DSHA" "$DG/infra/scripts/deploy.sh" --tag "${2:-$DTAG}"
+  env AWS_STUB_DIR="$1" DOCKER_STUB_DIR="$d" GITHUB_SHA="$DSHA" VEDA_SCAN_POLL_SECONDS=0 VEDA_SCAN_MAX_POLLS="${SCAN_POLLS:-60}" \
+    "$DG/infra/scripts/deploy.sh" --tag "${2:-$DTAG}"
 }
 DA="$(deploy_stub)"
 out_dep="$(dep "$DA" 2>&1)"
@@ -1900,6 +1900,40 @@ check "DEPLOY a session other than veda-gh-deploy is refused" fail "not veda-gh-
 check "DEPLOY a tag that is not this commit is refused" fail "is not this commit" -- dep "$(deploy_stub)" "0123456789ab"
 check "DEPLOY a different bundle already uploaded for the tag is refused" fail "a different bundle already exists" -- dep "$(deploy_stub 0 Success "$(printf 'b%.0s' {1..64})")"
 check "DEPLOY a failed veda-deploy fails the run" fail "veda-deploy ended Failed" -- dep "$(deploy_stub 0 Failed)"
+# The scan is registered a few seconds after the push (scan on push): "not found yet" and "in progress" wait.
+scan_seq() { # scan_seq <aws dir> <answer>...: describe-image-scan-findings answers in turn (not-found, in-progress, high, failed, denied)
+  local d="$1"; shift
+  printf '%s\n' "$@" >"$d/scan.seq"
+  cat >"$d/ecr_describe-image-scan-findings.cmd" <<'STUB'
+#!/usr/bin/env bash
+d="$AWS_STUB_DIR"; n=$(($(cat "$d/scan.n" 2>/dev/null || echo 0) + 1)); echo "$n" >"$d/scan.n"
+a="$(sed -n "${n}p" "$d/scan.seq")"; [[ -n "$a" ]] || a="$(tail -n 1 "$d/scan.seq")"
+case "$a" in
+  not-found) echo "An error occurred (ScanNotFoundException) when calling the DescribeImageScanFindings operation: Image scan does not exist" >&2; exit 254 ;;
+  denied) echo "An error occurred (AccessDeniedException) when calling the DescribeImageScanFindings operation" >&2; exit 254 ;;
+  in-progress) echo '{"imageScanStatus":{"status":"IN_PROGRESS"}}' ;;
+  failed) echo '{"imageScanStatus":{"status":"UNSUPPORTED_IMAGE","description":"unsupported image"}}' ;;
+  high) echo '{"imageScanStatus":{"status":"COMPLETE"},"imageScanFindings":{"findingSeverityCounts":{"HIGH":1}}}' ;;
+  *) echo '{"imageScanStatus":{"status":"COMPLETE"},"imageScanFindings":{"findingSeverityCounts":{"MEDIUM":2}}}' ;;
+esac
+STUB
+  chmod +x "$d/ecr_describe-image-scan-findings.cmd"
+  echo "$d"
+}
+DA="$(scan_seq "$(deploy_stub)" not-found not-found in-progress clean)"
+check "DEPLOY a scan not registered yet right after the push is waited for, not a failure" ok "deployed $DTAG \($DIGEST\) to staging" -- dep "$DA"
+check "  ... it polled until the scan completed (4 reads)" ok '^4$' -- grep -c "describe-image-scan-findings" "$DA/calls.log"
+absent "  ... and no CLI waiter is used (it fails on ScanNotFoundException)" "ecr wait" "$(cat "$DA/calls.log")"
+DA="$(scan_seq "$(deploy_stub)" not-found high)"
+check "DEPLOY HIGH findings found after waiting are still refused" fail "HIGH or CRITICAL findings; refusing" -- dep "$DA"
+DA="$(scan_seq "$(deploy_stub)" not-found failed)"
+check "DEPLOY a scan that ends unsupported or failed is refused" fail "image scan ended UNSUPPORTED_IMAGE: unsupported image; refusing" -- dep "$DA"
+absent "  ... before any upload or command" "s3 cp|send-command" "$(cat "$DA/calls.log")"
+DA="$(scan_seq "$(deploy_stub)" denied)"
+check "DEPLOY any other scan error is refused at once" fail "cannot read the image scan: An error occurred \(AccessDeniedException\)" -- dep "$DA"
+dep_polls3() { SCAN_POLLS=3 dep "$1"; }
+DA="$(scan_seq "$(deploy_stub)" not-found)"
+check "DEPLOY a scan that never appears is refused after the poll limit" fail "image scan not complete after 3 checks \(last: not registered yet\); refusing" -- dep_polls3 "$DA"
 
 # The deploy document and the host scripts.
 DEPDOC="$HERE/fixtures/deploy-plan.json"
