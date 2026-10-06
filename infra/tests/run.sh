@@ -1855,7 +1855,7 @@ check "DEPLOY the job assumes veda-gh-deploy through OIDC" ok "oidc-session.sh -
 absent "DEPLOY no stored secret, no OIDC token at workflow level" "secrets\.|^permissions:.*id-token" "$DWT"
 absent "DEPLOY every action pinned to a commit" 'uses: [^@]+@v[0-9]' "$DWT"
 absent "DEPLOY checkouts keep no credentials" "persist-credentials: true" "$DWT"
-check "DEPLOY deploys stay disabled: deploy.enabled is false in the committed decision" ok '^false$' -- jq -r '.deploy.enabled' "$INFRA/config/staging-platform.json"
+check "DEPLOY deploys are enabled in the committed decision, public intake stays disabled" ok '^true disabled DECIDED$' -- jq -r '"\(.deploy.enabled) \(.deploy.public_intake) \(.deploy.status)"' "$INFRA/config/staging-platform.json"
 check "DEPLOY oidc-session names the deploy and evidence roles among the accepted ones" fail "plan, apply, deploy or evidence" -- "$INFRA/scripts/oidc-session.sh" --role bogus
 check "DEPLOY stack.sh decisions accepts the committed decisions" ok "owner decisions recorded" -- env VEDA_DECISIONS_DIR="$INFRA/config" "$INFRA/scripts/stack.sh" decisions
 

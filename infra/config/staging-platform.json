@@ -80,8 +80,8 @@
   },
   "deploy": {
     "status": "DECIDED",
-    "decision": "2026-10-05 (owner): do not deploy Veda; public lead intake stays disabled. 12-deploy refuses while enabled is false.",
-    "enabled": false,
+    "decision": "2026-10-06 (owner, deploy-enable phase): deploy.enabled true, so 12-deploy may run and the deployment alarms notify (review R4). Merged only after the D6 change, the CloudTrail data events and the eight AUT-302 secrets; applied (1 parameter added, 11 alarm actions on) immediately before the first 12-deploy. Public lead intake stays disabled: no tunnel, DNS or Turnstile widget (AUT-201 to AUT-204), and the test Turnstile secret (D8) is not for public use.",
+    "enabled": true,
     "public_intake": "disabled"
   }
 }

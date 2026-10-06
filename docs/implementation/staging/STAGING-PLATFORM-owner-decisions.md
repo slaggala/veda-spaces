@@ -45,6 +45,15 @@ The owner chose **option B**: the application's anchor retention becomes configu
 - **The order is still enforced.** `infra/tests/run.sh` refuses `deploy.enabled: true` unless the application change,
   the mapping and the planned parameter are all in place.
 
+## Deploy enable (pending owner approval)
+
+The deploy-enable change sets `deploy.enabled: true`, while public intake stays `disabled`. It is proposed for the
+owner's review in a separate pull request, with its order, checks and rollback in the
+[change package](DEPLOY-ENABLE-change-package.md). It is merged only after:
+- D6;
+- the CloudTrail data events;
+- the eight secrets.
+
 ## D8: staging Turnstile
 
 **Cloudflare's published always-pass test secret** is used in staging, seeded as `VEDA_TURNSTILE_SECRET` with the
