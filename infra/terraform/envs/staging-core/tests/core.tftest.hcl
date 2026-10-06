@@ -123,3 +123,17 @@ run "network_from_the_committed_decision" {
   }
 }
 
+# D6: the anchor retention the application receives is the committed decision, as a whole number of days.
+run "anchor_retention_parameter_is_the_decision" {
+  command = plan
+
+  assert {
+    condition     = local.app_config["VEDA_ANCHOR_RETENTION_DAYS"] == "30"
+    error_message = "VEDA_ANCHOR_RETENTION_DAYS must be the decided staging retention (anchor_retention.application_retention_days)"
+  }
+
+  assert {
+    condition     = module.ssm.config_parameter_names == sort([for k in keys(local.app_config) : "/veda/staging/config/${k}"])
+    error_message = "every configuration value, the anchor retention included, must be planned under /veda/staging/config/"
+  }
+}

@@ -15,6 +15,7 @@ Roles: **owner session** = the bootstrap owner role (MFA, Mumbai-only session po
 | Apply gate | `infra/config/apply-gate.json` (OD-B7, N-04-S) | Both decided with a committed record |
 | Decision gate | `infra/config/staging-*.json`: no section `PROPOSED` (`stack.sh decisions`) | The owner records every proposed value |
 | Deploy gate | `staging-platform.json` `deploy.enabled` | The owner sets it true in a reviewed pull request |
+| Anchor retention (D6) | `infra/tests/run.sh` refuses `deploy.enabled: true` unless the application reads `VEDA_ANCHOR_RETENTION_DAYS`, the anchor store locks for it, and `staging-core` plans it from `anchor_retention` (30 days); the API refuses to start in staging without it | Already met by the D6 change; it stays enforced |
 | Deployment alarm actions | The same `deploy.enabled`: the alarms fed by the application, the agent or the heartbeat exist but notify no one (review R4) | The plan and apply that follow the `deploy.enabled` change |
 | Public path | No tunnel, DNS or Turnstile widget (AUT-201 … 203, out of scope) | Those stories are built |
 
@@ -22,8 +23,10 @@ Roles: **owner session** = the bootstrap owner role (MFA, Mumbai-only session po
 
 **First deploy** (after the apply sequence, §7, and the secrets, §6.3):
 1. Set `deploy.enabled: true` in `infra/config/staging-platform.json` (reviewed pull request, merged to `main`).
-2. Plan and apply `staging-core` (`10-infra-plan` → `11-infra-apply`): the only change is the **alarm actions** of the
-   deployment alarms turning on (`actions_enabled`, review R4). Until then those alarms report missing data silently.
+2. Plan and apply `staging-core` (`10-infra-plan` → `11-infra-apply`): the **alarm actions** of the deployment alarms
+   turn on (`actions_enabled`, review R4; until then those alarms report missing data silently), and, the first time,
+   the parameter `/veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS` = `30` is added (D6). Expect 1 to add, the alarm
+   changes, 0 to destroy.
 3. Actions → `12-deploy` → Run workflow on `main`. Approve the `staging` environment.
 4. The job builds the image of this commit, pushes `veda-api:<12-hex>`, waits for the scan (stops on HIGH or
    CRITICAL), uploads `deploy/<tag>/bundle.tgz` with its SHA-256, and runs `veda-deploy` on the host:
@@ -135,6 +138,26 @@ Generate and write, with the owner session, the eight `SecureString` parameters 
 `VEDA_RECOVERY_CODE_HMAC_KEY`, `VEDA_EMAIL_HASH_HMAC_KEY`, `VEDA_ACTION_TOKEN_KEY` — each key ≥ 32 random bytes,
 distinct, labels not `dev-*` — and `VEDA_TURNSTILE_SECRET`, D8). Values never leave the owner's terminal and are never
 committed. `render-env.sh` refuses to start the application until all eight exist.
+
+Encrypt them with the **data key** (`alias/veda-stg-data`): the host role may decrypt only with that key, so a
+parameter under the default `aws/ssm` key would fail to render. Each value goes from `openssl` straight into SSM; none
+is printed, and `--no-overwrite` stops a second run from replacing a key:
+```sh
+put() { aws ssm put-parameter --region ap-south-1 --name "/veda/staging/app/$1" --type SecureString \
+          --key-id alias/veda-stg-data --value "$2" --no-overwrite >/dev/null && echo "seeded $1"; }
+put VEDA_JWT_PRIVATE_KEY_PEM "$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256)"
+put VEDA_JWT_KID stg-2026-10
+put VEDA_CHAIN_KEY "$(openssl rand -base64 32)"
+put VEDA_CHAIN_KEY_LABEL stg-2026-10
+put VEDA_RECOVERY_CODE_HMAC_KEY "$(openssl rand -base64 32)"
+put VEDA_EMAIL_HASH_HMAC_KEY "$(openssl rand -base64 32)"
+put VEDA_ACTION_TOKEN_KEY "$(openssl rand -base64 32)"
+put VEDA_TURNSTILE_SECRET 1x0000000000000000000000000000000AA   # Cloudflare's published always-pass test secret (D8)
+aws ssm get-parameters-by-path --region ap-south-1 --path /veda/staging/app --query 'Parameters[].[Name,Type]' --output text
+```
+The check lists names and types only: eight `SecureString` rows. Never read the values back. The test Turnstile secret
+accepts every token, so it is allowed only while public intake stays disabled and until AUT-203 provides the real
+widget (D8). The anchor retention is configuration, not a secret: Terraform writes it under `config/` (D6).
 
 ### 6.4 Pins after the first plan
 Record `compute.ami_id` and `az_id` (staging-network.json) from the first real plan, so later plans cannot replace the

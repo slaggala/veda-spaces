@@ -1670,10 +1670,27 @@ rm "$T/infra/config/staging-broken.json"
 PLATFORM="$INFRA/config/staging-platform.json"
 check "AUT-103 committed decision: evidence COMPLIANCE 30 days, snapshots expire after their 35-day lock" ok '^COMPLIANCE 30 42$' -- jq -r '"\(.storage.evidence_lock_mode) \(.storage.evidence_lock_days) \(.storage.snapshots_expire_days)"' "$PLATFORM"
 check "AUT-103 committed decision D6: configurable anchor retention, 30 days in staging" ok '^DECIDED 30$' -- jq -r '"\(.anchor_retention.status) \(.anchor_retention.application_retention_days)"' "$PLATFORM"
-# D6 order: no deployment (no anchor) until the application's retention is the decided one.
-APP_RETENTION="$(sed -nE 's/^RETENTION = timedelta\(days=([0-9]+)\)$/\1/p' "$INFRA/../api/veda/platform/anchor_store.py")"
+# D6: the application locks anchors for VEDA_ANCHOR_RETENTION_DAYS (staging: required; production: at least 3650), and
+# staging-core plans that parameter from the decision. No deployment (no anchor) unless all of it is in place.
+ANCHOR_STORE="$INFRA/../api/veda/platform/anchor_store.py"
+APP_CONFIG="$INFRA/../api/veda/config.py"
+check "D6 the application reads VEDA_ANCHOR_RETENTION_DAYS as whole days" ok 'anchor_retention_days=_days\("VEDA_ANCHOR_RETENTION_DAYS"\)' -- cat "$APP_CONFIG"
+# shellcheck disable=SC2016 # literal for the inner shell
+check "D6 staging refuses an unset retention, production anything below 3650 days" ok '^4 3650$' -- bash -c 'printf "%s %s\n" "$(grep -cE "^    if env == \"staging\" and days is None:$|^        problems.append\(\"VEDA_ANCHOR_RETENTION_DAYS is required in staging \(D6\)\"\)$|^        if settings.anchor_retention.days < ANCHOR_RETENTION_PRODUCTION_MIN_DAYS:$|^                f\"VEDA_ANCHOR_RETENTION_DAYS must be at least \{ANCHOR_RETENTION_PRODUCTION_MIN_DAYS\} in production \(D6\)\"$" "$1")" "$(sed -nE "s/^ANCHOR_RETENTION_PRODUCTION_MIN_DAYS = ([0-9]+)$/\1/p" "$1")"' _ "$APP_CONFIG"
+check "D6 both anchor writes lock for the configured retention" ok '^2$' -- grep -c "ObjectLockRetainUntilDate=clock.now() + settings().anchor_retention," "$ANCHOR_STORE"
+absent "D6 the anchor store keeps no fixed retention of its own" "timedelta\(days=|^RETENTION" "$(cat "$ANCHOR_STORE")"
+check "D6 staging-core maps the parameter from the decision" ok 'VEDA_ANCHOR_RETENTION_DAYS = tostring\(local.platform.anchor_retention.application_retention_days\)' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 # shellcheck disable=SC2016 # jq program
-check "AUT-103 D6 deploys stay disabled while the application's anchor retention differs from the decision" ok "^ok$" -- jq -r --arg app "${APP_RETENTION:-unknown}" 'if .deploy.enabled == true and ($app != (.anchor_retention.application_retention_days | tostring)) then "deploy.enabled with application retention \($app), decided \(.anchor_retention.application_retention_days)" else "ok" end' "$PLATFORM"
+check "D6 the planned parameter is the decided retention, plain text under config/" ok '^/veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS String 30 30$' -- jq -r --slurpfile p "$PLATFORM" '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_ANCHOR_RETENTION_DAYS\"]") | .change.after | "\(.name) \(.type) \(.value) \($p[0].anchor_retention.application_retention_days)"' "$HERE/fixtures/aut107-ssm-plan.json"
+# The gate: deploy.enabled only with the application change, the mapping and the planned parameter all in place.
+D6_READY=yes
+grep -q 'anchor_retention_days=_days("VEDA_ANCHOR_RETENTION_DAYS")' "$APP_CONFIG" || D6_READY=no
+grep -qx '    if env == "staging" and days is None:' "$APP_CONFIG" || D6_READY=no
+[[ "$(grep -c "ObjectLockRetainUntilDate=clock.now() + settings().anchor_retention," "$ANCHOR_STORE")" == 2 ]] || D6_READY=no
+grep -q 'VEDA_ANCHOR_RETENTION_DAYS = tostring(local.platform.anchor_retention.application_retention_days)' <(tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf") || D6_READY=no
+[[ "$(jq -r '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_ANCHOR_RETENTION_DAYS\"]") | .change.after.value' "$HERE/fixtures/aut107-ssm-plan.json")" == "$(jq -r '.anchor_retention.application_retention_days' "$PLATFORM")" ]] || D6_READY=no
+# shellcheck disable=SC2016 # jq program
+check "D6 gate: deploy.enabled only once the configured anchor retention is implemented and planned" ok "^ok$" -- jq -r --arg ready "$D6_READY" 'if .deploy.enabled == true and $ready != "yes" then "deploy.enabled without the D6 anchor retention in place" else "ok" end' "$PLATFORM"
 check "AUT-103 staging-core plans the storage module" ok 'source = "../../modules/storage"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 check "AUT-103 C3 VPC flow logs go to the logs bucket" ok 'flow_log_destination_arn = module.storage.flow_log_destination_arn' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
 

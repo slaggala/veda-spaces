@@ -124,7 +124,8 @@ module "runtime_iam" {
   ses_send                 = { resources = module.ses.send_resources, from_address = module.ses.from_address }
 }
 
-# AUT-107: non-secret configuration and Session Manager preferences.
+# AUT-107: non-secret configuration and Session Manager preferences. VEDA_ANCHOR_RETENTION_DAYS is the Object Lock
+# retention the application gives each anchor, from the owner decision D6 (anchor_retention, 30 days).
 locals {
   app_config = {
     VEDA_ENV                   = "staging"
@@ -136,6 +137,7 @@ locals {
     VEDA_SNAPSHOT_DIR          = "/var/lib/veda/snapshots"
     VEDA_SNAPSHOT_BUCKET       = module.storage.bucket_names["snapshots"]
     VEDA_ANCHOR_BUCKET         = module.storage.bucket_names["anchor"]
+    VEDA_ANCHOR_RETENTION_DAYS = tostring(local.platform.anchor_retention.application_retention_days)
     LITESTREAM_BUCKET          = module.storage.bucket_names["litestream"]
     LITESTREAM_REGION          = var.aws_region
     LITESTREAM_RETENTION       = local.platform.ssm.litestream_retention

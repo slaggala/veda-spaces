@@ -52,6 +52,8 @@ def deployed_env(monkeypatch, env="production", **overrides):
         "VEDA_TRUSTED_PROXY_CIDRS": "172.18.0.1/32",
         "VEDA_SNAPSHOT_BUCKET": "veda-snapshots",
         "VEDA_SNAPSHOT_DIR": "/var/lib/veda/snapshots",
+        # D6: staging states its anchor retention (30 days, the committed decision); production keeps the default.
+        "VEDA_ANCHOR_RETENTION_DAYS": "30" if env == "staging" else None,
     }
     values.update(overrides)
     for name in list(os.environ):

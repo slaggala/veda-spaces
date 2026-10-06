@@ -235,4 +235,5 @@ variables removed.
 | `VEDA_SCHEMA_AHEAD_ACCEPTED` | Revisions newer than the image that the operator declares compatible (§2). |
 | `VEDA_BREAK_GLASS_IDENTITY` | `sts` (required in staging and production) or `asserted` (local/test only). |
 | `VEDA_SNAPSHOT_DIR` (required in staging and production: absolute, inside the database volume, RR-14), `VEDA_SNAPSHOT_BUCKET` (required in production), `VEDA_SNAPSHOT_KEEP`, `VEDA_SNAPSHOT_LOCK_DAYS` | §4 |
+| `VEDA_ANCHOR_RETENTION_DAYS` | Object Lock retention, in whole days, of every anchor object (COMPLIANCE mode, D6). Unset means 3650. Required in staging (30 days there, planned by `staging-core`); at least 3650 in production; 1 to 36500 everywhere. Anything that is not a whole number refuses to load. |
 | `LITESTREAM_BUCKET`, `LITESTREAM_REGION`, `LITESTREAM_RETENTION` | `deploy/litestream.yml` |

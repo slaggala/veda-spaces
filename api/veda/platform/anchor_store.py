@@ -14,6 +14,9 @@ Objects are written once and never overwritten (an identical re-write is accepte
   ``archive`` manifests, checks them against the ``export`` objects and the SECURITY_LOG_ARCHIVED events, and
   treats a ``pending`` manifest whose rows are still online as an abandoned attempt (RR-05, RR-06).
 
+Every S3 object is locked in COMPLIANCE mode for the configured retention (``VEDA_ANCHOR_RETENTION_DAYS``, D6:
+ten years by default and at least that in production; staging sets its own).
+
 Production uses an S3 bucket with Object Lock in COMPLIANCE mode (write-only role for the writer, read-only
 role for verification). Local and test use a directory of JSON files with the same layout. Verification reads
 the store, not the database host, so an attacker who controls the host cannot move the anchor (IR-03).
@@ -22,14 +25,12 @@ the store, not the database host, so an attacker who controls the host cannot mo
 from __future__ import annotations
 
 import json
-from datetime import timedelta
 from pathlib import Path
 
 from veda.config import settings
 from veda.kernel import clock
 
 PREFIX = "security-log"
-RETENTION = timedelta(days=3650)
 
 
 def _key(kind: str, ident: int | str, ext: str = "json") -> str:
@@ -103,7 +104,7 @@ class S3AnchorStore:
             Key=_key(kind, seq),
             Body=json.dumps(body, sort_keys=True).encode(),
             ObjectLockMode="COMPLIANCE",
-            ObjectLockRetainUntilDate=clock.now() + RETENTION,
+            ObjectLockRetainUntilDate=clock.now() + settings().anchor_retention,
             ContentType="application/json",
         )
 
@@ -113,7 +114,7 @@ class S3AnchorStore:
             Key=_key(kind, seq, "jsonl"),
             Body=data,
             ObjectLockMode="COMPLIANCE",
-            ObjectLockRetainUntilDate=clock.now() + RETENTION,
+            ObjectLockRetainUntilDate=clock.now() + settings().anchor_retention,
             ContentType="application/x-ndjson",
         )
 

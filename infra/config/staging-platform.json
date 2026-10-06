@@ -20,7 +20,7 @@
   },
   "anchor_retention": {
     "status": "DECIDED",
-    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D6 option B. The anchor retention becomes configurable in the application and staging uses 30 days. Until that reviewed application change merges, the application still locks every anchor in COMPLIANCE mode for 3650 days (api/veda/platform/anchor_store.py RETENTION), so deploy.enabled must stay false (infra/tests/run.sh refuses deploy.enabled true while the two differ). The bucket has Object Lock enabled with no default retention.",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D6 option B. The anchor retention is configurable in the application (VEDA_ANCHOR_RETENTION_DAYS, whole days; required in staging, at least 3650 in production) and staging uses 30 days: staging-core plans /veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS from application_retention_days, and the S3 anchor store locks every object in COMPLIANCE mode until now plus that retention. infra/tests/run.sh refuses deploy.enabled true unless the application change, the mapping and the planned parameter are all in place. The bucket has Object Lock enabled with no default retention.",
     "application_retention_days": 30
   },
   "cloudtrail": {
