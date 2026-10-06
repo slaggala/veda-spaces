@@ -144,7 +144,7 @@ parameter under the default `aws/ssm` key would fail to render. Each value goes 
 is printed, and `--no-overwrite` stops a second run from replacing a key:
 ```sh
 put() { aws ssm put-parameter --region ap-south-1 --name "/veda/staging/app/$1" --type SecureString \
-          --key-id alias/veda-stg-data --value "$2" --no-overwrite >/dev/null && echo "seeded $1"; }
+          --key-id alias/veda-stg-data --value="$2" --no-overwrite >/dev/null && echo "seeded $1"; }
 put VEDA_JWT_PRIVATE_KEY_PEM "$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256)"
 put VEDA_JWT_KID stg-2026-10
 put VEDA_CHAIN_KEY "$(openssl rand -base64 32)"
