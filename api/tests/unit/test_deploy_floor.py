@@ -6,7 +6,6 @@ that release would. Nothing here deploys anything; no rollback rehearsal is clai
 
 import json
 import os
-import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -44,6 +43,11 @@ DOCKER = textwrap.dedent(
         if "--require-known" in args:
             out["floor_known"] = image["floor_known"]
         print(json.dumps(out)); sys.exit(0 if image["floor_known"] or "--require-known" not in args else 4)
+    if "generations" in args:
+        print("name  generation  lag  start  end")
+        for g in filter(None, os.environ.get("SHIM_GENERATIONS", "").split(",")):
+            print(f"s3    {g}  0s   2026-10-01T00:00:00Z  2026-10-06T00:00:00Z")
+        sys.exit(int(os.environ.get("SHIM_GENERATIONS_EXIT", "0")))
     if "exec" in args:
         print('{"status": "ok", "checks": {"migrations": "head"}}'); sys.exit(0)
     print("{}")
@@ -56,20 +60,37 @@ def deploy(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "docker").write_text(DOCKER)
-    (bin_dir / "curl").write_text("#!/bin/sh\necho 'litestream_db_size 1'\n")
+    # Litestream metrics answer only once it has been started (SHIM_LITESTREAM_UP=1 says it already runs).
+    (bin_dir / "curl").write_text(
+        '#!/bin/sh\nif [ "$SHIM_LITESTREAM_UP" = 1 ] || grep -q "up -d --no-deps litestream" "$SHIM_LOG" 2>/dev/null; then\n'
+        '  [ "$SHIM_LITESTREAM_BROKEN" = 1 ] && exit 7; echo "litestream_db_size 1"; exit 0\nfi\nexit 7\n'
+    )
+    (bin_dir / "mountpoint").write_text('#!/bin/sh\nexit "${SHIM_MOUNTED_EXIT:-0}"\n')
+    (bin_dir / "sleep").write_text("#!/bin/sh\nexit 0\n")
     for f in bin_dir.iterdir():
         f.chmod(0o755)
     work = tmp_path / "deploy"
     work.mkdir()
-    shutil.copy(DEPLOY, work / "deploy.sh")
+    data = tmp_path / "data"
+    data.mkdir()
+    # The copy works on a scratch data volume instead of /var/lib/veda (no runtime override exists).
+    script = DEPLOY.read_text()
+    assert script.count("readonly DATA_DIR=/var/lib/veda") == 1
+    (work / "deploy.sh").write_text(script.replace("readonly DATA_DIR=/var/lib/veda", f"readonly DATA_DIR={data}"))
     log = tmp_path / "docker.log"
 
-    def run(*args, env_extra=None):
+    def run(*args, env_extra=None, first=False):
+        db = data / "veda.db"
+        if first:
+            db.unlink(missing_ok=True)
+        else:
+            db.write_text("")
         env = {
             **os.environ,
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "SHIM_IMAGES": json.dumps(IMAGES),
             "SHIM_LOG": str(log),
+            "SHIM_LITESTREAM_UP": "1",
             **(env_extra or {}),
         }
         r = subprocess.run(
@@ -120,3 +141,68 @@ def test_FC12_image_reports_its_release_sequence():
     from veda.release import RELEASE_SEQUENCE
 
     assert RELEASE_SEQUENCE >= 3
+
+
+# --- The first deploy: no database yet, so Litestream starts after the migration creates it -----------------------
+
+
+def _order(calls, *steps):
+    lines = calls.splitlines()
+    at = [next(i for i, line in enumerate(lines) if step in line) for step in steps]
+    return at == sorted(at)
+
+
+def test_first_deploy_starts_replication_after_the_migration_and_before_the_api(deploy):
+    r, calls = deploy("at-floor", first=True, env_extra={"SHIM_LITESTREAM_UP": "0"})
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "first deploy: no database and an empty replica" in r.stdout
+    assert "2. Snapshot: none (no database yet)" in r.stdout and "maintenance snapshot" not in calls
+    assert _order(calls, "litestream generations", "migrate", "up -d --no-deps litestream", "up -d --no-deps api")
+    assert _deployed(calls)
+
+
+def test_first_deploy_refuses_when_the_replica_already_has_generations(deploy):
+    # A rebuilt host with an empty volume must restore first: a new generation would let retention delete the old.
+    r, calls = deploy("at-floor", first=True, env_extra={"SHIM_GENERATIONS": "a1b2c3d4e5f60708"})
+    assert r.returncode == 1
+    assert "replica has generations; restore it first" in r.stdout
+    assert "migrate" not in calls and "stop worker" not in calls and not _deployed(calls)
+
+
+def test_first_deploy_refuses_when_the_replica_cannot_be_listed(deploy):
+    r, calls = deploy("at-floor", first=True, env_extra={"SHIM_GENERATIONS_EXIT": "1"})
+    assert r.returncode == 1
+    assert "cannot list the replica's generations" in r.stdout
+    assert "migrate" not in calls and not _deployed(calls)
+
+
+def test_first_deploy_never_starts_the_api_without_replication(deploy):
+    r, calls = deploy("at-floor", first=True, env_extra={"SHIM_LITESTREAM_UP": "0", "SHIM_LITESTREAM_BROKEN": "1"})
+    assert r.returncode == 1
+    assert "Refusing to start the API without replication" in r.stdout
+    assert "migrate" in calls and not _deployed(calls)
+    assert "up -d --no-deps worker scheduler" not in calls
+
+
+def test_no_database_on_rollback_is_refused(deploy):
+    r, calls = deploy("--rollback", "at-floor", first=True)
+    assert r.returncode == 1 and "no database at" in r.stdout and not _deployed(calls)
+
+
+def test_an_unmounted_data_volume_is_refused(deploy):
+    r, calls = deploy("at-floor", first=True, env_extra={"SHIM_MOUNTED_EXIT": "1"})
+    assert r.returncode == 1 and "is not the mounted data volume" in r.stdout
+    assert "generations" not in calls and "migrate" not in calls and not _deployed(calls)
+
+
+def test_later_deploys_start_a_stopped_litestream_and_require_its_metrics_first(deploy):
+    r, calls = deploy("at-floor", env_extra={"SHIM_LITESTREAM_UP": "0"})
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _order(calls, "up -d --no-deps litestream", "maintenance snapshot", "migrate", "up -d --no-deps api")
+    assert "generations" not in calls
+
+
+def test_later_deploys_refuse_without_replication_before_any_change(deploy):
+    r, calls = deploy("at-floor", env_extra={"SHIM_LITESTREAM_BROKEN": "1"})
+    assert r.returncode == 1 and "litestream metrics unavailable" in r.stdout
+    assert "maintenance snapshot" not in calls and "migrate" not in calls and not _deployed(calls)

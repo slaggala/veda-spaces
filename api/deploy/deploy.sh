@@ -21,6 +21,19 @@ if [[ "${1:-}" == "--rollback" ]]; then ROLLBACK=1; shift; fi
 TAG="${1:?usage: deploy.sh [--rollback] <image-tag>}"
 COMPOSE=(docker compose -f docker-compose.yml)
 export VEDA_IMAGE_TAG="$TAG"
+# The persistent data volume (host-setup.sh mounts it) and the database Litestream replicates (litestream.yml).
+readonly DATA_DIR=/var/lib/veda
+readonly DB="$DATA_DIR/veda.db"
+
+# Litestream serves replication metrics on 127.0.0.1:9090 once it has opened the database.
+replicating() {
+  for _ in $(seq 1 30); do
+    curl -fsS http://127.0.0.1:9090/metrics 2>/dev/null | grep -q litestream_ && return 0
+    sleep 2
+  done
+  echo "litestream metrics unavailable"
+  return 1
+}
 
 # Readiness is read inside the api container: only a loopback peer sees the detailed checks (the host reaches the
 # port through the Docker bridge). Prints the body and succeeds when ready with the expected migrations state.
@@ -63,10 +76,33 @@ fi
 
 echo "1. Pre-flight: single-worker configuration and replication"
 "${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli deploy-check
-curl -fsS http://127.0.0.1:9090/metrics | grep -q litestream_ || { echo "litestream metrics unavailable"; exit 1; }
+mountpoint -q "$DATA_DIR" || { echo "Refusing: $DATA_DIR is not the mounted data volume"; exit 1; }
+FIRST=0
+if [[ ! -e "$DB" ]]; then
+  # No database on the volume: the first deploy, or a rebuilt host. A rebuilt host must restore its replica first
+  # (api-runbooks §3): starting empty would begin a new Litestream generation beside the old one, and retention
+  # would later delete the old one. So an empty volume is accepted only while the replica holds no generation.
+  [[ $ROLLBACK -eq 0 ]] || { echo "Refusing: no database at $DB to roll back"; exit 1; }
+  GENERATIONS=$("${COMPOSE[@]}" run --rm --no-deps litestream generations "$DB") ||
+    { echo "Refusing: cannot list the replica's generations for $DB"; exit 1; }
+  if [[ -n "$(printf '%s\n' "$GENERATIONS" | tail -n +2 | grep -v '^[[:space:]]*$' || true)" ]]; then
+    echo "Refusing: no database at $DB but its replica has generations; restore it first (api-runbooks §3)"
+    exit 1
+  fi
+  FIRST=1
+  echo "first deploy: no database and an empty replica; replication starts once the migration creates the database"
+else
+  # Started if it is not running (a no-op when it is; a changed configuration recreates it), then it must report.
+  "${COMPOSE[@]}" up -d --no-deps litestream
+  replicating || exit 1
+fi
 
-echo "2. Snapshot: nightly-style snapshot now, recorded for disaster rollback"
-"${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli maintenance snapshot | tee "pre-deploy-snapshot-$(date -u +%Y%m%dT%H%M%SZ).json"
+if [[ $FIRST -eq 1 ]]; then
+  echo "2. Snapshot: none (no database yet)"
+else
+  echo "2. Snapshot: nightly-style snapshot now, recorded for disaster rollback"
+  "${COMPOSE[@]}" run --rm --no-deps api python -m veda.cli maintenance snapshot | tee "pre-deploy-snapshot-$(date -u +%Y%m%dT%H%M%SZ).json"
+fi
 
 echo "3. Quiesce: pause the outbox worker and scheduler (the API keeps serving)"
 "${COMPOSE[@]}" stop worker scheduler
@@ -87,6 +123,12 @@ else
 fi
 EXPECTED=head
 [[ $ROLLBACK -eq 1 && "${STATE:-head}" != "head" ]] && EXPECTED=ahead
+
+if [[ $FIRST -eq 1 ]]; then
+  echo "4b. Replication: start Litestream on the new database; it must report before the API starts"
+  "${COMPOSE[@]}" up -d --no-deps litestream
+  replicating || { echo "Refusing to start the API without replication; worker and scheduler stay stopped"; exit 1; }
+fi
 
 echo "5. Deploy: restart the API on image $TAG; /health/ready must pass with migrations: $EXPECTED"
 "${COMPOSE[@]}" up -d --no-deps api
