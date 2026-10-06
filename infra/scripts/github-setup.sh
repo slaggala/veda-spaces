@@ -13,7 +13,8 @@
 #   staging-plan      reviewers, any branch       PR plans (read-only role; reads state, F9)
 #   staging-infra     reviewers, main only        infra apply, secrets seed
 #   staging           reviewers, main only        deploy, drills
-#   staging-evidence  no reviewers, main only     evidence collection (read-only role)
+#   staging-evidence  reviewers, main only        evidence collection (read-only role; 13-evidence proves the approval,
+#                                                 RR-07; owner decision 2026-10-06)
 # Branch protection on main (F10): pull request required (0 approvals, so a single owner can merge; owner decision
 # RR-G), enforced for admins, no force pushes, no deletion. "main only" environments mean nothing without it. An
 # already compliant protection is left as it is, and required status checks are never dropped.
@@ -52,7 +53,7 @@ while (($#)); do
     --verify) VERIFY=1; shift ;;
     --verify-environments) VERIFY_ENVIRONMENTS=1; shift ;;
     --apply) APPLY=1; shift ;;
-    -h | --help) sed -n '2,35p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,36p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -61,7 +62,7 @@ require_tools gh jq
 REPO="$(resolve_repo "$REPO_ARG")"
 
 # name reviewers(yes|no) main_only(yes|no)
-ENVIRONMENTS="bootstrap:yes:yes staging-plan:yes:no staging-infra:yes:yes staging:yes:yes staging-evidence:no:yes"
+ENVIRONMENTS="bootstrap:yes:yes staging-plan:yes:no staging-infra:yes:yes staging:yes:yes staging-evidence:yes:yes"
 
 # The status checks main requires: the job names of .github/workflows/ci.yml (infra/tests/run.sh keeps the two equal).
 REQUIRED_CHECKS=("api (sqlite)" "api (postgresql)" "app" "security" "browser e2e + axe" "infra")
