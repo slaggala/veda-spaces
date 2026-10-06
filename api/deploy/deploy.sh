@@ -24,6 +24,8 @@ export VEDA_IMAGE_TAG="$TAG"
 # The persistent data volume (host-setup.sh mounts it) and the database Litestream replicates (litestream.yml).
 readonly DATA_DIR=/var/lib/veda
 readonly DB="$DATA_DIR/veda.db"
+# The Cloudflare tunnel configuration render-edge.sh writes when the owner seeded /veda/staging/edge (AUT-201).
+readonly EDGE_DIR=/etc/veda/cloudflared
 
 # Litestream serves replication metrics on 127.0.0.1:9090 once it has opened the database.
 replicating() {
@@ -139,4 +141,30 @@ fi
 
 echo "6. Resume the worker and scheduler"
 "${COMPOSE[@]}" up -d --no-deps worker scheduler
+
+# The tunnel connects out to Cloudflare only and serves the API host behind Cloudflare Access (AUT-201). Its
+# metrics on 127.0.0.1:20241 report the edge connections it holds.
+tunnel_ready() {
+  for _ in $(seq 1 30); do
+    n=$(curl -fsS http://127.0.0.1:20241/ready 2>/dev/null | python3 -c 'import json,sys
+try:
+    print(int(json.load(sys.stdin).get("readyConnections", 0)))
+except Exception:
+    print(0)') || n=0
+    if (( n > 0 )); then echo "tunnel ready: $n edge connection(s)"; return 0; fi
+    sleep 2
+  done
+  echo "tunnel not ready: no edge connection"
+  return 1
+}
+if [[ -f "$EDGE_DIR/config.yml" ]]; then
+  echo "7. Edge: Cloudflare tunnel, Cloudflare Access required at the origin"
+  grep -q "^        required: true$" "$EDGE_DIR/config.yml" && [[ -f "$EDGE_DIR/tunnel.env" ]] ||
+    { echo "Refusing to start the tunnel: its configuration does not require Cloudflare Access or has no token"; exit 1; }
+  "${COMPOSE[@]}" --profile edge up -d --no-deps cloudflared
+  tunnel_ready || { echo "the API is deployed and serves on loopback; the tunnel did not connect"; exit 1; }
+else
+  echo "7. Edge: not configured (no tunnel); the API serves on loopback only"
+  "${COMPOSE[@]}" --profile edge rm -s -f cloudflared
+fi
 echo "done: $TAG"

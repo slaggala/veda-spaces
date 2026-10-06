@@ -1,0 +1,20 @@
+# Cloudflare tunnel ingress for staging (AUT-201). Rendered by render-edge.sh into /etc/veda/cloudflared/config.yml:
+# __API_HOST__ comes from VEDA_API_BASE_URL (D7), __ACCESS_TEAM_NAME__ and __ACCESS_AUD__ from the owner-seeded
+# /veda/staging/edge parameters. The tunnel token is never written here (tunnel.env, 0600).
+#
+# Owner decision 2026-10-06: staging is reachable only through Cloudflare Access (owner and staff), public intake
+# is disabled, no anonymous internet traffic. So cloudflared itself requires a valid Access token for the team and
+# application on every request before it reaches the API: without an Access application, or with a request that
+# bypassed it, the origin answers 403. Only the API host is routed; every other hostname gets 404.
+no-autoupdate: true
+metrics: 127.0.0.1:20241
+ingress:
+  - hostname: __API_HOST__
+    service: http://127.0.0.1:8000
+    originRequest:
+      access:
+        required: true
+        teamName: __ACCESS_TEAM_NAME__
+        audTag:
+          - __ACCESS_AUD__
+  - service: http_status:404
