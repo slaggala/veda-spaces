@@ -9,7 +9,7 @@ disabled (owner decision 2026-10-06, runbook §6.5).
 |---|---|
 | Account, region | `veda-staging` (813238078849), ap-south-1 |
 | Host | `i-01538ad0e744faaff`, Amazon Linux 2023.12.20260930, aarch64 |
-| Code deployed | `main` at the merge of PR #35 (`fcbec8466571`), which includes PR #34 |
+| Code deployed | `main` at the merge of PR #35, which includes PR #34; the image tag is the first 12 characters of that commit |
 | Tunnel | `veda-staging`, locally managed; one proxied CNAME, `api-staging.vedaspaces.com` |
 | Access | Team `kite-relay`; self-hosted application "Veda staging" for `api-staging.vedaspaces.com`; one Allow policy (owner and staff e-mail addresses); login by One-time PIN |
 | Raw evidence | `s3://veda-evidence-813238078849/host/2026-10-07/i-01538ad0e744faaff/aut-201-tunnel-20261007T102054Z.tgz` |
@@ -36,7 +36,7 @@ disabled (owner decision 2026-10-06, runbook §6.5).
 | 37604060821 | `11-infra-apply` | Refused at preflight, as designed: the plan run was triggered by `push`, not `workflow_dispatch` |
 | 37604228732 | `10-infra-plan` on `main` (`workflow_dispatch`) | 0 to add, 1 to change, 0 to destroy. The only change is the install line of `module.deploy.aws_ssm_document.deploy`. Plan SHA-256 `151c4c9323ee606a629e9e116486c0e9b37faf0af72fb3a744166b2374479703` |
 | 37605128953 | `11-infra-apply` | 0 added, 1 changed, 0 destroyed |
-| **37605327200** | **`12-deploy`** | **`deployed fcbec8466571 (sha256:97ea7274adff614bdf608317c23ab093fb4b8dfd0f1a3320605068c8dee41247) to staging`** |
+| **37605327200** | **`12-deploy`** | **`deployed <tag> (sha256:97ea7274adff614bdf608317c23ab093fb4b8dfd0f1a3320605068c8dee41247) to staging`** |
 | **37606639922** | **`13-evidence`** (`aut-201-tunnel`) | Approved by `slaggala`; evidence object above |
 
 The failed run stopped before `deploy.sh`. It changed no container or database and served no traffic.
@@ -45,9 +45,9 @@ The failed run stopped before `deploy.sh`. It changed no container or database a
 
 | Item | Value |
 |---|---|
-| Image | `veda-api:fcbec8466571` → `sha256:97ea7274adff614bdf608317c23ab093fb4b8dfd0f1a3320605068c8dee41247` |
+| Image | `veda-api:<tag>` → `sha256:97ea7274adff614bdf608317c23ab093fb4b8dfd0f1a3320605068c8dee41247` |
 | Scan gate | 2 HIGH findings, each covered by a reviewed staging exception: CVE-2026-95619 (`gcc-14` 14.2.0-19) and CVE-2026-85091 (`zlib` 1.3.dfsg+really1.3.1-1). No other HIGH or CRITICAL finding. The exception for CVE-2026-102010 no longer matches a finding (A3) |
-| Bundle | `s3://veda-stg-artifacts-813238078849/deploy/fcbec8466571/bundle.tgz`, SHA-256 `cef22587cd04853f734f332c6534549102b9c61e9b59863e61b4585f37e9a30c`, verified on the host before use |
+| Bundle | `s3://veda-stg-artifacts-813238078849/deploy/<tag>/bundle.tgz`, SHA-256 `cef22587cd04853f734f332c6534549102b9c61e9b59863e61b4585f37e9a30c`, verified on the host before use |
 | `cloudflared` | `cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c` (pinned in `api/deploy/docker-compose.yml`) |
 | Pre-deploy snapshot | `veda-20261007T100954Z.db`, 991,232 bytes, SHA-256 `9548ff779168b7338cab0c14a72dce19c2de207220bcab8d0f73e42395921c7a` |
 
@@ -55,7 +55,7 @@ The failed run stopped before `deploy.sh`. It changed no container or database a
 
 | Check (runbook §6.5) | Evidence | Pass |
 |---|---|---|
-| `12-deploy` log | `rendered the tunnel for api-staging.vedaspaces.com (Access required: team kite-relay)`; then `7. Edge: Cloudflare tunnel, Cloudflare Access required at the origin`; then `tunnel ready: 2 edge connection(s)` and `done: fcbec8466571` | Yes |
+| `12-deploy` log | `rendered the tunnel for api-staging.vedaspaces.com (Access required: team kite-relay)`; then `7. Edge: Cloudflare tunnel, Cloudflare Access required at the origin`; then `tunnel ready: 2 edge connection(s)` and `done: <tag>` | Yes |
 | Anonymous request (`curl -sI https://api-staging.vedaspaces.com/health/live`) | `HTTP/2 302` to `https://kite-relay.cloudflareaccess.com/…`. The API never answered | Yes |
 | Signed-in browser at the same URL | `{"status":"ok"}`, after the One-time PIN login | Yes |
 | Edge parameters | `/veda/staging/edge/CLOUDFLARED_TOKEN` (`SecureString`, `alias/veda-stg-data`), `ACCESS_TEAM_NAME` = `kite-relay`, `ACCESS_AUD` equal to the application's AUD tag (compared by the owner) | Yes |
@@ -73,9 +73,9 @@ the Access application and policy worked before the origin existed.
 
 | Container | Image | State | Port |
 |---|---|---|---|
-| `deploy-api-1` | `veda-api:fcbec8466571` | Up | `127.0.0.1:8000` |
-| `deploy-worker-1` | `veda-api:fcbec8466571` | Up | None |
-| `deploy-scheduler-1` | `veda-api:fcbec8466571` | Up | None |
+| `deploy-api-1` | `veda-api:<tag>` | Up | `127.0.0.1:8000` |
+| `deploy-worker-1` | `veda-api:<tag>` | Up | None |
+| `deploy-scheduler-1` | `veda-api:<tag>` | Up | None |
 | `deploy-litestream-1` | `litestream/litestream:0.3.13` | Up | `127.0.0.1:9090` |
 | `deploy-cloudflared-1` | `cloudflare/cloudflared:2026.9.3` | Up | None (host network, outbound only) |
 
