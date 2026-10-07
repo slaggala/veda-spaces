@@ -154,6 +154,8 @@ locals {
     VEDA_API_BASE_URL          = local.platform.ssm.api_base_url
     VEDA_JWT_ISSUER            = local.platform.ssm.api_base_url
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
+    # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
+    VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
   }
 }
 

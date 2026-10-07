@@ -147,6 +147,8 @@ def test_IR09_each_missing_or_weak_setting_is_reported(monkeypatch, env, overrid
     [
         ({"VEDA_SENTRY_DSN": None}, "VEDA_SENTRY_DSN"),
         ({"VEDA_ANCHOR_BUCKET": None}, "VEDA_ANCHOR_BUCKET"),
+        # Credentialed public-site CORS exists for the Access-protected staging site only.
+        ({"VEDA_PUBLIC_SITE_CREDENTIALS": "true"}, "VEDA_PUBLIC_SITE_CREDENTIALS is staging-only"),
     ],
 )
 def test_IR09_production_only_requirements(monkeypatch, override, fragment):
@@ -221,3 +223,9 @@ def test_IRA13_siteverify_hostname_must_be_ours():
         assert not turnstile.accept({"success": True})
     finally:
         config._current = previous
+
+
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_public_site_credentials_default_off(monkeypatch, env):
+    assert deployed_env(monkeypatch, env).public_site_credentials is False
+    assert deployed_env(monkeypatch, "staging", VEDA_PUBLIC_SITE_CREDENTIALS="true").public_site_credentials is True

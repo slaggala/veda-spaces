@@ -1525,6 +1525,62 @@
       }
     },
     {
+      "address": "module.ssm.aws_ssm_parameter.config[\"VEDA_PUBLIC_SITE_CREDENTIALS\"]",
+      "module_address": "module.ssm",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "config",
+      "index": "VEDA_PUBLIC_SITE_CREDENTIALS",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "allowed_pattern": null,
+          "description": "Veda staging configuration (non-secret, AUT-107)",
+          "name": "/veda/staging/config/VEDA_PUBLIC_SITE_CREDENTIALS",
+          "overwrite": null,
+          "region": "ap-south-1",
+          "tags": null,
+          "tags_all": {
+            "env": "staging",
+            "managed-by": "terraform",
+            "project": "veda-spaces",
+            "repository": "example-org/veda-spaces",
+            "stack": "core"
+          },
+          "tier": "Standard",
+          "type": "String",
+          "value": "true",
+          "value_wo": null,
+          "value_wo_version": null
+        },
+        "after_unknown": {
+          "arn": true,
+          "data_type": true,
+          "has_value_wo": true,
+          "id": true,
+          "insecure_value": true,
+          "key_id": true,
+          "tags_all": {},
+          "version": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {
+          "tags_all": {},
+          "value": true,
+          "value_wo": true
+        },
+        "after_identity": {
+          "account_id": null,
+          "name": null,
+          "region": null
+        }
+      }
+    },
+    {
       "address": "module.ssm.aws_ssm_parameter.config[\"VEDA_SES_CONFIGURATION_SET\"]",
       "module_address": "module.ssm",
       "mode": "managed",

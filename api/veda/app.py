@@ -225,7 +225,8 @@ def _allowed_origin() -> tuple[str | None, bool]:
     if origin == s.app_origin:
         return origin, True
     if origin in s.public_site_origins and request.path.startswith("/api/v1/public/"):
-        return origin, False
+        # Credentials only where the public site itself is behind Cloudflare Access (staging; production refuses).
+        return origin, s.public_site_credentials
     return None, False
 
 

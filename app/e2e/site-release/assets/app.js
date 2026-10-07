@@ -214,6 +214,8 @@ contactForm.addEventListener('submit', async (event) => {
     const res = await fetch(`${apiBase}/api/v1/public/leads`, {
       method: 'POST', signal: controller.signal,
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+      // Staging only (behind Cloudflare Access): send the API host's Access cookie. Production sends none.
+      credentials: meta('veda-api-credentials') === 'include' ? 'include' : 'same-origin',
       body: JSON.stringify(body),
     });
     const payload = await res.json().catch(() => ({}));

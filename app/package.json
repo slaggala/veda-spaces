@@ -12,7 +12,8 @@
     "lint:tokens": "node scripts/lint-tokens.mjs",
     "test:contrast": "node scripts/contrast.mjs",
     "lint": "eslint .",
-    "test:e2e:site": "node e2e/site.e2e.mjs"
+    "test:e2e:site": "node e2e/site.e2e.mjs",
+    "test:staging-build": "node --test scripts/staging-build.test.mjs"
   },
   "dependencies": {
     "@lit/context": "^1.1.6",
