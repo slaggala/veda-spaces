@@ -2033,6 +2033,10 @@ check "AUT-201 the committed template requires Access for exactly one host and e
 DEPDOC="$HERE/fixtures/deploy-plan.json"
 check "DEPLOY the veda-deploy document verifies the bundle SHA-256 and pulls the image by digest" ok 'sha256sum -c' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content' "$DEPDOC"
 check "  ... its parameters only accept a tag, a digest and a SHA-256" ok '^\^sha256:\[0-9a-f\]\{64\}\$$' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content | fromjson | .parameters.imageDigest.allowedPattern' "$DEPDOC"
+# The edge test copies cloudflared.yml beside render-edge.sh; the document must ship it there too (every non-script
+# host file the scripts read, so a new template cannot be left behind).
+# shellcheck disable=SC2016 # expanded by the inner bash
+check "DEPLOY veda-deploy installs every host configuration file beside the scripts" ok '^cloudflared.yml cloudwatch-agent.json$' -- bash -c 'cmd="$(jq -r ".resource_changes[] | select(.address == \"module.deploy.aws_ssm_document.deploy\") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[]" "$1")"; for f in "$2"/*; do b="${f##*/}"; case "$b" in *.sh|README.md) continue ;; esac; grep -qF "\"\$REL\"/infra/host/$b " <<<"$cmd" && printf "%s\n" "$b"; done | paste -sd" " -' _ "$DEPDOC" "$INFRA/host"
 check "DEPLOY the host renders the environment only with every secret seeded (AUT-302)" ok "refusing: secrets not seeded" -- cat "$INFRA/host/render-env.sh"
 check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
 # shellcheck disable=SC2016 # matched literally in the script

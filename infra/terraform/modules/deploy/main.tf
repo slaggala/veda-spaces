@@ -31,7 +31,7 @@ resource "aws_ssm_document" "deploy" {
           "aws s3 cp --region ${var.region} \"s3://${var.artifacts_bucket}/deploy/$TAG/bundle.tgz\" \"$REL.tgz\"",
           "echo \"$SUM  $REL.tgz\" | sha256sum -c -",
           "tar -xzf \"$REL.tgz\" -C \"$REL\"",
-          "install -d /opt/veda/host && install -m 0755 \"$REL\"/infra/host/*.sh /opt/veda/host/ && install -m 0644 \"$REL\"/infra/host/cloudwatch-agent.json /opt/veda/host/",
+          "install -d /opt/veda/host && install -m 0755 \"$REL\"/infra/host/*.sh /opt/veda/host/ && install -m 0644 \"$REL\"/infra/host/cloudwatch-agent.json \"$REL\"/infra/host/cloudflared.yml /opt/veda/host/",
           "/opt/veda/host/host-setup.sh ${var.data_device} ${var.region} ${var.agent_config_file}",
           "/opt/veda/host/render-env.sh ${var.region}",
           "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${split("/", var.repository_url)[0]}",
