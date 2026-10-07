@@ -266,21 +266,54 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
    | `veda-staging-site` | `node scripts/staging-build.mjs site` | `dist-staging-site` | `STAGING_TURNSTILE_SITE_KEY` |
    | `veda-staging-app` | `npm ci && node scripts/staging-build.mjs app` | `dist` | `STAGING_TURNSTILE_SITE_KEY` |
 
+   - **Order, so nothing is ever public:** create each project **without** `STAGING_TURNSTILE_SITE_KEY`. Its first
+     build then fails on purpose and publishes nothing. Add the Access hostnames (step 3), attach the custom domain,
+     then add the variable and **Retry deployment**.
    - Attach the custom domains `staging.vedaspaces.com` and `app-staging.vedaspaces.com`. Pages creates the proxied
-     CNAMEs (AUT-202); don't create them by hand.
-   - Set **Preview deployments** to *None*, or put them behind Access. A `*.pages.dev` URL is otherwise public.
+     CNAMEs (AUT-202); don't create them by hand. A domain stuck in **Verifying** asks for the CNAME itself: add
+     exactly what it shows (an empty name means `@`), proxied, then **Check DNS records**.
+   - **Preview branches:** project **Settings → Build → Branch control → Preview branch: None**. The
+     `*.<project>.pages.dev` row in Access covers any preview that exists anyway.
 3. **Access.** In the "Veda staging" application:
-   - **Hostnames:** add `staging.vedaspaces.com` and `app-staging.vedaspaces.com`, and the projects'
-     `*.pages.dev` hosts. Keep the same Allow policy.
-   - **CORS settings:** allowed origins `https://staging.vedaspaces.com` and `https://app-staging.vedaspaces.com`;
-     **Allow credentials** on; methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`; headers `Content-Type,
-     Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization`.
-     Access answers the preflight itself: `cloudflared` would refuse an `OPTIONS` without an Access token.
+   - **Hostnames (Destinations → Public hostnames):** `staging` and `app-staging` on `vedaspaces.com`, and for each
+     project two rows on its own domain `<project>.pages.dev`: subdomain empty, and subdomain `*`. The domain list
+     shows only projects that already exist; otherwise use **Switch to custom input**. **Never pick
+     `veda-spaces.pages.dev`:** that is the public production site's project. Keep the same Allow policy.
+   - **CORS settings** (search the application page for "CORS"):
+     - **Access-Control-Allow-Credentials: on.** Off is the default and gives the browser error "the value of
+       Access-Control-Allow-Credentials is '' … must be 'true'".
+     - Allowed origins: `https://staging.vedaspaces.com` and `https://app-staging.vedaspaces.com`, listed (not "Allow
+       all origins": credentials need explicit origins).
+     - Methods: `GET, POST, PUT, PATCH, DELETE` (OPTIONS is not in the list: it is the preflight itself).
+     - Headers: `Content-Type, Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization`.
+     - **Bypass options requests to origin: off.** Access answers the preflight itself; `cloudflared` would refuse an
+       `OPTIONS` without an Access token.
    - **The browser needs the API host's own Access cookie.** After signing in, open
      `https://api-staging.vedaspaces.com/health/live` once in the same browser, so `CF_Authorization` exists for that
      host. Without it, a credentialed call is redirected to the login and fails as a CORS error.
-4. **SES DKIM (AUT-202).** Publish the three CNAMEs of §4 as **DNS only** (not proxied). Change no other record:
-   `@`, `www`, MX, the apex SPF and the Google verification record stay as they are.
+4. **SES DKIM (AUT-202).** In the main dashboard (`dash.cloudflare.com`, not Zero Trust): `vedaspaces.com` → **DNS →
+   Records**. Publish the three CNAMEs of §4 as **DNS only** (grey cloud). Name `<token>._domainkey.staging`;
+   Cloudflare adds the zone. Change no other record: `@`, `www`, MX, the apex SPF and the Google verification record
+   stay as they are. Record `dig` of MX and TXT **before** and compare after.
+
+**Turnstile keys: two values, one public.** The widget page shows a **Site Key** (about 24 characters, public: Pages
+variable, in the page) and a **Secret Key** (about 35 characters: SSM only). Both start with `0x4AAAA`. The staging
+build refuses a secret-length value (incident I1 of the AUT-202 to AUT-204 evidence). If the secret ever reaches a
+page or a Pages variable: **rotate it** (widget → Rotate secret key), put the new one in SSM, fix the variable,
+retry the deployments, **delete every older deployment**, and re-run `12-deploy`.
+
+**Owner tasks from a managed workstation** (no Session Manager plugin, no admin rights): sign in to the console as
+`org-admin` with MFA and switch role into the staging account (`OrganizationAccountAccessRole`):
+- **SSM parameters:** Systems Manager → Parameter Store → Edit; keep **SecureString** and the KMS key
+  `alias/veda-stg-data` (the host decrypts with no other key). Never "Show decrypted value".
+- **Commands on the host:** SSM **Run Command** (`AWS-RunShellScript`), from the console or
+  `aws ssm send-command --profile veda-owner`. The console Session Manager shell may not take keyboard input.
+  **Anything a command prints is kept** in the command history, and the container's output also goes to the log
+  group: never run a command that prints a secret.
+- **CLI login:** `aws login --profile veda-owner` reuses that console sign-in. "Invalid request" means a stale URL:
+  stop it, close old sign-in tabs, and run it once again.
+- CloudTrail records these actions as `OrganizationAccountAccessRole/org-admin`, not `bootstrap-owner`: note it in the
+  evidence of the change.
 
 **Validation:**
 
@@ -293,7 +326,16 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
 | Signed in, `staging.vedaspaces.com` | The form shows the consent block and the Turnstile widget |
 | A submission with the widget solved | `201` and a reference |
 | The same request with a forged token | `422 CAPTCHA_FAILED`, no lead, a `PUBLIC_INTAKE_BLOCKED` event |
-| The page source of both staging hosts | No `api.vedaspaces.com` |
+| The page source of both staging hosts | No `api.vedaspaces.com`; `veda-turnstile-sitekey` is the 24-character site key |
+| A fresh private window (close every private window first: they share cookies) at each staging host and each `<project>.pages.dev` | The Access login before any page |
+| `dig +short vedaspaces.com` (apex) | Cloudflare addresses; the browser lands on `https://www.vedaspaces.com` (301, path and query kept) |
+| `aws sesv2 get-email-identity --email-identity staging.vedaspaces.com` | `VerificationStatus` and DKIM `SUCCESS` |
+
+Some corporate networks reset TLS to `*.vedaspaces.com` hosts: a `curl` failing with "connection reset" there is the
+network, not the site. Check in a browser instead.
+
+**After any dashboard change** (Pages, Access, Turnstile, DNS), run this table again: none of the Cloudflare setup is
+in the repository.
 
 Then run the end-to-end lead flow of §8.
 
