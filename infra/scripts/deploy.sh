@@ -39,12 +39,23 @@ REPO="${VEDA_PREFIX}-api"
 BUCKET="${VEDA_PREFIX}-stg-artifacts-$ACCOUNT"
 KEY="deploy/$TAG/bundle.tgz"
 
-log "1. build and push $REPO:$TAG"
-docker build --platform linux/arm64 -f "$REPO_ROOT/api/deploy/Dockerfile" -t "$REGISTRY/$REPO:$TAG" "$REPO_ROOT/api"
-aws ecr get-login-password --region "$VEDA_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
-docker push "$REGISTRY/$REPO:$TAG"
-DIGEST="$(aws ecr describe-images --region "$VEDA_REGION" --repository-name "$REPO" --image-ids "imageTag=$TAG" --output json |
-  jq -r '.imageDetails[0].imageDigest // empty')"
+image_digest() { aws ecr describe-images --region "$VEDA_REGION" --repository-name "$REPO" --image-ids "imageTag=$TAG" --output json; }
+# Tags are immutable: a commit already pushed (a re-run after a configuration or secret change, runbook §6.5/§6.6)
+# reuses its image instead of failing on the push. The scan gate below still applies to it.
+ecr_err="$(mktemp)"
+if existing="$(image_digest 2>"$ecr_err")"; then
+  DIGEST="$(jq -r '.imageDetails[0].imageDigest // empty' <<<"$existing")"
+  log "1. image $REPO:$TAG already pushed (immutable tag): reusing it"
+elif grep -q ImageNotFoundException "$ecr_err"; then
+  log "1. build and push $REPO:$TAG"
+  docker build --platform linux/arm64 -f "$REPO_ROOT/api/deploy/Dockerfile" -t "$REGISTRY/$REPO:$TAG" "$REPO_ROOT/api"
+  aws ecr get-login-password --region "$VEDA_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+  docker push "$REGISTRY/$REPO:$TAG"
+  DIGEST="$(image_digest | jq -r '.imageDetails[0].imageDigest // empty')"
+else
+  cat "$ecr_err" >&2
+  die "cannot read $REPO:$TAG from ECR; refusing"
+fi
 [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || die "cannot read the pushed image digest"
 log "image $REPO@$DIGEST"
 

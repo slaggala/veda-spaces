@@ -256,7 +256,8 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
    - Its **secret key** replaces the D8 test secret. The parameter was seeded with `--no-overwrite`, so in an owner
      session, delete it first, then put the new one:
      `aws ssm delete-parameter --region ap-south-1 --name /veda/staging/app/VEDA_TURNSTILE_SECRET`, then the §6.3
-     `put` line with `--value="$(pbpaste)"` straight from the clipboard. Re-run `12-deploy`.
+     `put` line with `--value="$(pbpaste)"` straight from the clipboard (or edit it in the console, keeping
+     `alias/veda-stg-data`). Re-run `12-deploy`: a commit already pushed reuses its image.
    - The API accepts a token only when siteverify succeeds **for one of these hosts** (`kernel/turnstile.py`).
 2. **Pages (AUT-204): two projects** from this repository, production branch `main`, root directory `app`:
 

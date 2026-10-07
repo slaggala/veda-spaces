@@ -1875,7 +1875,15 @@ deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum
   echo "{\"Account\":\"$ACCT\",\"Arn\":\"arn:aws:sts::$ACCT:assumed-role/veda-gh-deploy/gh-100-1-deploy\"}" >"$d/sts_get-caller-identity.json"
   echo "An error occurred (UnauthorizedOperation): explicit deny in a permissions boundary" >"$d/ec2_describe-availability-zones@us-east-1.fail"
   echo "token" >"$d/ecr_get-login-password.json"
-  echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$d/ecr_describe-images.json"
+  # The tag is not in ECR until the push (the first describe-images), then it is.
+  cat >"$d/ecr_describe-images.cmd" <<STUB
+#!/usr/bin/env bash
+if [[ -f "\$AWS_STUB_DIR/pushed" ]]; then echo '{"imageDetails":[{"imageDigest":"$DIGEST"}]}'; exit 0; fi
+: >"\$AWS_STUB_DIR/pushed"
+echo "An error occurred (ImageNotFoundException) when calling the DescribeImages operation: The image with imageId {imageTag:'x'} does not exist" >&2
+exit 254
+STUB
+  chmod +x "$d/ecr_describe-images.cmd"
   local listed="[]"
   [[ "${1:-0}" == 0 ]] || listed='[{"name":"CVE-2026-11111","severity":"HIGH","attributes":[{"key":"package_name","value":"openssl"},{"key":"package_version","value":"3.5.1-1"}]}]'
   echo "{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"findingSeverityCounts\":{\"MEDIUM\":2,\"HIGH\":${1:-0}},\"findings\":$listed}}" >"$d/ecr_describe-image-scan-findings.json"
@@ -1888,7 +1896,7 @@ deploy_stub() { # deploy_stub [high findings] [send status] [existing bundle sum
 }
 dep() { # dep <aws dir> [tag]
   local d="$TMP/docker.$RANDOM$RANDOM"
-  mkdir -p "$d"
+  mkdir -p "$d" && echo "$d" >"$1/docker.dir"
   env AWS_STUB_DIR="$1" DOCKER_STUB_DIR="$d" GITHUB_SHA="$DSHA" VEDA_SCAN_POLL_SECONDS=0 VEDA_SCAN_MAX_POLLS="${SCAN_POLLS:-60}" \
     "$DG/infra/scripts/deploy.sh" --tag "${2:-$DTAG}"
 }
@@ -1905,6 +1913,15 @@ check "DEPLOY a session other than veda-gh-deploy is refused" fail "not veda-gh-
 check "DEPLOY a tag that is not this commit is refused" fail "is not this commit" -- dep "$(deploy_stub)" "0123456789ab"
 check "DEPLOY a different bundle already uploaded for the tag is refused" fail "a different bundle already exists" -- dep "$(deploy_stub 0 Success "$(printf 'b%.0s' {1..64})")"
 check "DEPLOY a failed veda-deploy fails the run" fail "veda-deploy ended Failed" -- dep "$(deploy_stub 0 Failed)"
+DA="$(deploy_stub)" && dep "$DA" >/dev/null 2>&1
+check "DEPLOY a first deploy of the commit builds and pushes the image" ok "^push " -- cat "$(cat "$DA/docker.dir")/calls.log"
+# A re-run of the same commit (a configuration or secret change): the immutable tag already exists in ECR.
+DA="$(deploy_stub)" && rm "$DA/ecr_describe-images.cmd" && echo "{\"imageDetails\":[{\"imageDigest\":\"$DIGEST\"}]}" >"$DA/ecr_describe-images.json"
+check "DEPLOY a re-run of a commit already pushed reuses its image (immutable tag)" ok "already pushed \(immutable tag\): reusing it" -- dep "$DA"
+absent "  ... without building or pushing again" "^(build|push) " "$(cat "$(cat "$DA/docker.dir")/calls.log")"
+check "  ... and still deploys that digest after the scan gate" ok "describe-image-scan-findings" -- cat "$DA/calls.log"
+DA="$(deploy_stub)" && rm "$DA/ecr_describe-images.cmd" && echo "An error occurred (AccessDeniedException) when calling the DescribeImages operation" >"$DA/ecr_describe-images.fail"
+check "DEPLOY an ECR read error other than not-found is refused" fail "cannot read veda-api:$DTAG from ECR; refusing" -- dep "$DA"
 # The scan is registered a few seconds after the push (scan on push): "not found yet" and "in progress" wait.
 scan_seq() { # scan_seq <aws dir> <answer>...: describe-image-scan-findings answers in turn (not-found, in-progress, high, failed, denied)
   local d="$1"; shift
