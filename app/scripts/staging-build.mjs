@@ -13,9 +13,12 @@ export const PRODUCTION_API = 'https://api.vedaspaces.com';
 const APP = fileURLToPath(new URL('..', import.meta.url));
 
 export function siteKey(value) {
-  // A real widget key. Cloudflare's always-pass/fail test keys (1x…, 2x…, 3x…) are refused (AUT-203, D8).
-  if (!/^0x[0-9A-Za-z_-]{16,}$/.test(value ?? '')) {
-    throw new Error('STAGING_TURNSTILE_SITE_KEY must be the staging widget site key (0x…), not a test key');
+  // A real widget key. Cloudflare's always-pass/fail test keys (1x…, 2x…, 3x…) are refused (AUT-203, D8), and so is
+  // a secret key: it also starts with 0x but is longer (about 35 characters against 24), and it would be published.
+  if (!/^0x[0-9A-Za-z_-]{16,26}$/.test(value ?? '')) {
+    throw new Error(
+      'STAGING_TURNSTILE_SITE_KEY must be the staging widget site key (0x…, about 24 characters), not a test or secret key',
+    );
   }
   return value;
 }
