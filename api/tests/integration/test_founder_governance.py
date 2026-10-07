@@ -321,3 +321,67 @@ def test_grant_founder_in_steady_state_executes(api, factory):
     assert user.protection_level == "FOUNDER"
     assert rows(sa.select(UserRole).where(UserRole.user_id == s.id, UserRole.role_id == factory.role_id("FOUNDER")))
     assert_invariants()
+
+
+# --- R1/R2: in a deployed environment the invite link is never printed ------------------------------------------
+
+
+@pytest.fixture
+def deployed(monkeypatch):
+    import veda.cli.main as cli
+
+    monkeypatch.setattr(cli, "_stdout_link_allowed", lambda settings: False)
+
+
+def _founders():
+    return rows(sa.select(User).where(User.protection_level == "FOUNDER"))
+
+
+def test_R1_deployed_bootstrap_without_a_channel_is_refused(api, deployed, capsys):
+    from veda.cli.main import main
+
+    assert main(["bootstrap-founder", "--email", "founder@vedaspaces.test", "--name", "Founder One"]) == 2
+    assert "never printed" in capsys.readouterr().err and not _founders() and not events("BOOTSTRAP_FOUNDER")
+
+
+def test_R1_deployed_bootstrap_emails_the_link_and_prints_no_token(api, deployed, capsys):
+    from veda.cli.main import main
+    from veda.platform.notifications.models import OutboxEvent
+
+    assert (
+        main(["bootstrap-founder", "--email", "founder@vedaspaces.test", "--name", "Founder One", "--email-link"]) == 0
+    )
+    printed = capsys.readouterr().out
+    out = json.loads(printed.strip().splitlines()[-1])
+    assert out["invite"] == "emailed" and "invite_link" not in out and "token=" not in printed
+    assert rows(sa.select(OutboxEvent).where(OutboxEvent.event_type == "user.invited"))
+
+
+def test_R1_deployed_bootstrap_writes_the_link_to_a_private_new_file(api, deployed, capsys, tmp_path):
+    import os
+    import stat
+
+    from veda.cli.main import main
+
+    path = tmp_path / "invite"
+    assert main(["bootstrap-founder", "--email", "f@vedaspaces.test", "--name", "F", "--link-file", str(path)]) == 0
+    printed = capsys.readouterr().out
+    assert "token=" not in printed and json.loads(printed.strip().splitlines()[-1])["invite_link_file"] == str(path)
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600 and "/accept-invite#token=" in path.read_text()
+
+
+def test_R1_an_existing_link_file_is_never_overwritten_and_nothing_is_created(api, deployed, capsys, tmp_path):
+    from veda.cli.main import main
+
+    path = tmp_path / "invite"
+    path.write_text("keep")
+    assert main(["bootstrap-founder", "--email", "f@vedaspaces.test", "--name", "F", "--link-file", str(path)]) == 2
+    assert path.read_text() == "keep" and not _founders(), "the bootstrap rolled back"
+
+
+@pytest.mark.parametrize("env,allowed", [("local", True), ("test", True), ("staging", False), ("production", False)])
+def test_R1_only_local_and_test_print_the_invite_link(env, allowed):
+    from veda import config
+    from veda.cli.main import _stdout_link_allowed
+
+    assert _stdout_link_allowed(config.Settings(env=env)) is allowed
