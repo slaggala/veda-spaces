@@ -14,10 +14,14 @@ output "configuration_set" {
 }
 
 output "send_resources" {
-  description = "Resources the host may send through (AUT-106): the sender identity and the configuration set."
+  description = "Resources the host may send through (AUT-106): the sender identity, the configuration set and, while the account is in the SES sandbox, the verified recipient addresses (SES checks the recipient identity too)."
   value = [
     "arn:aws:ses:${var.region}:${var.account_id}:identity/${var.sender_domain}",
     "arn:aws:ses:${var.region}:${var.account_id}:configuration-set/${var.name_prefix}",
+    # Email-address identities only, never another domain: the sandbox recipients the owner verified (O11). Named by
+    # pattern, so the (sensitive) owner address never appears in the plan text. The From address stays pinned by the
+    # ses:FromAddress condition of the host policy.
+    "arn:aws:ses:${var.region}:${var.account_id}:identity/*@*",
   ]
 }
 
