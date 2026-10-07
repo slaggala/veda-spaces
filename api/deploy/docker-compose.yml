@@ -22,6 +22,19 @@ services:
     command: ["python", "-m", "veda.cli", "scheduler"]
     volumes: ["/var/lib/veda:/var/lib/veda"]
     restart: unless-stopped
+  # Cloudflare tunnel (AUT-201): connects out only, host network so the API sees the Docker gateway as its peer
+  # (VEDA_TRUSTED_PROXY_CIDRS). Started by deploy.sh only when render-edge.sh rendered its configuration, which
+  # requires Cloudflare Access on every request (infra/host/cloudflared.yml).
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
+    profiles: ["edge"]
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    env_file:
+      - path: /etc/veda/cloudflared/tunnel.env
+        required: false
+    network_mode: host
+    volumes: ["/etc/veda/cloudflared/config.yml:/etc/cloudflared/config.yml:ro"]
+    restart: unless-stopped
   litestream:
     image: litestream/litestream:0.3.13@sha256:027eda2a89a86015b9797d2129d4dd447e8953097b4190e1d5a30b73e76d8d58
     command: ["replicate"]

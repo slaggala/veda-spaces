@@ -1984,6 +1984,51 @@ check "SCAN an exception without an exact version is refused" fail "missing vers
 check "SCAN deploy.sh applies the gate with the staging environment, after the scan completes" ok "in order" -- order_ok "$(cat "$INFRA/scripts/deploy.sh")" "COMPLETE) findings=" 'check-image-scan.sh" --findings "\$scan_json" --environment staging'
 absent "SCAN deploy.sh keeps no count-only HIGH/CRITICAL test that an exception could not reach" "CRITICAL // 0\) \+ \(.HIGH" "$(cat "$INFRA/scripts/deploy.sh")"
 
+# AUT-201: render-edge.sh renders the tunnel only from all three owner-seeded edge parameters, always requiring Access.
+EDGE_AUD="$(printf 'ab%.0s' {1..32})"
+EDGE_TOKEN="eyJhIjoiMTIzNDU2Nzg5MGFiY2RlZjEyMzQ1Njc4OTBhYmNkZWYiLCJ0IjoieHl6In0=" # pragma: allowlist secret (fake test token)
+edge_tree() { # edge_tree <parameters json>: a copy of render-edge.sh and its template writing under a scratch /etc/veda
+  local t="$TMP/edge.$RANDOM$RANDOM"
+  mkdir -p "$t/host" "$t/etc" "$t/aws"
+  cp "$INFRA/host/cloudflared.yml" "$t/host/"
+  sed "s#^ETC=/etc/veda\$#ETC=$t/etc#" "$INFRA/host/render-edge.sh" >"$t/host/render-edge.sh" && chmod +x "$t/host/render-edge.sh"
+  echo 'VEDA_API_BASE_URL="https://api-staging.vedaspaces.com"' >"$t/etc/api.env"
+  printf '%s' "$1" >"$t/aws/ssm_get-parameters-by-path.json"
+  echo "$t"
+}
+edge_params() { # edge_params [token type] [team] [aud] [extra name]
+  jq -n --arg tt "${1:-SecureString}" --arg team "${2:-vedaspaces}" --arg aud "${3:-$EDGE_AUD}" --arg tok "$EDGE_TOKEN" --arg x "${4:-}" '{Parameters: ([
+    {Name: "/veda/staging/edge/CLOUDFLARED_TOKEN", Type: $tt, Value: $tok},
+    {Name: "/veda/staging/edge/ACCESS_TEAM_NAME", Type: "String", Value: $team},
+    {Name: "/veda/staging/edge/ACCESS_AUD", Type: "String", Value: $aud}] + (if $x == "" then [] else [{Name: ("/veda/staging/edge/" + $x), Type: "String", Value: "x"}] end))}'
+}
+redge() { AWS_STUB_DIR="$1/aws" "$1/host/render-edge.sh" ap-south-1; }
+ET="$(edge_tree "$(edge_params)")"
+check "AUT-201 render-edge renders the tunnel for the API host with Access required" ok "rendered the tunnel for api-staging.vedaspaces.com \(Access required: team vedaspaces\)" -- redge "$ET"
+# shellcheck disable=SC2016 # literal for the inner shell
+check "  ... the ingress serves only the API host, on loopback, Access required for the team and AUD, then 404" ok "^api-staging.vedaspaces.com http://127.0.0.1:8000 true vedaspaces $EDGE_AUD http_status:404 2$" -- bash -c 'c="$1/etc/cloudflared/config.yml"; printf "%s %s %s %s %s %s %s\n" "$(sed -nE "s/^  - hostname: (.*)/\1/p" "$c")" "$(sed -nE "s/^    service: (.*)/\1/p" "$c")" "$(sed -nE "s/^        required: (.*)/\1/p" "$c")" "$(sed -nE "s/^        teamName: (.*)/\1/p" "$c")" "$(sed -nE "s/^          - (.*)/\1/p" "$c")" "$(tail -n 1 "$c" | sed -nE "s/^  - service: (.*)/\1/p")" "$(grep -c "service:" "$c")"' _ "$ET"
+check "  ... metrics on loopback only, no auto-update" ok "^metrics: 127.0.0.1:20241$" -- cat "$ET/etc/cloudflared/config.yml"
+absent "  ... the token is never in the configuration" "$EDGE_TOKEN" "$(cat "$ET/etc/cloudflared/config.yml")"
+# shellcheck disable=SC2016 # literal for the inner shell
+check "  ... the token is in tunnel.env, readable by root only" ok "^600 TUNNEL_TOKEN=$EDGE_TOKEN$" -- bash -c 'printf "%s %s\n" "$(stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1")" "$(cat "$1")"' _ "$ET/etc/cloudflared/tunnel.env"
+ET="$(edge_tree '{"Parameters":[]}')" && mkdir -p "$ET/etc/cloudflared" && touch "$ET/etc/cloudflared/config.yml" "$ET/etc/cloudflared/tunnel.env"
+check "AUT-201 nothing seeded: the tunnel is not configured, and earlier files are removed" ok "edge not configured" -- redge "$ET"
+# shellcheck disable=SC2016 # literal for the inner shell
+check "  ... (no config.yml or tunnel.env left)" ok '^0$' -- bash -c 'ls "$1/etc/cloudflared" | wc -l | tr -d " "' _ "$ET"
+check "AUT-201 a partial edge configuration is refused" fail "needs CLOUDFLARED_TOKEN, ACCESS_TEAM_NAME and ACCESS_AUD" -- redge "$(edge_tree "$(edge_params | jq 'del(.Parameters[2])')")"
+check "AUT-201 a token stored as plain String is refused" fail "CLOUDFLARED_TOKEN must be a SecureString" -- redge "$(edge_tree "$(edge_params String)")"
+check "AUT-201 a team given as a domain is refused" fail "ACCESS_TEAM_NAME must be the team name only" -- redge "$(edge_tree "$(edge_params SecureString vedaspaces.cloudflareaccess.com)")"
+check "AUT-201 an AUD tag that is not 64 hex is refused" fail "ACCESS_AUD must be the 64-hex" -- redge "$(edge_tree "$(edge_params SecureString vedaspaces abc)")"
+check "AUT-201 an unexpected edge parameter is refused" fail "unexpected parameter /veda/staging/edge/NO_ACCESS" -- redge "$(edge_tree "$(edge_params SecureString vedaspaces "$EDGE_AUD" NO_ACCESS)")"
+ET="$(edge_tree "$(edge_params)")" && echo 'VEDA_API_BASE_URL="https://evil.example.com"' >"$ET/etc/api.env"
+check "AUT-201 an API host outside vedaspaces.com is refused" fail "is not an https vedaspaces.com host" -- redge "$ET"
+ET="$(edge_tree "$(edge_params)")" && sed -i.bak 's/        required: true/        required: false/' "$ET/host/cloudflared.yml"
+check "AUT-201 a template that no longer requires Access is refused" fail "does not require Access" -- redge "$ET"
+# shellcheck disable=SC2016 # literal matched text
+check "AUT-201 render-env renders the tunnel after the API environment" ok 'render-edge.sh" "\$REGION"' -- cat "$INFRA/host/render-env.sh"
+# shellcheck disable=SC2016 # literal for the inner shell
+check "AUT-201 the committed template requires Access for exactly one host and ends with 404" ok '^1 1 1$' -- bash -c 'printf "%s %s %s\n" "$(grep -c "^        required: true$" "$1")" "$(grep -c "^  - hostname: __API_HOST__$" "$1")" "$(tail -n 1 "$1" | grep -c "^  - service: http_status:404$")"' _ "$INFRA/host/cloudflared.yml"
+
 # The deploy document and the host scripts.
 DEPDOC="$HERE/fixtures/deploy-plan.json"
 check "DEPLOY the veda-deploy document verifies the bundle SHA-256 and pulls the image by digest" ok 'sha256sum -c' -- jq -r '.resource_changes[] | select(.address == "module.deploy.aws_ssm_document.deploy") | .change.after.content' "$DEPDOC"

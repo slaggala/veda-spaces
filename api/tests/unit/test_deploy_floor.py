@@ -62,7 +62,10 @@ def deploy(tmp_path):
     (bin_dir / "docker").write_text(DOCKER)
     # Litestream metrics answer only once it has been started (SHIM_LITESTREAM_UP=1 says it already runs).
     (bin_dir / "curl").write_text(
-        '#!/bin/sh\nif [ "$SHIM_LITESTREAM_UP" = 1 ] || grep -q "up -d --no-deps litestream" "$SHIM_LOG" 2>/dev/null; then\n'
+        '#!/bin/sh\ncase "$*" in *20241/ready*)\n'
+        '  [ "$SHIM_TUNNEL" = ready ] && { echo \'{"status":200,"readyConnections":4}\'; exit 0; }\n'
+        '  echo \'{"status":503,"readyConnections":0}\'; exit 22 ;;\nesac\n'
+        'if [ "$SHIM_LITESTREAM_UP" = 1 ] || grep -q "up -d --no-deps litestream" "$SHIM_LOG" 2>/dev/null; then\n'
         '  [ "$SHIM_LITESTREAM_BROKEN" = 1 ] && exit 7; echo "litestream_db_size 1"; exit 0\nfi\nexit 7\n'
     )
     (bin_dir / "mountpoint").write_text('#!/bin/sh\nexit "${SHIM_MOUNTED_EXIT:-0}"\n')
@@ -73,18 +76,32 @@ def deploy(tmp_path):
     work.mkdir()
     data = tmp_path / "data"
     data.mkdir()
+    edge = tmp_path / "edge"
+    edge.mkdir()
     # The copy works on a scratch data volume instead of /var/lib/veda (no runtime override exists).
     script = DEPLOY.read_text()
-    assert script.count("readonly DATA_DIR=/var/lib/veda") == 1
-    (work / "deploy.sh").write_text(script.replace("readonly DATA_DIR=/var/lib/veda", f"readonly DATA_DIR={data}"))
+    assert (
+        script.count("readonly DATA_DIR=/var/lib/veda") == 1
+        and script.count("readonly EDGE_DIR=/etc/veda/cloudflared") == 1
+    )
+    script = script.replace("readonly DATA_DIR=/var/lib/veda", f"readonly DATA_DIR={data}")
+    (work / "deploy.sh").write_text(
+        script.replace("readonly EDGE_DIR=/etc/veda/cloudflared", f"readonly EDGE_DIR={edge}")
+    )
     log = tmp_path / "docker.log"
 
-    def run(*args, env_extra=None, first=False):
+    def run(*args, env_extra=None, first=False, tunnel_config=None, tunnel_token=True):
         db = data / "veda.db"
         if first:
             db.unlink(missing_ok=True)
         else:
             db.write_text("")
+        for f in edge.iterdir():
+            f.unlink()
+        if tunnel_config is not None:
+            (edge / "config.yml").write_text(tunnel_config)
+            if tunnel_token:
+                (edge / "tunnel.env").write_text("TUNNEL_TOKEN=x\n")
         env = {
             **os.environ,
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
@@ -206,3 +223,60 @@ def test_later_deploys_refuse_without_replication_before_any_change(deploy):
     r, calls = deploy("at-floor", env_extra={"SHIM_LITESTREAM_BROKEN": "1"})
     assert r.returncode == 1 and "litestream metrics unavailable" in r.stdout
     assert "maintenance snapshot" not in calls and "migrate" not in calls and not _deployed(calls)
+
+
+# --- AUT-201: the Cloudflare tunnel, behind Cloudflare Access ------------------------------------------------------
+
+ACCESS_CONFIG = (Path(__file__).resolve().parents[3] / "infra" / "host" / "cloudflared.yml").read_text()
+
+
+def test_without_an_edge_configuration_the_tunnel_stays_stopped(deploy):
+    r, calls = deploy("at-floor")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "7. Edge: not configured (no tunnel)" in r.stdout
+    assert "--profile edge rm -s -f cloudflared" in calls and "up -d --no-deps cloudflared" not in calls
+
+
+def test_with_an_access_configuration_the_tunnel_starts_after_the_api_and_must_connect(deploy):
+    r, calls = deploy("at-floor", tunnel_config=ACCESS_CONFIG, env_extra={"SHIM_TUNNEL": "ready"})
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "tunnel ready: 4 edge connection(s)" in r.stdout
+    assert _order(
+        calls, "up -d --no-deps api", "up -d --no-deps worker scheduler", "--profile edge up -d --no-deps cloudflared"
+    )
+    assert r.stdout.rstrip().endswith("done: at-floor")
+
+
+def test_a_tunnel_that_never_connects_fails_the_deploy(deploy):
+    r, calls = deploy("at-floor", tunnel_config=ACCESS_CONFIG, env_extra={"SHIM_TUNNEL": "down"})
+    assert r.returncode == 1
+    assert "tunnel not ready: no edge connection" in r.stdout and "done:" not in r.stdout
+
+
+def test_a_tunnel_configuration_without_access_is_never_started(deploy):
+    open_config = ACCESS_CONFIG.replace("        required: true\n", "        required: false\n")
+    r, calls = deploy("at-floor", tunnel_config=open_config, env_extra={"SHIM_TUNNEL": "ready"})
+    assert r.returncode == 1
+    assert "does not require Cloudflare Access" in r.stdout
+    assert "up -d --no-deps cloudflared" not in calls
+
+
+def test_a_tunnel_configuration_without_its_token_is_never_started(deploy):
+    r, calls = deploy("at-floor", tunnel_config=ACCESS_CONFIG, tunnel_token=False, env_extra={"SHIM_TUNNEL": "ready"})
+    assert r.returncode == 1 and "up -d --no-deps cloudflared" not in calls
+
+
+def test_the_compose_tunnel_service_is_pinned_host_networked_and_opt_in():
+    compose = (DEPLOY.parent / "docker-compose.yml").read_text()
+    block = compose[compose.index("  cloudflared:") : compose.index("  litestream:")]
+    assert (
+        "image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c"
+        in block
+    )
+    assert 'profiles: ["edge"]' in block and "network_mode: host" in block
+    assert "ports:" not in block, "the tunnel connects out; it publishes nothing"
+    assert "/etc/veda/cloudflared/config.yml:/etc/cloudflared/config.yml:ro" in block
+    assert "api.env" not in block, "the tunnel never receives the API's secrets"
+    assert [line.strip() for line in block.splitlines() if "path:" in line] == [
+        "- path: /etc/veda/cloudflared/tunnel.env"
+    ]

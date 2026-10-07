@@ -164,6 +164,67 @@ widget (D8). The anchor retention is configuration, not a secret: Terraform writ
 Record `compute.ami_id` and `az_id` (staging-network.json) from the first real plan, so later plans cannot replace the
 host or the subnet.
 
+### 6.5 Cloudflare tunnel behind Cloudflare Access (AUT-201)
+
+**Owner decision (2026-10-06):**
+- `public_intake` stays **disabled**.
+- Staging is reachable **only through Cloudflare Access**, by the owner and staff.
+- **No anonymous internet traffic** reaches it.
+
+**How the tunnel enforces it:**
+- **Defined in the repository:** the tunnel is locally managed, and its ingress is in `infra/host/cloudflared.yml`, so
+  it is reviewed.
+- **Access required on every request:** `cloudflared` itself requires a valid Access token for the team and the
+  application. A request without one gets 403 at the origin, even if the Access application were missing or
+  misconfigured.
+- **One host only:** only `api-staging.vedaspaces.com` is routed; every other host gets 404.
+- **Outbound only:** the host keeps no inbound rule.
+
+**Owner steps**, from the workstation. Credentials stay there and the token goes straight into SSM.
+1. Install `cloudflared` (for example `brew install cloudflared`). Then run `cloudflared tunnel login`, choosing the
+   `vedaspaces.com` zone.
+2. Run `cloudflared tunnel create veda-staging`, then
+   `cloudflared tunnel route dns veda-staging api-staging.vedaspaces.com`. That creates one proxied CNAME and touches
+   no other record.
+3. In **Zero Trust**:
+   1. Note the **team name**: `<team>` in `<team>.cloudflareaccess.com`.
+   2. Create a **self-hosted application**, "Veda staging", for `api-staging.vedaspaces.com`. `staging` and
+      `app-staging` are added with AUT-204.
+   3. Add an **Allow** policy for the owner's and staff e-mail addresses only.
+   4. Copy its **Application Audience (AUD) tag**.
+4. In an owner session (MFA, runbook §6.3), seed `/veda/staging/edge` and list it by name only:
+   ```sh
+   aws ssm put-parameter --region ap-south-1 --name /veda/staging/edge/CLOUDFLARED_TOKEN --type SecureString \
+     --key-id alias/veda-stg-data --value="$(cloudflared tunnel token veda-staging)" --no-overwrite >/dev/null
+   aws ssm put-parameter --region ap-south-1 --name /veda/staging/edge/ACCESS_TEAM_NAME --type String --value <team> --no-overwrite
+   aws ssm put-parameter --region ap-south-1 --name /veda/staging/edge/ACCESS_AUD --type String --value <aud-tag> --no-overwrite
+   aws ssm get-parameters-by-path --region ap-south-1 --path /veda/staging/edge --query 'Parameters[].[Name,Type]' --output text
+   ```
+5. Run `12-deploy`. `render-edge.sh` renders `/etc/veda/cloudflared/` (the token in `tunnel.env`, mode 0600). Then
+   `deploy.sh` step 7 starts `cloudflared` and requires at least one edge connection.
+6. Delete `~/.cloudflared/cert.pem` and the tunnel credentials JSON from the workstation. They manage the tunnel; the
+   host needs only the token.
+
+**Validation:**
+
+| Check | Pass |
+|---|---|
+| `12-deploy` log | `7. Edge: Cloudflare tunnel, Cloudflare Access required at the origin`, then `tunnel ready: N edge connection(s)` |
+| Anonymous request (`curl -sI https://api-staging.vedaspaces.com/health/live`) | A redirect to `<team>.cloudflareaccess.com` (302), never the API |
+| Signed-in browser at the same URL | The live check answers |
+| `13-evidence` (label `aut-201-tunnel`) | `deploy-cloudflared-1` up; listeners add only `127.0.0.1:20241`; the security group still has no ingress rule |
+
+**Without the edge parameters:** the tunnel stays stopped (step 7 "not configured") and the API serves on loopback
+only.
+
+**A partial or malformed edge configuration refuses the deploy:**
+- a missing parameter;
+- a token stored as plain `String`;
+- a team given as a domain;
+- an AUD tag that is not 64 hex.
+
+**To turn the tunnel off:** delete the three parameters and re-run `12-deploy`.
+
 ## 7. Staging apply sequence
 
 Every apply: `10-infra-plan` on `main` → review the plan text and the guard → approve the digest → `11-infra-apply`.

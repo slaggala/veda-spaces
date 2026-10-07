@@ -40,3 +40,5 @@ chmod 0600 "$TMP"
 mv "$TMP" "$OUT"
 trap - EXIT
 echo "rendered $OUT ($(grep -c '=' "$OUT") settings)"
+# The Cloudflare tunnel (AUT-201), from the owner-seeded /veda/staging/edge parameters, for the API host above.
+"$(dirname "$0")/render-edge.sh" "$REGION"

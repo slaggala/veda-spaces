@@ -54,6 +54,19 @@ owner's review in a separate pull request, with its order, checks and rollback i
 - the CloudTrail data events;
 - the eight secrets.
 
+## Staging access model and public intake (2026-10-06)
+
+**`public_intake` = DISABLED**, as `deploy.public_intake` already records.
+
+| Rule | Detail |
+|---|---|
+| Cloudflare Access only | Staging is reachable only through Cloudflare Access |
+| Who | The owner and staff only |
+| No anonymous traffic | No anonymous internet traffic and no public lead intake |
+| Enforced at the origin | The tunnel (AUT-201, runbook §6.5) requires a valid Access token on every request. A request that bypassed Access, or a missing Access application, gets 403 from `cloudflared` |
+| Turnstile | D8 (the test Turnstile secret) remains acceptable under this model, because nothing is anonymous |
+| Changing it | Any public exposure needs a new owner decision recorded here |
+
 ## D8: staging Turnstile
 
 **Cloudflare's published always-pass test secret** is used in staging, seeded as `VEDA_TURNSTILE_SECRET` with the
