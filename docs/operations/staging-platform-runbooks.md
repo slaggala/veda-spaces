@@ -225,6 +225,77 @@ only.
 
 **To turn the tunnel off:** delete the three parameters and re-run `12-deploy`.
 
+### 6.6 Staging frontends behind Cloudflare Access (AUT-202 to AUT-204)
+
+**Owner decision (2026-10-07):**
+- Staging stays behind Cloudflare Access, and `public_intake` stays **disabled**: no anonymous visitor can submit a lead.
+- Owner and staff signed in to Access may submit through the staging site. For that, its intake call carries
+  credentials (`VEDA_PUBLIC_SITE_CREDENTIALS`, staging only).
+
+**Three frontends:**
+
+| | Production site | Staging site | Staff application (staging) |
+|---|---|---|---|
+| Host | `www.vedaspaces.com` | `staging.vedaspaces.com` | `app-staging.vedaspaces.com` |
+| Source | Committed root `dist/` (Pages project `veda-spaces`) | `app/e2e/site-release/`, staged by `node scripts/staging-build.mjs site` | `app/`, built by `node scripts/staging-build.mjs app` |
+| Access | Public | Cloudflare Access | Cloudflare Access |
+| Lead intake | Off: the committed `site-release` keeps `veda-api-base`, `veda-turnstile-sitekey` and `veda-api-credentials` empty (`test_public_intake_disabled`) | On, to `https://api-staging.vedaspaces.com`, with the staging widget and `credentials: 'include'` | Not applicable (staff API) |
+| CORS from the API | No credentials for public-site origins (production refuses `VEDA_PUBLIC_SITE_CREDENTIALS`) | Credentials for `https://staging.vedaspaces.com` on `/api/v1/public/*` only | Credentials for `VEDA_APP_ORIGIN` on every route (unchanged) |
+| Indexed | Yes | No (`X-Robots-Tag: noindex`, `robots.txt` disallows all, no sitemap) | No (`X-Robots-Tag: noindex`) |
+
+**The staging build never targets production.** `staging-build.mjs` writes `https://api-staging.vedaspaces.com` into
+the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
+- any output that still names `https://api.vedaspaces.com`;
+- a `VITE_API_BASE` other than the staging API;
+- a Turnstile test key (`1x…`, `2x…`, `3x…`) instead of the staging widget key.
+
+**Owner steps** (Cloudflare dashboard; no Cloudflare API token is used):
+1. **Turnstile (AUT-203).**
+   - Create a widget "Veda staging" for `staging.vedaspaces.com` and `app-staging.vedaspaces.com` (Managed).
+   - Its **site key** is public: it goes in the Pages variable `STAGING_TURNSTILE_SITE_KEY` below.
+   - Its **secret key** replaces the D8 test secret. The parameter was seeded with `--no-overwrite`, so in an owner
+     session, delete it first, then put the new one:
+     `aws ssm delete-parameter --region ap-south-1 --name /veda/staging/app/VEDA_TURNSTILE_SECRET`, then the §6.3
+     `put` line with `--value="$(pbpaste)"` straight from the clipboard. Re-run `12-deploy`.
+   - The API accepts a token only when siteverify succeeds **for one of these hosts** (`kernel/turnstile.py`).
+2. **Pages (AUT-204): two projects** from this repository, production branch `main`, root directory `app`:
+
+   | Project | Build command | Output | Variables |
+   |---|---|---|---|
+   | `veda-staging-site` | `node scripts/staging-build.mjs site` | `dist-staging-site` | `STAGING_TURNSTILE_SITE_KEY` |
+   | `veda-staging-app` | `npm ci && node scripts/staging-build.mjs app` | `dist` | `STAGING_TURNSTILE_SITE_KEY` |
+
+   - Attach the custom domains `staging.vedaspaces.com` and `app-staging.vedaspaces.com`. Pages creates the proxied
+     CNAMEs (AUT-202); don't create them by hand.
+   - Set **Preview deployments** to *None*, or put them behind Access. A `*.pages.dev` URL is otherwise public.
+3. **Access.** In the "Veda staging" application:
+   - **Hostnames:** add `staging.vedaspaces.com` and `app-staging.vedaspaces.com`, and the projects'
+     `*.pages.dev` hosts. Keep the same Allow policy.
+   - **CORS settings:** allowed origins `https://staging.vedaspaces.com` and `https://app-staging.vedaspaces.com`;
+     **Allow credentials** on; methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`; headers `Content-Type,
+     Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization`.
+     Access answers the preflight itself: `cloudflared` would refuse an `OPTIONS` without an Access token.
+   - **The browser needs the API host's own Access cookie.** After signing in, open
+     `https://api-staging.vedaspaces.com/health/live` once in the same browser, so `CF_Authorization` exists for that
+     host. Without it, a credentialed call is redirected to the login and fails as a CORS error.
+4. **SES DKIM (AUT-202).** Publish the three CNAMEs of §4 as **DNS only** (not proxied). Change no other record:
+   `@`, `www`, MX, the apex SPF and the Google verification record stay as they are.
+
+**Validation:**
+
+| Check | Pass |
+|---|---|
+| `dig +short staging.vedaspaces.com`, `app-staging…`, `api-staging…` | Cloudflare addresses (proxied) |
+| `dig +short CNAME <token>._domainkey.staging.vedaspaces.com` (×3) | `<token>.dkim.amazonses.com.` |
+| `dig +short MX vedaspaces.com`, `dig +short TXT vedaspaces.com` | Unchanged (Google MX, SPF, verification) |
+| Anonymous `curl -sI` of each staging host | `302` to `kite-relay.cloudflareaccess.com` |
+| Signed in, `staging.vedaspaces.com` | The form shows the consent block and the Turnstile widget |
+| A submission with the widget solved | `201` and a reference |
+| The same request with a forged token | `422 CAPTCHA_FAILED`, no lead, a `PUBLIC_INTAKE_BLOCKED` event |
+| The page source of both staging hosts | No `api.vedaspaces.com` |
+
+Then run the end-to-end lead flow of §8.
+
 ## 7. Staging apply sequence
 
 Every apply: `10-infra-plan` on `main` → review the plan text and the guard → approve the digest → `11-infra-apply`.

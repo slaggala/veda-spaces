@@ -3,3 +3,4 @@ dist/
 *.log
 .env.local
 e2e-artifacts/
+dist-staging-site/

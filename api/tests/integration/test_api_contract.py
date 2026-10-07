@@ -133,6 +133,46 @@ def test_SEC_002_cors_allowlist(client):
     assert "Access-Control-Allow-Origin" not in r.headers, "the public site origin reaches public endpoints only"
 
 
+def _cors_headers(client, method, path, origin, **kw):
+    if method == "OPTIONS":
+        r = client.options(path, headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+    else:
+        r = client.post(path, json={}, headers={"Origin": origin}, **kw)
+    return r.headers.get("Access-Control-Allow-Origin"), r.headers.get("Access-Control-Allow-Credentials")
+
+
+@pytest.mark.parametrize("method", ["OPTIONS", "POST"])
+def test_public_site_without_credentials_by_default(client, method):
+    """Production behaviour: the public site reaches public routes without credentials."""
+    assert _cors_headers(client, method, "/api/v1/public/leads", "http://localhost:8000") == (
+        "http://localhost:8000",
+        None,
+    )
+
+
+@pytest.mark.settings(public_site_credentials=True)
+@pytest.mark.parametrize("method", ["OPTIONS", "POST"])
+def test_staging_public_site_credentials(client, method):
+    """Staging (behind Cloudflare Access): the approved site origin gets credentials on public routes only."""
+    assert _cors_headers(client, method, "/api/v1/public/leads", "http://localhost:8000") == (
+        "http://localhost:8000",
+        "true",
+    )
+    # Non-approved origins get no CORS headers at all.
+    for origin in ("https://evil.example", "http://localhost:8001", "https://staging.vedaspaces.com.evil.example"):
+        assert _cors_headers(client, method, "/api/v1/public/leads", origin) == (None, None), origin
+    # The public site still never reaches the workspace API.
+    assert _cors_headers(client, method, "/api/v1/leads", "http://localhost:8000") == (None, None)
+
+
+@pytest.mark.parametrize("app", [{}, {"public_site_credentials": True}], indirect=True)
+def test_staff_app_cors_unchanged(client):
+    """The staff application keeps credentialed CORS on every route, whatever the public-site setting."""
+    for path in ("/api/v1/auth/login", "/api/v1/leads", "/api/v1/public/leads"):
+        for method in ("OPTIONS", "POST"):
+            assert _cors_headers(client, method, path, "http://localhost:5173") == ("http://localhost:5173", "true")
+
+
 def test_LOG_005_health(client):
     assert client.get("/health/live").get_json() == {"status": "ok"}
     body = client.get("/health/ready").get_json()

@@ -40,10 +40,11 @@
   },
   "ssm": {
     "status": "DECIDED",
-    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D7 accepted; the rest accepted as proposed. D7 staging host names; the trusted proxy is the Compose network gateway 172.30.0.1 (Docker address pool 172.30.0.0/16, AUT-001 host design): the peer the API sees for every request published on 127.0.0.1:8000; Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302).",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D7 accepted; the rest accepted as proposed. D7 staging host names; the trusted proxy is the Compose network gateway 172.30.0.1 (Docker address pool 172.30.0.0/16, AUT-001 host design): the peer the API sees for every request published on 127.0.0.1:8000; Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302). 2026-10-07 (owner, AUT-202 to AUT-204): public_site_credentials true, because the staging site is behind Cloudflare Access and its intake call must carry the Access cookie of the API host; the API refuses this setting in production.",
     "app_origin": "https://app-staging.vedaspaces.com",
     "api_base_url": "https://api-staging.vedaspaces.com",
     "public_site_origins": "https://staging.vedaspaces.com",
+    "public_site_credentials": true,
     "trusted_proxy_cidrs": "172.30.0.1/32",
     "litestream_retention": "168h",
     "session_log_retention_days": 90,

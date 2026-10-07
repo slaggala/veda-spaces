@@ -1781,6 +1781,8 @@ for t in aws_ssm_association aws_ssm_activation aws_ssm_maintenance_window aws_s
 done
 check "AUT-107 the host may find its session log group (Session Manager)" ok '^logs:DescribeLogGroups$' -- jq -r '.resource_changes[] | select(.address == "module.runtime_iam.aws_iam_policy.runtime") | .change.after.policy | fromjson | .Statement[] | select(.Sid == "FindLogGroups") | .Action' "$IAMPLAN"
 check "AUT-107 committed decision: staging host names, trusted proxy the Compose gateway (D7)" ok '^DECIDED https://api-staging.vedaspaces.com 172.30.0.1/32$' -- jq -r '"\(.ssm.status) \(.ssm.api_base_url) \(.ssm.trusted_proxy_cidrs)"' "$PLATFORM"
+check "AUT-204 the staging site is behind Access, so its intake is credentialed (committed decision)" ok '^true$' -- jq -r '.ssm.public_site_credentials' "$PLATFORM"
+check "  ... planned as the plain-text config parameter true" ok '^/veda/staging/config/VEDA_PUBLIC_SITE_CREDENTIALS String true$' -- jq -r '.resource_changes[] | select(.address == "module.ssm.aws_ssm_parameter.config[\"VEDA_PUBLIC_SITE_CREDENTIALS\"]") | .change.after | "\(.name) \(.type) \(.value)"' "$SSMPLAN"
 
 echo "== AUT-110: monitoring (bounded metrics, alarms to the encrypted topic, nothing leaves the account)"
 MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"

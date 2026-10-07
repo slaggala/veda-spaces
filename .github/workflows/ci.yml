@@ -113,6 +113,7 @@ jobs:
       - run: npm run lint:tokens
       - run: npm run test:contrast
       - run: npm test
+      - run: npm run test:staging-build
       - run: npm run build
 
   # Infrastructure checks (RD-02): the offline checks of infra/ with the pinned tools (infra/tools/tools.lock), and

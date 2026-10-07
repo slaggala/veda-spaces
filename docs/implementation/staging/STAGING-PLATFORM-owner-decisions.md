@@ -80,6 +80,24 @@ other AUT-302 secrets.
   - for production.
 - **This decision has no configuration value in the repository.** The secret is seeded by the owner and never committed.
 
+## Staging site credentials (2026-10-07)
+
+The staging site calls the API from another host, and both are behind Cloudflare Access. The browser sends the API
+host's Access cookie only on a credentialed request, and the API never allowed credentials for public-site origins.
+
+**Decision (owner, AUT-202 to AUT-204):** a staging-only setting, `VEDA_PUBLIC_SITE_CREDENTIALS`.
+
+| Rule | Detail |
+|---|---|
+| What it allows | `Access-Control-Allow-Credentials` for the approved public-site origins, on `/api/v1/public/*` only |
+| Where | Staging only (`ssm.public_site_credentials` in `infra/config/staging-platform.json`). The API refuses it in production |
+| Unchanged | The staff application's CORS; the public site never reaches the workspace API; refresh CSRF still accepts only the workspace origin |
+| Public intake | Stays **disabled**: the committed site keeps intake off, and only Access users reach the staging site |
+
+Alternatives considered: a Pages Function proxy with an Access service token, or serving the site through the tunnel.
+Both were rejected: the proxy hides the client from rate limits and Turnstile, and the tunnel option takes the site
+off Pages and adds a container. The setup is in runbook §6.6.
+
 ## N-04-S correction (2026-10-05)
 
 `PRIVATE_REPOSITORY` was recorded on the assumption that GitHub Pro or Team keeps environment protection in a private

@@ -257,6 +257,7 @@ def test_IR25_pair_throttle_activation_is_recorded(api, factory):
 # --- IR-A03: refresh CSRF accepts only the workspace origin -----------------------------------------------
 
 
+@pytest.mark.parametrize("app", [{}, {"public_site_credentials": True}], indirect=True)
 def test_IRA03_public_site_origin_cannot_refresh(api, factory):
     sales = factory.user("SALES")
     factory.login(api, sales)

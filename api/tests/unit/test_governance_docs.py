@@ -262,3 +262,4 @@ def test_public_intake_disabled():
     html = (REPO / "app/e2e/site-release/index.html").read_text()
     assert '<meta name="veda-api-base" content="">' in html
     assert '<meta name="veda-turnstile-sitekey" content="">' in html
+    assert '<meta name="veda-api-credentials" content="">' in html  # credentialed intake is staging-only

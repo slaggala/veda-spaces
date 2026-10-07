@@ -13,7 +13,7 @@ const sinks = [
 ];
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'e2e-artifacts/**', 'e2e/site-release/**'] },
+  { ignores: ['dist/**', 'dist-staging-site/**', 'node_modules/**', 'e2e-artifacts/**', 'e2e/site-release/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   lit.configs['flat/recommended'],

@@ -100,6 +100,9 @@ class Settings:
     database_url: str = "sqlite:///var/veda.db"
     app_origin: str = "http://localhost:5173"
     public_site_origins: list[str] = field(default_factory=lambda: ["http://localhost:8000"])
+    # Staging only: the staging site sits behind Cloudflare Access, so its intake call must carry the Access cookie
+    # and the API must allow credentials for the public-site origins on public routes. Production refuses it.
+    public_site_credentials: bool = False
     api_base_url: str = "http://localhost:5000"
     app_base_url: str = "http://localhost:5173"
     # JWT (05 §5): ES256 keys as PEM; previous key accepted for rotation overlap.
@@ -244,6 +247,7 @@ def load_settings(**overrides) -> Settings:
         database_url=_str("VEDA_DATABASE_URL", "sqlite:///var/veda.db"),
         app_origin=_str("VEDA_APP_ORIGIN", "http://localhost:5173"),
         public_site_origins=_list("VEDA_PUBLIC_SITE_ORIGINS", ["http://localhost:8000"]),
+        public_site_credentials=_bool("VEDA_PUBLIC_SITE_CREDENTIALS", False),
         api_base_url=_str("VEDA_API_BASE_URL", "http://localhost:5000"),
         app_base_url=_str("VEDA_APP_BASE_URL", "http://localhost:5173"),
         jwt_private_key_pem=_env("VEDA_JWT_PRIVATE_KEY_PEM"),
@@ -418,6 +422,8 @@ def validate_environment(settings: Settings) -> list[str]:
     if settings.lead_retention_enabled and not settings.lead_retention_days:
         problems.append("LEAD_RETENTION_ENABLED requires an approved LEAD_RETENTION_DAYS (OWNER-INPUT-002)")
     if settings.is_production:
+        if settings.public_site_credentials:
+            problems.append("VEDA_PUBLIC_SITE_CREDENTIALS is staging-only (Cloudflare Access); production refuses it")
         if not settings.sentry_dsn:
             problems.append("VEDA_SENTRY_DSN is required in production (LOG-004)")
         if not settings.anchor_bucket:
