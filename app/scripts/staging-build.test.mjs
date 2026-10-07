@@ -41,10 +41,12 @@ test('a build that names the production API is refused', () => {
 });
 
 test('test and missing Turnstile keys are refused', () => {
-  for (const key of [undefined, '', '1x00000000000000000000AA', '2x00000000000000000000AB', '3x00000000000000000000FF']) {
-    assert.throws(() => siteKey(key), /staging widget site key/, String(key));
+  const secretShaped = '0x4AAAAAAAstagingSecretKeyLooksLikeThis'; // pragma: allowlist secret (fake, secret-key length)
+  for (const key of [undefined, '', '1x00000000000000000000AA', '2x00000000000000000000AB', '3x00000000000000000000FF', secretShaped]) {
+    assert.throws(() => siteKey(key), /not a test or secret key/, String(key));
   }
   assert.equal(siteKey(KEY), KEY);
+  assert.equal(siteKey('0x4AAAAAAAAbcdEFghIJklMN'), '0x4AAAAAAAAbcdEFghIJklMN'); // a 24-character site key
 });
 
 test('an app build aimed at another API is refused before building', async () => {
