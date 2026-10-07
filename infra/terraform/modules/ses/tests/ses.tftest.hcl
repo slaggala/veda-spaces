@@ -58,3 +58,17 @@ run "apex_domain_refused" {
 
   expect_failures = [var.sender_domain]
 }
+
+run "host_may_reach_sandbox_recipients_without_naming_them" {
+  command = plan
+
+  assert {
+    condition     = contains(output.send_resources, "arn:aws:ses:ap-south-1:111122223333:identity/*@*") && !contains(output.send_resources, "arn:aws:ses:ap-south-1:111122223333:identity/*")
+    error_message = "the sandbox recipients are email-address identities only, never every identity"
+  }
+
+  assert {
+    condition     = length([for r in output.send_resources : r if strcontains(r, "owner@example.com")]) == 0
+    error_message = "the sensitive recipient address is never named in the host policy"
+  }
+}
