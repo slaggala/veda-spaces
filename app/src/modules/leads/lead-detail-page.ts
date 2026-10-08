@@ -14,6 +14,7 @@ import './activity-dialog.js';
 import type { ActivityMode } from './activity-dialog.js';
 import { loadAssignees } from './assignees.js';
 import { LookupAwareElement } from './base.js';
+import './estimate-panel.js';
 import './lead-form.js';
 import './status-dialog.js';
 import { primaryTransition } from './transitions.js';
@@ -380,6 +381,7 @@ export class VsLeadDetailPage extends LookupAwareElement {
         ${lead.duplicate_of ? html`<a href=${`/leads/${lead.duplicate_of.id}`}>${lead.duplicate_of.lead_number}${lead.duplicate_of.status ? ` (${statusLabel(lead.duplicate_of.status)})` : ''}</a>` : nothing}
         ${this.canUpdate ? html`<button class="btn small" @click=${() => (this.dialog = 'duplicate')}>Review</button>` : nothing}</section>` : nothing}
       ${lead.message ? html`<section class="card stack"><h2 class="eyebrow">Enquiry message</h2><p class="message">"${lead.message}"</p></section>` : nothing}
+      <vs-estimate-panel .leadId=${lead.id} @estimate-changed=${() => void this.loadActivities()}></vs-estimate-panel>
     </aside>`;
   }
 

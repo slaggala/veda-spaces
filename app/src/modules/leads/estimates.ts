@@ -1,0 +1,41 @@
+import type { EstimateRange, EstimateSelection } from '../../core/api/types.js';
+import { formatINR } from '../../core/format/format.js';
+
+/** Paise → ₹ with Indian grouping (the API returns integer paise). */
+export function rupees(minor: number | null | undefined): string {
+  return minor === null || minor === undefined ? '—' : formatINR(Math.round(minor / 100));
+}
+
+export function rangeText(range: EstimateRange): string {
+  return `${rupees(range.low_minor)} – ${rupees(range.high_minor)}`;
+}
+
+export const PACKAGES = ['ESSENTIAL', 'PREMIUM', 'LUXURY'] as const;
+
+/**
+ * A revision request: the original selections with the staff's measurement edits applied. An edit with an empty or
+ * non-positive value removes that measurement, so the engine uses (and labels) the typical size again.
+ */
+export function revisedSelections(
+  selections: EstimateSelection[],
+  edits: Record<string, string>,
+): EstimateSelection[] {
+  return selections.map((sel, i) => {
+    const measurements = { ...sel.measurements };
+    for (const [key, raw] of Object.entries(edits)) {
+      const [index, name, unit] = key.split('|');
+      if (Number(index) !== i) continue;
+      const value = Number(raw);
+      if (raw.trim() === '' || !(value > 0)) delete measurements[name];
+      else measurements[name] = { value, unit: unit || measurements[name]?.unit || 'ft' };
+    }
+    return { ...sel, measurements, options: { ...sel.options } };
+  });
+}
+
+/** Measurement keys of a selection's product as shown in the revision form: entered values plus typical ones. */
+export function measurementRows(sel: EstimateSelection, typicalInputs: string[]): { name: string; value: string; unit: string; typical: boolean }[] {
+  const entered = Object.entries(sel.measurements).map(([name, m]) => ({ name, value: String(m.value), unit: m.unit, typical: false }));
+  const typical = typicalInputs.filter((n) => !(n in sel.measurements)).map((name) => ({ name, value: '', unit: 'ft', typical: true }));
+  return [...entered, ...typical];
+}
