@@ -309,6 +309,11 @@ def conflict_extra(s: Session, lead: Lead) -> dict:
 def check_version(s: Session, lead: Lead, if_match: int | None) -> None:
     from veda.kernel.http import check_version as _check
 
+    if if_match is not None:
+        # R8: lock the row and read its committed version before comparing. A concurrent writer then waits for this
+        # transaction instead of passing the same check, so the loser always gets 409 with current_version (on
+        # PostgreSQL it otherwise failed at flush as a StaleDataError, without it). SQLite already serializes writers.
+        s.refresh(lead, with_for_update=True)
     _check(
         if_match,
         lead.version,
