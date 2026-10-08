@@ -74,7 +74,7 @@ dead ends.
 | 3 New or renovation | [v2-3-new-or-renovation.png](ux-v2/v2-3-new-or-renovation.png) |
 | 4 Rooms | [v2-4-rooms.png](ux-v2/v2-4-rooms.png), and with extras open: [v2-4b-rooms-extras-open.png](ux-v2/v2-4b-rooms-extras-open.png) |
 | 5 Package | [v2-5-package.png](ux-v2/v2-5-package.png) |
-| 6 Budget range | [v2-6-budget-range.png](ux-v2/v2-6-budget-range.png) |
+| 6 Budget range | [Variant A](ux-v2/v2-6-result-variant-A.png), [Variant B](ux-v2/v2-6-result-variant-B.png) (see [ESTIMATOR-UX-V2-TRUST](ESTIMATOR-UX-V2-TRUST.md)) |
 | 7 Get my quotation | [v2-7-get-quotation.png](ux-v2/v2-7-get-quotation.png) |
 | 8 Tighten your range | [v2-8-tighten-range.png](ux-v2/v2-8-tighten-range.png) |
 | Confirmation | [v2-9-confirmation.png](ux-v2/v2-9-confirmation.png) |

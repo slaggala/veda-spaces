@@ -6,7 +6,8 @@ import { chromium } from 'playwright';
 
 const require = createRequire(import.meta.url);
 const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-const BASE = `${process.env.SITE_OFF ?? 'http://localhost:8001'}/prototype/estimator-v2/`;
+const ROOT = `${process.env.SITE_OFF ?? 'http://localhost:8001'}/prototype/estimator-v2/`;
+const BASE = `${ROOT}?variant=B`;
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };
 
@@ -33,7 +34,9 @@ const overflow = () => page.evaluate(() => document.documentElement.scrollWidth 
 const visible = (n) => page.locator(`[data-screen="${n}"]`).isVisible();
 const next = (n) => page.click(`[data-screen="${n}"] [data-next]`);
 // Start again: clear the tab's saved state in a fresh document (a previous page can still save on pending events).
-const fresh = async () => { await page.goto(BASE); await page.evaluate(() => sessionStorage.clear()); await page.reload(); await page.waitForSelector('[data-screen="1"]:not([hidden])'); };
+const fresh = async (url = BASE) => { await page.goto(url); await page.evaluate(() => sessionStorage.clear()); await page.reload(); await page.waitForSelector('[data-screen="1"]:not([hidden])'); };
+const toResult = async () => { for (const n of [1, 2, 3, 4]) await next(n); await page.check('#verify'); await page.click('#see-budget'); await page.waitForSelector('[data-screen="6"]:not([hidden])'); };
+const resultText = () => page.evaluate(() => { document.querySelectorAll('[data-screen="6"] details').forEach((d) => { d.open = true; }); return document.querySelector('[data-screen="6"]').innerText; });
 
 await page.goto(BASE);
 const t0 = Date.now();
@@ -87,17 +90,35 @@ const range = await page.textContent('#range');
 check('progress bar only on steps 1–5', !(await page.locator('#progress').isVisible()));
 check('estimate shown before any contact details', /₹[\d,]+ – ₹[\d,]+/.test(range) && !(await visible(7)), range);
 check('time to first estimate on the default path (automated, 5 taps)', ms < 120000, `${ms} ms`);
-const details = await page.evaluate(() => ({
-  open: [...document.querySelectorAll('[data-screen="6"] summary')].map((s) => s.textContent),
-  disclaimer: document.querySelector('.disclaimer').textContent,
-}));
-check('result: package, allowance, assumptions and disclaimer present', ['Project Preparation & Protection Package', 'Custom Features Allowance', 'Assumptions'].every((t) => details.open.includes(t)) &&
-  details.disclaimer.startsWith('This is a preliminary budgetary estimate'));
-await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
-await axe('6 result');
+// Variant B (trust-first): the validation tasks, as far as automation can check them.
+const ctas = await page.locator('#cta button').allTextContents();
+check('B: CTA order personalise → quotation → designer', ctas.join(' | ') === 'Personalise and narrow my estimate | Get a detailed quotation | Talk to a designer', ctas.join(' | '));
+const b = await resultText();
+check('B task 1: the material promise (what kitchen and wardrobe are made of)', /What Essential includes/.test(b) && /Cabinet structure/.test(b) && /Doors and shutters/.test(b) &&
+  (await page.locator('.room-card .spec-line').count()) >= 8);
+check('B task 2: the execution package is included in the range', /Site Execution & Handover Package/.test(b) && (b.match(/Included in your estimated range/g) || []).length === 2 &&
+  /Included in this range: your rooms, the Site Execution & Handover Package and the Design Personalisation Allowance\. GST is extra\./.test(b));
+check('B task 3: the allowance is not an automatic extra', /Design Personalisation Allowance/.test(b) && /not an automatic extra charge/.test(b));
+check('B task 4: what changes the range', /Why is this a range\?/.test(b) && /How your range is built/.test(b) && /physical site measurement/.test(b));
+check('B task 5–6: exclusions and warranty findable', /Not included/.test(b) && /Warranty/.test(b) && (await page.locator('[data-screen="6"] a[href="/warranty"]').count()) === 1);
+check('B task 7: how to compare with another provider', /How to compare this estimate/.test(b) && /Hardware brand and type/.test(b));
+check('no rates, price ceilings or conflicting warranty periods on the result', !/per sq|\/sq ?ft|per sheet|₹2,500|₹800|₹1,000 per|10 years|30-year|30 years/i.test(b));
+check('room subtotals shown, no line amounts', (await page.locator('.room-amount').count()) === 9);
+await axe('6 result (variant B)');
 check('360 px without horizontal scroll (result)', (await overflow()) <= 1);
 // Optional refinement narrows or moves the range.
-await page.click('#to-refine');
+// Detailed specification on demand; the default promises only what both historical specifications agree on.
+await page.click('#result-body .link:has-text("View detailed material specification")');
+const spec = await page.locator('[data-screen="10"]').innerText();
+check('detailed specification: 9 categories, no conflicting grade promised by default', (await page.locator('#spec-detail .spec-cat').count()) === 9 &&
+  !/Sylvan Blu|Blum|0\.72|1\.3 mm/.test(spec) && /approved equivalent/.test(spec));
+await axe('10 detailed specification');
+await page.click('#spec-back');
+check('specification back returns to the estimate', await visible(6));
+// T9: personalise without technical knowledge (primary CTA).
+await page.click('#cta button:has-text("Personalise and narrow my estimate")');
+check('B: personalise opens the plain-language refinement', (await page.textContent('#h8')) === 'Personalise and narrow my estimate' &&
+  (await page.locator('[data-screen="8"] small').count()) >= 3);
 await page.fill('[data-screen="8"] input >> nth=0', '16');
 await page.click('#update');
 const refined = await page.textContent('#refined-range');
@@ -117,6 +138,25 @@ await page.click('#send');
 await page.waitForSelector('[data-screen="9"]:not([hidden])');
 check('confirmation with the estimate reference', /PROTO-/.test(await page.textContent('#estimate-ref')));
 await axe('9 confirmation');
+// Talk to a designer: consultation request, no amount.
+await fresh();
+await toResult();
+await page.click('#cta button:has-text("Talk to a designer")');
+check('talk to a designer: consultation request without an amount', await visible(7) && (await page.textContent('#h7')) === 'Request a design consultation' &&
+  !/₹/.test(await page.locator('[data-screen="7"]').innerText()));
+// Variant A: the current result page plus material summaries; approved labels; quotation first.
+await fresh(`${ROOT}?variant=A`);
+await toResult();
+const a = await resultText();
+check('A: approved labels, material summary per room, quotation first', /Project Preparation & Protection Package/.test(a) && /Custom Features Allowance/.test(a) &&
+  (await page.locator('.totals .spec-line').count()) === 9 && (await page.locator('#cta button').first().textContent()) === 'Get my detailed quotation →');
+check('A: no rates or conflicting warranty periods', !/per sq|per sheet|₹2,500|10 years|30-year/i.test(a));
+await axe('6 result (variant A)');
+// Specification candidates (owner decision T1) are only shown when asked for.
+await fresh(`${ROOT}?variant=B&spec=oct`);
+await toResult();
+await page.click('#result-body .link:has-text("View detailed material specification")');
+check('candidate specification shown only on request (?spec=oct)', /Sylvan Blu/.test(await page.locator('[data-screen="10"]').innerText()));
 // Luxury: consultation without an amount.
 await fresh();
 for (const n of [1, 2, 3, 4]) await next(n);
