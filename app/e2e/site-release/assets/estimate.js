@@ -350,6 +350,7 @@ function toEnquiry() {
 
 function init() {
   if (!apiBase) return; // off: the "coming soon" panel stays
+  if (meta('veda-estimator-ux') === 'v2') return; // UX V2 runs instead (estimate-v2.js); V1 stays for comparison
   $('#est-off').hidden = true;
   $('#est-app').hidden = false;
   try { Object.assign(state, JSON.parse(sessionStorage.getItem(STATE_KEY) || '{}')); } catch { /* fresh start */ }

@@ -12,6 +12,7 @@
   <meta name="veda-estimator-packages" content="">
   <meta name="veda-estimator-home-sizes" content="">
   <meta name="veda-estimator-property-types" content="">
+  <meta name="veda-estimator-ux" content="">
   <meta name="veda-api-base" content="">
   <meta name="veda-turnstile-sitekey" content="">
   <meta name="veda-api-credentials" content="">
@@ -25,6 +26,7 @@
   <link rel="stylesheet" href="/assets/styles.css">
   <link rel="stylesheet" href="/assets/enhancements.css">
   <link rel="stylesheet" href="/assets/estimate.css">
+  <link rel="stylesheet" href="/assets/estimate-v2.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -36,7 +38,7 @@
   <main id="main-content" class="est-main">
     <p class="eyebrow">Plan your budget</p>
     <h1>Estimate your interiors budget</h1>
-    <p class="lead">Choose your rooms, enter measurements if you have them, and see a preliminary budget range in a few minutes. No contact details are needed to see your estimate.</p>
+    <p class="lead" id="est-lead">Choose your rooms, enter measurements if you have them, and see a preliminary budget range in a few minutes. No contact details are needed to see your estimate.</p>
 
     <section class="est-panel" id="est-off">
       <h2>Coming soon</h2>
@@ -135,9 +137,113 @@
         <a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Prefer WhatsApp? Continue there →</a>
       </section>
     </div>
+
+    <!-- Budgetary Estimate UX V2 (STAGING_ESTIMATOR_UX=v2; docs/implementation/estimator/ESTIMATOR-UX-V2*.md). -->
+    <div id="est-v2" hidden>
+      <p class="v2-progress" id="v2-progress" hidden><span id="v2-progress-text"></span><span class="v2-bar" aria-hidden="true"><span id="v2-progress-fill"></span></span></p>
+      <div class="v2-summary" id="v2-summary" role="alert" tabindex="-1" hidden></div>
+
+      <section class="v2-screen" data-v2="1" aria-labelledby="v2-h1">
+        <h2 id="v2-h1" tabindex="-1">What kind of home is it?</h2>
+        <div class="v2-choices" role="radiogroup" aria-labelledby="v2-h1" id="v2-types"></div>
+        <div class="v2-actions"><span></span><button class="v2-primary" type="button" data-v2-next>Continue →</button></div>
+      </section>
+
+      <section class="v2-screen" data-v2="2" aria-labelledby="v2-h2" hidden>
+        <h2 id="v2-h2" tabindex="-1">How many bedrooms?</h2>
+        <div class="v2-pills" role="radiogroup" aria-labelledby="v2-h2" id="v2-sizes"></div>
+        <p class="v2-note" id="v2-size-note"></p>
+        <label class="v2-field" for="v2-city">City or area <span class="v2-opt">(optional)</span>
+          <input id="v2-city" maxlength="60" autocomplete="address-level2" placeholder="e.g. Kondapur, Hyderabad">
+        </label>
+        <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-back>← Back</button><button class="v2-primary" type="button" data-v2-next>Continue →</button></div>
+      </section>
+
+      <section class="v2-screen" data-v2="3" aria-labelledby="v2-h3" hidden>
+        <h2 id="v2-h3" tabindex="-1">Is this a new home or a renovation?</h2>
+        <div class="v2-choices" role="radiogroup" aria-labelledby="v2-h3">
+          <label class="v2-choice"><input type="radio" name="v2-kind" value="NEW_HOME" checked><span><strong>New home</strong><small>Recently handed over, empty</small></span></label>
+          <label class="v2-choice"><input type="radio" name="v2-kind" value="RENOVATION"><span><strong>Renovation</strong><small>Lived-in home, replacing or adding interiors</small></span></label>
+        </div>
+        <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-back>← Back</button><button class="v2-primary" type="button" data-v2-next>Continue →</button></div>
+      </section>
+
+      <section class="v2-screen" data-v2="4" aria-labelledby="v2-h4" hidden>
+        <h2 id="v2-h4" tabindex="-1">Which rooms should we design?</h2>
+        <p class="v2-sub" id="v2-rooms-sub"></p>
+        <div id="v2-rooms" class="v2-rooms"></div>
+        <p class="v2-hint" id="v2-rooms-hint" role="status"></p>
+        <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-back>← Back</button><button class="v2-primary" type="button" data-v2-next id="v2-rooms-next">Continue →</button></div>
+      </section>
+
+      <section class="v2-screen" data-v2="5" aria-labelledby="v2-h5" hidden>
+        <h2 id="v2-h5" tabindex="-1">Choose your finish</h2>
+        <div class="v2-choices" role="radiogroup" aria-labelledby="v2-h5" id="v2-packages"></div>
+        <div class="turnstile" id="v2-ts-estimate"></div>
+        <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-back>← Back</button><button class="v2-primary" type="button" id="v2-see">See my budget →</button></div>
+      </section>
+
+      <section class="v2-screen v2-result" data-v2="6" aria-labelledby="v2-h6" hidden>
+        <p class="v2-eyebrow">Veda Spaces preliminary budgetary estimate</p>
+        <h2 id="v2-h6" tabindex="-1" class="v2-range" aria-live="polite"><span id="v2-range"></span></h2>
+        <p class="v2-gst" id="v2-gst"></p>
+        <p class="v2-basis" id="v2-basis"></p>
+        <p class="v2-included" id="v2-included"></p>
+        <p><a class="v2-link" href="#v2-next-steps">Next steps ↓</a></p>
+        <div id="v2-result-body"></div>
+        <p class="v2-disclaimer" id="v2-disclaimer"></p>
+        <p class="v2-small" id="v2-meta"></p>
+      </section>
+
+      <section class="v2-screen" data-v2="7" aria-labelledby="v2-h7" hidden>
+        <h2 id="v2-h7" tabindex="-1">Get my detailed quotation</h2>
+        <p class="v2-sub" id="v2-lead-sub"></p>
+        <form id="v2-lead" novalidate>
+          <label class="v2-field" for="v2-name">Name <span class="v2-req">Required</span><input id="v2-name" autocomplete="name" maxlength="150" aria-describedby="v2-name-err"><span class="v2-err" id="v2-name-err"></span></label>
+          <label class="v2-field" for="v2-phone">Phone <span class="v2-req">Required</span><input id="v2-phone" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+91" aria-describedby="v2-phone-err"><span class="v2-err" id="v2-phone-err"></span></label>
+          <label class="v2-field" for="v2-email">Email <span class="v2-opt">(optional)</span><input id="v2-email" type="email" autocomplete="email" maxlength="254"></label>
+          <fieldset class="v2-field"><legend>How should we contact you?</legend>
+            <label class="v2-inline"><input type="radio" name="v2-contact" value="PHONE" checked> Call</label>
+            <label class="v2-inline"><input type="radio" name="v2-contact" value="WHATSAPP"> WhatsApp</label>
+            <label class="v2-inline"><input type="radio" name="v2-contact" value="EMAIL"> Email</label>
+          </fieldset>
+          <div class="hp-field" aria-hidden="true"><label for="v2-website">Company website<input id="v2-website" tabindex="-1" autocomplete="off"></label></div>
+          <label class="v2-consent" for="v2-consent"><input id="v2-consent" type="checkbox" aria-describedby="v2-consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the <a href="/privacy">Privacy Notice</a> (v2026-09-v1). <span class="v2-req">Required</span></span><span class="v2-err" id="v2-consent-err"></span></label>
+          <div class="turnstile" id="v2-ts-enquiry"></div>
+          <p class="v2-refine-link" id="v2-refine-link">Want a tighter range first? <button class="v2-link" type="button" data-v2-goto="8">Personalise and narrow my estimate →</button></p>
+          <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-back>← Back</button><button class="v2-primary" type="submit" id="v2-send">Send my request →</button></div>
+        </form>
+      </section>
+
+      <section class="v2-screen" data-v2="8" aria-labelledby="v2-h8" hidden>
+        <h2 id="v2-h8" tabindex="-1">Personalise and narrow my estimate</h2>
+        <p class="v2-sub">Add what you know and leave the rest. We keep typical sizes for anything you skip. You can also <button class="v2-link" type="button" data-v2-goto="4">change your rooms and extras</button>.</p>
+        <div id="v2-refine" class="v2-refine"></div>
+        <div class="turnstile" id="v2-ts-refine"></div>
+        <button class="v2-primary v2-wide" type="button" id="v2-update">Update my estimate</button>
+        <p class="v2-range v2-small-range" id="v2-refined" aria-live="polite"></p>
+        <div class="v2-actions"><button class="v2-ghost" type="button" data-v2-goto="6">← My estimate</button><button class="v2-primary" type="button" data-v2-goto="7">Get my detailed quotation →</button></div>
+      </section>
+
+      <section class="v2-screen" data-v2="9" aria-labelledby="v2-h9" hidden role="status">
+        <h2 id="v2-h9" tabindex="-1">Thank you.</h2>
+        <p>Your reference is <strong id="v2-reference"></strong>.</p>
+        <p id="v2-next"></p>
+        <p class="v2-small" id="v2-estimate-ref"></p>
+        <a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Prefer WhatsApp? Continue there →</a>
+      </section>
+
+      <section class="v2-screen" data-v2="10" aria-labelledby="v2-h10" hidden>
+        <h2 id="v2-h10" tabindex="-1">Detailed material specification</h2>
+        <p class="v2-sub" id="v2-spec-sub"></p>
+        <div id="v2-spec"></div>
+        <div class="v2-actions"><button class="v2-ghost" type="button" id="v2-spec-back">← Back to my estimate</button><span></span></div>
+      </section>
+    </div>
   </main>
 
   <footer class="est-footer"><span>© 2026 Veda Spaces · Designed with Sense. Built with Care.</span><a href="/warranty">Warranty policy</a><a href="/">www.vedaspaces.com</a></footer>
   <script src="/assets/estimate.js"></script>
+  <script src="/assets/estimate-v2.js"></script>
 </body>
 </html>

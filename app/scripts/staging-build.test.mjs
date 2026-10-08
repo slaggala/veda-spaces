@@ -77,16 +77,24 @@ test('the estimator page is off unless STAGING_ESTIMATOR=on, and Essential-only 
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PACKAGES: 'ESSENTIAL,LUXURY' }), /optionally PREMIUM/, 'D2');
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_HOME_SIZES: '5BHK' }), /unknown home sizes/);
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PROPERTY_TYPES: 'OFFICE' }), /unknown property types/);
+  assert.match(onHtml, /<meta name="veda-estimator-ux" content="">/, 'V1 by default');
+  const v2 = join(tmp(), 'site');
+  buildSite(SRC, v2, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_UX: 'v2' }));
+  assert.match(readFileSync(join(v2, 'estimate.html'), 'utf8'), /<meta name="veda-estimator-ux" content="v2">/);
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_UX: 'v3' }), /v1 or v2/);
 });
 
 test('the committed estimator page is off and holds no rates', () => {
   const html = readFileSync(join(SRC, 'estimate.html'), 'utf8');
-  for (const name of ['veda-estimator', 'veda-estimator-packages', 'veda-estimator-home-sizes', 'veda-estimator-property-types', 'veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
+  for (const name of ['veda-estimator', 'veda-estimator-packages', 'veda-estimator-home-sizes', 'veda-estimator-property-types', 'veda-estimator-ux', 'veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
     assert.ok(html.includes(`<meta name="${name}" content="">`), name);
   }
   const js = readFileSync(join(SRC, 'assets/estimate.js'), 'utf8');
   assert.ok(!/rate_minor|_minor\s*:\s*\d/.test(js), 'no rate table in the page script');
   assert.ok(!js.includes('innerHTML'), 'DOM built without innerHTML');
+  const v2js = readFileSync(join(SRC, 'assets/estimate-v2.js'), 'utf8');
+  assert.ok(!/rate_minor|_minor\s*:\s*\d|innerHTML/.test(v2js), 'UX V2 script: no rate table, no innerHTML');
+  assert.ok(!/per sq|per sheet|10 years|30-year/i.test(v2js), 'UX V2 script: no rates or warranty durations in copy');
 });
 
 test('the warranty policy page is the same customer-facing page on the live site and the staging site', () => {

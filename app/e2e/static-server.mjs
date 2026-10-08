@@ -52,7 +52,8 @@ http.createServer((req, res) => {
       .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
       .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">')
       .replace('<meta name="veda-estimator-home-sizes" content="">', '<meta name="veda-estimator-home-sizes" content="2BHK,3BHK">')
-      .replace('<meta name="veda-estimator-property-types" content="">', '<meta name="veda-estimator-property-types" content="APARTMENT">'));
+      .replace('<meta name="veda-estimator-property-types" content="">', '<meta name="veda-estimator-property-types" content="APARTMENT">')
+      .replace('<meta name="veda-estimator-ux" content="">', `<meta name="veda-estimator-ux" content="${new URL(req.url, 'http://x').searchParams.get('ux') === 'v2' ? 'v2' : ''}">`));
   }
   res.setHeader('Content-Type', TYPES[path.extname(file)] || 'application/octet-stream');
   res.end(body);
