@@ -1,0 +1,53 @@
+/* Budgetary Estimate page (ADR-012). Builds on styles.css and enhancements.css; mobile first. */
+.est-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 4vw; background: #281a13; color: #fff; }
+.est-brand img { width: 132px; height: auto; object-fit: contain; }
+.est-back { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; min-height: 44px; display: inline-flex; align-items: center; }
+.est-main { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.15rem 4rem; }
+.est-main h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.4rem); line-height: 1.05; margin: 0; }
+.est-main h2 { font-family: var(--serif); font-weight: 400; font-size: 1.9rem; margin: 0 0 1rem; }
+.est-main h3 { font-size: 1rem; margin: 1.8rem 0 .5rem; }
+.est-main .lead { margin: 1rem 0 2rem; }
+.est-panel, .est-step { background: #fbf9f5; border: 1px solid var(--line); padding: 1.4rem; }
+.est-step { display: grid; gap: 1.1rem; }
+.est-step[hidden], .est-panel[hidden] { display: none; }
+.est-step label { display: grid; gap: .35rem; font-size: .9rem; }
+.est-step input:not([type="checkbox"]):not([type="radio"]), .est-step select { min-height: 48px; padding: .5rem .7rem; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.est-step fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: .6rem; }
+.est-step legend { font-weight: 600; margin-bottom: .4rem; }
+.est-step .choice { display: flex; align-items: center; gap: .6rem; min-height: 44px; font-size: .95rem; }
+.est-step .choice input { width: 22px; height: 22px; accent-color: #8c5b37; }
+.choice.unavailable { color: #6b645b; }
+.hint { color: #5d574f; font-size: .85rem; margin: 0; }
+.est-steps { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; margin: 0 0 1.2rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.est-steps li { padding: .35rem .6rem; border: 1px solid var(--line); color: #5d574f; }
+.est-steps li.done { border-color: #8c5b37; color: #6f4428; }
+.est-steps li[aria-current="step"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.est-rooms, .est-items { display: grid; gap: 1rem; }
+.est-room, .est-item { border: 1px solid var(--line) !important; padding: 1rem !important; background: #fff; }
+.est-measure { display: grid; gap: .5rem; grid-template-columns: 1fr auto; align-items: end; padding: .4rem 0; border-top: 1px solid var(--line); }
+.est-measure .choice, .est-measure .hint { grid-column: 1 / -1; }
+.est-actions { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: space-between; margin-top: .4rem; }
+.est-actions .button { min-height: 52px; }
+.est-main .button-ghost { border-color: var(--ink); color: var(--ink); background: transparent; }
+.est-disclaimer { border-left: 3px solid #8c5b37; background: #f4ece4; padding: .9rem 1rem; font-size: .9rem; }
+.est-disclaimer p { margin: 0 0 .4rem; }
+.est-disclaimer ul { margin: 0; padding-left: 1.2rem; }
+.est-range { padding: 1.1rem; background: #281a13; color: #fff; }
+.est-range .eyebrow { color: #e9cdb4; margin: 0 0 .4rem; }
+.est-range-value { font-family: var(--serif); font-size: clamp(1.8rem, 7vw, 2.6rem); margin: 0; }
+.est-table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.est-table th, .est-table td { text-align: left; padding: .55rem .2rem; border-bottom: 1px solid var(--line); }
+.est-table td { text-align: right; white-space: nowrap; }
+.est-prep { border: 1px solid var(--line); background: #fff; padding: 1rem; }
+.est-prep h3 { margin-top: 0; }
+.est-prep-amount { font-weight: 600; font-size: 1.15rem; margin: 0 0 .4rem; }
+.est-result ul { margin: 0; padding-left: 1.2rem; }
+.turnstile { min-height: 65px; }
+.est-footer { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; padding: 1.5rem 4vw; font-size: .8rem; color: #5d574f; border-top: 1px solid var(--line); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.est-step.contact-form { grid-template-columns: 1fr; }
+@media (min-width: 720px) {
+  .est-panel, .est-step { padding: 2rem; }
+  .est-step.contact-form { grid-template-columns: 1fr 1fr; }
+  .est-step.contact-form .full { grid-column: 1 / -1; }
+}

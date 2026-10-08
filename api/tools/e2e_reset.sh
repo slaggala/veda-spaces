@@ -9,5 +9,8 @@ export VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db VEDA_COOKIE_SECURE=
 mkdir -p var
 rm -f var/e2e.db var/e2e.db-wal var/e2e.db-shm var/e2e.db.api.lock && rm -rf var/mail var/anchors
 "$PY" -m veda.cli migrate >/dev/null 2>&1
+# Budgetary Estimate (ADR-012): the SYNTHETIC rate card only (never commercial rates).
+"$PY" -m veda.cli estimator load-card tests/fixtures/estimator/synthetic-rate-card.json >/dev/null
+"$PY" -m veda.cli estimator activate-card --version SYNTHETIC-1 --approval "E2E synthetic card (no commercial rates)" >/dev/null
 "$PY" -m veda.cli bootstrap-founder --email founder@vedaspaces.test --name "Lakshmi Rao" | tail -1 > var/bootstrap.json
 cat var/bootstrap.json
