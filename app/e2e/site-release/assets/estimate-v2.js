@@ -26,8 +26,7 @@
     return n;
   };
   const rupees = (minor) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Math.round(minor / 100));
-  const lakh = (minor) => `₹${(minor / 10000000).toFixed(1)} L`;
-  const roomAmount = (minor) => (minor >= 10000000 ? `₹${(minor / 10000000).toFixed(2)} L` : rupees(minor));
+  const roomAmount = rupees; // the same format as the build-up, so the rooms visibly add up
 
   // --- room bundles (ESTIMATOR-UX-V2 §3.2): customer words → unchanged engine selections ---------------------------
   const ROOM_CODE = { kitchen: 'KITCHEN', living: 'LIVING', dining: 'DINING', master: 'MASTER_BEDROOM', bed2: 'BEDROOM_2',
@@ -90,11 +89,22 @@
   // --- fixed customer copy (owner decisions T5–T7) -------------------------------------------------------------------
   const PACKAGE_NAME = 'Site Execution & Handover Package';
   const ALLOWANCE_NAME = 'Design Personalisation Allowance';
-  const PACKAGE_PARTS = ['Site and floor protection', 'Plywood and material protection', 'Material freight and handling', 'Debris handling', 'Completion deep cleaning', 'Pest-control preparation where applicable'];
-  const ALLOWANCE_EXAMPLES = ['Additional drawers', 'Mirrors', 'Pelmets', 'Profile lighting beyond your selection', 'Lighting sensors', 'Additional internal storage', 'Selected accessories'];
-  const WHY_RANGE = ['Typical sizes are used until you share measurements', 'How much your design is personalised', 'The final configuration of each unit', 'The finishes and accessories you select', 'The physical site measurement', 'The quantities actually executed', 'Site conditions'];
+  const PACKAGE_TEXT = 'This covers the preparation, protection, material handling, completion and handover activities required to execute the selected project scope professionally.';
+  const PACKAGE_PARTS = ['Site and floor protection', 'Plywood or material protection', 'Material freight and handling', 'Debris handling', 'Completion deep cleaning', 'Pest-control preparation where applicable'];
+  const ALLOWANCE_TEXT = 'This planning allowance protects your budget for commonly selected design additions. It is not an automatic extra charge. Your detailed quotation replaces it with only the items you approve.';
+  const ALLOWANCE_EXAMPLES = ['Extra drawers', 'Mirrors', 'Pelmets', 'Profile lighting', 'Sensors', 'Additional internal storage', 'Selected accessories'];
+  // The engine sets the allowance as a share of your room work; measurements change it only through that rule.
+  const ALLOWANCE_NOTES = ['The upper amount is not charged automatically.', 'The allowance is a share of your room work, so it moves when your room sizes change. Adding measurements does not remove it.', 'In your detailed quotation, the items you actually approve replace it.'];
+  const WHY_RANGE = ['Typical sizes are used until you share measurements', 'Room configurations may change during design', 'Finishes and accessories affect the final value', 'The physical site measurement sets the final quantities', 'Site conditions may change what the work requires'];
   const COMPARE = ['Product sizes', 'Cabinet material', 'Door material and finish', 'Hardware brand and type', 'What each room includes', 'Installation', 'Freight and handling', 'Protection and cleaning', 'Taxes (GST)', 'Items you supply', 'What is excluded'];
-  const WARRANTY_DEFAULT = 'Material and hardware warranties depend on the selected manufacturer, product and documented warranty terms. Applicable workmanship and fitment service is provided according to the Veda Spaces Warranty, Service & Customer Care Policy.';
+  // Warranty (Phase 5): manufacturer-backed protection and Veda Spaces service support are separate promises. The one
+  // duration shown is Veda Spaces' own, from the approved policy ("one year of free service from the project handover
+  // date"); no material or hardware duration is shown until each product's documentation is reconciled.
+  const MANUFACTURER_DEFAULT = 'Approved materials and hardware carry the applicable manufacturer warranty for the exact product selected and documented in your final quotation.';
+  const SERVICE_SUPPORT = 'Veda Spaces provides one year of applicable workmanship and fitment service support from handover, subject to the Warranty, Service & Customer Care Policy.';
+  const SERVICE_NOTE = 'A longer manufacturer warranty is the manufacturer’s own. It does not extend Veda Spaces workmanship or service support.';
+  const TRUST_MARKERS = ['No contact details required for your first estimate', 'Room-wise estimate shown', 'Material specification available', 'Warranty and exclusions disclosed', 'GST shown separately'];
+  const NEXT_STEPS = ['Personalise and narrow your estimate. No contact details are needed for this.', 'Request a designer consultation.', 'We complete a physical site measurement.', 'You confirm the design, materials and brands.', 'You receive your detailed final quotation.', 'You approve the scope before any work starts.'];
   const PACKAGES = [['ESSENTIAL', 'Essential', 'Branded plywood, laminate finishes and soft-close hardware'], ['PREMIUM', 'Premium', ''], ['LUXURY', 'Luxury', '']];
   const SIZE_LABEL = { '1BHK': '1 BHK', '2BHK': '2 BHK', '3BHK': '3 BHK', '4BHK': '4 BHK', CUSTOM: 'Custom' };
   const TYPE_LABEL = { APARTMENT: ['Apartment', 'Flat in a building or gated community'], VILLA: ['Villa or independent house', ''] };
@@ -310,67 +320,114 @@
   const button = (cls, text, fn) => { const b = el('button', { class: cls, type: 'button', text }); b.addEventListener('click', fn); return b; };
   const spec = () => state.estimate?.specification || null;
   const roomIdOf = (code) => Object.keys(ROOM_CODE).find((k) => ROOM_CODE[k] === code);
-  function roomSpecLine(code) {
-    const s = spec(); if (!s) return '';
-    const ids = code === 'WHOLE_HOME' ? ['ceiling'] : ['structure', 'surface', 'hardware'];
-    return ids.map((id) => s.categories.find((c) => c.code === id && c.rooms.includes(code))?.summary).filter(Boolean).join(' · ');
+  const nearest = (minor) => Math.round(minor / 100000) * 100000; // ₹1,000, as the room amounts are rounded
+  const signed = (minor) => `${minor < 0 ? '−' : '+'}${rupees(Math.abs(minor))}`;
+  const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+  const plural = (n, one, many) => `${WORDS[n] || n} ${n === 1 ? one : many}`;
+  // Every amount on this page comes from the estimate response; the variation line is what remains between the
+  // displayed components and the displayed range, so the build-up always adds up exactly (Phase 8).
+  function buildUp(e) {
+    const rooms = e.rooms.reduce((sum, r) => sum + r.amount_minor, 0);
+    const optional = nearest(e.optional_items_minor || 0);
+    const pkg = e.project_preparation.amount_minor;
+    const a = e.custom_features_allowance;
+    const low = rooms + optional + pkg + a.low_minor;
+    const high = rooms + optional + pkg + a.high_minor;
+    return { rooms, optional, pkg, allowLow: a.low_minor, allowHigh: a.high_minor, varLow: e.range.low_minor - low, varHigh: e.range.high_minor - high };
+  }
+  const amountRow = (term, text, data) => [el('dt', { text: term }), el('dd', { text, 'data-low': data?.[0] ?? null, 'data-high': data?.[1] ?? null })];
+  function typicalAssumptions() {
+    const picked = chosen();
+    const on = (id) => roomState(id).on;
+    const count = (id) => picked.filter((p) => p.id === id).length;
+    const out = [];
+    if (on('kitchen')) out.push('Standard modular kitchen with wall units and loft');
+    if (count('wardrobe')) out.push(`${plural(count('wardrobe'), 'wardrobe', 'wardrobes')} with lofts`);
+    if (on('living')) out.push(count('living_wall') || count('dining_wall') || count('bed_wall') ? 'TV unit and feature-wall scope' : 'TV unit scope');
+    const pu = [on('pooja') ? 'Pooja' : null, on('utility') ? 'utility' : null].filter(Boolean);
+    if (pu.length) out.push(`${pu.join(' and ')} scope as selected`.replace(/^./, (c) => c.toUpperCase()));
+    if (on('whole')) out.push(`Whole-home ceiling and lighting based on typical ${SIZE_LABEL[state.size]} dimensions`);
+    const measured = REFINE.filter((f) => Number(state.measures[`${f.room}:${f.item}`]) > 0).map((f) => f.label.toLowerCase());
+    if (measured.length) out.push(`Your measurements are used for: ${measured.join(', ')}`);
+    return out;
+  }
+  function roomCard(r, details) {
+    const s = spec();
+    const id = roomIdOf(r.room);
+    const def = rooms().find((x) => x.id === id);
+    const std = def ? def.includes.map((x) => ITEMS[x].label) : [];
+    const extras = [...new Set(chosen().filter((p) => p.room === id && !def?.includes.includes(p.id)).map((p) => ITEMS[p.id].label + (ITEMS[p.id].optional ? ' (shown separately under optional items)' : '')))];
+    const m = details?.materials;
+    const cats = s && m ? m.categories.map((code) => s.categories.find((c) => c.code === code)).filter(Boolean) : [];
+    const material = cats.map((c) => el('div', { class: 'v2-spec-cat' }, el('p', {}, el('strong', { text: `${c.label}: ` }), c.requirement),
+      c.brand_examples.length ? el('p', { class: 'v2-small', text: `Approved examples: ${c.brand_examples.join(', ')}, or an approved equivalent` }) : null));
+    return el('article', { class: 'v2-room-card', 'aria-label': def?.label || r.label },
+      el('div', { class: 'v2-room-row' }, el('h4', { text: def?.label || r.label }), el('span', { class: 'v2-room-amount', text: roomAmount(r.amount_minor) })),
+      el('p', { class: 'v2-room-std', text: [...std, ...extras.map((x) => `+ ${x}`)].join(' · ') }),
+      m?.line ? el('p', { class: 'v2-spec-line' }, el('strong', { text: 'Essential specification: ' }), m.line) : null,
+      disclosure('View inclusions & materials',
+        el('h5', { text: 'Included items' }), ul(std),
+        el('h5', { text: 'Material specification' }), ...(material.length ? [...material, el('p', { class: 'v2-small', text: s.final_selection })] : [el('p', { text: 'Materials are confirmed in your detailed quotation.' })]),
+        el('h5', { text: 'Optional or selected extras' }), extras.length ? ul(extras) : el('p', { text: 'None added.' }),
+        el('h5', { text: 'Assumptions' }), details?.assumptions?.length ? ul(details.assumptions) : el('p', { text: 'Your measurements are used for this room.' })));
   }
   function renderResult() {
     const e = state.estimate;
     if (!e) return;
+    const s = spec();
+    const b = buildUp(e);
+    const gstText = `GST at ${e.gst.pct}% is extra: about ${rupees(e.gst.low_minor)} – ${rupees(e.gst.high_minor)}`;
     $('#v2-range').textContent = `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}`;
-    $('#v2-gst').textContent = `Plus GST at ${e.gst.pct}%: about ${lakh(e.gst.low_minor)} – ${lakh(e.gst.high_minor)}`;
+    $('#v2-gst').textContent = gstText;
     const measured = Object.values(state.measures).some((v) => Number(v) > 0);
     $('#v2-basis').textContent = `${SIZE_LABEL[state.size]} ${state.type === 'VILLA' ? 'villa' : 'apartment'} · ${state.kind === 'NEW_HOME' ? 'New home' : 'Renovation'} · Essential · ${measured ? 'Including your measurements' : `Based on typical ${SIZE_LABEL[state.size]} sizes`}`;
-    $('#v2-included').textContent = `Included in this range: your rooms, the ${PACKAGE_NAME} and the ${ALLOWANCE_NAME}. GST is extra.`;
-    const s = spec();
-    const picked = chosen();
-    const rooms2 = e.rooms.map((r) => {
-      const id = roomIdOf(r.room);
-      const def = rooms().find((x) => x.id === id);
-      const std = def ? def.includes.map((x) => ITEMS[x].label) : [];
-      const extras = [...new Set(picked.filter((p) => p.room === id && !def?.includes.includes(p.id)).map((p) => ITEMS[p.id].label))];
-      const cats = s ? s.categories.filter((c) => c.rooms.includes(r.room)) : [];
-      return el('article', { class: 'v2-room-card', 'aria-label': r.label },
-        el('div', { class: 'v2-room-row' }, el('h4', { text: def?.label || r.label }), el('span', { class: 'v2-room-amount', text: roomAmount(r.amount_minor) })),
-        el('p', { class: 'v2-room-std', text: std.join(', ') }),
-        extras.length ? el('p', { class: 'v2-room-extras', text: `Your extras: ${extras.join(', ')}` }) : null,
-        s ? el('p', { class: 'v2-spec-line' }, el('strong', { text: 'Essential specification: ' }), roomSpecLine(r.room)) : null,
-        disclosure('View room details', ul([...std, ...extras].map((t) => `${t}: sized to typical dimensions until measured`))),
-        cats.length ? disclosure('View material details', ...cats.map((c) => el('div', { class: 'v2-spec-cat' }, el('p', {}, el('strong', { text: `${c.label}: ` }), c.requirement), ul([...c.thickness, ...c.details])))) : null);
-    });
-    const roomWork = e.rooms.reduce((sum, r) => sum + r.amount_minor, 0);
-    const allowance = e.custom_features_allowance;
-    const policy = e.warranty?.policy_url || '/warranty';
     const toRefine = () => show(8);
     const toQuote = () => { state.consult = null; save(); show(7); };
     const toDesigner = () => { state.consult = 'designer'; save(); show(7); };
+    const markers = TRUST_MARKERS.filter((t) => s || t !== 'Material specification available');
+    $('#v2-top').replaceChildren(
+      el('div', { class: 'v2-block v2-includes-block' }, el('h3', { text: 'Your estimate includes' }),
+        ul(['Your selected rooms and products', PACKAGE_NAME, ALLOWANCE_NAME]), el('p', { class: 'v2-small', text: 'GST is shown separately.' })),
+      el('ul', { class: 'v2-markers', 'aria-label': 'About this estimate' }, ...markers.map((t) => el('li', { text: t }))),
+      el('div', { class: 'v2-block' }, el('h3', { text: 'Why is this a range?' }), ul(WHY_RANGE),
+        button('v2-primary v2-wide', 'Personalise and narrow my estimate', toRefine)),
+      el('p', {}, el('a', { class: 'v2-link', href: '#v2-next-steps', text: 'What happens next ↓' })));
+    const details = Object.fromEntries((e.room_details || []).map((d) => [d.room, d]));
+    const policy = e.warranty?.policy_url || '/warranty';
+    const build = el('dl', { class: 'v2-build', id: 'v2-build' },
+      ...amountRow('Your selected rooms', rupees(b.rooms), [b.rooms, b.rooms]),
+      ...(b.optional ? amountRow('+ Optional items you added', rupees(b.optional), [b.optional, b.optional]) : []),
+      ...amountRow(`+ ${PACKAGE_NAME}`, rupees(b.pkg), [b.pkg, b.pkg]),
+      ...amountRow(`+ ${ALLOWANCE_NAME}`, `${rupees(b.allowLow)} – ${rupees(b.allowHigh)}`, [b.allowLow, b.allowHigh]),
+      ...amountRow('Size and site variation', `${signed(b.varLow)} to ${signed(b.varHigh)}`, [b.varLow, b.varHigh]),
+      el('dt', { class: 'v2-total', text: 'Your estimated range' }), el('dd', { class: 'v2-total', text: `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}`, 'data-low': e.range.low_minor, 'data-high': e.range.high_minor }),
+      el('dt', { text: 'GST, shown separately' }), el('dd', { text: `about ${rupees(e.gst.low_minor)} – ${rupees(e.gst.high_minor)}` }));
     $('#v2-result-body').replaceChildren(
+      section('How your estimate is built', build,
+        el('p', { class: 'v2-small', text: 'The size and site variation allows for actual sizes and site conditions. It is wider while typical sizes are used and narrows for the items you measure. Amounts are rounded, and the variation includes the rounding.' })),
       section('What Essential includes', ...(s ? [el('p', { class: 'v2-small', text: s.summary }),
-        el('dl', { class: 'v2-promise' }, ...s.categories.flatMap((c) => [el('dt', { text: c.label }), el('dd', { text: c.requirement })])),
+        disclosure(`See all ${s.categories.length} material categories`, el('dl', { class: 'v2-promise' }, ...s.categories.flatMap((c) => [el('dt', { text: c.label }), el('dd', { text: c.summary })]))),
         el('p', { class: 'v2-small', text: `${s.equivalent_policy} ${s.final_selection}` }),
         button('v2-link', 'View detailed material specification →', () => { state.specReturn = 6; show(10); })]
         : [el('p', { text: 'Your materials are confirmed in your detailed quotation.' })])),
-      section('Your rooms', ...rooms2, el('p', { class: 'v2-small', text: 'Room amounts are rounded and include installation. Rates are never shown on this page; your detailed quotation lists every item.' })),
-      section(PACKAGE_NAME, el('p', { class: 'v2-amount', text: rupees(e.project_preparation.amount_minor) }), el('p', { class: 'v2-badge', text: 'Included in your estimated range' }),
-        el('p', { text: 'This covers the preparation, protection, material handling, completion and handover activities required to execute your project professionally.' }),
-        disclosure('Why this is needed', el('p', { text: 'Interiors work brings materials, cutting and dust into a finished home. Protecting floors and materials, moving materials and debris, and a final deep clean are part of doing the work properly, so they are planned and shown rather than added later.' })),
-        disclosure('View detailed breakdown', ul(PACKAGE_PARTS), el('p', { class: 'v2-small', text: 'Your detailed quotation shows the amount for each item.' }))),
-      section(ALLOWANCE_NAME, el('p', { class: 'v2-amount', text: `${rupees(allowance.low_minor)} – ${rupees(allowance.high_minor)}` }), el('p', { class: 'v2-badge', text: 'Included in your estimated range' }),
-        el('p', { text: 'This planning allowance protects your budget for design additions homeowners commonly choose. It is not an automatic extra charge: your detailed quotation replaces it with only the items you approve.' }),
+      section('Your rooms', ...e.rooms.map((r) => roomCard(r, details[r.room])), el('p', { class: 'v2-small', text: 'Room amounts are rounded and include installation. Rates are never shown on this page; your detailed quotation lists every item.' })),
+      section(PACKAGE_NAME, el('p', { class: 'v2-amount', text: rupees(b.pkg) }), el('p', { class: 'v2-badge', text: 'Included in your estimated range' }),
+        el('p', { text: PACKAGE_TEXT }),
+        disclosure('What it covers', ul(PACKAGE_PARTS), el('p', { class: 'v2-small', text: 'Your detailed quotation shows the amount for each item.' }))),
+      section(ALLOWANCE_NAME, el('p', { class: 'v2-amount', text: `${rupees(b.allowLow)} – ${rupees(b.allowHigh)}` }), el('p', { class: 'v2-badge', text: 'Included in your estimated range' }),
+        el('p', { text: ALLOWANCE_TEXT }), ul(ALLOWANCE_NOTES),
         disclosure('What it usually covers', ul(ALLOWANCE_EXAMPLES))),
-      section('Why this is a range', el('dl', { class: 'v2-build' },
-        el('dt', { text: 'Your rooms' }), el('dd', { text: rupees(roomWork) }),
-        el('dt', { text: `+ ${PACKAGE_NAME}` }), el('dd', { text: rupees(e.project_preparation.amount_minor) }),
-        el('dt', { text: `+ ${ALLOWANCE_NAME}` }), el('dd', { text: `${rupees(allowance.low_minor)} – ${rupees(allowance.high_minor)}` }),
-        el('dt', { text: 'Planning range, allowing for actual sizes and site conditions' }), el('dd', { class: 'v2-total', text: `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}` })),
-        el('p', { text: 'Your final price depends on:' }), ul(WHY_RANGE),
-        button('v2-ghost v2-wide', 'Narrow my range', toRefine)),
-      section('Warranty and service', el('p', { text: s?.warranty_summary || WARRANTY_DEFAULT }), el('p', {}, el('a', { href: policy, text: 'Read the Warranty, Service & Customer Care Policy, including exclusions' }))),
+      section('Warranty and service',
+        el('h4', { text: 'Manufacturer-backed protection' }), el('p', { text: s?.warranty_summary || MANUFACTURER_DEFAULT }),
+        el('h4', { text: 'Veda Spaces service support' }), el('p', { text: SERVICE_SUPPORT }), el('p', { class: 'v2-small', text: SERVICE_NOTE }),
+        el('p', {}, el('a', { href: policy, text: 'View full warranty and exclusions' }))),
       section('Not included', ul([...e.exclusions, ...(e.client_scope.length ? [`Supplied by you: ${e.client_scope.join(', ')}`] : [])])),
       section('How to compare this estimate', el('p', { text: 'Estimates only compare fairly when the scope is the same. Check each provider’s:' }), ul(COMPARE)),
-      section('Assumptions', ul(e.assumptions.length ? e.assumptions : ['All sizes are typical for your home until measured.'])),
-      el('section', { class: 'v2-block v2-next-steps', id: 'v2-next-steps', 'aria-label': 'Next steps' }, el('h3', { text: 'Next steps' }),
+      section(measured ? 'Assumptions used' : `Typical ${SIZE_LABEL[state.size]} assumptions used`, ul(typicalAssumptions()),
+        disclosure('View technical assumptions', ...(e.room_details || []).filter((d) => d.assumptions.length).flatMap((d) => [el('h4', { text: (rooms().find((x) => x.id === roomIdOf(d.room)) || {}).label || d.room }), ul(d.assumptions)]),
+          ...(e.room_details ? [] : [ul(e.assumptions)]))),
+      el('section', { class: 'v2-block v2-next-steps', id: 'v2-next-steps', 'aria-label': 'What happens next?' }, el('h3', { text: 'What happens next?' }),
+        el('ol', { class: 'v2-steps' }, ...NEXT_STEPS.map((t) => el('li', { text: t }))),
         button('v2-primary v2-wide', 'Personalise and narrow my estimate', toRefine),
         button('v2-ghost v2-wide', 'Get my detailed quotation', toQuote),
         button('v2-link', 'Talk to a designer', toDesigner)),
@@ -401,7 +458,7 @@
     $('#v2-h7').textContent = c ? 'Request a design consultation' : 'Get my detailed quotation';
     $('#v2-lead-sub').textContent = c === 'luxury' ? 'Luxury is priced after a design consultation. A designer will call you to understand your home.'
       : c === 'designer' ? 'A designer will call you to talk through your home, your estimate and your ideas.'
-        : 'A designer will call you within one working day and arrange a free site measurement.';
+        : 'A designer will call you within one working day to arrange a physical site measurement. You then confirm the design, materials and brands, receive your detailed final quotation, and approve the scope before any work starts.';
     $('#v2-send').textContent = c ? 'Request my consultation →' : 'Send my request →';
     $('#v2-refine-link').hidden = Boolean(c) || !state.estimate;
   }

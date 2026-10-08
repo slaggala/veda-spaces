@@ -68,7 +68,7 @@ def test_lifecycle_one_active_per_package_with_audited_events(api):
         "SPEC_ROLLED_BACK",
     ]
     items = rows(sa.select(EstimatorCustomerSpecItem))
-    assert len(items) == 8 and all(i.equivalent_rule and i.final_selection for i in items)
+    assert len(items) == 2 * len(SPEC_DOC["categories"]) and all(i.equivalent_rule and i.final_selection for i in items)
 
 
 def test_a_specification_with_amounts_is_refused_on_load(api):
@@ -126,3 +126,35 @@ def test_cli_spec_actions_print_codes_and_hashes_only(api, tmp_path, capsys):
     assert main(["estimator", "list-specs"]) == 0
     listed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["specs"]
     assert [x["status"] for x in listed] == ["ACTIVE"]
+
+
+@ON
+def test_room_details_carry_promises_from_the_priced_lines_and_the_assumptions(api):
+    load_card()
+    load_spec(spec_version(1))
+    r = post(api)  # a kitchen and a measured sliding wardrobe (with its loft)
+    assert r.status == 201, r
+    details = {d["room"]: d for d in r.data["room_details"]}
+    assert details["KITCHEN"]["materials"]["line"] == (
+        "Branded plywood cabinetry · Laminate finish · Soft-close kitchen hardware"
+    )
+    assert details["MASTER_BEDROOM"]["materials"]["line"] == (
+        "Branded plywood wardrobe · Laminate finish · Soft-close wardrobe hardware"  # the loft keeps soft-close hinges
+    )
+    assert "soft_close" in details["MASTER_BEDROOM"]["materials"]["categories"]
+    assert details["KITCHEN"]["assumptions"] and all("Kitchen" in a for a in details["KITCHEN"]["assumptions"])
+    assert not any("width" in a for a in details["MASTER_BEDROOM"]["assumptions"]), "the measured width is not assumed"
+    assert "₹" not in json.dumps(r.data["room_details"], ensure_ascii=False)
+    with actor(system_context("CLI")), db.unit_of_work(write=False) as s:
+        row = s.execute(
+            sa.select(BudgetEstimate).where(BudgetEstimate.public_reference == r.data["reference"])
+        ).scalar_one()
+        assert service.staff_view(s, row)["room_details"] == r.data["room_details"]
+
+
+@ON
+def test_room_details_without_a_specification_keep_the_assumptions_only(api):
+    load_card()
+    r = post(api)
+    assert r.status == 201 and all(d["materials"] is None for d in r.data["room_details"])
+    assert any(d["assumptions"] for d in r.data["room_details"])

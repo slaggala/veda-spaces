@@ -328,6 +328,34 @@ def _snapshot_spec(s: Session, row: BudgetEstimate) -> dict | None:
     return customer_spec.customer_view(spec.document) if spec is not None else None
 
 
+def room_details(s: Session, row: BudgetEstimate) -> list[dict]:
+    """Per room, what the customer was told about it: the material promise derived from the specification snapshot
+    and the lines priced in that room (never a generic line), and the typical sizes assumed there. No amount."""
+    lines = s.execute(
+        sa.select(BudgetEstimateLine.room, BudgetEstimateLine.product_code, BudgetEstimateLine.line_code)
+        .where(BudgetEstimateLine.estimate_id == row.id, BudgetEstimateLine.is_deleted.is_(False))
+        .order_by(BudgetEstimateLine.position)
+    ).all()
+    assumed = s.execute(
+        sa.select(BudgetEstimateAssumption.room, BudgetEstimateAssumption.text)
+        .where(BudgetEstimateAssumption.estimate_id == row.id, BudgetEstimateAssumption.is_deleted.is_(False))
+        .order_by(BudgetEstimateAssumption.position)
+    ).all()
+    priced: dict[str, list[tuple[str, str]]] = {}
+    for room, product, line in lines:
+        priced.setdefault(room, []).append((product, line))
+    spec = s.get(EstimatorCustomerSpec, row.customer_spec_id) if row.customer_spec_id else None
+    materials = customer_spec.room_materials(spec.document, priced) if spec is not None else {}
+    return [
+        {
+            "room": room,
+            "materials": materials.get(room),
+            "assumptions": [text for r, text in assumed if r == room],
+        }
+        for room in priced
+    ]
+
+
 # --- estimates -------------------------------------------------------------------------------------------------------
 
 
@@ -468,6 +496,7 @@ def public_view(row: BudgetEstimate) -> dict:
     view["expires_on"] = row.expires_on.date().isoformat()
     session = object_session(row)
     view["specification"] = _snapshot_spec(session, row) if session is not None else None
+    view["room_details"] = room_details(session, row) if session is not None else []
     return view
 
 
@@ -670,6 +699,7 @@ def staff_view(s: Session, row: BudgetEstimate, lead=None) -> dict:
             if (spec_row := (s.get(EstimatorCustomerSpec, row.customer_spec_id) if row.customer_spec_id else None))
             else None
         ),
+        "room_details": room_details(s, row),
         "lead": {"id": lead.id, "lead_number": lead.lead_number, "status": lead.status} if lead is not None else None,
         "preferred_contact": link_row.preferred_contact if link_row else None,
         "events": [
