@@ -42,7 +42,7 @@ All three stay disabled. Production refuses `VEDA_ESTIMATOR_ENABLED`.
 
 | Evidence | Result |
 |---|---|
-| CI on the PR #47 head (`e2c9936`) and on `main` after the merge | All checks pass: api (SQLite, PostgreSQL), app, browser e2e + axe, infra, security, Pages |
+| CI on the PR #47 head and on `main` after the merge | All checks pass: api (SQLite, PostgreSQL), app, browser e2e + axe, infra, security, Pages |
 | API suite | 1,327 tests (11 skipped) on SQLite and PostgreSQL, run locally on the follow-up branch (CI re-runs them on its PR). Estimator engine: 67 tests. Estimator API: 34 scenarios on each database |
 | Browser journey | 27/27 estimator checks on the PR #47 head: <ul><li>axe on steps 1–7 and the Luxury screens;</li><li>the allowance and the six package inclusions;</li><li>the Luxury path;</li><li>360 px;</li><li>no CSP violation, no page error.</li></ul> The follow-up PR adds the D3 offered-scope check |
 | Staff app | 77 tests pass |
