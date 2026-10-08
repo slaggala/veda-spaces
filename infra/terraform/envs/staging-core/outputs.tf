@@ -11,6 +11,17 @@ output "budget" {
   }
 }
 
+# ADR-012 staging validation: whether the Budgetary Estimate is enabled on staging and the policy page it links to.
+output "estimator" {
+  description = "Budgetary Estimate on staging (behind Cloudflare Access): enabled, and the warranty policy link."
+  value       = { enabled = local.estimator_enabled, warranty_policy_url = var.warranty_policy_url }
+
+  precondition {
+    condition     = !local.estimator_enabled || var.warranty_policy_url != ""
+    error_message = "The estimator is enabled in infra/config/staging-platform.json but no warranty policy link is set: set the WARRANTY_POLICY_URL variable of the staging-plan environment to the approved policy page. Nothing is planned until then (no broken or placeholder link)."
+  }
+}
+
 # AUT-101: what the network plan creates, readable in the plan text, and the IDs AUT-108 attaches the host to.
 output "network" {
   description = "Staging network summary and IDs."

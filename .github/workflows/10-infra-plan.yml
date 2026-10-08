@@ -86,6 +86,8 @@ jobs:
           # AUT-112 budget alert recipient. Not a credential: a secret of the staging-plan environment only so that
           # GitHub masks it (plain variables are printed in this public job log). Sensitive in Terraform as well.
           TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
+          # ADR-012: the warranty policy page every estimate links to (required while the staging estimator is on).
+          TF_VAR_warranty_policy_url: ${{ vars.WARRANTY_POLICY_URL }}
         run: infra/scripts/stack.sh plan --stack core --out infra/generated/core
 
       - name: Publish the plan for review? (N-04-S)

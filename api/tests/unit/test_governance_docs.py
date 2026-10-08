@@ -266,3 +266,34 @@ def test_public_intake_disabled():
     estimate = (REPO / "app/e2e/site-release/estimate.html").read_text()
     for name in ("veda-estimator", "veda-api-base", "veda-turnstile-sitekey", "veda-api-credentials"):
         assert f'<meta name="{name}" content="">' in estimate, name  # the estimator page is off in production
+
+
+def test_estimator_flag_is_staging_only():
+    """ADR-012 staging validation (decision log 20): only the staging core configuration may enable the estimator,
+    always together with its warranty policy link; nothing else in the repository sets the flag."""
+    setters = sorted(
+        str(p.relative_to(REPO))
+        for p in (REPO / "infra").rglob("*")
+        if p.is_file()
+        and ".terraform" not in p.parts
+        and ".tools" not in p.parts
+        and p.suffix in (".tf", ".json", ".sh", ".yml", ".hcl", ".env")
+        and re.search(r"VEDA_ESTIMATOR_ENABLED|estimator_enabled", p.read_text(errors="ignore"))
+    )
+    assert setters == [
+        "infra/config/staging-platform.json",
+        "infra/terraform/envs/staging-core/main.tf",
+        "infra/terraform/envs/staging-core/outputs.tf",
+        "infra/terraform/envs/staging-core/tests/core.tftest.hcl",
+    ], setters
+    platform = json.loads((REPO / "infra/config/staging-platform.json").read_text())
+    assert platform["ssm"]["estimator_enabled"] is True and "VEDA_ENV" not in platform["ssm"]
+    main = (REPO / "infra/terraform/envs/staging-core/main.tf").read_text()
+    assert (
+        'VEDA_ENV                   = "staging"' in main
+        and "VEDA_WARRANTY_POLICY_URL = var.warranty_policy_url" in main
+    )
+    workflows = [
+        p.name for p in (REPO / ".github/workflows").glob("*.yml") if "VEDA_ESTIMATOR_ENABLED" in p.read_text()
+    ]
+    assert workflows == [], "no workflow sets the flag directly"
