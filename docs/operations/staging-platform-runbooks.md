@@ -297,7 +297,9 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
      - Allowed origins: `https://staging.vedaspaces.com` and `https://app-staging.vedaspaces.com`, listed (not "Allow
        all origins": credentials need explicit origins).
      - Methods: `GET, POST, PUT, PATCH, DELETE` (OPTIONS is not in the list: it is the preflight itself).
-     - Headers: `Content-Type, Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization`.
+     - Headers: `Content-Type, Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization,
+       X-Veda-Client` (the estimator wizard's browser token; without it the browser refuses the estimate request and
+       the wizard says "You appear to be offline").
      - **Bypass options requests to origin: off.** Access answers the preflight itself; `cloudflared` would refuse an
        `OPTIONS` without an Access token.
    - **The browser needs the API host's own Access cookie.** After signing in, open

@@ -385,7 +385,7 @@ def calculate(card: RateCard, request: EstimateRequest) -> Estimate:
             continue
         instances[product.code] = instances.get(product.code, 0) + 1
         if instances[product.code] > product.max_instances:
-            errors.append({"field": path, "code": "TOO_MANY", "message": f"At most {product.max_instances}."})
+            errors.append({"field": path, "code": "TOO_MANY", "message": f"At most {product.max_instances} per home."})
             continue
         key = (sel.room, product.code)
         room_instances[key] = room_instances.get(key, 0) + 1
