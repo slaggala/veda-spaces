@@ -11,13 +11,19 @@
 - anonymous public access;
 - production.
 
-## 1. Order of changes
+## 1. Activation order (refreshed after the owner merged #48 and #49)
 
-| # | Change | Contents | State |
+| # | Step | Who | State |
 |---|---|---|---|
-| 1 | Sign-off PR (`feature/estimator-signoff`) | D3 offered scope (3 BHK apartments only), decision records 19–20, staging validation plan, sign-off package | Ready to merge; awaits authorisation |
-| 2 | Prerequisites (`feature/estimator-staging-prereqs`) | **S4:** the aggregate limit counts only successful (Turnstile-verified) requests. **U7:** the error summary links to fields; `aria-invalid`; per-field messages. **S2 follow-through:** customer room subtotals rounded in the public API response | Ready to review. Stacked on 1 |
-| 3 | Enablement (`feature/estimator-staging-enable`) | `estimator_enabled` for staging, with the warranty policy link; plan precondition; API guard; tests | Prepared, not applied. Stacked on 2. **Blocked on the policy link (§4)** |
+| 1 | Sign-off (#48) | Owner | **Merged** |
+| 2 | Prerequisites (#49): S4 aggregate limit after Turnstile, S2 public subtotal rounding, U7 linked error summary | Owner | #49 was merged into its stacked base, not `main`. **#51 lands the same changes on `main`: merge it** |
+| 3 | Warranty policy page (#52): `https://www.vedaspaces.com/warranty` | Owner, after the legal-review items in #52 | Draft. **Merging publishes the page publicly** (production Pages serves `dist/`) |
+| 4 | Check the page is live: `curl -sI https://www.vedaspaces.com/warranty` answers `200` | Owner or engineering | After 3 |
+| 5 | Set the link for the staging plan: `gh variable set WARRANTY_POLICY_URL --env staging-plan --body https://www.vedaspaces.com/warranty -R slaggala/veda-spaces` | Owner | After 4. It enables nothing by itself |
+| 6 | Retarget #50 to `main` (after #51), then re-run its checks | Engineering | The `plan (staging-core)` check passes once 5 is done |
+| 7 | Review the plan: `Plan: 3 to add` (§3) | Owner | |
+| 8 | Merge #50, then `10-infra-plan` on `main`, owner approval, `11-infra-apply`, `12-deploy` | Owner | **Only with a separate approval: this enables the estimator on staging** |
+| 9 | Load and activate card draft 4 on the host; set the Pages variables (3 BHK, Apartment); run V1–V12 behind Access; `13-evidence` | Owner | [Validation plan](ESTIMATOR-staging-validation-plan.md) |
 
 ## 2. The enablement change
 
@@ -50,25 +56,25 @@ the precondition as designed (no link set). The three additions are:
 **Apply path:** owner approval, then `11-infra-apply` (the saved plan), then `12-deploy`. The host re-reads SSM, and the
 API then answers the two public estimator routes, still behind Access.
 
-## 4. Warranty policy link (Phase 3): **STAGING BLOCKER**
+## 4. Warranty policy link
+
+**Proposed link:** `https://www.vedaspaces.com/warranty`, the public page in #52. It is not live yet.
+
+**Why the public page:**
+- The policy is customer-facing.
+- The same link then works during staging validation and later in production.
+- It meets the plan's rule (an `https` page on a `vedaspaces.com` host).
+
+The staging site serves the same page at `https://staging.vedaspaces.com/warranty` behind Access. That is a
+fallback only, because it would have to change before public use.
 
 | Requirement | Status |
 |---|---|
-| A staging-reachable page with the approved Warranty, Service & Customer Care Policy | **Not available.** No policy page exists in the site. The approved text is a customer-specific template (v1.0) with a note that it needs legal and tax review before it becomes standard |
-| No broken or placeholder link | **Enforced.** The page shows the link only when it is set. The plan and the API both refuse an enabled estimator without a real `https` link |
-| Estimator shows only the concise summary | **Verified.** The summary is five items filtered to the selection, plus the note that manufacturer warranties do not extend Veda Spaces workmanship or free service. It matches policy clauses 1.1–1.5 and 6.1, and states plywood more conservatively |
-| Full exclusions only through the link | **By design.** The exclusions are in the policy (clauses 2, 6.2) |
-| Public enablement blocked until legal review is recorded | **Held.** D8, decision log 19 |
-
-**To clear the blocker (owner):**
-1. Choose where the policy page lives on a `vedaspaces.com` host reachable during protected validation. A staging-only
-   page must not reach the production site.
-2. Approve its text. A de-identified copy of the v1.0 template is in the owner's private folder, not in the
-   repository.
-3. Set `WARRANTY_POLICY_URL` in the `staging-plan` environment.
-
-Publishing the policy text in this public repository is a separate owner decision, because its legal review is
-pending.
+| A reachable page with the approved policy | **Prepared (#52).** The v1.0 text in the policy's own clause numbering, with customer and contract fields left out |
+| No broken or placeholder link | **Enforced.** The plan and the API refuse an enabled estimator without a real `https` link. Steps 3–5 set the link only after the page answers `200` |
+| Estimator shows only the concise summary | **Verified.** It matches clauses 1.1–1.5 and 6.1 of the page |
+| Full exclusions only through the link | **Yes.** Sections 2 and 6.2 of the page |
+| Public enablement blocked until legal review is recorded | **Held.** D8, decision log 19. The page's own legal-review items are listed in #52 |
 
 ## 5. The private card is never exposed
 
