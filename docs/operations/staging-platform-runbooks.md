@@ -91,6 +91,18 @@ and stay silent until the apply of §1 step 2 (review R4).
 | `veda-stg-host-cpu` / `-memory` / `-data-disk` / `-root-disk` | Resource pressure | `docker stats`; prune old images; grow the volume (decision) |
 | `veda-stg-ses-bounce-rate` / `-ses-rejects` | Sending reputation | Suppression list; recipients; SES console |
 
+**Dead-lettered outbox events (`veda-stg-outbox-dead`).** The alarm stays in ALARM while any event is dead, and
+CloudWatch notifies only on a state change, so **clear every dead event**, or the next one will not alert. On the host
+(SSM Run Command `AWS-RunShellScript`, or Session Manager), from `/opt/veda/releases/<tag>/api/deploy` with
+`VEDA_IMAGE_TAG=<tag>`:
+```sh
+docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cli outbox dead
+docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cli outbox requeue --id <id> --reason "<cause fixed>"
+docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cli outbox retire --id <id> --reason "<why it must not run>"
+```
+Requeue when the cause is fixed and the event should run; retire when it must not (for example an invite already
+accepted). The alarm returns to OK within 5 minutes of the last dead event.
+
 **Drill (RG-5):** `aws cloudwatch set-alarm-state --alarm-name veda-stg-app-5xx --state-value ALARM --state-reason drill`
 (deploy role or owner), then read `veda-stg-alarm-capture` and the owner mailbox; record with `13-evidence`.
 
@@ -296,6 +308,19 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
 | The page source of both staging hosts | No `api.vedaspaces.com` |
 
 Then run the end-to-end lead flow of §8.
+
+### 6.7 First staff account (Founder)
+
+Once per environment (AUTH-014), after SES can deliver to the address (§4, §6.6):
+```sh
+docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cli bootstrap-founder \
+  --email <verified address> --name "<name>" --email-link
+```
+- **The invite link is a credential and is never printed in staging or production.** The container's output goes to
+  the log group. `--email-link` emails it; `--link-file <new path>` writes it to a new file, mode 0600, never
+  overwriting one. Without either, the command refuses before creating anything.
+- Accept it within the hour. Then MFA enrolment is required.
+- Run it with SSM Run Command if Session Manager is not available on the workstation.
 
 ## 7. Staging apply sequence
 
