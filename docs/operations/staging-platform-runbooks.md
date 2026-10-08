@@ -420,6 +420,17 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
 Each new estimate records the active version and its SHA-256. Earlier estimates keep the version they were shown with.
 Without an active specification, estimates still work and say that materials are confirmed in the quotation.
 
+**ESSENTIAL-1.1** (trust finalisation; `essential-specification-v1.1.json`) replaces 1.0 for new estimates. Its room
+promises follow the lines each estimate prices, so a room is never promised hardware or a material it was not priced
+with. Activate it only when all of these hold:
+1. The branch is merged and deployed.
+2. Sales has signed the checklist in `ESSENTIAL-SPECIFICATION-v1.1.md`.
+3. Operations has confirmed the customer-promise matrix (`essential-1.1-promise-matrix.md`).
+
+On the host, `validate-spec` must print the document SHA-256
+`b9a5ea24d249cc4b9a6fb4b0ee513a5f27f2b321a39c066654007bfc59091902` before `load-spec` and `activate-spec`. Activation
+retires 1.0. Set `STAGING_ESTIMATOR_UX=v2` only after 1.1 is active, and keep V1 available through `v1`.
+
 **Customer experience (UX V2):** the staging site shows V1 unless `STAGING_ESTIMATOR_UX=v2` is set in the Pages
 project `veda-staging-site` (`v1` is the default; any other value fails the build). Set it, then retry the
 deployment. To return to V1, set `v1` and retry. V2 uses the same API, engine and rate card. The review package is
