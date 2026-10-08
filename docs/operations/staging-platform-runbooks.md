@@ -420,16 +420,34 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
 Each new estimate records the active version and its SHA-256. Earlier estimates keep the version they were shown with.
 Without an active specification, estimates still work and say that materials are confirmed in the quotation.
 
-**ESSENTIAL-1.1** (trust finalisation; `essential-specification-v1.1.json`) replaces 1.0 for new estimates. Its room
-promises follow the lines each estimate prices, so a room is never promised hardware or a material it was not priced
-with. Activate it only when all of these hold:
-1. The branch is merged and deployed.
-2. Sales has signed the checklist in `ESSENTIAL-SPECIFICATION-v1.1.md`.
-3. Operations has confirmed the customer-promise matrix (`essential-1.1-promise-matrix.md`).
+**ESSENTIAL-1.1** (`essential-specification-v1.1.json`, document SHA-256
+`6f798ef6cd3cea06f491041a4143e35776900107e73e6c953fbed4bd37ad286d`) replaces 1.0 for new estimates. Its room promises
+follow the lines each estimate prices. **Do not activate it until the owner approves its digest, and until
+`activation-check` is ready.** The pre-activation closure guards:
+1. The sales checklist (`ESSENTIAL-1.1-SALES-DECISIONS.md`) is decided.
+2. The operations sign-off sheet (`ESSENTIAL-1.1-OPERATIONS-CONFIRMATION.md`) is complete.
+3. No row of `essential-1.1-promise-matrix.json` is anything but `OPERATIONALLY_CONFIRMED`, `SALES_CONFIRMED`,
+   `OWNER_CONFIRMED` or `REMOVED`, and every confirmed row names its accountable owner.
 
-On the host, `validate-spec` must print the document SHA-256
-`b9a5ea24d249cc4b9a6fb4b0ee513a5f27f2b321a39c066654007bfc59091902` before `load-spec` and `activate-spec`. Activation
-retires 1.0. Set `STAGING_ESTIMATOR_UX=v2` only after 1.1 is active, and keep V1 available through `v1`.
+On the host (files copied read-only, as for the specification), run the read-only check. It exits 0 only when ready
+and prints the specification, its SHA-256, every blocker and what is active now:
+`veda estimator activation-check /spec.json --matrix /matrix.json --expect-sha <owner-approved digest>`.
+
+Then activate with the same matrix: `veda estimator activate-spec --spec ESSENTIAL-1.1 --approval "<owner approval,
+date>" --matrix /matrix.json`. On staging and production, `activate-spec` refuses a specification with room promises
+unless the matrix is complete and confirmed. `list-specs` must then show ESSENTIAL-1.1 as the only ACTIVE Essential
+version. Set `STAGING_ESTIMATOR_UX=v2` only after that, and keep V1 available through `v1`.
+
+**Rollback** (from 1.1 to 1.0, or to any version without room promises):
+1. Set `STAGING_ESTIMATOR_UX=v1` in `veda-staging-site` and retry the deployment. V1 is now served.
+2. `veda estimator rollback-spec --package ESSENTIAL --approval "<reason, date>" --ux-v1-confirmed`. Without
+   `--ux-v1-confirmed` the rollback is refused, because V2 must not run on a specification without room promises.
+   Activating 1.0 directly needs the same flag.
+3. `list-specs` shows 1.0 ACTIVE. If V2 is served by mistake, it still shows no material promise, because it treats a
+   specification without room promises as none (e2e regression).
+
+The API cannot change a Pages variable. Step 1 is therefore enforced by the refusal in step 2 and backed by V2's own
+safe behaviour, not done automatically.
 
 **Customer experience (UX V2):** the staging site shows V1 unless `STAGING_ESTIMATOR_UX=v2` is set in the Pages
 project `veda-staging-site` (`v1` is the default; any other value fails the build). Set it, then retry the

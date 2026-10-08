@@ -40,6 +40,20 @@ free service from the project handover date for fitment-related or workmanship i
 | Workmanship | One year of free service from the handover date, for workmanship issues within the completed scope | "One year of free service after handover for applicable workmanship or fitment issues" | — | — | "One year of applicable workmanship and fitment service support from handover, subject to the policy" | **Resolved.** This is Veda Spaces' own policy; a test ties the page to the policy text |
 | Fitment service | As for workmanship (fitment-related issues) | As for workmanship | — | — | As for workmanship | **Resolved** |
 
+## Pre-activation closure: what must agree before any material duration is published
+
+A plywood or hardware duration may appear in V2 only when all four of these agree for the exact product:
+1. the manufacturer's product certificate or documented warranty terms;
+2. Essential Specification 1.1, or the version then active (which today states no duration, and the validator refuses one);
+3. the detailed quotation wording;
+4. the Warranty, Service & Customer Care Policy.
+
+Until then, V2 shows no material duration. A staging-build test fails if any numeric duration appears in the V2 copy,
+or any spelled duration other than the Veda Spaces service sentence. The separation stays as approved:
+manufacturer-backed protection applies to the exact selected and documented product, and Veda Spaces workmanship and
+fitment support lasts one year from handover, subject to the policy. In the matrix, the `manufacturer_warranty` row
+stays BLOCKED until operations confirms that the warranty documents are handed over.
+
 ## To close before any material duration is shown
 
 1. For each "partly resolved" row, attach the manufacturer's documented terms for the product named in the quotation
