@@ -22,7 +22,13 @@ _PHONE = re.compile(r"(?<![\w:.-])\+?\d(?:\s?\d){9,14}(?![\w:.-])")
 DENYLIST = ("password", "token", "authorization", "cookie", "secret", "code", "recovery")
 
 
+# R2: action-token links (invite, reset, MFA enrollment) carry the token in the fragment or the query string. A token
+# is a credential, so it never reaches a log line, whatever the field or message that carries the link.
+_SECRET_PARAM = re.compile(r"([?#&;](?:token|code|key|secret|signature|sig)=)[^&#\s\"'<>]+", re.IGNORECASE)
+
+
 def _mask(value: str) -> str:
+    value = _SECRET_PARAM.sub(r"\1[REDACTED]", value)
     value = _EMAIL.sub(lambda m: f"{m.group(1)}***@{m.group(2)}", value)
     return _PHONE.sub(lambda m: m.group(0)[:3] + "******" + m.group(0)[-4:], value)
 
