@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
@@ -75,6 +76,7 @@ check('rooms preselected, no measurement fields', (await page.locator('.v2-room'
 await axe('V2 4 rooms');
 await shot('4-rooms');
 await next(4);
+check('package picker makes no universal soft-close promise', (await page.locator('label:has(input[name="v2-pkg"][value="ESSENTIAL"]) small').textContent()) === 'Branded materials and approved hardware, according to the selected rooms and product configuration.');
 check('Premium unavailable; Luxury is a consultation', await page.isDisabled('input[name="v2-pkg"][value="PREMIUM"]') && !(await page.isDisabled('input[name="v2-pkg"][value="LUXURY"]')));
 await axe('V2 5 package');
 await fresh();
@@ -116,6 +118,10 @@ check('room subtotals shown with room-specific specification lines', cards.lengt
   !/plywood/i.test(byRoom.WHOLE_HOME || '') && /^Branded plywood furniture · Laminate finish · Soft-close wardrobe hardware$/.test(byRoom.MASTER_BEDROOM || ''), JSON.stringify(byRoom));
 check('room subtotals as displayed add up to "Your selected rooms"', cards.reduce((a, c) => a + c.amount, 0) * 100 === rows[0][1]);
 check('one "View inclusions & materials" per room with four parts', cards.every((c) => c.more.join() === 'View inclusions & materials' && c.parts.join(' | ') === 'Included items | Material specification | Optional or selected extras | Assumptions'));
+const COMPONENT_WORDS = { FLOOR_PROTECTION: 'Site and floor protection', PLY_PROTECTION: 'Plywood or material protection', FREIGHT: 'Material freight and handling', DEBRIS: 'Debris handling', DEEP_CLEANING: 'Completion deep cleaning', PEST_CONTROL: 'Pest-control preparation where applicable' };
+const packageList = async () => page.locator('section[aria-label="Site Execution & Handover Package"] details li').allTextContents();
+check('package components shown are exactly the priced ones', JSON.stringify(await packageList()) === JSON.stringify([...new Set(v2run.data.project_preparation.component_codes.map((c) => COMPONENT_WORDS[c]))]) &&
+  v2run.data.project_preparation.component_codes.length > 0);
 check('package and allowance included, allowance not an automatic extra', (text.match(/Included in your estimated range/g) || []).length === 2 && /It is not an automatic extra charge\./.test(text) &&
   /The upper amount is not charged automatically\./.test(text) && /execute the selected project scope professionally/.test(text) && !/complimentary|free of charge|\bfree\b/i.test(text));
 const policyText = await (await fetch(`${ON}/warranty`)).text();
@@ -231,14 +237,63 @@ for (const [idx, key] of items.entries()) {
 const v1res = page.waitForResponse((r) => r.url().endsWith('/api/v1/public/estimates'));
 await page.click('#est-calculate');
 const v1data = (await (await v1res).json()).data;
-const rooms = (d) => JSON.stringify([...d.rooms].map((r) => [r.room, r.amount_minor]).sort());
-if (!QUIET && rooms(v1data) !== rooms(v2run.data)) console.log('rooms V1', rooms(v1data), 'V2', rooms(v2run.data));
-const same = v1data.range.low_minor === v2run.data.range.low_minor && v1data.range.high_minor === v2run.data.range.high_minor &&
-  rooms(v1data) === rooms(v2run.data) &&
-  v1data.custom_features_allowance.low_minor === v2run.data.custom_features_allowance.low_minor &&
-  v1data.project_preparation.amount_minor === v2run.data.project_preparation.amount_minor;
-check('V1/V2 equivalence: same selections give the same range, rooms, package and allowance', same,
-  QUIET ? '' : `V1 ${v1data.range.low_minor}–${v1data.range.high_minor} · V2 ${v2run.data.range.low_minor}–${v2run.data.range.high_minor}`);
+// Every customer-visible field of the two responses (estimate mathematics, package, allowance, GST, optional items,
+// assumptions, exclusions, warranty copy, specification snapshot, card version) must be identical.
+const FIELDS = {
+  'lower and upper range': (d) => d.range,
+  'every room subtotal': (d) => [...d.rooms].map((r) => [r.room, r.amount_minor]).sort(),
+  package: (d) => d.project_preparation,
+  'allowance low and high': (d) => [d.custom_features_allowance.low_minor, d.custom_features_allowance.high_minor],
+  GST: (d) => d.gst,
+  'optional items': (d) => d.optional_items_minor,
+  assumptions: (d) => [...d.assumptions].sort(),
+  exclusions: (d) => [d.exclusions, d.client_scope],
+  'warranty copy': (d) => d.warranty,
+  'specification snapshot': (d) => d.specification && [d.specification.spec_code, d.specification.version],
+  'card version': (d) => d.rate_card_version,
+  'room details': (d) => [...d.room_details].sort((a, b) => a.room.localeCompare(b.room)),
+};
+const differing = Object.entries(FIELDS).filter(([, f]) => JSON.stringify(f(v1data)) !== JSON.stringify(f(v2run.data))).map(([k]) => k);
+check(`V1/V2 equivalence on ${Object.keys(FIELDS).join(', ')}`, differing.length === 0, differing.join(', '));
+check('equivalence ran against the expected specification and a real response', v2run.data.specification?.spec_code === SPEC_CODE && v1data.rate_card_version === v2run.data.rate_card_version,
+  QUIET ? '' : v1data.rate_card_version);
+
+// Scope-aware package: a ceiling-only home has no plywood protection and no pest-control preparation.
+await fresh();
+await next(1); await page.check('input[name="v2-size"][value="3BHK"]'); await next(2); await next(3);
+for (const label of ['Kitchen', 'Living room', 'Dining', 'Master bedroom', 'Bedroom 2', 'Bedroom 3', 'Pooja room', 'Utility']) {
+  await page.locator(`input[aria-label="Include ${label}"]`).uncheck();
+}
+await next(4);
+const ceilRes = page.waitForResponse((r) => r.url().endsWith('/api/v1/public/estimates'));
+await page.click('#v2-see');
+const ceil = (await (await ceilRes).json()).data;
+await page.waitForSelector('[data-v2="6"]:not([hidden])');
+const ceilList = await packageList();
+check('ceiling-only scope: package lists only what applies', ceilList.length > 0 && !ceilList.includes(COMPONENT_WORDS.PLY_PROTECTION) && !ceilList.includes(COMPONENT_WORDS.PEST_CONTROL) &&
+  JSON.stringify(ceilList) === JSON.stringify([...new Set(ceil.project_preparation.component_codes.map((c) => COMPONENT_WORDS[c]))]), ceilList.join(' | '));
+
+// F1 regression through the page: with ESSENTIAL-1.0 active, V2 shows no material promise at all.
+if (process.env.API_DIR && process.env.API_PYTHON) {
+  const cli = (...args) => execFileSync(process.env.API_PYTHON, ['-m', 'veda.cli', 'estimator', ...args], { cwd: process.env.API_DIR, stdio: 'pipe',
+    env: { ...process.env, VEDA_ENV: 'local', VEDA_DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'sqlite:///var/e2e.db' } }).toString();
+  try { cli('load-spec', path.join(HERE, '../../docs/implementation/estimator/specifications/essential-specification-v1.0.json')); } catch { /* already loaded */ }
+  cli('activate-spec', '--spec', 'ESSENTIAL-1.0', '--approval', 'E2E regression: ESSENTIAL-1.0 under V2', '--ux-v1-confirmed');
+  try {
+    await fresh();
+    const old = await toResult();
+    const oldText = await page.locator('[data-v2="6"]').innerText();
+    check('ESSENTIAL-1.0 under V2: no room line, no room categories, no specification overview or marker',
+      old.data.specification?.spec_code === 'ESSENTIAL-1.0' && old.data.specification.room_promises === false &&
+      (await page.locator('.v2-spec-line').count()) === 0 && !/Material specification available|View detailed material specification|Soft-close|plywood/i.test(oldText) &&
+      (await page.locator('.v2-room-card details').first().textContent()).includes('Materials are confirmed in your detailed quotation.'),
+      JSON.stringify({ spec: old.data.specification?.spec_code, rp: old.data.specification?.room_promises, lines: await page.locator('.v2-spec-line').count(), words: oldText.match(/Material specification available|View detailed material specification|Soft-close|plywood/gi) }));
+  } finally {
+    cli('rollback-spec', '--package', 'ESSENTIAL', '--approval', 'E2E regression: restore the previous specification');
+  }
+} else {
+  check('ESSENTIAL-1.0 regression needs API_DIR and API_PYTHON (run through run-all.sh)', false);
+}
 
 check('no Content-Security-Policy violations under the production policy', csp.length === 0, csp.slice(0, 3).join('; '));
 check('no page errors', errors.length === 0, errors.join('; '));
