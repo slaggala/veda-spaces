@@ -33,7 +33,7 @@ async function axe(name) {
   const violations = await page.evaluate(async () => {
     const res = await window.axe.run(document.querySelector('main'), {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } });
-    return res.violations.map((v) => `${v.id} (${v.nodes.length})`);
+    return res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
   });
   check(`axe: ${name}`, violations.length === 0, violations.join(', '));
 }
@@ -59,16 +59,17 @@ await axe('step 2 (rooms)');
 await page.click('#step-2 button[type="submit"]');
 check('step 3 lists a measurement per input', (await page.locator('[data-role="value"]').count()) >= 4);
 // Unticking "typical" without a value is refused with a focused summary.
-await page.uncheck('[data-item="0"][data-input="WIDTH"][data-role="typical"]');
+// The wizard lists items in room order (kitchen first); only the wardrobe has a WIDTH here.
+await page.uncheck('[data-input="WIDTH"][data-role="typical"]');
 await page.click('#step-3 button[type="submit"]');
 check('missing measurement → focused summary', await page.evaluate(() => document.activeElement?.id === 'est-summary'));
-await page.fill('[data-item="0"][data-input="WIDTH"][data-role="value"]', '6');
+await page.fill('[data-input="WIDTH"][data-role="value"]', '6');
 await axe('step 3 (measurements)');
 await page.click('#step-3 button[type="submit"]');
 const premiumDisabled = await page.locator('input[name="package"][value="PREMIUM"]').isDisabled();
 check('step 4: Premium and Luxury unavailable without approved rates', premiumDisabled &&
   (await page.locator('input[name="package"][value="LUXURY"]').isDisabled()));
-await page.selectOption('[data-item="0"][data-option="DOOR"]', 'SLIDING');
+await page.selectOption('[data-option="DOOR"]', 'SLIDING');
 await axe('step 4 (preferences)');
 await page.click('#est-calculate');
 await page.waitForSelector('#step-5:not([hidden])');

@@ -7,6 +7,7 @@
 .est-main h2 { font-family: var(--serif); font-weight: 400; font-size: 1.9rem; margin: 0 0 1rem; }
 .est-main h3 { font-size: 1rem; margin: 1.8rem 0 .5rem; }
 .est-main .lead { margin: 1rem 0 2rem; }
+.est-main .eyebrow { color: #8c5b37; } /* 5.0:1 on the page background (the site copper is 3.8:1, below AA) */
 .est-panel, .est-step { background: #fbf9f5; border: 1px solid var(--line); padding: 1.4rem; }
 .est-step { display: grid; gap: 1.1rem; }
 .est-step[hidden], .est-panel[hidden] { display: none; }
