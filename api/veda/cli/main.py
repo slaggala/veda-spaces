@@ -229,6 +229,8 @@ def cmd_estimator(args) -> int:
     from veda.modules.estimator import service
 
     _settings()
+    if args.action.endswith("-spec") or args.action == "list-specs":
+        return _estimator_spec(args)
     try:
         if args.action in ("validate-card", "load-card"):
             if not args.file:
@@ -254,6 +256,42 @@ def cmd_estimator(args) -> int:
         print(json.dumps(out))
         return 0
     except (service.CardError, OSError, ValueError) as err:
+        print(f"refused: {str(err).splitlines()[0]}", file=sys.stderr)
+        return 2
+
+
+def _estimator_spec(args) -> int:
+    """Customer specifications (ADR-012 T9): validate, load, activate, roll back, list. Prints codes, states and
+    SHA-256 only."""
+    from veda.kernel import db
+    from veda.kernel.context import actor, system_context
+    from veda.modules.estimator import service
+
+    try:
+        if args.action in ("validate-spec", "load-spec"):
+            if not args.file:
+                raise service.SpecError("give the customer specification file")
+            document = json.loads(Path(args.file).read_text())
+            if args.action == "validate-spec":
+                spec = service.validate_spec(document)
+                out: dict[str, object] = {"valid": True, "spec": spec.spec_code, "sha256": service._sha(document)}
+                print(json.dumps(out))
+                return 0
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            if args.action == "load-spec":
+                row = service.load_spec(s, document)
+                out = {"loaded": row.spec_code, "status": row.status, "sha256": row.document_sha256}
+            elif args.action == "activate-spec":
+                row = service.activate_spec(s, args.spec or "", args.approval or "")
+                out = {"active": row.spec_code, "package": row.package}
+            elif args.action == "rollback-spec":
+                row = service.rollback_spec(s, args.package, args.approval or "")
+                out = {"active": row.spec_code, "package": row.package, "rolled_back": True}
+            else:
+                out = {"specs": service.list_specs(s)}
+        print(json.dumps(out))
+        return 0
+    except (service.SpecError, OSError, ValueError) as err:
         print(f"refused: {str(err).splitlines()[0]}", file=sys.stderr)
         return 2
 
@@ -472,9 +510,25 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--link-file", default=None, help="write the invite link to this new file (mode 0600)")
     p.set_defaults(fn=cmd_bootstrap_founder)
     p = sub.add_parser("estimator")
-    p.add_argument("action", choices=["validate-card", "load-card", "activate-card", "rollback-card", "list-cards"])
+    p.add_argument(
+        "action",
+        choices=[
+            "validate-card",
+            "load-card",
+            "activate-card",
+            "rollback-card",
+            "list-cards",
+            "validate-spec",
+            "load-spec",
+            "activate-spec",
+            "rollback-spec",
+            "list-specs",
+        ],
+    )
     p.add_argument("file", nargs="?", default=None)
     p.add_argument("--version", default=None)
+    p.add_argument("--spec", default=None, help="customer specification code, for example ESSENTIAL-1.0")
+    p.add_argument("--package", default="ESSENTIAL", choices=["ESSENTIAL", "PREMIUM", "LUXURY"])
     p.add_argument("--approval", default=None)
     p.set_defaults(fn=cmd_estimator)
     p = sub.add_parser("outbox")

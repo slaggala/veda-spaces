@@ -51,10 +51,12 @@ REVISIONS: dict[str, list[str]] = {
         "budget_estimate_lead_link",
         "estimate_event",
     ],
+    "0102_estimator_spec": ["estimator_customer_spec", "estimator_customer_spec_item", "estimator_spec_event"],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),
-# mfa_challenge by 0009_mfa_challenge_binding (IR-01). Those revisions ALTER the table by hand.
+# mfa_challenge by 0009_mfa_challenge_binding (IR-01), budget_estimate by 0102_estimator_spec. Those revisions ALTER
+# the table by hand.
 DEFERRED_COLUMNS = {
     "app_user": {
         "proposed_email",
@@ -65,6 +67,8 @@ DEFERRED_COLUMNS = {
         "security_cooling_off_until",
     },
     "mfa_challenge": {"factor_id", "enrollment_path"},
+    # 0102_estimator_spec adds the customer-specification snapshot to budget_estimate (ADR-012 T9).
+    "budget_estimate": {"customer_spec_id", "customer_spec_sha256"},
 }
 
 

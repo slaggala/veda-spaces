@@ -135,6 +135,10 @@ register(AuditPolicy("budget_estimate_assumption", FULL, parent=("budget_estimat
 register(AuditPolicy("budget_estimate_project_item", FULL, parent=("budget_estimate", "estimate_id")))
 register(AuditPolicy("budget_estimate_lead_link", FULL, parent=("lead", "lead_id")))
 register(AuditPolicy("estimate_event", FULL))
+# Customer specification master (ADR-012 T9): public text, no rates; the document is kept on the row, not snapshotted.
+register(AuditPolicy("estimator_customer_spec", FULL, excluded=frozenset({"document"})))
+register(AuditPolicy("estimator_customer_spec_item", FULL, parent=("estimator_customer_spec", "customer_spec_id")))
+register(AuditPolicy("estimator_spec_event", FULL))
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))
 register(AuditPolicy("refresh_token", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-007", "EXC-009")))

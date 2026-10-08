@@ -404,6 +404,27 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
    - a forged Turnstile token gets `422`;
    - an anonymous request gets a `302` to Access.
 
+**Customer specification** (ADR-012 T9; operator only; the material promise customers see):
+1. The reviewed file is `docs/implementation/estimator/specifications/essential-specification-v1.0.json` (customer
+   text only: the validator refuses amounts, price wording, durations and personal data). A change is a new version
+   (`ESSENTIAL-1.1`), never an edit of a loaded one.
+2. Dry run: `veda estimator validate-spec <file>`. It prints the spec code and SHA-256.
+3. Load it on the host as for a rate card (SSM Run Command, read-only mount): `veda estimator load-spec /spec.json`.
+   It is stored as DRAFT.
+4. After the sales review of the wording, activate it with the owner's approval reference:
+   `veda estimator activate-spec --spec ESSENTIAL-1.0 --approval "<owner approval, date>"`. The previous version is
+   retired. One version is active per package.
+5. To go back: `veda estimator rollback-spec --package ESSENTIAL --approval "<reason>"`.
+6. To check: `veda estimator list-specs`.
+
+Each new estimate records the active version and its SHA-256. Earlier estimates keep the version they were shown with.
+Without an active specification, estimates still work and say that materials are confirmed in the quotation.
+
+**Customer experience (UX V2):** the staging site shows V1 unless `STAGING_ESTIMATOR_UX=v2` is set in the Pages
+project `veda-staging-site` (`v1` is the default; any other value fails the build). Set it, then retry the
+deployment. To return to V1, set `v1` and retry. V2 uses the same API, engine and rate card. The review package is
+[ESTIMATOR-UX-V2-review-package](../implementation/estimator/ESTIMATOR-UX-V2-review-package.md).
+
 **Retention:** the daily `estimate-retention` job soft-deletes estimates never linked to a lead
 `VEDA_ESTIMATE_RETENTION_DAYS` after creation (90, owner decision D7), and never while an estimate is still valid
 (30 days). A linked estimate stays with its lead.

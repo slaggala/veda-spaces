@@ -13,8 +13,11 @@ from veda.modules.estimator.models import (
     BudgetEstimateLine,
     BudgetEstimateProjectItem,
     EstimateEvent,
+    EstimatorCustomerSpec,
+    EstimatorCustomerSpecItem,
     EstimatorRateCard,
     EstimatorRateItem,
+    EstimatorSpecEvent,
 )
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
@@ -43,8 +46,11 @@ __all__ = [
     "BudgetEstimateLine",
     "BudgetEstimateProjectItem",
     "EstimateEvent",
+    "EstimatorCustomerSpec",
+    "EstimatorCustomerSpecItem",
     "EstimatorRateCard",
     "EstimatorRateItem",
+    "EstimatorSpecEvent",
     "Lead",
     "LeadActivity",
     "LeadNote",

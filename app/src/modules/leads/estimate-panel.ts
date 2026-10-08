@@ -135,7 +135,7 @@ export class VsEstimatePanel extends SessionElement {
     const manage = this.can('estimate.manage');
     return html`<div class="stack">
       ${this.problem ? html`<vs-problem-banner .problem=${this.problem}></vs-problem-banner>` : nothing}
-      <p class="meta">${d.reference} · created ${formatFull(d.created_on)} · ${humanize(d.origin)}${d.source_reference ? ` · from ${d.source_reference}` : ''} · rate card ${d.rate_card_version} (rules ${d.calculation_version}) · valid until ${formatDate(d.expires_on.slice(0, 10))}</p>
+      <p class="meta">${d.reference} · created ${formatFull(d.created_on)} · ${humanize(d.origin)}${d.source_reference ? ` · from ${d.source_reference}` : ''} · rate card ${d.rate_card_version} (rules ${d.calculation_version}) · specification ${d.specification ? d.specification.spec_code : 'none'} · valid until ${formatDate(d.expires_on.slice(0, 10))}</p>
       <p class="meta">${e.disclaimer}</p>
       <section><h3 class="eyebrow">Property</h3><p>${humanize(d.property_type)} · ${d.home_size.replace('BHK', ' BHK')} · ${humanize(d.project_kind)}${d.city ? ` · ${d.city}` : ''} · package ${humanize(d.package)}${d.preferred_contact ? ` · prefers ${humanize(d.preferred_contact)}` : ''}</p>
         ${d.site_measurement_required ? html`<span class="badge">Site measurement required</span>` : nothing}</section>

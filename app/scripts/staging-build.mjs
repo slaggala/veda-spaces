@@ -67,6 +67,7 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
     est = setMeta(est, 'veda-estimator-packages', estimator.packages.join(','));
     est = setMeta(est, 'veda-estimator-home-sizes', estimator.homeSizes.join(','));
     est = setMeta(est, 'veda-estimator-property-types', estimator.propertyTypes.join(','));
+    if (estimator.ux === 'v2') est = setMeta(est, 'veda-estimator-ux', 'v2'); // UX V2; V1 stays the default
   }
   writeFileSync(join(out, 'estimate.html'), est);
   writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
@@ -78,7 +79,8 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
 /**
  * STAGING_ESTIMATOR=on enables the estimator page. The page offers only what the active rate card supports (ADR-012
  * §11 D1–D3): STAGING_ESTIMATOR_PACKAGES (default ESSENTIAL; Luxury is never priced, it is a consultation),
- * STAGING_ESTIMATOR_HOME_SIZES (default 3BHK) and STAGING_ESTIMATOR_PROPERTY_TYPES (default APARTMENT).
+ * STAGING_ESTIMATOR_HOME_SIZES (default 3BHK) and STAGING_ESTIMATOR_PROPERTY_TYPES (default APARTMENT). STAGING_ESTIMATOR_UX
+ * chooses the customer experience: v1 (default) or v2 (docs/implementation/estimator/ESTIMATOR-UX-V2*.md).
  */
 export function estimatorFlags(env) {
   const list = (value, fallback) => (value || fallback).split(',').map((p) => p.trim()).filter(Boolean);
@@ -94,7 +96,9 @@ export function estimatorFlags(env) {
   if (!propertyTypes.length || propertyTypes.some((t) => !['APARTMENT', 'VILLA'].includes(t))) {
     throw new Error(`STAGING_ESTIMATOR_PROPERTY_TYPES lists unknown property types (got ${propertyTypes.join(',')})`);
   }
-  return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes };
+  const ux = env.STAGING_ESTIMATOR_UX || 'v1';
+  if (!['v1', 'v2'].includes(ux)) throw new Error(`STAGING_ESTIMATOR_UX must be v1 or v2 (got ${ux})`);
+  return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes, ux };
 }
 
 export function buildApp(key) {
