@@ -41,5 +41,6 @@ run workspace.e2e.mjs
 run access.e2e.mjs
 run site.e2e.mjs
 run estimator.e2e.mjs
+run estimator-v2-prototype.e2e.mjs
 run axe.e2e.mjs
 exit $status

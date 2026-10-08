@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Budget estimate — prototype V2 — Veda Spaces</title>
+  <!-- PROTOTYPE (ESTIMATOR UX V2). Staging only, behind Cloudflare Access. No API calls; illustrative numbers from the
+       synthetic test card, never real rates. Not part of the production site (dist/). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="stylesheet" href="proto.css">
+</head>
+<body>
+  <a class="skip" href="#app">Skip to main content</a>
+  <header class="top">
+    <span class="brand">VEDA SPACES</span>
+    <span class="proto-tag">Prototype</span>
+  </header>
+
+  <main id="app" class="app" tabindex="-1">
+    <p class="progress" id="progress" hidden><span id="progress-text"></span><span class="bar" aria-hidden="true"><span id="progress-fill"></span></span></p>
+
+    <!-- 1 Home type -->
+    <section class="screen" data-screen="1" aria-labelledby="h1">
+      <h1 id="h1" tabindex="-1">What kind of home is it?</h1>
+      <p class="sub">Plan your interiors budget in about a minute. No contact details needed.</p>
+      <div class="choices" role="radiogroup" aria-labelledby="h1">
+        <label class="choice"><input type="radio" name="type" value="APARTMENT" checked><span><strong>Apartment</strong><small>Flat in a building or gated community</small></span></label>
+        <label class="choice disabled"><input type="radio" name="type" value="VILLA" disabled><span><strong>Villa or independent house</strong><small>Online estimates coming soon</small></span></label>
+      </div>
+      <button class="link" type="button" data-consult="villa">Have a villa? Talk to a designer →</button>
+      <div class="actions"><span></span><button class="primary" type="button" data-next>Continue →</button></div>
+    </section>
+
+    <!-- 2 BHK -->
+    <section class="screen" data-screen="2" aria-labelledby="h2" hidden>
+      <h2 id="h2" tabindex="-1">How many bedrooms?</h2>
+      <div class="pills" role="radiogroup" aria-labelledby="h2">
+        <label class="pill disabled"><input type="radio" name="bhk" value="1BHK" disabled><span>1 BHK</span></label>
+        <label class="pill disabled"><input type="radio" name="bhk" value="2BHK" disabled><span>2 BHK</span></label>
+        <label class="pill"><input type="radio" name="bhk" value="3BHK" checked><span>3 BHK</span></label>
+        <label class="pill disabled"><input type="radio" name="bhk" value="4BHK" disabled><span>4 BHK</span></label>
+      </div>
+      <p class="note">1, 2 and 4 BHK: online estimates coming soon. <button class="link inline" type="button" data-consult="size">Talk to a designer →</button></p>
+      <label class="field" for="city">City or area <span class="opt">(optional)</span>
+        <input id="city" name="city" maxlength="60" autocomplete="address-level2" placeholder="e.g. Kondapur, Hyderabad">
+      </label>
+      <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="button" data-next>Continue →</button></div>
+    </section>
+
+    <!-- 3 New or renovation -->
+    <section class="screen" data-screen="3" aria-labelledby="h3" hidden>
+      <h2 id="h3" tabindex="-1">Is this a new home or a renovation?</h2>
+      <div class="choices" role="radiogroup" aria-labelledby="h3">
+        <label class="choice"><input type="radio" name="kind" value="NEW_HOME" checked><span><strong>New home</strong><small>Recently handed over, empty</small></span></label>
+        <label class="choice"><input type="radio" name="kind" value="RENOVATION"><span><strong>Renovation</strong><small>Lived-in home, replacing or adding interiors</small></span></label>
+      </div>
+      <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="button" data-next>Continue →</button></div>
+    </section>
+
+    <!-- 4 Rooms -->
+    <section class="screen" data-screen="4" aria-labelledby="h4" hidden>
+      <h2 id="h4" tabindex="-1">Which rooms should we design?</h2>
+      <p class="sub">We've selected what most 3 BHK homes include. Turn rooms on or off and add extras.</p>
+      <div id="rooms" class="rooms"></div>
+      <p class="hint" id="rooms-hint" role="status"></p>
+      <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="button" data-next id="rooms-next">Continue →</button></div>
+    </section>
+
+    <!-- 5 Package -->
+    <section class="screen" data-screen="5" aria-labelledby="h5" hidden>
+      <h2 id="h5" tabindex="-1">Choose your finish</h2>
+      <div class="choices" role="radiogroup" aria-labelledby="h5">
+        <label class="choice"><input type="radio" name="pkg" value="ESSENTIAL" checked><span><strong>Essential</strong><small>Laminate finishes, branded plywood, soft-close hardware</small></span></label>
+        <label class="choice disabled"><input type="radio" name="pkg" value="PREMIUM" disabled><span><strong>Premium</strong><small>Pricing coming soon</small></span></label>
+        <label class="choice"><input type="radio" name="pkg" value="LUXURY"><span><strong>Luxury</strong><small>Priced after a design consultation</small></span></label>
+      </div>
+      <label class="verify"><input type="checkbox" id="verify"> <span>Verify you are human <small>(simulated in the prototype)</small></span></label>
+      <p class="hint" id="pkg-hint" role="status"></p>
+      <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="button" id="see-budget">See my budget →</button></div>
+    </section>
+
+    <!-- 6 Result -->
+    <section class="screen result" data-screen="6" aria-labelledby="h6" hidden>
+      <p class="eyebrow">Veda Spaces preliminary budgetary estimate</p>
+      <h2 id="h6" tabindex="-1" class="range" aria-live="polite"><span id="range"></span></h2>
+      <p class="gst" id="gst"></p>
+      <p class="basis" id="basis"></p>
+      <div class="cta">
+        <button class="primary wide" type="button" id="to-quote">Get my detailed quotation →</button>
+        <button class="ghost wide" type="button" id="to-refine">Tighten your range (optional)</button>
+      </div>
+      <details open><summary>What's included</summary><table class="totals"><caption class="sr">Room subtotals</caption><tbody id="room-totals"></tbody></table></details>
+      <details><summary>Project Preparation &amp; Protection Package</summary><p class="amount" id="prep"></p><p>Site preparation, material handling, protection and completion activities needed to carry out and hand over the work safely.</p><ul><li>Site and floor protection</li><li>Plywood protection</li><li>Material freight and handling</li><li>Debris handling</li><li>Completion deep cleaning</li><li>Pest control</li></ul><p class="small">One grouped value, included in the range above.</p></details>
+      <details><summary>Custom Features Allowance</summary><p class="amount" id="allowance"></p><p>Bespoke details usually added during design, such as extra drawers, mirrors, pelmets and lighting sensors. The detailed quotation replaces it with the actual items.</p></details>
+      <details><summary>Timeline, warranty and what's not included</summary><p id="timeline"></p><p>Warranty: plywood up to 10 years (manufacturer terms), kitchen tandems 3 years, channels and hinges 5 years, 1 year free service. <a href="/warranty">Full policy</a></p><p>Not included: civil work, appliances, loose furniture and décor. Sink, tiles, granite and taps are supplied by you.</p></details>
+      <details><summary>Assumptions</summary><ul id="assumptions"></ul></details>
+      <p class="disclaimer">This is a preliminary budgetary estimate for planning purposes and is not a final quotation or contractual offer. The final price depends on site measurement, approved design and selected materials.</p>
+      <p class="proto-note">Prototype: illustrative numbers from a test rate card, not a real estimate.</p>
+      <p class="small" id="meta"></p>
+      <div class="actions"><button class="ghost" type="button" data-goto="4">← Change my rooms</button><span></span></div>
+    </section>
+
+    <!-- 7 Lead capture -->
+    <section class="screen" data-screen="7" aria-labelledby="h7" hidden>
+      <h2 id="h7" tabindex="-1">Get my detailed quotation</h2>
+      <p class="sub" id="lead-sub">A designer will call you within one working day and arrange a free site measurement.</p>
+      <div class="summary-box" id="lead-summary" role="alert" tabindex="-1" hidden></div>
+      <form id="lead" novalidate>
+        <label class="field" for="name">Name <span class="req">Required</span><input id="name" autocomplete="name" maxlength="150" aria-describedby="name-err"><span class="err" id="name-err"></span></label>
+        <label class="field" for="phone">Phone <span class="req">Required</span><input id="phone" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+91" aria-describedby="phone-err"><span class="err" id="phone-err"></span></label>
+        <label class="field" for="email">Email <span class="opt">(optional)</span><input id="email" type="email" autocomplete="email" maxlength="254"></label>
+        <fieldset class="field"><legend>How should we contact you?</legend>
+          <label class="inline-choice"><input type="radio" name="contact" value="PHONE" checked> Call</label>
+          <label class="inline-choice"><input type="radio" name="contact" value="WHATSAPP"> WhatsApp</label>
+          <label class="inline-choice"><input type="radio" name="contact" value="EMAIL"> Email</label>
+        </fieldset>
+        <label class="consent" for="consent"><input id="consent" type="checkbox" aria-describedby="consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the Privacy Notice. <span class="req">Required</span></span><span class="err" id="consent-err"></span></label>
+        <label class="verify"><input type="checkbox" id="verify2"> <span>Verify you are human <small>(simulated)</small></span></label>
+        <p class="refine-link" id="refine-link">Want a tighter range first? <button class="link inline" type="button" data-goto="8">Tighten your range →</button></p>
+        <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="submit" id="send">Send my request →</button></div>
+      </form>
+    </section>
+
+    <!-- 7b Confirmation -->
+    <section class="screen" data-screen="9" aria-labelledby="h9" hidden>
+      <h2 id="h9" tabindex="-1">Thank you.</h2>
+      <p>Your reference is <strong>PROTO-0001</strong>.</p>
+      <p id="next-text">Our designer will call you within one working day to go through your estimate and arrange a site measurement.</p>
+      <p class="small" id="estimate-ref"></p>
+      <p class="proto-note">Prototype: nothing was sent.</p>
+      <div class="actions"><span></span><button class="ghost" type="button" id="restart">Start again</button></div>
+    </section>
+
+    <!-- 8 Refine -->
+    <section class="screen" data-screen="8" aria-labelledby="h8" hidden>
+      <h2 id="h8" tabindex="-1">Tighten your range</h2>
+      <p class="sub">Add what you know and leave the rest. We'll keep typical sizes for anything you skip.</p>
+      <div id="refine-fields" class="refine"></div>
+      <button class="primary wide" type="button" id="update">Update my range</button>
+      <p class="range small-range" id="refined-range" aria-live="polite"></p>
+      <div class="actions"><button class="ghost" type="button" data-goto="6">← My estimate</button><button class="primary" type="button" data-goto="7">Get my quotation →</button></div>
+    </section>
+  </main>
+
+  <aside class="facilitator" id="facilitator" hidden aria-label="Facilitator tools">
+    <p><strong>Facilitator</strong> · time to first estimate: <span id="ttfe">—</span></p>
+    <button type="button" id="export">Export session log</button>
+    <button type="button" id="reset">Reset session</button>
+  </aside>
+
+  <script src="proto.js"></script>
+</body>
+</html>
