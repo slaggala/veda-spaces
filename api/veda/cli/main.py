@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -75,55 +76,101 @@ def cmd_bootstrap_founder(args) -> int:
     from veda.platform.notifications.handlers import app_link
     from veda.platform.rbac.models import Role, UserRole
 
-    _settings()
-    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
-        # Bootstrap mode: zero Founders have ever existed (06 §7.2.4) — soft-deleted Founders count as history.
-        existing = s.execute(
-            sa.select(User.id).where(User.protection_level == "FOUNDER").execution_options(include_deleted=True)
-        ).first()
-        prior = s.execute(
-            sa.select(SecurityEventLog.id).where(SecurityEventLog.event_type == "BOOTSTRAP_FOUNDER")
-        ).first()
-        if existing or prior:
-            print("refused: a Founder exists or bootstrap already ran (06 §7.2.4)", file=sys.stderr)
-            return 2
-        email_norm = normalize_email(args.email)
-        if s.execute(sa.select(User.id).where(User.email_normalized == email_norm)).first():
-            print("refused: a user with this email exists", file=sys.stderr)
-            return 2
-        now = db.tx_time(s)
-        founder_role = s.execute(sa.select(Role).where(Role.grant_path == "FOUNDER_WORKFLOW_ONLY")).scalar_one()
-        user = User(
-            email=args.email.strip(),
-            email_normalized=email_norm,
-            full_name=args.name,
-            user_type="HUMAN",
-            status="INVITED",
-            status_changed_on=now,
-            timezone="Asia/Kolkata",
-            locale="en-IN",
-            protection_level="FOUNDER",
-            mfa_required=False,
-            authz_version=1,
-        )
-        s.add(user)
-        s.flush()
-        s.add(UserCredential(user_id=user.id, password_hash=None, must_change_password=False, failed_login_count=0))
-        s.add(UserRole(user_id=user.id, role_id=founder_role.id, reason="Bootstrap"))
-        tok, raw = create_action_token(s, user, "INVITE", ttl=timedelta(hours=1))
-        s.flush()
-        security_events.record(s, "BOOTSTRAP_FOUNDER", "SUCCESS", subject_user_id=user.id, detail={"channel": "cli"})
-        if args.email_link:
-            outbox.enqueue(s, "user.invited", "app_user", user.id, user_id=user.id, token_id=tok.id)
+    settings = _settings()
+    # R1/R2: the invite link is a credential. The container's stdout is shipped to the log group, so a deployed
+    # environment never prints it: it is emailed (--email-link) or written to a new 0600 file (--link-file).
+    if not (args.email_link or args.link_file or _stdout_link_allowed(settings)):
         print(
-            json.dumps(
-                {
-                    "user_id": user.id,
-                    "invite_link": app_link(f"/accept-invite#token={raw}"),
-                    "expires_on": tok.expires_on.isoformat(),
-                }
-            )
+            f"refused: in {settings.env} the invite link is never printed; use --email-link or --link-file",
+            file=sys.stderr,
         )
+        return 2
+    try:
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            # Bootstrap mode: zero Founders have ever existed (06 §7.2.4) — soft-deleted Founders count as history.
+            existing = s.execute(
+                sa.select(User.id).where(User.protection_level == "FOUNDER").execution_options(include_deleted=True)
+            ).first()
+            prior = s.execute(
+                sa.select(SecurityEventLog.id).where(SecurityEventLog.event_type == "BOOTSTRAP_FOUNDER")
+            ).first()
+            if existing or prior:
+                print("refused: a Founder exists or bootstrap already ran (06 §7.2.4)", file=sys.stderr)
+                return 2
+            email_norm = normalize_email(args.email)
+            if s.execute(sa.select(User.id).where(User.email_normalized == email_norm)).first():
+                print("refused: a user with this email exists", file=sys.stderr)
+                return 2
+            now = db.tx_time(s)
+            founder_role = s.execute(sa.select(Role).where(Role.grant_path == "FOUNDER_WORKFLOW_ONLY")).scalar_one()
+            user = User(
+                email=args.email.strip(),
+                email_normalized=email_norm,
+                full_name=args.name,
+                user_type="HUMAN",
+                status="INVITED",
+                status_changed_on=now,
+                timezone="Asia/Kolkata",
+                locale="en-IN",
+                protection_level="FOUNDER",
+                mfa_required=False,
+                authz_version=1,
+            )
+            s.add(user)
+            s.flush()
+            s.add(UserCredential(user_id=user.id, password_hash=None, must_change_password=False, failed_login_count=0))
+            s.add(UserRole(user_id=user.id, role_id=founder_role.id, reason="Bootstrap"))
+            tok, raw = create_action_token(s, user, "INVITE", ttl=timedelta(hours=1))
+            s.flush()
+            security_events.record(
+                s, "BOOTSTRAP_FOUNDER", "SUCCESS", subject_user_id=user.id, detail={"channel": "cli"}
+            )
+            if args.email_link:
+                outbox.enqueue(s, "user.invited", "app_user", user.id, user_id=user.id, token_id=tok.id)
+            out: dict[str, object] = {"user_id": user.id, "expires_on": tok.expires_on.isoformat()}
+            link = app_link(f"/accept-invite#token={raw}")
+            if args.link_file:
+                _write_secret_file(args.link_file, link + "\n")  # fails closed: the transaction rolls back
+                out["invite_link_file"] = args.link_file
+            if args.email_link:
+                out["invite"] = "emailed"
+            if not (args.email_link or args.link_file):
+                out["invite_link"] = link  # local and test only (checked above)
+            print(json.dumps(out))
+    except FileExistsError:
+        print(f"refused: {args.link_file} exists; the invite link file is never overwritten", file=sys.stderr)
+        return 2
+    return 0
+
+
+def _stdout_link_allowed(settings) -> bool:
+    return settings.dev_keys_allowed
+
+
+def _write_secret_file(path: str, content: str) -> None:
+    """A new file, readable by its owner only; an existing file is never overwritten."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(content)
+
+
+def cmd_outbox(args) -> int:
+    """R3: list, retire or requeue dead-lettered outbox events (payloads are never shown)."""
+    from veda.platform.notifications import dead_letters
+
+    _settings()
+    try:
+        if args.action == "dead":
+            print(json.dumps(dead_letters.list_dead()))
+        elif not args.id:
+            raise dead_letters.DeadLetterError("--id is required")
+        elif args.action == "retire":
+            print(json.dumps(dead_letters.retire(args.id, args.reason)))
+        else:
+            print(json.dumps(dead_letters.requeue(args.id, args.reason)))
+    except dead_letters.DeadLetterError as err:
+        print(f"refused: {err}", file=sys.stderr)
+        return 2
     return 0
 
 
@@ -375,8 +422,14 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("bootstrap-founder")
     p.add_argument("--email", required=True)
     p.add_argument("--name", required=True)
-    p.add_argument("--email-link", action="store_true", help="also email the invite link")
+    p.add_argument("--email-link", action="store_true", help="email the invite link (never printed)")
+    p.add_argument("--link-file", default=None, help="write the invite link to this new file (mode 0600)")
     p.set_defaults(fn=cmd_bootstrap_founder)
+    p = sub.add_parser("outbox")
+    p.add_argument("action", choices=["dead", "retire", "requeue"])
+    p.add_argument("--id", default=None)
+    p.add_argument("--reason", default=None)
+    p.set_defaults(fn=cmd_outbox)
     sub.add_parser("sync-permissions").set_defaults(fn=cmd_sync_permissions)
     p = sub.add_parser("worker")
     p.add_argument("--once", action="store_true")
