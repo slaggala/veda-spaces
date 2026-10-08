@@ -305,6 +305,8 @@ def public_view(row: BudgetEstimate) -> dict:
     """The customer-safe response: the customer view, the reference and expiry. No internal identifier, no rate, no
     line amount, no workflow state."""
     view = {k: v for k, v in row.result.items() if k in _CUSTOMER_KEYS}
+    # The stored snapshot is the staff view (exact room amounts); customers see them rounded (review S2).
+    view["rooms"] = [dict(r, amount_minor=engine.customer_amount(r["amount_minor"])) for r in row.result["rooms"]]
     view["project_preparation"] = {k: v for k, v in row.result["project_preparation"].items() if k != "components"}
     view["custom_features_allowance"] = {
         k: row.result["custom_features_allowance"][k] for k in ("label", "description", "low_minor", "high_minor")
