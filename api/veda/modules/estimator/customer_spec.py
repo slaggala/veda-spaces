@@ -5,6 +5,13 @@ requirement, grade, thickness and finish, approved brand **examples**, the rule 
 point at which the final selection is confirmed (the detailed quotation). It is public text: it carries **no amount,
 price limit, cost, margin or rate**, and **no warranty duration** (owner decision T7: durations stay in the approved
 warranty policy until the specification and the policy are reconciled). The validator refuses all of these.
+
+**Room promises** (trust finalisation, Phase 3) are never generic: a category applies to a room only through what the
+estimate actually priced there (`applies_to.lines`, as `PRODUCT.LINE` or `PRODUCT.*`), so a room without a soft-close
+line is never told it has soft-close hardware, and a gypsum ceiling is never called plywood. `room_materials` builds each
+room's one-line promise from the snapshot and the priced lines: one phrase per `line_group` (the first applicable
+category of the group, in specification order), worded per product where `phrases` says so. Specifications without
+line or product applicability (ESSENTIAL-1.0) give no room line.
 """
 
 from __future__ import annotations
@@ -32,6 +39,9 @@ RoomCode = Literal[
 ]
 ROOMS = get_args(RoomCode)
 Code = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,39}$")]
+ProductCode = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")]
+LineRef = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}\.([A-Z][A-Z0-9_]{1,39}|\*)$")]
+PhraseKey = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}(\.[A-Z][A-Z0-9_]{1,39})?$")]
 Text = Annotated[str, Field(min_length=1, max_length=300)]
 Short = Annotated[str, Field(min_length=1, max_length=160)]
 
@@ -55,7 +65,8 @@ class _Model(BaseModel):
 
 class Applicability(_Model):
     rooms: tuple[RoomCode, ...] = Field(min_length=1)
-    products: tuple[Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")], ...] = ()
+    products: tuple[ProductCode, ...] = ()
+    lines: tuple[LineRef, ...] = ()  # the priced lines that carry this promise; takes precedence over products
 
 
 class Category(_Model):
@@ -73,6 +84,18 @@ class Category(_Model):
     warranty_summary: Text
     applies_to: Applicability
     details: tuple[Text, ...] = ()
+    line_group: Code | None = None  # shown in a room's one-line promise, once per group
+    phrases: dict[PhraseKey, Short] = Field(default_factory=dict)  # room-line wording per PRODUCT or PRODUCT.LINE
+
+    @model_validator(mode="after")
+    def _phrases_follow_applicability(self):
+        scope = {ref.split(".")[0] for ref in self.applies_to.lines} | set(self.applies_to.products)
+        for key in self.phrases:
+            if key.split(".")[0] not in scope:
+                raise ValueError(f"phrase {key} names a product this category does not apply to")
+        if self.phrases and self.line_group is None:
+            raise ValueError("phrases are room-line wording; give the category a line_group")
+        return self
 
 
 class CustomerSpec(_Model):
@@ -126,7 +149,7 @@ def _texts(spec: CustomerSpec):
             value = getattr(c, field)
             if value:
                 yield f"{base}.{field}", value
-        for i, value in enumerate((*c.thickness, *c.brand_examples, *c.details)):
+        for i, value in enumerate((*c.thickness, *c.brand_examples, *c.details, *c.phrases.values())):
             yield f"{base}[{i}]", value
 
 
@@ -166,3 +189,44 @@ def customer_view(document: dict) -> dict:
             for c in spec.categories
         ],
     }
+
+
+def _applies(category: Category, room: str, priced: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The priced (product, line) pairs in `room` that carry this category's promise ([] when it does not apply)."""
+    scope = category.applies_to
+    if room not in scope.rooms:
+        return []
+    if scope.lines:
+        refs = set(scope.lines)
+        return [(p, ln) for p, ln in priced if f"{p}.{ln}" in refs or f"{p}.*" in refs]
+    if scope.products:
+        return [(p, ln) for p, ln in priced if p in scope.products]
+    return list(priced)
+
+
+def room_materials(document: dict, priced: dict[str, list[tuple[str, str]]]) -> dict[str, dict]:
+    """Each room's material promise, from the specification snapshot and the lines the estimate priced in that room.
+
+    `priced` maps a room code to its (product, line) pairs. Returns {room: {"line": str | None, "categories": [code]}}:
+    `categories` lists every category that applies (for the room's material details) and `line` joins one phrase per
+    line group. A phrase is the product- or line-specific wording when every priced line of the category in the room
+    agrees on it, and the category summary otherwise. Deterministic: the same snapshot and lines give the same text.
+    """
+    spec = parse(document)
+    out: dict[str, dict] = {}
+    for room, lines in priced.items():
+        applicable: list[tuple[Category, list[tuple[str, str]]]] = []
+        for c in spec.categories:
+            matched = _applies(c, room, lines)
+            if matched:
+                applicable.append((c, matched))
+        groups: dict[str, str] = {}
+        for c, matched in applicable:
+            if c.line_group is None or c.line_group in groups:
+                continue
+            words = list(
+                dict.fromkeys(c.phrases.get(f"{p}.{ln}") or c.phrases.get(p) or c.summary for p, ln in matched)
+            )
+            groups[c.line_group] = words[0] if len(words) == 1 else c.summary
+        out[room] = {"line": " · ".join(groups.values()) or None, "categories": [c.code for c, _ in applicable]}
+    return out
