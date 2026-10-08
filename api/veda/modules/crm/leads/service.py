@@ -424,14 +424,26 @@ def find_by_idempotency_key(s: Session, key: str) -> Lead | None:
 
 
 def create_public(
-    s: Session, body, *, key: str, fingerprint: str, ip: str | None, ua: str | None, request_id: str | None
+    s: Session,
+    body,
+    *,
+    key: str,
+    fingerprint: str,
+    ip: str | None,
+    ua: str | None,
+    request_id: str | None,
+    on_created=None,
+    extra_unmapped: dict | None = None,
 ) -> dict:
+    """`on_created(s, lead)` runs in the same transaction after the insert (the estimate link, ADR-012), so the enquiry
+    and its link commit together or not at all. `extra_unmapped` records values the caller could not use; they never
+    reject the enquiry (LEAD-030)."""
     data = validate_public(body)
     with acting(
         s, ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=ua)
     ):
         now = db.tx_time(s)
-        unmapped = {}
+        unmapped = dict(extra_unmapped or {})
         ids = {}
         for field, col, cat in LOOKUP_FIELDS:
             code = data["codes"][field]
@@ -490,6 +502,8 @@ def create_public(
         add_system_activity(
             s, lead, "SYSTEM", "Enquiry received from the website", owner=WEB_INTAKE_USER_ID, description=None
         )
+        if on_created is not None:
+            on_created(s, lead)
         if spam:
             security_events.record(
                 s, "PUBLIC_INTAKE_QUARANTINED", "SUCCESS", target=("lead", lead.id), detail={"reason": "honeypot"}

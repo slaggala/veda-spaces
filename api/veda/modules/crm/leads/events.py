@@ -52,6 +52,11 @@ def _created(s: Session, event: OutboxEvent) -> None:
     recipients = holders_of(s, "lead.assign")
     title = f"New enquiry: {lead.lead_number}"
     body = _summary(s, lead)
+    from veda.modules.estimator.service import summary_line
+
+    estimate = summary_line(s, lead.id)  # ADR-012: the Budgetary Estimate the enquiry followed, if any
+    if estimate:
+        body = f"{body} · {estimate}"
     notify_in_app(
         s,
         event,

@@ -41,6 +41,16 @@ REVISIONS: dict[str, list[str]] = {
     "0007_notifications": ["outbox_event", "notification"],
     "0008_account_security": ["admin_approval_request"],
     "0100_crm_leads": ["lead", "lead_note", "lead_activity"],
+    "0101_estimator": [
+        "estimator_rate_card",
+        "estimator_rate_item",
+        "budget_estimate",
+        "budget_estimate_line",
+        "budget_estimate_assumption",
+        "budget_estimate_project_item",
+        "budget_estimate_lead_link",
+        "estimate_event",
+    ],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

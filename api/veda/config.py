@@ -167,6 +167,13 @@ class Settings:
     audit_online_retention_days: int | None = None
     lead_retention_days: int | None = None
     lead_retention_enabled: bool = False
+    # Budgetary Estimate (ADR-012). Off by default: the public estimate and enquiry routes answer 404 until enabled.
+    estimator_enabled: bool = False
+    estimate_turnstile_required: bool = True  # an estimate needs a solved Turnstile, like an enquiry
+    estimate_retention_days: int = (
+        90  # unlinked estimates (no personal data) are removed after expiry + this (owner input)
+    )
+    warranty_policy_url: str = ""  # the full Warranty, Service & Customer Care Policy, linked from every estimate
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -287,6 +294,10 @@ def load_settings(**overrides) -> Settings:
         audit_online_retention_days=_int("VEDA_AUDIT_ONLINE_RETENTION_DAYS", None),
         lead_retention_days=_int("VEDA_LEAD_RETENTION_DAYS", None),
         lead_retention_enabled=_bool("VEDA_LEAD_RETENTION_ENABLED", False),
+        estimator_enabled=_bool("VEDA_ESTIMATOR_ENABLED", False),
+        estimate_turnstile_required=_bool("VEDA_ESTIMATE_TURNSTILE_REQUIRED", True),
+        estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
+        warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
         anchor_bucket=_env("VEDA_ANCHOR_BUCKET"),
         anchor_retention_days=_days("VEDA_ANCHOR_RETENTION_DAYS"),
@@ -421,7 +432,15 @@ def validate_environment(settings: Settings) -> list[str]:
         problems.append(f"VEDA_BREAK_GLASS_IDENTITY must be sts in {env}")
     if settings.lead_retention_enabled and not settings.lead_retention_days:
         problems.append("LEAD_RETENTION_ENABLED requires an approved LEAD_RETENTION_DAYS (OWNER-INPUT-002)")
+    if settings.estimator_enabled and not settings.estimate_turnstile_required:
+        problems.append(f"VEDA_ESTIMATE_TURNSTILE_REQUIRED must stay true in {env} when the estimator is enabled")
+    if not 1 <= settings.estimate_retention_days <= 3650:
+        problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:
+        if settings.estimator_enabled:
+            # Production behaviour must not change until the implementation is reviewed and the owner enables it
+            # (owner instruction 2026-10-08). Enabling it is a reviewed change to this check.
+            problems.append("VEDA_ESTIMATOR_ENABLED is not authorised in production yet")
         if settings.public_site_credentials:
             problems.append("VEDA_PUBLIC_SITE_CREDENTIALS is staging-only (Cloudflare Access); production refuses it")
         if not settings.sentry_dsn:

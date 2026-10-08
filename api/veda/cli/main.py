@@ -41,6 +41,7 @@ def _settings():
         db.configure(s.database_url)
     import veda.models  # noqa: F401
     from veda.modules.crm.leads import events  # noqa: F401  (handlers)
+    from veda.modules.estimator import events as _estimate_events  # noqa: F401
 
     return s
 
@@ -199,6 +200,7 @@ JOBS = {
     "purge": "purge",
     "erasure-audit": "run_erasure_audit",
     "lead-retention": "lead_retention",
+    "estimate-retention": "estimate_retention",
     "verify-chain": "verify_chain",
     "anchor-chain": "anchor_chain",
     "invariants": "check_invariants",
@@ -211,6 +213,49 @@ JOBS = {
     "follow-up-reminders": "follow_up_reminders",
     "spam-review": "spam_review",
 }
+
+
+def cmd_estimator(args) -> int:
+    """Rate cards (operator only; no API exposes a card) and estimate retention (ADR-012 Part I).
+
+    validate-card FILE       dry run: schema, business rules, no customer data; prints the version and SHA-256 only
+    load-card FILE           store as DRAFT (a version is loaded once)
+    activate-card VERSION    with --approval "<owner approval reference>"; the previous card is retired
+    rollback-card            re-activate the most recently retired card, with --approval
+    list-cards               versions, states and SHA-256 (never rates)
+    """
+    from veda.kernel import db
+    from veda.kernel.context import actor, system_context
+    from veda.modules.estimator import service
+
+    _settings()
+    try:
+        if args.action in ("validate-card", "load-card"):
+            if not args.file:
+                raise service.CardError("give the private rate-card file")
+            document = json.loads(Path(args.file).read_text())
+            if args.action == "validate-card":
+                card = service.validate_document(document)
+                print(json.dumps({"valid": True, "version": card.version, "sha256": service._sha(document)}))
+                return 0
+        out: dict[str, object]
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            if args.action == "load-card":
+                row = service.load_card(s, document)
+                out = {"loaded": row.card_version, "status": row.status, "sha256": row.document_sha256}
+            elif args.action == "activate-card":
+                row = service.activate_card(s, args.version or "", args.approval or "")
+                out = {"active": row.card_version}
+            elif args.action == "rollback-card":
+                row = service.rollback_card(s, args.approval or "")
+                out = {"active": row.card_version, "rolled_back": True}
+            else:
+                out = {"cards": service.list_cards(s)}
+        print(json.dumps(out))
+        return 0
+    except (service.CardError, OSError, ValueError) as err:
+        print(f"refused: {str(err).splitlines()[0]}", file=sys.stderr)
+        return 2
 
 
 def cmd_maintenance(args) -> int:
@@ -273,6 +318,7 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
         "03:00": "anchor-chain",
         "03:30": "purge",
         "04:00": "lead-retention",
+        "04:15": "estimate-retention",
         "05:00": "restore-verify",
         "09:00": "spam-review",
     }
@@ -425,6 +471,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--email-link", action="store_true", help="email the invite link (never printed)")
     p.add_argument("--link-file", default=None, help="write the invite link to this new file (mode 0600)")
     p.set_defaults(fn=cmd_bootstrap_founder)
+    p = sub.add_parser("estimator")
+    p.add_argument("action", choices=["validate-card", "load-card", "activate-card", "rollback-card", "list-cards"])
+    p.add_argument("file", nargs="?", default=None)
+    p.add_argument("--version", default=None)
+    p.add_argument("--approval", default=None)
+    p.set_defaults(fn=cmd_estimator)
     p = sub.add_parser("outbox")
     p.add_argument("action", choices=["dead", "retire", "requeue"])
     p.add_argument("--id", default=None)

@@ -433,6 +433,58 @@ def seed_roles_and_matrix(conn, *, audit: bool) -> None:
             )
 
 
+def grant_new_codes(conn, codes: tuple[str, ...], *, audit: bool) -> int:
+    """A later module migration: grant the matrix rows of `codes` that are missing (fresh databases already have them
+    from 0003, which reads the live registry), then bump every human's authz_version so sessions pick them up."""
+    from veda.platform.rbac.registry import MATRIX, matrix_scope
+
+    now = clock.now()
+    tx = new_id()
+    roles = {
+        r.code: r.id for r in conn.execute(sa.select(ROLE.c.code, ROLE.c.id).where(ROLE.c.is_deleted == sa.false()))
+    }
+    perms = {
+        r.code: r.id
+        for r in conn.execute(
+            sa.select(PERMISSION.c.code, PERMISSION.c.id).where(
+                PERMISSION.c.is_deleted == sa.false(), PERMISSION.c.code.in_(codes)
+            )
+        )
+    }
+    existing = {
+        (r.role_id, r.permission_id)
+        for r in conn.execute(
+            sa.select(ROLE_PERMISSION.c.role_id, ROLE_PERMISSION.c.permission_id).where(
+                ROLE_PERMISSION.c.is_deleted == sa.false()
+            )
+        )
+    }
+    inserted = 0
+    for code in codes:
+        for role_code, symbol in MATRIX[code].items():
+            if role_code not in roles or (roles[role_code], perms[code]) in existing:
+                continue
+            insert_audited(
+                conn,
+                ROLE_PERMISSION,
+                {"role_id": roles[role_code], "permission_id": perms[code], "scope": matrix_scope(symbol)},
+                transaction_id=tx,
+                now=now,
+                audit=audit,
+            )
+            inserted += 1
+    if inserted:
+        u = APP_USER_0002
+        conn.execute(
+            u.update()
+            .where(u.c.user_type == "HUMAN")
+            .values(
+                authz_version=u.c.authz_version + 1, version=u.c.version + 1, updated_on=now, updated_by=SYSTEM_USER_ID
+            )
+        )
+    return inserted
+
+
 def assert_rbac_seed(conn) -> None:
     """06 §3.1 rules 3 and 5, asserted in the seed migration (RBAC-018)."""
     rows = (

@@ -695,6 +695,41 @@
         "title": "ErasureIn",
         "type": "object"
       },
+      "EstimateRevisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "package": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package"
+          },
+          "selections": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selections"
+          }
+        },
+        "title": "EstimateRevisionIn",
+        "type": "object"
+      },
       "ForgotIn": {
         "additionalProperties": false,
         "properties": {
@@ -1625,6 +1660,119 @@
           }
         },
         "title": "PublicConsent",
+        "type": "object"
+      },
+      "PublicEnquiryIn": {
+        "additionalProperties": false,
+        "description": "The website enquiry (04 \u00a75.1) plus the estimate it follows and how the customer prefers to be contacted.",
+        "properties": {
+          "attribution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicAttribution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "budget_range_code": {
+            "default": null,
+            "title": "Budget Range Code"
+          },
+          "city": {
+            "default": null,
+            "title": "City"
+          },
+          "company_website_url": {
+            "default": null,
+            "title": "Company Website Url"
+          },
+          "consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicConsent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "email": {
+            "default": null,
+            "title": "Email"
+          },
+          "estimate_reference": {
+            "default": null,
+            "title": "Estimate Reference"
+          },
+          "message": {
+            "default": null,
+            "title": "Message"
+          },
+          "name": {
+            "default": null,
+            "title": "Name"
+          },
+          "phone": {
+            "default": null,
+            "title": "Phone"
+          },
+          "preferred_contact": {
+            "default": null,
+            "title": "Preferred Contact"
+          },
+          "project_type_code": {
+            "default": null,
+            "title": "Project Type Code"
+          },
+          "property_type_code": {
+            "default": null,
+            "title": "Property Type Code"
+          },
+          "turnstile_token": {
+            "default": null,
+            "title": "Turnstile Token"
+          }
+        },
+        "title": "PublicEnquiryIn",
+        "type": "object"
+      },
+      "PublicEstimateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "default": null,
+            "title": "City"
+          },
+          "home_size": {
+            "default": null,
+            "title": "Home Size"
+          },
+          "package": {
+            "default": null,
+            "title": "Package"
+          },
+          "project_kind": {
+            "default": null,
+            "title": "Project Kind"
+          },
+          "property_type": {
+            "default": null,
+            "title": "Property Type"
+          },
+          "selections": {
+            "default": null,
+            "title": "Selections"
+          },
+          "turnstile_token": {
+            "default": null,
+            "title": "Turnstile Token"
+          }
+        },
+        "title": "PublicEstimateIn",
         "type": "object"
       },
       "PublicLeadIn": {
@@ -3868,6 +4016,268 @@
         "x-requirement": "AUTH-016"
       }
     },
+    "/api/v1/estimates/{estimate_id}": {
+      "get": {
+        "operationId": "estimator_get_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.get_estimate",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
+    "/api/v1/estimates/{estimate_id}/consultation-copy": {
+      "post": {
+        "operationId": "estimator_consultation_copy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.consultation_copy",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
+    "/api/v1/estimates/{estimate_id}/duplicate": {
+      "post": {
+        "operationId": "estimator_duplicate_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.duplicate_estimate",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
+    "/api/v1/estimates/{estimate_id}/quotation-process": {
+      "post": {
+        "operationId": "estimator_quotation_process",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.quotation_process",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
+    "/api/v1/estimates/{estimate_id}/revisions": {
+      "post": {
+        "operationId": "estimator_revise_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateRevisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.revise_estimate",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
+    "/api/v1/estimates/{estimate_id}/site-measurement": {
+      "post": {
+        "operationId": "estimator_site_measurement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.site_measurement",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
     "/api/v1/founder-actions": {
       "post": {
         "operationId": "approvals_founder_action",
@@ -5347,6 +5757,48 @@
         "x-requirement": "LEAD-029"
       }
     },
+    "/api/v1/leads/{lead_id}/estimates": {
+      "get": {
+        "operationId": "estimator_lead_estimates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lead_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "estimator.lead_estimates",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": [
+          "estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "EST-005"
+      }
+    },
     "/api/v1/leads/{lead_id}/history": {
       "get": {
         "operationId": "leads_history",
@@ -6452,6 +6904,74 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-016"
+      }
+    },
+    "/api/v1/public/enquiries": {
+      "post": {
+        "operationId": "estimator_public_create_enquiry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicEnquiryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Enquiry after a Budgetary Estimate (anonymous, consented, Turnstile-gated); links the estimate",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-007",
+        "x-requirement": "EST-004"
+      }
+    },
+    "/api/v1/public/estimates": {
+      "post": {
+        "operationId": "estimator_public_create_estimate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicEstimateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Preliminary Budgetary Estimate (anonymous; no personal data; Turnstile-gated; not a quotation)",
+        "tags": [
+          "estimator"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-007",
+        "x-requirement": "EST-001"
       }
     },
     "/api/v1/public/leads": {

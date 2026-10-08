@@ -207,6 +207,8 @@ These capabilities are available to authenticated users by design (06 §11, RBX-
 | `lead_activity.read` | yes | Read the timeline | ACT-001 | A | A | A¹ |
 | `lead_activity.update` | yes | Edit, complete, cancel or reschedule | ACT-002 | A | A | O |
 | `lead_activity.delete` | yes | Delete non-system activities | ACT-002 | A | A | O |
+| `estimate.read` | no | View budgetary estimates (internal lines and preparation components), within the linked lead's visibility (ADR-012) | EST-005 | ✓ | ✓ | ✓ |
+| `estimate.manage` | no | Duplicate or revise an estimate, consultation copy, mark site measurement, start the official quotation process; within the linked lead's visibility (ADR-012) | EST-005 | ✓ | ✓ | ✓ |
 
 ¹ Child reads are limited by the parent lead's OWN scope (§4).
 
@@ -429,3 +431,4 @@ These endpoints are intentionally not gated by a permission code. None is privil
 | RBX-004 | `POST /auth/password/change`, `POST /auth/reauth`, `POST /auth/mfa/step-up`, `POST /auth/mfa/enroll/start`, `POST /auth/mfa/enroll/confirm`, `POST /auth/mfa/recovery-codes`, `DELETE /auth/mfa/factor`, `PUT /auth/me/email` | Authenticated caller + password re-entry, step-up or single-use enrollment token (05 §11.3) | Own credentials only. Enrollment never on password alone or recovery code alone. |
 | RBX-005 | `POST /public/leads` | Turnstile, rate limit, idempotency | Anonymous public intake |
 | RBX-006 | `GET /health/*`, `GET /auth/.well-known/jwks.json` | None | No data |
+| RBX-007 | `POST /public/estimates`, `POST /public/enquiries` | Feature flag (off by default), Turnstile, layered rate limits (source, network, browser token, aggregate); enquiries also consent and idempotency | Anonymous Budgetary Estimate and the enquiry that follows it (ADR-011, ADR-012). No personal data in an estimate; customer-safe responses only |
