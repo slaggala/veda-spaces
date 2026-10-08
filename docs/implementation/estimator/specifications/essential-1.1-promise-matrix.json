@@ -1,0 +1,610 @@
+{
+ "schema": "veda.estimator.promise-matrix/1",
+ "spec_code": "ESSENTIAL-1.1",
+ "package": {
+  "statements": [
+   "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "Approved materials and hardware carry the applicable manufacturer warranty for the exact product selected and documented in your final quotation.",
+   "Branded plywood furniture with laminate finishes, soft-close hardware in the kitchen, wardrobes and TV unit, made and installed by Veda Spaces.",
+   "Essential Specification",
+   "Final material and brand selections are confirmed in your detailed quotation."
+  ]
+ },
+ "categories": [
+  {
+   "code": "structure",
+   "customer_wording": "Cabinet and furniture structure: Branded plywood furniture. Cabinet and furniture bodies in branded plywood.",
+   "statements": [
+    "12 mm behind the TV",
+    "18 mm cabinet and furniture bodies",
+    "9 mm back panels",
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Branded plywood TV unit",
+    "Branded plywood bed",
+    "Branded plywood cabinetry",
+    "Branded plywood crockery unit",
+    "Branded plywood furniture",
+    "Branded plywood study unit",
+    "Branded plywood utility unit",
+    "Branded plywood wardrobe",
+    "Cabinet and furniture bodies in branded plywood",
+    "Cabinet and furniture structure",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Plywood of the approved grade",
+    "Sylvan Blu"
+   ],
+   "brand_examples": [
+    "Sylvan Blu"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Carcass, shelf, back-panel and TV-background boards in plywood of the approved grade (October 2026 baseline: Sylvan Blu): 18 mm bodies, 9 mm backs, 12 mm TV backgrounds. Vanity and utility boards to be confirmed by sales (wet areas).",
+   "quotation_mapping": "Every carcass or body line (kitchen base, wall and loft; wardrobe and loft; TV box, storage and panel; crockery; study; vanity; bed; utility; storage boxes; window seat; laminate partition) names board brand, grade and thickness.",
+   "procurement_verification": "Purchase order and supplier invoice name brand, grade and thickness; goods received checked against the board stamp and the quotation.",
+   "execution_verification": "Site supervisor checks board stamps and thickness before fabrication or installation; photographs kept with the project record.",
+   "handover_evidence": "Handover record lists board brand and grade with the invoice reference; manufacturer warranty card where the manufacturer issues one.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer (quotation mapping); project manager (procurement and site checks)",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "board",
+   "customer_wording": "Pooja unit and arch structure: Approved board structure. Pooja unit and window-arch structure in an approved board, specified in your detailed quotation.",
+   "statements": [
+    "Approved board structure",
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Pooja unit and arch structure",
+    "Pooja unit and window-arch structure in an approved board, specified in your detailed quotation",
+    "The board and its grade are confirmed in your detailed quotation"
+   ],
+   "brand_examples": [],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Pooja unit and window-arch structures: board and grade chosen at design (CNC and jaali work may need a different board); no plywood promise until specified.",
+   "quotation_mapping": "Pooja unit and window-arch lines name the board, grade and thickness.",
+   "procurement_verification": "As for the quotation line: invoice names the board specified.",
+   "execution_verification": "Site supervisor checks the board against the quotation before installation.",
+   "handover_evidence": "Handover record lists the board used.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "doors",
+   "customer_wording": "Doors and shutters: Branded block-board shutters. Hinged and sliding shutters in branded block board.",
+   "statements": [
+    "18 to 19 mm shutters",
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Block board of the approved grade",
+    "Branded block-board shutters",
+    "Doors and shutters",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Hinged and sliding shutters in branded block board",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Sylvan Primo Plus"
+   ],
+   "brand_examples": [
+    "Sylvan Primo Plus"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Hinged and sliding shutters in block board of the approved grade (October 2026 baseline: Sylvan Primo Plus), 18 to 19 mm. Any HDHMR or other engineered-board shutter must be named in the quotation instead.",
+   "quotation_mapping": "Shutter lines name board brand, grade and thickness; any non-block-board shutter is named explicitly.",
+   "procurement_verification": "Invoice names the shutter board; goods received checked against the stamp.",
+   "execution_verification": "Site supervisor checks shutter board and thickness before fitting.",
+   "handover_evidence": "Handover record lists shutter board brand and grade.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "surface",
+   "customer_wording": "Surface finish: Laminate finish. Laminate on visible surfaces, in colours you choose from the approved range.",
+   "statements": [
+    "0.8 mm inner laminate",
+    "1.0 mm outer laminate",
+    "Airolam",
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Century",
+    "Dazzle Berry",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Greenlam",
+    "Laminate finish",
+    "Laminate on visible surfaces, in colours you choose from the approved range",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Merino",
+    "Outer: your choice from the approved range; inner: a standard colour selected by Veda Spaces",
+    "Plain Art",
+    "Royal Touch",
+    "Stylam",
+    "Surface finish"
+   ],
+   "brand_examples": [
+    "Merino",
+    "Century",
+    "Greenlam",
+    "Royal Touch",
+    "Stylam",
+    "Plain Art",
+    "Dazzle Berry",
+    "Airolam"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "1.0 mm outer laminate in the customer’s chosen colours from the approved brands; 0.8 mm inner laminate in a standard colour.",
+   "quotation_mapping": "Laminate brand, series, shade code and thickness per room in the quotation or its finish schedule.",
+   "procurement_verification": "Invoice names brand, shade code and thickness; shades checked against the customer-approved finish schedule.",
+   "execution_verification": "Shade and thickness checked at pressing; mismatch corrected before installation.",
+   "handover_evidence": "Signed finish schedule with shade codes kept with the handover record.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer (finish schedule); project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "edges",
+   "customer_wording": "Edges: Sealed edges. Edge banding on every exposed laminated edge.",
+   "statements": [
+    "0.8 mm inner edge banding",
+    "2 mm outer edge banding",
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "E3",
+    "Edge banding on every exposed laminated edge",
+    "Edges",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Red Star",
+    "Sealed edges",
+    "Solid Edge",
+    "URO"
+   ],
+   "brand_examples": [
+    "Solid Edge",
+    "E3",
+    "URO",
+    "Red Star"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "2 mm outer and 0.8 mm inner edge banding on every exposed laminated edge, approved brands.",
+   "quotation_mapping": "Edge-banding specification stated in the quotation’s material schedule.",
+   "procurement_verification": "Invoice names edge-band brand and thickness.",
+   "execution_verification": "Edges inspected at fabrication and at installation.",
+   "handover_evidence": "Snag list at handover covers edges.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "soft_close",
+   "customer_wording": "Soft-close hardware: Soft-close hardware. Soft-close hinges on the hinged shutters of your kitchen, wardrobes and TV unit, and soft-close drawer systems in your kitchen.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Hettich",
+    "Kitchen drawer systems: Hettich",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Soft-close TV-unit hardware",
+    "Soft-close hardware",
+    "Soft-close hinges and kitchen drawer systems",
+    "Soft-close hinges on the hinged shutters of your kitchen, wardrobes and TV unit, and soft-close drawer systems in your kitchen",
+    "Soft-close hinges: Hettich",
+    "Soft-close kitchen hardware",
+    "Soft-close wardrobe hardware"
+   ],
+   "brand_examples": [
+    "Hettich"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Soft-close hinges on hinged shutters of the kitchen, wardrobes and TV unit; soft-close tandem drawer systems in the kitchen (October 2026 baseline: Hettich). Priced in those product lines, never in the Site Execution & Handover Package.",
+   "quotation_mapping": "Kitchen, wardrobe and TV-unit soft-close lines name brand and model; promise shown only when the estimate priced a soft-close line in that room.",
+   "procurement_verification": "Invoice names brand and model; quantities checked against the quotation.",
+   "execution_verification": "Every soft-close hinge and drawer checked for soft closing at installation.",
+   "handover_evidence": "Handover checklist records soft-close operation; manufacturer documentation handed over where issued.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "hardware",
+   "customer_wording": "Hinges and channels: Approved hinges and channels. Hinges, drawer channels and sliding-door channels from approved brands, and a hydraulic lift where your bed has storage.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Approved hinges and channels",
+    "Blum",
+    "Branded sliding-door channels",
+    "Drawer channels: Blum",
+    "Ebco",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Folding-door channels: Ebco or Hettich",
+    "Hettich",
+    "Hinges and channels",
+    "Hinges, channels and fittings",
+    "Hinges, drawer channels and sliding-door channels from approved brands, and a hydraulic lift where your bed has storage",
+    "Hinges: Hettich",
+    "Hydraulic bed-storage fitting",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Nimmi",
+    "Sliding-door channels: Nimmi or Hettich"
+   ],
+   "brand_examples": [
+    "Hettich",
+    "Blum",
+    "Nimmi",
+    "Ebco"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Hinges, drawer channels, sliding-door channels and folding channels from approved brands (October 2026 baseline: Hettich hinges, Blum channels, Nimmi or Hettich sliding, Ebco or Hettich folding); hydraulic lift for storage beds. No soft-close promise for these units.",
+   "quotation_mapping": "Hardware lines name brand and type per unit (crockery, study, vanity, utility, pooja, storage, window seat, sliding wardrobe, bed).",
+   "procurement_verification": "Invoice names brand and type.",
+   "execution_verification": "Operation checked at installation.",
+   "handover_evidence": "Handover checklist records hardware operation.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "handles",
+   "customer_wording": "Handles: Standard handles. Handles chosen by you from the standard range.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Handles",
+    "Handles chosen by you from the standard range",
+    "Lengths of 1 ft, 1.5 ft or 2 ft",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Standard handles"
+   ],
+   "brand_examples": [],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Handles from the standard range, chosen by the customer, in 1 ft, 1.5 ft or 2 ft lengths.",
+   "quotation_mapping": "Handle model per room in the finish schedule.",
+   "procurement_verification": "Invoice names the handle model.",
+   "execution_verification": "Handle model checked against the finish schedule at fitting.",
+   "handover_evidence": "Signed finish schedule.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "accessories",
+   "customer_wording": "Kitchen accessories: Kitchen accessories, if you choose them. Kitchen accessories you choose, such as wicker baskets, rolling shutters and pantry pull-outs, come from approved brands. They are planned within your Design Personalisation Allowance, not within the kitchen subtotal.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Hettich",
+    "Kitchen accessories",
+    "Kitchen accessories you choose, such as wicker baskets, rolling shutters and pantry pull-outs, come from approved brands. They are planned within your Design Personalisation Allowance, not within the kitchen subtotal",
+    "Kitchen accessories, if you choose them",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Nimmi",
+    "Olive",
+    "Samsung Irex"
+   ],
+   "brand_examples": [
+    "Nimmi",
+    "Hettich",
+    "Samsung Irex",
+    "Olive"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Kitchen accessories (wicker baskets, rolling shutters, pantry pull-outs) only as the customer selects them; covered by the Design Personalisation Allowance, not the kitchen subtotal.",
+   "quotation_mapping": "Each accessory chosen appears as its own quotation line, replacing part of the allowance.",
+   "procurement_verification": "Invoice names brand and model.",
+   "execution_verification": "Fitted and operated at installation.",
+   "handover_evidence": "Handover checklist.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "decorative",
+   "customer_wording": "Veneer, glass and decorative finishes: Decorative finishes confirmed in your quotation. Veneer, glass, mirrors, wall panelling, wallpaper, texture paint and cushioned headboards are selected with you during design.",
+   "statements": [
+    "Decorative finishes confirmed in your quotation",
+    "Each item is specified by material and finish in your detailed quotation.",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "No material is promised for these items until your design is final; each one is specified in your detailed quotation.",
+    "Veneer, glass and decorative finishes",
+    "Veneer, glass, mirrors, wall panelling, wallpaper, texture paint and cushioned headboards are selected with you during design"
+   ],
+   "brand_examples": [],
+   "equivalent_rule": "Each item is specified by material and finish in your detailed quotation.",
+   "internal_requirement": "Veneer, glass, mirrors, wall panelling, wallpaper, texture paint and cushioned headboards: no material promised in the estimate; each specified at design.",
+   "quotation_mapping": "Each decorative item is its own quotation line with material, finish and supplier.",
+   "procurement_verification": "Invoice matches the quotation line.",
+   "execution_verification": "Checked against approved drawings.",
+   "handover_evidence": "Handover checklist.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Designer",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "ceiling",
+   "customer_wording": "False ceiling: Gypsum ceiling on steel channels. Gypsum false ceiling on steel channels.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Ceiling channels: Bright 04/06",
+    "False ceiling",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Gypsum board on Bright 04/06 channels",
+    "Gypsum board: Saint-Gobain",
+    "Gypsum ceiling on steel channels",
+    "Gypsum false ceiling on steel channels",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Saint-Gobain"
+   ],
+   "brand_examples": [
+    "Saint-Gobain"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Gypsum board (October 2026 baseline: Saint-Gobain) on Bright 04/06 steel channels.",
+   "quotation_mapping": "False-ceiling lines name board brand and channel series.",
+   "procurement_verification": "Invoice names board and channels.",
+   "execution_verification": "Board and channels checked before boarding; photographs kept.",
+   "handover_evidence": "Handover record.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "lighting",
+   "customer_wording": "Lighting: Approved lighting specification. LED panel, COB, spot and profile lights from approved brands, installed where your design includes them.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Approved lighting specification",
+    "Avion",
+    "COB and spot lights: Wipro",
+    "Crompton",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "LED panel, COB, spot and profile lights from approved brands, installed where your design includes them",
+    "Lighting",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Panel lights: Philips",
+    "Philips",
+    "Profile lights: Crompton or Avion",
+    "Wipro"
+   ],
+   "brand_examples": [
+    "Philips",
+    "Wipro",
+    "Crompton",
+    "Avion"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Panel lights (Philips), COB and spot lights (Wipro), profile lights (Crompton or Avion), or approved equivalents of the same specification.",
+   "quotation_mapping": "Lighting lines name brand, wattage and colour temperature.",
+   "procurement_verification": "Invoice names brand and model.",
+   "execution_verification": "Every fitting tested at installation.",
+   "handover_evidence": "Handover checklist; manufacturer documentation where issued.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "painting",
+   "customer_wording": "Painting, if added: Premium emulsion paint. Premium emulsion paint in one wall colour, over putty and primer when your painting includes full preparation.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Asian Paints",
+    "Birla",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Paint: Asian Paints Premium emulsion, one wall colour",
+    "Painting, if added",
+    "Premium emulsion paint",
+    "Premium emulsion paint in one wall colour, over putty and primer when your painting includes full preparation",
+    "Premium emulsion repaint",
+    "Putty: Birla or Asian"
+   ],
+   "brand_examples": [
+    "Asian Paints",
+    "Birla"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Asian Paints Premium emulsion in one wall colour; Birla or Asian putty and primer where full preparation is included.",
+   "quotation_mapping": "Painting line names system (repaint or full preparation), brand and product.",
+   "procurement_verification": "Invoice names product.",
+   "execution_verification": "Coats and preparation checked by the site supervisor.",
+   "handover_evidence": "Handover checklist.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "code": "electrical",
+   "customer_wording": "Electrical wiring, if added: Branded copper wiring. Branded copper wiring for the electrical work you add.",
+   "statements": [
+    "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+    "Branded copper wiring",
+    "Branded copper wiring for the electrical work you add",
+    "Electrical wiring, if added",
+    "Final material and brand selections are confirmed in your detailed quotation.",
+    "Finolex",
+    "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+    "Polycab",
+    "Wiring: Polycab or Finolex"
+   ],
+   "brand_examples": [
+    "Polycab",
+    "Finolex"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "internal_requirement": "Branded copper wiring (Polycab or Finolex) for the electrical scope the customer adds.",
+   "quotation_mapping": "Electrical line names wiring brand and gauge.",
+   "procurement_verification": "Invoice names brand and gauge.",
+   "execution_verification": "Wiring and circuits tested before closing.",
+   "handover_evidence": "Handover checklist and test record.",
+   "warranty_source": "Manufacturer’s documented terms for the exact product named in the quotation; Veda Spaces workmanship and fitment service per the policy (one year from handover).",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  }
+ ],
+ "page": [
+  {
+   "id": "range_includes",
+   "statement": "Your selected rooms and products",
+   "source": "Engine: room lines are in the range (ADR-012 §3)",
+   "verification": "e2e: build-up reconciles to the range",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "package_text",
+   "statement": "This covers the preparation, protection, material handling, completion and handover activities required to execute the selected project scope professionally.",
+   "source": "ADR-012 package; owner decision T5",
+   "verification": "Quotation shows each component (staff view keeps the breakdown)",
+   "accountable_role": "Designer",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "package_included",
+   "statement": "Included in your estimated range",
+   "source": "Engine: package and allowance are inside the range",
+   "verification": "e2e: build-up reconciliation",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "allowance_text",
+   "statement": "This planning allowance protects your budget for commonly selected design additions. It is not an automatic extra charge. Your detailed quotation replaces it with only the items you approve.",
+   "source": "Owner decision T6",
+   "verification": "Quotation replaces the allowance with approved items only",
+   "accountable_role": "Designer",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "allowance_max",
+   "statement": "The upper amount is not charged automatically.",
+   "source": "Owner decision T6",
+   "verification": "Quotation process",
+   "accountable_role": "Designer",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "allowance_rule",
+   "statement": "The allowance is a share of your room work, so it moves when your room sizes change. Adding measurements does not remove it.",
+   "source": "Engine: allowance = card percentage band of room work",
+   "verification": "Engine unit tests; refinement e2e",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "allowance_replaced",
+   "statement": "In your detailed quotation, the items you actually approve replace it.",
+   "source": "Owner decision T6",
+   "verification": "Quotation process",
+   "accountable_role": "Designer",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "manufacturer",
+   "statement": "Approved materials and hardware carry the applicable manufacturer warranty for the exact product selected and documented in your final quotation.",
+   "source": "Warranty policy; ESSENTIAL-1.1 warranty summary",
+   "verification": "Product named in the quotation; manufacturer documentation at handover",
+   "accountable_role": "Project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "service_support",
+   "statement": "Veda Spaces provides one year of applicable workmanship and fitment service support from handover, subject to the Warranty, Service & Customer Care Policy.",
+   "source": "Warranty policy: one year of free service from the project handover date",
+   "verification": "Staging-build test ties the sentence to the published policy",
+   "accountable_role": "Customer care",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "service_note",
+   "statement": "A longer manufacturer warranty is the manufacturer’s own. It does not extend Veda Spaces workmanship or service support.",
+   "source": "Warranty policy (manufacturer warranties)",
+   "verification": "Policy text",
+   "accountable_role": "Customer care",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "marker_1",
+   "statement": "No contact details required for your first estimate",
+   "source": "Page behaviour",
+   "verification": "e2e checks the behaviour behind the marker",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "marker_2",
+   "statement": "Room-wise estimate shown",
+   "source": "Page behaviour",
+   "verification": "e2e checks the behaviour behind the marker",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "marker_3",
+   "statement": "Material specification available",
+   "source": "Page behaviour",
+   "verification": "e2e checks the behaviour behind the marker",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "marker_4",
+   "statement": "Warranty and exclusions disclosed",
+   "source": "Page behaviour",
+   "verification": "e2e checks the behaviour behind the marker",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "marker_5",
+   "statement": "GST shown separately",
+   "source": "Page behaviour",
+   "verification": "e2e checks the behaviour behind the marker",
+   "accountable_role": "Engineering",
+   "status": "VERIFIED BY TESTS"
+  },
+  {
+   "id": "next_1",
+   "statement": "Personalise and narrow your estimate. No contact details are needed for this.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "next_2",
+   "statement": "Request a designer consultation.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "next_3",
+   "statement": "We complete a physical site measurement.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "next_4",
+   "statement": "You confirm the design, materials and brands.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "next_5",
+   "statement": "You receive your detailed final quotation.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  },
+  {
+   "id": "next_6",
+   "statement": "You approve the scope before any work starts.",
+   "source": "Veda Spaces sales process (ADR-012: call within one working day)",
+   "verification": "Operations: lead workflow",
+   "accountable_role": "Sales; designer; project manager",
+   "status": "PROPOSED: operations to confirm each verification step and owner before activation"
+  }
+ ]
+}
