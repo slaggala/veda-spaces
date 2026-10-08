@@ -88,7 +88,7 @@
 #est-v2 .v2-build { display: grid; grid-template-columns: 1fr auto; gap: .45rem 1rem; margin: 0 0 .8rem; font-size: .92rem; }
 #est-v2 .v2-build dt { color: var(--v2-muted); }
 #est-v2 .v2-build dd { margin: 0; text-align: right; white-space: nowrap; }
-#est-v2 .v2-build dt:last-of-type, #est-v2 .v2-total { border-top: 1px solid var(--ink); padding-top: .4rem; font-weight: 600; color: var(--ink); }
+#est-v2 .v2-build .v2-total { border-top: 1px solid var(--ink); padding-top: .4rem; font-weight: 600; color: var(--ink); }
 #est-v2 .v2-next-steps { display: grid; gap: .6rem; }
 #est-v2 .v2-next-steps .v2-link { justify-self: center; }
 #est-v2 .v2-spec-cat h3 { font-family: var(--sans); font-size: 1rem; margin: 1rem 0 .2rem; }
@@ -106,3 +106,12 @@
 #est-v2 .v2-unit { min-height: 48px; display: inline-flex; align-items: center; color: var(--v2-muted); }
 #est-v2 .v2-measure small { grid-column: 1 / -1; color: var(--v2-muted); font-size: .8rem; }
 #est-v2 .v2-small-range { font-size: 1.6rem; min-height: 2rem; }
+/* Trust finalisation: summary first, explanations second, technical detail on demand. */
+#est-v2 .v2-includes-block ul { margin: .3rem 0; }
+#est-v2 .v2-markers { list-style: none; padding: 0; margin: .8rem 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+#est-v2 .v2-markers li { font-size: .82rem; padding: .25rem .6rem; border: 1px solid var(--v2-line, #d9cfc6); border-radius: 12px; background: #fff; }
+#est-v2 .v2-markers li::before { content: "✓ "; color: #1f4f2a; font-weight: 700; }
+#est-v2 .v2-steps { margin: .4rem 0 1rem; padding-left: 1.3rem; }
+#est-v2 .v2-steps li { margin: .25rem 0; }
+#est-v2 .v2-more h5 { font-family: var(--sans); font-size: .9rem; margin: .8rem 0 .2rem; }
+#est-v2 .v2-block h4 { font-family: var(--sans); font-size: .95rem; margin: .8rem 0 .2rem; }

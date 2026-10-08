@@ -151,6 +151,9 @@ export class VsEstimatePanel extends SessionElement {
         <p class="meta">${e.custom_features_allowance.low_pct}–${e.custom_features_allowance.high_pct}% of room work ${rupees(e.custom_features_allowance.basis_minor ?? 0)}; midpoint ${rupees(e.custom_features_allowance.amount_minor ?? 0)} is in the base. Shown to the customer as its own range; the detailed quotation replaces it with the actual items.</p></section>
       <section><h3 class="eyebrow">Measurements</h3>
         <ul>${d.inputs.selections.map((s, i) => html`<li>${humanize(s.room)} – ${humanize(s.product)}: ${measurementRows(s, this.typicalInputs(s, i)).map((m) => (m.typical ? `${humanize(m.name)} typical` : `${humanize(m.name)} ${m.value} ${m.unit}`)).join(', ') || 'no measurement needed'}</li>`)}</ul></section>
+      ${d.specification ? html`<section><h3 class="eyebrow">What the customer was promised (${d.specification.spec_code})</h3>
+        <ul>${(d.room_details ?? []).map((r) => html`<li>${humanize(r.room)}: ${r.materials?.line ?? 'materials confirmed in the detailed quotation'}</li>`)}</ul>
+        <p class="meta">Carry these into the detailed quotation: each line maps to the specification categories listed in the customer-promise matrix.</p></section>` : nothing}
       <section><h3 class="eyebrow">Assumptions</h3><ul>${e.assumptions.map((a) => html`<li>${a}</li>`)}</ul></section>
       <section><h3 class="eyebrow">Exclusions and client scope</h3><ul>${[...e.exclusions, ...e.client_scope.map((c) => `${c} (client scope)`)].map((x) => html`<li>${x}</li>`)}</ul></section>
       <section><h3 class="eyebrow">Warranty summary</h3><ul>${e.warranty.items.map((w) => html`<li>${w}</li>`)}</ul></section>

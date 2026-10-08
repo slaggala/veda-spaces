@@ -451,6 +451,8 @@ export interface EstimateDetail {
   calculation_version: string;
   /** The customer specification snapshot the estimate was shown with (ADR-012 T9); null before one was active. */
   specification?: { spec_code: string; version: string; sha256: string | null } | null;
+  /** Per room, the material promise the customer was shown (from the snapshot and the priced lines) and the assumed sizes. */
+  room_details?: { room: string; materials: { line: string | null; categories: string[] } | null; assumptions: string[] }[];
   property_type: string;
   home_size: string;
   project_kind: string;

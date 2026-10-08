@@ -95,6 +95,23 @@ test('the committed estimator page is off and holds no rates', () => {
   const v2js = readFileSync(join(SRC, 'assets/estimate-v2.js'), 'utf8');
   assert.ok(!/rate_minor|_minor\s*:\s*\d|innerHTML/.test(v2js), 'UX V2 script: no rate table, no innerHTML');
   assert.ok(!/per sq|per sheet|10 years|30-year/i.test(v2js), 'UX V2 script: no rates or warranty durations in copy');
+  // Phase 5: no material or hardware duration; the one duration is Veda Spaces' own service support, as the policy states.
+  const copy = v2js.replace(/^\s*\/\/.*$/gm, ''); // what customers can see, not the comments
+  assert.ok(!/\d+\s*-?\s*(year|years|yr)s?\b|up to \d/i.test(copy), 'UX V2 script: no numeric warranty duration');
+  assert.deepEqual(copy.match(/[^'.]*\b(one|two|three|five|ten|thirty) years?\b[^'.]*/gi),
+    ['Veda Spaces provides one year of applicable workmanship and fitment service support from handover, subject to the Warranty, Service & Customer Care Policy'],
+    'UX V2 script: the only duration is the Veda Spaces service-support sentence');
+  const policy = readFileSync(join(SRC, 'warranty.html'), 'utf8');
+  assert.ok(/one year of free service from the project handover date for fitment-related or workmanship issues/.test(policy), 'the policy supports the one-year service sentence');
+  assert.ok(!/\b(complimentary|free)\b/i.test(copy), 'UX V2 script: required work is never called free or complimentary');
+  // Phase 12: the customer-promise matrix and the page agree both ways.
+  const matrix = JSON.parse(readFileSync(join(SRC, '../../../docs/implementation/estimator/specifications/essential-1.1-promise-matrix.json'), 'utf8'));
+  for (const row of matrix.page) assert.ok(copy.includes(row.statement), `matrix statement not on the page: ${row.statement}`);
+  const listed = new Set(matrix.page.map((r) => r.statement));
+  const constant = (name) => { const m = copy.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]|'[^']*');`)); assert.ok(m, name); return JSON.parse(m[1].replace(/'/g, '"')); };
+  for (const name of ['PACKAGE_TEXT', 'ALLOWANCE_TEXT', 'ALLOWANCE_NOTES', 'MANUFACTURER_DEFAULT', 'SERVICE_SUPPORT', 'SERVICE_NOTE', 'TRUST_MARKERS', 'NEXT_STEPS']) {
+    for (const statement of [constant(name)].flat()) assert.ok(listed.has(statement), `page promise missing from the matrix: ${statement}`);
+  }
 });
 
 test('the warranty policy page is the same customer-facing page on the live site and the staging site', () => {
