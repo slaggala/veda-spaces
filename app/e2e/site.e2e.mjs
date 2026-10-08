@@ -234,6 +234,25 @@ for (const base of [ON, OFF]) {
   await collectCsp();
 }
 
+// 8. Warranty, Service & Customer Care Policy page (/warranty): readable on a phone, linked from the footer.
+await page.setViewportSize({ width: 360, height: 800 });
+await page.goto(`${OFF}/warranty`);
+const policy = await page.evaluate(() => ({
+  h1: document.querySelector('h1')?.textContent,
+  sections: [...document.querySelectorAll('main h2[id]')].map((h) => h.id),
+  overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  tel: !!document.querySelector('section[aria-labelledby="contact"] a[href="tel:+919515125153"]'),
+}));
+check('warranty page: summary first, then terms, service, exclusions and contact', policy.h1 === 'Warranty, Service & Customer Care Policy' &&
+  policy.sections[0] === 'summary' && ['coverage', 'exclusions', 'service', 'claims', 'contact'].every((id) => policy.sections.includes(id)) && policy.tel,
+  JSON.stringify({ h1: policy.h1, tel: policy.tel, sections: policy.sections.join(',') }));
+check('warranty page: 360 px without horizontal scroll', policy.overflow <= 1, `${policy.overflow}px`);
+await collectCsp();
+await page.setViewportSize({ width: 1280, height: 900 });
+await page.goto(`${OFF}/`);
+check('footer links the warranty policy', (await page.locator('footer a[href="/warranty"]').count()) === 1);
+await collectCsp();
+
 check('no Content-Security-Policy violations under the production policy', csp.length === 0, csp.slice(0, 3).join('; '));
 check('no page errors', errors.length === 0, errors.join('; '));
 await browser.close();
