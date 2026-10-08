@@ -27,11 +27,13 @@ const csp = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 const collectCsp = async () => { csp.push(...(await page.evaluate(() => window.__csp || []))); };
 // axe is loaded through the DevTools protocol (page.evaluate), which the page's CSP does not govern, so the journey
-// itself keeps running under the real production policy (and is checked for violations below).
+// itself keeps running under the real production policy (and is checked for violations below). preload is off because
+// axe would otherwise fetch the cross-origin font stylesheet with XHR, which connect-src rightly blocks; that request is
+// the test's, not the page's.
 async function axe(name) {
   await page.evaluate(AXE);
   const violations = await page.evaluate(async () => {
-    const res = await window.axe.run(document.querySelector('main'), {
+    const res = await window.axe.run(document.querySelector('main'), { preload: false,
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } });
     return res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
   });
