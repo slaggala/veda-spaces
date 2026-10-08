@@ -49,7 +49,9 @@ http.createServer((req, res) => {
     body = Buffer.from(body.toString()
       .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)
       .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
-      .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">'));
+      .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">')
+      .replace('<meta name="veda-estimator-home-sizes" content="">', '<meta name="veda-estimator-home-sizes" content="2BHK,3BHK">')
+      .replace('<meta name="veda-estimator-property-types" content="">', '<meta name="veda-estimator-property-types" content="APARTMENT">'));
   }
   res.setHeader('Content-Type', TYPES[path.extname(file)] || 'application/octet-stream');
   res.end(body);

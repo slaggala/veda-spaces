@@ -7,7 +7,11 @@
 const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.content?.trim() || '';
 const apiBase = meta('veda-estimator') === 'on' && meta('veda-turnstile-sitekey') ? meta('veda-api-base') : '';
 const credentials = meta('veda-api-credentials') === 'include' ? 'include' : 'same-origin';
-const enabledPackages = (meta('veda-estimator-packages') || 'ESSENTIAL').split(',').map((p) => p.trim()).filter(Boolean);
+const listMeta = (name, fallback) => (meta(name) || fallback).split(',').map((p) => p.trim()).filter(Boolean);
+const enabledPackages = listMeta('veda-estimator-packages', 'ESSENTIAL');
+// Only what the active rate card supports is offered (ADR-012 D3); the build sets these, defaulting to 3 BHK apartments.
+const homeSizes = listMeta('veda-estimator-home-sizes', '3BHK');
+const propertyTypes = listMeta('veda-estimator-property-types', 'APARTMENT');
 const $ = (sel) => document.querySelector(sel);
 
 const ROOMS = [
@@ -39,7 +43,7 @@ const PRODUCTS = {
   ELECTRICAL: { label: 'Electrical and lighting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'CARPET', label: 'Carpet area', kind: 'area', hint: 'Carpet area of the home.' }, { name: 'SPOTS', label: 'Spot lights', kind: 'count', hint: 'Number of spot lights.' }], options: [] },
 };
 const UNITS = { length: [['ft', 'ft'], ['in', 'in'], ['m', 'm'], ['cm', 'cm']], area: [['sqft', 'sq ft'], ['sqm', 'sq m']], count: [['nos', 'nos']] };
-const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', 'Design-led, bespoke materials and a dedicated designer.']];
+const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', '']]; // shown only as "Priced after a design consultation" (owner decision)
 // Luxury has no public price (ADR-012 D2): it leads straight to a design consultation.
 const STATE_KEY = 'veda-estimate-v1';
 const state = { step: 1, home: {}, items: [], package: 'ESSENTIAL', estimate: null, enquiryKey: null, luxury: false };
@@ -157,7 +161,7 @@ function renderPreferences() {
     const input = el('input', { type: 'radio', name: 'package', value: code, checked: state.package === code, disabled: !on });
     input.addEventListener('change', packageChanged);
     fs.append(el('label', { class: `choice package${on ? '' : ' unavailable'}` }, input,
-      ` ${label} — ${luxury ? `${description} Priced after a design consultation.` : on ? description : 'pricing coming soon'}`));
+      ` ${label} — ${luxury ? 'Priced after a design consultation' : on ? description : 'pricing coming soon'}`));
   }
   packageChanged();
   const box = $('#est-options');
@@ -290,13 +294,26 @@ function renderResult(e) {
   $('#est-meta').textContent = `Estimate ${e.reference} · rate card ${e.rate_card_version} · valid until ${e.expires_on}.`;
 }
 
+function limitScope() {
+  const select = $('#est-home-size');
+  [...select.options].forEach((o) => { if (!homeSizes.includes(o.value)) o.remove(); });
+  if (!homeSizes.includes(select.value)) select.value = select.options[0]?.value || '';
+  document.querySelectorAll('input[name="property_type"]').forEach((r) => { if (!propertyTypes.includes(r.value)) r.closest('label').remove(); });
+  const radios = document.querySelectorAll('input[name="property_type"]');
+  if (![...radios].some((r) => r.checked) && radios[0]) radios[0].checked = true;
+  const sizes = [...select.options].map((o) => o.textContent).join(', ');
+  const types = [...radios].map((r) => `${r.parentElement.textContent.trim().toLowerCase()}s`).join(' and ');
+  const scope = $('#est-scope');
+  scope.textContent = `Online estimates are available for ${sizes} ${types} for now. For other homes, contact us for a consultation.`;
+  scope.hidden = false;
+}
 function restoreHome() {
   const form = $('#step-1');
   for (const name of ['property_type', 'project_kind']) {
     const radio = form.querySelector(`input[name="${name}"][value="${state.home[name]}"]`);
     if (radio) radio.checked = true;
   }
-  if (state.home.home_size) $('#est-home-size').value = state.home.home_size;
+  if (homeSizes.includes(state.home.home_size)) $('#est-home-size').value = state.home.home_size;
   if (state.home.city) $('#est-city').value = state.home.city;
 }
 function toEnquiry() {
@@ -409,6 +426,7 @@ function init() {
     summary(explain(r.body));
   });
 
+  limitScope();
   restoreHome();
   const valid = state.estimate && state.estimate.expires_on >= new Date().toISOString().slice(0, 10);
   if (state.luxury && state.step === 6) { toEnquiry(); return; }

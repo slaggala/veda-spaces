@@ -386,7 +386,10 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
 1. **API:** set `VEDA_ESTIMATOR_ENABLED=true` (and `VEDA_WARRANTY_POLICY_URL`) through the staging SSM
    configuration: a reviewed Terraform change, then plan, apply and `12-deploy`.
 2. **Site:** in the Pages project `veda-staging-site`, set `STAGING_ESTIMATOR=on` and leave
-   `STAGING_ESTIMATOR_PACKAGES=ESSENTIAL`, then retry the deployment.
+   `STAGING_ESTIMATOR_PACKAGES=ESSENTIAL`, `STAGING_ESTIMATOR_HOME_SIZES=3BHK` and
+   `STAGING_ESTIMATOR_PROPERTY_TYPES=APARTMENT` (the defaults: only what the card supports, ADR-012 D3), then retry
+   the deployment. The full test list is in the
+   [staging validation plan](../implementation/estimator/ESTIMATOR-staging-validation-plan.md).
 3. **Validate:**
    - signed in, open `https://staging.vedaspaces.com/estimate`, choose **3 BHK, Apartment** (the only home size
      the draft card prices; others answer "not available for this home size yet"), create an estimate, then request a

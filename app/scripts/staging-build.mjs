@@ -65,6 +65,8 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
   if (estimator.enabled) {
     est = setMeta(est, 'veda-estimator', 'on');
     est = setMeta(est, 'veda-estimator-packages', estimator.packages.join(','));
+    est = setMeta(est, 'veda-estimator-home-sizes', estimator.homeSizes.join(','));
+    est = setMeta(est, 'veda-estimator-property-types', estimator.propertyTypes.join(','));
   }
   writeFileSync(join(out, 'estimate.html'), est);
   writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
@@ -73,14 +75,26 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
   checkStaging(out);
 }
 
-/** STAGING_ESTIMATOR=on enables the estimator page; STAGING_ESTIMATOR_PACKAGES lists offered packages (default ESSENTIAL). */
+/**
+ * STAGING_ESTIMATOR=on enables the estimator page. The page offers only what the active rate card supports (ADR-012
+ * §11 D1–D3): STAGING_ESTIMATOR_PACKAGES (default ESSENTIAL; Luxury is never priced, it is a consultation),
+ * STAGING_ESTIMATOR_HOME_SIZES (default 3BHK) and STAGING_ESTIMATOR_PROPERTY_TYPES (default APARTMENT).
+ */
 export function estimatorFlags(env) {
-  const packages = (env.STAGING_ESTIMATOR_PACKAGES || 'ESSENTIAL').split(',').map((p) => p.trim()).filter(Boolean);
-  const unknown = packages.filter((p) => !['ESSENTIAL', 'PREMIUM', 'LUXURY'].includes(p));
-  if (unknown.length || !packages.includes('ESSENTIAL')) {
-    throw new Error(`STAGING_ESTIMATOR_PACKAGES must list ESSENTIAL and only known packages (got ${packages.join(',')})`);
+  const list = (value, fallback) => (value || fallback).split(',').map((p) => p.trim()).filter(Boolean);
+  const packages = list(env.STAGING_ESTIMATOR_PACKAGES, 'ESSENTIAL');
+  if (packages.some((p) => !['ESSENTIAL', 'PREMIUM'].includes(p)) || !packages.includes('ESSENTIAL')) {
+    throw new Error(`STAGING_ESTIMATOR_PACKAGES must list ESSENTIAL and optionally PREMIUM (got ${packages.join(',')})`);
   }
-  return { enabled: env.STAGING_ESTIMATOR === 'on', packages };
+  const homeSizes = list(env.STAGING_ESTIMATOR_HOME_SIZES, '3BHK');
+  if (!homeSizes.length || homeSizes.some((h) => !['1BHK', '2BHK', '3BHK', '4BHK', 'CUSTOM'].includes(h))) {
+    throw new Error(`STAGING_ESTIMATOR_HOME_SIZES lists unknown home sizes (got ${homeSizes.join(',')})`);
+  }
+  const propertyTypes = list(env.STAGING_ESTIMATOR_PROPERTY_TYPES, 'APARTMENT');
+  if (!propertyTypes.length || propertyTypes.some((t) => !['APARTMENT', 'VILLA'].includes(t))) {
+    throw new Error(`STAGING_ESTIMATOR_PROPERTY_TYPES lists unknown property types (got ${propertyTypes.join(',')})`);
+  }
+  return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes };
 }
 
 export function buildApp(key) {

@@ -454,3 +454,18 @@ def test_one_public_response_does_not_reveal_an_exact_rate():
     one = engine.calculate(CARD, req(sel("STUDY_UNIT", "STUDY", {"WIDTH": (5.1, "ft")}, STORAGE="NO")))
     shown = one.customer_view()["rooms"][0]["amount_minor"]
     assert shown != one.lines[0].amount_minor and shown % 100_000 == 0
+
+
+def test_only_supported_property_types_are_priced():
+    """D3: a card offers only what has approved data; the synthetic card offers both."""
+    assert CARD.available_property_types() == ("APARTMENT", "VILLA")
+    doc = copy.deepcopy(CARD_DOC)
+    doc["property_types"] = ["APARTMENT"]
+    card = ratecard.parse(doc)
+    with pytest.raises(EstimateError) as err:
+        engine.calculate(card, req(wardrobe(), property_type="VILLA"))
+    assert err.value.errors[0]["code"] == "PROPERTY_TYPE_UNAVAILABLE"
+    assert engine.calculate(card, req(wardrobe())).base_minor > 0
+    doc["property_types"] = []
+    with pytest.raises(ValidationError):
+        ratecard.parse(doc)

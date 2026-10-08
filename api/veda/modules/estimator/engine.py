@@ -333,6 +333,14 @@ def calculate(card: RateCard, request: EstimateRequest) -> Estimate:
         errors.append(
             {"field": "home_size", "code": "HOME_SIZE_UNAVAILABLE", "message": "This home size is not offered yet."}
         )
+    if request.property_type not in card.available_property_types():
+        errors.append(
+            {
+                "field": "property_type",
+                "code": "PROPERTY_TYPE_UNAVAILABLE",
+                "message": "This property type is not offered yet.",
+            }
+        )
     if request.package not in card.enabled_packages():
         errors.append(
             {"field": "package", "code": "PACKAGE_UNAVAILABLE", "message": f"{request.package} is not offered yet."}
