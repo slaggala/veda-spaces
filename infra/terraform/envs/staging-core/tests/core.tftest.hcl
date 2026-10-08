@@ -10,6 +10,7 @@ variables {
   account_manifest_path = "../../bootstrap/tests/fixtures/account.json"
   budget_config_path    = "tests/fixtures/budget.json"
   budget_alert_email    = "owner@example.com"
+  warranty_policy_url   = "https://staging.vedaspaces.com/warranty"
 }
 
 run "root_reads_the_manifest" {
@@ -136,4 +137,39 @@ run "anchor_retention_parameter_is_the_decision" {
     condition     = module.ssm.config_parameter_names == sort([for k in keys(local.app_config) : "/veda/staging/config/${k}"])
     error_message = "every configuration value, the anchor retention included, must be planned under /veda/staging/config/"
   }
+}
+
+# ADR-012 staging validation (decision log 20): the estimator flag and its policy link, staging only.
+run "estimator_enabled_on_staging_with_its_policy_link" {
+  command = plan
+
+  assert {
+    condition     = local.app_config["VEDA_ESTIMATOR_ENABLED"] == "true" && local.app_config["VEDA_WARRANTY_POLICY_URL"] == "https://staging.vedaspaces.com/warranty"
+    error_message = "the staging estimator flag and its warranty policy link must reach SSM together"
+  }
+
+  assert {
+    condition     = contains(module.ssm.config_parameter_names, "/veda/staging/config/VEDA_ESTIMATOR_ENABLED")
+    error_message = "the flag is a staging configuration parameter"
+  }
+}
+
+run "estimator_without_a_policy_link_refused" {
+  command = plan
+
+  variables {
+    warranty_policy_url = ""
+  }
+
+  expect_failures = [output.estimator]
+}
+
+run "estimator_policy_link_must_be_a_vedaspaces_https_page" {
+  command = plan
+
+  variables {
+    warranty_policy_url = "http://example.com/policy"
+  }
+
+  expect_failures = [var.warranty_policy_url]
 }

@@ -434,6 +434,12 @@ def validate_environment(settings: Settings) -> list[str]:
         problems.append("LEAD_RETENTION_ENABLED requires an approved LEAD_RETENTION_DAYS (OWNER-INPUT-002)")
     if settings.estimator_enabled and not settings.estimate_turnstile_required:
         problems.append(f"VEDA_ESTIMATE_TURNSTILE_REQUIRED must stay true in {env} when the estimator is enabled")
+    if settings.estimator_enabled and (
+        not _is_public_https(settings.warranty_policy_url)
+        or "example" in (urlparse(settings.warranty_policy_url).hostname or "")
+    ):
+        # Every estimate links the Warranty, Service & Customer Care Policy: never a broken or placeholder link.
+        problems.append(f"VEDA_WARRANTY_POLICY_URL must be a real https URL in {env} when the estimator is enabled")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:

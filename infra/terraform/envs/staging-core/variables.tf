@@ -50,3 +50,15 @@ variable "platform_config_path" {
   type        = string
   default     = ""
 }
+
+variable "warranty_policy_url" {
+  description = "The Warranty, Service & Customer Care Policy page every Budgetary Estimate links to (ADR-012 D8), reachable on staging behind Cloudflare Access. From the WARRANTY_POLICY_URL variable of the staging-plan environment; required while the estimator is enabled (output \"estimator\")."
+  type        = string
+  default     = ""
+  nullable    = false
+
+  validation {
+    condition     = var.warranty_policy_url == "" || can(regex("^https://[a-z0-9.-]+\\.vedaspaces\\.com/[^[:space:]]*$", var.warranty_policy_url))
+    error_message = "warranty_policy_url must be an https page on a vedaspaces.com host (no placeholder link)."
+  }
+}

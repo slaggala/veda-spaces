@@ -127,7 +127,7 @@ module "runtime_iam" {
 # AUT-107: non-secret configuration and Session Manager preferences. VEDA_ANCHOR_RETENTION_DAYS is the Object Lock
 # retention the application gives each anchor, from the owner decision D6 (anchor_retention, 30 days).
 locals {
-  app_config = {
+  app_config = merge({
     VEDA_ENV                   = "staging"
     VEDA_AWS_REGION            = var.aws_region
     VEDA_LOG_LEVEL             = "INFO"
@@ -156,7 +156,19 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-  }
+    }, local.estimator_config
+  )
+}
+
+locals {
+  # ADR-012 staging validation (decision log 20): the Budgetary Estimate is enabled on staging only, behind
+  # Cloudflare Access. Every estimate links the warranty policy, so the flag goes together with that link
+  # (output "estimator" refuses an enabled estimator without one; the API refuses it in production).
+  estimator_enabled = try(local.platform.ssm.estimator_enabled, false)
+  estimator_config = local.estimator_enabled ? {
+    VEDA_ESTIMATOR_ENABLED   = "true"
+    VEDA_WARRANTY_POLICY_URL = var.warranty_policy_url
+  } : {}
 }
 
 module "ssm" {

@@ -229,3 +229,18 @@ def test_IRA13_siteverify_hostname_must_be_ours():
 def test_public_site_credentials_default_off(monkeypatch, env):
     assert deployed_env(monkeypatch, env).public_site_credentials is False
     assert deployed_env(monkeypatch, "staging", VEDA_PUBLIC_SITE_CREDENTIALS="true").public_site_credentials is True
+
+
+@pytest.mark.parametrize("url", [None, "", "http://staging.vedaspaces.com/warranty", "https://example.com/policy"])
+def test_an_enabled_estimator_needs_a_real_warranty_policy_link(monkeypatch, url):
+    """Staging validation plan, Phase 3: no broken or placeholder warranty link (ADR-012 D8)."""
+    s = deployed_env(monkeypatch, "staging", VEDA_ESTIMATOR_ENABLED="true", VEDA_WARRANTY_POLICY_URL=url)
+    assert any("VEDA_WARRANTY_POLICY_URL" in p for p in config.validate_environment(s))
+
+
+def test_staging_estimator_with_its_policy_link_passes_and_production_still_refuses(monkeypatch):
+    url = "https://staging.vedaspaces.com/warranty"
+    staging = deployed_env(monkeypatch, "staging", VEDA_ESTIMATOR_ENABLED="true", VEDA_WARRANTY_POLICY_URL=url)
+    assert config.validate_environment(staging) == []
+    production = deployed_env(monkeypatch, "production", VEDA_ESTIMATOR_ENABLED="true", VEDA_WARRANTY_POLICY_URL=url)
+    assert "VEDA_ESTIMATOR_ENABLED is not authorised in production yet" in config.validate_environment(production)
