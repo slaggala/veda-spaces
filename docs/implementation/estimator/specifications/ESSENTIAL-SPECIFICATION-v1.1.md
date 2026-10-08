@@ -18,7 +18,7 @@
 
 ## Categories and the priced lines that carry them
 
-A category applies to a room only when the estimate priced one of its lines there. The room card's one-line promise takes one phrase per line group (structure, surface, hardware, ceiling, lighting, paint, electrical): the first applicable category of the group, worded per product when every priced line agrees, otherwise the category summary.
+A category applies to a room only when the estimate priced one of its lines there; every category covers every room, so the priced lines alone decide (pre-activation closure, F1). The room card's one-line promise takes one phrase per line group (structure, surface, hardware, ceiling, lighting, paint, electrical): the first applicable category of the group, worded per product when every priced line agrees, otherwise the category summary.
 
 | Category | Summary (room-line group) | Requirement | Approved examples | Priced lines | Room-line wording |
 |---|---|---|---|---|---|
@@ -65,12 +65,14 @@ A panelled TV unit still has its TV box and side storage, which the card prices 
 | Ceiling and lighting in one category | **False ceiling** and **Lighting** | Separate room-line phrases |
 | Optional electrical and painting in one category | **Painting, if added** and **Electrical wiring, if added** (repaint worded separately) | A repaint has no putty or primer |
 | Warranty summary: the T7 combined sentence | Manufacturer-backed sentence only; Veda Spaces service support is shown separately on the page | Phase 5 separation |
+| Each category limited to listed rooms (carpentry rooms or whole home) | Every category covers every room; the priced lines decide | A ceiling, light or vanity the card prices outside its usual room still gets its promise, and nothing else (F1) |
 | Doors: "Door shutters in branded block board" | "Hinged and sliding shutters in branded block board"; any HDHMR or other engineered-board shutter must be named in the quotation | The policy mentions HDHMR shutters |
 
 Brands, thicknesses and the October 2026 baseline are unchanged; see the v1.0 reconciliation table.
 
 ## Review checklist (sales and owner)
 
+- [ ] The [sales decision package](../ESSENTIAL-1.1-SALES-DECISIONS.md) is decided item by item.
 - [ ] Each room promise above matches what Veda Spaces builds for that item.
 - [ ] Vanity and utility boards: confirm branded plywood is used in these wet areas, or move them to *Approved board structure*.
 - [ ] Shutters: confirm block board for every shutter line, or name the exceptions.

@@ -11,7 +11,7 @@ estimate actually priced there (`applies_to.lines`, as `PRODUCT.LINE` or `PRODUC
 line is never told it has soft-close hardware, and a gypsum ceiling is never called plywood. `room_materials` builds each
 room's one-line promise from the snapshot and the priced lines: one phrase per `line_group` (the first applicable
 category of the group, in specification order), worded per product where `phrases` says so. Specifications without
-line or product applicability (ESSENTIAL-1.0) give no room line.
+line applicability (ESSENTIAL-1.0) give nothing per room: no line and no categories.
 """
 
 from __future__ import annotations
@@ -170,6 +170,7 @@ def customer_view(document: dict) -> dict:
         "equivalent_policy": spec.equivalent_policy,
         "final_selection": spec.final_selection,
         "warranty_summary": spec.warranty_summary,
+        "room_promises": room_promises(spec),
         "categories": [
             {
                 "code": c.code,
@@ -192,16 +193,21 @@ def customer_view(document: dict) -> dict:
 
 
 def _applies(category: Category, room: str, priced: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """The priced (product, line) pairs in `room` that carry this category's promise ([] when it does not apply)."""
+    """The priced (product, line) pairs in `room` that carry this category's promise ([] when it does not apply).
+
+    Only priced lines carry a room promise (pre-activation closure, F1): a category without `applies_to.lines` (every
+    ESSENTIAL-1.0 category) applies to no room, so its package-level wording can never reach a room's details.
+    """
     scope = category.applies_to
-    if room not in scope.rooms:
+    if room not in scope.rooms or not scope.lines:
         return []
-    if scope.lines:
-        refs = set(scope.lines)
-        return [(p, ln) for p, ln in priced if f"{p}.{ln}" in refs or f"{p}.*" in refs]
-    if scope.products:
-        return [(p, ln) for p, ln in priced if p in scope.products]
-    return list(priced)
+    refs = set(scope.lines)
+    return [(p, ln) for p, ln in priced if f"{p}.{ln}" in refs or f"{p}.*" in refs]
+
+
+def room_promises(spec: CustomerSpec) -> bool:
+    """True when every category names the priced lines that carry it, so room details can be shown (V2 needs this)."""
+    return all(c.applies_to.lines for c in spec.categories)
 
 
 def room_materials(document: dict, priced: dict[str, list[tuple[str, str]]]) -> dict[str, dict]:

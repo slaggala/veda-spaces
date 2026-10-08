@@ -14,6 +14,7 @@ from veda.kernel.context import actor, system_context
 from veda.modules.estimator import service
 from veda.modules.estimator.models import (
     BudgetEstimate,
+    BudgetEstimateProjectItem,
     EstimatorCustomerSpec,
     EstimatorCustomerSpecItem,
     EstimatorSpecEvent,
@@ -158,3 +159,128 @@ def test_room_details_without_a_specification_keep_the_assumptions_only(api):
     r = post(api)
     assert r.status == 201 and all(d["materials"] is None for d in r.data["room_details"])
     assert any(d["assumptions"] for d in r.data["room_details"])
+
+
+# --- pre-activation closure: guards, F1 through the API, package components -------------------------------------------
+DOCS = Path(__file__).resolve().parents[3] / "docs/implementation/estimator/specifications"
+ESSENTIAL_10 = json.loads((DOCS / "essential-specification-v1.0.json").read_text())
+ESSENTIAL_11 = json.loads((DOCS / "essential-specification-v1.1.json").read_text())
+MATRIX = json.loads((DOCS / "essential-1.1-promise-matrix.json").read_text())
+
+
+def _confirmed_matrix():
+    m = copy.deepcopy(MATRIX)
+    for r in m["rows"]:
+        r.update(status="OWNER_CONFIRMED", accountable_owner="Named Person (test)")
+    return m
+
+
+def test_a_specification_without_room_promises_needs_ux_v1_confirmed(api):
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        service.load_spec(s, ESSENTIAL_10)
+        with pytest.raises(service.SpecError, match="STAGING_ESTIMATOR_UX=v1"):
+            service.activate_spec(s, "ESSENTIAL-1.0", APPROVAL)
+        service.activate_spec(s, "ESSENTIAL-1.0", APPROVAL, ux_v1_confirmed=True)
+        service.load_spec(s, spec_version(1))
+        service.activate_spec(s, "SYNTHETIC-ESSENTIAL-1.0", APPROVAL)
+        with pytest.raises(service.SpecError, match="STAGING_ESTIMATOR_UX=v1"):
+            service.rollback_spec(s, "ESSENTIAL", APPROVAL)  # back to 1.0: V2 must be switched off first
+        assert service.rollback_spec(s, "ESSENTIAL", APPROVAL, ux_v1_confirmed=True).spec_code == "ESSENTIAL-1.0"
+        with pytest.raises(service.SpecError, match="approval reference"):
+            service.rollback_spec(s, "ESSENTIAL", "short")
+    assert [x["spec"] for x in service_list() if x["status"] == "ACTIVE"] == ["ESSENTIAL-1.0"]
+
+
+def service_list():
+    with db.unit_of_work(write=False) as s:
+        return service.list_specs(s)
+
+
+def test_on_staging_activation_needs_a_confirmed_matrix(api, monkeypatch):
+    monkeypatch.setattr(service, "settings", lambda: type("S", (), {"env": "staging"})())
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        service.load_spec(s, ESSENTIAL_11)
+        with pytest.raises(service.SpecError, match="matrix is required"):
+            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL)
+        with pytest.raises(service.SpecError, match="not ready for activation: spec.structure: BLOCKED"):
+            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=MATRIX)
+        broken = copy.deepcopy(MATRIX)
+        broken["rows"].pop(0)
+        with pytest.raises(service.SpecError, match="matrix: category structure has no row"):
+            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=broken)
+        assert service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=_confirmed_matrix()).status == "ACTIVE"
+    assert [(x["spec"], x["status"]) for x in service_list()] == [("ESSENTIAL-1.1", "ACTIVE")]
+
+
+def test_cli_activation_check_reports_every_guard_and_never_activates(api, tmp_path, capsys):
+    from veda.cli.main import main
+
+    spec_file, matrix_file = tmp_path / "spec.json", tmp_path / "matrix.json"
+    spec_file.write_text(json.dumps(ESSENTIAL_11))
+    matrix_file.write_text(json.dumps(MATRIX))
+    digest = service._sha(ESSENTIAL_11)
+    args = ["estimator", "activation-check", str(spec_file), "--matrix", str(matrix_file)]
+    assert main([*args, "--expect-sha", digest]) == 3
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["ready"] is False and out["sha256"] == digest and any("BLOCKED" in b for b in out["blockers"])
+    assert main([*args, "--expect-sha", "0" * 64]) == 3
+    assert "not the owner-approved digest" in capsys.readouterr().out
+    matrix_file.write_text(json.dumps(_confirmed_matrix()))
+    assert main([*args, "--expect-sha", digest]) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {
+        "spec": "ESSENTIAL-1.1",
+        "sha256": digest,
+        "blockers": [],
+        "active_now": [],
+        "ready": True,
+    }
+    assert service_list() == [], "a check never loads or activates anything"
+
+
+@ON
+def test_essential_10_never_reaches_v2_room_details_through_the_api(api):
+    """F1 regression through the API: with ESSENTIAL-1.0 active, no room carries a category or a line."""
+    load_card()
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        service.load_spec(s, ESSENTIAL_10)
+        service.activate_spec(s, "ESSENTIAL-1.0", APPROVAL, ux_v1_confirmed=True)
+    r = post(api)
+    assert r.status == 201
+    assert r.data["specification"]["room_promises"] is False
+    assert all(d["materials"] == {"line": None, "categories": []} for d in r.data["room_details"])
+
+
+@ON
+@pytest.mark.parametrize("scope", ["kitchen_and_wardrobe", "ceiling_only"])
+def test_package_components_reconcile_priced_visible_and_stored(api, scope):
+    load_card()
+    selections = None
+    if scope == "ceiling_only":
+        selections = [{"room": "WHOLE_HOME", "product": "FALSE_CEILING"}]
+    r = api.post(
+        "/api/v1/public/estimates",
+        body(**({"selections": selections} if selections else {})),
+        anonymous=True,
+        headers={"Origin": SITE},
+    )
+    assert r.status == 201, r
+    visible = r.data["project_preparation"]
+    with actor(system_context("CLI")), db.unit_of_work(write=False) as s:
+        row = s.execute(
+            sa.select(BudgetEstimate).where(BudgetEstimate.public_reference == r.data["reference"])
+        ).scalar_one()
+        priced = service.staff_view(s, row)["estimate"]["project_preparation"]["components"]
+        stored = sorted(
+            (i.component_code, i.amount_minor)
+            for i in s.execute(
+                sa.select(BudgetEstimateProjectItem).where(BudgetEstimateProjectItem.estimate_id == row.id)
+            ).scalars()
+        )
+    assert visible["component_codes"] == [c["code"] for c in priced]
+    assert sorted((c["code"], c["amount_minor"]) for c in priced) == stored, "the stored snapshot is what was priced"
+    assert visible["amount_minor"] == sum(c["amount_minor"] for c in priced)
+    assert visible["inclusions"] == list(dict.fromkeys(c["inclusion"] for c in priced))
+    if scope == "ceiling_only":  # no carpentry: no plywood protection, no pest-control preparation
+        assert not {"PLY_PROTECTION", "PEST_CONTROL"} & set(visible["component_codes"]) and visible["component_codes"]
+    else:
+        assert {"PLY_PROTECTION", "PEST_CONTROL"} <= set(visible["component_codes"])

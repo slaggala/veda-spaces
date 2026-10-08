@@ -181,9 +181,73 @@ def test_every_room_line_phrase_belongs_to_a_category_that_applies_there():
         assert set(v["line"].split(" · ")) <= allowed, room
 
 
-def test_a_specification_without_line_applicability_gives_no_room_line():
-    got = customer_spec.room_materials(ESSENTIAL_10, {"KITCHEN": KITCHEN})
-    assert got["KITCHEN"]["line"] is None and "hardware" in got["KITCHEN"]["categories"]
+def test_a_specification_without_line_applicability_gives_nothing_per_room():
+    """F1 regression: ESSENTIAL-1.0's generic categories never reach a room, neither as a line nor in the details."""
+    got = customer_spec.room_materials(ESSENTIAL_10, {"KITCHEN": KITCHEN, "POOJA": [("POOJA_UNIT", "UNIT")]})
+    assert got == {"KITCHEN": {"line": None, "categories": []}, "POOJA": {"line": None, "categories": []}}
+    assert customer_spec.customer_view(ESSENTIAL_10)["room_promises"] is False
+    assert customer_spec.customer_view(ESSENTIAL)["room_promises"] is True
+
+
+# Every priced line of every product, alone in every room the card allows it in (F1 negative tests).
+SINGLE_LINES = [(room, p["code"], ln["code"]) for p in CARD["products"] for room in p["rooms"] for ln in p["lines"]]
+
+
+@pytest.mark.parametrize("room,product,line", SINGLE_LINES, ids=[f"{r}-{p}.{ln}" for r, p, ln in SINGLE_LINES])
+def test_room_details_show_only_categories_carried_by_the_priced_line(room, product, line):
+    spec = customer_spec.parse(ESSENTIAL)
+    got = customer_spec.room_materials(ESSENTIAL, {room: [(product, line)]})[room]
+    expected = [
+        c.code
+        for c in spec.categories
+        if room in c.applies_to.rooms and ({f"{product}.{line}", f"{product}.*"} & set(c.applies_to.lines))
+    ]
+    assert got["categories"] == expected
+    assert ("soft_close" in got["categories"]) == (
+        line.startswith("SOFT_CLOSE") or (product, line) == ("KITCHEN", "TANDEM")
+    )
+    assert ("lighting" in got["categories"]) == (
+        (product, line) in {("FALSE_CEILING", "PANEL_LIGHTS"), ("ELECTRICAL", "SPOTS")}
+        or product == "CEILING_PROFILE_LIGHTING"
+    )
+    not_plywood = {
+        "FEATURE_WALL",
+        "FALSE_CEILING",
+        "CEILING_PROFILE_LIGHTING",
+        "VENEER_ACCENTS",
+        "POOJA_UNIT",
+        "PAINTING",
+        "ELECTRICAL",
+    }
+    if (
+        product in not_plywood
+        or line in {"FLUTED", "GLASS", "MIRROR", "CUSHION", "HYDRAULIC", "SLIDING", "ARCH", "TANDEM"}
+        or line.startswith("SOFT_CLOSE")
+    ):
+        assert "structure" not in got["categories"] and "plywood" not in (got["line"] or "").lower()
+    assert all(c.code == "decorative" for c in spec.categories if c.code in got["categories"]) or product not in {
+        "FEATURE_WALL",
+        "VENEER_ACCENTS",
+    }
+
+
+def test_a_feature_wall_only_room_gets_no_cabinetry_promise():
+    for finish in ("PANELLING", "WALLPAPER", "TEXTURE"):
+        got = customer_spec.room_materials(ESSENTIAL, {"BEDROOM_2": [("FEATURE_WALL", finish)]})["BEDROOM_2"]
+        assert got == {"line": None, "categories": ["decorative"]}
+
+
+def test_lighting_only_when_lighting_is_priced():
+    plain = customer_spec.room_materials(ESSENTIAL, {"WHOLE_HOME": [("FALSE_CEILING", "GYPSUM")]})["WHOLE_HOME"]
+    assert "lighting" not in plain["categories"] and plain["line"] == "Gypsum ceiling on steel channels"
+
+
+@pytest.mark.parametrize("room,product,line", SINGLE_LINES, ids=[f"{r}-{p}.{ln}" for r, p, ln in SINGLE_LINES])
+def test_essential_10_never_reaches_room_details(room, product, line):
+    assert customer_spec.room_materials(ESSENTIAL_10, {room: [(product, line)]})[room] == {
+        "line": None,
+        "categories": [],
+    }
 
 
 @pytest.mark.parametrize(

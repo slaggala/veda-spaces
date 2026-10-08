@@ -23,7 +23,7 @@ from veda.kernel.context import ActorContext, acting
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.ids import WEB_INTAKE_USER_ID
 
-from . import customer_spec, engine, ratecard
+from . import customer_spec, engine, promise_matrix, ratecard
 from .models import (
     BudgetEstimate,
     BudgetEstimateAssumption,
@@ -262,10 +262,39 @@ def active_spec(s: Session, package: str) -> EstimatorCustomerSpec | None:
     ).scalar_one_or_none()
 
 
+def activation_blockers(document: dict, matrix: dict | None) -> list[str]:
+    """Why a specification may not be activated on a deployed environment (pre-activation closure guards).
+
+    A specification with room promises needs its customer-promise matrix, structurally complete, with every visible
+    promise confirmed by sales, operations or the owner and a named accountable owner. One without room promises
+    (ESSENTIAL-1.0) is handled by `ux_v1_confirmed` instead: V2 must not run on it.
+    """
+    if not customer_spec.room_promises(customer_spec.parse(document)):
+        return []
+    if matrix is None:
+        return ["the customer-promise matrix is required (--matrix)"]
+    try:
+        promise_matrix.validate(document, matrix)
+    except promise_matrix.MatrixError as err:
+        return [f"matrix: {err}"]
+    return promise_matrix.blockers(matrix)
+
+
 def activate_spec(
-    s: Session, spec_code: str, approval_reference: str, actor_id: str | None = None
+    s: Session,
+    spec_code: str,
+    approval_reference: str,
+    actor_id: str | None = None,
+    *,
+    matrix: dict | None = None,
+    ux_v1_confirmed: bool = False,
 ) -> EstimatorCustomerSpec:
-    """Make a DRAFT (or a RETIRED version, for rollback) the one ACTIVE specification of its package."""
+    """Make a DRAFT (or a RETIRED version, for rollback) the one ACTIVE specification of its package.
+
+    Guards: a specification without room promises is activated only with `ux_v1_confirmed` (the operator has set
+    STAGING_ESTIMATOR_UX=v1 first; V2 also withholds every material promise for it). On staging and production a
+    specification with room promises also needs a matrix with no blockers.
+    """
     if len((approval_reference or "").strip()) < 10:
         raise SpecError("activation needs the owner's approval reference (at least 10 characters)")
     row = _spec_by_code(s, spec_code)
@@ -274,6 +303,15 @@ def activate_spec(
     if row.document_sha256 != _sha(row.document):
         raise SpecError(f"{spec_code}: the stored document does not match its SHA-256; refusing")
     validate_spec(row.document)
+    if not customer_spec.room_promises(customer_spec.parse(row.document)) and not ux_v1_confirmed:
+        raise SpecError(
+            f"{spec_code} has no room promises, so UX V2 must not run on it: set STAGING_ESTIMATOR_UX=v1, "
+            "redeploy the staging site, then repeat with --ux-v1-confirmed"
+        )
+    if settings().env in ("staging", "production"):
+        blocked = activation_blockers(row.document, matrix)
+        if blocked:
+            raise SpecError(f"{spec_code} is not ready for activation: {'; '.join(blocked[:5])}")
     now = db.tx_time(s)
     previous = active_spec(s, row.package)
     if previous is not None:
@@ -292,8 +330,11 @@ def activate_spec(
     return row
 
 
-def rollback_spec(s: Session, package: str, approval_reference: str, actor_id: str | None = None):
-    """Re-activate the most recently retired specification of a package."""
+def rollback_spec(
+    s: Session, package: str, approval_reference: str, actor_id: str | None = None, *, ux_v1_confirmed: bool = False
+):
+    """Re-activate the most recently retired specification of a package (its matrix was checked when it was first
+    activated; a target without room promises still needs `ux_v1_confirmed`)."""
     previous = s.execute(
         sa.select(EstimatorCustomerSpec)
         .where(EstimatorCustomerSpec.package == package, EstimatorCustomerSpec.status == "RETIRED")
@@ -302,7 +343,30 @@ def rollback_spec(s: Session, package: str, approval_reference: str, actor_id: s
     ).scalar_one_or_none()
     if previous is None:
         raise SpecError(f"no retired {package} specification to roll back to")
-    return activate_spec(s, previous.spec_code, approval_reference, actor_id)
+    if len((approval_reference or "").strip()) < 10:
+        raise SpecError("rollback needs the owner's approval reference (at least 10 characters)")
+    if previous.document_sha256 != _sha(previous.document):
+        raise SpecError(f"{previous.spec_code}: the stored document does not match its SHA-256; refusing")
+    if not customer_spec.room_promises(customer_spec.parse(previous.document)) and not ux_v1_confirmed:
+        raise SpecError(
+            f"rolling back to {previous.spec_code}, which has no room promises: set STAGING_ESTIMATOR_UX=v1, "
+            "redeploy the staging site, then repeat with --ux-v1-confirmed"
+        )
+    now = db.tx_time(s)
+    current = active_spec(s, package)
+    if current is not None:
+        current.status, current.retired_on = "RETIRED", now
+        _spec_event(s, "SPEC_RETIRED", current, {"spec": current.spec_code, "by": previous.spec_code})
+        s.flush()
+    previous.status, previous.activated_on, previous.retired_on = "ACTIVE", now, None
+    previous.activated_by, previous.approval_reference = actor_id, approval_reference.strip()[:200]
+    _spec_event(
+        s,
+        "SPEC_ROLLED_BACK",
+        previous,
+        {"spec": previous.spec_code, "previous": current.spec_code if current else None},
+    )
+    return previous
 
 
 def list_specs(s: Session) -> list[dict]:
@@ -488,6 +552,10 @@ def public_view(row: BudgetEstimate) -> dict:
     # The stored snapshot is the staff view (exact room amounts); customers see them rounded (review S2).
     view["rooms"] = [dict(r, amount_minor=engine.customer_amount(r["amount_minor"])) for r in row.result["rooms"]]
     view["project_preparation"] = {k: v for k, v in row.result["project_preparation"].items() if k != "components"}
+    # Which components were priced for this scope (codes only, no amounts): V2 lists exactly these.
+    view["project_preparation"]["component_codes"] = [
+        c["code"] for c in row.result["project_preparation"]["components"]
+    ]
     view["custom_features_allowance"] = {
         k: row.result["custom_features_allowance"][k] for k in ("label", "description", "low_minor", "high_minor")
     }
