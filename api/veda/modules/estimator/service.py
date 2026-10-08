@@ -15,7 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import sqlalchemy as sa
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from veda.config import settings
 from veda.kernel import db
@@ -23,7 +23,7 @@ from veda.kernel.context import ActorContext, acting
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.ids import WEB_INTAKE_USER_ID
 
-from . import engine, ratecard
+from . import customer_spec, engine, ratecard
 from .models import (
     BudgetEstimate,
     BudgetEstimateAssumption,
@@ -31,8 +31,11 @@ from .models import (
     BudgetEstimateLine,
     BudgetEstimateProjectItem,
     EstimateEvent,
+    EstimatorCustomerSpec,
+    EstimatorCustomerSpecItem,
     EstimatorRateCard,
     EstimatorRateItem,
+    EstimatorSpecEvent,
 )
 
 CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # pragma: allowlist secret (an alphabet)
@@ -179,6 +182,152 @@ def active_card(s: Session) -> tuple[EstimatorRateCard, ratecard.RateCard]:
     return row, _card_cache[key]
 
 
+# --- customer specifications (ADR-012 T9; operator CLI only, like rate cards) ----------------------------------------
+
+
+class SpecError(ValueError):
+    """A customer specification was refused (validation, state or approval)."""
+
+
+def validate_spec(document: dict) -> customer_spec.CustomerSpec:
+    """Dry run: schema, the no-amounts / no-durations / no-personal-data rules."""
+    try:
+        return customer_spec.parse(document)
+    except ValidationError as err:
+        raise SpecError(f"invalid customer specification: {err.error_count()} problem(s)\n{err}") from err
+
+
+def _spec_event(s: Session, event_type: str, row: EstimatorCustomerSpec, detail: dict | None = None) -> None:
+    s.add(EstimatorSpecEvent(event_type=event_type, customer_spec_id=row.id, detail=detail))
+
+
+def load_spec(s: Session, document: dict) -> EstimatorCustomerSpec:
+    """Store a validated specification as DRAFT. A spec_code is loaded once; a change is a new version."""
+    spec = validate_spec(document)
+    taken = s.execute(
+        sa.select(EstimatorCustomerSpec.id).where(EstimatorCustomerSpec.spec_code == spec.spec_code)
+    ).first()
+    if taken:
+        raise SpecError(f"specification {spec.spec_code} is already loaded; give a changed specification a new version")
+    row = EstimatorCustomerSpec(
+        spec_code=spec.spec_code,
+        spec_version=spec.version,
+        package=spec.package,
+        name=spec.name,
+        summary=spec.summary,
+        status="DRAFT",
+        effective_on=datetime.combine(spec.effective_on, datetime.min.time(), tzinfo=UTC),
+        document=document,
+        document_sha256=_sha(document),
+    )
+    s.add(row)
+    s.flush()
+    for c in spec.categories:
+        s.add(
+            EstimatorCustomerSpecItem(
+                customer_spec_id=row.id,
+                category_code=c.code,
+                label=c.label,
+                summary=c.summary,
+                requirement=c.requirement,
+                grade=c.grade,
+                thickness="; ".join(c.thickness)[:300] or None,
+                finish=c.finish,
+                brand_examples=", ".join(c.brand_examples)[:400] or None,
+                equivalent_rule=c.equivalent_rule,
+                final_selection=c.final_selection,
+                hardware_category=c.hardware_category,
+                warranty_summary=c.warranty_summary,
+                applicability={"rooms": list(c.applies_to.rooms), "products": list(c.applies_to.products)},
+            )
+        )
+    _spec_event(s, "SPEC_LOADED", row, {"spec": spec.spec_code, "sha256": row.document_sha256})
+    return row
+
+
+def _spec_by_code(s: Session, spec_code: str) -> EstimatorCustomerSpec:
+    row = s.execute(
+        sa.select(EstimatorCustomerSpec).where(EstimatorCustomerSpec.spec_code == spec_code)
+    ).scalar_one_or_none()
+    if row is None:
+        raise SpecError(f"no customer specification {spec_code}")
+    return row
+
+
+def active_spec(s: Session, package: str) -> EstimatorCustomerSpec | None:
+    return s.execute(
+        sa.select(EstimatorCustomerSpec).where(
+            EstimatorCustomerSpec.package == package, EstimatorCustomerSpec.status == "ACTIVE"
+        )
+    ).scalar_one_or_none()
+
+
+def activate_spec(
+    s: Session, spec_code: str, approval_reference: str, actor_id: str | None = None
+) -> EstimatorCustomerSpec:
+    """Make a DRAFT (or a RETIRED version, for rollback) the one ACTIVE specification of its package."""
+    if len((approval_reference or "").strip()) < 10:
+        raise SpecError("activation needs the owner's approval reference (at least 10 characters)")
+    row = _spec_by_code(s, spec_code)
+    if row.status == "ACTIVE":
+        raise SpecError(f"{spec_code} is already active")
+    if row.document_sha256 != _sha(row.document):
+        raise SpecError(f"{spec_code}: the stored document does not match its SHA-256; refusing")
+    validate_spec(row.document)
+    now = db.tx_time(s)
+    previous = active_spec(s, row.package)
+    if previous is not None:
+        previous.status, previous.retired_on = "RETIRED", now
+        _spec_event(s, "SPEC_RETIRED", previous, {"spec": previous.spec_code, "by": spec_code})
+        s.flush()
+    rollback = row.status == "RETIRED"
+    row.status, row.activated_on, row.retired_on = "ACTIVE", now, None
+    row.activated_by, row.approval_reference = actor_id, approval_reference.strip()[:200]
+    _spec_event(
+        s,
+        "SPEC_ROLLED_BACK" if rollback else "SPEC_ACTIVATED",
+        row,
+        {"spec": spec_code, "previous": previous.spec_code if previous else None},
+    )
+    return row
+
+
+def rollback_spec(s: Session, package: str, approval_reference: str, actor_id: str | None = None):
+    """Re-activate the most recently retired specification of a package."""
+    previous = s.execute(
+        sa.select(EstimatorCustomerSpec)
+        .where(EstimatorCustomerSpec.package == package, EstimatorCustomerSpec.status == "RETIRED")
+        .order_by(EstimatorCustomerSpec.retired_on.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if previous is None:
+        raise SpecError(f"no retired {package} specification to roll back to")
+    return activate_spec(s, previous.spec_code, approval_reference, actor_id)
+
+
+def list_specs(s: Session) -> list[dict]:
+    rows = s.execute(sa.select(EstimatorCustomerSpec).order_by(EstimatorCustomerSpec.created_on)).scalars()
+    return [
+        {
+            "spec": r.spec_code,
+            "package": r.package,
+            "status": r.status,
+            "effective_on": r.effective_on.date().isoformat(),
+            "sha256": r.document_sha256,
+            "activated_on": r.activated_on.isoformat() if r.activated_on else None,
+        }
+        for r in rows
+    ]
+
+
+def _snapshot_spec(s: Session, row: BudgetEstimate) -> dict | None:
+    """The specification an estimate showed (frozen at creation), as the customer sees it."""
+    if not row.customer_spec_id:
+        return None
+    spec = s.get(EstimatorCustomerSpec, row.customer_spec_id)
+    return customer_spec.customer_view(spec.document) if spec is not None else None
+
+
 # --- estimates -------------------------------------------------------------------------------------------------------
 
 
@@ -247,6 +396,9 @@ def store(
         project_type_code=est.project_type_code,
         expires_on=now + timedelta(days=est.validity_days),
     )
+    spec = active_spec(s, est.package)  # T9: the specification shown is frozen with the estimate
+    if spec is not None:
+        row.customer_spec_id, row.customer_spec_sha256 = spec.id, spec.document_sha256
     s.add(row)
     s.flush()
     for i, line in enumerate(est.lines, start=1):
@@ -314,6 +466,8 @@ def public_view(row: BudgetEstimate) -> dict:
     view["warranty"] = dict(row.result["warranty"], policy_url=settings().warranty_policy_url or None)
     view["reference"] = row.public_reference
     view["expires_on"] = row.expires_on.date().isoformat()
+    session = object_session(row)
+    view["specification"] = _snapshot_spec(session, row) if session is not None else None
     return view
 
 
@@ -506,6 +660,16 @@ def staff_view(s: Session, row: BudgetEstimate, lead=None) -> dict:
             row.result, warranty=dict(row.result["warranty"], policy_url=settings().warranty_policy_url or None)
         ),
         "site_measurement_required": row.site_measurement_required,
+        "specification": (
+            {
+                "spec_code": spec_row.spec_code,
+                "version": spec_row.spec_version,
+                "sha256": row.customer_spec_sha256,
+                "document": customer_spec.customer_view(spec_row.document),
+            }
+            if (spec_row := (s.get(EstimatorCustomerSpec, row.customer_spec_id) if row.customer_spec_id else None))
+            else None
+        ),
         "lead": {"id": lead.id, "lead_number": lead.lead_number, "status": lead.status} if lead is not None else None,
         "preferred_contact": link_row.preferred_contact if link_row else None,
         "events": [

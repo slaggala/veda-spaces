@@ -1,0 +1,136 @@
+{
+ "schema": "veda.estimator.customer-spec/1",
+ "spec_code": "SYNTHETIC-ESSENTIAL-1.0",
+ "version": "1.0",
+ "package": "ESSENTIAL",
+ "name": "Synthetic Essential Specification",
+ "summary": "SYNTHETIC test specification. Not the Veda Spaces specification.",
+ "effective_on": "2026-10-01",
+ "equivalent_policy": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+ "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+ "warranty_summary": "Material and hardware warranties depend on the selected manufacturer, product and documented warranty terms. Applicable workmanship and fitment service is provided according to the Veda Spaces Warranty, Service & Customer Care Policy.",
+ "categories": [
+  {
+   "code": "structure",
+   "label": "Cabinet structure",
+   "summary": "Test plywood structure",
+   "requirement": "Cabinet bodies in test plywood",
+   "grade": null,
+   "thickness": [
+    "18 mm cabinet bodies"
+   ],
+   "finish": null,
+   "brand_examples": [
+    "Brand A"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+   "hardware_category": null,
+   "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+   "applies_to": {
+    "rooms": [
+     "KITCHEN",
+     "UTILITY",
+     "LIVING",
+     "DINING",
+     "MASTER_BEDROOM",
+     "BEDROOM_2",
+     "BEDROOM_3",
+     "BEDROOM_4",
+     "KIDS_ROOM",
+     "STUDY",
+     "POOJA"
+    ],
+    "products": []
+   },
+   "details": []
+  },
+  {
+   "code": "surface",
+   "label": "Surface finish",
+   "summary": "Test laminate finish",
+   "requirement": "Laminate on visible surfaces",
+   "grade": null,
+   "thickness": [],
+   "finish": null,
+   "brand_examples": [
+    "Brand B"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+   "hardware_category": null,
+   "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+   "applies_to": {
+    "rooms": [
+     "KITCHEN",
+     "UTILITY",
+     "LIVING",
+     "DINING",
+     "MASTER_BEDROOM",
+     "BEDROOM_2",
+     "BEDROOM_3",
+     "BEDROOM_4",
+     "KIDS_ROOM",
+     "STUDY",
+     "POOJA"
+    ],
+    "products": []
+   },
+   "details": []
+  },
+  {
+   "code": "hardware",
+   "label": "Hardware",
+   "summary": "Test soft-close hardware",
+   "requirement": "Soft-close hinges",
+   "grade": null,
+   "thickness": [],
+   "finish": null,
+   "brand_examples": [
+    "Brand C"
+   ],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+   "hardware_category": "Hinges",
+   "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+   "applies_to": {
+    "rooms": [
+     "KITCHEN",
+     "UTILITY",
+     "LIVING",
+     "DINING",
+     "MASTER_BEDROOM",
+     "BEDROOM_2",
+     "BEDROOM_3",
+     "BEDROOM_4",
+     "KIDS_ROOM",
+     "STUDY",
+     "POOJA"
+    ],
+    "products": []
+   },
+   "details": []
+  },
+  {
+   "code": "ceiling",
+   "label": "Ceiling and lighting",
+   "summary": "Test gypsum ceiling",
+   "requirement": "Gypsum ceiling",
+   "grade": null,
+   "thickness": [],
+   "finish": null,
+   "brand_examples": [],
+   "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+   "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+   "hardware_category": null,
+   "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+   "applies_to": {
+    "rooms": [
+     "WHOLE_HOME"
+    ],
+    "products": []
+   },
+   "details": []
+  }
+ ]
+}

@@ -38,6 +38,7 @@ EVENT_TYPES = (
     "QUOTATION_PROCESS_STARTED",
     "ESTIMATE_EXPIRED",
 )
+SPEC_EVENT_TYPES = ("SPEC_LOADED", "SPEC_ACTIVATED", "SPEC_RETIRED", "SPEC_ROLLED_BACK")
 _ACTIVE_LIVE = "status = 'ACTIVE' AND is_deleted = 0"
 
 
@@ -131,6 +132,12 @@ class BudgetEstimate(AuditedBase):
     range_low_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     range_high_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     preparation_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    # The customer specification shown with this estimate (ADR-012 T9), frozen at creation: later specification
+    # versions never change it. Null when no specification was active (added by 0102).
+    customer_spec_id: Mapped[str | None] = mapped_column(
+        GUID(), ForeignKey("estimator_customer_spec.id", ondelete="RESTRICT")
+    )
+    customer_spec_sha256: Mapped[str | None] = mapped_column(sa.String(64))
     # Custom Features Allowance (D9): the midpoint is part of base_minor; the band is part of the range.
     allowance_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     allowance_low_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
@@ -274,4 +281,91 @@ class EstimateEvent(AuditedBase):
         CheckConstraint("estimate_id IS NOT NULL OR rate_card_id IS NOT NULL", name="ck_estimate_event__subject"),
         Index("ix_estimate_event__estimate", "estimate_id", "created_on", **live_where()),
         Index("ix_estimate_event__card", "rate_card_id", "created_on", **live_where()),
+    )
+
+
+# --- customer specification master (ADR-012 T9) ---------------------------------------------------------------------
+
+
+class EstimatorCustomerSpec(AuditedBase):
+    """A versioned customer-facing material specification for one package (no rates, no costs). The validated
+    document is kept whole and never edited: a change is a new version, so estimates keep what they were shown."""
+
+    __tablename__ = "estimator_customer_spec"
+
+    spec_code: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    spec_version: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    package: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    name: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    summary: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="DRAFT", server_default="DRAFT")
+    effective_on: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    document: Mapped[dict] = mapped_column(JSONType(), nullable=False)
+    document_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    approval_reference: Mapped[str | None] = mapped_column(sa.String(200))
+    activated_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    activated_by: Mapped[str | None] = mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"))
+    retired_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        in_check("estimator_customer_spec", "status", CARD_STATUSES),
+        in_check("estimator_customer_spec", "package", PACKAGES),
+        CheckConstraint("length(document_sha256) = 64", name="ck_estimator_customer_spec__sha_len"),
+        Index("ux_estimator_customer_spec__spec_code", "spec_code", unique=True, **live_where()),
+        Index(
+            "ux_estimator_customer_spec__one_active",
+            "package",
+            unique=True,
+            **where(_ACTIVE_LIVE, "status = 'ACTIVE' AND is_deleted = false"),
+        ),
+    )
+
+
+class EstimatorCustomerSpecItem(AuditedBase):
+    """One material category of a customer specification, flattened for staff review."""
+
+    __tablename__ = "estimator_customer_spec_item"
+
+    customer_spec_id: Mapped[str] = mapped_column(
+        GUID(), ForeignKey("estimator_customer_spec.id", ondelete="RESTRICT"), nullable=False
+    )
+    category_code: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    label: Mapped[str] = mapped_column(sa.String(80), nullable=False)
+    summary: Mapped[str] = mapped_column(sa.String(160), nullable=False)
+    requirement: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    grade: Mapped[str | None] = mapped_column(sa.String(160))
+    thickness: Mapped[str | None] = mapped_column(sa.String(300))
+    finish: Mapped[str | None] = mapped_column(sa.String(160))
+    brand_examples: Mapped[str | None] = mapped_column(sa.String(400))
+    equivalent_rule: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    final_selection: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    hardware_category: Mapped[str | None] = mapped_column(sa.String(80))
+    warranty_summary: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    applicability: Mapped[dict] = mapped_column(JSONType(), nullable=False)  # rooms and products it applies to
+
+    __table_args__ = (
+        Index(
+            "ux_estimator_customer_spec_item__spec_category",
+            "customer_spec_id",
+            "category_code",
+            unique=True,
+            **live_where(),
+        ),
+    )
+
+
+class EstimatorSpecEvent(AuditedBase):
+    """What happened to a customer specification, and who did it (`created_by`)."""
+
+    __tablename__ = "estimator_spec_event"
+
+    event_type: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    customer_spec_id: Mapped[str] = mapped_column(
+        GUID(), ForeignKey("estimator_customer_spec.id", ondelete="RESTRICT"), nullable=False
+    )
+    detail: Mapped[dict | None] = mapped_column(JSONType())
+
+    __table_args__ = (
+        in_check("estimator_spec_event", "event_type", SPEC_EVENT_TYPES),
+        Index("ix_estimator_spec_event__spec", "customer_spec_id", "created_on", **live_where()),
     )
