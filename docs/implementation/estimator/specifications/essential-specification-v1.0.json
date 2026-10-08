@@ -1,0 +1,344 @@
+{
+  "schema": "veda.estimator.customer-spec/1",
+  "spec_code": "ESSENTIAL-1.0",
+  "version": "1.0",
+  "package": "ESSENTIAL",
+  "name": "Essential Specification",
+  "summary": "Branded plywood interiors with laminate finishes and soft-close hardware, made and installed by Veda Spaces.",
+  "effective_on": "2026-10-08",
+  "equivalent_policy": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+  "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+  "warranty_summary": "Material and hardware warranties depend on the selected manufacturer, product and documented warranty terms. Applicable workmanship and fitment service is provided according to the Veda Spaces Warranty, Service & Customer Care Policy.",
+  "categories": [
+    {
+      "code": "structure",
+      "label": "Cabinet structure",
+      "summary": "Branded plywood structure",
+      "requirement": "Cabinet bodies in branded plywood",
+      "grade": "Plywood of the approved grade",
+      "thickness": [
+        "18 mm cabinet bodies",
+        "9 mm back panels",
+        "12 mm behind the TV"
+      ],
+      "finish": null,
+      "brand_examples": [
+        "Sylvan Blu"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": [
+        "Cabinet bodies, back panels and TV backgrounds in branded plywood",
+        "Approved example: Sylvan Blu, or an approved equivalent of the same grade"
+      ]
+    },
+    {
+      "code": "doors",
+      "label": "Doors and shutters",
+      "summary": "Branded block-board doors",
+      "requirement": "Door shutters in branded block board",
+      "grade": "Block board of the approved grade",
+      "thickness": [
+        "18 to 19 mm shutters"
+      ],
+      "finish": null,
+      "brand_examples": [
+        "Sylvan Primo Plus"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": [
+        "Approved example: Sylvan Primo Plus, or an approved equivalent of the same grade"
+      ]
+    },
+    {
+      "code": "surface",
+      "label": "Surface finish",
+      "summary": "Laminate finish",
+      "requirement": "Laminate on every visible surface, in colours you choose from the approved range",
+      "grade": null,
+      "thickness": [
+        "1.0 mm outer laminate",
+        "0.8 mm inner laminate"
+      ],
+      "finish": "Outer: your choice from the approved range; inner: a standard colour selected by Veda Spaces",
+      "brand_examples": [
+        "Merino",
+        "Century",
+        "Greenlam",
+        "Royal Touch",
+        "Stylam",
+        "Plain Art",
+        "Dazzle Berry",
+        "Airolam"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": [
+        "Outer laminate in your chosen colours",
+        "Inner laminate in a standard colour"
+      ]
+    },
+    {
+      "code": "edges",
+      "label": "Edges",
+      "summary": "Sealed edges",
+      "requirement": "Edge banding on every exposed edge",
+      "grade": null,
+      "thickness": [
+        "2 mm outer edge banding",
+        "0.8 mm inner edge banding"
+      ],
+      "finish": null,
+      "brand_examples": [
+        "Solid Edge",
+        "E3",
+        "URO",
+        "Red Star"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": []
+    },
+    {
+      "code": "hardware",
+      "label": "Hardware",
+      "summary": "Soft-close hardware",
+      "requirement": "Soft-close hinges and kitchen drawers, with branded channels for drawers, sliding and folding doors",
+      "grade": null,
+      "thickness": [],
+      "finish": null,
+      "brand_examples": [
+        "Hettich",
+        "Blum",
+        "Nimmi",
+        "Ebco"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": "Hinges, drawer systems and channels",
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": [
+        "Hinges: Hettich",
+        "Kitchen drawer systems: Hettich",
+        "Drawer channels: Blum",
+        "Sliding-door channels: Nimmi or Hettich",
+        "Folding-door channels: Ebco or Hettich"
+      ]
+    },
+    {
+      "code": "handles",
+      "label": "Handles",
+      "summary": "Standard handles",
+      "requirement": "Handles chosen by you from the standard range",
+      "grade": "Lengths of 1 ft, 1.5 ft or 2 ft",
+      "thickness": [],
+      "finish": null,
+      "brand_examples": [],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA"
+        ],
+        "products": []
+      },
+      "details": []
+    },
+    {
+      "code": "accessories",
+      "label": "Kitchen accessories",
+      "summary": "Kitchen accessories",
+      "requirement": "Wicker baskets, rolling shutters and pantry pull-outs where your kitchen design includes them",
+      "grade": null,
+      "thickness": [],
+      "finish": null,
+      "brand_examples": [
+        "Nimmi",
+        "Hettich",
+        "Samsung Irex",
+        "Olive"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": "Kitchen accessories",
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "KITCHEN"
+        ],
+        "products": []
+      },
+      "details": []
+    },
+    {
+      "code": "ceiling",
+      "label": "Ceiling and lighting",
+      "summary": "Gypsum ceiling, LED lights",
+      "requirement": "Gypsum false ceiling on steel channels, with LED panel, COB, spot and profile lights installed",
+      "grade": "Gypsum board on Bright 04/06 channels",
+      "thickness": [],
+      "finish": null,
+      "brand_examples": [
+        "Saint-Gobain",
+        "Philips",
+        "Wipro",
+        "Crompton",
+        "Avion"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "WHOLE_HOME"
+        ],
+        "products": [
+          "FALSE_CEILING",
+          "CEILING_PROFILE_LIGHTING"
+        ]
+      },
+      "details": [
+        "Gypsum board: Saint-Gobain",
+        "Ceiling channels: Bright 04/06",
+        "Panel lights: Philips",
+        "COB and spot lights: Wipro",
+        "Profile lights: Crompton or Avion"
+      ]
+    },
+    {
+      "code": "optional",
+      "label": "Optional electrical and painting",
+      "summary": "Branded wiring and paint, if added",
+      "requirement": "If you add them: branded copper wiring, and premium emulsion paint over putty in one wall colour",
+      "grade": null,
+      "thickness": [],
+      "finish": null,
+      "brand_examples": [
+        "Polycab",
+        "Finolex",
+        "Asian Paints",
+        "Birla"
+      ],
+      "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
+      "final_selection": "Final material and brand selections are confirmed in your detailed quotation.",
+      "hardware_category": null,
+      "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
+      "applies_to": {
+        "rooms": [
+          "WHOLE_HOME"
+        ],
+        "products": [
+          "PAINTING",
+          "ELECTRICAL"
+        ]
+      },
+      "details": [
+        "Wiring: Polycab or Finolex",
+        "Putty: Birla or Asian",
+        "Paint: Asian Paints Premium emulsion, one wall colour"
+      ]
+    }
+  ]
+}
