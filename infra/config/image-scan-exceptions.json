@@ -20,23 +20,6 @@
     },
     {
       "environment": "staging",
-      "vulnerability": "CVE-2026-102010",
-      "package": "gcc-14",
-      "version": "14.2.0-19",
-      "severity": "HIGH",
-      "reason": "libstdc++ use-after-free in erase_if on a binary-heap priority queue. Unfixed in Debian; rated no-dsa (minor issue) for trixie. Not reachable: nothing in the image calls erase_if on a priority queue with request input.",
-      "compensating_controls": [
-        "the container runs as the unprivileged veda user (uid 10001) with no added capabilities",
-        "no inbound path: the security group has no ingress rule; browser traffic arrives only through the Cloudflare tunnel (AUT-201)",
-        "every other HIGH or CRITICAL finding still blocks the deploy; a different package version is not covered",
-        "staging holds no production data; production has no exceptions"
-      ],
-      "approved_on": "2026-10-06",
-      "expires": "2026-12-31",
-      "tracking": "https://security-tracker.debian.org/tracker/CVE-2026-102010: remove when trixie ships a fixed gcc-14"
-    },
-    {
-      "environment": "staging",
       "vulnerability": "CVE-2026-85091",
       "package": "zlib",
       "version": "1.3.dfsg+really1.3.1-1",
