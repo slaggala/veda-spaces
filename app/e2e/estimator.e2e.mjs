@@ -65,6 +65,16 @@ await page.click('#step-1 button[type="submit"]');
 await page.check('input[value="MASTER_BEDROOM:WARDROBE"]');
 await page.check('input[value="KITCHEN:KITCHEN"]');
 await axe('step 2 (rooms)');
+// One per home: profile lighting only under Whole home; a pooja unit in two rooms is stopped at this step.
+check('profile lighting offered for the whole home only', (await page.locator('input[value$=":CEILING_PROFILE_LIGHTING"]').count()) === 1 &&
+  (await page.locator('input[value="WHOLE_HOME:CEILING_PROFILE_LIGHTING"]').count()) === 1);
+await page.check('input[value="POOJA:POOJA_UNIT"]');
+await page.check('input[value="DINING:POOJA_UNIT"]');
+await page.click('#step-2 button[type="submit"]');
+check('a one-per-home item in two rooms is stopped at the rooms step', /Pooja unit: choose it in one room only/.test(await page.textContent('#est-summary')) &&
+  await visible('#step-2'));
+await page.uncheck('input[value="POOJA:POOJA_UNIT"]');
+await page.uncheck('input[value="DINING:POOJA_UNIT"]');
 await page.click('#step-2 button[type="submit"]');
 check('step 3 lists a measurement per input', (await page.locator('[data-role="value"]').count()) >= 4);
 // Unticking "typical" without a value is refused with a focused summary.
