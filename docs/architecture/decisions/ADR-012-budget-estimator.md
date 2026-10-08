@@ -257,3 +257,14 @@ the implementation; earlier sections are read in their light.
 
 **Rules version:** `2026.10.2` (the allowance, hardware lines, up to 40 selections).
 
+**Confirmed for sign-off** (owner, 2026-10-08, decision log 19):
+- **D1:** Premium stays disabled until it is validated against real Premium quotations.
+- **D2:** Luxury stays consultation-only, with no public estimate. The public endpoint refuses it whatever the card
+  says.
+- **D3:** use the existing 3 BHK medians and **do not expose unsupported sizes**. The rate card declares its property
+  types, and the engine refuses home sizes without approved preparation amounts. The staging page offers only the
+  configured sizes and types (default 3 BHK apartments).
+- **D5:** soft-close stays in product pricing as implemented (kitchen, wardrobe, TV unit). This answers review item P4.
+- **D4, D6, D7 (30-day validity, 90-day retention), D8 and D9:** approved as implemented.
+- **Status:** public intake and public use of the estimator stay disabled.
+

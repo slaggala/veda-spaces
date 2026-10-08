@@ -51,6 +51,13 @@ await page.goto(`${ON}/estimate?visit=1`);
 await page.evaluate(() => sessionStorage.clear());
 await page.goto(`${ON}/estimate?visit=2`);
 check('on: wizard shown', await visible('#step-1'));
+const offered = await page.evaluate(() => ({
+  sizes: [...document.querySelectorAll('#est-home-size option')].map((o) => o.value),
+  types: [...document.querySelectorAll('input[name="property_type"]')].map((r) => r.value),
+  scope: document.getElementById('est-scope').textContent,
+}));
+check('D3: only the supported home sizes and property types are offered', offered.sizes.join() === '2BHK,3BHK' &&
+  offered.types.join() === 'APARTMENT' && /2 BHK, 3 BHK apartments/.test(offered.scope), JSON.stringify(offered));
 await axe('step 1 (home)');
 await page.selectOption('#est-home-size', '2BHK');
 await page.fill('#est-city', 'Kondapur, Hyderabad');

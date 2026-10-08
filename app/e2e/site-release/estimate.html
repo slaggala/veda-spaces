@@ -10,6 +10,8 @@
   <!-- Budgetary Estimate (ADR-012). Off unless veda-estimator is "on" and the intake metas are set (staging build). -->
   <meta name="veda-estimator" content="">
   <meta name="veda-estimator-packages" content="">
+  <meta name="veda-estimator-home-sizes" content="">
+  <meta name="veda-estimator-property-types" content="">
   <meta name="veda-api-base" content="">
   <meta name="veda-turnstile-sitekey" content="">
   <meta name="veda-api-credentials" content="">
@@ -61,6 +63,7 @@
             <option value="4BHK">4 BHK</option><option value="CUSTOM">Custom</option>
           </select>
         </label>
+        <p class="hint" id="est-scope" hidden></p>
         <label for="est-city">City or project location <span class="opt">(optional)</span>
           <input id="est-city" name="city" maxlength="60" autocomplete="address-level2" placeholder="e.g. Kondapur, Hyderabad">
         </label>

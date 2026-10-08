@@ -221,6 +221,8 @@ class RateCard(_Model):
     effective_on: date
     currency: Literal["INR"]
     packages: dict[str, bool]
+    # The property types this card prices (ADR-012 D3: only what has approved data is offered).
+    property_types: tuple[Literal["APARTMENT", "VILLA"], ...] = Field(default=("APARTMENT", "VILLA"), min_length=1)
     gst_pct: Pct
     validity_days: int = Field(ge=1, le=90)
     ranges: Ranges
@@ -275,6 +277,9 @@ class RateCard(_Model):
 
     def enabled_packages(self) -> tuple[str, ...]:
         return tuple(p for p in PACKAGES if self.packages[p])
+
+    def available_property_types(self) -> tuple[str, ...]:
+        return tuple(t for t in PROPERTY_TYPES if t in self.property_types)
 
     def available_home_sizes(self) -> tuple[str, ...]:
         """Home sizes every preparation component has an approved amount for."""

@@ -70,13 +70,18 @@ test('the estimator page is off unless STAGING_ESTIMATOR=on, and Essential-only 
   const onHtml = readFileSync(join(on, 'estimate.html'), 'utf8');
   assert.match(onHtml, /<meta name="veda-estimator" content="on">/);
   assert.match(onHtml, /<meta name="veda-estimator-packages" content="ESSENTIAL">/);
+  assert.match(onHtml, /<meta name="veda-estimator-home-sizes" content="3BHK">/, 'D3: only supported sizes');
+  assert.match(onHtml, /<meta name="veda-estimator-property-types" content="APARTMENT">/);
   assert.ok(!onHtml.includes(PRODUCTION_API));
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PACKAGES: 'LUXURY' }), /must list ESSENTIAL/);
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PACKAGES: 'ESSENTIAL,LUXURY' }), /optionally PREMIUM/, 'D2');
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_HOME_SIZES: '5BHK' }), /unknown home sizes/);
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PROPERTY_TYPES: 'OFFICE' }), /unknown property types/);
 });
 
 test('the committed estimator page is off and holds no rates', () => {
   const html = readFileSync(join(SRC, 'estimate.html'), 'utf8');
-  for (const name of ['veda-estimator', 'veda-estimator-packages', 'veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
+  for (const name of ['veda-estimator', 'veda-estimator-packages', 'veda-estimator-home-sizes', 'veda-estimator-property-types', 'veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
     assert.ok(html.includes(`<meta name="${name}" content="">`), name);
   }
   const js = readFileSync(join(SRC, 'assets/estimate.js'), 'utf8');
