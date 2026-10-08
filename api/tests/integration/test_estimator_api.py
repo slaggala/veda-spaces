@@ -129,6 +129,10 @@ def test_public_estimate_is_customer_safe(api):
     assert not leaked, leaked
     assert data["project_preparation"]["label"] == "Project Preparation & Protection Package"
     assert data["range"]["low_minor"] < data["range"]["high_minor"] and data["gst"]["pct"] == 18
+    assert data["rooms"] and all(r["amount_minor"] % 100_000 == 0 for r in data["rooms"]), "rounded to ₹1,000 (S2)"
+    stored = rows(sa.select(BudgetEstimate).where(BudgetEstimate.public_reference == data["reference"]))[0]
+    exact = {r["room"]: r["amount_minor"] for r in stored.result["rooms"]}
+    assert all(abs(r["amount_minor"] - exact[r["room"]]) <= 50_000 for r in data["rooms"]), "staff keep exact amounts"
     allowance = data["custom_features_allowance"]
     assert set(allowance) == {"label", "description", "low_minor", "high_minor"}, "no percentage or basis"
     assert allowance["label"] == "Custom Features Allowance" and 0 < allowance["low_minor"] < allowance["high_minor"]
