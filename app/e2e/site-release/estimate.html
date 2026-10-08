@@ -112,7 +112,7 @@
       </section>
 
       <form class="est-step contact-form" id="step-6" data-step="6" novalidate hidden>
-        <h2 class="full" tabindex="-1">Get my detailed quotation</h2>
+        <h2 class="full" tabindex="-1" id="eq-heading">Get my detailed quotation</h2>
         <p class="hint full" id="eq-intro">Our designer will review your estimate with you, arrange a site measurement and prepare your detailed quotation.</p>
         <label for="eq-name">Full Name <span class="req">Required</span><input id="eq-name" name="name" required aria-required="true" autocomplete="name" maxlength="150" aria-describedby="eq-name-err"><span class="field-error" id="eq-name-err"></span></label>
         <label for="eq-phone">Phone Number <span class="req">Required</span><input id="eq-phone" name="phone" required aria-required="true" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+91" aria-describedby="eq-phone-err"><span class="field-error" id="eq-phone-err"></span></label>
@@ -126,8 +126,8 @@
       </form>
 
       <section class="est-step form-panel" id="step-7" data-step="7" hidden role="status" tabindex="-1">
-        <h2>Thank you.</h2>
-        <p>Your reference is <strong id="eq-reference"></strong>. Our design team will call you within one working day to discuss your estimate and arrange a site measurement.</p>
+        <h2 tabindex="-1">Thank you.</h2>
+        <p>Your reference is <strong id="eq-reference"></strong>. <span id="eq-next">Our design team will call you within one working day to discuss your estimate and arrange a site measurement.</span></p>
         <p class="hint" id="eq-estimate-line">Keep your estimate reference <strong id="eq-estimate-reference"></strong> handy for that conversation.</p>
         <a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Prefer WhatsApp? Continue there →</a>
       </section>

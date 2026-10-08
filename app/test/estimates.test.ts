@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing';
 import type { EstimateSelection } from '../src/core/api/types.js';
-import { measurementRows, rangeText, revisedSelections, rupees } from '../src/modules/leads/estimates.js';
+import { apiUnit, measurementRows, PACKAGES, rangeText, revisedSelections, rupees } from '../src/modules/leads/estimates.js';
 
 const selections: EstimateSelection[] = [
   { room: 'MASTER_BEDROOM', product: 'WARDROBE', measurements: { WIDTH: { value: 6, unit: 'ft' } }, options: { DOOR: 'SLIDING' } },
@@ -23,6 +23,18 @@ describe('Budgetary Estimate helpers (ADR-012)', () => {
   it('an empty or non-positive edit returns the measurement to the typical size', () => {
     expect(revisedSelections(selections, { '0|WIDTH|ft': '' })[0].measurements).to.deep.equal({});
     expect(revisedSelections(selections, { '0|WIDTH|ft': '-2' })[0].measurements).to.deep.equal({});
+  });
+  it('keeps the unit kind of a typical area or count, so a revision is accepted', () => {
+    expect(apiUnit('sq ft')).to.equal('sqft');
+    expect(apiUnit('nos')).to.equal('nos');
+    expect(apiUnit('ft')).to.equal('ft');
+    const ceiling = { room: 'WHOLE_HOME', product: 'FALSE_CEILING', measurements: {}, options: {} };
+    expect(measurementRows(ceiling, [{ name: 'AREA', unit: 'sqft' }])).to.deep.equal([
+      { name: 'AREA', value: '', unit: 'sqft', typical: true },
+    ]);
+  });
+  it('never offers Luxury for a staff revision (priced after a design consultation)', () => {
+    expect([...PACKAGES]).to.deep.equal(['ESSENTIAL', 'PREMIUM']);
   });
   it('lists entered and typical measurements for the revision form', () => {
     expect(measurementRows(selections[0], ['HEIGHT'])).to.deep.equal([

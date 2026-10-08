@@ -388,9 +388,14 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
 2. **Site:** in the Pages project `veda-staging-site`, set `STAGING_ESTIMATOR=on` and leave
    `STAGING_ESTIMATOR_PACKAGES=ESSENTIAL`, then retry the deployment.
 3. **Validate:**
-   - signed in, open `https://staging.vedaspaces.com/estimate`, create an estimate, then request a quotation;
+   - signed in, open `https://staging.vedaspaces.com/estimate`, choose **3 BHK, Apartment** (the only home size
+     the draft card prices; others answer "not available for this home size yet"), create an estimate, then request a
+     quotation;
+   - the estimate shows the Custom Features Allowance as its own range and the package with six inclusions;
    - the lead shows the Budgetary Estimate panel;
    - the notification carries the estimate summary;
+   - choose **Luxury**: no price, a design-consultation request; the lead shows "Luxury design consultation
+     requested";
    - a forged Turnstile token gets `422`;
    - an anonymous request gets a `302` to Access.
 

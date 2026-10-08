@@ -10,7 +10,13 @@ export function rangeText(range: EstimateRange): string {
   return `${rupees(range.low_minor)} – ${rupees(range.high_minor)}`;
 }
 
-export const PACKAGES = ['ESSENTIAL', 'PREMIUM', 'LUXURY'] as const;
+/** Packages a staff revision can price. Luxury is never priced: it is a design consultation (ADR-012 D2). */
+export const PACKAGES = ['ESSENTIAL', 'PREMIUM'] as const;
+
+/** The API unit for an assumption's unit text ("ft", "sq ft", "nos"). */
+export function apiUnit(unit: string): string {
+  return unit === 'sq ft' ? 'sqft' : unit === 'nos' ? 'nos' : 'ft';
+}
 
 /**
  * A revision request: the original selections with the staff's measurement edits applied. An edit with an empty or
@@ -33,9 +39,15 @@ export function revisedSelections(
   });
 }
 
-/** Measurement keys of a selection's product as shown in the revision form: entered values plus typical ones. */
-export function measurementRows(sel: EstimateSelection, typicalInputs: string[]): { name: string; value: string; unit: string; typical: boolean }[] {
+/**
+ * Measurement keys of a selection's product as shown in the revision form: entered values plus typical ones. A typical
+ * input keeps its own kind of unit (sq ft for an area, nos for a count), so a revised value is accepted by the engine.
+ */
+export function measurementRows(sel: EstimateSelection, typicalInputs: (string | { name: string; unit: string })[]): { name: string; value: string; unit: string; typical: boolean }[] {
   const entered = Object.entries(sel.measurements).map(([name, m]) => ({ name, value: String(m.value), unit: m.unit, typical: false }));
-  const typical = typicalInputs.filter((n) => !(n in sel.measurements)).map((name) => ({ name, value: '', unit: 'ft', typical: true }));
+  const typical = typicalInputs
+    .map((t) => (typeof t === 'string' ? { name: t, unit: 'ft' } : t))
+    .filter((t) => !(t.name in sel.measurements))
+    .map((t) => ({ name: t.name, value: '', unit: t.unit, typical: true }));
   return [...entered, ...typical];
 }

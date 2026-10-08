@@ -52,6 +52,9 @@ ALLOWANCE_DESCRIPTION = (
     "Bespoke details usually added during design, such as extra drawers, mirrors, pelmets, lighting sensors and "
     "material upgrades. It is part of the estimate total; the detailed quotation replaces it with the actual items."
 )
+# Customer-facing subtotals are rounded to ₹1,000 so that a single response does not expose an exact line rate (the
+# staff view keeps exact amounts). The range itself is rounded to the card's step.
+CUSTOMER_ROUND_MINOR = 100_000
 ROOMS = OrderedDict(
     [
         ("KITCHEN", "Kitchen"),
@@ -106,7 +109,7 @@ Code = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")]
 
 
 class Measurement(_Model):
-    value: float = Field(gt=0, le=100_000)
+    value: float = Field(ge=0, le=100_000)  # 0 only passes for counts (the card bounds lengths and areas)
     unit: Literal["ft", "in", "m", "cm", "sqft", "sqm", "nos"]
 
 
@@ -232,7 +235,7 @@ class Estimate:
             "home_size": self.home_size,
             "range": {"low_minor": self.low_minor, "high_minor": self.high_minor, "currency": "INR"},
             "gst": {"pct": self.gst_pct, "low_minor": self.gst_low_minor, "high_minor": self.gst_high_minor},
-            "rooms": self.room_totals(),
+            "rooms": [dict(r, amount_minor=_nearest(r["amount_minor"])) for r in self.room_totals()],
             "project_preparation": {
                 "label": PREP_PACKAGE,
                 "description": PREP_DESCRIPTION,
@@ -243,8 +246,8 @@ class Estimate:
             "custom_features_allowance": {
                 "label": ALLOWANCE,
                 "description": ALLOWANCE_DESCRIPTION,
-                "low_minor": self.allowance_low_minor,
-                "high_minor": self.allowance_high_minor,
+                "low_minor": _round(Decimal(self.allowance_low_minor), CUSTOMER_ROUND_MINOR, ROUND_FLOOR),
+                "high_minor": _round(Decimal(self.allowance_high_minor), CUSTOMER_ROUND_MINOR, ROUND_CEILING),
             },
             "optional_items_minor": self.optional_minor,
             "timeline": self.timeline,
@@ -282,7 +285,10 @@ class Estimate:
             {"code": c.code, "label": c.label, "inclusion": c.inclusion, "amount_minor": c.amount_minor}
             for c in self.prep
         ]
+        view["rooms"] = self.room_totals()  # exact for staff
         view["custom_features_allowance"].update(
+            exact_low_minor=self.allowance_low_minor,
+            exact_high_minor=self.allowance_high_minor,
             amount_minor=self.allowance_minor,
             basis_minor=self.allowance_basis_minor,
             low_pct=self.allowance_low_pct,
@@ -310,6 +316,10 @@ def _q(value: Decimal | float, places: str = "0.01") -> Decimal:
 
 def _paise(value: Decimal) -> int:
     return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def _nearest(minor: int) -> int:
+    return _round(Decimal(minor), CUSTOMER_ROUND_MINOR, ROUND_HALF_UP)
 
 
 def _round(minor: Decimal, step: int, rounding) -> int:
@@ -416,6 +426,9 @@ def _price(card, request, product, sel, instance, path, est, errors) -> None:
             )
             continue
         bound = card.bounds[spec.kind]
+        if spec.kind == "count" and converted != int(converted):
+            errors.append({"field": field_path, "code": "OUT_OF_BOUNDS", "message": "Must be a whole number."})
+            continue
         if not bound.min <= converted <= bound.max:
             errors.append(
                 {
@@ -447,6 +460,15 @@ def _price(card, request, product, sel, instance, path, est, errors) -> None:
         if q.kind == "area":
             height = values[q.height_input] if q.height_input else q.height
             qty = Decimal(str(values[q.input])) * Decimal(str(height))
+            if qty > Decimal(str(card.bounds["area"].max)):  # width × height is bounded like an entered area
+                errors.append(
+                    {
+                        "field": path,
+                        "code": "OUT_OF_BOUNDS",
+                        "message": f"{product.label} is larger than {card.bounds['area'].max:g} sq ft.",
+                    }
+                )
+                return
         elif q.kind == "direct":
             qty = Decimal(str(values[q.input]))
         elif q.kind == "count":

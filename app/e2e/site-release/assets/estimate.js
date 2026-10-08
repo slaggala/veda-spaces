@@ -177,7 +177,11 @@ function renderPreferences() {
 function packageChanged() {
   const luxury = document.querySelector('input[name="package"]:checked')?.value === 'LUXURY';
   $('#est-calculate').textContent = luxury ? 'Request a design consultation →' : 'See my estimate →';
-  $('#est-turnstile-estimate').hidden = luxury;
+  const box = $('#est-turnstile-estimate');
+  const wasHidden = box.hidden;
+  box.hidden = luxury;
+  // A challenge rendered while hidden may not complete: restart it once the widget is visible again.
+  if (wasHidden && !luxury && window.turnstile && widgets.estimate !== undefined) window.turnstile.reset(widgets.estimate);
 }
 function readPreferences() {
   state.package = document.querySelector('input[name="package"]:checked')?.value || 'ESSENTIAL';
@@ -244,6 +248,7 @@ function requestBody() {
 function explain(body) {
   if (body.code === 'VALIDATION_FAILED' && Array.isArray(body.errors)) {
     return body.errors.map((e) => {
+      if (e.code === 'HOME_SIZE_UNAVAILABLE') return 'Online estimates are not available for this home size yet. Go back to “Your home” and choose another size, or contact us.';
       const match = /^selections\[(\d+)\]/.exec(e.field || '');
       const item = match ? state.items[Number(match[1])] : null;
       return item ? `${itemTitle(item)}: ${e.message}` : e.message;
@@ -285,8 +290,19 @@ function renderResult(e) {
   $('#est-meta').textContent = `Estimate ${e.reference} · rate card ${e.rate_card_version} · valid until ${e.expires_on}.`;
 }
 
+function restoreHome() {
+  const form = $('#step-1');
+  for (const name of ['property_type', 'project_kind']) {
+    const radio = form.querySelector(`input[name="${name}"][value="${state.home[name]}"]`);
+    if (radio) radio.checked = true;
+  }
+  if (state.home.home_size) $('#est-home-size').value = state.home.home_size;
+  if (state.home.city) $('#est-city').value = state.home.city;
+}
 function toEnquiry() {
   $('#eq-location').value = state.home.city || '';
+  $('#eq-heading').textContent = state.luxury ? 'Request a design consultation' : 'Get my detailed quotation';
+  $('#eq-submit').textContent = state.luxury ? 'Request my consultation →' : 'Request my quotation →';
   $('#eq-intro').textContent = state.luxury
     ? 'Luxury is priced after a design consultation. Our designer will call you to understand your home and arrange a site visit.'
     : 'Our designer will review your estimate with you, arrange a site measurement and prepare your detailed quotation.';
@@ -381,6 +397,9 @@ function init() {
     if (r.status === 201) {
       $('#eq-reference').textContent = r.body.data.reference;
       $('#eq-estimate-line').hidden = state.luxury;
+      $('#eq-next').textContent = state.luxury
+        ? 'Our designer will call you within one working day to arrange your design consultation.'
+        : 'Our design team will call you within one working day to discuss your estimate and arrange a site measurement.';
       if (!state.luxury) $('#eq-estimate-reference').textContent = state.estimate.reference;
       show(7);
       try { sessionStorage.removeItem(STATE_KEY); } catch { /* ignore */ }
@@ -390,7 +409,14 @@ function init() {
     summary(explain(r.body));
   });
 
-  if (state.estimate && !state.luxury && state.step >= 5 && state.step <= 6) { renderResult(state.estimate); show(5); } else show(1);
+  restoreHome();
+  const valid = state.estimate && state.estimate.expires_on >= new Date().toISOString().slice(0, 10);
+  if (state.luxury && state.step === 6) { toEnquiry(); return; }
+  if (valid && state.step >= 5 && state.step <= 6) {
+    try { renderResult(state.estimate); show(5); return; } catch { /* an older response shape: start again */ }
+  }
+  state.estimate = null;
+  show(1);
 }
 
 init();

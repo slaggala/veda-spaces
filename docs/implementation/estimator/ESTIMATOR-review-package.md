@@ -13,6 +13,9 @@ for this review, staging validation and the owner's explicit enablement.
 - no official quotation generated;
 - no legal or tax approval claimed.
 
+**Consolidated review:** completed with three independent reviewers. No high-severity finding; the dispositions are in
+[ESTIMATOR-consolidated-review.md](ESTIMATOR-consolidated-review.md).
+
 ## 1. What a reviewer should check first
 
 | # | Claim | Where to verify |
@@ -20,7 +23,7 @@ for this review, staging validation and the owner's explicit enablement.
 | 1 | Off by default; production refuses it | `veda/config.py` (`estimator_enabled`, the production check); `test_public_endpoints_are_disabled_by_default`; the committed `estimate.html` metas are empty (`test_public_intake_disabled`) |
 | 2 | Only two public endpoints, exact paths, default deny | `RBX_REGISTER["RBX-007"]` in `veda/app.py`; `test_no_route_exposes_a_rate_card` (public routes are exactly estimates, enquiries and the existing leads) |
 | 3 | No personal data in an estimate | Closed `EstimateRequest`; `test_estimate_takes_no_personal_data`; no estimator table holds personal data |
-| 4 | Customer responses never expose rates, lines, internal IDs or workflow state | `service.public_view`; `test_public_estimate_is_customer_safe`; `test_customer_view_never_shows_rates_lines_or_quantities`; the enquiry returns `{reference, message}` only |
+| 4 | Customer responses never expose rates, lines, internal IDs or workflow state; subtotals are rounded to ₹1,000 | `service.public_view`; `test_public_estimate_is_customer_safe`; `test_customer_view_never_shows_rates_lines_or_quantities`; the enquiry returns `{reference, message}` only |
 | 5 | The lead and its estimate link commit atomically | `create_public(on_created=…)`; `test_lead_and_link_commit_together` |
 | 6 | An enquiry is never rejected because of its estimate | `usable_for_enquiry`; `test_unusable_estimate_never_rejects_the_enquiry` (unknown, expired, already linked, invalid) |
 | 7 | Rates are never inferred | `RateCard._consistent` (an enabled package must price every line); Premium and Luxury off in the private card; `PACKAGE_UNAVAILABLE` |
@@ -130,7 +133,7 @@ in the audit registry (FULL; documents and results not snapshotted). Permissions
    inclusions; the **Custom Features Allowance** as its own range and explanation; optional items; timeline;
    assumptions; exclusions; client scope; warranty summary and policy link; rate-card version and validity (30 days).
 6. "Get my detailed quotation": name, phone, email, preferred contact, location, consent, Turnstile.
-7. Confirmation: customer reference only.
+7. Confirmation: the customer reference, and the estimate reference when there is one (none on the Luxury path).
 
 The page is mobile first, uses the production CSP, builds the DOM with `textContent`, keeps its state in
 `sessionStorage`, and holds no rates.
@@ -150,12 +153,12 @@ start the official quotation process.
 
 | Suite | Result |
 |---|---|
-| `tests/unit/test_estimator_engine.py` (E1) | 63 passed: every product (18), units and bounds, invalid input, packages, preparation grouping and scope, customer view without rates, reproducibility, monotonicity, timeline, lookups, warranty, card validation (including hardware in the package and the allowance band), unapproved home sizes, the allowance (explicit, banded, room work only), soft-close in the products, a full home in one request |
-| `tests/integration/test_estimator_api.py` (E2/E3) | 32 scenarios × SQLite and PostgreSQL = 64 passed: flag off, the allowance in the public response, the Luxury consultation enquiry, no card, customer-safe response, no personal data, Turnstile, invalid input, snapshot and reproducibility, link, retry, unusable references, atomicity, consent, notification text, staff view and actions, lead scope, unlinked visibility, no card route, card lifecycle and rollback, refusals (tamper, approval, customer data), CLI dry run, retention (90 days from creation, never while valid), rate limits |
+| `tests/unit/test_estimator_engine.py` (E1) | 66 passed: every product (18), units and bounds, invalid input, packages, preparation grouping and scope, customer view without rates, reproducibility, monotonicity, timeline, lookups, warranty, card validation (including hardware in the package and the allowance band), unapproved home sizes, the allowance (explicit, banded, room work only), soft-close in the products, a full home in one request, whole-number counts, bounded computed areas, rounded customer subtotals |
+| `tests/integration/test_estimator_api.py` (E2/E3) | 34 scenarios × SQLite and PostgreSQL = 68 passed: flag off, the allowance in the public response, the Luxury consultation enquiry, Luxury never priced publicly, a concurrently linked estimate never rejecting the enquiry, no card, customer-safe response, no personal data, Turnstile, invalid input, snapshot and reproducibility, link, retry, unusable references, atomicity, consent, notification text, staff view and actions, lead scope, unlinked visibility, no card route, card lifecycle and rollback, refusals (tamper, approval, customer data), CLI dry run, retention (90 days from creation, never while valid), rate limits |
 | Schema, lint, registry, governance, ops | Updated head and order; module-boundary and seed-file lists; RBX register; committed estimator page is off |
 | Full API suite | Pass (SQLite and PostgreSQL); ruff and format clean; mypy ratchet 157 = baseline; OpenAPI snapshot updated; secret scan clean |
 | `app/scripts/staging-build.test.mjs` | 7 passed, including the estimator page off by default, on only with `STAGING_ESTIMATOR=on`, Essential only, no rates or `innerHTML` in the page script |
-| `app/test/estimates.test.ts`, `app/e2e/estimator.e2e.mjs` | Run in CI (Node 22): helper tests; the browser journey (off and on, every step, validation, axe per step, the allowance and the six package inclusions, the Luxury consultation path, 360 px, CSP, page errors) |
+| `app/test/estimates.test.ts`, `app/e2e/estimator.e2e.mjs` | Run in CI (Node 22). **Helper tests:** units of typical inputs in revisions, no Luxury revision. **Browser journey:** off and on; steps 1–7 with axe on each; validation; the allowance and the six package inclusions; confirmation focus; the Luxury consultation path with axe on its screens; 360 px width on step 1; no CSP violations; no page errors |
 
 ## 9. Historical quotation comparison
 
@@ -191,7 +194,11 @@ The business rules are frozen (ADR-012 §11, decision log 18). Still open, as da
   - an API Host guard;
   - no credentials on the public route;
   - an edge rate limit.
-- **The owner inputs** in §10 (2, 3 and 5 at least, for the home sizes offered).
+- **The owner inputs** in §10 (2, 3 and 5 at least, for the home sizes offered), and the soft-close scope (review P4).
+- **From the consolidated review** ([record](ESTIMATOR-consolidated-review.md)):
+  - S4: edge rate limiting on the intake hostname (the aggregate application limits count requests before
+    Turnstile);
+  - U7: the error-summary accessibility follow-up.
 - **Independent review** of this package, then staging validation behind Access.
 - **The owner's explicit enablement**, recorded as a decision.
 - **Still open from earlier:** the deploy replica-safety order (R6-F1), and SES recipients verified or production

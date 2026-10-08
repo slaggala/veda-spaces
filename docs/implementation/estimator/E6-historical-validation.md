@@ -17,7 +17,8 @@ relative results are recorded. The private rate card and the comparison scripts 
 | B | Veda Spaces quotation workbook | 3 BHK apartment | June 2026 | Older rates: carcass about 7 % higher, profile glass about 15 % lower, tandems about 12 % higher |
 | C | Veda Spaces quotation workbook | 3 BHK apartment, same building and layout as B | August 2026 revision | Carcass about 7 % lower; a revision made during execution (it carries execution-stage additions) |
 
-C was not used in the first run.
+C was not part of the first run; its old-model figure below was computed on rules `2026.10.1` during the
+re-run, for comparison.
 
 **The evidence is thin:** three quotations, all 3 BHK apartments, two of them in one building. A fourth, independent
 quotation (2 BHK preferred, another project) is an open owner input.
@@ -42,14 +43,14 @@ quotation (2 BHK preferred, another project) is an open owner input.
 
 ## 3. Results
 
-| Ref | First run: base vs actual | Re-run, measured: base | Range | Actual in range | Re-run, typical sizes: base | Range | Actual in range |
+| Ref | Old model (`2026.10.1`): base vs actual | Re-run, measured: base | Range | Actual in range | Re-run, typical sizes: base | Range | Actual in range |
 |---|---|---|---|---|---|---|---|
 | A | −14.5 % (outside the range) | **+4.6 %** | −9.4 % … +23.3 % | **Yes** | +10.1 % | −8.6 % … +37.8 % | Yes |
 | B | −32.2 % (outside) | **−3.8 %** | −16.6 % … +13.6 % | **Yes** | −8.8 % | −25.0 % … +15.4 % | Yes |
 | C | −31.2 % (outside) | **−0.5 %** | −13.9 % … +17.3 % | **Yes** | +2.9 % | −14.6 % … +28.7 % | Yes |
 
 **Overall:**
-- **Average gap, measured:** 3.0 % (first run: 26.0 %).
+- **Average gap, measured:** 3.0 % (old model: 26.0 %).
 - **Range width:** about 31 % measured, up from 25 % in the first run, because the allowance band adds width. Wider
   with typical sizes.
 
@@ -68,7 +69,8 @@ quotation (2 BHK preferred, another project) is an open owner input.
 ## 4. Assessment
 
 **Measured inputs meet the acceptance criteria** (every historical total inside its range, base within ±10 %) for all
-three quotations. **Typical sizes** keep every total in range; A's base is at +10.1 %.
+three quotations. **With typical sizes** every total stays in range, but A's base (+10.1 %) **misses** the ±10 %
+criterion by 0.1 point. B (−8.8 %) and C (+2.9 %) meet it.
 
 **Limits:**
 - The new product rates, the allowance band and the 3 BHK typical sizes come from these same three quotations. The

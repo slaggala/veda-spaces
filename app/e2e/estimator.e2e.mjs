@@ -108,6 +108,8 @@ await page.click('#eq-submit');
 await page.waitForSelector('#step-7:not([hidden])');
 const ref = await page.textContent('#eq-reference');
 check('enquiry → confirmation with a customer reference', /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(ref || ''), ref);
+check('confirmation takes focus', await page.evaluate(() => document.activeElement?.closest('#step-7') !== null));
+await axe('step 7 (confirmation)');
 await collectCsp();
 
 // 4. Luxury: no price, straight to a design consultation (D2).
@@ -121,14 +123,17 @@ await page.check('input[name="package"][value="LUXURY"]');
 check('luxury: the action is a design consultation, not a price', (await page.textContent('#est-calculate')).includes('design consultation'));
 await page.click('#est-calculate');
 await page.waitForSelector('#step-6:not([hidden])');
-check('luxury: enquiry explains the consultation', /priced after a design consultation/.test(await page.textContent('#eq-intro')));
+check('luxury: enquiry explains the consultation', /priced after a design consultation/.test(await page.textContent('#eq-intro')) &&
+  (await page.textContent('#eq-heading')) === 'Request a design consultation');
+await axe('luxury step 6 (consultation request)');
 await page.fill('#eq-name', 'Kavya Rao');
 await page.fill('#eq-phone', '98480 54321');
 await page.check('#eq-consent');
 await page.click('#eq-submit');
 await page.waitForSelector('#step-7:not([hidden])');
 check('luxury: confirmation with a reference and no estimate', /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test((await page.textContent('#eq-reference')) || '') &&
-  !(await visible('#eq-estimate-line')));
+  !(await visible('#eq-estimate-line')) && /design consultation/.test(await page.textContent('#eq-next')));
+await axe('luxury step 7 (confirmation)');
 await collectCsp();
 
 // 5. Mobile width.

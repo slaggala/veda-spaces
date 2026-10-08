@@ -316,6 +316,30 @@ def test_luxury_enquiry_requests_a_design_consultation(api, factory):
     assert sum(a.subject.startswith(service.LUXURY_CONSULTATION) for a in rows(sa.select(LeadActivity))) == 1
 
 
+@ON
+def test_a_concurrently_linked_estimate_never_rejects_the_enquiry(api, monkeypatch):
+    """Review finding: two enquiries racing on one reference both pass the check; the second must still be taken."""
+    load_card()
+    reference = estimate(api).data["reference"]
+    assert enquiry(api, reference).status == 201
+    row = rows(sa.select(BudgetEstimate))[0]
+    monkeypatch.setattr(service, "usable_for_enquiry", lambda s, ref: (s.get(BudgetEstimate, row.id), None))
+    r = enquiry(api, reference)
+    assert r.status == 201, r
+    second = [lead for lead in rows(sa.select(Lead)) if lead.intake_unmapped][0]
+    assert second.intake_unmapped["estimate_reference"] == f"ALREADY_LINKED:{reference}"
+    assert len(rows(sa.select(BudgetEstimateLeadLink))) == 1
+
+
+@ON
+def test_luxury_is_never_priced_publicly(api):
+    doc = copy.deepcopy(CARD_DOC)
+    doc["packages"]["LUXURY"] = True
+    load_card(doc)
+    r = estimate(api, package="LUXURY")
+    assert r.status == 422 and r.json["errors"][0]["code"] == "PACKAGE_UNAVAILABLE", r
+
+
 # --- staff ----------------------------------------------------------------------------------------------------------------
 
 

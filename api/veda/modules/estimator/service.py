@@ -11,7 +11,7 @@ import json
 import re
 import secrets
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import sqlalchemy as sa
 from pydantic import ValidationError
@@ -197,7 +197,7 @@ def _new_reference(s: Session) -> str:
 
 
 def _centi(value) -> int:
-    return int((Decimal(str(value)) * 100).to_integral_value())
+    return int((Decimal(str(value)) * 100).to_integral_value(rounding=ROUND_HALF_UP))  # as the engine rounds
 
 
 def calculate(card: ratecard.RateCard, request: engine.EstimateRequest) -> engine.Estimate:
@@ -341,6 +341,19 @@ def create_public(s: Session, request: engine.EstimateRequest, *, ip, ua, reques
     with acting(
         s, ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=ua)
     ):
+        if request.package == "LUXURY":  # D2: never priced publicly, whatever the card enables
+            raise ApiError(
+                422,
+                "VALIDATION_FAILED",
+                "Some estimate inputs need attention.",
+                errors=[
+                    {
+                        "field": "package",
+                        "code": "PACKAGE_UNAVAILABLE",
+                        "message": "Luxury is priced after a design consultation.",
+                    }
+                ],
+            )
         card_row, card = active_card(s)
         est = calculate(card, request)
         row = store(s, card_row, request, est, origin="PUBLIC")
@@ -363,18 +376,36 @@ def usable_for_enquiry(s: Session, reference: str | None) -> tuple[BudgetEstimat
     return row, None
 
 
-def link(s: Session, estimate: BudgetEstimate, lead, *, policy_version: str | None, preferred_contact: str | None):
-    """Link in the lead's own transaction (atomic with the enquiry)."""
-    s.add(
-        BudgetEstimateLeadLink(
-            estimate_id=estimate.id,
-            lead_id=lead.id,
-            consent_policy_version=policy_version,
-            preferred_contact=preferred_contact,
-            linked_on=db.tx_time(s),
+def link(
+    s: Session, estimate: BudgetEstimate, lead, *, policy_version: str | None, preferred_contact: str | None
+) -> bool:
+    """Link in the lead's own transaction (atomic with the enquiry). A concurrent enquiry may have linked the estimate
+    since it was checked: the link is then skipped under a savepoint and recorded on the lead, never rejecting the
+    enquiry. Returns whether the link was made."""
+    from sqlalchemy.exc import IntegrityError
+
+    savepoint = s.begin_nested()
+    try:
+        s.add(
+            BudgetEstimateLeadLink(
+                estimate_id=estimate.id,
+                lead_id=lead.id,
+                consent_policy_version=policy_version,
+                preferred_contact=preferred_contact,
+                linked_on=db.tx_time(s),
+            )
         )
-    )
+        s.flush()
+        savepoint.commit()
+    except IntegrityError:
+        savepoint.rollback()
+        lead.intake_unmapped = {
+            **(lead.intake_unmapped or {}),
+            "estimate_reference": f"ALREADY_LINKED:{estimate.public_reference}",
+        }
+        return False
     _event(s, "ESTIMATE_LINKED", estimate_id=estimate.id, detail={"lead": lead.lead_number})
+    return True
 
 
 def summary_line(s: Session, lead_id: str) -> str | None:
@@ -387,20 +418,21 @@ def summary_line(s: Session, lead_id: str) -> str | None:
         .order_by(BudgetEstimate.created_on.desc())
         .limit(1)
     ).scalar_one_or_none()
-    if row is None:
-        from veda.modules.crm.leads.models import LeadActivity
+    from veda.modules.crm.leads.models import LeadActivity
 
-        luxury = s.execute(
-            sa.select(LeadActivity.id)
-            .where(LeadActivity.lead_id == lead_id, LeadActivity.subject.startswith(LUXURY_CONSULTATION))
-            .limit(1)
-        ).first()
-        return "Luxury design consultation requested" if luxury else None
-    rooms = len(row.result.get("rooms", []))
-    return (
-        f"Budgetary Estimate {_lakh(row.range_low_minor)}–{_lakh(row.range_high_minor)} "
-        f"({row.package.title()}, {rooms} room{'s' if rooms != 1 else ''})"
-    )
+    luxury = s.execute(
+        sa.select(LeadActivity.id)
+        .where(LeadActivity.lead_id == lead_id, LeadActivity.subject.startswith(LUXURY_CONSULTATION))
+        .limit(1)
+    ).first()
+    parts = ["Luxury design consultation requested"] if luxury else []
+    if row is not None:
+        rooms = len(row.result.get("rooms", []))
+        parts.append(
+            f"Budgetary Estimate {_lakh(row.range_low_minor)}–{_lakh(row.range_high_minor)} "
+            f"({row.package.title()}, {rooms} room{'s' if rooms != 1 else ''})"
+        )
+    return " · ".join(parts) or None
 
 
 def _lakh(minor: int) -> str:

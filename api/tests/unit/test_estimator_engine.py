@@ -256,9 +256,12 @@ def test_room_subtotals_optional_items_and_total():
     view = est.customer_view()
     assert [r["room"] for r in view["rooms"]] == ["MASTER_BEDROOM"]
     assert view["optional_items_minor"] == 2000 * 2_500
+    exact = est.staff_view()["rooms"]
     assert est.base_minor == (
-        sum(r["amount_minor"] for r in view["rooms"]) + est.allowance_minor + est.prep_minor + est.optional_minor
+        sum(r["amount_minor"] for r in exact) + est.allowance_minor + est.prep_minor + est.optional_minor
     )
+    assert all(r["amount_minor"] % 100_000 == 0 for r in view["rooms"]), "customer subtotals rounded to ₹1,000"
+    assert all(abs(c["amount_minor"] - x["amount_minor"]) <= 50_000 for c, x in zip(view["rooms"], exact, strict=True))
     assert view["range"]["low_minor"] <= est.base_minor <= view["range"]["high_minor"]
 
 
@@ -374,9 +377,9 @@ def test_allowance_is_an_explicit_component_of_the_estimate():
     assert customer == {
         "label": "Custom Features Allowance",
         "description": engine.ALLOWANCE_DESCRIPTION,
-        "low_minor": est.allowance_low_minor,
-        "high_minor": est.allowance_high_minor,
-    }, "shown as its own range; the percentages and the basis stay internal"
+        "low_minor": est.allowance_low_minor // 100_000 * 100_000,
+        "high_minor": -(-est.allowance_high_minor // 100_000) * 100_000,
+    }, "shown as its own range (outward to ₹1,000); the percentages and the basis stay internal"
     staff = est.staff_view()["custom_features_allowance"]
     assert staff["low_pct"] == 5 and staff["high_pct"] == 15 and staff["basis_minor"] == work
     assert staff["amount_minor"] == est.allowance_minor
@@ -426,3 +429,28 @@ def test_a_full_home_fits_in_one_request():
     assert len(selections) == 33
     est = engine.calculate(CARD, req(*selections, home_size="3BHK"))
     assert est.low_minor < est.base_minor < est.high_minor and est.allowance_minor > 0
+
+
+# --- review findings ---------------------------------------------------------------------------------------------------
+
+
+def test_counts_are_whole_and_may_be_zero():
+    none = engine.calculate(CARD, req(sel("ELECTRICAL", "WHOLE_HOME", {"CARPET": (1000, "sqft"), "SPOTS": (0, "nos")})))
+    assert ("ELECTRICAL", "SPOTS") not in lines(none), "zero spot lights is a valid answer"
+    with pytest.raises(EstimateError) as err:
+        engine.calculate(CARD, req(sel("KITCHEN", "KITCHEN", {"RUN": (10, "ft"), "DRAWERS": (2.5, "nos")})))
+    assert err.value.errors[0]["message"] == "Must be a whole number."
+    with pytest.raises(EstimateError):
+        engine.calculate(CARD, req(sel("WARDROBE", "MASTER_BEDROOM", {"WIDTH": (0, "ft")})))
+
+
+def test_a_computed_area_is_bounded_like_an_entered_one():
+    with pytest.raises(EstimateError) as err:
+        engine.calculate(CARD, req(sel("WARDROBE", "MASTER_BEDROOM", {"WIDTH": (150, "ft"), "HEIGHT": (150, "ft")})))
+    assert err.value.errors[0]["code"] == "OUT_OF_BOUNDS" and "larger than" in err.value.errors[0]["message"]
+
+
+def test_one_public_response_does_not_reveal_an_exact_rate():
+    one = engine.calculate(CARD, req(sel("STUDY_UNIT", "STUDY", {"WIDTH": (5.1, "ft")}, STORAGE="NO")))
+    shown = one.customer_view()["rooms"][0]["amount_minor"]
+    assert shown != one.lines[0].amount_minor and shown % 100_000 == 0

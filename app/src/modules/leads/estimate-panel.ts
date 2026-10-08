@@ -6,7 +6,7 @@ import { SessionElement } from '../../core/authz/session-element.js';
 import { formatDate, formatFull, humanize } from '../../core/format/format.js';
 import { toast } from '../../design-system/components.js';
 import { shared } from '../../design-system/styles.js';
-import { measurementRows, PACKAGES, rangeText, revisedSelections, rupees } from './estimates.js';
+import { apiUnit, measurementRows, PACKAGES, rangeText, revisedSelections, rupees } from './estimates.js';
 
 type Dialog = '' | 'detail' | 'revise' | 'copy';
 
@@ -77,8 +77,8 @@ export class VsEstimatePanel extends SessionElement {
     }
   }
 
-  private async act(path: string, body?: unknown, message = 'Done') {
-    if (!this.detail) return;
+  private async act(path: string, body?: unknown, message = 'Done'): Promise<boolean> {
+    if (!this.detail) return false;
     this.busy = true;
     try {
       const r = await api.post<EstimateDetail>(`/api/v1/estimates/${this.detail.id}/${path}`, body);
@@ -87,8 +87,10 @@ export class VsEstimatePanel extends SessionElement {
       else if (path === 'site-measurement') this.detail = r.data;
       await this.load();
       this.dispatchEvent(new CustomEvent('estimate-changed', { bubbles: true, composed: true }));
+      return true;
     } catch (e) {
       this.problem = e as ApiProblem;
+      return false;
     } finally {
       this.busy = false;
     }
@@ -112,21 +114,27 @@ export class VsEstimatePanel extends SessionElement {
     const edits: Record<string, string> = {};
     for (const [k, v] of form.entries()) if (k.includes('|')) edits[k] = String(v);
     const selections = revisedSelections(this.detail.inputs.selections, edits);
-    void this.act('revisions', { package: pkg, selections }, 'Revised estimate created').then(() => (this.dialog = 'detail'));
+    this.problem = null;
+    void this.act('revisions', { package: pkg, selections }, 'Revised estimate created').then((ok) => {
+      if (ok) this.dialog = 'detail'; // on failure the form stays open with the problem shown in it
+    });
   }
 
   /** Inputs of a selection that used a typical size (from the stored assumptions). */
-  private typicalInputs(sel: EstimateSelection, index: number): string[] {
+  private typicalInputs(sel: EstimateSelection, index: number): { name: string; unit: string }[] {
     const sels = this.detail?.inputs.selections ?? [];
     const instance = sels.slice(0, index).filter((s) => s.room === sel.room && s.product === sel.product).length + 1;
-    const details = (this.detail?.estimate as unknown as { assumption_details?: { room: string; product: string; instance: number; input: string }[] })?.assumption_details ?? [];
-    return details.filter((a) => a.room === sel.room && a.product === sel.product && a.instance === instance).map((a) => a.input);
+    const details = (this.detail?.estimate as unknown as { assumption_details?: { room: string; product: string; instance: number; input: string; unit: string }[] })?.assumption_details ?? [];
+    return details
+      .filter((a) => a.room === sel.room && a.product === sel.product && a.instance === instance)
+      .map((a) => ({ name: a.input, unit: apiUnit(a.unit) }));
   }
 
   private renderDetail(d: EstimateDetail) {
     const e = d.estimate;
     const manage = this.can('estimate.manage');
     return html`<div class="stack">
+      ${this.problem ? html`<vs-problem-banner .problem=${this.problem}></vs-problem-banner>` : nothing}
       <p class="meta">${d.reference} · created ${formatFull(d.created_on)} · ${humanize(d.origin)}${d.source_reference ? ` · from ${d.source_reference}` : ''} · rate card ${d.rate_card_version} (rules ${d.calculation_version}) · valid until ${formatDate(d.expires_on.slice(0, 10))}</p>
       <p class="meta">${e.disclaimer}</p>
       <section><h3 class="eyebrow">Property</h3><p>${humanize(d.property_type)} · ${d.home_size.replace('BHK', ' BHK')} · ${humanize(d.project_kind)}${d.city ? ` · ${d.city}` : ''} · package ${humanize(d.package)}${d.preferred_contact ? ` · prefers ${humanize(d.preferred_contact)}` : ''}</p>
@@ -160,6 +168,7 @@ export class VsEstimatePanel extends SessionElement {
 
   private renderRevise(d: EstimateDetail) {
     return html`<form id="rev" class="stack" @submit=${(ev: Event) => this.submitRevision(ev)}>
+      ${this.problem ? html`<vs-problem-banner .problem=${this.problem}></vs-problem-banner>` : nothing}
       <label class="field"><span class="label">Package</span>
         <select name="package">${PACKAGES.map((p) => html`<option value=${p} ?selected=${p === d.package}>${humanize(p)}</option>`)}</select></label>
       <p class="meta">Only approved packages are accepted. Leave a measurement empty to use the typical size.</p>
