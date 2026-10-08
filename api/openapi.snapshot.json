@@ -1664,7 +1664,7 @@
       },
       "PublicEnquiryIn": {
         "additionalProperties": false,
-        "description": "The website enquiry (04 \u00a75.1) plus the estimate it follows and how the customer prefers to be contacted.",
+        "description": "The website enquiry (04 \u00a75.1) plus the estimate it follows, how the customer prefers to be contacted and, for\nLuxury (priced after a design consultation, ADR-012 D2), `consultation: \"LUXURY_DESIGN\"`.",
         "properties": {
           "attribution": {
             "anyOf": [
@@ -1699,6 +1699,10 @@
               }
             ],
             "default": null
+          },
+          "consultation": {
+            "default": null,
+            "title": "Consultation"
           },
           "email": {
             "default": null,

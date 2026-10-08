@@ -100,6 +100,7 @@
         <h3>Room-level subtotals</h3>
         <table class="est-table"><caption class="sr-only">Room-level subtotals</caption><thead><tr><th scope="col">Room</th><th scope="col">Subtotal</th></tr></thead><tbody id="est-rooms-table"></tbody></table>
         <div class="est-prep"><h3 id="est-prep-label"></h3><p class="est-prep-amount" id="est-prep-amount"></p><p id="est-prep-description"></p><ul id="est-prep-inclusions"></ul><p class="hint" id="est-prep-note"></p></div>
+        <div class="est-prep est-allowance"><h3 id="est-allowance-label"></h3><p class="est-prep-amount" id="est-allowance-range"></p><p id="est-allowance-description"></p></div>
         <p id="est-optional" hidden></p>
         <h3>Expected timeline</h3><p id="est-timeline"></p>
         <h3>Assumptions</h3><ul id="est-assumptions"></ul>
@@ -112,7 +113,7 @@
 
       <form class="est-step contact-form" id="step-6" data-step="6" novalidate hidden>
         <h2 class="full" tabindex="-1">Get my detailed quotation</h2>
-        <p class="hint full">Our designer will review your estimate with you, arrange a site measurement and prepare your detailed quotation.</p>
+        <p class="hint full" id="eq-intro">Our designer will review your estimate with you, arrange a site measurement and prepare your detailed quotation.</p>
         <label for="eq-name">Full Name <span class="req">Required</span><input id="eq-name" name="name" required aria-required="true" autocomplete="name" maxlength="150" aria-describedby="eq-name-err"><span class="field-error" id="eq-name-err"></span></label>
         <label for="eq-phone">Phone Number <span class="req">Required</span><input id="eq-phone" name="phone" required aria-required="true" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="+91" aria-describedby="eq-phone-err"><span class="field-error" id="eq-phone-err"></span></label>
         <label for="eq-email">Email Address <span class="opt">(optional)</span><input id="eq-email" name="email" type="email" autocomplete="email" maxlength="254" aria-describedby="eq-email-err"><span class="field-error" id="eq-email-err"></span></label>
@@ -121,13 +122,13 @@
         <div class="hp-field" aria-hidden="true"><label for="eq-website">Company website<input id="eq-website" name="company_website_url" tabindex="-1" autocomplete="off"></label></div>
         <label class="full consent" for="eq-consent"><input id="eq-consent" name="consent" type="checkbox" required aria-required="true" aria-describedby="eq-consent-err"> <span>I agree to be contacted by Veda Spaces about my enquiry, as described in the <a href="/privacy">Privacy Notice</a> (v2026-09-v1). <span class="req">Required</span></span><span class="field-error" id="eq-consent-err"></span></label>
         <div class="turnstile full" id="est-turnstile-enquiry"></div>
-        <div class="est-actions full"><button class="button button-ghost" type="button" data-back>← Back to my estimate</button><button class="button button-dark" type="submit" id="eq-submit">Request my quotation →</button></div>
+        <div class="est-actions full"><button class="button button-ghost" type="button" data-back id="eq-back">← Back to my estimate</button><button class="button button-dark" type="submit" id="eq-submit">Request my quotation →</button></div>
       </form>
 
       <section class="est-step form-panel" id="step-7" data-step="7" hidden role="status" tabindex="-1">
         <h2>Thank you.</h2>
         <p>Your reference is <strong id="eq-reference"></strong>. Our design team will call you within one working day to discuss your estimate and arrange a site measurement.</p>
-        <p class="hint">Keep your estimate reference <strong id="eq-estimate-reference"></strong> handy for that conversation.</p>
+        <p class="hint" id="eq-estimate-line">Keep your estimate reference <strong id="eq-estimate-reference"></strong> handy for that conversation.</p>
         <a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Prefer WhatsApp? Continue there →</a>
       </section>
     </div>

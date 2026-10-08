@@ -124,11 +124,14 @@ def test_public_estimate_is_customer_safe(api):
     assert r.status == 201, r
     data = r.data
     assert data["title"] == "VEDA SPACES PRELIMINARY BUDGETARY ESTIMATE"
-    assert service.REFERENCE_RE.match(data["reference"]) and data["rate_card_version"] == "SYNTHETIC-1"
+    assert service.REFERENCE_RE.match(data["reference"]) and data["rate_card_version"] == "SYNTHETIC-2"
     leaked = set(keys(data)) & {"id", "rate_minor", "lines", "quantity", "components", "base_minor", "uom", "lead"}
     assert not leaked, leaked
     assert data["project_preparation"]["label"] == "Project Preparation & Protection Package"
     assert data["range"]["low_minor"] < data["range"]["high_minor"] and data["gst"]["pct"] == 18
+    allowance = data["custom_features_allowance"]
+    assert set(allowance) == {"label", "description", "low_minor", "high_minor"}, "no percentage or basis"
+    assert allowance["label"] == "Custom Features Allowance" and 0 < allowance["low_minor"] < allowance["high_minor"]
     assert r.headers["Cache-Control"] == "no-store"
     assert r.headers["Access-Control-Allow-Origin"] == SITE
 
@@ -194,13 +197,15 @@ def test_snapshot_is_complete_and_reproducible(api):
     lines = rows(sa.select(BudgetEstimateLine).where(BudgetEstimateLine.estimate_id == row.id))
     prep = rows(sa.select(BudgetEstimateProjectItem).where(BudgetEstimateProjectItem.estimate_id == row.id))
     assumptions = rows(sa.select(BudgetEstimateAssumption).where(BudgetEstimateAssumption.estimate_id == row.id))
-    assert sum(ln.amount_minor for ln in lines) + sum(p.amount_minor for p in prep) == row.base_minor
+    work = sum(ln.amount_minor for ln in lines)
+    assert work + row.allowance_minor + sum(p.amount_minor for p in prep) == row.base_minor
+    assert row.allowance_low_minor == round(work * 0.05) and row.allowance_high_minor == round(work * 0.15)
     assert len(assumptions) > 0 and all(a.text for a in assumptions), "the kitchen used typical sizes"
-    assert row.calculation_version == engine.CALCULATION_VERSION and row.rate_card_version == "SYNTHETIC-1"
+    assert row.calculation_version == engine.CALCULATION_VERSION and row.rate_card_version == "SYNTHETIC-2"
     card = rows(sa.select(EstimatorRateCard).where(EstimatorRateCard.id == row.rate_card_id))[0]
     again = engine.calculate(ratecard.parse(card.document), engine.EstimateRequest.model_validate(row.inputs))
     assert json.loads(json.dumps(again.staff_view(), default=str)) == row.result
-    assert (row.expires_on - row.created_on).days == 15
+    assert (row.expires_on - row.created_on).days == 30, "D7: 30-day validity"
     assert [e.event_type for e in rows(sa.select(EstimateEvent).where(EstimateEvent.estimate_id == row.id))] == [
         "ESTIMATE_CREATED"
     ]
@@ -245,7 +250,7 @@ def test_unusable_estimate_never_rejects_the_enquiry(api, problem):
     elif problem == "INVALID":
         reference = "not a reference"
     elif problem == "EXPIRED":
-        clock.advance(timedelta(days=16))
+        clock.advance(timedelta(days=31))
     else:
         assert enquiry(api, reference).status == 201
     r = enquiry(api, reference)
@@ -290,6 +295,25 @@ def test_lead_notification_carries_the_estimate_summary(api, factory):
     worker.drain_once()
     texts = [m.text for m in CaptureEmailProvider.sent]
     assert any("Budgetary Estimate ₹" in t and "Essential" in t for t in texts), texts
+
+
+@ON
+def test_luxury_enquiry_requests_a_design_consultation(api, factory):
+    """D2: Luxury has no public price; the enquiry is marked on the lead and in the notification."""
+    from veda.platform.notifications import worker
+    from veda.platform.notifications.email import CaptureEmailProvider
+
+    factory.user(founder=True)
+    load_card()
+    assert enquiry(api, None, consultation="LUXURY_DESIGN", preferred_contact="PHONE").status == 201
+    lead = rows(sa.select(Lead))[0]
+    subjects = [a.subject for a in rows(sa.select(LeadActivity).where(LeadActivity.lead_id == lead.id))]
+    assert any(t.startswith(service.LUXURY_CONSULTATION) and t.endswith("prefers phone") for t in subjects), subjects
+    assert not rows(sa.select(BudgetEstimateLeadLink)) and not lead.intake_unmapped
+    worker.drain_once()
+    assert any("Luxury design consultation requested" in m.text for m in CaptureEmailProvider.sent)
+    assert enquiry(api, None, consultation="SOMETHING_ELSE").status == 201, "an unknown value is ignored"
+    assert sum(a.subject.startswith(service.LUXURY_CONSULTATION) for a in rows(sa.select(LeadActivity))) == 1
 
 
 # --- staff ----------------------------------------------------------------------------------------------------------------
@@ -407,11 +431,11 @@ def test_cli_dry_run_validates_without_storing(app, tmp_path, capsys):
     path.write_text(json.dumps(CARD_DOC))
     assert main(["estimator", "validate-card", str(path)]) == 0
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert out["valid"] and out["version"] == "SYNTHETIC-1" and "rates" not in json.dumps(out)
+    assert out["valid"] and out["version"] == "SYNTHETIC-2" and "rates" not in json.dumps(out)
     assert not rows(sa.select(EstimatorRateCard))
     assert main(["estimator", "load-card", str(path)]) == 0
-    assert main(["estimator", "activate-card", "--version", "SYNTHETIC-1", "--approval", APPROVAL]) == 0
-    assert main(["estimator", "activate-card", "--version", "SYNTHETIC-1", "--approval", APPROVAL]) == 2
+    assert main(["estimator", "activate-card", "--version", "SYNTHETIC-2", "--approval", APPROVAL]) == 0
+    assert main(["estimator", "activate-card", "--version", "SYNTHETIC-2", "--approval", APPROVAL]) == 2
 
 
 # --- retention, rate limits ---------------------------------------------------------------------------------------------------
@@ -423,9 +447,11 @@ def test_retention_removes_only_expired_unlinked_estimates(api):
     kept = estimate(api).data["reference"]
     assert enquiry(api, kept).status == 201
     estimate(api)
-    clock.advance(timedelta(days=15 + 91))
     from veda.platform import maintenance
 
+    clock.advance(timedelta(days=89))
+    assert maintenance.estimate_retention()["removed"] == 0, "D7: kept for 90 days from creation"
+    clock.advance(timedelta(days=2))
     assert maintenance.estimate_retention()["removed"] == 1
     live = rows(sa.select(BudgetEstimate), include_deleted=False)
     assert [e.public_reference for e in live] == [kept]

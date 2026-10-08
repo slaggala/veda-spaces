@@ -1,7 +1,7 @@
 {
  "schema": "veda.estimator.rate-card/1",
  "description": "SYNTHETIC test rate card. Not Veda Spaces commercial rates.",
- "version": "SYNTHETIC-1",
+ "version": "SYNTHETIC-2",
  "effective_on": "2026-10-01",
  "currency": "INR",
  "packages": {
@@ -10,7 +10,7 @@
   "LUXURY": false
  },
  "gst_pct": 18,
- "validity_days": 15,
+ "validity_days": 30,
  "ranges": {
   "measured": {
    "low_pct": 10,
@@ -25,7 +25,7 @@
  "bounds": {
   "length": {
    "min": 0.5,
-   "max": 60
+   "max": 150
   },
   "area": {
    "min": 10,
@@ -179,6 +179,67 @@
       "PREMIUM": 1040000,
       "LUXURY": 1360000
      }
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hardware (base units)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2.9
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     }
+    },
+    {
+     "code": "SOFT_CLOSE_WALL",
+     "label": "Soft-close hardware (wall units)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "WALL_UNITS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE_LOFT",
+     "label": "Soft-close hardware (loft)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
     }
    ]
   },
@@ -323,6 +384,52 @@
        ]
       }
      ]
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hinges",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "HINGED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE_LOFT",
+     "label": "Soft-close hinges (loft)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
     }
    ]
   },
@@ -419,6 +526,45 @@
       {
        "option": "STYLE",
        "in": [
+        "PANELLED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hardware (TV box)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.3
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     }
+    },
+    {
+     "code": "SOFT_CLOSE_STORAGE",
+     "label": "Soft-close hardware (storage)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 3
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "BOX_STORAGE",
         "PANELLED"
        ]
       }
@@ -1378,6 +1524,548 @@
      }
     }
    ]
+  },
+  {
+   "code": "POOJA_UNIT",
+   "label": "Pooja unit",
+   "category": "CARPENTRY",
+   "area": "LIVING",
+   "rooms": [
+    "POOJA",
+    "DINING",
+    "LIVING"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Unit width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 3
+     }
+    },
+    {
+     "name": "DOOR_WIDTH",
+     "label": "Door opening width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 4
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "DOOR",
+     "label": "Pooja doors",
+     "choices": [
+      "NONE",
+      "STANDARD",
+      "CNC_VENEER"
+     ],
+     "default": "STANDARD"
+    },
+    {
+     "name": "BEADING",
+     "label": "Veneer beading",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    },
+    {
+     "name": "ASTA_CHAKRA",
+     "label": "Ceiling asta chakra",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "NO"
+    }
+   ],
+   "lines": [
+    {
+     "code": "UNIT",
+     "label": "Mandir unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "BEADING",
+     "label": "Veneer beading",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "WIDTH",
+      "factor": 5
+     },
+     "rates": {
+      "ESSENTIAL": 90000,
+      "PREMIUM": 117000,
+      "LUXURY": 153000
+     },
+     "when": [
+      {
+       "option": "BEADING",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "DOOR",
+     "label": "Door shutters",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "DOOR_WIDTH",
+      "height": 7.5
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "STANDARD"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "DOOR_CNC",
+     "label": "CNC veneer door shutters",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "DOOR_WIDTH",
+      "height": 7.5
+     },
+     "rates": {
+      "ESSENTIAL": 150000,
+      "PREMIUM": 195000,
+      "LUXURY": 255000
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "CNC_VENEER"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "ASTA_CHAKRA",
+     "label": "Asta chakra ceiling",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 1200000,
+      "PREMIUM": 1560000,
+      "LUXURY": 2040000
+     },
+     "when": [
+      {
+       "option": "ASTA_CHAKRA",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "WINDOW_SEATING",
+   "label": "Window seating",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "LIVING",
+    "STUDY"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Window width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 5,
+      "1BHK": 4,
+      "4BHK": 6
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "ARCH",
+     "label": "Window arch framing",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "SEAT",
+     "label": "Seat with storage",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "ARCH",
+     "label": "Window arch",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "WIDTH",
+      "factor": 9
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "ARCH",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "VENEER_ACCENTS",
+   "label": "Veneer accents",
+   "category": "FINISH",
+   "area": "LIVING",
+   "rooms": [
+    "LIVING",
+    "DINING",
+    "KITCHEN",
+    "POOJA",
+    "WHOLE_HOME",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "LENGTH",
+     "label": "Running length",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 20
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "STYLE",
+     "label": "Accent",
+     "choices": [
+      "ARCH",
+      "CEILING_STRIP",
+      "BEADING"
+     ],
+     "default": "ARCH"
+    }
+   ],
+   "lines": [
+    {
+     "code": "ARCH",
+     "label": "Veneer arch",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 90000,
+      "PREMIUM": 117000,
+      "LUXURY": 153000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "ARCH"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "CEILING_STRIP",
+     "label": "Veneer in ceiling",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 85000,
+      "PREMIUM": 110500,
+      "LUXURY": 144500
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "CEILING_STRIP"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEADING",
+     "label": "Sofa-back beading",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 40000,
+      "PREMIUM": 52000,
+      "LUXURY": 68000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "BEADING"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "STORAGE_BOXES",
+   "label": "Storage boxes",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "KITCHEN",
+    "LIVING",
+    "DINING",
+    "UTILITY"
+   ],
+   "max_instances": 10,
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 3
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 7
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "TYPE",
+     "label": "Type",
+     "choices": [
+      "TALL",
+      "BEDSIDE_BOX",
+      "BEDSIDE_TABLE"
+     ],
+     "default": "TALL"
+    }
+   ],
+   "lines": [
+    {
+     "code": "TALL",
+     "label": "Storage box",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "TALL"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEDSIDE_BOX",
+     "label": "Bedside box",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.5
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "BEDSIDE_BOX"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEDSIDE_TABLE",
+     "label": "Bedside table",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "count": 1
+     },
+     "rates": {
+      "ESSENTIAL": 900000,
+      "PREMIUM": 1170000,
+      "LUXURY": 1530000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "BEDSIDE_TABLE"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "CEILING_PROFILE_LIGHTING",
+   "label": "Ceiling profile lighting",
+   "category": "CEILING",
+   "area": "WHOLE_HOME",
+   "has_electrical": true,
+   "rooms": [
+    "WHOLE_HOME",
+    "LIVING",
+    "DINING",
+    "KITCHEN",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "LENGTH",
+     "label": "Profile length",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 60,
+      "1BHK": 30,
+      "2BHK": 45,
+      "3BHK": 60,
+      "4BHK": 80
+     }
+    },
+    {
+     "name": "COB",
+     "label": "COB lights",
+     "kind": "count",
+     "typical": {
+      "DEFAULT": 0
+     }
+    }
+   ],
+   "lines": [
+    {
+     "code": "PROFILE",
+     "label": "Profile lights",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 60000,
+      "PREMIUM": 78000,
+      "LUXURY": 102000
+     }
+    },
+    {
+     "code": "COB",
+     "label": "COB lights",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "input": "COB"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    }
+   ]
   }
  ],
  "project_preparation": [
@@ -1469,21 +2157,6 @@
    ]
   },
   {
-   "code": "SOFT_CLOSE",
-   "label": "Soft-close hinges",
-   "inclusion": "Standard soft-close hardware provision",
-   "amounts": {
-    "1BHK": 1000000,
-    "2BHK": 1600000,
-    "3BHK": 2200000,
-    "4BHK": 2800000,
-    "CUSTOM": 2200000
-   },
-   "applies_to": [
-    "CARPENTRY"
-   ]
-  },
-  {
    "code": "PEST_CONTROL",
    "label": "Pest control",
    "inclusion": "Pest-control preparation where applicable",
@@ -1500,6 +2173,15 @@
    ]
   }
  ],
+ "custom_features_allowance": {
+  "low_pct": 5,
+  "high_pct": 15,
+  "applies_to": [
+   "CARPENTRY",
+   "CEILING",
+   "FINISH"
+  ]
+ },
  "timeline": [
   {
    "up_to_minor": 200000000,

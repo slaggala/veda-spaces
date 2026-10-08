@@ -20,10 +20,12 @@ class PublicEstimateIn(Closed):
 
 
 class PublicEnquiryIn(PublicLeadIn):
-    """The website enquiry (04 §5.1) plus the estimate it follows and how the customer prefers to be contacted."""
+    """The website enquiry (04 §5.1) plus the estimate it follows, how the customer prefers to be contacted and, for
+    Luxury (priced after a design consultation, ADR-012 D2), `consultation: "LUXURY_DESIGN"`."""
 
     estimate_reference: Any = None
     preferred_contact: Any = None
+    consultation: Any = None
 
 
 class EstimateRevisionIn(Closed):

@@ -171,7 +171,7 @@ class Settings:
     estimator_enabled: bool = False
     estimate_turnstile_required: bool = True  # an estimate needs a solved Turnstile, like an enquiry
     estimate_retention_days: int = (
-        90  # unlinked estimates (no personal data) are removed after expiry + this (owner input)
+        90  # unlinked estimates (no personal data) are removed this long after creation, never while valid (D7)
     )
     warranty_policy_url: str = ""  # the full Warranty, Service & Customer Care Policy, linked from every estimate
     spam_review_age_hours: int = 24

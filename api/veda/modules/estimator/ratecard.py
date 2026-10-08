@@ -20,6 +20,9 @@ HOME_SIZES = ("1BHK", "2BHK", "3BHK", "4BHK", "CUSTOM")
 PROPERTY_TYPES = ("APARTMENT", "VILLA")
 UOMS = ("SFT", "RFT", "NOS", "LUMP")
 INPUT_KINDS = ("length", "area", "count")
+# The Project Preparation & Protection Package holds exactly these site activities (owner decision, ADR-012 D5).
+# Hardware such as soft-close fittings is priced in the products that use it, never in the package.
+PREP_COMPONENTS = ("FLOOR_PROTECTION", "PLY_PROTECTION", "FREIGHT", "DEBRIS", "DEEP_CLEANING", "PEST_CONTROL")
 Code = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")]
 Text = Annotated[str, Field(min_length=1, max_length=300)]
 Minor = Annotated[int, Field(ge=0, le=10_000_000_000)]  # up to ₹10 crore per amount
@@ -187,6 +190,23 @@ class Ranges(_Model):
         return self
 
 
+class CustomAllowance(_Model):
+    """The Custom Features Allowance (ADR-012 D9): a disclosed percentage band on the room work (lines of the listed
+    categories) for the bespoke details a design usually adds. Always shown to the customer as its own component."""
+
+    low_pct: Annotated[float, Field(ge=0, le=50)]
+    high_pct: Annotated[float, Field(ge=0, le=50)]
+    applies_to: tuple[Literal["CARPENTRY", "CEILING", "FINISH"], ...] = ("CARPENTRY", "CEILING", "FINISH")
+
+    @model_validator(mode="after")
+    def _ordered(self):
+        if self.high_pct < self.low_pct:
+            raise ValueError("the allowance high_pct must not be below low_pct")
+        if not self.applies_to:
+            raise ValueError("the allowance must apply to at least one category")
+        return self
+
+
 class TimelineBand(_Model):
     up_to_minor: Minor | None  # None: the last, open band
     label: Text
@@ -207,6 +227,7 @@ class RateCard(_Model):
     bounds: dict[Literal["length", "area", "count"], Bounds]
     products: tuple[ProductSpec, ...] = Field(min_length=1)
     project_preparation: tuple[PrepComponent, ...]
+    custom_features_allowance: CustomAllowance
     timeline: tuple[TimelineBand, ...] = Field(min_length=1)
     exclusions: tuple[Text, ...]
     client_scope: tuple[Text, ...]
@@ -221,6 +242,9 @@ class RateCard(_Model):
             raise ValueError("ESSENTIAL must be enabled")
         if set(self.bounds) != set(INPUT_KINDS):
             raise ValueError(f"bounds must cover {list(INPUT_KINDS)}")
+        prep = [c.code for c in self.project_preparation]
+        if len(set(prep)) != len(prep) or set(prep) - set(PREP_COMPONENTS):
+            raise ValueError(f"project_preparation components must be distinct and among {list(PREP_COMPONENTS)}")
         codes = [p.code for p in self.products]
         if len(set(codes)) != len(codes):
             raise ValueError("duplicate product codes")

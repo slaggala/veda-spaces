@@ -131,6 +131,10 @@ class BudgetEstimate(AuditedBase):
     range_low_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     range_high_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     preparation_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    # Custom Features Allowance (D9): the midpoint is part of base_minor; the band is part of the range.
+    allowance_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    allowance_low_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    allowance_high_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     optional_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     gst_low_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     gst_high_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
@@ -152,6 +156,8 @@ class BudgetEstimate(AuditedBase):
         CheckConstraint(
             "base_minor >= 0 AND range_low_minor >= 0 AND range_low_minor <= base_minor "
             "AND base_minor <= range_high_minor AND preparation_minor >= 0 AND optional_minor >= 0 "
+            "AND allowance_low_minor >= 0 AND allowance_low_minor <= allowance_minor "
+            "AND allowance_minor <= allowance_high_minor "
             "AND gst_low_minor >= 0 AND gst_high_minor >= gst_low_minor",
             name="ck_budget_estimate__amounts",
         ),

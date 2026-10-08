@@ -12,7 +12,7 @@ from veda.modules.estimator.engine import EstimateError, EstimateRequest
 
 CARD_DOC = json.loads((Path(__file__).parents[1] / "fixtures/estimator/synthetic-rate-card.json").read_text())
 CARD = ratecard.parse(CARD_DOC)
-PREP_2BHK = 1_200_000 + 1_000_000 + 1_200_000 + 700_000 + 900_000 + 1_600_000 + 400_000  # carpentry, apartment
+PREP_2BHK = 1_200_000 + 1_000_000 + 1_200_000 + 700_000 + 900_000 + 400_000  # carpentry, apartment (no hardware)
 
 
 def req(*selections, package="ESSENTIAL", home_size="2BHK", property_type="APARTMENT", **extra):
@@ -50,11 +50,19 @@ def wardrobe(**options):
 
 def test_wardrobe_worked_example_measured():
     est = engine.calculate(CARD, req(wardrobe()))
-    assert lines(est) == {("WARDROBE", "BODY"): 42 * 100_000, ("WARDROBE", "LOFT"): 12 * 80_000}
-    assert est.prep_minor == PREP_2BHK
-    assert est.base_minor == 5_160_000 + PREP_2BHK == 12_160_000
-    assert (est.low_minor, est.high_minor) == (10_500_000, 14_000_000), "measured band −10/+15, rounded to ₹5,000"
-    assert (est.gst_low_minor, est.gst_high_minor) == (1_890_000, 2_520_000)
+    assert lines(est) == {
+        ("WARDROBE", "BODY"): 42 * 100_000,
+        ("WARDROBE", "LOFT"): 12 * 80_000,
+        ("WARDROBE", "SOFT_CLOSE"): 42 * 5_000,  # hinge hardware is part of the wardrobe (D5)
+        ("WARDROBE", "SOFT_CLOSE_LOFT"): 12 * 5_000,
+    }
+    assert est.prep_minor == PREP_2BHK == 5_400_000
+    work = 5_430_000
+    assert (est.allowance_low_minor, est.allowance_minor, est.allowance_high_minor) == (271_500, 543_000, 814_500)
+    assert est.base_minor == work + 543_000 + PREP_2BHK == 11_373_000, "allowance midpoint is in the base"
+    # low: 0.9 × (work + prep) + 5 % allowance = 10_018_500 → ₹1,00,00,000 paise; high: 1.15 × … + 15 % = 13_269_000
+    assert (est.low_minor, est.high_minor) == (10_000_000, 13_500_000), "measured band −10/+15, rounded to ₹5,000"
+    assert (est.gst_low_minor, est.gst_high_minor) == (1_800_000, 2_430_000)
     assert est.timeline["min_days"] == 70 and est.budget_range_code == "UNDER_5L"
     assert est.project_type_code == "BEDROOM_WARDROBE" and not est.assumptions
 
@@ -76,10 +84,13 @@ def test_typical_sizes_widen_the_band_and_are_labelled():
 EVERY_PRODUCT = [
     (
         sel("KITCHEN", "KITCHEN", {"RUN": (10, "ft"), "DRAWERS": (4, "nos")}),
-        3_000_000 + 2_000_000 + 1_600_000 + 2_000_000 + 800_000,
+        3_000_000 + 2_000_000 + 1_600_000 + 2_000_000 + 800_000 + (29 + 20 + 20) * 5_000,
     ),
-    (wardrobe(DOOR="SLIDING", GLASS="YES"), 4_200_000 + 960_000 + 1_000_000 + 420_000),
-    (sel("TV_UNIT", "LIVING", {"WIDTH": (7, "ft")}, STYLE="PANELLED"), 1_050_000 + 2_100_000 + 3_920_000),
+    (wardrobe(DOOR="SLIDING", GLASS="YES"), 4_200_000 + 960_000 + 1_000_000 + 420_000 + 12 * 5_000),
+    (
+        sel("TV_UNIT", "LIVING", {"WIDTH": (7, "ft")}, STYLE="PANELLED"),
+        1_050_000 + 2_100_000 + 3_920_000 + (9.1 + 21) * 5_000,
+    ),
     (sel("FEATURE_WALL", "LIVING", {"WIDTH": (8, "ft"), "HEIGHT": (9, "ft")}, FINISH="WALLPAPER"), 72 * 20_000),
     (sel("CROCKERY_UNIT", "DINING", {"WIDTH": (5, "ft"), "HEIGHT": (7, "ft")}, GLASS="YES"), 3_500_000 + 525_000),
     (sel("PARTITION", "LIVING", {"WIDTH": (4, "ft"), "HEIGHT": (8, "ft")}), 32 * 150_000),
@@ -90,6 +101,18 @@ EVERY_PRODUCT = [
     (sel("UTILITY", "UTILITY", {"WIDTH": (4, "ft")}), 800_000 + 500_000),
     (sel("PAINTING", "WHOLE_HOME", {"AREA": (2500, "sqft")}), 2500 * 2_500),
     (sel("ELECTRICAL", "WHOLE_HOME", {"CARPET": (1100, "sqft"), "SPOTS": (8, "nos")}), 1100 * 3_000 + 8 * 50_000),
+    # The recurring product types (D9).
+    (
+        sel("POOJA_UNIT", "POOJA", {"WIDTH": (3, "ft"), "DOOR_WIDTH": (4, "ft")}, DOOR="CNC_VENEER", ASTA_CHAKRA="YES"),
+        6 * 100_000 + 15 * 90_000 + 30 * 150_000 + 1_200_000,
+    ),
+    (sel("WINDOW_SEATING", "BEDROOM_2", {"WIDTH": (5, "ft")}), 10 * 100_000 + 45 * 80_000),
+    (sel("VENEER_ACCENTS", "KITCHEN", {"LENGTH": (18, "ft")}), 18 * 90_000),
+    (sel("STORAGE_BOXES", "MASTER_BEDROOM", {"WIDTH": (3, "ft"), "HEIGHT": (7, "ft")}), 21 * 100_000),
+    (
+        sel("CEILING_PROFILE_LIGHTING", "WHOLE_HOME", {"LENGTH": (50, "ft"), "COB": (4, "nos")}),
+        50 * 60_000 + 4 * 100_000,
+    ),
 ]
 
 
@@ -131,7 +154,7 @@ def test_square_metres_convert():
     "measurements,code",
     [
         ({"WIDTH": (0.1, "ft")}, "OUT_OF_BOUNDS"),
-        ({"WIDTH": (61, "ft")}, "OUT_OF_BOUNDS"),
+        ({"WIDTH": (151, "ft")}, "OUT_OF_BOUNDS"),
         ({"WIDTH": (6, "sqft")}, "INVALID_UNIT"),
         ({"DEPTH": (2, "ft")}, "UNKNOWN_INPUT"),
     ],
@@ -177,7 +200,7 @@ def test_request_schema_is_closed_and_has_no_personal_data():
         "selections",
     }
     with pytest.raises(ValidationError):
-        req(*[wardrobe()] * 31)
+        req(*[wardrobe()] * 41)
 
 
 # --- packages --------------------------------------------------------------------------------------------------------
@@ -207,11 +230,11 @@ def test_preparation_is_one_grouped_value_for_customers_and_detailed_for_staff()
     est = engine.calculate(CARD, req(wardrobe()))
     customer = est.customer_view()["project_preparation"]
     assert customer["label"] == "Project Preparation & Protection Package" and customer["amount_minor"] == PREP_2BHK
-    assert "components" not in customer and len(customer["inclusions"]) == 7
+    assert "components" not in customer and len(customer["inclusions"]) == 6
     assert "MANDATORY" not in json.dumps(est.customer_view()).upper()
     staff = est.staff_view()["project_preparation"]["components"]
     assert sum(c["amount_minor"] for c in staff) == PREP_2BHK
-    assert est.base_minor == sum(lines(est).values()) + PREP_2BHK, "never hidden from the total"
+    assert est.base_minor == sum(lines(est).values()) + est.allowance_minor + PREP_2BHK, "never hidden from the total"
 
 
 def test_preparation_follows_scope_home_size_and_property_type():
@@ -233,7 +256,9 @@ def test_room_subtotals_optional_items_and_total():
     view = est.customer_view()
     assert [r["room"] for r in view["rooms"]] == ["MASTER_BEDROOM"]
     assert view["optional_items_minor"] == 2000 * 2_500
-    assert est.base_minor == sum(r["amount_minor"] for r in view["rooms"]) + est.prep_minor + est.optional_minor
+    assert est.base_minor == (
+        sum(r["amount_minor"] for r in view["rooms"]) + est.allowance_minor + est.prep_minor + est.optional_minor
+    )
     assert view["range"]["low_minor"] <= est.base_minor <= view["range"]["high_minor"]
 
 
@@ -254,7 +279,7 @@ def test_customer_view_never_shows_rates_lines_or_quantities():
     assert view["title"] == "VEDA SPACES PRELIMINARY BUDGETARY ESTIMATE" and view["disclaimer"].startswith(
         "This is a preliminary"
     )
-    assert view["client_scope"] == ["Sink", "Tiles", "Granite", "Taps"] and view["rate_card_version"] == "SYNTHETIC-1"
+    assert view["client_scope"] == ["Sink", "Tiles", "Granite", "Taps"] and view["rate_card_version"] == "SYNTHETIC-2"
 
 
 def test_reproducible():
@@ -308,11 +333,14 @@ def test_lookup_mapping_and_warranty_follow_the_selection():
         (lambda d: d["packages"].update(ESSENTIAL=False), "ESSENTIAL must be enabled"),
         (lambda d: d["products"].append(copy.deepcopy(d["products"][0])), "duplicate product codes"),
         (lambda d: d["timeline"].reverse(), "timeline"),
-        (lambda d: d["products"][1]["inputs"][0]["typical"].update(DEFAULT=99), "outside bounds"),
+        (lambda d: d["products"][1]["inputs"][0]["typical"].update(DEFAULT=199), "outside bounds"),
         (lambda d: d["products"][1]["lines"][0]["quantity"].update(input="DEPTH"), "unknown input"),
         (lambda d: d["ranges"]["typical"].update(low_pct=1), "at least as wide"),
         (lambda d: d.update(salesperson="x"), "Extra inputs"),
         (lambda d: d["project_preparation"][0]["amounts"].update(HUGE=1), "approved home sizes"),
+        (lambda d: d["project_preparation"].append(dict(d["project_preparation"][0], code="SOFT_CLOSE")), "among"),
+        (lambda d: d["custom_features_allowance"].update(low_pct=20, high_pct=10), "must not be below"),
+        (lambda d: d.pop("custom_features_allowance"), "custom_features_allowance"),
     ],
 )
 def test_invalid_rate_cards_are_refused(mutate, message):
@@ -332,3 +360,69 @@ def test_a_home_size_without_approved_preparation_amounts_is_not_offered():
         engine.calculate(card, req(wardrobe(), home_size="2BHK"))
     assert err.value.errors[0]["code"] == "HOME_SIZE_UNAVAILABLE"
     assert engine.calculate(card, req(wardrobe(), home_size="3BHK")).prep_minor > 0
+
+
+# --- Custom Features Allowance and hardware (ADR-012 D5, D9) ----------------------------------------------------------
+
+
+def test_allowance_is_an_explicit_component_of_the_estimate():
+    est = engine.calculate(CARD, req(wardrobe(), sel("KITCHEN", "KITCHEN")))
+    work = sum(ln.amount_minor for ln in est.lines)
+    assert est.allowance_basis_minor == work
+    assert (est.allowance_low_minor, est.allowance_high_minor) == (round(work * 0.05), round(work * 0.15))
+    customer = est.customer_view()["custom_features_allowance"]
+    assert customer == {
+        "label": "Custom Features Allowance",
+        "description": engine.ALLOWANCE_DESCRIPTION,
+        "low_minor": est.allowance_low_minor,
+        "high_minor": est.allowance_high_minor,
+    }, "shown as its own range; the percentages and the basis stay internal"
+    staff = est.staff_view()["custom_features_allowance"]
+    assert staff["low_pct"] == 5 and staff["high_pct"] == 15 and staff["basis_minor"] == work
+    assert staff["amount_minor"] == est.allowance_minor
+
+
+def test_allowance_applies_to_room_work_only():
+    painting = engine.calculate(CARD, req(sel("PAINTING", "WHOLE_HOME", {"AREA": (2000, "sqft")})))
+    assert painting.allowance_basis_minor == 0 and painting.allowance_high_minor == 0, "never on optional items"
+    est = engine.calculate(CARD, req(wardrobe(), sel("PAINTING", "WHOLE_HOME", {"AREA": (2000, "sqft")})))
+    assert est.allowance_basis_minor == sum(ln.amount_minor for ln in est.lines if not ln.optional)
+    doc = copy.deepcopy(CARD_DOC)
+    doc["custom_features_allowance"] = {"low_pct": 0, "high_pct": 0, "applies_to": ["CEILING"]}
+    none = engine.calculate(ratecard.parse(doc), req(wardrobe()))
+    assert none.allowance_minor == 0 and none.base_minor == sum(lines(none).values()) + none.prep_minor
+
+
+def test_soft_close_hardware_is_in_the_products_not_the_package():
+    assert [c.code for c in CARD.project_preparation] == [
+        "FLOOR_PROTECTION",
+        "PLY_PROTECTION",
+        "FREIGHT",
+        "DEBRIS",
+        "DEEP_CLEANING",
+        "PEST_CONTROL",
+    ]
+    est = engine.calculate(
+        CARD, req(wardrobe(), sel("KITCHEN", "KITCHEN"), sel("TV_UNIT", "LIVING", {"WIDTH": (7, "ft")}, STYLE="BOX"))
+    )
+    hardware = {(ln.product, ln.code) for ln in est.lines if ln.code.startswith("SOFT_CLOSE")}
+    assert {p for p, _ in hardware} == {"WARDROBE", "KITCHEN", "TV_UNIT"}
+    assert ("TV_UNIT", "SOFT_CLOSE_STORAGE") not in hardware, "only the shutters that exist"
+    sliding = engine.calculate(CARD, req(wardrobe(DOOR="SLIDING")))
+    assert ("WARDROBE", "SOFT_CLOSE") not in lines(sliding), "sliding doors carry their channel, not hinges"
+    assert "hardware" not in est.customer_view()["project_preparation"]["description"]
+
+
+def test_a_full_home_fits_in_one_request():
+    bedrooms = ("MASTER_BEDROOM", "BEDROOM_2", "BEDROOM_3")
+    selections = [sel("KITCHEN", "KITCHEN"), sel("UTILITY", "UTILITY"), sel("POOJA_UNIT", "DINING")]
+    selections += [sel("TV_UNIT", "LIVING"), sel("VENEER_ACCENTS", "LIVING", STYLE="BEADING")]
+    selections += [sel("CEILING_PROFILE_LIGHTING", "WHOLE_HOME"), sel("FALSE_CEILING", "WHOLE_HOME")]
+    for room in bedrooms:
+        selections += [sel("WARDROBE", room), sel("BED", room), sel("VANITY_UNIT", room), sel("WINDOW_SEATING", room)]
+        selections += [sel("STORAGE_BOXES", room, TYPE="BEDSIDE_TABLE"), sel("STORAGE_BOXES", room)]
+        selections += [sel("FEATURE_WALL", room, FINISH="WALLPAPER"), sel("STUDY_UNIT", room)]
+    selections += [sel("PAINTING", "WHOLE_HOME"), sel("ELECTRICAL", "WHOLE_HOME")]
+    assert len(selections) == 33
+    est = engine.calculate(CARD, req(*selections, home_size="3BHK"))
+    assert est.low_minor < est.base_minor < est.high_minor and est.allowance_minor > 0

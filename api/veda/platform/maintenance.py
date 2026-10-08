@@ -807,7 +807,7 @@ def disk_usage() -> dict:
 
 
 def estimate_retention() -> dict:
-    """Soft-delete Budgetary Estimates never linked to a lead once expired beyond the retention period (ADR-012).
+    """Soft-delete Budgetary Estimates never linked to a lead once the retention period has passed (ADR-012 D7).
     They hold no personal data; linked estimates follow the lead."""
     from veda.modules.estimator.service import purge_expired
 

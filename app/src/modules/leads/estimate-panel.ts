@@ -139,6 +139,8 @@ export class VsEstimatePanel extends SessionElement {
       <section><h3 class="eyebrow">${e.project_preparation.label} — ${rupees(e.project_preparation.amount_minor)}</h3>
         <ul>${(e.project_preparation.components ?? []).map((c) => html`<li>${c.label} (${c.inclusion}): ${rupees(c.amount_minor)}</li>`)}</ul>
         <p class="meta">Customers see this as one grouped value; the detailed final quotation shows every component.</p></section>
+      <section><h3 class="eyebrow">${e.custom_features_allowance.label} — ${rupees(e.custom_features_allowance.low_minor)} – ${rupees(e.custom_features_allowance.high_minor)}</h3>
+        <p class="meta">${e.custom_features_allowance.low_pct}–${e.custom_features_allowance.high_pct}% of room work ${rupees(e.custom_features_allowance.basis_minor ?? 0)}; midpoint ${rupees(e.custom_features_allowance.amount_minor ?? 0)} is in the base. Shown to the customer as its own range; the detailed quotation replaces it with the actual items.</p></section>
       <section><h3 class="eyebrow">Measurements</h3>
         <ul>${d.inputs.selections.map((s, i) => html`<li>${humanize(s.room)} – ${humanize(s.product)}: ${measurementRows(s, this.typicalInputs(s, i)).map((m) => (m.typical ? `${humanize(m.name)} typical` : `${humanize(m.name)} ${m.value} ${m.unit}`)).join(', ') || 'no measurement needed'}</li>`)}</ul></section>
       <section><h3 class="eyebrow">Assumptions</h3><ul>${e.assumptions.map((a) => html`<li>${a}</li>`)}</ul></section>
@@ -171,10 +173,12 @@ export class VsEstimatePanel extends SessionElement {
   }
 
   private renderCopy() {
-    const c = this.copy as { title?: string; reference?: string; range?: { low_minor: number; high_minor: number }; disclaimer?: string; assumptions?: string[] } | null;
+    const c = this.copy as { title?: string; reference?: string; range?: { low_minor: number; high_minor: number }; disclaimer?: string; assumptions?: string[]; custom_features_allowance?: { label: string; description: string; low_minor: number; high_minor: number } } | null;
     if (!c) return nothing;
+    const allowance = c.custom_features_allowance;
     return html`<div class="stack"><h3>${c.title}</h3><p class="meta">Consultation copy · ${c.reference}</p><p>${c.disclaimer}</p>
-      ${c.range ? html`<p class="range">${rangeText(c.range)}</p>` : nothing}<ul>${(c.assumptions ?? []).map((a) => html`<li>${a}</li>`)}</ul>
+      ${c.range ? html`<p class="range">${rangeText(c.range)}</p>` : nothing}
+      ${allowance ? html`<p>${allowance.label}: ${rangeText(allowance)} — ${allowance.description}</p>` : nothing}<ul>${(c.assumptions ?? []).map((a) => html`<li>${a}</li>`)}</ul>
       <p class="meta">A preliminary budgetary estimate, not a quotation.</p></div>`;
   }
 

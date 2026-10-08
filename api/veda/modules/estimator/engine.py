@@ -1,9 +1,11 @@
 """Budgetary Estimate pricing engine (ADR-012 §3). Pure: no database, no clock, no I/O.
 
-    quantity × rate(item, package)          per quotation-style line, in paise
+    quantity × rate(item, package)          per quotation-style line, in paise (hardware in its product)
+  + Custom Features Allowance              room work × the card's band (its midpoint in the base)
   + Project Preparation & Protection Package (by home size and property type)
   + selected optional items (painting, electrical and lighting)
-  = base estimate  →  range (measured or typical-size band per line)  →  GST, timeline, warranty, assumptions
+  = base estimate  →  range (measured or typical-size band per line, plus the allowance band)  →  GST, timeline,
+    warranty, assumptions
 
 The same inputs and rate card always give the same result (`CALCULATION_VERSION` names these rules). The result has a
 customer view (no rates, no line amounts) and a staff view (every line and every preparation component).
@@ -20,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .ratecard import ProductSpec, RateCard
 
-CALCULATION_VERSION = "2026.10.1"
+CALCULATION_VERSION = "2026.10.2"
 TITLE = "VEDA SPACES PRELIMINARY BUDGETARY ESTIMATE"
 DISCLAIMER = (
     "This is a preliminary budgetary estimate for planning purposes and is not a final quotation or contractual offer."
@@ -38,12 +40,17 @@ SUBJECT_TO = (
 )
 PREP_PACKAGE = "Project Preparation & Protection Package"
 PREP_DESCRIPTION = (
-    "Includes the site preparation, material handling, protection, standard hardware setup and completion activities "
-    "required to execute and hand over the selected work safely and professionally."
+    "Includes the site preparation, material handling, protection and completion activities required to execute and "
+    "hand over the selected work safely and professionally."
 )
 PREP_NOTE = (
     "Shown as one grouped value for clarity. It is part of the estimate total, and the detailed final quotation shows "
     "every component."
+)
+ALLOWANCE = "Custom Features Allowance"
+ALLOWANCE_DESCRIPTION = (
+    "Bespoke details usually added during design, such as extra drawers, mirrors, pelmets, lighting sensors and "
+    "material upgrades. It is part of the estimate total; the detailed quotation replaces it with the actual items."
 )
 ROOMS = OrderedDict(
     [
@@ -118,7 +125,7 @@ class EstimateRequest(_Model):
     project_kind: Literal["NEW_HOME", "RENOVATION"]
     city: Annotated[str, Field(min_length=1, max_length=60, pattern=r"^[\w .,'()-]+$")] | None = None
     package: Literal["ESSENTIAL", "PREMIUM", "LUXURY"]
-    selections: tuple[Selection, ...] = Field(min_length=1, max_length=30)
+    selections: tuple[Selection, ...] = Field(min_length=1, max_length=40)  # a full 3 BHK needs up to ~37
 
 
 class EstimateError(ValueError):
@@ -178,6 +185,12 @@ class Estimate:
     lines: list[Line] = field(default_factory=list)
     assumptions: list[Assumption] = field(default_factory=list)
     prep: list[PrepComponentAmount] = field(default_factory=list)
+    allowance_basis_minor: int = 0  # the room work the allowance applies to
+    allowance_low_pct: float = 0
+    allowance_high_pct: float = 0
+    allowance_minor: int = 0  # the band's midpoint, part of the base
+    allowance_low_minor: int = 0
+    allowance_high_minor: int = 0
     base_minor: int = 0
     low_minor: int = 0
     high_minor: int = 0
@@ -227,6 +240,12 @@ class Estimate:
                 "amount_minor": self.prep_minor,
                 "inclusions": list(OrderedDict.fromkeys(c.inclusion for c in self.prep)),
             },
+            "custom_features_allowance": {
+                "label": ALLOWANCE,
+                "description": ALLOWANCE_DESCRIPTION,
+                "low_minor": self.allowance_low_minor,
+                "high_minor": self.allowance_high_minor,
+            },
             "optional_items_minor": self.optional_minor,
             "timeline": self.timeline,
             "assumptions": [a.text for a in self.assumptions],
@@ -263,6 +282,12 @@ class Estimate:
             {"code": c.code, "label": c.label, "inclusion": c.inclusion, "amount_minor": c.amount_minor}
             for c in self.prep
         ]
+        view["custom_features_allowance"].update(
+            amount_minor=self.allowance_minor,
+            basis_minor=self.allowance_basis_minor,
+            low_pct=self.allowance_low_pct,
+            high_pct=self.allowance_high_pct,
+        )
         view["assumption_details"] = [a.__dict__ for a in self.assumptions]
         view["budget_range_code"] = self.budget_range_code
         view["project_type_code"] = self.project_type_code
@@ -348,6 +373,7 @@ def calculate(card: RateCard, request: EstimateRequest) -> Estimate:
     if errors:
         raise EstimateError(errors)
     _project_preparation(card, request, selected, est)
+    _allowance(card, est)
     _totals(card, est)
     est.warranty = _warranty(selected)
     est.project_type_code = _project_type(selected)
@@ -461,9 +487,23 @@ def _project_preparation(card: RateCard, request: EstimateRequest, selected: lis
         est.prep.append(PrepComponentAmount(comp.code, comp.label, comp.inclusion, _paise(amount)))
 
 
+def _allowance(card: RateCard, est: Estimate) -> None:
+    """The Custom Features Allowance: a disclosed band on the room work of the card's categories (never hidden inside
+    another amount). The midpoint is part of the base; the band widens the range."""
+    spec = card.custom_features_allowance
+    categories = {p.code: p.category for p in card.products}
+    basis = sum(line.amount_minor for line in est.lines if categories[line.product] in spec.applies_to)
+    low, high = Decimal(str(spec.low_pct)) / 100, Decimal(str(spec.high_pct)) / 100
+    est.allowance_basis_minor = basis
+    est.allowance_low_pct, est.allowance_high_pct = spec.low_pct, spec.high_pct
+    est.allowance_low_minor = _paise(basis * low)
+    est.allowance_high_minor = _paise(basis * high)
+    est.allowance_minor = _paise(basis * (low + high) / 2)
+
+
 def _totals(card: RateCard, est: Estimate) -> None:
     measured, typical = card.ranges.measured, card.ranges.typical
-    base = sum(line.amount_minor for line in est.lines) + est.prep_minor
+    base = sum(line.amount_minor for line in est.lines) + est.allowance_minor + est.prep_minor
     low = high = Decimal(0)
     for line in est.lines:
         band = typical if line.typical else measured
@@ -471,6 +511,8 @@ def _totals(card: RateCard, est: Estimate) -> None:
         high += line.amount_minor * (1 + Decimal(str(band.high_pct)) / 100)
     low += est.prep_minor * (1 - Decimal(str(measured.low_pct)) / 100)
     high += est.prep_minor * (1 + Decimal(str(measured.high_pct)) / 100)
+    low += est.allowance_low_minor
+    high += est.allowance_high_minor
     step = card.ranges.round_to_minor
     est.base_minor = base
     est.low_minor = max(0, _round(low, step, ROUND_FLOOR))

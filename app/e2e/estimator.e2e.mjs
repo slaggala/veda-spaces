@@ -69,8 +69,9 @@ await page.fill('[data-input="WIDTH"][data-role="value"]', '6');
 await axe('step 3 (measurements)');
 await page.click('#step-3 button[type="submit"]');
 const premiumDisabled = await page.locator('input[name="package"][value="PREMIUM"]').isDisabled();
-check('step 4: Premium and Luxury unavailable without approved rates', premiumDisabled &&
-  (await page.locator('input[name="package"][value="LUXURY"]').isDisabled()));
+const luxuryLabel = await page.locator('label:has(input[name="package"][value="LUXURY"])').textContent();
+check('step 4: Premium unavailable without approved rates; Luxury offered as a design consultation (D2)', premiumDisabled &&
+  !(await page.locator('input[name="package"][value="LUXURY"]').isDisabled()) && /design consultation/.test(luxuryLabel));
 await page.selectOption('[data-option="DOOR"]', 'SLIDING');
 await axe('step 4 (preferences)');
 await page.click('#est-calculate');
@@ -79,6 +80,10 @@ const result = await page.evaluate(() => ({
   title: document.getElementById('est-result-title').textContent,
   range: document.getElementById('est-range').textContent,
   prep: document.getElementById('est-prep-label').textContent,
+  allowance: document.getElementById('est-allowance-label').textContent,
+  allowanceRange: document.getElementById('est-allowance-range').textContent,
+  inclusions: document.querySelectorAll('#est-prep-inclusions li').length,
+  prepText: document.querySelector('.est-prep').innerText,
   disclaimer: document.getElementById('est-disclaimer').textContent,
   assumptions: document.querySelectorAll('#est-assumptions li').length,
   text: document.querySelector('main').innerText,
@@ -87,6 +92,9 @@ check('result: title, range, grouped preparation package, disclaimer', result.ti
   /₹[\d,]+ – ₹[\d,]+/.test(result.range) && result.prep === 'Project Preparation & Protection Package' &&
   result.disclaimer.startsWith('This is a preliminary budgetary estimate'), JSON.stringify(result.range));
 check('result: typical sizes labelled as assumptions', result.assumptions >= 2);
+check('result: Custom Features Allowance shown as its own range (D9)', result.allowance === 'Custom Features Allowance' &&
+  /₹[\d,]+ – ₹[\d,]+/.test(result.allowanceRange), result.allowanceRange);
+check('result: the package lists its six site activities, no hardware (D5)', result.inclusions === 6 && !/hardware/i.test(result.prepText));
 check('result: no "mandatory" framing and no line rates', !/mandatory/i.test(result.text) && !/per sq/i.test(result.text));
 await axe('step 5 (estimate)');
 
@@ -102,7 +110,28 @@ const ref = await page.textContent('#eq-reference');
 check('enquiry → confirmation with a customer reference', /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(ref || ''), ref);
 await collectCsp();
 
-// 4. Mobile width.
+// 4. Luxury: no price, straight to a design consultation (D2).
+await page.goto(`${ON}/estimate?visit=4`);
+await page.selectOption('#est-home-size', '3BHK');
+await page.click('#step-1 button[type="submit"]');
+await page.check('input[value="KITCHEN:KITCHEN"]');
+await page.click('#step-2 button[type="submit"]');
+await page.click('#step-3 button[type="submit"]');
+await page.check('input[name="package"][value="LUXURY"]');
+check('luxury: the action is a design consultation, not a price', (await page.textContent('#est-calculate')).includes('design consultation'));
+await page.click('#est-calculate');
+await page.waitForSelector('#step-6:not([hidden])');
+check('luxury: enquiry explains the consultation', /priced after a design consultation/.test(await page.textContent('#eq-intro')));
+await page.fill('#eq-name', 'Kavya Rao');
+await page.fill('#eq-phone', '98480 54321');
+await page.check('#eq-consent');
+await page.click('#eq-submit');
+await page.waitForSelector('#step-7:not([hidden])');
+check('luxury: confirmation with a reference and no estimate', /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test((await page.textContent('#eq-reference')) || '') &&
+  !(await visible('#eq-estimate-line')));
+await collectCsp();
+
+// 5. Mobile width.
 await page.setViewportSize({ width: 360, height: 800 });
 await page.goto(`${ON}/estimate?visit=3`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -394,8 +394,9 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
    - a forged Turnstile token gets `422`;
    - an anonymous request gets a `302` to Access.
 
-**Retention:** the daily `estimate-retention` job soft-deletes estimates never linked to a lead once
-`expires_on + VEDA_ESTIMATE_RETENTION_DAYS` has passed (default 90, an owner input).
+**Retention:** the daily `estimate-retention` job soft-deletes estimates never linked to a lead
+`VEDA_ESTIMATE_RETENTION_DAYS` after creation (90, owner decision D7), and never while an estimate is still valid
+(30 days). A linked estimate stays with its lead.
 
 ## 7. Staging apply sequence
 

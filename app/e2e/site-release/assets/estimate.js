@@ -13,7 +13,7 @@ const $ = (sel) => document.querySelector(sel);
 const ROOMS = [
   ['KITCHEN', 'Kitchen', 1], ['UTILITY', 'Utility', 1], ['LIVING', 'Living room', 1], ['DINING', 'Dining', 1],
   ['MASTER_BEDROOM', 'Master bedroom', 1], ['BEDROOM_2', 'Bedroom 2', 2], ['BEDROOM_3', 'Bedroom 3', 3],
-  ['BEDROOM_4', 'Bedroom 4', 4], ['STUDY', 'Study', 1], ['WHOLE_HOME', 'Whole home', 1],
+  ['BEDROOM_4', 'Bedroom 4', 4], ['STUDY', 'Study', 1], ['POOJA', 'Pooja room', 1], ['WHOLE_HOME', 'Whole home', 1],
 ];
 const BEDROOMS = ['MASTER_BEDROOM', 'BEDROOM_2', 'BEDROOM_3', 'BEDROOM_4'];
 const YES_NO = [['YES', 'Yes'], ['NO', 'No']];
@@ -30,13 +30,19 @@ const PRODUCTS = {
   VANITY_UNIT: { label: 'Vanity unit', rooms: [...BEDROOMS, 'DINING', 'WHOLE_HOME'], inputs: [LEN('WIDTH', 'Width', 'Width of a dresser vanity (not needed for a toilet vanity).')], options: [['TYPE', 'Type', [['TOILET', 'Toilet vanity'], ['DRESSER', 'Dresser vanity']]], ['MIRROR', 'Mirror', YES_NO]] },
   BED: { label: 'Bed and headboard', rooms: BEDROOMS, inputs: [], options: [['SIZE', 'Size', [['QUEEN', 'Queen'], ['KING', 'King']]], ['STORAGE', 'Storage', [['HYDRAULIC', 'Hydraulic storage'], ['NONE', 'No storage']]], ['HEADBOARD', 'Headboard', [['PANEL', 'Panelled'], ['CUSHIONED', 'Cushioned'], ['NONE', 'None']]]] },
   UTILITY: { label: 'Utility unit', rooms: ['UTILITY'], inputs: [LEN('WIDTH', 'Width', 'Width of the utility wall unit.')], options: [] },
+  POOJA_UNIT: { label: 'Pooja unit', rooms: ['POOJA', 'DINING', 'LIVING'], inputs: [LEN('WIDTH', 'Unit width', 'Width of the mandir unit.'), LEN('DOOR_WIDTH', 'Door opening width', 'Width of the pooja door opening.')], options: [['DOOR', 'Pooja doors', [['STANDARD', 'Standard doors'], ['CNC_VENEER', 'CNC-cut veneer doors'], ['NONE', 'No doors']]], ['BEADING', 'Veneer beading', YES_NO], ['ASTA_CHAKRA', 'Ceiling asta chakra', [['NO', 'No'], ['YES', 'Yes']]]] },
+  WINDOW_SEATING: { label: 'Window seating', rooms: [...BEDROOMS, 'LIVING', 'STUDY'], inputs: [LEN('WIDTH', 'Window width', 'Width of the window or sit-out.')], options: [['ARCH', 'Window arch framing', YES_NO]] },
+  VENEER_ACCENTS: { label: 'Veneer accents', rooms: ['LIVING', 'DINING', 'KITCHEN', 'POOJA', 'WHOLE_HOME', ...BEDROOMS], inputs: [LEN('LENGTH', 'Running length', 'Total length of the arch, ceiling strip or beading.')], options: [['STYLE', 'Accent', [['ARCH', 'Veneer arch'], ['CEILING_STRIP', 'Veneer strip in the ceiling'], ['BEADING', 'Sofa-back beading']]]] },
+  STORAGE_BOXES: { label: 'Storage boxes', rooms: [...BEDROOMS, 'KITCHEN', 'LIVING', 'DINING', 'UTILITY'], inputs: [LEN('WIDTH', 'Width', 'Width of the box or tall unit.'), LEN('HEIGHT', 'Height', 'Height of a tall storage box (not needed for bedside units).')], options: [['TYPE', 'Type', [['TALL', 'Tall storage box'], ['BEDSIDE_BOX', 'Bedside box'], ['BEDSIDE_TABLE', 'Bedside table']]]] },
+  CEILING_PROFILE_LIGHTING: { label: 'Ceiling profile lighting', rooms: ['WHOLE_HOME', 'LIVING', 'DINING', 'KITCHEN', ...BEDROOMS], inputs: [LEN('LENGTH', 'Profile length', 'Total running length of profile lights.'), { name: 'COB', label: 'COB lights', kind: 'count', hint: 'Number of COB lights, if any.' }], options: [] },
   PAINTING: { label: 'Painting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'AREA', label: 'Wall area', kind: 'area', hint: 'Total wall area to paint.' }], options: [['SYSTEM', 'Paint system', [['FULL', 'Primer, putty and two coats'], ['REPAINT', 'Two coats only']]]] },
   ELECTRICAL: { label: 'Electrical and lighting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'CARPET', label: 'Carpet area', kind: 'area', hint: 'Carpet area of the home.' }, { name: 'SPOTS', label: 'Spot lights', kind: 'count', hint: 'Number of spot lights.' }], options: [] },
 };
 const UNITS = { length: [['ft', 'ft'], ['in', 'in'], ['m', 'm'], ['cm', 'cm']], area: [['sqft', 'sq ft'], ['sqm', 'sq m']], count: [['nos', 'nos']] };
-const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', 'Premium finishes and top hardware tiers.']];
+const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', 'Design-led, bespoke materials and a dedicated designer.']];
+// Luxury has no public price (ADR-012 D2): it leads straight to a design consultation.
 const STATE_KEY = 'veda-estimate-v1';
-const state = { step: 1, home: {}, items: [], package: 'ESSENTIAL', estimate: null, enquiryKey: null };
+const state = { step: 1, home: {}, items: [], package: 'ESSENTIAL', estimate: null, enquiryKey: null, luxury: false };
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -146,11 +152,14 @@ function renderPreferences() {
   const fs = $('#est-packages');
   fs.replaceChildren(el('legend', { text: 'Package' }));
   for (const [code, label, description] of PACKAGES) {
-    const on = enabledPackages.includes(code);
-    fs.append(el('label', { class: `choice package${on ? '' : ' unavailable'}` },
-      el('input', { type: 'radio', name: 'package', value: code, checked: state.package === code, disabled: !on }),
-      ` ${label} — ${on ? description : 'pricing coming soon'}`));
+    const luxury = code === 'LUXURY';
+    const on = luxury || enabledPackages.includes(code);
+    const input = el('input', { type: 'radio', name: 'package', value: code, checked: state.package === code, disabled: !on });
+    input.addEventListener('change', packageChanged);
+    fs.append(el('label', { class: `choice package${on ? '' : ' unavailable'}` }, input,
+      ` ${label} — ${luxury ? `${description} Priced after a design consultation.` : on ? description : 'pricing coming soon'}`));
   }
+  packageChanged();
   const box = $('#est-options');
   box.replaceChildren();
   state.items.forEach((item, idx) => {
@@ -164,6 +173,11 @@ function renderPreferences() {
     }
     box.append(fs2);
   });
+}
+function packageChanged() {
+  const luxury = document.querySelector('input[name="package"]:checked')?.value === 'LUXURY';
+  $('#est-calculate').textContent = luxury ? 'Request a design consultation →' : 'See my estimate →';
+  $('#est-turnstile-estimate').hidden = luxury;
 }
 function readPreferences() {
   state.package = document.querySelector('input[name="package"]:checked')?.value || 'ESSENTIAL';
@@ -256,6 +270,10 @@ function renderResult(e) {
   const optional = $('#est-optional');
   optional.hidden = !e.optional_items_minor;
   optional.textContent = e.optional_items_minor ? `Optional items you selected (included above): ${inr(e.optional_items_minor)}.` : '';
+  const allowance = e.custom_features_allowance;
+  $('#est-allowance-label').textContent = allowance.label;
+  $('#est-allowance-range').textContent = `${inr(allowance.low_minor)} – ${inr(allowance.high_minor)}`;
+  $('#est-allowance-description').textContent = allowance.description;
   $('#est-timeline').textContent = `${e.timeline.label} (about ${e.timeline.min_days}–${e.timeline.max_days} days after design approval).`;
   list('#est-assumptions', e.assumptions.length ? e.assumptions : ['All measurements were entered by you.']);
   list('#est-exclusions', e.exclusions);
@@ -267,6 +285,16 @@ function renderResult(e) {
   $('#est-meta').textContent = `Estimate ${e.reference} · rate card ${e.rate_card_version} · valid until ${e.expires_on}.`;
 }
 
+function toEnquiry() {
+  $('#eq-location').value = state.home.city || '';
+  $('#eq-intro').textContent = state.luxury
+    ? 'Luxury is priced after a design consultation. Our designer will call you to understand your home and arrange a site visit.'
+    : 'Our designer will review your estimate with you, arrange a site measurement and prepare your detailed quotation.';
+  $('#eq-back').textContent = state.luxury ? '← Back to preferences' : '← Back to my estimate';
+  show(6);
+  renderWidget('enquiry', '#est-turnstile-enquiry');
+}
+
 // --- wiring -----------------------------------------------------------------------------------------------------------------------
 
 function init() {
@@ -276,7 +304,7 @@ function init() {
   try { Object.assign(state, JSON.parse(sessionStorage.getItem(STATE_KEY) || '{}')); } catch { /* fresh start */ }
 
   document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => {
-    const back = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 }[state.step] || 1;
+    const back = { 2: 1, 3: 2, 4: 3, 5: 4, 6: state.luxury ? 4 : 5 }[state.step] || 1;
     if (back === 2) renderRooms(); if (back === 3) renderMeasurements(); if (back === 4) { renderPreferences(); renderWidget('estimate', '#est-turnstile-estimate'); }
     show(back);
   }));
@@ -308,6 +336,8 @@ function init() {
   $('#step-4').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     readPreferences();
+    state.luxury = state.package === 'LUXURY';
+    if (state.luxury) { toEnquiry(); return; }
     const button = $('#est-calculate');
     button.disabled = true;
     ev.target.setAttribute('aria-busy', 'true');
@@ -324,11 +354,7 @@ function init() {
     renderWidget('estimate', '#est-turnstile-estimate');
     summary(explain(r.body));
   });
-  $('#est-to-quote').addEventListener('click', () => {
-    $('#eq-location').value = state.home.city || '';
-    show(6);
-    renderWidget('enquiry', '#est-turnstile-enquiry');
-  });
+  $('#est-to-quote').addEventListener('click', toEnquiry);
   $('#step-6').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const f = new FormData(ev.target);
@@ -344,16 +370,18 @@ function init() {
     const r = await post('/api/v1/public/enquiries', {
       name: String(f.get('name')).trim(), phone: String(f.get('phone')).trim(), email: String(f.get('email') || '').trim() || null,
       city: String(f.get('location') || '').trim() || null, preferred_contact: f.get('preferred_contact'),
-      message: `Requested a detailed quotation after Budgetary Estimate ${state.estimate.reference}.`,
+      message: state.luxury ? `Requested a Luxury design consultation for: ${state.items.map(itemTitle).join(', ')}.`.slice(0, 500) : `Requested a detailed quotation after Budgetary Estimate ${state.estimate.reference}.`,
       consent: { acknowledged: true, policy_version: meta('veda-policy-version') },
-      estimate_reference: state.estimate.reference, company_website_url: String(f.get('company_website_url') || ''),
+      estimate_reference: state.luxury ? null : state.estimate.reference, company_website_url: String(f.get('company_website_url') || ''),
+      ...(state.luxury ? { consultation: 'LUXURY_DESIGN' } : {}),
       turnstile_token: token('enquiry'),
       attribution: { form_page: '/estimate', landing_page: location.pathname },
     }, { 'Idempotency-Key': state.enquiryKey });
     button.disabled = false;
     if (r.status === 201) {
       $('#eq-reference').textContent = r.body.data.reference;
-      $('#eq-estimate-reference').textContent = state.estimate.reference;
+      $('#eq-estimate-line').hidden = state.luxury;
+      if (!state.luxury) $('#eq-estimate-reference').textContent = state.estimate.reference;
       show(7);
       try { sessionStorage.removeItem(STATE_KEY); } catch { /* ignore */ }
       return;
@@ -362,7 +390,7 @@ function init() {
     summary(explain(r.body));
   });
 
-  if (state.estimate && state.step >= 5 && state.step <= 6) { renderResult(state.estimate); show(5); } else show(1);
+  if (state.estimate && !state.luxury && state.step >= 5 && state.step <= 6) { renderResult(state.estimate); show(5); } else show(1);
 }
 
 init();

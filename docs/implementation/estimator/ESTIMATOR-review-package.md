@@ -1,8 +1,9 @@
 # Budgetary Estimate: consolidated independent-review package (ADR-012; ADR-011 conditions)
 
 **Instruction:** `VEDA-SPACES-PUBLIC-INTAKE-AND-BUDGET-ESTIMATOR-IMPLEMENTATION` (owner, 2026-10-08).
-**Branch:** `feature/budget-estimator`, one workstream with phase commits E1 to E6. **E7 (the public-intake hostname)
-is not implemented**: it waits for this review, staging validation and the owner's explicit enablement.
+**Branch:** `feature/budget-estimator`, one workstream with phase commits E1 to E6, plus the frozen business rules
+(ADR-012 §11: D1–D9 and the soft-close modification). **E7 (the public-intake hostname) is not implemented**: it waits
+for this review, staging validation and the owner's explicit enablement.
 
 **Governance held throughout:**
 - public intake disabled, and Cloudflare Access unchanged;
@@ -25,18 +26,23 @@ is not implemented**: it waits for this review, staging validation and the owner
 | 7 | Rates are never inferred | `RateCard._consistent` (an enabled package must price every line); Premium and Luxury off in the private card; `PACKAGE_UNAVAILABLE` |
 | 8 | Project costs are honestly grouped | Engine `customer_view` (one value plus inclusions, never hidden from the total); staff view has the components; no "mandatory" label (test) |
 | 9 | Reproducibility | Each estimate stores the inputs, the card version and SHA, and the rule version; `test_snapshot_is_complete_and_reproducible` recomputes and compares |
+| 10 | The Custom Features Allowance is explicit, never hidden (D9) | Engine `_allowance`; its own customer-view component (label, description, range; no percentage or basis); `test_allowance_is_an_explicit_component_of_the_estimate`; stored as its own columns |
+| 11 | No hardware in the package (D5) | `ratecard.PREP_COMPONENTS` (the schema refuses any other component); soft-close lines in the kitchen, wardrobe and TV unit; `test_soft_close_hardware_is_in_the_products_not_the_package` |
+| 12 | Luxury has no public price (D2) | Wizard: Luxury leads to a consultation enquiry; `consultation: "LUXURY_DESIGN"` marks the lead; `test_luxury_enquiry_requests_a_design_consultation` |
 
 ## 2. Pricing engine (E1)
 
 `veda/modules/estimator/engine.py` is pure: no database, clock or I/O. Its rules version is
-`CALCULATION_VERSION = "2026.10.1"`.
+`CALCULATION_VERSION = "2026.10.2"`.
 
 ```
-line   = quantity(inputs, options) × rate[package]     # paise, half-up; quantity in hundredths
-base   = Σ lines (rooms) + Project Preparation & Protection Package(home size, property type, scope)
-         + selected optional items (painting, electrical and lighting)
-range  = Σ line × (1 ∓ band) where band = typical-size band if the line used an assumed size, else the measured band;
-         preparation uses the measured band; low rounded down and high rounded up to the card's step
+line      = quantity(inputs, options) × rate[package]  # paise, half-up; quantity in hundredths; hardware in its product
+work      = Σ lines of the allowance categories (carpentry, ceiling, finish; never optional items or the package)
+allowance = work × [low %, high %]                      # Custom Features Allowance (D9); midpoint in the base
+base      = Σ lines (rooms) + allowance midpoint + Project Preparation & Protection Package(home size, property, scope)
+            + selected optional items (painting, electrical and lighting)
+range     = Σ line × (1 ∓ band) where band = typical-size band if the line used an assumed size, else the measured
+            band; preparation uses the measured band; + the allowance band; low rounded down and high rounded up
 GST    = range × gst_pct, shown separately
 timeline = the band containing the upper estimate;  warranty = summary filtered to the selection
 ```
@@ -46,9 +52,14 @@ timeline = the band containing the upper estimate;  warranty = summary filtered 
 - **Assumptions:** recorded only for measurements that priced a line.
 - **Preparation package:** includes only components applicable to the selected scope (carpentry, ceiling, finish,
   optional), with a villa factor.
-- **Supported:** all 13 products (Kitchen, Wardrobe, TV Unit, Living Room feature wall, Crockery Unit, Partition, False
-  Ceiling, Study Unit, Vanity Unit, Bed and Headboard, Utility, optional Painting, optional Electrical and Lighting),
-  Apartment or Villa, 1–4 BHK or Custom.
+- **Supported:** 18 products:
+  - the original 13: Kitchen, Wardrobe, TV Unit, Living Room feature wall, Crockery Unit, Partition, False Ceiling,
+    Study Unit, Vanity Unit, Bed and Headboard, Utility, optional Painting, optional Electrical and Lighting;
+  - the five recurring types (D9): Pooja Unit, Window Seating, Veneer Accents, Storage Boxes, Ceiling Profile Lighting.
+
+  Apartment or Villa, 1–4 BHK or Custom, up to 40 selections.
+- **Soft-close hardware (D5):** priced per sq ft of shutter area in the kitchen (base, wall, loft), wardrobe (hinged
+  body, loft) and TV unit (box, storage). It is not in the package.
 
 ## 3. Rate-card schema (`veda.estimator.rate-card/1`)
 
@@ -59,8 +70,11 @@ timeline = the band containing the upper estimate;  warranty = summary filtered 
 - **`bounds`:** per input kind.
 - **`products`:** code, label, category, area, rooms, inputs with typical sizes by home size, options, and lines
   (code, label, UOM, quantity, rates by package, conditions).
-- **`project_preparation`:** components with an inclusion text, amounts by home size and a villa factor. A home size
-  without an approved amount is not offered.
+- **`project_preparation`:** components with an inclusion text, amounts by home size and a villa factor. Only floor
+  protection, plywood protection, freight, debris handling, deep cleaning and pest control are accepted (D5). A home
+  size without an approved amount is not offered.
+- **`custom_features_allowance`** (required): `low_pct`, `high_pct` (0–50, high ≥ low) and the categories it applies
+  to.
 - **`timeline`:** ascending bands, the last one open.
 - **`exclusions`, `client_scope`.**
 
@@ -73,7 +87,7 @@ without rates, and (in the loader) any email address or phone number.
 |---|---|
 | `estimator_rate_card` | The versioned card: document, SHA-256, rule version, status DRAFT/ACTIVE/RETIRED (one ACTIVE, partial unique index), approval reference, activation and retirement |
 | `estimator_rate_item` | Flattened lines of a card, for staff review |
-| `budget_estimate` | Immutable snapshot: public reference, card and rule versions, origin (PUBLIC/STAFF), source estimate, package, property, home size, kind, city, inputs, staff-view result, base/range/preparation/optional/GST amounts, timeline, lookup codes, expiry, site-measurement flag |
+| `budget_estimate` | Immutable snapshot: public reference, card and rule versions, origin (PUBLIC/STAFF), source estimate, package, property, home size, kind, city, inputs, staff-view result, base/range/preparation/allowance (midpoint, low, high)/optional/GST amounts, timeline, lookup codes, expiry, site-measurement flag |
 | `budget_estimate_line` | Each priced line (quantity in hundredths, rate, amount, typical, optional) |
 | `budget_estimate_assumption` | Each assumed measurement (value in hundredths, unit, text) |
 | `budget_estimate_project_item` | Preparation components (internal) |
@@ -89,7 +103,7 @@ in the audit registry (FULL; documents and results not snapshotted). Permissions
 | Method and path | Auth | Purpose |
 |---|---|---|
 | `POST /api/v1/public/estimates` | Public, RBX-007, flag, Turnstile, limits: 10/min and 60/h per IP, 120/h per network, 6/min per browser token (`X-Veda-Client`), 600/h aggregate | Create an estimate; customer-safe response with reference and expiry |
-| `POST /api/v1/public/enquiries` | Public, RBX-007, flag, Turnstile, consent, Idempotency-Key, limits: 5/min and 30/h per IP, 60/h per network, 3/min per browser token, 300/h aggregate | The website enquiry plus `estimate_reference` and `preferred_contact`; returns `{reference, message}` |
+| `POST /api/v1/public/enquiries` | Public, RBX-007, flag, Turnstile, consent, Idempotency-Key, limits: 5/min and 30/h per IP, 60/h per network, 3/min per browser token, 300/h aggregate | The website enquiry plus `estimate_reference`, `preferred_contact` and `consultation` (`LUXURY_DESIGN` marks a Luxury design-consultation request on the lead; other values are ignored); returns `{reference, message}` |
 | `GET /api/v1/leads/{lead_id}/estimates` | `estimate.read`, lead visibility | The lead's estimates |
 | `GET /api/v1/estimates/{estimate_id}` | `estimate.read`, lead visibility (unlinked: ALL leads) | Staff view |
 | `POST /api/v1/estimates/{id}/duplicate` | `estimate.manage` | A new estimate, same inputs, active card, linked to the same lead |
@@ -104,13 +118,17 @@ in the audit registry (FULL; documents and results not snapshotted). Permissions
 
 `/estimate` (`estimate.html`, `assets/estimate.js`, `assets/estimate.css`). The screens:
 1. Home: property type, BHK or custom, city, new or renovation.
-2. Rooms and products (bedrooms follow the BHK).
+2. Rooms and products (bedrooms follow the BHK; a Pooja room).
+   - 18 products, including the five recurring types (D9).
+   - Painting and electrical are optional and unticked (D6).
 3. Measurements: value, unit (ft, in, m, cm; sq ft, sq m; nos), "Use a typical size", and guidance per input.
-4. Package and preferences: Premium and Luxury show "pricing coming soon" unless listed; options per product;
-   Turnstile.
-5. Estimate: title, disclaimer and "subject to" list; range; GST; room subtotals; the grouped package with inclusions;
-   optional items; timeline; assumptions; exclusions; client scope; warranty summary and policy link; rate-card
-   version and validity.
+4. Package and preferences: options per product; Turnstile.
+   - Premium shows "pricing coming soon" unless listed (D1).
+   - Luxury says "priced after a design consultation" and goes straight to step 6 as a consultation request, with no
+     estimate (D2).
+5. Estimate: title, disclaimer and "subject to" list; range; GST; room subtotals; the grouped package with its six
+   inclusions; the **Custom Features Allowance** as its own range and explanation; optional items; timeline;
+   assumptions; exclusions; client scope; warranty summary and policy link; rate-card version and validity (30 days).
 6. "Get my detailed quotation": name, phone, email, preferred contact, location, consent, Turnstile.
 7. Confirmation: customer reference only.
 
@@ -122,7 +140,7 @@ The page is mobile first, uses the production CSP, builds the DOM with `textCont
 The lead detail page has a "Budgetary Estimate" card (`vs-estimate-panel`). It shows the list, then the full view:
 - reference, dates, card and rule versions, property;
 - rooms, every line with rate and amount, typical-size markers, customer measurements and assumptions;
-- package, room totals, range and GST, the package with its components, timeline;
+- package, room totals, range and GST, the package with its components, the allowance (band, basis, midpoint), timeline;
 - exclusions and client scope, warranty, linked lead, history.
 
 **Actions:** duplicate; revise measurements or package; consultation copy (printable); mark site measurement required;
@@ -132,34 +150,39 @@ start the official quotation process.
 
 | Suite | Result |
 |---|---|
-| `tests/unit/test_estimator_engine.py` (E1) | 51 passed: every product, units and bounds, invalid input, packages, preparation grouping and scope, customer view without rates, reproducibility, monotonicity, timeline, lookups, warranty, card validation, unapproved home sizes |
-| `tests/integration/test_estimator_api.py` (E2/E3) | 31 scenarios × SQLite and PostgreSQL = 62 passed: flag off, no card, customer-safe response, no personal data, Turnstile, invalid input, snapshot and reproducibility, link, retry, unusable references, atomicity, consent, notification text, staff view and actions, lead scope, unlinked visibility, no card route, card lifecycle and rollback, refusals (tamper, approval, customer data), CLI dry run, retention, rate limits |
+| `tests/unit/test_estimator_engine.py` (E1) | 63 passed: every product (18), units and bounds, invalid input, packages, preparation grouping and scope, customer view without rates, reproducibility, monotonicity, timeline, lookups, warranty, card validation (including hardware in the package and the allowance band), unapproved home sizes, the allowance (explicit, banded, room work only), soft-close in the products, a full home in one request |
+| `tests/integration/test_estimator_api.py` (E2/E3) | 32 scenarios × SQLite and PostgreSQL = 64 passed: flag off, the allowance in the public response, the Luxury consultation enquiry, no card, customer-safe response, no personal data, Turnstile, invalid input, snapshot and reproducibility, link, retry, unusable references, atomicity, consent, notification text, staff view and actions, lead scope, unlinked visibility, no card route, card lifecycle and rollback, refusals (tamper, approval, customer data), CLI dry run, retention (90 days from creation, never while valid), rate limits |
 | Schema, lint, registry, governance, ops | Updated head and order; module-boundary and seed-file lists; RBX register; committed estimator page is off |
 | Full API suite | Pass (SQLite and PostgreSQL); ruff and format clean; mypy ratchet 157 = baseline; OpenAPI snapshot updated; secret scan clean |
 | `app/scripts/staging-build.test.mjs` | 7 passed, including the estimator page off by default, on only with `STAGING_ESTIMATOR=on`, Essential only, no rates or `innerHTML` in the page script |
-| `app/test/estimates.test.ts`, `app/e2e/estimator.e2e.mjs` | Run in CI (Node 22): helper tests; the browser journey (off and on, every step, validation, axe per step, 360 px, CSP, page errors) |
+| `app/test/estimates.test.ts`, `app/e2e/estimator.e2e.mjs` | Run in CI (Node 22): helper tests; the browser journey (off and on, every step, validation, axe per step, the allowance and the six package inclusions, the Luxury consultation path, 360 px, CSP, page errors) |
 
 ## 9. Historical quotation comparison
 
-See [E6-historical-validation.md](E6-historical-validation.md). Two suitable quotations exist; a third is missing.
+See [E6-historical-validation.md](E6-historical-validation.md). Three 3 BHK quotations (A, B, and C in the same
+building as B).
 
-**Result:** the engine is exact for its products. As scoped, though, it underestimates typical projects: about 15 % for
-A and about 32 % for B. The causes are recurring items outside the 13 products, rate drift and simplified geometry.
-**It is not ready for customers** until the owner decides on additional products and/or a disclosed custom-features
-allowance.
+**Result on rules `2026.10.2`:**
+- **Old model:** none of the three actual totals fell inside the range (base −14.5 %, −32.2 %, −31.2 %).
+- **New model, measured inputs:** base +4.6 %, −3.8 % and −0.5 %; all three totals inside the range.
+- **New model, typical sizes:** all three still inside (base +10.1 %, −8.8 %, +2.9 %).
+- **Leave-one-out:** the allowance band still covers each quotation when sized on the other two.
+
+**Not ready for customers** until a fourth, independent quotation is run and the other home sizes have approved
+typical sizes and preparation amounts.
 
 ## 10. Open owner inputs
 
-1. **Premium and Luxury rates.** The engine and data model support them; they are disabled.
-2. **Preparation amounts** for 1, 2 and 4 BHK and villas (only 3 BHK is known), and the villa factors.
-3. **Typical measurements** per product and home size (the private draft uses placeholders from the synthetic card).
-4. **Painting and electrical:** offered as optional lines? At what basis?
-5. **Estimate retention** (default 90 days).
-6. **Public detail level:** room totals only, as implemented, or more.
-7. **Additional product types**, or a disclosed custom-features allowance (E6).
-8. **Range bands** (implemented as configuration: measured −10/+15 %, typical −15/+25 %).
-9. **A third historical quotation.**
-10. **The warranty policy URL**, and the legal and tax review of the policy text (not claimed).
+The business rules are frozen (ADR-012 §11, decision log 18). Still open, as data:
+
+1. **Premium rates** and two real Premium quotations to check them (D1). Premium stays disabled; Luxury is
+   consultation-only (D2).
+2. **Preparation amounts** for 1, 2 and 4 BHK and villas, and the villa factors. Only 3 BHK is known, so the engine
+   refuses the other sizes.
+3. **Typical sizes** beyond 3 BHK (D3). 3 BHK uses the median of the three quotations.
+4. **The soft-close basis:** per sq ft of shutter area, calibrated to A. Owner confirmation of the basis.
+5. **A fourth, independent historical quotation** (2 BHK preferred).
+6. **The warranty policy URL**, and the legal and tax review of the policy text (D8; not claimed).
 
 ## 11. Blockers for public intake (ADR-011)
 
@@ -168,7 +191,7 @@ allowance.
   - an API Host guard;
   - no credentials on the public route;
   - an edge rate limit.
-- **The E6 coverage decision** (§9), and the owner inputs 1–4 and 7.
+- **The owner inputs** in §10 (2, 3 and 5 at least, for the home sizes offered).
 - **Independent review** of this package, then staging validation behind Access.
 - **The owner's explicit enablement**, recorded as a decision.
 - **Still open from earlier:** the deploy replica-safety order (R6-F1), and SES recipients verified or production
@@ -189,7 +212,7 @@ All of §11, plus:
 1. Merge after independent review (CI green).
 2. `10-infra-plan` / `11-infra-apply` only if the SSM flag change is included (a separate reviewed PR adds
    `VEDA_ESTIMATOR_ENABLED`, false at first). Then `12-deploy`, which runs migration `0101_estimator`.
-3. Load the private Essential card and activate it with the owner's approval reference (runbook §6.8).
+3. Load the private Essential card (draft 3: the five product types, the allowance, soft-close in the products) and activate it with the owner's approval reference (runbook §6.8).
 4. Flip the flag to true (reviewed change, then apply and deploy).
 5. Pages `veda-staging-site`: `STAGING_ESTIMATOR=on`, retry.
 6. Validate behind Access (runbook §6.8), then `13-evidence` with label `estimator-staging`.

@@ -241,6 +241,9 @@ def upgrade() -> None:
         sa.Column("range_low_minor", sa.BigInteger(), nullable=False),
         sa.Column("range_high_minor", sa.BigInteger(), nullable=False),
         sa.Column("preparation_minor", sa.BigInteger(), nullable=False),
+        sa.Column("allowance_minor", sa.BigInteger(), nullable=False),
+        sa.Column("allowance_low_minor", sa.BigInteger(), nullable=False),
+        sa.Column("allowance_high_minor", sa.BigInteger(), nullable=False),
         sa.Column("optional_minor", sa.BigInteger(), nullable=False),
         sa.Column("gst_low_minor", sa.BigInteger(), nullable=False),
         sa.Column("gst_high_minor", sa.BigInteger(), nullable=False),
@@ -270,7 +273,7 @@ def upgrade() -> None:
             ["updated_by"], ["app_user.id"], name="fk_budget_estimate__updated_by", ondelete="RESTRICT"
         ),
         sa.CheckConstraint(
-            "base_minor >= 0 AND range_low_minor >= 0 AND range_low_minor <= base_minor AND base_minor <= range_high_minor AND preparation_minor >= 0 AND optional_minor >= 0 AND gst_low_minor >= 0 AND gst_high_minor >= gst_low_minor",
+            "base_minor >= 0 AND range_low_minor >= 0 AND range_low_minor <= base_minor AND base_minor <= range_high_minor AND preparation_minor >= 0 AND optional_minor >= 0 AND allowance_low_minor >= 0 AND allowance_low_minor <= allowance_minor AND allowance_minor <= allowance_high_minor AND gst_low_minor >= 0 AND gst_high_minor >= gst_low_minor",
             name="ck_budget_estimate__amounts",
         ),
         sa.CheckConstraint("length(budget_range_code) <= 20", name="ck_budget_estimate__budget_range_code_len").ddl_if(

@@ -171,6 +171,7 @@ def create_enquiry(req: Req):
     body = req.body
     estimate, problem = service.usable_for_enquiry(req.session, body.estimate_reference)
     preferred = body.preferred_contact if body.preferred_contact in ("PHONE", "WHATSAPP", "EMAIL") else None
+    luxury = body.consultation == "LUXURY_DESIGN"  # any other value is ignored, never an error
     defaults = {}
     if estimate is not None:
         if body.project_type_code in (None, ""):
@@ -178,7 +179,10 @@ def create_enquiry(req: Req):
         if body.budget_range_code in (None, ""):
             defaults["budget_range_code"] = estimate.budget_range_code
     lead_body = S.PublicLeadIn.model_validate(
-        {**body.model_dump(exclude={"estimate_reference", "preferred_contact"}, exclude_unset=True), **defaults}
+        {
+            **body.model_dump(exclude={"estimate_reference", "preferred_contact", "consultation"}, exclude_unset=True),
+            **defaults,
+        }
     )
     unmapped = {"estimate_reference": f"{problem}:{str(body.estimate_reference)[:40]}"} if problem else None
 
@@ -186,6 +190,8 @@ def create_enquiry(req: Req):
         if estimate is not None:
             policy = lead.consent_policy_version
             service.link(s, estimate, lead, policy_version=policy, preferred_contact=preferred)
+        if luxury:
+            service.request_luxury_consultation(s, lead, preferred_contact=preferred)
 
     data = lead_service.create_public(
         req.session,

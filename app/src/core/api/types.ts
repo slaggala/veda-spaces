@@ -426,6 +426,10 @@ export interface EstimateResult {
     label: string; description: string; note: string; amount_minor: number; inclusions: string[];
     components?: { code: string; label: string; inclusion: string; amount_minor: number }[];
   };
+  custom_features_allowance: {
+    label: string; description: string; low_minor: number; high_minor: number;
+    amount_minor?: number; basis_minor?: number; low_pct?: number; high_pct?: number;
+  };
   optional_items_minor: number;
   timeline: { label: string; min_days: number; max_days: number };
   assumptions: string[];

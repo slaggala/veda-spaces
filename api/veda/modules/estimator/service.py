@@ -235,6 +235,9 @@ def store(
         range_low_minor=est.low_minor,
         range_high_minor=est.high_minor,
         preparation_minor=est.prep_minor,
+        allowance_minor=est.allowance_minor,
+        allowance_low_minor=est.allowance_low_minor,
+        allowance_high_minor=est.allowance_high_minor,
         optional_minor=est.optional_minor,
         gst_low_minor=est.gst_low_minor,
         gst_high_minor=est.gst_high_minor,
@@ -303,6 +306,9 @@ def public_view(row: BudgetEstimate) -> dict:
     line amount, no workflow state."""
     view = {k: v for k, v in row.result.items() if k in _CUSTOMER_KEYS}
     view["project_preparation"] = {k: v for k, v in row.result["project_preparation"].items() if k != "components"}
+    view["custom_features_allowance"] = {
+        k: row.result["custom_features_allowance"][k] for k in ("label", "description", "low_minor", "high_minor")
+    }
     view["warranty"] = dict(row.result["warranty"], policy_url=settings().warranty_policy_url or None)
     view["reference"] = row.public_reference
     view["expires_on"] = row.expires_on.date().isoformat()
@@ -372,7 +378,8 @@ def link(s: Session, estimate: BudgetEstimate, lead, *, policy_version: str | No
 
 
 def summary_line(s: Session, lead_id: str) -> str | None:
-    """One line for the lead notification: 'Budgetary Estimate ₹a–b L (Essential, 3 rooms)'."""
+    """One line for the lead notification: 'Budgetary Estimate ₹a–b L (Essential, 3 rooms)', or the Luxury design
+    consultation request (D2)."""
     row = s.execute(
         sa.select(BudgetEstimate)
         .join(BudgetEstimateLeadLink, BudgetEstimateLeadLink.estimate_id == BudgetEstimate.id)
@@ -381,7 +388,14 @@ def summary_line(s: Session, lead_id: str) -> str | None:
         .limit(1)
     ).scalar_one_or_none()
     if row is None:
-        return None
+        from veda.modules.crm.leads.models import LeadActivity
+
+        luxury = s.execute(
+            sa.select(LeadActivity.id)
+            .where(LeadActivity.lead_id == lead_id, LeadActivity.subject.startswith(LUXURY_CONSULTATION))
+            .limit(1)
+        ).first()
+        return "Luxury design consultation requested" if luxury else None
     rooms = len(row.result.get("rooms", []))
     return (
         f"Budgetary Estimate {_lakh(row.range_low_minor)}–{_lakh(row.range_high_minor)} "
@@ -503,6 +517,17 @@ def mark_site_measurement(s: Session, row: BudgetEstimate, lead) -> None:
             add_system_activity(s, lead, "SYSTEM", f"Site measurement required (estimate {row.public_reference})")
 
 
+LUXURY_CONSULTATION = "Luxury design consultation requested (Luxury is priced after a design consultation)"
+
+
+def request_luxury_consultation(s: Session, lead, *, preferred_contact: str | None) -> None:
+    """ADR-012 D2: Luxury has no public price. The enquiry is marked on the lead for a design consultation."""
+    from veda.modules.crm.leads.service import add_system_activity
+
+    contact = f"; prefers {preferred_contact.lower()}" if preferred_contact else ""
+    add_system_activity(s, lead, "SYSTEM", f"{LUXURY_CONSULTATION}{contact}")
+
+
 def start_quotation_process(s: Session, row: BudgetEstimate, lead) -> None:
     """Records that the official quotation process has started from this estimate. It never creates a quotation and
     never changes the lead's status: the official quotation is prepared separately."""
@@ -528,16 +553,19 @@ def consultation_copy(s: Session, row: BudgetEstimate) -> dict:
 
 
 def purge_expired(s: Session, *, dry_run: bool = False) -> int:
-    """Soft-delete estimates never linked to a lead, once expired for longer than the retention period."""
-    cutoff = db.tx_time(s) - timedelta(days=settings().estimate_retention_days)
+    """Soft-delete estimates never linked to a lead once the retention period (ADR-012 D7: 90 days from creation)
+    has passed. An estimate that is still valid is never removed; a linked one stays with its lead."""
+    now = db.tx_time(s)
+    cutoff = now - timedelta(days=settings().estimate_retention_days)
     linked = sa.select(BudgetEstimateLeadLink.estimate_id)
     rows = list(
         s.execute(
-            sa.select(BudgetEstimate).where(BudgetEstimate.expires_on < cutoff, BudgetEstimate.id.not_in(linked))
+            sa.select(BudgetEstimate).where(
+                BudgetEstimate.created_on < cutoff, BudgetEstimate.expires_on < now, BudgetEstimate.id.not_in(linked)
+            )
         ).scalars()
     )
     if not dry_run:
-        now = db.tx_time(s)
         for row in rows:
             for model in (BudgetEstimateLine, BudgetEstimateAssumption, BudgetEstimateProjectItem):
                 for child in s.execute(sa.select(model).where(model.estimate_id == row.id)).scalars():
