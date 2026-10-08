@@ -88,3 +88,29 @@ test('the committed estimator page is off and holds no rates', () => {
   assert.ok(!/rate_minor|_minor\s*:\s*\d/.test(js), 'no rate table in the page script');
   assert.ok(!js.includes('innerHTML'), 'DOM built without innerHTML');
 });
+
+test('the warranty policy page is the same customer-facing page on the live site and the staging site', () => {
+  const live = readFileSync(join(SRC, '../../../dist/warranty.html'), 'utf8');
+  const release = readFileSync(join(SRC, 'warranty.html'), 'utf8');
+  assert.equal(live, release, 'dist/warranty.html and site-release/warranty.html must be identical');
+  assert.equal(readFileSync(join(SRC, '../../../dist/assets/policy.css'), 'utf8'), readFileSync(join(SRC, 'assets/policy.css'), 'utf8'));
+  for (const id of ['summary', 'coverage', 'exclusions', 'variations', 'tolerances', 'handover', 'service', 'tiles', 'claims', 'contact']) {
+    assert.ok(release.includes(`id="${id}"`), `section ${id}`);
+  }
+  assert.ok(!/<script|<style|\sstyle=|\son[a-z]+=/i.test(release), 'no inline script or style (production CSP)');
+  assert.match(release, /<link rel="canonical" href="https:\/\/www\.vedaspaces\.com\/warranty">/);
+  assert.match(release, /Version 1\.0 · Effective 6 October 2026/);
+  // Approved wording kept (spot checks of the clauses the estimator summary relies on).
+  for (const clause of [
+    'up to 10 years, depending on the plywood selected for the project and subject to the applicable manufacturer’s warranty',
+    '3 years against manufacturing defects, subject to manufacturer terms and normal use',
+    '5 years against manufacturing defects, subject to manufacturer terms and normal use',
+    'does not extend Veda Spaces workmanship or free-service obligations',
+    'one year of free service from the project handover date for fitment-related or workmanship issues',
+    'Nothing in this policy is intended to limit rights that cannot legally be excluded under applicable law.',
+  ]) assert.ok(release.includes(clause), clause);
+  assert.ok(!/customer name|signature|policy reference/i.test(release), 'no contract or customer fields on the public page');
+  for (const map of ['dist/sitemap.xml', 'app/e2e/site-release/sitemap.xml']) {
+    assert.ok(readFileSync(join(SRC, '../../..', map), 'utf8').includes('<loc>https://www.vedaspaces.com/warranty</loc>'), map);
+  }
+});
