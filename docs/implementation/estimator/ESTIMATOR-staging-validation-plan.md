@@ -17,7 +17,7 @@ rate card.
 |---|---|---|
 | P1 | PR #47 merged after the owner's sign-off, CI green on `main` | GitHub checks on the merge commit |
 | P2 | `12-deploy` has run that commit on staging; migration head `0101_estimator` | `12-deploy` log; `/health/ready` is healthy |
-| P3 | Cloudflare Access protects `staging.vedaspaces.com`, `app.staging…` and `api.staging…` (unchanged) | An anonymous request gets `302` to Access |
+| P3 | Cloudflare Access protects `staging.vedaspaces.com`, `app-staging.vedaspaces.com` and `api-staging.vedaspaces.com` (unchanged) | An anonymous request gets `302` to Access |
 | P4 | The private card `ESS-2026-10-PRIVATE-DRAFT-4` is saved by the owner outside the repository | The owner has the file and its SHA-256 |
 | P5 | The SES sandbox recipients used for the test are verified | SES console |
 
