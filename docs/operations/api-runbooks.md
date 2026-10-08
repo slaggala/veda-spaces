@@ -199,7 +199,7 @@ Break-glass stays unusable until OWNER-INPUT-004 names the custodians (`VEDA_BRE
 | `SECURITY_LOG_CHAIN_BROKEN` / `ChainVerificationFailed` | §5; freeze the host; snapshot the volume. |
 | `GovernanceInvariantFailures > 0` | Run `veda maintenance invariants` and read the problems. Founder state may need the Founder workflow; never edit rows directly. |
 | `REFRESH_REUSE_DETECTED`, MFA guessing, credential stuffing (05 §9.8) | Check the security events for the subject. Revoke sessions (`POST /users/{id}/sessions/revoke`). Consider an MFA reset through dual control. |
-| `OutboxDead > 0` | Read `last_error` on the dead events. Fix the cause (SES, templates), then re-queue (set `status=PENDING`, `attempts=0` through a maintenance session). Delivered messages are not re-sent (IR-30). |
+| `OutboxDead > 0` | `veda outbox dead` lists the dead events (type, attempts, `last_error`; never the payload). Fix the cause (SES, templates), then `veda outbox requeue --id <id> --reason "…"`; or, when the event must not run (an invite already accepted), `veda outbox retire --id <id> --reason "…"`. Both act on DEAD events only and record the reason on the event and in the log. **Clear every dead event:** the alarm notifies only on a state change, so one left behind hides the next. Delivered messages are not re-sent (IR-30). |
 | 5xx rate, readiness failing | Check the API logs by `request_id`; exceptions carry `error_type`, `error_fingerprint` and `stack` only. Roll back per §2. |
 
 ## 9. Metrics and alerts (LOG-006, 02 §9)

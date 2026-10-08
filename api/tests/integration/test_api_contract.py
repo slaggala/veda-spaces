@@ -237,6 +237,51 @@ def test_TD_F_two_writer_conflict(app, api, factory, founder):
     assert len(updates) == 2, "no audit row for the rejected write"
 
 
+def test_R8_a_writer_that_loses_the_race_always_learns_the_current_version(app, api, factory, founder, monkeypatch):
+    """Deterministic interleaving of the TD-F race: A passes its version check and pauses; B sends the same edit
+    meanwhile. B must wait for A (the row is locked by the check) and get 409 with current_version. Without the lock,
+    B commits first and A's flush fails as StaleDataError, a 409 without current_version (R8)."""
+    import time
+
+    from veda.modules.crm.leads import service
+
+    x, y = factory.user("ADMIN"), factory.user("ADMIN")
+    lead = factory.lead(api, founder.token)
+    tx, ty = factory.login(api, x, set_default=False), factory.login(api, y, set_default=False)
+    version = lead["version"]
+    a_checked = threading.Event()
+    real_update = service.update
+
+    def update(s, ctx, row, body):
+        if getattr(body, "priority", None) == "HIGH":  # writer A only
+            a_checked.set()
+            time.sleep(1.0)
+        return real_update(s, ctx, row, body)
+
+    monkeypatch.setattr(service, "update", update)
+    results = {}
+
+    def writer(name, token, body, wait=None):
+        from tests.support.api import ApiClient
+
+        if wait is not None:
+            assert wait.wait(10)
+        results[name] = ApiClient(app.test_client()).patch(
+            f"/api/v1/leads/{lead['id']}", body, token=token, if_match=version
+        )
+
+    threads = [
+        threading.Thread(target=writer, args=("a", tx, {"priority": "HIGH"})),
+        threading.Thread(target=writer, args=("b", ty, {"city": "Pune"}, a_checked)),
+    ]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    a, b = results["a"], results["b"]
+    assert a.status == 200, a.json
+    assert b.status == 409 and b.code == "VERSION_CONFLICT", b.json
+    assert b.json["current_version"] == a.data["version"]
+
+
 def test_PLAT_010_sequence_allocation_under_concurrency(app, api, factory, founder):
     from tests.support.api import ApiClient
 

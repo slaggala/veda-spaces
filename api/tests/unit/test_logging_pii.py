@@ -92,3 +92,28 @@ def test_IR27_engine_hides_bound_parameters():
 
     engine = db.create_engine("sqlite://")
     assert engine.hide_parameters is True
+
+
+# --- R2: action-token links never reach a log line -------------------------------------------------------------
+
+TOKEN = "Hu9AEwJomuwDpYvB8mH1UHVe7fJdwAhY2qIiLUfdFVg"  # pragma: allowlist secret (fake, shape of an invite token)
+LINKS = (
+    f"https://app-staging.vedaspaces.com/accept-invite#token={TOKEN}",
+    f"https://app.vedaspaces.com/reset-password?token={TOKEN}&next=/",
+    f"https://app.vedaspaces.com/mfa/enroll?code={TOKEN}",
+)
+
+
+def test_R2_token_links_are_masked_in_messages_and_fields():
+    def run():
+        for link in LINKS:
+            logging.getLogger("veda.cli").warning("invite %s", link)
+            structlog.get_logger("veda.cli").info("printed", link=link, note=f'{{"invite_link": "{link}"}}')
+
+    text = json.dumps(_capture(run))
+    assert TOKEN not in text
+    assert "accept-invite#token=[REDACTED]" in text and "reset-password?token=[REDACTED]&next=/" in text
+
+
+def test_R2_masking_keeps_ordinary_urls():
+    assert vlog._mask("https://app.vedaspaces.com/leads/01a1?page=2") == "https://app.vedaspaces.com/leads/01a1?page=2"

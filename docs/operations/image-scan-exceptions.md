@@ -38,8 +38,10 @@ The script checks each of these. A malformed exception refuses every deploy.
 | Vulnerability | Package (ECR) | Debian status | Why it isn't reachable |
 |---|---|---|---|
 | CVE-2026-95619 | `gcc-14` 14.2.0-19 (`libstdc++6`) | Unfixed in every release; fixed in upstream GCC | Needs C++ code passing attacker-controlled sizes to aligned `operator new`. The API is Python |
-| CVE-2026-102010 | `gcc-14` 14.2.0-19 (`libstdc++6`) | Unfixed; `no-dsa` (minor issue) for trixie | Needs `erase_if` on a priority queue with request input. Nothing in the image does this |
 | CVE-2026-85091 | `zlib` 1.3.dfsg+really1.3.1-1 (`zlib1g`) | Unfixed (bug 1146895); fixed upstream | Needs `gzprintf()`/`gzvprintf()`. CPython's `zlib` and `gzip` use the deflate stream API |
+
+**Removed 2026-10-07:** CVE-2026-102010 (`gcc-14`). The image no longer reports it, and `12-deploy` warned that the
+exception matched no finding (AUT-201 evidence, finding A3). If it reappears, it blocks the deploy until re-reviewed.
 
 **Compensating controls:**
 - the container runs as the unprivileged `veda` user, with no added capabilities;
