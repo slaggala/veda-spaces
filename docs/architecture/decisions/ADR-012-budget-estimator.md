@@ -1,6 +1,9 @@
 # ADR-012: Budget Estimator (budgetary estimate, then lead capture)
 
-- **Status:** **Proposed.** Design only, nothing implemented. Owner inputs in §9 are needed before implementation.
+- **Status:** **Accepted for implementation** (owner, 2026-10-08, same instruction). The output is titled **"VEDA SPACES
+  PRELIMINARY BUDGETARY ESTIMATE"** and is never an official quotation. Amended by that instruction: project costs are
+  shown as one **Project Preparation & Protection Package**; Premium and Luxury stay disabled until approved rates
+  exist; no line rates are shown publicly; the required tables are listed in §4 as amended in the implementation.
 - **Date:** 2026-10-08
 - **Constraints:**
   - `public_intake` stays **disabled**, and Cloudflare Access stays on; anonymous use waits for ADR-011.
