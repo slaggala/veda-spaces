@@ -381,8 +381,19 @@
   function renderSpec() {
     const s = spec();
     $('#v2-spec-sub').textContent = s ? `${s.name} ${s.version}. ${s.equivalent_policy} ${s.final_selection}` : '';
-    $('#v2-spec').replaceChildren(...(s ? s.categories.map((c) => el('section', { class: 'v2-spec-cat' }, el('h3', { text: c.label }), el('p', { text: c.requirement }),
-      ul([...(c.grade ? [c.grade] : []), ...c.thickness, ...(c.finish ? [c.finish] : []), ...(c.brand_examples.length ? [`Approved examples: ${c.brand_examples.join(', ')}`] : []), ...c.details, c.warranty_summary])))
+    // Each category keeps the four parts apart (T3): what is promised, brand examples, the equivalent rule, final selection.
+    const row = (term, value) => (value ? [el('dt', { text: term }), el('dd', { text: value })] : []);
+    $('#v2-spec').replaceChildren(...(s ? s.categories.map((c) => el('section', { class: 'v2-spec-cat' }, el('h3', { text: c.label }),
+      el('dl', { class: 'v2-spec-dl' },
+        ...row('Material requirement', c.requirement),
+        ...row('Grade', c.grade),
+        ...row('Thickness', c.thickness.join('; ')),
+        ...row('Finish', c.finish),
+        ...row('Approved brand examples', c.brand_examples.join(', ')),
+        ...row('Approved equivalent', c.equivalent_rule),
+        ...row('Final selection', c.final_selection),
+        ...row('Warranty', c.warranty_summary)),
+      c.details.length ? ul(c.details) : null))
       : [el('p', { text: 'Your materials are confirmed in your detailed quotation.' })]));
   }
   function renderLead() {

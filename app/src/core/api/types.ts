@@ -449,6 +449,8 @@ export interface EstimateDetail {
   source_reference: string | null;
   rate_card_version: string;
   calculation_version: string;
+  /** The customer specification snapshot the estimate was shown with (ADR-012 T9); null before one was active. */
+  specification?: { spec_code: string; version: string; sha256: string | null } | null;
   property_type: string;
   home_size: string;
   project_kind: string;

@@ -30,6 +30,7 @@ const errors = [];
 const csp = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 const collectCsp = async () => { csp.push(...(await page.evaluate(() => window.__csp || []))); };
+const shot = async (name) => { if (process.env.E2E_OUT) await page.screenshot({ path: path.join(process.env.E2E_OUT, `estimator-v2-${name}.png`), fullPage: true }); };
 async function axe(name) {
   await page.evaluate(AXE);
   const v = await page.evaluate(async () => {
@@ -68,6 +69,7 @@ await axe('V2 3 new or renovation');
 await next(3);
 check('rooms preselected, no measurement fields', (await page.locator('.v2-room').count()) === 9 && (await page.locator('[data-v2="4"] input[type="number"]').count()) === 0);
 await axe('V2 4 rooms');
+await shot('4-rooms');
 await next(4);
 check('Premium unavailable; Luxury is a consultation', await page.isDisabled('input[name="v2-pkg"][value="PREMIUM"]') && !(await page.isDisabled('input[name="v2-pkg"][value="LUXURY"]')));
 await axe('V2 5 package');
@@ -80,26 +82,31 @@ const blocks = await page.locator('#v2-result-body > section h3').allTextContent
 check('result order', blocks.join(' | ') === 'What Essential includes | Your rooms | Site Execution & Handover Package | Design Personalisation Allowance | Why this is a range | Warranty and service | Not included | How to compare this estimate | Assumptions | Next steps', blocks.join(' | '));
 const text = await page.locator('[data-v2="6"]').innerText();
 check('included statement', /Included in this range: your rooms, the Site Execution & Handover Package and the Design Personalisation Allowance\. GST is extra\./.test(text));
-check('material promise from the specification snapshot', v2run.data.specification?.spec_code === 'SYNTHETIC-ESSENTIAL-1.0' && /Cabinet structure/.test(text) && /Approved brands such as the named examples/.test(text));
+check('material promise from the specification snapshot', v2run.data.specification?.spec_code === (process.env.E2E_SPEC ?? 'SYNTHETIC-ESSENTIAL-1.0') && /Cabinet structure/.test(text) && /Approved brands such as the named examples/.test(text));
 check('room subtotals with Essential specification lines', (await page.locator('.v2-room-card').count()) === v2run.data.rooms.length && (await page.locator('.v2-room-card .v2-spec-line').count()) >= 8);
 check('package and allowance included, allowance not an automatic extra', (text.match(/Included in your estimated range/g) || []).length === 2 && /not an automatic extra charge/.test(text));
 check('warranty wording (T7) and policy link', /Material and hardware warranties depend on the selected manufacturer/.test(text) && (await page.locator('[data-v2="6"] a:has-text("Warranty, Service & Customer Care Policy")').count()) === 1);
 check('no rates, price limits or warranty durations shown', !/per sq|per sheet|₹2,500|10 years|30-year|30 years|5 years|3 years/i.test(text));
 const ctas = await page.locator('#v2-next-steps button').allTextContents();
 check('CTA hierarchy', ctas.join(' | ') === 'Personalise and narrow my estimate | Get my detailed quotation | Talk to a designer', ctas.join(' | '));
+await shot('6-result');
 await page.evaluate(() => document.querySelectorAll('#est-v2 details').forEach((d) => { d.open = true; }));
 await axe('V2 6 result');
 check('360 px without horizontal scroll (result)', (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 1);
 // 3. Detailed material specification on demand.
 await page.click('#v2-result-body button:has-text("View detailed material specification")');
 check('detailed specification screen', await visible(10) && (await page.locator('#v2-spec .v2-spec-cat').count()) === v2run.data.specification.categories.length);
+const terms = await page.locator('#v2-spec .v2-spec-cat').evaluateAll((cats) => cats.map((c) => [...c.querySelectorAll('dt')].map((d) => d.textContent)));
+check('every category separates requirement, equivalent rule and final selection (T3)', terms.every((t) => ['Material requirement', 'Approved equivalent', 'Final selection'].every((x) => t.includes(x))));
 await axe('V2 10 specification');
+await shot('10-specification');
 await page.click('#v2-spec-back');
 // 4. Refinement without engineering terms: one measurement, a new estimate.
 await page.click('#v2-next-steps button:has-text("Personalise and narrow my estimate")');
 const refineText = await page.locator('[data-v2="8"]').innerText();
 check('refinement in customer words (ft and sq ft only)', !/RUN|WIDTH|AREA|carcass|uom/.test(refineText) && (await page.locator('#v2-refine input').count()) === 4);
 await axe('V2 8 refine');
+await shot('8-refine');
 await page.fill('#v2-m-kitchen-kitchen', '16');
 const refineReq = page.waitForRequest((r) => r.url().endsWith('/api/v1/public/estimates') && r.method() === 'POST');
 await page.click('#v2-update');
@@ -120,6 +127,7 @@ const enquiryBody = JSON.parse((await enq).postData());
 await page.waitForSelector('[data-v2="9"]:not([hidden])');
 check('enquiry links the latest estimate; customer reference shown', /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test((await page.textContent('#v2-reference')) || '') && enquiryBody.estimate_reference && !enquiryBody.consultation);
 await axe('V2 9 confirmation');
+await shot('9-confirmation');
 // 6. Talk to a designer and Luxury: consultation requests without an amount.
 await fresh();
 await toResult();
