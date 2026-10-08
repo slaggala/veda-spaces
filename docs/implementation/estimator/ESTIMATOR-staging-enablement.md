@@ -40,6 +40,13 @@
 | The `estimator` output: `{ enabled = true, warranty_policy_url = "<link>" }` | A rate, a card or any customer data. The card never goes through Terraform |
 | **Until the link is set,** the plan fails with "The estimator is enabled … but no warranty policy link is set". This is the expected blocker | A plan that succeeds without the link |
 
+**Plan observed on the PR:** the read-only `10-infra-plan` check on the PR showed `Plan: 3 to add`, then failed on
+the precondition as designed (no link set). The three additions are:
+- the two SSM parameters above;
+- `module.monitoring.aws_sns_topic_subscription.owner`, which was **already pending on `main` before this change**
+  (the last successful plan, on another PR, showed `1 to add`, that subscription). Applying the enablement plan also
+  applies it, unless it is applied separately first.
+
 **Apply path:** owner approval, then `11-infra-apply` (the saved plan), then `12-deploy`. The host re-reads SSM, and the
 API then answers the two public estimator routes, still behind Access.
 
