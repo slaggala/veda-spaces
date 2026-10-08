@@ -4,6 +4,8 @@
   PRELIMINARY BUDGETARY ESTIMATE"** and is never an official quotation. Amended by that instruction: project costs are
   shown as one **Project Preparation & Protection Package**; Premium and Luxury stay disabled until approved rates
   exist; no line rates are shown publicly; the required tables are listed in §4 as amended in the implementation.
+  **Business rules frozen** (owner, 2026-10-08, "ADR-012 Approved"): decisions D1–D9 as recommended, with one
+  modification (soft-close hardware moves into the products). See §11; §11 prevails over earlier sections.
 - **Date:** 2026-10-08
 - **Constraints:**
   - `public_intake` stays **disabled**, and Cloudflare Access stays on; anonymous use waits for ADR-011.
@@ -67,7 +69,8 @@ Build the estimator as a **server-side pricing engine** over a **versioned rate 
 | **Living room** | Feature wall (panelling, wallpaper, texture), crockery unit width, partition width, sofa-back beading length | Panelling (W × H); wallpaper (rolls); texture paint (sq ft); crockery unit (W × H); partition (W × H, partition rate); beading (running ft) |
 
 **Project-level lines**, added once and scaled by home size (1/2/3/4 BHK):
-- mandatory items (cleaning, debris, protection, freight, soft-close hinges, pest control);
+- the Project Preparation & Protection Package (floor protection, plywood protection, freight, debris handling, deep
+  cleaning, pest control). Soft-close hardware is priced in the kitchen, wardrobe and TV unit (§11, D5);
 - optional painting (sq ft, paint tier per package).
 
 Electrical wiring is quoted per home and is offered as an optional line.
@@ -153,7 +156,7 @@ ACTIVE. Every estimate records the card version it used.
    - the range (low to high), with a breakdown by room;
    - the timeline band and the warranty summary;
    - exclusions and disclaimers;
-   - the reference and its validity (15 days).
+   - the reference and its validity (30 days, §11 D7).
 6. **"Get my detailed quotation":** the existing enquiry form, pre-filled from the estimate (project type, budget
    range, rooms in the message), plus name, phone, consent and Turnstile.
 7. **Thank you:**
@@ -165,7 +168,7 @@ ACTIVE. Every estimate records the card version it used.
 - "This is a Budgetary Estimate, not a quotation."
 - "Final pricing follows a site measurement and approved design."
 - "Excludes GST, civil work and client-scope items (sink, tiles, granite, taps)."
-- "Valid for 15 days."
+- "Valid for 30 days."
 
 ## 6. UI flow
 
@@ -209,6 +212,10 @@ needs ADR-011 (its intake host must also forward `/api/v1/public/estimates`) and
 
 ## 9. Owner inputs needed
 
+*Status: §11 settles the business rules. Still open as data: Premium rates and the two Premium quotations to check
+them (D1); typical sizes beyond 3 BHK (D3); preparation amounts for 1, 2 and 4 BHK and villas; the warranty policy URL
+and its legal and tax review (D8); a fourth, independent quotation. Rate cards stay admin-loaded (item 7).*
+
 1. **Premium and Luxury rates** or factors per item (only Essential, the quotation specification, is known).
 2. **Range bands** (proposal: measured −10/+15 %, typical −15/+25 %), and whether to show a single "from ₹X" number
    instead.
@@ -225,8 +232,28 @@ needs ADR-011 (its intake host must also forward `/api/v1/public/estimates`) and
 - **No personal data before consent:** the estimate holds only rooms, measurements and preferences; personal data
   enters only through the existing consented lead form.
 - **Prices cannot be tampered with:** all computation is server-side; the client sends inputs, never prices.
-- **Bounded input:** closed schema; numeric ranges per input (for example width 1–60 ft); at most 30 rooms; body size
-  limit.
+- **Bounded input:** closed schema; numeric ranges per input (lengths 0.5–150 ft); at most 40 selections (a full
+  3 BHK needs up to about 37); body size limit.
 - **Abuse:** per-IP rate limit on estimate creation; references are random and unguessable; snapshots expire.
 - **Rate confidentiality:** the rate card is not in the repository. Individual line amounts are visible to whoever
   uses the estimator. Showing only room totals is an **owner option** (§9).
+
+## 11. Owner decisions (frozen business rules, 2026-10-08)
+
+The owner approved D1–D9 of the owner-decision package as recommended, with one modification (D5). These rules govern
+the implementation; earlier sections are read in their light.
+
+| # | Decision | Rule |
+|---|---|---|
+| D1 | Premium pricing | Its own rate for each line, worked out from the Premium specification, never a multiplier on Essential. Hidden ("pricing coming soon") until two real Premium quotations fall inside its range |
+| D2 | Luxury pricing | No public price. Luxury leads straight to a design-consultation enquiry; the lead is marked and the notification says so |
+| D3 | Typical sizes | The median size per product and home size from Veda's past projects, shown as assumptions with the wider typical band (−15 / +25 %) |
+| D4 | Public detail | Level 2: range, GST separately, room subtotals, the package as one value with its inclusions, the allowance as its own range, timeline, assumptions, exclusions. No rates, lines or quantities |
+| D5 | Project Preparation & Protection Package | One grouped value, a fixed amount per home size, only the components that apply, a villa factor. **Modified:** it holds exactly floor protection, plywood protection, freight, debris handling, deep cleaning and pest control. Soft-close hardware is priced in the kitchen, wardrobe and TV unit lines that use it; the rate-card schema refuses any other package component |
+| D6 | Painting and electrical | Optional and unticked; painting on wall area, electrical on carpet area and light points; full rewiring is a site-measurement case |
+| D7 | Retention | Estimate validity 30 days; an estimate never linked to a lead is removed 90 days after creation (never while valid); a linked estimate stays with its lead |
+| D8 | Warranty | A short summary filtered to the selection, plus the policy link. Legal and tax review of the policy text is still required and is not claimed |
+| D9 | Underestimation | Five recurring product types (Pooja Unit, Window Seating, Veneer Accents, Storage Boxes, Ceiling Profile Lighting) and a **Custom Features Allowance**: a disclosed band on the room work (5–15 %, set in the rate card), shown to customers as its own range and never hidden; its midpoint is part of the base. Calibrated on past quotations ([E6](../../implementation/estimator/E6-historical-validation.md)) |
+
+**Rules version:** `2026.10.2` (the allowance, hardware lines, up to 40 selections).
+
