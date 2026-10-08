@@ -26,8 +26,10 @@ const errors = [];
 const csp = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 const collectCsp = async () => { csp.push(...(await page.evaluate(() => window.__csp || []))); };
+// axe is loaded through the DevTools protocol (page.evaluate), which the page's CSP does not govern, so the journey
+// itself keeps running under the real production policy (and is checked for violations below).
 async function axe(name) {
-  await page.addScriptTag({ content: AXE });
+  await page.evaluate(AXE);
   const violations = await page.evaluate(async () => {
     const res = await window.axe.run(document.querySelector('main'), {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } });
