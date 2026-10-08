@@ -72,6 +72,14 @@ check('step 3 lists a measurement per input', (await page.locator('[data-role="v
 await page.uncheck('[data-input="WIDTH"][data-role="typical"]');
 await page.click('#step-3 button[type="submit"]');
 check('missing measurement → focused summary', await page.evaluate(() => document.activeElement?.id === 'est-summary'));
+const linked = await page.evaluate(() => {
+  const link = document.querySelector('#est-summary a');
+  const field = link && document.querySelector(link.getAttribute('href'));
+  return { href: link?.getAttribute('href'), invalid: field?.getAttribute('aria-invalid') };
+});
+await page.click('#est-summary a');
+check('U7: the summary links to the field, which is marked invalid and takes focus', linked.invalid === 'true' &&
+  (await page.evaluate((href) => document.activeElement === document.querySelector(href), linked.href)), JSON.stringify(linked));
 await page.fill('[data-input="WIDTH"][data-role="value"]', '6');
 await axe('step 3 (measurements)');
 await page.click('#step-3 button[type="submit"]');
@@ -108,6 +116,15 @@ await axe('step 5 (estimate)');
 
 // 3. Enquiry linked to the estimate → customer reference only.
 await page.click('#est-to-quote');
+await page.click('#eq-submit');
+const fieldErrors = await page.evaluate(() => ({
+  name: document.getElementById('eq-name').getAttribute('aria-invalid'),
+  slot: document.getElementById('eq-name-err').textContent,
+  links: document.querySelectorAll('#est-summary a').length,
+}));
+check('U7: enquiry errors are shown at each field and linked from the summary', fieldErrors.name === 'true' &&
+  fieldErrors.slot === 'Enter your name.' && fieldErrors.links === 3, JSON.stringify(fieldErrors));
+await axe('step 6 (enquiry errors)');
 await page.fill('#eq-name', 'Meera Iyer');
 await page.fill('#eq-phone', '98480 12345');
 await page.check('#eq-consent');

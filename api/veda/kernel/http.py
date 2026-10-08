@@ -522,8 +522,14 @@ class Api:
                 from veda.kernel.ratelimit import limiter
 
                 for limit in limits:
-                    value, key = limit if isinstance(limit, tuple) else (limit, limit_key)
-                    view = limiter.limit(value, key_func=key)(view) if key else limiter.limit(value)(view)
+                    # A limit is "N per period", (value, key) or (value, key, options): options are passed to
+                    # Flask-Limiter (e.g. deduct_when, so a bucket counts only some responses).
+                    if not isinstance(limit, tuple):
+                        limit = (limit, limit_key)
+                    value, key, options = limit[0], limit[1], (limit[2] if len(limit) > 2 else {})
+                    if key:
+                        options = {**options, "key_func": key}
+                    view = limiter.limit(value, **options)(view)
             self.blueprint.add_url_rule(rule, endpoint=fn.__name__, view_func=view, methods=[method])
             return fn
 

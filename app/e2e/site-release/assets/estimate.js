@@ -78,10 +78,28 @@ function show(step) {
   heading?.focus();
   save();
 }
-function clearSummary() { const s = $('#est-summary'); s.hidden = true; s.replaceChildren(); }
-function summary(messages) {
+function clearSummary() {
+  const s = $('#est-summary'); s.hidden = true; s.replaceChildren();
+  document.querySelectorAll('[aria-invalid="true"]').forEach((f) => f.removeAttribute('aria-invalid'));
+  document.querySelectorAll('.field-error').forEach((e) => { e.textContent = ''; });
+}
+// A problem is a message, or { text, field } naming the input it concerns: the summary links to that field, which is
+// marked aria-invalid and, where it has one, shows the message in its own error slot.
+function summary(problems) {
+  clearSummary();
   const s = $('#est-summary');
-  s.replaceChildren(el('p', { text: 'Please check the following:' }), el('ul', {}, ...messages.map((m) => el('li', { text: m }))));
+  const items = problems.map((p) => {
+    const { text, field } = typeof p === 'string' ? { text: p, field: null } : p;
+    const input = field && document.getElementById(field);
+    if (!input) return el('li', { text });
+    input.setAttribute('aria-invalid', 'true');
+    const slot = document.getElementById(`${field}-err`);
+    if (slot) slot.textContent = text;
+    const link = el('a', { href: `#${field}`, text });
+    link.addEventListener('click', (ev) => { ev.preventDefault(); input.focus(); });
+    return el('li', {}, link);
+  });
+  s.replaceChildren(el('p', { text: 'Please check the following:' }), el('ul', {}, ...items));
   s.hidden = false;
   s.focus();
 }
@@ -143,7 +161,7 @@ function readMeasurements() {
       const value = document.querySelector(`[data-item="${idx}"][data-input="${input.name}"][data-role="value"]`).value;
       const unit = document.querySelector(`[data-item="${idx}"][data-input="${input.name}"][data-role="unit"]`).value;
       const n = Number(value);
-      if (!typical && !(n > 0)) problems.push(`${itemTitle(item)}: enter the ${input.label.toLowerCase()} or use a typical size.`);
+      if (!typical && !(n > 0)) problems.push({ text: `${itemTitle(item)}: enter the ${input.label.toLowerCase()} or use a typical size.`, field: `m-${idx}-${input.name}-v` });
       item.measurements[input.name] = { typical, value, unit };
     }
   });
@@ -352,7 +370,7 @@ function init() {
   $('#step-2').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const picks = [...document.querySelectorAll('input[name="pick"]:checked')].map((c) => c.value);
-    if (!picks.length) { summary(['Choose at least one room or product.']); return; }
+    if (!picks.length) { summary([{ text: 'Choose at least one room or product.', field: document.querySelector('input[name="pick"]')?.id }]); return; }
     const previous = new Map(state.items.map((i) => [`${i.room}:${i.product}`, i]));
     state.items = picks.map((key) => { const [room, product] = key.split(':'); return previous.get(key) || { room, product, measurements: {}, options: {} }; });
     renderMeasurements();
@@ -392,9 +410,9 @@ function init() {
     ev.preventDefault();
     const f = new FormData(ev.target);
     const problems = [];
-    if (!String(f.get('name') || '').trim()) problems.push('Enter your name.');
-    if (String(f.get('phone') || '').replace(/\D/g, '').length < 10) problems.push('Enter a valid phone number.');
-    if (!f.get('consent')) problems.push('Please agree to be contacted so we can prepare your quotation.');
+    if (!String(f.get('name') || '').trim()) problems.push({ text: 'Enter your name.', field: 'eq-name' });
+    if (String(f.get('phone') || '').replace(/\D/g, '').length < 10) problems.push({ text: 'Enter a valid phone number.', field: 'eq-phone' });
+    if (!f.get('consent')) problems.push({ text: 'Please agree to be contacted so we can prepare your quotation.', field: 'eq-consent' });
     if (problems.length) { summary(problems); return; }
     state.enquiryKey = state.enquiryKey || `est-${randomToken()}`;
     save();

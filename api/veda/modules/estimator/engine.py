@@ -318,8 +318,12 @@ def _paise(value: Decimal) -> int:
     return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
-def _nearest(minor: int) -> int:
+def customer_amount(minor: int) -> int:
+    """A subtotal as customers see it: to the nearest ₹1,000 (never an exact line amount)."""
     return _round(Decimal(minor), CUSTOMER_ROUND_MINOR, ROUND_HALF_UP)
+
+
+_nearest = customer_amount
 
 
 def _round(minor: Decimal, step: int, rounding) -> int:
