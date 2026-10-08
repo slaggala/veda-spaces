@@ -133,6 +133,22 @@ def test_SEC_002_cors_allowlist(client):
     assert "Access-Control-Allow-Origin" not in r.headers, "the public site origin reaches public endpoints only"
 
 
+def test_SEC_002_estimator_preflight_allows_the_wizard_headers(client):
+    """The estimator wizard sends X-Veda-Client and Idempotency-Key; a preflight that omits one makes the browser
+    refuse the request (seen on staging as "You appear to be offline")."""
+    for path in ("/api/v1/public/estimates", "/api/v1/public/enquiries"):
+        r = client.options(
+            path,
+            headers={
+                "Origin": "http://localhost:8000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,idempotency-key,x-veda-client",
+            },
+        )
+        allowed = {h.strip().lower() for h in r.headers["Access-Control-Allow-Headers"].split(",")}
+        assert r.status_code == 204 and {"content-type", "idempotency-key", "x-veda-client"} <= allowed, path
+
+
 def _cors_headers(client, method, path, origin, **kw):
     if method == "OPTIONS":
         r = client.options(path, headers={"Origin": origin, "Access-Control-Request-Method": "POST"})

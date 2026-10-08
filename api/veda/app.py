@@ -257,8 +257,9 @@ def _preflight():
     origin, credentials = _allowed_origin()
     if origin is not None:
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        # X-Veda-Client: the estimator wizard's per-browser token (rate-limit key, ADR-012).
         resp.headers["Access-Control-Allow-Headers"] = (
-            "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID, X-Requested-With"
+            "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID, X-Requested-With, X-Veda-Client"
         )
         resp.headers["Access-Control-Max-Age"] = "600"
     return resp
