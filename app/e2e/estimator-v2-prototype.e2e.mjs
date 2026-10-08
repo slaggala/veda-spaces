@@ -32,6 +32,8 @@ async function axe(name) {
 const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const visible = (n) => page.locator(`[data-screen="${n}"]`).isVisible();
 const next = (n) => page.click(`[data-screen="${n}"] [data-next]`);
+// Start again: clear the tab's saved state in a fresh document (a previous page can still save on pending events).
+const fresh = async () => { await page.goto(BASE); await page.evaluate(() => sessionStorage.clear()); await page.reload(); await page.waitForSelector('[data-screen="1"]:not([hidden])'); };
 
 await page.goto(BASE);
 const t0 = Date.now();
@@ -74,8 +76,7 @@ const used = await page.evaluate(() => {
 });
 check('limits prevented in the rooms step ("Limit reached for your home")', limited > 0 && used === 9, `${limited} extras disabled`);
 // Back to the typical selection for the timed path.
-await page.evaluate(() => sessionStorage.removeItem('veda-estimator-v2-prototype'));
-await page.goto(BASE);
+await fresh();
 for (const n of [1, 2, 3, 4]) await next(n);
 await page.check('#verify');
 await axe('5 package');
@@ -117,8 +118,7 @@ await page.waitForSelector('[data-screen="9"]:not([hidden])');
 check('confirmation with the estimate reference', /PROTO-/.test(await page.textContent('#estimate-ref')));
 await axe('9 confirmation');
 // Luxury: consultation without an amount.
-await page.evaluate(() => sessionStorage.removeItem('veda-estimator-v2-prototype'));
-await page.goto(BASE);
+await fresh();
 for (const n of [1, 2, 3, 4]) await next(n);
 await page.check('input[name="pkg"][value="LUXURY"]');
 await page.check('#verify');

@@ -81,7 +81,8 @@ const fresh = () => ({
 });
 let state;
 try { state = Object.assign(fresh(), JSON.parse(sessionStorage.getItem(KEY) || '{}')); } catch { state = fresh(); }
-const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(state)); } catch { /* private mode */ } };
+let frozen = false; // set while resetting, so a pending event cannot save the old state back
+const save = () => { if (frozen) return; try { sessionStorage.setItem(KEY, JSON.stringify(state)); } catch { /* private mode */ } };
 const log = (type, detail = {}) => { state.events.push({ t: Date.now() - state.started, screen: state.screen, type, ...detail }); save(); };
 
 // --- selection model --------------------------------------------------------------------------------------------------
@@ -310,7 +311,7 @@ $('#lead').addEventListener('submit', (ev) => {
   $('#estimate-ref').textContent = !state.consult && state.estimate ? `Keep your estimate reference ${state.estimate.reference} handy.` : '';
   show(9);
 });
-$('#restart').addEventListener('click', () => { const events = state.events; state = fresh(); state.events = events; log('restart'); save(); location.reload(); });
+$('#restart').addEventListener('click', () => { const events = state.events; state = fresh(); state.events = events; log('restart'); save(); frozen = true; location.reload(); });
 
 // Facilitator tools (?facilitator=1): time to first estimate, export of the anonymous event log, reset.
 if (new URLSearchParams(location.search).get('facilitator') === '1') {
@@ -322,7 +323,7 @@ if (new URLSearchParams(location.search).get('facilitator') === '1') {
     const a = el('a', { href: URL.createObjectURL(blob), download: `estimator-v2-session-${Date.now()}.json` });
     document.body.append(a); a.click(); a.remove();
   });
-  $('#reset').addEventListener('click', () => { try { sessionStorage.removeItem(KEY); } catch { /* ignore */ } location.reload(); });
+  $('#reset').addEventListener('click', () => { frozen = true; try { sessionStorage.removeItem(KEY); } catch { /* ignore */ } location.reload(); });
 }
 
 // Restore the answers and the screen (a stale estimate is recalculated, never shown as old).
