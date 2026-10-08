@@ -124,6 +124,8 @@ test('the estimator V2 prototype stays on staging: not in the live site, no netw
   assert.ok(!/<script(?![^>]*\bsrc=)|<style|\sstyle=|\son[a-z]+=/i.test(html), 'no inline script or style (production CSP)');
   assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|innerHTML/.test(js), 'no network calls and no innerHTML');
   assert.ok(!/rate_minor|_minor\s*:/.test(js), 'no rate table');
+  const spec = readFileSync(join(proto, 'proto-spec.js'), 'utf8');
+  assert.ok(!/₹|fetch\(|XMLHttpRequest|innerHTML/.test(spec), 'customer specification: no amounts, no network, no innerHTML');
   const out = join(tmp(), 'site');
   buildSite(SRC, out, KEY, estimatorFlags({}));
   assert.ok(existsSync(join(out, 'prototype/estimator-v2/index.html')), 'served by the staging site (behind Access)');

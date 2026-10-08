@@ -114,3 +114,36 @@ summary { cursor: pointer; min-height: 48px; display: flex; align-items: center;
 .facilitator p { margin: 0; flex: 1 1 100%; }
 .facilitator button { min-height: 40px; padding: 0 .8rem; border: 1px solid var(--ink); background: #fff; border-radius: 6px; cursor: pointer; }
 @media (min-width: 720px) { .app { padding-top: 2.4rem; } h1, h2 { font-size: 2.4rem; } .range { font-size: 2.8rem; } }
+/* Trust layer (variants A and B) */
+.included-line { margin: .5rem 0 0; font-size: .92rem; }
+.cta .link { justify-self: center; }
+.block { border-top: 1px solid var(--line); padding: 1rem 0 .4rem; }
+.block h3 { font-family: var(--serif); font-weight: 500; font-size: 1.45rem; margin: 0 0 .6rem; }
+.promise { margin: 0 0 .4rem; display: grid; grid-template-columns: 1fr; gap: .1rem; }
+.promise dt { font-weight: 600; font-size: .9rem; margin-top: .5rem; }
+.promise dd { margin: 0; color: var(--muted); font-size: .92rem; }
+ul.promise { padding-left: 1.1rem; display: grid; gap: .3rem; font-size: .92rem; }
+.includes-box { margin: 1rem 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 1rem .6rem; }
+.room-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem .4rem; margin-bottom: .7rem; }
+.room-row { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; }
+.room-row h4 { margin: 0; font-size: 1.02rem; }
+.room-amount { font-weight: 600; white-space: nowrap; }
+.room-std, .room-extras { margin: .3rem 0 0; color: var(--muted); font-size: .9rem; }
+.spec-line { margin: .4rem 0 0; font-size: .88rem; }
+.totals .spec-line { color: var(--accent); }
+.more { border-top: 0; padding: 0; }
+.more summary { min-height: 44px; font-size: .9rem; color: var(--accent); }
+.more ul { margin: 0 0 .6rem; padding-left: 1.2rem; font-size: .9rem; }
+.badge { display: inline-block; margin: 0 0 .6rem; padding: .2rem .6rem; border-radius: 12px; background: #e3efe5; color: #1f4f2a; font-size: .82rem; font-weight: 600; }
+.build { display: grid; grid-template-columns: 1fr auto; gap: .45rem 1rem; margin: 0 0 .8rem; font-size: .92rem; }
+.build dt { color: var(--muted); }
+.build dd { margin: 0; text-align: right; white-space: nowrap; }
+.build .total { font-weight: 600; border-top: 1px solid var(--ink); padding-top: .4rem; }
+.build dt:last-of-type { border-top: 1px solid var(--ink); padding-top: .4rem; font-weight: 600; color: var(--ink); }
+.spec-cat h3 { font-family: var(--sans); font-size: 1rem; margin: 1rem 0 .2rem; }
+.spec-cat p { margin: .2rem 0; }
+.spec-cat ul { margin: .2rem 0 .6rem; padding-left: 1.2rem; color: var(--muted); font-size: .9rem; }
+.reference { padding-top: .2rem; }
+.ref { border-top: 1px solid var(--line); }
+.ref summary { font-family: var(--serif); font-size: 1.3rem; font-weight: 500; min-height: 52px; }
+.ref ul { margin: 0 0 .8rem; padding-left: 1.2rem; font-size: .92rem; }

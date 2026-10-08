@@ -78,30 +78,35 @@
         <label class="choice disabled"><input type="radio" name="pkg" value="PREMIUM" disabled><span><strong>Premium</strong><small>Pricing coming soon</small></span></label>
         <label class="choice"><input type="radio" name="pkg" value="LUXURY"><span><strong>Luxury</strong><small>Priced after a design consultation</small></span></label>
       </div>
+      <details class="includes-box" id="pkg-includes"><summary>What Essential includes</summary><ul class="promise" id="pkg-promise"></ul><button class="link" type="button" data-spec>View detailed material specification →</button></details>
       <label class="verify"><input type="checkbox" id="verify"> <span>Verify you are human <small>(simulated in the prototype)</small></span></label>
       <p class="hint" id="pkg-hint" role="status"></p>
       <div class="actions"><button class="ghost" type="button" data-back>← Back</button><button class="primary" type="button" id="see-budget">See my budget →</button></div>
     </section>
 
-    <!-- 6 Result -->
+    <!-- 6 Result (variant A or B, rendered by proto.js) -->
     <section class="screen result" data-screen="6" aria-labelledby="h6" hidden>
       <p class="eyebrow">Veda Spaces preliminary budgetary estimate</p>
       <h2 id="h6" tabindex="-1" class="range" aria-live="polite"><span id="range"></span></h2>
       <p class="gst" id="gst"></p>
       <p class="basis" id="basis"></p>
-      <div class="cta">
-        <button class="primary wide" type="button" id="to-quote">Get my detailed quotation →</button>
-        <button class="ghost wide" type="button" id="to-refine">Tighten your range (optional)</button>
-      </div>
-      <details open><summary>What's included</summary><table class="totals"><caption class="sr">Room subtotals</caption><tbody id="room-totals"></tbody></table></details>
-      <details><summary>Project Preparation &amp; Protection Package</summary><p class="amount" id="prep"></p><p>Site preparation, material handling, protection and completion activities needed to carry out and hand over the work safely.</p><ul><li>Site and floor protection</li><li>Plywood protection</li><li>Material freight and handling</li><li>Debris handling</li><li>Completion deep cleaning</li><li>Pest control</li></ul><p class="small">One grouped value, included in the range above.</p></details>
-      <details><summary>Custom Features Allowance</summary><p class="amount" id="allowance"></p><p>Bespoke details usually added during design, such as extra drawers, mirrors, pelmets and lighting sensors. The detailed quotation replaces it with the actual items.</p></details>
-      <details><summary>Timeline, warranty and what's not included</summary><p id="timeline"></p><p>Warranty: plywood up to 10 years (manufacturer terms), kitchen tandems 3 years, channels and hinges 5 years, 1 year free service. <a href="/warranty">Full policy</a></p><p>Not included: civil work, appliances, loose furniture and décor. Sink, tiles, granite and taps are supplied by you.</p></details>
-      <details><summary>Assumptions</summary><ul id="assumptions"></ul></details>
+      <p class="included-line" id="included-line" hidden></p>
+      <div class="cta" id="cta"></div>
+      <div id="result-body"></div>
       <p class="disclaimer">This is a preliminary budgetary estimate for planning purposes and is not a final quotation or contractual offer. The final price depends on site measurement, approved design and selected materials.</p>
       <p class="proto-note">Prototype: illustrative numbers from a test rate card, not a real estimate.</p>
       <p class="small" id="meta"></p>
       <div class="actions"><button class="ghost" type="button" data-goto="4">← Change my rooms</button><span></span></div>
+    </section>
+
+    <!-- 10 Detailed material specification (progressive disclosure) -->
+    <section class="screen" data-screen="10" aria-labelledby="h10" hidden>
+      <h2 id="h10" tabindex="-1">Essential: detailed material specification</h2>
+      <p class="sub" id="spec-sub"></p>
+      <div id="spec-detail"></div>
+      <p class="small" id="spec-equivalent"></p>
+      <p class="small">Prices for materials are not shown here; your detailed quotation lists every item.</p>
+      <div class="actions"><button class="ghost" type="button" id="spec-back">← Back</button><span></span></div>
     </section>
 
     <!-- 7 Lead capture -->
@@ -147,11 +152,12 @@
   </main>
 
   <aside class="facilitator" id="facilitator" hidden aria-label="Facilitator tools">
-    <p><strong>Facilitator</strong> · time to first estimate: <span id="ttfe">—</span></p>
+    <p><strong>Facilitator</strong> · variant <span id="fvariant">—</span> · specification <span id="fspec">—</span> · time to first estimate: <span id="ttfe">—</span></p>
     <button type="button" id="export">Export session log</button>
     <button type="button" id="reset">Reset session</button>
   </aside>
 
+  <script src="proto-spec.js"></script>
   <script src="proto.js"></script>
 </body>
 </html>
