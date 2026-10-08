@@ -70,13 +70,19 @@ def _all(prefix: str):
     return key
 
 
+def _succeeded(response) -> bool:
+    return 200 <= response.status_code < 300
+
+
 def _limits(prefix: str, per_ip: tuple[str, str], per_network: str, per_client: str, aggregate: str) -> list:
+    """Source limits count every request. The aggregate limit counts only successful ones (Turnstile passed), so
+    unverified traffic from a few networks cannot exhaust the estimator for everyone (review S4)."""
     return [
         (per_ip[0], _ip(prefix)),
         (per_ip[1], _ip(prefix)),
         (per_network, _network(prefix)),
         (per_client, _client(prefix)),
-        (aggregate, _all(prefix)),
+        (aggregate, _all(prefix), {"deduct_when": _succeeded}),
     ]
 
 

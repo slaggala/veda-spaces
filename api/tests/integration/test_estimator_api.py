@@ -489,3 +489,23 @@ def test_estimate_rate_limits(api):
     load_card()
     codes = [estimate(api).status for _ in range(12)]
     assert codes[:6].count(201) == 6 and 429 in codes, codes
+
+
+@pytest.mark.settings(estimator_enabled=True, rate_limits_enabled=True)
+def test_unverified_traffic_cannot_exhaust_the_aggregate_limit(api):
+    """Review S4 / staging stop condition: requests that fail Turnstile count against their own source limits, never
+    against the aggregate, so 102 networks sending 612 unverified requests (over the 600/h aggregate) lock out only
+    themselves."""
+    load_card()
+
+    def post(ip, token):
+        return api.post(
+            "/api/v1/public/estimates",
+            body(turnstile_token=token),
+            anonymous=True,
+            headers={"Origin": SITE, "CF-Connecting-IP": ip, "X-Veda-Client": f"c{ip.replace('.', '')}"},
+        )
+
+    refused = [post(f"10.{n // 250}.{n % 250}.7", "fail-x").status for n in range(102) for _ in range(6)]
+    assert set(refused) == {422}, "each source stays inside its own limits"
+    assert post("10.9.9.9", "ok-token").status == 201, "a verified customer is still served"
