@@ -13,6 +13,8 @@ for this review, staging validation and the owner's explicit enablement.
 - no official quotation generated;
 - no legal or tax approval claimed.
 
+**Owner sign-off:** [ESTIMATOR-signoff-package.md](ESTIMATOR-signoff-package.md); staging steps in [ESTIMATOR-staging-validation-plan.md](ESTIMATOR-staging-validation-plan.md).
+
 **Consolidated review:** completed with three independent reviewers. No high-severity finding; the dispositions are in
 [ESTIMATOR-consolidated-review.md](ESTIMATOR-consolidated-review.md).
 
