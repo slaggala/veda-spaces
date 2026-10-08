@@ -65,6 +65,25 @@ dead ends.
 
 ## 2. Flow and wireframes (mobile, 360 px)
 
+**Screenshots of the built prototype** (360 px, full page, illustrative numbers) are in [`ux-v2/`](ux-v2/):
+
+| Screen | Screenshot |
+|---|---|
+| 1 Home type | [v2-1-home-type.png](ux-v2/v2-1-home-type.png) |
+| 2 BHK | [v2-2-bhk.png](ux-v2/v2-2-bhk.png) |
+| 3 New or renovation | [v2-3-new-or-renovation.png](ux-v2/v2-3-new-or-renovation.png) |
+| 4 Rooms | [v2-4-rooms.png](ux-v2/v2-4-rooms.png), and with extras open: [v2-4b-rooms-extras-open.png](ux-v2/v2-4b-rooms-extras-open.png) |
+| 5 Package | [v2-5-package.png](ux-v2/v2-5-package.png) |
+| 6 Budget range | [v2-6-budget-range.png](ux-v2/v2-6-budget-range.png) |
+| 7 Get my quotation | [v2-7-get-quotation.png](ux-v2/v2-7-get-quotation.png) |
+| 8 Tighten your range | [v2-8-tighten-range.png](ux-v2/v2-8-tighten-range.png) |
+| Confirmation | [v2-9-confirmation.png](ux-v2/v2-9-confirmation.png) |
+
+The prototype also refines the wireframes below:
+- **Folded extras:** each room's extras sit behind "Add extras (n)", so the rooms screen reads as a home rather than a
+  catalogue.
+- **Limit message:** an extra at a limit says "Limit reached for your home".
+
 ```
 Home type → BHK → New / Renovation → Rooms → Package → Your budget range → Get my quotation → (optional) Tighten your range
    1         2          3              4        5              6                   7                     8
@@ -411,3 +430,96 @@ needed to start V2 for 3 BHK apartments.
 - retention and the privacy rules.
 
 Estimates created by V1 and V2 are indistinguishable to staff and to the engine.
+
+## 6. The clickable prototype (A)
+
+| Item | Detail |
+|---|---|
+| Where | `app/e2e/site-release/prototype/estimator-v2/` (`index.html`, `proto.css`, `proto.js`). Served by the **staging site only**, at `https://staging.vedaspaces.com/prototype/estimator-v2/`, behind Cloudflare Access. Never in `dist/` (the production site); a test guards this. `noindex` |
+| What it is | All eight screens, plus the confirmation and the Luxury consultation path. State is kept in the tab and survives a reload. Engine limits are prevented in the rooms step. The lead form uses the linked error summary. **No network calls** and no rates |
+| Numbers | Illustrative only. Each room and extra was priced once with the real engine on the **synthetic** test card (3 BHK, typical sizes). The prototype sums them with the engine's structure: typical band −15/+25 %, measured band −10/+15 %, allowance 5–15 % of room work, the grouped package, GST 18 % separate. Each page says "illustrative numbers from a test rate card, not a real estimate" |
+| Facilitator mode | Add `?facilitator=1`. It shows the time to the first estimate, an "Export session log" button (anonymous screen and control events as JSON) and "Reset session" |
+| Participants outside the team | They need access to the staging site: add their email to the Access policy with a one-time PIN for the session, then remove it. Or the facilitator shares a screen. **Never published publicly** |
+| Tests | `app/e2e/estimator-v2-prototype.e2e.mjs` (in CI, 30 checks). Every screen; axe on each; 360 px; no CSP violations under the production policy; no network calls; limits prevented; estimate before any contact details; refinement; lead errors linked; Luxury without an amount; reload kept |
+
+## 7. Customer journey map (C)
+
+| Stage | Customer goal | V1 (current) | V2 | What we measure |
+|---|---|---|---|---|
+| Discover | "Can I afford good interiors?" | A link to the estimate page | Same; the promise is "about a minute, no contact details" | Visits to `/estimate` |
+| Start | "Is this quick?" | Step 1 of a 4-step form: property, size, city and project kind together | One question per screen with a progress bar; unsupported options say "coming soon" up front | Start rate (screen 1 → 2) |
+| Describe the home | "This is my home" | Property, size, city, project kind on one form | Three single-tap screens, all pre-filled | Drop-off on screens 1–3 |
+| Choose the scope | "These are the rooms I want done" | A grid of about 71 room × product checkboxes; customer builds the scope from nothing | Nine room cards already on for a typical 3 BHK; turn off what's not wanted; extras folded | Time on rooms; rooms off; extras added |
+| Measurements | "I don't know my measurements" | 20 number fields with units and "use a typical size" (69 unit and dimension terms) | **None before the estimate** | V1: drop-off at measurements |
+| Choose the finish | "What level of finish?" | Package plus 33 option dropdowns for the selected items | Three package cards, Turnstile, "See my budget" | Drop-off at the package screen |
+| **First estimate** | "Roughly how much?" | After 21 or more actions; errors possible (limits, sizes, units) | After 6 actions; no reachable errors | **Completion to first estimate**; time to first estimate |
+| Understand | "What's included? Is it fair?" | One long result page | The range first, then folded details: rooms, package, allowance, timeline, assumptions | Detail sections opened |
+| Decide | "Talk to someone or think about it" | One "Get my detailed quotation" | The same, plus "Tighten your range (optional)" | Quotation clicks; refinement use |
+| Refine (optional) | "Make it closer to my home" | Back to step 3 and re-enter | The 4 measurements that move the price most, inline; "Update my range" | Refinements per estimate; range change |
+| Lead | "Call me" | Contact form after the estimate | The same, with linked errors and consultation wording for Luxury | **Estimate → enquiry conversion** |
+| After | "What happens now?" | Reference and "we'll call within a day" | The same, plus the estimate reference to keep | Designer contact time (operations) |
+
+## 8. Conversion comparison V1 vs V2 (D)
+
+### 8.1 Measured effort (same scope, same engine input)
+
+Method:
+- Both wizards were driven in a 360 px browser for the **same scope**: the typical 3 BHK selection of 16 items, in
+  the room bundles of §3.2.
+- Everything a customer must see and do **before the first estimate** was counted. A control counts only if the
+  browser reports it visible.
+- V2 uses its defaults; V1 needs the 16 items ticked by hand.
+
+| Before the first estimate | V1 | V2 | Change |
+|---|---|---|---|
+| Actions needed (taps, ticks, verification, submit) | 21 | 6 | −71 % |
+| Visible controls to scan | 177 | 41 | −77 % |
+| Number fields | 20 | 0 | −100 % |
+| Dropdowns | 54 | 0 | −100 % |
+| Words to read | 882 | 269 | −70 % |
+| Unit and dimension terms (ft, sq ft, width, height, length …) | 69 | 0 | −100 % |
+| Server rejections a customer can reach | Several (`TOO_MANY`, `HOME_SIZE_UNAVAILABLE`, `OUT_OF_BOUNDS`, `INVALID_UNIT` …) | None (prevented in the UI) | — |
+
+### 8.2 Expected conversion: what we can and cannot claim
+
+- **No customer data exists yet.** Neither version has been public, so a percentage uplift cannot be claimed.
+- **What the measurements support:** a large cut in effort at exactly the points where V1 asks for unknown
+  information (measurements) and builds the scope from nothing (the product grid). Both are the patterns that
+  competitors avoid (desk research, 2026-10-08).
+- **Measurement plan:**
+  - the five-participant prototype test (§3.6) measures completion and time to the first estimate on both versions;
+  - on staging and later in public, the funnel events of §7 compare V2 against V1 on completion to the first
+    estimate and on estimate → enquiry conversion;
+  - V1 stays behind its switch until V2 matches or beats it.
+
+### 8.3 Estimate accuracy is unchanged
+
+- V2 sends the **same request shape** to the **same engine and card**: products, rooms and default options from the
+  bundles; typical sizes unless refined.
+- For the same scope and the same measurements, V1 and V2 therefore give the **same range**: same lines, same
+  allowance, same package.
+- The calibration (E6, rules `2026.10.2`) applies to both. Its typical-size results are A +10.1 %, B −8.8 %,
+  C +2.9 %, all inside the range.
+- The build (§9) adds an **equivalence test**. For each supported size, the V2 bundle expansion and the matching V1
+  selection must produce identical engine results on the synthetic card in CI, and on the private card in the local
+  rehearsal.
+
+## 9. Implementation plan (E)
+
+Front-end only. **No change** to the pricing engine, rules, rate cards, calibration, API contracts, database or staff
+panel.
+
+| Phase | Work | Files | Tests and gates | Size |
+|---|---|---|---|---|
+| P0 | Merge this prototype. Owner reviews it on staging, and approves the room bundles (U2-1) and the customer copy (U2-9) | — | CI green | S |
+| P1 | Usability test: five participants (§3.6). Fix the findings in the prototype | prototype | §1.4 targets met, or findings accepted | M |
+| P2 | Build V2 in the real page, behind `STAGING_ESTIMATOR_UX=v2`. **Screens:** screens 1–8 from the prototype. **Room bundles:** a config object with no rates, expanded to engine selections; limits from §3.2. **API calls:** real `POST /public/estimates` and `/public/enquiries` (unchanged contracts). **Turnstile:** `execute` mode for refinement. Keep the U7 error pattern, rounding and the CSP | `estimate.html`, `assets/estimate-v2.js`, `assets/estimate-v2.css`, `staging-build.mjs` (the switch) | Unit: bundle expansion is valid for the card (products, rooms, options, limits). **Equivalence: V1 and V2 give identical engine results for the same scope.** e2e: every screen and state, axe, 360 px, CSP, no reachable server error. Staging-build: the switch | L |
+| P3 | Staging: set `STAGING_ESTIMATOR_UX=v2`. Re-run V1–V12; add the §1.4 measures with 2–3 internal users | Pages variable | Owner sign-off | M |
+| P4 | Retire V1: remove the V1 script, the switch and its tests; update the runbook | `estimate.js`, e2e | CI green | S |
+| P5 | Public: ADR-011 E7, the policy's legal review, owner enablement | — | Separate owner decision | — |
+
+**API contracts:** no change is essential. The only identified case, limits with every extra on (U2-10), is handled
+in the UI. A change would be proposed separately only if the usability test shows it matters.
+
+**Rollback:** at any phase, `STAGING_ESTIMATOR_UX` unset brings back V1, with the same engine and the same estimates.
+

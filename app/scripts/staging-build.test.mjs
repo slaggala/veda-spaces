@@ -114,3 +114,17 @@ test('the warranty policy page is the same customer-facing page on the live site
     assert.ok(readFileSync(join(SRC, '../../..', map), 'utf8').includes('<loc>https://www.vedaspaces.com/warranty</loc>'), map);
   }
 });
+
+test('the estimator V2 prototype stays on staging: not in the live site, no network, no inline code, noindex', () => {
+  const proto = join(SRC, 'prototype/estimator-v2');
+  const html = readFileSync(join(proto, 'index.html'), 'utf8');
+  const js = readFileSync(join(proto, 'proto.js'), 'utf8');
+  assert.ok(!existsSync(join(SRC, '../../../dist/prototype')), 'never in dist/ (the production site)');
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  assert.ok(!/<script(?![^>]*\bsrc=)|<style|\sstyle=|\son[a-z]+=/i.test(html), 'no inline script or style (production CSP)');
+  assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|innerHTML/.test(js), 'no network calls and no innerHTML');
+  assert.ok(!/rate_minor|_minor\s*:/.test(js), 'no rate table');
+  const out = join(tmp(), 'site');
+  buildSite(SRC, out, KEY, estimatorFlags({}));
+  assert.ok(existsSync(join(out, 'prototype/estimator-v2/index.html')), 'served by the staging site (behind Access)');
+});

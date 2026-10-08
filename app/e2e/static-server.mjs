@@ -30,6 +30,7 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x').pathname;
   let file = path.join(root, url === '/' ? 'index.html' : url);
   if (!path.extname(file) && fs.existsSync(`${file}.html`)) file = `${file}.html`; // Pages serves /estimate as estimate.html
+  if (fs.existsSync(file) && fs.statSync(file).isDirectory() && fs.existsSync(path.join(file, 'index.html'))) file = path.join(file, 'index.html'); // and /dir/ as dir/index.html
   if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     file = path.join(root, '404.html');
     res.statusCode = 404;
