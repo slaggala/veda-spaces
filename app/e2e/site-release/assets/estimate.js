@@ -43,7 +43,7 @@ const PRODUCTS = {
   ELECTRICAL: { label: 'Electrical and lighting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'CARPET', label: 'Carpet area', kind: 'area', hint: 'Carpet area of the home.' }, { name: 'SPOTS', label: 'Spot lights', kind: 'count', hint: 'Number of spot lights.' }], options: [] },
 };
 const UNITS = { length: [['ft', 'ft'], ['in', 'in'], ['m', 'm'], ['cm', 'cm']], area: [['sqft', 'sq ft'], ['sqm', 'sq m']], count: [['nos', 'nos']] };
-const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', 'Design-led, bespoke materials and a dedicated designer.']];
+const PACKAGES = [['ESSENTIAL', 'Essential', 'Quality laminate finishes, branded plywood and standard soft-close hardware.'], ['PREMIUM', 'Premium', 'Upgraded finishes and hardware.'], ['LUXURY', 'Luxury', '']]; // shown only as "Priced after a design consultation" (owner decision)
 // Luxury has no public price (ADR-012 D2): it leads straight to a design consultation.
 const STATE_KEY = 'veda-estimate-v1';
 const state = { step: 1, home: {}, items: [], package: 'ESSENTIAL', estimate: null, enquiryKey: null, luxury: false };
@@ -161,7 +161,7 @@ function renderPreferences() {
     const input = el('input', { type: 'radio', name: 'package', value: code, checked: state.package === code, disabled: !on });
     input.addEventListener('change', packageChanged);
     fs.append(el('label', { class: `choice package${on ? '' : ' unavailable'}` }, input,
-      ` ${label} — ${luxury ? `${description} Priced after a design consultation.` : on ? description : 'pricing coming soon'}`));
+      ` ${label} — ${luxury ? 'Priced after a design consultation' : on ? description : 'pricing coming soon'}`));
   }
   packageChanged();
   const box = $('#est-options');

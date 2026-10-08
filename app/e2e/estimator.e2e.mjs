@@ -78,7 +78,8 @@ await page.click('#step-3 button[type="submit"]');
 const premiumDisabled = await page.locator('input[name="package"][value="PREMIUM"]').isDisabled();
 const luxuryLabel = await page.locator('label:has(input[name="package"][value="LUXURY"])').textContent();
 check('step 4: Premium unavailable without approved rates; Luxury offered as a design consultation (D2)', premiumDisabled &&
-  !(await page.locator('input[name="package"][value="LUXURY"]').isDisabled()) && /design consultation/.test(luxuryLabel));
+  !(await page.locator('input[name="package"][value="LUXURY"]').isDisabled()) && luxuryLabel.trim() === 'Luxury — Priced after a design consultation' &&
+  !/₹/.test(luxuryLabel), luxuryLabel.trim());
 await page.selectOption('[data-option="DOOR"]', 'SLIDING');
 await axe('step 4 (preferences)');
 await page.click('#est-calculate');

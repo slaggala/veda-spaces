@@ -268,3 +268,15 @@ the implementation; earlier sections are read in their light.
 - **D4, D6, D7 (30-day validity, 90-day retention), D8 and D9:** approved as implemented.
 - **Status:** public intake and public use of the estimator stay disabled.
 
+**Interpretations approved for staging validation** (owner, `VEDA-SPACES-ESTIMATOR-STAGING-VALIDATION`, 2026-10-08,
+decision log 20):
+1. **Soft-close pricing:** priced per square foot of shutter area for the applicable kitchen, wardrobe and TV-unit
+   products, including hinged wardrobe lofts where the approved product definition requires soft-close hardware.
+   Soft-close stays outside the Project Preparation & Protection Package.
+2. **Retention:** an estimate never linked to a lead is kept for 90 days from creation, and never deleted while it is
+   still valid. A linked estimate follows the lead-retention policy. It holds no personal data and stays with its
+   lead, whose personal data the lead-retention job anonymises (period OWNER-INPUT-002).
+3. **Supported scope in staging:** only approved 3 BHK apartment pricing. **Not exposed:** 1 BHK, 2 BHK, 4 BHK,
+   Custom, Villa, Premium pricing, Luxury pricing. Luxury is visible only as "Priced after a design consultation" and
+   routes to the enquiry without an amount.
+
