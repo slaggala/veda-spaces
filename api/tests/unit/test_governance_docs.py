@@ -263,3 +263,6 @@ def test_public_intake_disabled():
     assert '<meta name="veda-api-base" content="">' in html
     assert '<meta name="veda-turnstile-sitekey" content="">' in html
     assert '<meta name="veda-api-credentials" content="">' in html  # credentialed intake is staging-only
+    estimate = (REPO / "app/e2e/site-release/estimate.html").read_text()
+    for name in ("veda-estimator", "veda-api-base", "veda-turnstile-sitekey", "veda-api-credentials"):
+        assert f'<meta name="{name}" content="">' in estimate, name  # the estimator page is off in production

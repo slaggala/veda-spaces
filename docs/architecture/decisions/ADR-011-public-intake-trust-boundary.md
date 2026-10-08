@@ -1,7 +1,13 @@
 # ADR-011: Public lead intake across the Cloudflare Access trust boundary
 
-- **Status:** **Proposed.** Not accepted, not implemented. It needs an owner decision (§8). `public_intake` stays
-  `disabled` until then.
+- **Status:** **Accepted with conditions** (owner, 2026-10-08, `VEDA-SPACES-PUBLIC-INTAKE-AND-BUDGET-ESTIMATOR-IMPLEMENTATION`).
+  **Option A**: a dedicated public-intake hostname exposing only the minimum anonymous estimate and enquiry
+  endpoints (initially `POST /api/v1/public/estimates` and `POST /api/v1/public/enquiries`). All staff,
+  administration, operational, health, readiness and internal routes stay behind Cloudflare Access.
+  **Conditions:** default deny; exact path matching; Turnstile per the approved policy; layered rate limits; no
+  enumeration and no internal identifiers or workflow state in public responses; approved origins only. **Not
+  implemented yet:** implementation (phase E7) waits for independent certification, staging validation and the
+  owner's explicit enablement. `public_intake` stays `disabled` until then.
 - **Date:** 2026-10-07
 - **Follow-up:** R7 of the AUT-202 to AUT-204 evidence
   ([record](../../release-evidence/AUT-202-204-STAGING-FRONTENDS/README.md))

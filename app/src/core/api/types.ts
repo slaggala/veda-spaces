@@ -387,3 +387,77 @@ export interface CursorMeta {
   has_more: boolean;
   unread_count?: number;
 }
+
+// --- Budgetary Estimate (ADR-012) -----------------------------------------------------------------------------
+
+export interface EstimateRange { low_minor: number; high_minor: number; currency?: string }
+
+export interface EstimateSummary {
+  id: string;
+  reference: string;
+  created_on: string;
+  origin: 'PUBLIC' | 'STAFF';
+  package: string;
+  range: EstimateRange;
+  rate_card_version: string;
+  site_measurement_required: boolean;
+}
+
+export interface EstimateSelection {
+  room: string;
+  product: string;
+  measurements: Record<string, { value: number; unit: string }>;
+  options: Record<string, string>;
+}
+
+export interface EstimateLine {
+  room: string; instance: number; product: string; code: string; label: string; uom: string;
+  quantity: string; rate_minor: number; amount_minor: number; typical: boolean; optional: boolean;
+}
+
+export interface EstimateResult {
+  title: string;
+  disclaimer: string;
+  package: string;
+  range: EstimateRange;
+  gst: { pct: number; low_minor: number; high_minor: number };
+  rooms: { room: string; label: string; amount_minor: number }[];
+  project_preparation: {
+    label: string; description: string; note: string; amount_minor: number; inclusions: string[];
+    components?: { code: string; label: string; inclusion: string; amount_minor: number }[];
+  };
+  custom_features_allowance: {
+    label: string; description: string; low_minor: number; high_minor: number;
+    amount_minor?: number; basis_minor?: number; low_pct?: number; high_pct?: number;
+  };
+  optional_items_minor: number;
+  timeline: { label: string; min_days: number; max_days: number };
+  assumptions: string[];
+  exclusions: string[];
+  client_scope: string[];
+  warranty: { items: string[]; note: string; policy_url: string | null };
+  lines?: EstimateLine[];
+  base_minor?: number;
+}
+
+export interface EstimateDetail {
+  id: string;
+  reference: string;
+  created_on: string;
+  expires_on: string;
+  origin: 'PUBLIC' | 'STAFF';
+  source_reference: string | null;
+  rate_card_version: string;
+  calculation_version: string;
+  property_type: string;
+  home_size: string;
+  project_kind: string;
+  city: string | null;
+  package: string;
+  inputs: { selections: EstimateSelection[]; package: string; [k: string]: unknown };
+  estimate: EstimateResult;
+  site_measurement_required: boolean;
+  lead: { id: string; lead_number: string; status: string } | null;
+  preferred_contact: string | null;
+  events: { type: string; on: string; by: string; detail: Record<string, unknown> | null }[];
+}

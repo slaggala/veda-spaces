@@ -1,0 +1,2222 @@
+{
+ "schema": "veda.estimator.rate-card/1",
+ "description": "SYNTHETIC test rate card. Not Veda Spaces commercial rates.",
+ "version": "SYNTHETIC-2",
+ "effective_on": "2026-10-01",
+ "currency": "INR",
+ "packages": {
+  "ESSENTIAL": true,
+  "PREMIUM": true,
+  "LUXURY": false
+ },
+ "gst_pct": 18,
+ "validity_days": 30,
+ "ranges": {
+  "measured": {
+   "low_pct": 10,
+   "high_pct": 15
+  },
+  "typical": {
+   "low_pct": 15,
+   "high_pct": 25
+  },
+  "round_to_minor": 500000
+ },
+ "bounds": {
+  "length": {
+   "min": 0.5,
+   "max": 150
+  },
+  "area": {
+   "min": 10,
+   "max": 10000
+  },
+  "count": {
+   "min": 0,
+   "max": 60
+  }
+ },
+ "products": [
+  {
+   "code": "KITCHEN",
+   "label": "Modular kitchen",
+   "category": "CARPENTRY",
+   "area": "KITCHEN",
+   "rooms": [
+    "KITCHEN"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "RUN",
+     "label": "Counter length",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 10,
+      "1BHK": 8,
+      "2BHK": 10,
+      "3BHK": 12,
+      "4BHK": 14
+     }
+    },
+    {
+     "name": "DRAWERS",
+     "label": "Drawers",
+     "kind": "count",
+     "typical": {
+      "DEFAULT": 4,
+      "1BHK": 3,
+      "3BHK": 5,
+      "4BHK": 6
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "WALL_UNITS",
+     "label": "Wall units",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    },
+    {
+     "name": "LOFT",
+     "label": "Loft",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "BASE",
+     "label": "Base unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 3
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "WALL",
+     "label": "Wall unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "WALL_UNITS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "LOFT",
+     "label": "Loft",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "TANDEM",
+     "label": "Tandem drawers",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "input": "DRAWERS"
+     },
+     "rates": {
+      "ESSENTIAL": 500000,
+      "PREMIUM": 650000,
+      "LUXURY": 850000
+     }
+    },
+    {
+     "code": "PLUMBING",
+     "label": "Plumbing labour and materials",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 800000,
+      "PREMIUM": 1040000,
+      "LUXURY": 1360000
+     }
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hardware (base units)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2.9
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     }
+    },
+    {
+     "code": "SOFT_CLOSE_WALL",
+     "label": "Soft-close hardware (wall units)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "WALL_UNITS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE_LOFT",
+     "label": "Soft-close hardware (loft)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "RUN",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "WARDROBE",
+   "label": "Wardrobe",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 6
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 7
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "DOOR",
+     "label": "Door",
+     "choices": [
+      "HINGED",
+      "SLIDING"
+     ],
+     "default": "HINGED"
+    },
+    {
+     "name": "LOFT",
+     "label": "Loft",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    },
+    {
+     "name": "GLASS",
+     "label": "Profile glass",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "NO"
+    }
+   ],
+   "lines": [
+    {
+     "code": "BODY",
+     "label": "Wardrobe",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "LOFT",
+     "label": "Loft",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SLIDING",
+     "label": "Sliding-door hardware",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 1000000,
+      "PREMIUM": 1300000,
+      "LUXURY": 1700000
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "SLIDING"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "GLASS",
+     "label": "Profile glass",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1
+     },
+     "rates": {
+      "ESSENTIAL": 70000,
+      "PREMIUM": 91000,
+      "LUXURY": 119000
+     },
+     "when": [
+      {
+       "option": "GLASS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hinges",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "HINGED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE_LOFT",
+     "label": "Soft-close hinges (loft)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "LOFT",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "TV_UNIT",
+   "label": "TV unit",
+   "category": "CARPENTRY",
+   "area": "LIVING",
+   "rooms": [
+    "LIVING",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Wall width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 7
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "STYLE",
+     "label": "Style",
+     "choices": [
+      "BOX",
+      "BOX_STORAGE",
+      "PANELLED"
+     ],
+     "default": "BOX_STORAGE"
+    }
+   ],
+   "lines": [
+    {
+     "code": "BOX",
+     "label": "TV box",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.5
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "STORAGE",
+     "label": "Side storage",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 3
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "BOX_STORAGE",
+        "PANELLED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "PANEL",
+     "label": "Wall panelling",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 7
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "PANELLED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "SOFT_CLOSE",
+     "label": "Soft-close hardware (TV box)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.3
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     }
+    },
+    {
+     "code": "SOFT_CLOSE_STORAGE",
+     "label": "Soft-close hardware (storage)",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 3
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "BOX_STORAGE",
+        "PANELLED"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "FEATURE_WALL",
+   "label": "Feature wall",
+   "category": "FINISH",
+   "area": "LIVING",
+   "rooms": [
+    "LIVING",
+    "DINING",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 8
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 9
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "FINISH",
+     "label": "Finish",
+     "choices": [
+      "PANELLING",
+      "WALLPAPER",
+      "TEXTURE"
+     ],
+     "default": "PANELLING"
+    }
+   ],
+   "lines": [
+    {
+     "code": "PANELLING",
+     "label": "Panelling",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "FINISH",
+       "in": [
+        "PANELLING"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "WALLPAPER",
+     "label": "Wallpaper",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 20000,
+      "PREMIUM": 26000,
+      "LUXURY": 34000
+     },
+     "when": [
+      {
+       "option": "FINISH",
+       "in": [
+        "WALLPAPER"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "TEXTURE",
+     "label": "Texture paint",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 20000,
+      "PREMIUM": 26000,
+      "LUXURY": 34000
+     },
+     "when": [
+      {
+       "option": "FINISH",
+       "in": [
+        "TEXTURE"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "CROCKERY_UNIT",
+   "label": "Crockery unit",
+   "category": "CARPENTRY",
+   "area": "LIVING",
+   "rooms": [
+    "DINING",
+    "LIVING"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 5
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 7
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "GLASS",
+     "label": "Profile glass",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "NO"
+    }
+   ],
+   "lines": [
+    {
+     "code": "BODY",
+     "label": "Crockery unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "GLASS",
+     "label": "Profile glass",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.5
+     },
+     "rates": {
+      "ESSENTIAL": 70000,
+      "PREMIUM": 91000,
+      "LUXURY": 119000
+     },
+     "when": [
+      {
+       "option": "GLASS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "PARTITION",
+   "label": "Partition",
+   "category": "CARPENTRY",
+   "area": "LIVING",
+   "rooms": [
+    "LIVING",
+    "DINING"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 4
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 8
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "FINISH",
+     "label": "Finish",
+     "choices": [
+      "LAMINATE",
+      "FLUTED_GLASS"
+     ],
+     "default": "FLUTED_GLASS"
+    }
+   ],
+   "lines": [
+    {
+     "code": "LAMINATE",
+     "label": "Partition",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "FINISH",
+       "in": [
+        "LAMINATE"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "FLUTED",
+     "label": "Partition with fluted glass",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 150000,
+      "PREMIUM": 195000,
+      "LUXURY": 255000
+     },
+     "when": [
+      {
+       "option": "FINISH",
+       "in": [
+        "FLUTED_GLASS"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "FALSE_CEILING",
+   "label": "False ceiling",
+   "category": "CEILING",
+   "area": "WHOLE_HOME",
+   "has_electrical": true,
+   "rooms": [
+    "WHOLE_HOME",
+    "LIVING",
+    "DINING",
+    "KITCHEN",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "AREA",
+     "label": "Ceiling area",
+     "kind": "area",
+     "typical": {
+      "DEFAULT": 900,
+      "1BHK": 550,
+      "2BHK": 900,
+      "3BHK": 1300,
+      "4BHK": 1700
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "DESIGN",
+     "label": "Design",
+     "choices": [
+      "PLAIN",
+      "COVE",
+      "CLOUD"
+     ],
+     "default": "PLAIN"
+    },
+    {
+     "name": "LIGHTS",
+     "label": "Lights",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "GYPSUM",
+     "label": "Gypsum ceiling",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA"
+     },
+     "rates": {
+      "ESSENTIAL": 5000,
+      "PREMIUM": 6500,
+      "LUXURY": 8500
+     }
+    },
+    {
+     "code": "COVE",
+     "label": "Cove detail",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA",
+      "factor": 0.1
+     },
+     "rates": {
+      "ESSENTIAL": 20000,
+      "PREMIUM": 26000,
+      "LUXURY": 34000
+     },
+     "when": [
+      {
+       "option": "DESIGN",
+       "in": [
+        "COVE"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "CLOUD",
+     "label": "Cloud ceiling",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA",
+      "factor": 0.05
+     },
+     "rates": {
+      "ESSENTIAL": 20000,
+      "PREMIUM": 26000,
+      "LUXURY": 34000
+     },
+     "when": [
+      {
+       "option": "DESIGN",
+       "in": [
+        "CLOUD"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "PANEL_LIGHTS",
+     "label": "Panel lights",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA",
+      "factor": 0.025
+     },
+     "rates": {
+      "ESSENTIAL": 70000,
+      "PREMIUM": 91000,
+      "LUXURY": 119000
+     },
+     "when": [
+      {
+       "option": "LIGHTS",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "STUDY_UNIT",
+   "label": "Study unit",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "STUDY"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 5
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "STORAGE",
+     "label": "Overhead storage",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "DESK",
+     "label": "Study unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2.5
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "STORAGE",
+     "label": "Overhead storage",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "STORAGE",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "VANITY_UNIT",
+   "label": "Vanity unit",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "DINING",
+    "WHOLE_HOME"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 4
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "TYPE",
+     "label": "Type",
+     "choices": [
+      "TOILET",
+      "DRESSER"
+     ],
+     "default": "TOILET"
+    },
+    {
+     "name": "MIRROR",
+     "label": "Mirror",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "TOILET",
+     "label": "Toilet vanity (2×2)",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 900000,
+      "PREMIUM": 1170000,
+      "LUXURY": 1530000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "TOILET"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "DRESSER",
+     "label": "Dresser vanity",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 3
+     },
+     "rates": {
+      "ESSENTIAL": 120000,
+      "PREMIUM": 156000,
+      "LUXURY": 204000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "DRESSER"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "MIRROR",
+     "label": "Mirror",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "count": 1
+     },
+     "rates": {
+      "ESSENTIAL": 400000,
+      "PREMIUM": 520000,
+      "LUXURY": 680000
+     },
+     "when": [
+      {
+       "option": "MIRROR",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "BED",
+   "label": "Bed and headboard",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "options": [
+    {
+     "name": "SIZE",
+     "label": "Size",
+     "choices": [
+      "QUEEN",
+      "KING"
+     ],
+     "default": "QUEEN"
+    },
+    {
+     "name": "STORAGE",
+     "label": "Storage",
+     "choices": [
+      "NONE",
+      "HYDRAULIC"
+     ],
+     "default": "HYDRAULIC"
+    },
+    {
+     "name": "HEADBOARD",
+     "label": "Headboard",
+     "choices": [
+      "NONE",
+      "PANEL",
+      "CUSHIONED"
+     ],
+     "default": "PANEL"
+    }
+   ],
+   "lines": [
+    {
+     "code": "QUEEN",
+     "label": "Queen bed",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "count": 1
+     },
+     "rates": {
+      "ESSENTIAL": 3000000,
+      "PREMIUM": 3900000,
+      "LUXURY": 5100000
+     },
+     "when": [
+      {
+       "option": "SIZE",
+       "in": [
+        "QUEEN"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "KING",
+     "label": "King bed",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "count": 1
+     },
+     "rates": {
+      "ESSENTIAL": 3600000,
+      "PREMIUM": 4680000,
+      "LUXURY": 6120000
+     },
+     "when": [
+      {
+       "option": "SIZE",
+       "in": [
+        "KING"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "HYDRAULIC",
+     "label": "Hydraulic storage fitting",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 700000,
+      "PREMIUM": 910000,
+      "LUXURY": 1190000
+     },
+     "when": [
+      {
+       "option": "STORAGE",
+       "in": [
+        "HYDRAULIC"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "PANEL",
+     "label": "Headboard panel",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 1500000,
+      "PREMIUM": 1950000,
+      "LUXURY": 2550000
+     },
+     "when": [
+      {
+       "option": "HEADBOARD",
+       "in": [
+        "PANEL",
+        "CUSHIONED"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "CUSHION",
+     "label": "Headboard cushion",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 1800000,
+      "PREMIUM": 2340000,
+      "LUXURY": 3060000
+     },
+     "when": [
+      {
+       "option": "HEADBOARD",
+       "in": [
+        "CUSHIONED"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "UTILITY",
+   "label": "Utility unit",
+   "category": "CARPENTRY",
+   "area": "KITCHEN",
+   "rooms": [
+    "UTILITY"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 4
+     }
+    }
+   ],
+   "lines": [
+    {
+     "code": "WALL",
+     "label": "Utility wall unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "SINK_LAYING",
+     "label": "Utility sink laying",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 500000,
+      "PREMIUM": 650000,
+      "LUXURY": 850000
+     }
+    }
+   ]
+  },
+  {
+   "code": "PAINTING",
+   "label": "Painting (optional)",
+   "category": "OPTIONAL",
+   "area": "WHOLE_HOME",
+   "rooms": [
+    "WHOLE_HOME"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "AREA",
+     "label": "Wall area",
+     "kind": "area",
+     "typical": {
+      "DEFAULT": 2500,
+      "1BHK": 1500,
+      "3BHK": 3500,
+      "4BHK": 4500
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "SYSTEM",
+     "label": "Paint system",
+     "choices": [
+      "REPAINT",
+      "FULL"
+     ],
+     "default": "FULL"
+    }
+   ],
+   "lines": [
+    {
+     "code": "REPAINT",
+     "label": "Two coats of paint",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA"
+     },
+     "rates": {
+      "ESSENTIAL": 2000,
+      "PREMIUM": 2600,
+      "LUXURY": 3400
+     },
+     "when": [
+      {
+       "option": "SYSTEM",
+       "in": [
+        "REPAINT"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "FULL",
+     "label": "Primer, putty and two coats",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "AREA"
+     },
+     "rates": {
+      "ESSENTIAL": 2500,
+      "PREMIUM": 3250,
+      "LUXURY": 4250
+     },
+     "when": [
+      {
+       "option": "SYSTEM",
+       "in": [
+        "FULL"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "ELECTRICAL",
+   "label": "Electrical and lighting (optional)",
+   "category": "OPTIONAL",
+   "area": "WHOLE_HOME",
+   "has_electrical": true,
+   "rooms": [
+    "WHOLE_HOME"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "CARPET",
+     "label": "Carpet area",
+     "kind": "area",
+     "typical": {
+      "DEFAULT": 1100,
+      "1BHK": 650,
+      "3BHK": 1500,
+      "4BHK": 2000
+     }
+    },
+    {
+     "name": "SPOTS",
+     "label": "Spot lights",
+     "kind": "count",
+     "typical": {
+      "DEFAULT": 8
+     }
+    }
+   ],
+   "lines": [
+    {
+     "code": "WIRING",
+     "label": "Electrical wiring",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "CARPET"
+     },
+     "rates": {
+      "ESSENTIAL": 3000,
+      "PREMIUM": 3900,
+      "LUXURY": 5100
+     }
+    },
+    {
+     "code": "SPOTS",
+     "label": "Spot lights",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "input": "SPOTS"
+     },
+     "rates": {
+      "ESSENTIAL": 50000,
+      "PREMIUM": 65000,
+      "LUXURY": 85000
+     }
+    }
+   ]
+  },
+  {
+   "code": "POOJA_UNIT",
+   "label": "Pooja unit",
+   "category": "CARPENTRY",
+   "area": "LIVING",
+   "rooms": [
+    "POOJA",
+    "DINING",
+    "LIVING"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Unit width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 3
+     }
+    },
+    {
+     "name": "DOOR_WIDTH",
+     "label": "Door opening width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 4
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "DOOR",
+     "label": "Pooja doors",
+     "choices": [
+      "NONE",
+      "STANDARD",
+      "CNC_VENEER"
+     ],
+     "default": "STANDARD"
+    },
+    {
+     "name": "BEADING",
+     "label": "Veneer beading",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    },
+    {
+     "name": "ASTA_CHAKRA",
+     "label": "Ceiling asta chakra",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "NO"
+    }
+   ],
+   "lines": [
+    {
+     "code": "UNIT",
+     "label": "Mandir unit",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "BEADING",
+     "label": "Veneer beading",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "WIDTH",
+      "factor": 5
+     },
+     "rates": {
+      "ESSENTIAL": 90000,
+      "PREMIUM": 117000,
+      "LUXURY": 153000
+     },
+     "when": [
+      {
+       "option": "BEADING",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "DOOR",
+     "label": "Door shutters",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "DOOR_WIDTH",
+      "height": 7.5
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "STANDARD"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "DOOR_CNC",
+     "label": "CNC veneer door shutters",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "DOOR_WIDTH",
+      "height": 7.5
+     },
+     "rates": {
+      "ESSENTIAL": 150000,
+      "PREMIUM": 195000,
+      "LUXURY": 255000
+     },
+     "when": [
+      {
+       "option": "DOOR",
+       "in": [
+        "CNC_VENEER"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "ASTA_CHAKRA",
+     "label": "Asta chakra ceiling",
+     "uom": "LUMP",
+     "quantity": {
+      "kind": "lump"
+     },
+     "rates": {
+      "ESSENTIAL": 1200000,
+      "PREMIUM": 1560000,
+      "LUXURY": 2040000
+     },
+     "when": [
+      {
+       "option": "ASTA_CHAKRA",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "WINDOW_SEATING",
+   "label": "Window seating",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "LIVING",
+    "STUDY"
+   ],
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Window width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 5,
+      "1BHK": 4,
+      "4BHK": 6
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "ARCH",
+     "label": "Window arch framing",
+     "choices": [
+      "YES",
+      "NO"
+     ],
+     "default": "YES"
+    }
+   ],
+   "lines": [
+    {
+     "code": "SEAT",
+     "label": "Seat with storage",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 2
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    },
+    {
+     "code": "ARCH",
+     "label": "Window arch",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "WIDTH",
+      "factor": 9
+     },
+     "rates": {
+      "ESSENTIAL": 80000,
+      "PREMIUM": 104000,
+      "LUXURY": 136000
+     },
+     "when": [
+      {
+       "option": "ARCH",
+       "in": [
+        "YES"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "VENEER_ACCENTS",
+   "label": "Veneer accents",
+   "category": "FINISH",
+   "area": "LIVING",
+   "rooms": [
+    "LIVING",
+    "DINING",
+    "KITCHEN",
+    "POOJA",
+    "WHOLE_HOME",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "inputs": [
+    {
+     "name": "LENGTH",
+     "label": "Running length",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 20
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "STYLE",
+     "label": "Accent",
+     "choices": [
+      "ARCH",
+      "CEILING_STRIP",
+      "BEADING"
+     ],
+     "default": "ARCH"
+    }
+   ],
+   "lines": [
+    {
+     "code": "ARCH",
+     "label": "Veneer arch",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 90000,
+      "PREMIUM": 117000,
+      "LUXURY": 153000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "ARCH"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "CEILING_STRIP",
+     "label": "Veneer in ceiling",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 85000,
+      "PREMIUM": 110500,
+      "LUXURY": 144500
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "CEILING_STRIP"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEADING",
+     "label": "Sofa-back beading",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 40000,
+      "PREMIUM": 52000,
+      "LUXURY": 68000
+     },
+     "when": [
+      {
+       "option": "STYLE",
+       "in": [
+        "BEADING"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "STORAGE_BOXES",
+   "label": "Storage boxes",
+   "category": "CARPENTRY",
+   "area": "BEDROOM",
+   "rooms": [
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM",
+    "KITCHEN",
+    "LIVING",
+    "DINING",
+    "UTILITY"
+   ],
+   "max_instances": 10,
+   "inputs": [
+    {
+     "name": "WIDTH",
+     "label": "Width",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 3
+     }
+    },
+    {
+     "name": "HEIGHT",
+     "label": "Height",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 7
+     }
+    }
+   ],
+   "options": [
+    {
+     "name": "TYPE",
+     "label": "Type",
+     "choices": [
+      "TALL",
+      "BEDSIDE_BOX",
+      "BEDSIDE_TABLE"
+     ],
+     "default": "TALL"
+    }
+   ],
+   "lines": [
+    {
+     "code": "TALL",
+     "label": "Storage box",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height_input": "HEIGHT"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "TALL"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEDSIDE_BOX",
+     "label": "Bedside box",
+     "uom": "SFT",
+     "quantity": {
+      "kind": "area",
+      "input": "WIDTH",
+      "height": 1.5
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "BEDSIDE_BOX"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "BEDSIDE_TABLE",
+     "label": "Bedside table",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "count": 1
+     },
+     "rates": {
+      "ESSENTIAL": 900000,
+      "PREMIUM": 1170000,
+      "LUXURY": 1530000
+     },
+     "when": [
+      {
+       "option": "TYPE",
+       "in": [
+        "BEDSIDE_TABLE"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "CEILING_PROFILE_LIGHTING",
+   "label": "Ceiling profile lighting",
+   "category": "CEILING",
+   "area": "WHOLE_HOME",
+   "has_electrical": true,
+   "rooms": [
+    "WHOLE_HOME",
+    "LIVING",
+    "DINING",
+    "KITCHEN",
+    "MASTER_BEDROOM",
+    "BEDROOM_2",
+    "BEDROOM_3",
+    "BEDROOM_4",
+    "KIDS_ROOM"
+   ],
+   "max_instances": 1,
+   "inputs": [
+    {
+     "name": "LENGTH",
+     "label": "Profile length",
+     "kind": "length",
+     "typical": {
+      "DEFAULT": 60,
+      "1BHK": 30,
+      "2BHK": 45,
+      "3BHK": 60,
+      "4BHK": 80
+     }
+    },
+    {
+     "name": "COB",
+     "label": "COB lights",
+     "kind": "count",
+     "typical": {
+      "DEFAULT": 0
+     }
+    }
+   ],
+   "lines": [
+    {
+     "code": "PROFILE",
+     "label": "Profile lights",
+     "uom": "RFT",
+     "quantity": {
+      "kind": "direct",
+      "input": "LENGTH"
+     },
+     "rates": {
+      "ESSENTIAL": 60000,
+      "PREMIUM": 78000,
+      "LUXURY": 102000
+     }
+    },
+    {
+     "code": "COB",
+     "label": "COB lights",
+     "uom": "NOS",
+     "quantity": {
+      "kind": "count",
+      "input": "COB"
+     },
+     "rates": {
+      "ESSENTIAL": 100000,
+      "PREMIUM": 130000,
+      "LUXURY": 170000
+     }
+    }
+   ]
+  }
+ ],
+ "project_preparation": [
+  {
+   "code": "FLOOR_PROTECTION",
+   "label": "Floor protection sheet",
+   "inclusion": "Site and floor protection",
+   "amounts": {
+    "1BHK": 800000,
+    "2BHK": 1200000,
+    "3BHK": 1600000,
+    "4BHK": 2000000,
+    "CUSTOM": 1600000
+   },
+   "villa_factor": 1.5,
+   "applies_to": [
+    "CARPENTRY",
+    "CEILING",
+    "FINISH"
+   ]
+  },
+  {
+   "code": "PLY_PROTECTION",
+   "label": "Plywood backside protection",
+   "inclusion": "Required execution-protection activities",
+   "amounts": {
+    "1BHK": 600000,
+    "2BHK": 1000000,
+    "3BHK": 1400000,
+    "4BHK": 1800000,
+    "CUSTOM": 1400000
+   },
+   "applies_to": [
+    "CARPENTRY"
+   ]
+  },
+  {
+   "code": "FREIGHT",
+   "label": "Freight",
+   "inclusion": "Material freight and handling",
+   "amounts": {
+    "1BHK": 800000,
+    "2BHK": 1200000,
+    "3BHK": 1500000,
+    "4BHK": 1800000,
+    "CUSTOM": 1500000
+   },
+   "villa_factor": 1.2,
+   "applies_to": [
+    "CARPENTRY",
+    "CEILING"
+   ]
+  },
+  {
+   "code": "DEBRIS",
+   "label": "Debris handling",
+   "inclusion": "Debris handling",
+   "amounts": {
+    "1BHK": 400000,
+    "2BHK": 700000,
+    "3BHK": 900000,
+    "4BHK": 1100000,
+    "CUSTOM": 900000
+   },
+   "villa_factor": 1.3,
+   "applies_to": [
+    "CARPENTRY",
+    "CEILING",
+    "FINISH"
+   ]
+  },
+  {
+   "code": "DEEP_CLEANING",
+   "label": "Deep cleaning",
+   "inclusion": "Completion cleaning",
+   "amounts": {
+    "1BHK": 600000,
+    "2BHK": 900000,
+    "3BHK": 1100000,
+    "4BHK": 1400000,
+    "CUSTOM": 1100000
+   },
+   "villa_factor": 1.5,
+   "applies_to": [
+    "CARPENTRY",
+    "CEILING",
+    "FINISH",
+    "OPTIONAL"
+   ]
+  },
+  {
+   "code": "PEST_CONTROL",
+   "label": "Pest control",
+   "inclusion": "Pest-control preparation where applicable",
+   "amounts": {
+    "1BHK": 300000,
+    "2BHK": 400000,
+    "3BHK": 500000,
+    "4BHK": 600000,
+    "CUSTOM": 500000
+   },
+   "villa_factor": 1.5,
+   "applies_to": [
+    "CARPENTRY"
+   ]
+  }
+ ],
+ "custom_features_allowance": {
+  "low_pct": 5,
+  "high_pct": 15,
+  "applies_to": [
+   "CARPENTRY",
+   "CEILING",
+   "FINISH"
+  ]
+ },
+ "timeline": [
+  {
+   "up_to_minor": 200000000,
+   "label": "About 2 months and 10 days, plus up to 10 days' grace",
+   "min_days": 70,
+   "max_days": 80
+  },
+  {
+   "up_to_minor": 270000000,
+   "label": "About 2.5 months and 12 days, plus up to 10 days' grace",
+   "min_days": 87,
+   "max_days": 97
+  },
+  {
+   "up_to_minor": 350000000,
+   "label": "About 3 months and 14 days, plus up to 10 days' grace",
+   "min_days": 104,
+   "max_days": 114
+  },
+  {
+   "up_to_minor": null,
+   "label": "Confirmed after design",
+   "min_days": 120,
+   "max_days": 180
+  }
+ ],
+ "exclusions": [
+  "Civil, plumbing-line and structural changes",
+  "Appliances, loose furniture and décor",
+  "Work outside the selected rooms and products"
+ ],
+ "client_scope": [
+  "Sink",
+  "Tiles",
+  "Granite",
+  "Taps"
+ ]
+}

@@ -29,6 +29,7 @@ const matches = (pattern, url) => (pattern.endsWith('*') ? url.startsWith(patter
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x').pathname;
   let file = path.join(root, url === '/' ? 'index.html' : url);
+  if (!path.extname(file) && fs.existsSync(`${file}.html`)) file = `${file}.html`; // Pages serves /estimate as estimate.html
   if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     file = path.join(root, '404.html');
     res.statusCode = 404;
@@ -44,10 +45,11 @@ http.createServer((req, res) => {
     res.setHeader('Content-Security-Policy', String(res.getHeader('Content-Security-Policy')).replace(' upgrade-insecure-requests', ''));
   }
   let body = fs.readFileSync(file);
-  if (apiOrigin && file.endsWith('index.html')) {
+  if (apiOrigin && (file.endsWith('index.html') || file.endsWith('estimate.html'))) {
     body = Buffer.from(body.toString()
       .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)
-      .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">'));
+      .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
+      .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">'));
   }
   res.setHeader('Content-Type', TYPES[path.extname(file)] || 'application/octet-stream');
   res.end(body);

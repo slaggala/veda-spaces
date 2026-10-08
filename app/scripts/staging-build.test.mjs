@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { buildSite, checkStaging, PRODUCTION_API, siteKey, STAGING_API } from './staging-build.mjs';
+import { buildSite, checkStaging, estimatorFlags, PRODUCTION_API, siteKey, STAGING_API } from './staging-build.mjs';
 
 const SRC = fileURLToPath(new URL('../e2e/site-release', import.meta.url));
 const KEY = '0x4AAAAAAAstagingTestKey01';
@@ -57,4 +57,29 @@ test('an app build aimed at another API is refused before building', async () =>
   } finally {
     delete process.env.VITE_API_BASE;
   }
+});
+
+test('the estimator page is off unless STAGING_ESTIMATOR=on, and Essential-only by default', () => {
+  const off = join(tmp(), 'site');
+  buildSite(SRC, off, KEY, estimatorFlags({}));
+  const offHtml = readFileSync(join(off, 'estimate.html'), 'utf8');
+  assert.match(offHtml, /<meta name="veda-estimator" content="">/);
+  assert.match(offHtml, new RegExp(`<meta name="veda-api-base" content="${STAGING_API}">`));
+  const on = join(tmp(), 'site');
+  buildSite(SRC, on, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on' }));
+  const onHtml = readFileSync(join(on, 'estimate.html'), 'utf8');
+  assert.match(onHtml, /<meta name="veda-estimator" content="on">/);
+  assert.match(onHtml, /<meta name="veda-estimator-packages" content="ESSENTIAL">/);
+  assert.ok(!onHtml.includes(PRODUCTION_API));
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PACKAGES: 'LUXURY' }), /must list ESSENTIAL/);
+});
+
+test('the committed estimator page is off and holds no rates', () => {
+  const html = readFileSync(join(SRC, 'estimate.html'), 'utf8');
+  for (const name of ['veda-estimator', 'veda-estimator-packages', 'veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
+    assert.ok(html.includes(`<meta name="${name}" content="">`), name);
+  }
+  const js = readFileSync(join(SRC, 'assets/estimate.js'), 'utf8');
+  assert.ok(!/rate_minor|_minor\s*:\s*\d/.test(js), 'no rate table in the page script');
+  assert.ok(!js.includes('innerHTML'), 'DOM built without innerHTML');
 });

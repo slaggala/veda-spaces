@@ -6,6 +6,16 @@ imports ``veda.models``.
 
 from veda.kernel.base import Base, finalize_metadata
 from veda.modules.crm.leads.models import Lead, LeadActivity, LeadNote
+from veda.modules.estimator.models import (
+    BudgetEstimate,
+    BudgetEstimateAssumption,
+    BudgetEstimateLeadLink,
+    BudgetEstimateLine,
+    BudgetEstimateProjectItem,
+    EstimateEvent,
+    EstimatorRateCard,
+    EstimatorRateItem,
+)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
     MfaChallenge,
@@ -27,6 +37,14 @@ finalize_metadata(metadata)
 __all__ = [
     "AdminApprovalRequest",
     "AuditLog",
+    "BudgetEstimate",
+    "BudgetEstimateAssumption",
+    "BudgetEstimateLeadLink",
+    "BudgetEstimateLine",
+    "BudgetEstimateProjectItem",
+    "EstimateEvent",
+    "EstimatorRateCard",
+    "EstimatorRateItem",
     "Lead",
     "LeadActivity",
     "LeadNote",

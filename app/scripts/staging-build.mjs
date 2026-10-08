@@ -47,7 +47,7 @@ export function checkStaging(dir) {
   }
 }
 
-export function buildSite(src, out, key) {
+export function buildSite(src, out, key, estimator = estimatorFlags(process.env)) {
   siteKey(key);
   rmSync(out, { recursive: true, force: true });
   cpSync(src, out, { recursive: true });
@@ -56,10 +56,31 @@ export function buildSite(src, out, key) {
   html = setMeta(html, 'veda-turnstile-sitekey', key);
   html = setMeta(html, 'veda-api-credentials', 'include'); // the Access cookie of the API host (staging only)
   writeFileSync(join(out, 'index.html'), html);
+  // The Budgetary Estimate page (ADR-012): the same intake metas; the estimator itself only when STAGING_ESTIMATOR=on,
+  // with Essential only unless approved packages are listed (Premium/Luxury need approved rates).
+  let est = readFileSync(join(out, 'estimate.html'), 'utf8');
+  est = setMeta(est, 'veda-api-base', STAGING_API);
+  est = setMeta(est, 'veda-turnstile-sitekey', key);
+  est = setMeta(est, 'veda-api-credentials', 'include');
+  if (estimator.enabled) {
+    est = setMeta(est, 'veda-estimator', 'on');
+    est = setMeta(est, 'veda-estimator-packages', estimator.packages.join(','));
+  }
+  writeFileSync(join(out, 'estimate.html'), est);
   writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
   writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
   rmSync(join(out, 'sitemap.xml'), { force: true });
   checkStaging(out);
+}
+
+/** STAGING_ESTIMATOR=on enables the estimator page; STAGING_ESTIMATOR_PACKAGES lists offered packages (default ESSENTIAL). */
+export function estimatorFlags(env) {
+  const packages = (env.STAGING_ESTIMATOR_PACKAGES || 'ESSENTIAL').split(',').map((p) => p.trim()).filter(Boolean);
+  const unknown = packages.filter((p) => !['ESSENTIAL', 'PREMIUM', 'LUXURY'].includes(p));
+  if (unknown.length || !packages.includes('ESSENTIAL')) {
+    throw new Error(`STAGING_ESTIMATOR_PACKAGES must list ESSENTIAL and only known packages (got ${packages.join(',')})`);
+  }
+  return { enabled: env.STAGING_ESTIMATOR === 'on', packages };
 }
 
 export function buildApp(key) {

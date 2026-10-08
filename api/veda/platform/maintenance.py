@@ -804,3 +804,12 @@ def disk_usage() -> dict:
     from veda.platform import backups
 
     return backups.disk_usage()
+
+
+def estimate_retention() -> dict:
+    """Soft-delete Budgetary Estimates never linked to a lead once the retention period has passed (ADR-012 D7).
+    They hold no personal data; linked estimates follow the lead."""
+    from veda.modules.estimator.service import purge_expired
+
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        return {"removed": purge_expired(s), "retention_days": settings().estimate_retention_days}

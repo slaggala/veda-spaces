@@ -125,6 +125,16 @@ register(
         "lead_activity", FULL, parent=("lead", "lead_id"), pii=frozenset({"description", "location", "metadata_"})
     )
 )
+# Budgetary Estimate (ADR-012). No personal data: rooms, measurements and preferences only. The rate-card document and
+# the estimate result snapshot are large and reproducible (document_sha256, rule versions), so they are not snapshotted.
+register(AuditPolicy("estimator_rate_card", FULL, excluded=frozenset({"document"})))
+register(AuditPolicy("estimator_rate_item", FULL, parent=("estimator_rate_card", "rate_card_id")))
+register(AuditPolicy("budget_estimate", FULL, excluded=frozenset({"inputs", "result"}), exceptions=("EXC-007",)))
+register(AuditPolicy("budget_estimate_line", FULL, parent=("budget_estimate", "estimate_id")))
+register(AuditPolicy("budget_estimate_assumption", FULL, parent=("budget_estimate", "estimate_id")))
+register(AuditPolicy("budget_estimate_project_item", FULL, parent=("budget_estimate", "estimate_id")))
+register(AuditPolicy("budget_estimate_lead_link", FULL, parent=("lead", "lead_id")))
+register(AuditPolicy("estimate_event", FULL))
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))
 register(AuditPolicy("refresh_token", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-007", "EXC-009")))
@@ -157,6 +167,7 @@ UNIQUE_INDEX_EXCEPTIONS = frozenset(
         "ux_admin_approval_request__open_founder_target",
         "ux_lead__public_reference",
         "ux_lead__intake_idempotency_key",
+        "ux_budget_estimate__public_reference",
         "ux_notification__event_recipient",
     }
 )

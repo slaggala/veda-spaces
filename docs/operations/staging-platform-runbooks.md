@@ -364,6 +364,45 @@ docker compose -f docker-compose.yml run --rm --no-deps -T api python -m veda.cl
 - Accept it within the hour. Then MFA enrolment is required.
 - Run it with SSM Run Command if Session Manager is not available on the workstation.
 
+### 6.8 Budgetary Estimate (ADR-012)
+
+**State after merge:** off everywhere.
+- `VEDA_ESTIMATOR_ENABLED` defaults to false, so both public routes answer 404. Production refuses `true`.
+- The committed `estimate.html` shows "coming soon".
+- `public_intake` stays **disabled**, and the anonymous intake hostname (ADR-011, phase E7) is **not** built.
+
+**Rate cards** (operator only; no API exposes a card):
+1. Prepare the private card: Essential rates only until Premium and Luxury are approved. Never commit it.
+2. Dry run: `veda estimator validate-card <file>`. It prints the version and SHA-256 only, and refuses customer data.
+3. Load it on the host with SSM Run Command (or Session Manager): write the file to a root-only temporary path,
+   mount it read-only into a one-off container, run `veda estimator load-card /card.json`, then delete the file.
+   Run Command keeps what a command prints, so print the version and SHA-256 only.
+4. Activate it with the owner's approval reference:
+   `veda estimator activate-card --version <v> --approval "<owner approval, date>"`. The previous card is retired.
+5. To go back: `veda estimator rollback-card --approval "<reason>"` re-activates the last retired card.
+6. To check: `veda estimator list-cards` shows versions, states and SHA-256, never rates.
+
+**Enable on staging (behind Cloudflare Access), after independent review and owner approval:**
+1. **API:** set `VEDA_ESTIMATOR_ENABLED=true` (and `VEDA_WARRANTY_POLICY_URL`) through the staging SSM
+   configuration: a reviewed Terraform change, then plan, apply and `12-deploy`.
+2. **Site:** in the Pages project `veda-staging-site`, set `STAGING_ESTIMATOR=on` and leave
+   `STAGING_ESTIMATOR_PACKAGES=ESSENTIAL`, then retry the deployment.
+3. **Validate:**
+   - signed in, open `https://staging.vedaspaces.com/estimate`, choose **3 BHK, Apartment** (the only home size
+     the draft card prices; others answer "not available for this home size yet"), create an estimate, then request a
+     quotation;
+   - the estimate shows the Custom Features Allowance as its own range and the package with six inclusions;
+   - the lead shows the Budgetary Estimate panel;
+   - the notification carries the estimate summary;
+   - choose **Luxury**: no price, a design-consultation request; the lead shows "Luxury design consultation
+     requested";
+   - a forged Turnstile token gets `422`;
+   - an anonymous request gets a `302` to Access.
+
+**Retention:** the daily `estimate-retention` job soft-deletes estimates never linked to a lead
+`VEDA_ESTIMATE_RETENTION_DAYS` after creation (90, owner decision D7), and never while an estimate is still valid
+(30 days). A linked estimate stays with its lead.
+
 ## 7. Staging apply sequence
 
 Every apply: `10-infra-plan` on `main` → review the plan text and the guard → approve the digest → `11-infra-apply`.
