@@ -184,7 +184,7 @@ def test_invalid_selections(selection, code):
 def test_instance_limit():
     with pytest.raises(EstimateError) as err:
         engine.calculate(CARD, req(sel("KITCHEN", "KITCHEN"), sel("KITCHEN", "KITCHEN")))
-    assert err.value.errors[0]["code"] == "TOO_MANY"
+    assert err.value.errors[0]["code"] == "TOO_MANY" and err.value.errors[0]["message"] == "At most 1 per home."
 
 
 def test_request_schema_is_closed_and_has_no_personal_data():

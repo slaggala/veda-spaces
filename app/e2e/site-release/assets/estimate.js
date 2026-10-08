@@ -34,11 +34,11 @@ const PRODUCTS = {
   VANITY_UNIT: { label: 'Vanity unit', rooms: [...BEDROOMS, 'DINING', 'WHOLE_HOME'], inputs: [LEN('WIDTH', 'Width', 'Width of a dresser vanity (not needed for a toilet vanity).')], options: [['TYPE', 'Type', [['TOILET', 'Toilet vanity'], ['DRESSER', 'Dresser vanity']]], ['MIRROR', 'Mirror', YES_NO]] },
   BED: { label: 'Bed and headboard', rooms: BEDROOMS, inputs: [], options: [['SIZE', 'Size', [['QUEEN', 'Queen'], ['KING', 'King']]], ['STORAGE', 'Storage', [['HYDRAULIC', 'Hydraulic storage'], ['NONE', 'No storage']]], ['HEADBOARD', 'Headboard', [['PANEL', 'Panelled'], ['CUSHIONED', 'Cushioned'], ['NONE', 'None']]]] },
   UTILITY: { label: 'Utility unit', rooms: ['UTILITY'], inputs: [LEN('WIDTH', 'Width', 'Width of the utility wall unit.')], options: [] },
-  POOJA_UNIT: { label: 'Pooja unit', rooms: ['POOJA', 'DINING', 'LIVING'], inputs: [LEN('WIDTH', 'Unit width', 'Width of the mandir unit.'), LEN('DOOR_WIDTH', 'Door opening width', 'Width of the pooja door opening.')], options: [['DOOR', 'Pooja doors', [['STANDARD', 'Standard doors'], ['CNC_VENEER', 'CNC-cut veneer doors'], ['NONE', 'No doors']]], ['BEADING', 'Veneer beading', YES_NO], ['ASTA_CHAKRA', 'Ceiling asta chakra', [['NO', 'No'], ['YES', 'Yes']]]] },
+  POOJA_UNIT: { label: 'Pooja unit', once: true, rooms: ['POOJA', 'DINING', 'LIVING'], inputs: [LEN('WIDTH', 'Unit width', 'Width of the mandir unit.'), LEN('DOOR_WIDTH', 'Door opening width', 'Width of the pooja door opening.')], options: [['DOOR', 'Pooja doors', [['STANDARD', 'Standard doors'], ['CNC_VENEER', 'CNC-cut veneer doors'], ['NONE', 'No doors']]], ['BEADING', 'Veneer beading', YES_NO], ['ASTA_CHAKRA', 'Ceiling asta chakra', [['NO', 'No'], ['YES', 'Yes']]]] },
   WINDOW_SEATING: { label: 'Window seating', rooms: [...BEDROOMS, 'LIVING', 'STUDY'], inputs: [LEN('WIDTH', 'Window width', 'Width of the window or sit-out.')], options: [['ARCH', 'Window arch framing', YES_NO]] },
   VENEER_ACCENTS: { label: 'Veneer accents', rooms: ['LIVING', 'DINING', 'KITCHEN', 'POOJA', 'WHOLE_HOME', ...BEDROOMS], inputs: [LEN('LENGTH', 'Running length', 'Total length of the arch, ceiling strip or beading.')], options: [['STYLE', 'Accent', [['ARCH', 'Veneer arch'], ['CEILING_STRIP', 'Veneer strip in the ceiling'], ['BEADING', 'Sofa-back beading']]]] },
   STORAGE_BOXES: { label: 'Storage boxes', rooms: [...BEDROOMS, 'KITCHEN', 'LIVING', 'DINING', 'UTILITY'], inputs: [LEN('WIDTH', 'Width', 'Width of the box or tall unit.'), LEN('HEIGHT', 'Height', 'Height of a tall storage box (not needed for bedside units).')], options: [['TYPE', 'Type', [['TALL', 'Tall storage box'], ['BEDSIDE_BOX', 'Bedside box'], ['BEDSIDE_TABLE', 'Bedside table']]]] },
-  CEILING_PROFILE_LIGHTING: { label: 'Ceiling profile lighting', rooms: ['WHOLE_HOME', 'LIVING', 'DINING', 'KITCHEN', ...BEDROOMS], inputs: [LEN('LENGTH', 'Profile length', 'Total running length of profile lights.'), { name: 'COB', label: 'COB lights', kind: 'count', hint: 'Number of COB lights, if any.' }], options: [] },
+  CEILING_PROFILE_LIGHTING: { label: 'Ceiling profile lighting', once: true, rooms: ['WHOLE_HOME'], inputs: [LEN('LENGTH', 'Profile length', 'Total running length of profile lights.'), { name: 'COB', label: 'COB lights', kind: 'count', hint: 'Number of COB lights, if any.' }], options: [] },
   PAINTING: { label: 'Painting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'AREA', label: 'Wall area', kind: 'area', hint: 'Total wall area to paint.' }], options: [['SYSTEM', 'Paint system', [['FULL', 'Primer, putty and two coats'], ['REPAINT', 'Two coats only']]]] },
   ELECTRICAL: { label: 'Electrical and lighting (optional)', rooms: ['WHOLE_HOME'], inputs: [{ name: 'CARPET', label: 'Carpet area', kind: 'area', hint: 'Carpet area of the home.' }, { name: 'SPOTS', label: 'Spot lights', kind: 'count', hint: 'Number of spot lights.' }], options: [] },
 };
@@ -371,6 +371,12 @@ function init() {
     ev.preventDefault();
     const picks = [...document.querySelectorAll('input[name="pick"]:checked')].map((c) => c.value);
     if (!picks.length) { summary([{ text: 'Choose at least one room or product.', field: document.querySelector('input[name="pick"]')?.id }]); return; }
+    // One per home (the rate card allows one): a pooja unit in one room only.
+    const twice = Object.entries(PRODUCTS).filter(([code, p]) => p.once && picks.filter((k) => k.endsWith(`:${code}`)).length > 1);
+    if (twice.length) {
+      summary(twice.map(([code, p]) => ({ text: `${p.label}: choose it in one room only.`, field: document.querySelector(`input[name="pick"][value$=":${code}"]:checked`)?.id })));
+      return;
+    }
     const previous = new Map(state.items.map((i) => [`${i.room}:${i.product}`, i]));
     state.items = picks.map((key) => { const [room, product] = key.split(':'); return previous.get(key) || { room, product, measurements: {}, options: {} }; });
     renderMeasurements();
