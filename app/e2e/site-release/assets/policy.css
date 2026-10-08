@@ -1,0 +1,39 @@
+/* Warranty, Service & Customer Care Policy page. Builds on styles.css only (identical in dist/ and site-release/);
+   mobile first; no inline styles (production CSP). Text colours meet WCAG AA on the page background. */
+.policy-skip { position: absolute; left: -999px; top: 0; padding: .7rem 1rem; background: var(--ink); color: #fff; z-index: 50; }
+.policy-skip:focus { left: 1rem; top: 1rem; }
+.policy-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 4vw; background: #281a13; color: #fff; }
+.policy-brand img { width: 132px; height: auto; object-fit: contain; }
+.policy-back { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; min-height: 44px; display: inline-flex; align-items: center; }
+.policy-main { max-width: 820px; margin: 0 auto; padding: 2.5rem 1.15rem 4rem; }
+.policy-eyebrow { margin: 0 0 1rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 600; font-size: .72rem; color: #8c5b37; }
+.policy-main h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.4rem); line-height: 1.05; margin: 0; }
+.policy-meta { margin: .8rem 0 0; color: #5d574f; font-size: .9rem; }
+.policy-lead { margin: 1.4rem 0 2rem; }
+.policy-main h2 { font-family: var(--serif); font-weight: 400; font-size: 1.8rem; line-height: 1.15; margin: 0 0 1rem; }
+.policy-main h2 span { color: #8c5b37; }
+.policy-main a { text-decoration: underline; text-underline-offset: 2px; }
+.policy-summary { background: #fbf9f5; border: 1px solid var(--line); border-left: 4px solid #8c5b37; padding: 1.4rem; }
+.policy-summary ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .5rem; }
+.policy-summary-cta { margin: 1.2rem 0 0; font-size: .95rem; }
+.policy-toc { margin: 2rem 0; padding: 1.2rem 1.4rem; border: 1px solid var(--line); }
+.policy-toc .policy-toc-title { font-family: var(--sans); font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; margin: 0 0 .6rem; }
+.policy-toc ol { margin: 0; padding-left: 1.4rem; display: grid; gap: .35rem; }
+.policy-toc a { display: inline-block; min-height: 24px; }
+.policy-section { padding: 2rem 0; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+.policy-section dl { margin: 0; display: grid; grid-template-columns: 2.6rem 1fr; gap: .7rem .6rem; }
+.policy-section dt { font-weight: 600; color: #5d574f; }
+.policy-section dd { margin: 0; }
+.policy-note { margin: 1rem 0 0; color: #5d574f; font-size: .9rem; }
+.policy-steps { margin: 0 0 1.2rem; padding-left: 1.3rem; display: grid; gap: .8rem; }
+.policy-contact ul { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .6rem; }
+.policy-contact li { display: grid; grid-template-columns: 6.5rem 1fr; gap: .5rem; align-items: baseline; }
+.policy-contact li span { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: #5d574f; }
+.policy-contact a { display: inline-block; min-height: 24px; }
+.policy-version { margin: 2rem 0 0; padding-top: 1.2rem; border-top: 1px solid var(--line); color: #5d574f; font-size: .85rem; }
+.policy-footer { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; padding: 1.5rem 4vw; font-size: .8rem; background: #191917; color: #ddd; }
+@media (min-width: 720px) {
+  .policy-main { padding-top: 3.5rem; }
+  .policy-summary { padding: 2rem; }
+  .policy-section dl { grid-template-columns: 3rem 1fr; }
+}
