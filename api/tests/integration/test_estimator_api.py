@@ -129,6 +129,10 @@ def test_public_estimate_is_customer_safe(api):
     assert not leaked, leaked
     assert data["project_preparation"]["label"] == "Project Preparation & Protection Package"
     assert data["range"]["low_minor"] < data["range"]["high_minor"] and data["gst"]["pct"] == 18
+    assert data["rooms"] and all(r["amount_minor"] % 100_000 == 0 for r in data["rooms"]), "rounded to ₹1,000 (S2)"
+    stored = rows(sa.select(BudgetEstimate).where(BudgetEstimate.public_reference == data["reference"]))[0]
+    exact = {r["room"]: r["amount_minor"] for r in stored.result["rooms"]}
+    assert all(abs(r["amount_minor"] - exact[r["room"]]) <= 50_000 for r in data["rooms"]), "staff keep exact amounts"
     allowance = data["custom_features_allowance"]
     assert set(allowance) == {"label", "description", "low_minor", "high_minor"}, "no percentage or basis"
     assert allowance["label"] == "Custom Features Allowance" and 0 < allowance["low_minor"] < allowance["high_minor"]
@@ -489,3 +493,23 @@ def test_estimate_rate_limits(api):
     load_card()
     codes = [estimate(api).status for _ in range(12)]
     assert codes[:6].count(201) == 6 and 429 in codes, codes
+
+
+@pytest.mark.settings(estimator_enabled=True, rate_limits_enabled=True)
+def test_unverified_traffic_cannot_exhaust_the_aggregate_limit(api):
+    """Review S4 / staging stop condition: requests that fail Turnstile count against their own source limits, never
+    against the aggregate, so 102 networks sending 612 unverified requests (over the 600/h aggregate) lock out only
+    themselves."""
+    load_card()
+
+    def post(ip, token):
+        return api.post(
+            "/api/v1/public/estimates",
+            body(turnstile_token=token),
+            anonymous=True,
+            headers={"Origin": SITE, "CF-Connecting-IP": ip, "X-Veda-Client": f"c{ip.replace('.', '')}"},
+        )
+
+    refused = [post(f"10.{n // 250}.{n % 250}.7", "fail-x").status for n in range(102) for _ in range(6)]
+    assert set(refused) == {422}, "each source stays inside its own limits"
+    assert post("10.9.9.9", "ok-token").status == 201, "a verified customer is still served"
