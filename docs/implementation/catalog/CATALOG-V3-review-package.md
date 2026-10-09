@@ -38,7 +38,7 @@ Also stated plainly:
 
 ## Pre-activation closure (follow-up to PR #66)
 
-### R2/R3: every customer-visible catalog text path governed
+### R2/R3: badges and the first short-text inventory (superseded by the customer-safety closure below)
 
 - **Badges:** `Package.badge` is a key to a `badge` copy record, never free text.
   - Badge copy (30 characters at most) refuses promise wording and marketing claims, such as premium, best, lowest,
@@ -83,7 +83,7 @@ Also stated plainly:
 - **Tests:**
   - A→B→C, then rollback C restores B;
   - a stale draft (C drafted under B, D activated, then C), then rollback C restores D;
-  - repeated rollbacks walk the history;
+  - rolling back a rollback restores the release that immediately preceded the rollback release (undo, see below);
   - a concurrent change is refused;
   - four kinds of corrupted history are refused.
 
@@ -132,6 +132,52 @@ UNASSIGNED. It therefore cannot activate, reach the public payload, be priced, o
 
 A keyboard-speed race found in this round, an estimate sent before the Turnstile widget rendered, is fixed: the page
 now awaits the widget.
+
+## Customer-safety closure (follow-up to PR #67)
+
+**Customer text.** Every customer-visible text path is inventoried and is either factual, controlled-copy governed,
+or promise-matrix governed.
+- The registry `veda.modules.catalog.text.FIELD_CLASSES` classifies all 151 string-bearing fields of the catalog
+  models as factual, statement, staff or identifier.
+- A test enumerates the fields by type and fails CI on any unclassified field.
+- The [customer-text inventory](CATALOG-V3-customer-text-inventory.md) is generated from the registry and checked to
+  be current.
+
+**Marketing claims.** These rules apply to every factual field (names, descriptions, option and measurement labels,
+captions, 3D labels, the rights owner):
+- A factual field may make no claim, matched as words and phrases, not substrings. "Premium" and "Luxury" name package
+  tiers; "premium pick" and "luxury choice" are claims.
+- A claim is made only by a copy record with claim governance: category, approval status, supporting source,
+  responsible owner, effective date, review date and what it applies to.
+- Absolute claims (best, number one, cheapest, lowest, guaranteed) also need independent substantiation. Pricing
+  wording is never customer text.
+- The release gate refuses unapproved, unowned, expired or unsubstantiated claims, and re-checks every string under
+  the current rules.
+- Released content loads by schema only, so historical releases and estimate snapshots are not re-judged.
+
+**Anti-bot readiness.** A token counts only when Turnstile's callback delivers it, and submission is refused without
+one.
+- Each widget runs a state machine: NOT_LOADED, LOADING, READY_NO_TOKEN, TOKEN_AVAILABLE, SUBMITTING, SUCCEEDED,
+  FAILED, EXPIRED.
+- The live token is read at submission; an empty, stale, expired or used token is never sent.
+- One request is in flight at a time.
+- Each estimate carries an `Idempotency-Key`. The server (migration 0104, additive) returns the same estimate for a
+  repeat; refuses the same key with other choices (409); and replays before the anti-bot check, because a real token
+  is single-use.
+- Failures (refused token, script not loading, lost response, expiry) are announced, keep the customer's choices,
+  and offer a safe retry, never a bypass.
+- The browser journey uses an asynchronous Turnstile stand-in; no scenario relies on an instant token.
+
+**Rollback semantics.** Rolling back a rollback restores the release that immediately preceded the rollback
+release. It behaves like undo, not like navigation through an arbitrary multi-step history.
+
+**Status (unchanged by this closure):**
+- V3 remains inactive.
+- Protected staging remains uncertified.
+- Media infrastructure remains unavailable.
+- Real 3D remains disabled.
+- Full-catalog expansion remains unapproved.
+- Production V3 remains prohibited.
 
 ## Merge versus activation boundaries
 

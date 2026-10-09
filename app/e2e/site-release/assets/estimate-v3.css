@@ -45,3 +45,4 @@
 .v3-block { border-top: 1px solid #ece4da; margin-top: 1rem; padding-top: 0.5rem; }
 .v3-block h3 { font-size: 1.05rem; margin: 0.25rem 0; }
 .v3-consult { display: inline-block; margin-top: 0.25rem; color: #281a13; }
+.v3-primary[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }

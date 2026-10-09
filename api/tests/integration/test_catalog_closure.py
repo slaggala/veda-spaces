@@ -97,8 +97,11 @@ def test_an_unconfirmed_promise_badge_blocks_release(people):
 def test_only_approved_badge_copy_reaches_the_public_payload(api, people):
     a, b = people
     seed_slice(a)
-    tx(a, service.create_record, "copy", "copy.badge.chosen", {"statement": "Most chosen", "category": "badge",
-                                                               "promise": False})  # fmt: skip
+    tx(a, service.create_record, "copy", "copy.badge.chosen", {
+        "statement": "Most chosen", "category": "badge", "promise": False,
+        "applies_to": {"packages": ["slice.essential"]},
+        "claim": {"category": "popularity", "status": "APPROVED", "source": "Order data (synthetic)",
+                  "owner": "Sales lead (role, test)", "effective_from": "2026-10-01"}})  # fmt: skip
     change(a, "package", "slice.essential", lambda d: d.update(badge="copy.badge.chosen"))
     approve_all(a, b)
     release(a, b)
@@ -217,7 +220,7 @@ def test_a_stale_draft_time_target_is_not_used(people):
     assert rolled_from == d and entries == _entries(d), "the release active immediately before C (D), not B"
 
 
-def test_multiple_rollbacks_walk_the_activation_history(people):
+def test_rolling_back_a_rollback_is_undo(people):
     a, b = people
     seed_slice(a)
     approve_all(a, b)

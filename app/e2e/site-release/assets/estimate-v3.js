@@ -35,40 +35,120 @@
   const state = { home: null, pkg: null, kind: 'NEW_HOME', rooms: {}, estimate: null, screen: 1 };
 
   // --- API ---------------------------------------------------------------------------------------------------------------
-  async function call(method, path, payload) {
+  async function call(method, path, payload, extraHeaders = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch(`${apiBase}${path}`, { method, signal: controller.signal, credentials,
-        headers: payload ? { 'Content-Type': 'application/json', 'X-Veda-Client': clientToken } : { 'X-Veda-Client': clientToken }, body: payload ? JSON.stringify(payload) : undefined });
+      const headers = { 'X-Veda-Client': clientToken, ...extraHeaders, ...(payload ? { 'Content-Type': 'application/json' } : {}) };
+      const res = await fetch(`${apiBase}${path}`, { method, signal: controller.signal, credentials, headers, body: payload ? JSON.stringify(payload) : undefined });
       return { status: res.status, body: await res.json().catch(() => ({})) };
     } catch (err) {
       return { status: 0, body: { code: err.name === 'AbortError' ? 'TIMEOUT' : 'UNREACHABLE' } };
     } finally { clearTimeout(timer); }
   }
-  const widgets = {};
-  const ready = {}; // the render of each widget, awaited before its token is read (no empty-token race)
+  // --- anti-bot readiness (customer-safety closure) ------------------------------------------------------------------
+  // One state machine per widget: NOT_LOADED → LOADING → READY_NO_TOKEN → TOKEN_AVAILABLE → SUBMITTING → SUCCEEDED,
+  // with FAILED and EXPIRED. A token is available only when Turnstile's own callback delivers it (never because the
+  // renderer exists). Submitting needs TOKEN_AVAILABLE and reads the live token at that moment; an empty, stale,
+  // expired or already-used token is never sent. While a request is in flight nothing else can be sent.
+  const TOKEN_LIFETIME_MS = 280000; // Turnstile tokens are valid for 300 s; treat them as stale a little earlier
+  const LOAD_TIMEOUT_MS = 15000;
+  const STATUS = {
+    NOT_LOADED: 'Preparing a quick security check…',
+    LOADING: 'Preparing a quick security check…',
+    READY_NO_TOKEN: 'Completing a quick security check…',
+    TOKEN_AVAILABLE: 'Ready.',
+    SUBMITTING: 'Preparing your estimate…',
+    SUCCEEDED: '',
+    FAILED: 'The security check could not be completed. Your choices are kept; try again.',
+    EXPIRED: 'The security check expired. It is being renewed…',
+  };
+  const guards = {
+    estimate: { box: '#v3-ts-estimate', button: '#v3-estimate', status: '#v3-ts-estimate-status', retry: '#v3-ts-estimate-retry' },
+    refine: { box: '#v3-ts-refine', button: '#v3-reestimate', status: '#v3-ts-refine-status', retry: '#v3-ts-refine-retry' },
+  };
+  for (const g of Object.values(guards)) Object.assign(g, { state: 'NOT_LOADED', id: undefined, token: '', at: 0, used: new Set(), key: null, sent: null });
+  const newKey = () => `v3-${randomToken()}`;
+  function setState(g, next) {
+    g.state = next;
+    const ready = next === 'TOKEN_AVAILABLE';
+    const button = $(g.button);
+    if (button) { button.setAttribute('aria-disabled', String(!ready)); button.classList.toggle('v3-waiting', !ready); }
+    const status = $(g.status);
+    if (status) status.textContent = STATUS[next];
+    const retry = $(g.retry);
+    if (retry) retry.hidden = next !== 'FAILED';
+  }
+  let loading = null;
   function loadTurnstile() {
     if (window.turnstile) return Promise.resolve();
-    return new Promise((resolve, reject) => {
+    if (loading) return loading;
+    loading = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      s.async = true; s.onload = () => resolve(); s.onerror = () => reject(new Error('turnstile'));
+      s.async = true;
+      const timer = setTimeout(() => { s.remove(); reject(new Error('timeout')); }, LOAD_TIMEOUT_MS);
+      s.onload = () => { clearTimeout(timer); window.turnstile ? resolve() : reject(new Error('turnstile')); };
+      s.onerror = () => { clearTimeout(timer); s.remove(); reject(new Error('turnstile')); };
       document.head.appendChild(s);
-    });
+    }).catch((err) => { loading = null; throw err; });
+    return loading;
   }
-  function widget(name, selector) {
-    ready[name] = render(name, selector);
-    return ready[name];
+  function onToken(g, value) {
+    if (!value || g.used.has(value)) { setState(g, g.state === 'SUBMITTING' ? 'SUBMITTING' : 'READY_NO_TOKEN'); return; }
+    g.token = value; g.at = Date.now();
+    if (g.state !== 'SUBMITTING') setState(g, 'TOKEN_AVAILABLE');
   }
-  async function render(name, selector) {
+  function onExpired(g) {
+    g.token = '';
+    if (g.state === 'SUBMITTING') return; // the request already carries its token; a fresh one is fetched after it
+    setState(g, 'EXPIRED');
+    renew(g);
+  }
+  function renew(g) {
+    g.token = '';
+    try { if (window.turnstile && g.id !== undefined) window.turnstile.reset(g.id); } catch { setState(g, 'FAILED'); }
+  }
+  async function prepare(name) {
+    const g = guards[name];
+    if (['LOADING', 'READY_NO_TOKEN', 'TOKEN_AVAILABLE', 'SUBMITTING', 'EXPIRED'].includes(g.state)) return;
+    setState(g, 'LOADING');
     try {
       await loadTurnstile();
-      if (widgets[name] === undefined) widgets[name] = window.turnstile.render(selector, { sitekey: meta('veda-turnstile-sitekey') });
-      else window.turnstile.reset(widgets[name]);
-    } catch { /* refused with CAPTCHA_FAILED and explained */ }
+      if (g.id === undefined) {
+        g.id = window.turnstile.render(g.box, {
+          sitekey: meta('veda-turnstile-sitekey'),
+          callback: (value) => onToken(g, value),
+          'expired-callback': () => onExpired(g),
+          'timeout-callback': () => onExpired(g),
+          'error-callback': () => { g.token = ''; if (g.state !== 'SUBMITTING') setState(g, 'FAILED'); return true; },
+        });
+      } else renew(g);
+      if (g.state === 'LOADING') setState(g, g.token ? 'TOKEN_AVAILABLE' : 'READY_NO_TOKEN');
+    } catch {
+      setState(g, 'FAILED'); // never submit without the check: the customer is offered a retry
+    }
   }
-  const token = (name) => (window.turnstile && widgets[name] !== undefined ? window.turnstile.getResponse(widgets[name]) : '') || '';
+  /** The live token, if one may be sent now; otherwise '' and the widget is renewed. */
+  function liveToken(g) {
+    if (g.state !== 'TOKEN_AVAILABLE' || !window.turnstile || g.id === undefined) return '';
+    const live = window.turnstile.getResponse(g.id) || '';
+    if (!live || live !== g.token || g.used.has(live) || Date.now() - g.at > TOKEN_LIFETIME_MS) {
+      setState(g, 'EXPIRED');
+      renew(g);
+      return '';
+    }
+    return live;
+  }
+  for (const [name, g] of Object.entries(guards)) {
+    const retry = $(g.retry);
+    if (!retry) continue;
+    retry.addEventListener('click', () => {
+      if (g.id === undefined) { g.state = 'NOT_LOADED'; prepare(name); return; } // the script never loaded: try again
+      setState(g, 'READY_NO_TOKEN'); // the widget exists: ask it for a fresh token
+      renew(g);
+    });
+  }
   // Staging validation analytics: counts per catalog key only, never a person or free text; off unless the meta says so.
   const track = (event, subject) => {
     if (meta('veda-catalog-analytics') !== 'on' || navigator.doNotTrack === '1') return;
@@ -157,7 +237,7 @@
     document.querySelectorAll('#v3 .v3-screen').forEach((s) => { s.hidden = Number(s.dataset.v3) !== n; });
     $('#v3-summary').hidden = true;
     ({ 1: renderHome, 2: renderRooms, 3: renderResult })[n]();
-    if (n === 2) widget('estimate', '#v3-ts-estimate');
+    if (n === 2) prepare('estimate');
     document.querySelector(`[data-v3="${n}"] h2`)?.focus();
   }
   document.querySelectorAll('[data-v3-back]').forEach((b) => b.addEventListener('click', () => show(Number(b.dataset.v3Back))));
@@ -286,13 +366,38 @@
     box.replaceChildren(el('p', { text: 'Please check the following:' }), el('ul', {}, ...[...new Set(list)].map((t) => el('li', { text: t }))));
     box.hidden = false; box.focus();
   }
-  async function estimate(widgetName) {
-    if (!ready[widgetName]) widget(widgetName, widgetName === 'refine' ? '#v3-ts-refine' : '#v3-ts-estimate');
-    await ready[widgetName];
-    const r = await call('POST', '/api/v1/public/catalog/estimates', { configuration: configuration(), turnstile_token: token(widgetName) });
-    widget(widgetName, widgetName === 'refine' ? '#v3-ts-refine' : '#v3-ts-estimate');
-    if (r.status === 201) { state.estimate = r.body.data; return true; }
-    problems(r.body);
+  const CONTROLLED = { CAPTCHA_FAILED: 'The security check could not be completed. Your choices are kept; try again.',
+    TIMEOUT: 'This is taking longer than expected. Your choices are kept; try again.',
+    UNREACHABLE: 'We could not reach our server. Your choices are kept; try again.',
+    RATE_LIMITED: 'Too many requests. Please wait a minute and try again.' };
+  /** Send one estimate request, or nothing. Returns true on success. */
+  async function estimate(name) {
+    const g = guards[name];
+    if (g.state === 'SUBMITTING') return false; // double click, key repeat: ignored while one is in flight
+    const value = liveToken(g);
+    if (!value) { prepare(name); return false; } // no valid token yet: nothing is sent
+    const config = configuration();
+    const configText = JSON.stringify(config);
+    // One idempotency key per request; a retry of the same choices after a lost response reuses it.
+    if (!g.sent || g.sent.config !== configText) g.sent = { config: configText, key: newKey() };
+    g.used.add(value);
+    setState(g, 'SUBMITTING');
+    const r = await call('POST', '/api/v1/public/catalog/estimates', { configuration: config, turnstile_token: value },
+      { 'Idempotency-Key': g.sent.key });
+    g.token = '';
+    if (r.status === 201) {
+      g.sent = null;
+      setState(g, 'SUCCEEDED');
+      state.estimate = r.body.data;
+      renew(g); setState(g, 'READY_NO_TOKEN'); // the next request gets its own token
+      return true;
+    }
+    const lost = r.status === 0 || r.status >= 500;
+    if (!lost) g.sent = null; // only a lost response is retried with the same key
+    setState(g, 'FAILED');
+    renew(g); // a fresh token arrives through the callback; the customer retries when ready
+    const code = r.body?.code;
+    problems(CONTROLLED[code] ? { errors: [{ message: CONTROLLED[code] }] } : r.body);
     return false;
   }
   $('#v3-estimate').addEventListener('click', async () => { if (await estimate('estimate')) { track('estimate_reached'); show(3); } });
@@ -345,7 +450,7 @@
     }
     $('#v3-refine').hidden = !fields.length;
     $('#v3-refine-fields').replaceChildren(...fields);
-    $('#v3-refine').addEventListener('toggle', () => widget('refine', '#v3-ts-refine'), { once: true });
+    $('#v3-refine').addEventListener('toggle', () => prepare('refine'), { once: true });
   }
   $('#v3-quote').addEventListener('click', () => track('quotation_requested'));
   $('#v3-reestimate').addEventListener('click', async () => { if (await estimate('refine')) { track('estimate_refined'); renderResult(); } });

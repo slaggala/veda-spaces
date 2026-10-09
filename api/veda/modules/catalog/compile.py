@@ -71,7 +71,8 @@ def load(rows: list[CatalogRecord], release_code: str, manifest_sha256: str) -> 
     cat = Catalog(release_code=release_code, manifest_sha256=manifest_sha256)
     for row in rows:
         cat.records.setdefault(row.kind, {})[row.record_key] = row
-        cat.models.setdefault(row.kind, {})[row.record_key] = kinds.parse(row.kind, row.document)
+        # Schema only: released content is not re-judged by later text rules (the release gate judged it).
+        cat.models.setdefault(row.kind, {})[row.record_key] = kinds.load_model(row.kind, row.document)
     return cat
 
 
@@ -161,7 +162,8 @@ def _choice_hidden(hidden: set[str], pkey: str, vkey: str, gkey: str, ckey: str)
 # a soft-close capability is a promise, shown only through a governed copy statement (R2/R3).
 _STAFF_FIELDS = {
     "staff_note", "warranty_source", "note", "visibility", "governance", "rights", "objects", "brands", "grade",
-    "thickness", "load_capacity_kg", "soft_close", "compatible_families", "matrix_row", "applies_to",
+    "thickness", "load_capacity_kg", "soft_close", "compatible_families", "matrix_row", "applies_to", "claim",
+    "consent_reference",
 }  # fmt: skip
 
 
