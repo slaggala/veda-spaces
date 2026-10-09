@@ -1,0 +1,411 @@
+{
+  "schema": "veda.catalog.v2-bundles/1",
+  "source": "app/e2e/site-release/assets/estimate-v2.js",
+  "items": {
+    "kitchen": {
+      "product": "KITCHEN",
+      "options": {},
+      "optional": false
+    },
+    "pantry": {
+      "product": "STORAGE_BOXES",
+      "options": {},
+      "optional": false
+    },
+    "living_tv": {
+      "product": "TV_UNIT",
+      "options": {
+        "STYLE": "PANELLED"
+      },
+      "optional": false
+    },
+    "living_wall": {
+      "product": "FEATURE_WALL",
+      "options": {},
+      "optional": false
+    },
+    "living_beading": {
+      "product": "VENEER_ACCENTS",
+      "options": {
+        "STYLE": "BEADING"
+      },
+      "optional": false
+    },
+    "living_partition": {
+      "product": "PARTITION",
+      "options": {},
+      "optional": false
+    },
+    "living_window": {
+      "product": "WINDOW_SEATING",
+      "options": {},
+      "optional": false
+    },
+    "dining_crockery": {
+      "product": "CROCKERY_UNIT",
+      "options": {},
+      "optional": false
+    },
+    "dining_basin": {
+      "product": "VANITY_UNIT",
+      "options": {
+        "TYPE": "DRESSER"
+      },
+      "optional": false
+    },
+    "dining_wall": {
+      "product": "FEATURE_WALL",
+      "options": {},
+      "optional": false
+    },
+    "dining_arch": {
+      "product": "VENEER_ACCENTS",
+      "options": {},
+      "optional": false
+    },
+    "wardrobe": {
+      "product": "WARDROBE",
+      "options": {},
+      "optional": false
+    },
+    "bed_king": {
+      "product": "BED",
+      "options": {
+        "SIZE": "KING"
+      },
+      "optional": false
+    },
+    "bed_queen": {
+      "product": "BED",
+      "options": {},
+      "optional": false
+    },
+    "bath_vanity": {
+      "product": "VANITY_UNIT",
+      "options": {
+        "TYPE": "TOILET"
+      },
+      "optional": false
+    },
+    "dressing": {
+      "product": "VANITY_UNIT",
+      "options": {
+        "TYPE": "DRESSER"
+      },
+      "optional": false
+    },
+    "study": {
+      "product": "STUDY_UNIT",
+      "options": {},
+      "optional": false
+    },
+    "bed_tv": {
+      "product": "TV_UNIT",
+      "options": {
+        "STYLE": "BOX"
+      },
+      "optional": false
+    },
+    "bed_window": {
+      "product": "WINDOW_SEATING",
+      "options": {},
+      "optional": false
+    },
+    "bed_wall": {
+      "product": "FEATURE_WALL",
+      "options": {},
+      "optional": false
+    },
+    "bedside": {
+      "product": "STORAGE_BOXES",
+      "options": {
+        "TYPE": "BEDSIDE_TABLE"
+      },
+      "optional": false
+    },
+    "pooja": {
+      "product": "POOJA_UNIT",
+      "options": {},
+      "optional": false
+    },
+    "asta": {
+      "product": null,
+      "options": {},
+      "optional": false
+    },
+    "utility": {
+      "product": "UTILITY",
+      "options": {},
+      "optional": false
+    },
+    "ceiling": {
+      "product": "FALSE_CEILING",
+      "options": {},
+      "optional": false
+    },
+    "profile": {
+      "product": "CEILING_PROFILE_LIGHTING",
+      "options": {},
+      "optional": false
+    },
+    "painting": {
+      "product": "PAINTING",
+      "options": {},
+      "optional": true
+    },
+    "electrical": {
+      "product": "ELECTRICAL",
+      "options": {},
+      "optional": true
+    }
+  },
+  "rooms_by_size": {
+    "3BHK": [
+      {
+        "id": "kitchen",
+        "room": "KITCHEN",
+        "includes": [
+          "kitchen"
+        ],
+        "extras": [
+          {
+            "id": "pantry",
+            "count": 0
+          }
+        ]
+      },
+      {
+        "id": "living",
+        "room": "LIVING",
+        "includes": [
+          "living_tv"
+        ],
+        "extras": [
+          {
+            "id": "living_wall",
+            "count": 0
+          },
+          {
+            "id": "living_beading",
+            "count": 0
+          },
+          {
+            "id": "living_partition",
+            "count": 0
+          },
+          {
+            "id": "living_window",
+            "count": 0
+          }
+        ]
+      },
+      {
+        "id": "dining",
+        "room": "DINING",
+        "includes": [
+          "dining_crockery"
+        ],
+        "extras": [
+          {
+            "id": "dining_basin",
+            "count": 0
+          },
+          {
+            "id": "dining_wall",
+            "count": 0
+          },
+          {
+            "id": "dining_arch",
+            "count": 0
+          }
+        ]
+      },
+      {
+        "id": "master",
+        "room": "MASTER_BEDROOM",
+        "includes": [
+          "wardrobe",
+          "bed_king",
+          "bath_vanity"
+        ],
+        "extras": [
+          {
+            "id": "dressing",
+            "count": 0
+          },
+          {
+            "id": "study",
+            "count": 0
+          },
+          {
+            "id": "bed_tv",
+            "count": 0
+          },
+          {
+            "id": "bed_window",
+            "count": 0
+          },
+          {
+            "id": "bed_wall",
+            "count": 0
+          },
+          {
+            "id": "bedside",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "id": "bed2",
+        "room": "BEDROOM_2",
+        "includes": [
+          "wardrobe",
+          "bed_queen",
+          "bath_vanity"
+        ],
+        "extras": [
+          {
+            "id": "dressing",
+            "count": 0
+          },
+          {
+            "id": "study",
+            "count": 0
+          },
+          {
+            "id": "bed_tv",
+            "count": 0
+          },
+          {
+            "id": "bed_window",
+            "count": 0
+          },
+          {
+            "id": "bed_wall",
+            "count": 0
+          },
+          {
+            "id": "bedside",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "id": "bed3",
+        "room": "BEDROOM_3",
+        "includes": [
+          "wardrobe",
+          "bed_queen",
+          "bath_vanity"
+        ],
+        "extras": [
+          {
+            "id": "dressing",
+            "count": 0
+          },
+          {
+            "id": "study",
+            "count": 0
+          },
+          {
+            "id": "bed_tv",
+            "count": 0
+          },
+          {
+            "id": "bed_window",
+            "count": 0
+          },
+          {
+            "id": "bed_wall",
+            "count": 0
+          },
+          {
+            "id": "bedside",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "id": "pooja",
+        "room": "POOJA",
+        "includes": [
+          "pooja"
+        ],
+        "extras": [
+          {
+            "id": "asta",
+            "count": 0
+          }
+        ]
+      },
+      {
+        "id": "utility",
+        "room": "UTILITY",
+        "includes": [
+          "utility"
+        ],
+        "extras": []
+      },
+      {
+        "id": "whole",
+        "room": "WHOLE_HOME",
+        "includes": [
+          "ceiling",
+          "profile"
+        ],
+        "extras": [
+          {
+            "id": "painting",
+            "count": 0
+          },
+          {
+            "id": "electrical",
+            "count": 0
+          }
+        ]
+      }
+    ]
+  },
+  "limits": {
+    "VANITY_UNIT": 6,
+    "STORAGE_BOXES": 10,
+    "FEATURE_WALL": 6,
+    "WINDOW_SEATING": 6,
+    "TV_UNIT": 6,
+    "_TOTAL": 40
+  },
+  "refine": [
+    {
+      "room": "kitchen",
+      "item": "kitchen",
+      "input": "RUN",
+      "unit": "ft",
+      "min": 0.5,
+      "max": 150
+    },
+    {
+      "room": "master",
+      "item": "wardrobe",
+      "input": "WIDTH",
+      "unit": "ft",
+      "min": 0.5,
+      "max": 150
+    },
+    {
+      "room": "living",
+      "item": "living_tv",
+      "input": "WIDTH",
+      "unit": "ft",
+      "min": 0.5,
+      "max": 150
+    },
+    {
+      "room": "whole",
+      "item": "ceiling",
+      "input": "AREA",
+      "unit": "sqft",
+      "min": 10,
+      "max": 10000
+    }
+  ]
+}

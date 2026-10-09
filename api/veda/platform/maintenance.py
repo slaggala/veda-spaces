@@ -813,3 +813,19 @@ def estimate_retention() -> dict:
 
     with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
         return {"removed": purge_expired(s), "retention_days": settings().estimate_retention_days}
+
+
+def catalog_activation() -> dict:
+    """Activate catalog releases whose scheduled time has come (ADR-013); each is re-validated and fails closed."""
+    from veda.modules.catalog import service
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return {"activated": service.run_scheduled(s)}
+
+
+def catalog_media_scan() -> dict:
+    """Scan catalog media still PENDING_SCAN (ADR-013 D6); without a scanner they stay pending outside local/test."""
+    from veda.modules.catalog import media
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return {"scanned": media.rescan_pending(s)}
