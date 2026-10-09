@@ -4,6 +4,7 @@
 //   node scripts/staging-build.mjs app    → dist/ (the staff workspace SPA)
 // Both need STAGING_TURNSTILE_SITE_KEY (the real staging widget, AUT-203; the public site key, not the secret).
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +48,38 @@ export function checkStaging(dir) {
   }
 }
 
+// The owner's activation-approval record for ESSENTIAL-1.1, packaged with the API (final pre-activation closure).
+export const APPROVAL = fileURLToPath(new URL('../../api/veda/modules/estimator/approved/essential-1.1-approval.json', import.meta.url));
+
+/** The canonical digest the API uses for approval records (sorted keys, compact, ASCII-escaped JSON). */
+export function canonicalSha256(value) {
+  const esc = (v) => JSON.stringify(v).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+  const canon = (v) => (Array.isArray(v) ? `[${v.map(canon).join(',')}]`
+    : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${esc(k)}:${canon(v[k])}`).join(',')}}` : esc(v));
+  return createHash('sha256').update(canon(value)).digest('hex');
+}
+
+export function readCopy(file) {
+  const text = readFileSync(file, 'utf8');
+  return JSON.parse(text.slice(text.indexOf('Object.freeze(') + 'Object.freeze('.length, text.lastIndexOf(');')));
+}
+
+/** STAGING_ESTIMATOR_UX=v2 is refused unless the owner approved exactly this customer copy for staging. */
+export function checkV2Approval(copyFile, approvalFile = APPROVAL) {
+  const approval = JSON.parse(readFileSync(approvalFile, 'utf8'));
+  const copy = readCopy(copyFile);
+  const p = copy.promise;
+  const problems = [];
+  if (approval.status !== 'APPROVED' || !approval.owner || !approval.approved_on) problems.push(`the owner approval record is ${approval.status}`);
+  if (approval.customer_copy_sha256 !== canonicalSha256(copy)) problems.push('the customer copy is not the approved copy');
+  if (approval.warranty_copy_sha256 !== canonicalSha256({ manufacturer: p.manufacturer, service: p.service, serviceNote: p.serviceNote })) problems.push('the warranty copy is not the approved copy');
+  const scope = approval.scope || {};
+  if (!(scope.environments || []).includes('staging') || scope.ux !== 'v2' || scope.public_intake !== false) problems.push('the approval does not cover V2 on staging without public intake');
+  if (problems.length) throw new Error(`STAGING_ESTIMATOR_UX=v2 is refused: ${problems.join('; ')}`);
+}
+
 export function buildSite(src, out, key, estimator = estimatorFlags(process.env)) {
+  if (estimator.enabled && estimator.ux === 'v2') checkV2Approval(join(src, 'assets/estimate-v2-copy.js'), estimator.approvalFile);
   siteKey(key);
   rmSync(out, { recursive: true, force: true });
   cpSync(src, out, { recursive: true });

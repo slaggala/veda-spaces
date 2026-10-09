@@ -12,8 +12,9 @@ rm -f var/e2e.db var/e2e.db-wal var/e2e.db-shm var/e2e.db.api.lock && rm -rf var
 # Budgetary Estimate (ADR-012): the SYNTHETIC rate card only (never commercial rates).
 "$PY" -m veda.cli estimator load-card tests/fixtures/estimator/synthetic-rate-card.json >/dev/null
 "$PY" -m veda.cli estimator activate-card --version SYNTHETIC-2 --approval "E2E synthetic card (no commercial rates)" >/dev/null
-# The customer specification master (ADR-012 T9): the SYNTHETIC specification only.
-"$PY" -m veda.cli estimator load-spec tests/fixtures/estimator/synthetic-customer-spec.json >/dev/null
-"$PY" -m veda.cli estimator activate-spec --spec SYNTHETIC-ESSENTIAL-1.1 --approval "E2E synthetic specification" >/dev/null
+# The customer specification master (ADR-012 T9): ESSENTIAL-1.1, the reviewed customer text (no rates), locally only.
+# Only a specification with a packaged promise matrix gets registered runtime text in V2 (final pre-activation closure).
+"$PY" -m veda.cli estimator load-spec ../docs/implementation/estimator/specifications/essential-specification-v1.1.json >/dev/null
+"$PY" -m veda.cli estimator activate-spec --spec ESSENTIAL-1.1 --approval "E2E local specification" >/dev/null
 "$PY" -m veda.cli bootstrap-founder --email founder@vedaspaces.test --name "Lakshmi Rao" | tail -1 > var/bootstrap.json
 cat var/bootstrap.json

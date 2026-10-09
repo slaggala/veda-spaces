@@ -24,6 +24,12 @@ ROOT = Path(__file__).resolve().parents[2]
 log = logging.getLogger("veda.cli")
 
 
+def _settings_env() -> str:
+    from veda import config
+
+    return config.settings().env
+
+
 def _settings():
     from veda import config
     from veda.kernel import db
@@ -268,7 +274,12 @@ def _estimator_spec(args) -> int:
     from veda.modules.estimator import service
 
     try:
-        matrix = json.loads(Path(args.matrix).read_text()) if args.matrix else None
+        if args.matrix:
+            raise service.SpecError(
+                "an externally supplied matrix is not accepted: activation uses the reviewed matrix packaged with this "
+                "release (veda/modules/estimator/approved/)"
+            )
+        operator = os.environ.get("SUDO_USER") or os.environ.get("USER") or None
         if args.action in ("validate-spec", "load-spec", "activation-check"):
             if not args.file:
                 raise service.SpecError("give the customer specification file")
@@ -278,18 +289,25 @@ def _estimator_spec(args) -> int:
                 out: dict[str, object] = {"valid": True, "spec": spec.spec_code, "sha256": service._sha(document)}
                 print(json.dumps(out))
                 return 0
-            if args.action == "activation-check":  # read-only: every pre-activation guard in one report
-                spec = service.validate_spec(document)
-                digest = service._sha(document)
-                blocked = service.activation_blockers(document, matrix)
-                if not args.expect_sha:
-                    blocked.insert(0, "give the owner-approved document SHA-256 (--expect-sha)")
-                elif args.expect_sha != digest:
-                    blocked.insert(0, "the document SHA-256 is not the owner-approved digest")
+            if args.action == "activation-check":  # read-only: every activation guard in one report
+                env = args.environment or (
+                    _settings_env() if _settings_env() in ("staging", "production") else "staging"
+                )
                 with db.unit_of_work(write=False) as s:
+                    report = service.activation_report(s, document, env=env, approval_reference=args.approval)
                     active = [x["spec"] for x in service.list_specs(s) if x["status"] == "ACTIVE"]
-                out = {"spec": spec.spec_code, "sha256": digest, "blockers": blocked, "active_now": active}
-                out["ready"] = not blocked
+                blocked = report["blockers"]
+                if args.expect_sha and args.expect_sha != report["evidence"]["specification_sha256"]:
+                    blocked.insert(0, "the document SHA-256 is not the owner-approved digest")
+                out = {
+                    "spec": report["evidence"]["spec"],
+                    "environment": env,
+                    "sha256": report["evidence"]["specification_sha256"],
+                    "digests": report["digests"],
+                    "blockers": blocked,
+                    "active_now": active,
+                    "ready": not blocked,
+                }
                 print(json.dumps(out))
                 return 0 if not blocked else 3
         with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
@@ -298,11 +316,23 @@ def _estimator_spec(args) -> int:
                 out = {"loaded": row.spec_code, "status": row.status, "sha256": row.document_sha256}
             elif args.action == "activate-spec":
                 row = service.activate_spec(
-                    s, args.spec or "", args.approval or "", matrix=matrix, ux_v1_confirmed=args.ux_v1_confirmed
+                    s,
+                    args.spec or "",
+                    args.approval or "",
+                    ux_v1_confirmed=args.ux_v1_confirmed,
+                    release=args.release,
+                    operator=operator,
                 )
                 out = {"active": row.spec_code, "package": row.package}
             elif args.action == "rollback-spec":
-                row = service.rollback_spec(s, args.package, args.approval or "", ux_v1_confirmed=args.ux_v1_confirmed)
+                row = service.rollback_spec(
+                    s,
+                    args.package,
+                    args.approval or "",
+                    ux_v1_confirmed=args.ux_v1_confirmed,
+                    release=args.release,
+                    operator=operator,
+                )
                 out = {"active": row.spec_code, "package": row.package, "rolled_back": True}
             else:
                 out = {"specs": service.list_specs(s)}
@@ -547,7 +577,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--version", default=None)
     p.add_argument("--spec", default=None, help="customer specification code, for example ESSENTIAL-1.0")
     p.add_argument("--package", default="ESSENTIAL", choices=["ESSENTIAL", "PREMIUM", "LUXURY"])
-    p.add_argument("--matrix", default=None, help="the customer-promise matrix JSON (activation guards)")
+    p.add_argument("--matrix", default=None, help=argparse.SUPPRESS)  # refused: only the packaged matrix is used
+    p.add_argument("--release", default=None, help="the deployed release commit, recorded with the activation")
+    p.add_argument("--environment", default=None, choices=["staging", "production"], help="activation-check target")
     p.add_argument("--expect-sha", default=None, help="the owner-approved specification document SHA-256")
     p.add_argument(
         "--ux-v1-confirmed",

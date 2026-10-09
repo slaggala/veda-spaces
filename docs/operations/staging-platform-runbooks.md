@@ -422,32 +422,38 @@ Without an active specification, estimates still work and say that materials are
 
 **ESSENTIAL-1.1** (`essential-specification-v1.1.json`, document SHA-256
 `6f798ef6cd3cea06f491041a4143e35776900107e73e6c953fbed4bd37ad286d`) replaces 1.0 for new estimates. Its room promises
-follow the lines each estimate prices. **Do not activate it until the owner approves its digest, and until
-`activation-check` is ready.** The pre-activation closure guards:
-1. The sales checklist (`ESSENTIAL-1.1-SALES-DECISIONS.md`) is decided.
-2. The operations sign-off sheet (`ESSENTIAL-1.1-OPERATIONS-CONFIRMATION.md`) is complete.
-3. No row of `essential-1.1-promise-matrix.json` is anything but `OPERATIONALLY_CONFIRMED`, `SALES_CONFIRMED`,
-   `OWNER_CONFIRMED` or `REMOVED`, and every confirmed row names its accountable owner.
+follow the lines each estimate prices. **Do not activate it until the owner approves the complete approval record.**
+The activation gate reads only the reviewed records packaged with the running release
+(`api/veda/modules/estimator/approved/`):
+- the promise matrix: every visible promise `OPERATIONALLY_CONFIRMED` with named accountable and backup owners and a
+  confirmation date;
+- the sales decisions: all ten APPROVE, named and dated;
+- the owner approval record: APPROVED, in scope, and carrying the current digests of the specification, matrix, sales
+  record, customer copy and warranty copy, plus the passing real-card equivalence on the active card.
 
-On the host (files copied read-only, as for the specification), run the read-only check. It exits 0 only when ready
-and prints the specification, its SHA-256, every blocker and what is active now:
-`veda estimator activation-check /spec.json --matrix /matrix.json --expect-sha <owner-approved digest>`.
+An operator-supplied matrix is refused.
 
-Then activate with the same matrix: `veda estimator activate-spec --spec ESSENTIAL-1.1 --approval "<owner approval,
-date>" --matrix /matrix.json`. On staging and production, `activate-spec` refuses a specification with room promises
-unless the matrix is complete and confirmed. `list-specs` must then show ESSENTIAL-1.1 as the only ACTIVE Essential
-version. Set `STAGING_ESTIMATOR_UX=v2` only after that, and keep V1 available through `v1`.
+**Steps:**
+1. Decisions are recorded in those JSON files through a reviewed pull request, merged, and deployed with `12-deploy`.
+2. On the host, run the read-only check: `veda estimator activation-check /spec.json --approval "<approval reference>"`.
+   It exits 0 only when ready, and prints every blocker and the full digests the approval record must carry.
+3. Activate: `veda estimator activate-spec --spec ESSENTIAL-1.1 --approval "<approval reference>" --release <deployed commit>`.
+   The event records the release, the specification and matrix digests, the decision and approval versions, the
+   approval reference, the operator, the environment and the time.
+4. `list-specs` shows ESSENTIAL-1.1 as the only ACTIVE Essential version.
+5. Set `STAGING_ESTIMATOR_UX=v2` in `veda-staging-site` and retry the deployment. The staging site build refuses V2
+   unless the owner approval record is APPROVED and carries the deployed customer copy's digests. V1 stays available
+   through `v1`.
 
-**Rollback** (from 1.1 to 1.0, or to any version without room promises):
-1. Set `STAGING_ESTIMATOR_UX=v1` in `veda-staging-site` and retry the deployment. V1 is now served.
-2. `veda estimator rollback-spec --package ESSENTIAL --approval "<reason, date>" --ux-v1-confirmed`. Without
-   `--ux-v1-confirmed` the rollback is refused, because V2 must not run on a specification without room promises.
-   Activating 1.0 directly needs the same flag.
-3. `list-specs` shows 1.0 ACTIVE. If V2 is served by mistake, it still shows no material promise, because it treats a
-   specification without room promises as none (e2e regression).
+**Rollback** (to 1.0, or to any specification without room promises):
+1. Set `STAGING_ESTIMATOR_UX=v1` and retry the Pages deployment.
+2. `veda estimator rollback-spec --package ESSENTIAL --approval "<reason, date>" --ux-v1-confirmed --release <commit>`.
+   Without `--ux-v1-confirmed` it is refused. A rollback re-checks the stored document's SHA-256 and revalidates it.
+3. **Reactivating 1.1 later is a new activation:** `rollback-spec` (or `activate-spec`) runs the whole gate again and
+   fails closed if any record, digest or the active card changed since the approval.
 
-The API cannot change a Pages variable. Step 1 is therefore enforced by the refusal in step 2 and backed by V2's own
-safe behaviour, not done automatically.
+The API cannot change a Pages variable. Step 1 is enforced by the refusal in step 2, by the site build's approval
+check, and by V2 showing no material promise or runtime text without a registered matrix.
 
 **Customer experience (UX V2):** the staging site shows V1 unless `STAGING_ESTIMATOR_UX=v2` is set in the Pages
 project `veda-staging-site` (`v1` is the default; any other value fails the build). Set it, then retry the

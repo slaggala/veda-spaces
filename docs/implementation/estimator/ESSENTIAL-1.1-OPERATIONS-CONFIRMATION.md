@@ -8,7 +8,7 @@ practical verification path, the promise is not confirmed. It is rewritten as a 
 `REMOVED` and taken off the page. Nothing here is confirmed yet.
 
 The proposed steps for each promise are recorded in the matrix
-([JSON](specifications/essential-1.1-promise-matrix.json), [rendered](specifications/essential-1.1-promise-matrix.md)).
+([JSON](../../../api/veda/modules/estimator/approved/essential-1.1-promise-matrix.json), [rendered](specifications/essential-1.1-promise-matrix.md)).
 This page is the sign-off sheet.
 
 ## The verification path every material promise needs

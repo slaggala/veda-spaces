@@ -2,16 +2,18 @@
 
 import copy
 import json
+import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_estimator_api import SITE, body, load_card
+from tests.integration.test_estimator_api import CARD_DOC, SITE, body, load_card
 from tests.support.dbh import rows
 from veda.kernel import db
 from veda.kernel.context import actor, system_context
-from veda.modules.estimator import service
+from veda.modules.estimator import activation, promise_matrix, service
 from veda.modules.estimator.models import (
     BudgetEstimate,
     BudgetEstimateProjectItem,
@@ -161,18 +163,96 @@ def test_room_details_without_a_specification_keep_the_assumptions_only(api):
     assert any(d["assumptions"] for d in r.data["room_details"])
 
 
-# --- pre-activation closure: guards, F1 through the API, package components -------------------------------------------
+# --- final pre-activation closure: the gate, reactivation, rollback, runtime text ------------------------------------
 DOCS = Path(__file__).resolve().parents[3] / "docs/implementation/estimator/specifications"
 ESSENTIAL_10 = json.loads((DOCS / "essential-specification-v1.0.json").read_text())
 ESSENTIAL_11 = json.loads((DOCS / "essential-specification-v1.1.json").read_text())
-MATRIX = json.loads((DOCS / "essential-1.1-promise-matrix.json").read_text())
+OWNER_APPROVAL = "Owner approval 2026-10-10, ESSENTIAL-1.1 protected staging"
+RELEASE = "0123abcd4567"  # pragma: allowlist secret (a test release id)
 
 
-def _confirmed_matrix():
-    m = copy.deepcopy(MATRIX)
-    for r in m["rows"]:
-        r.update(status="OWNER_CONFIRMED", accountable_owner="Named Person (test)")
-    return m
+def staging(monkeypatch):
+    monkeypatch.setattr(service, "settings", lambda: SimpleNamespace(env="staging"))
+
+
+def active_card_sha():
+    with db.unit_of_work(write=False) as s:
+        return service._active_card_sha(s)
+
+
+def write(path, doc):
+    path.write_text(json.dumps(doc))
+
+
+def approve_all(tmp_path, monkeypatch):
+    """A fully approved, current set of reviewed records (the shape operations, sales and the owner will produce)."""
+    d = tmp_path / "approved"
+    d.mkdir()
+    matrix = copy.deepcopy(promise_matrix.load("ESSENTIAL-1.1"))
+    for r in matrix["rows"]:
+        r.update(
+            status="OPERATIONALLY_CONFIRMED",
+            accountable_owner="Named Person (ops)",
+            backup_owner="Second Person (ops)",
+            confirmed_on="2026-10-10",
+        )
+    sales = copy.deepcopy(promise_matrix.load("ESSENTIAL-1.1", "sales-decisions"))
+    for item in sales["items"]:
+        item.update(owner_decision="APPROVE", owner_name="Sales Lead", decision_date="2026-10-10")
+    write(d / "essential-1.1-promise-matrix.json", matrix)
+    write(d / "essential-1.1-sales-decisions.json", sales)
+    monkeypatch.setattr(promise_matrix, "APPROVED_DIR", d)
+    monkeypatch.setattr(activation, "repository_blockers", lambda paths: [])
+    digests = activation.digests("ESSENTIAL-1.1")
+    approval = copy.deepcopy(
+        json.loads((DOCS.parents[3] / "api/veda/modules/estimator/approved/essential-1.1-approval.json").read_text())
+    )
+    approval.update(
+        status="APPROVED",
+        owner="Owner Name",
+        approved_on="2026-10-10",
+        approval_reference=OWNER_APPROVAL,
+        reviewed_commit="0123abcd",
+        specification_sha256=service._sha(ESSENTIAL_11),
+        sales_decisions_version=sales["version"],
+        operations_confirmation_version=matrix["version"],
+        real_card_equivalence={
+            "card_version": "SYNTHETIC-2",
+            "card_sha256": active_card_sha(),
+            "result": "PASS",
+            "run_on": "2026-10-10",
+            "commit": "0123abcd",
+        },
+        **digests,
+    )
+    write(d / "essential-1.1-approval.json", approval)
+    return d
+
+
+def load_11(activate=False, **kw):
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        service.load_spec(s, ESSENTIAL_11)
+        if activate:
+            service.activate_spec(s, "ESSENTIAL-1.1", OWNER_APPROVAL, **kw)
+
+
+def activate(code, approval=OWNER_APPROVAL, **kw):
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        return service.activate_spec(s, code, approval, **kw).status
+
+
+def rollback(approval=OWNER_APPROVAL, **kw):
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        return service.rollback_spec(s, "ESSENTIAL", approval, **kw).spec_code
+
+
+def service_list():
+    with db.unit_of_work(write=False) as s:
+        return service.list_specs(s)
+
+
+def last_event():
+    return rows(sa.select(EstimatorSpecEvent).order_by(EstimatorSpecEvent.id.desc()))[0]  # UUIDv7: time-ordered
 
 
 def test_a_specification_without_room_promises_needs_ux_v1_confirmed(api):
@@ -184,57 +264,230 @@ def test_a_specification_without_room_promises_needs_ux_v1_confirmed(api):
         service.load_spec(s, spec_version(1))
         service.activate_spec(s, "SYNTHETIC-ESSENTIAL-1.0", APPROVAL)
         with pytest.raises(service.SpecError, match="STAGING_ESTIMATOR_UX=v1"):
-            service.rollback_spec(s, "ESSENTIAL", APPROVAL)  # back to 1.0: V2 must be switched off first
+            service.rollback_spec(s, "ESSENTIAL", APPROVAL)
         assert service.rollback_spec(s, "ESSENTIAL", APPROVAL, ux_v1_confirmed=True).spec_code == "ESSENTIAL-1.0"
         with pytest.raises(service.SpecError, match="approval reference"):
             service.rollback_spec(s, "ESSENTIAL", "short")
     assert [x["spec"] for x in service_list() if x["status"] == "ACTIVE"] == ["ESSENTIAL-1.0"]
 
 
-def service_list():
-    with db.unit_of_work(write=False) as s:
-        return service.list_specs(s)
-
-
-def test_on_staging_activation_needs_a_confirmed_matrix(api, monkeypatch):
-    monkeypatch.setattr(service, "settings", lambda: type("S", (), {"env": "staging"})())
-    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
-        service.load_spec(s, ESSENTIAL_11)
-        with pytest.raises(service.SpecError, match="matrix is required"):
-            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL)
-        with pytest.raises(service.SpecError, match="not ready for activation: spec.structure: BLOCKED"):
-            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=MATRIX)
-        broken = copy.deepcopy(MATRIX)
-        broken["rows"].pop(0)
-        with pytest.raises(service.SpecError, match="matrix: category structure has no row"):
-            service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=broken)
-        assert service.activate_spec(s, "ESSENTIAL-1.1", APPROVAL, matrix=_confirmed_matrix()).status == "ACTIVE"
+def test_on_staging_activation_uses_only_the_reviewed_records_and_records_the_evidence(api, tmp_path, monkeypatch):
+    load_card()
+    load_11()
+    approve_all(tmp_path, monkeypatch)
+    staging(monkeypatch)
+    with pytest.raises(service.SpecError, match="--release"):
+        activate("ESSENTIAL-1.1")
+    assert activate("ESSENTIAL-1.1", release=RELEASE, operator="ops-user") == "ACTIVE"
+    detail = last_event().detail
+    assert last_event().event_type == "SPEC_ACTIVATED"
+    assert detail["release"] == RELEASE and detail["operator"] == "ops-user" and detail["environment"] == "staging"
+    assert detail["specification_sha256"] == service._sha(ESSENTIAL_11)
+    assert detail["promise_matrix_sha256"] == promise_matrix.sha256(promise_matrix.load("ESSENTIAL-1.1"))
+    assert detail["sales_decisions_version"] == "1" and detail["approval_version"] == "1"
+    assert detail["approval_reference"] == OWNER_APPROVAL and detail["at"]
     assert [(x["spec"], x["status"]) for x in service_list()] == [("ESSENTIAL-1.1", "ACTIVE")]
 
 
-def test_cli_activation_check_reports_every_guard_and_never_activates(api, tmp_path, capsys):
+def test_on_staging_the_committed_pending_records_refuse_activation(api, monkeypatch):
+    load_card()
+    load_11()
+    staging(monkeypatch)
+    monkeypatch.setattr(activation, "repository_blockers", lambda paths: [])
+    with pytest.raises(service.SpecError, match="not ready for activation: spec.structure: BLOCKED"):
+        activate("ESSENTIAL-1.1", release=RELEASE)
+
+
+def _mutate_matrix(d):
+    m = json.loads((d / "essential-1.1-promise-matrix.json").read_text())
+    m["rows"][0]["status"] = "BLOCKED"
+    m["rows"][0]["blocked_on"] = "re-opened by operations"
+    write(d / "essential-1.1-promise-matrix.json", m)
+
+
+def _mutate_sales(field, value):
+    def apply(d):
+        sales = json.loads((d / "essential-1.1-sales-decisions.json").read_text())
+        sales["items"][0][field] = value
+        write(d / "essential-1.1-sales-decisions.json", sales)
+
+    return apply
+
+
+def _mutate_approval(**changes):
+    def apply(d):
+        a = json.loads((d / "essential-1.1-approval.json").read_text())
+        a.update(changes)
+        write(d / "essential-1.1-approval.json", a)
+
+    return apply
+
+
+@pytest.mark.parametrize(
+    "mutate,message",
+    [
+        (_mutate_matrix, "spec.structure: BLOCKED"),
+        (_mutate_sales("owner_decision", None), "sales S1: no decision"),
+        (_mutate_sales("owner_decision", "CHANGE"), "CHANGE needs a new specification version"),
+        (_mutate_approval(status="PENDING"), "is PENDING, not APPROVED"),
+        (_mutate_approval(owner=""), "has no owner"),
+        (_mutate_approval(specification_sha256="0" * 64), "specification_sha256 does not match"),
+        (_mutate_approval(customer_copy_sha256="0" * 64), "customer_copy_sha256 does not match"),
+        (_mutate_approval(warranty_copy_sha256="0" * 64), "warranty_copy_sha256 does not match"),
+        (
+            _mutate_approval(scope={"environments": ["production"], "package": "ESSENTIAL", "public_intake": False}),
+            "does not cover",
+        ),
+        (
+            _mutate_approval(scope={"environments": ["staging"], "package": "ESSENTIAL", "public_intake": True}),
+            "exclude public intake",
+        ),
+        (
+            _mutate_approval(real_card_equivalence={"card_sha256": "f" * 64, "result": "PASS"}),
+            "not the card the equivalence",
+        ),
+        (_mutate_approval(real_card_equivalence={"card_sha256": None, "result": None}), "no passing real-card"),
+        (_mutate_approval(approval_reference="Some other approval"), "--approval does not match"),
+    ],
+)
+def test_any_missing_stale_or_changed_record_fails_closed(api, tmp_path, monkeypatch, mutate, message):
+    load_card()
+    load_11()
+    d = approve_all(tmp_path, monkeypatch)
+    mutate(d)
+    staging(monkeypatch)
+    with pytest.raises(service.SpecError, match=message):
+        activate("ESSENTIAL-1.1", release=RELEASE)
+    assert not [x for x in service_list() if x["status"] == "ACTIVE"]
+
+
+def test_reactivation_after_rollback_to_v1_reruns_the_whole_gate(api, tmp_path, monkeypatch):
+    load_card()
+    load_11()
+    d = approve_all(tmp_path, monkeypatch)
+    staging(monkeypatch)
+    activate("ESSENTIAL-1.1", release=RELEASE)
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        service.load_spec(s, ESSENTIAL_10)
+    assert activate("ESSENTIAL-1.0", ux_v1_confirmed=True, release=RELEASE) == "ACTIVE"  # back to V1
+    assert rollback(release=RELEASE) == "ESSENTIAL-1.1", "a current approval lets 1.1 come back"
+    assert last_event().event_type == "SPEC_ROLLED_BACK" and last_event().detail["promise_matrix_sha256"]
+    assert activate("ESSENTIAL-1.0", ux_v1_confirmed=True, release=RELEASE) == "ACTIVE"
+    _mutate_matrix(d)  # an operations row re-opened after the first activation
+    with pytest.raises(service.SpecError, match="not ready for activation"):
+        rollback(release=RELEASE)
+    load_card(version="SYNTHETIC-3")  # and a different active card makes the equivalence stale
+    (tmp_path / "again").mkdir()
+    approve_all(tmp_path / "again", monkeypatch)
+    _mutate_approval(real_card_equivalence={"card_sha256": "e" * 64, "result": "PASS"})(tmp_path / "again" / "approved")
+    with pytest.raises(service.SpecError, match="not the card the equivalence"):
+        rollback(release=RELEASE)
+    assert [x["spec"] for x in service_list() if x["status"] == "ACTIVE"] == ["ESSENTIAL-1.0"]
+
+
+def test_rollback_revalidates_and_refuses_a_tampered_specification(api):
+    load_spec(spec_version(1))
+    load_spec(spec_version(2))
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        row = s.execute(
+            sa.select(EstimatorCustomerSpec).where(EstimatorCustomerSpec.spec_code == "SYNTHETIC-ESSENTIAL-1.0")
+        ).scalar_one()
+        tampered = copy.deepcopy(row.document)
+        tampered["summary"] = "Tampered after approval."
+        row.document = tampered
+    with pytest.raises(service.SpecError, match="does not match its SHA-256"):
+        rollback(APPROVAL)
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        row = s.execute(
+            sa.select(EstimatorCustomerSpec).where(EstimatorCustomerSpec.spec_code == "SYNTHETIC-ESSENTIAL-1.0")
+        ).scalar_one()
+        invalid = copy.deepcopy(row.document)
+        invalid["categories"][0]["details"] = ["Laminate within ₹1,200 per sheet"]
+        row.document, row.document_sha256 = invalid, service._sha(invalid)
+    with pytest.raises(service.SpecError, match="invalid customer specification"):
+        rollback(APPROVAL)
+
+
+def test_cli_activation_check_and_refusal_of_an_external_matrix(api, tmp_path, capsys, monkeypatch):
     from veda.cli.main import main
 
-    spec_file, matrix_file = tmp_path / "spec.json", tmp_path / "matrix.json"
-    spec_file.write_text(json.dumps(ESSENTIAL_11))
-    matrix_file.write_text(json.dumps(MATRIX))
-    digest = service._sha(ESSENTIAL_11)
-    args = ["estimator", "activation-check", str(spec_file), "--matrix", str(matrix_file)]
-    assert main([*args, "--expect-sha", digest]) == 3
+    load_card()
+    f10, f11 = tmp_path / "s10.json", tmp_path / "s11.json"
+    write(f10, ESSENTIAL_10)
+    write(f11, ESSENTIAL_11)
+    monkeypatch.setattr(activation, "repository_blockers", lambda paths: [])
+    assert main(["estimator", "activation-check", str(f10)]) == 3  # L2: never "ready" for 1.0
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert out["ready"] is False and out["sha256"] == digest and any("BLOCKED" in b for b in out["blockers"])
-    assert main([*args, "--expect-sha", "0" * 64]) == 3
-    assert "not the owner-approved digest" in capsys.readouterr().out
-    matrix_file.write_text(json.dumps(_confirmed_matrix()))
-    assert main([*args, "--expect-sha", digest]) == 0
-    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {
-        "spec": "ESSENTIAL-1.1",
-        "sha256": digest,
-        "blockers": [],
-        "active_now": [],
-        "ready": True,
-    }
+    assert out["ready"] is False and "no room promises" in out["blockers"][0]
+    assert main(["estimator", "activation-check", str(f11)]) == 3
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["environment"] == "staging" and len(out["sha256"]) == 64
+    assert (
+        len(out["digests"]["promise_matrix_sha256"]) == 64
+        and "the owner approval record is PENDING, not APPROVED" in out["blockers"]
+    )
+    m = tmp_path / "matrix.json"
+    write(m, promise_matrix.load("ESSENTIAL-1.1"))
+    assert main(["estimator", "activation-check", str(f11), "--matrix", str(m)]) == 2
+    assert (
+        main(
+            ["estimator", "activate-spec", "--spec", "ESSENTIAL-1.1", "--approval", OWNER_APPROVAL, "--matrix", str(m)]
+        )
+        == 2
+    )
+    assert "externally supplied matrix is not accepted" in capsys.readouterr().err
+    approve_all(tmp_path, monkeypatch)
+    assert main(["estimator", "activation-check", str(f11), "--approval", OWNER_APPROVAL]) == 0
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["ready"] is True and out["blockers"] == [] and out["active_now"] == []
     assert service_list() == [], "a check never loads or activates anything"
+
+
+def test_repository_checks_refuse_untracked_modified_or_outside_records(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    approved = repo / "api/veda/modules/estimator/approved"
+    approved.mkdir(parents=True)
+    run = lambda *a: subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)  # noqa: E731
+    run("init", "-q")
+    run("config", "user.email", "t@example.invalid")
+    run("config", "user.name", "t")
+    tracked, untracked = approved / "a.json", approved / "b.json"
+    tracked.write_text("{}")
+    run("add", ".")
+    run("commit", "-qm", "x")
+    untracked.write_text("{}")
+    monkeypatch.setattr(activation, "REPO", repo)
+    assert activation.repository_blockers([tracked]) == []
+    assert "is not tracked" in activation.repository_blockers([untracked])[0]
+    tracked.write_text('{"edited": true}')
+    assert "differs from the committed version" in activation.repository_blockers([tracked])[0]
+    assert "outside the approved repository path" in activation.repository_blockers([tmp_path / "elsewhere.json"])[0]
+
+
+@ON
+def test_only_registered_runtime_text_reaches_v2(api):
+    """M3: V2's block keeps the registered disclaimer, exclusions and client scope, and drops anything else."""
+    card = copy.deepcopy(CARD_DOC)
+    card["version"] = "SYNTHETIC-UNREGISTERED"
+    card["exclusions"] = [*card["exclusions"], "Free modular upgrade for every room"]
+    load_card(card)
+    load_11(activate=True)
+    r = post(api)
+    assert r.status == 201, r
+    v2 = r.data["v2_copy"]
+    assert v2["approved"] is True and v2["matrix"]["spec_code"] == "ESSENTIAL-1.1"
+    assert "Free modular upgrade for every room" in r.data["exclusions"], "V1 keeps its existing response"
+    assert "Free modular upgrade for every room" not in v2["exclusions"] and v2["suppressed"] >= 1
+    assert v2["disclaimer"] == r.data["disclaimer"] and v2["client_scope"] == r.data["client_scope"]
+    assert all(v2["assumptions"][d["room"]] == d["assumptions"] for d in r.data["room_details"])
+
+
+@ON
+def test_without_a_registered_matrix_v2_gets_no_runtime_text(api):
+    load_card()
+    load_spec(spec_version(1))  # the synthetic specification has no packaged matrix
+    r = post(api)
+    assert r.status == 201 and r.data["v2_copy"] == {"approved": False}
 
 
 @ON
