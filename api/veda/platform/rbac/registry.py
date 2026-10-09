@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from veda.modules.catalog import permissions as catalog_permissions
 from veda.modules.crm.leads import permissions as lead_permissions
 from veda.modules.estimator import permissions as estimate_permissions
 
@@ -208,6 +209,7 @@ def _entries() -> tuple[RegistryEntry, ...]:
         ("platform", PLATFORM_PERMISSIONS),
         ("crm", lead_permissions.PERMISSIONS),
         ("estimator", estimate_permissions.PERMISSIONS),
+        ("catalog", catalog_permissions.PERMISSIONS),
     ):
         for d in defs:
             resource, _, action = d.code.partition(".")
@@ -217,7 +219,12 @@ def _entries() -> tuple[RegistryEntry, ...]:
 
 REGISTRY: tuple[RegistryEntry, ...] = _entries()
 BY_CODE: dict[str, RegistryEntry] = {e.code: e for e in REGISTRY}
-MATRIX: dict[str, dict[str, str]] = {**PLATFORM_MATRIX, **lead_permissions.MATRIX, **estimate_permissions.MATRIX}
+MATRIX: dict[str, dict[str, str]] = {
+    **PLATFORM_MATRIX,
+    **lead_permissions.MATRIX,
+    **estimate_permissions.MATRIX,
+    **catalog_permissions.MATRIX,
+}
 
 SENSITIVE_CODES = frozenset(e.code for e in REGISTRY if e.definition.is_sensitive)
 FOUNDER_WORKFLOW_ONLY_CODES = frozenset(e.code for e in REGISTRY if e.definition.grant_path == FOUNDER_WORKFLOW_ONLY)

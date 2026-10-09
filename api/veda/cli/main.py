@@ -207,6 +207,9 @@ JOBS = {
     "erasure-audit": "run_erasure_audit",
     "lead-retention": "lead_retention",
     "estimate-retention": "estimate_retention",
+    "catalog-activation": "catalog_activation",
+    "catalog-media-scan": "catalog_media_scan",
+    "catalog-media-retention": "catalog_media_retention",
     "verify-chain": "verify_chain",
     "anchor-chain": "anchor_chain",
     "invariants": "check_invariants",
@@ -388,6 +391,53 @@ def run_scheduled_job(job: str) -> int:
     return code
 
 
+def cmd_catalog(args) -> int:
+    """The catalog-driven estimator (ADR-013). Every write creates DRAFT records only; review, release, approval and
+    activation happen in the staff workspace under four-eyes review.
+
+    migrate-v2 CARD_FILE     V2 card + room bundles → DRAFT records (idempotent; --dry-run reports only)
+    seed-slice               the representative vertical slice (Living Room → TV Unit), synthetic, as DRAFTs
+    validate-release CODE    re-run release validation; prints checks and errors (never rates)
+    list-releases            codes, states and manifest SHA-256
+    """
+    import sqlalchemy as sa
+
+    from veda.kernel import db
+    from veda.kernel.context import actor, system_context
+    from veda.modules.catalog import migrate_v2, seed, service
+    from veda.modules.catalog.models import CatalogRelease
+
+    _settings()
+    try:
+        with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+            if args.action == "migrate-v2":
+                if not args.file:
+                    raise service.CatalogError("give the private V2 rate-card file")
+                document = json.loads(Path(args.file).read_text())
+                report = migrate_v2.apply(s, document, dry_run=args.dry_run)
+                out: dict[str, object] = {k: len(v) for k, v in report.items()} | {"dry_run": args.dry_run}
+            elif args.action == "seed-slice":
+                out = seed.apply(s)
+            elif args.action == "validate-release":
+                row = s.execute(
+                    sa.select(CatalogRelease).where(CatalogRelease.release_code == (args.code or ""))
+                ).scalar_one_or_none()
+                if row is None:
+                    raise service.CatalogError("no such release")
+                report = service.validate_release(s, row.id)
+                out = {"release": row.release_code, "ok": report["ok"], "checks": report["checks"],
+                       "errors": report["errors"], "warnings": len(report["warnings"])}  # fmt: skip
+            else:
+                rows = s.execute(sa.select(CatalogRelease).order_by(CatalogRelease.created_on)).scalars()
+                out = {"releases": [{"code": r.release_code, "status": r.status, "sha256": r.manifest_sha256}
+                                    for r in rows]}  # fmt: skip
+        print(json.dumps(out))
+        return 0
+    except (service.CatalogError, OSError, ValueError) as err:
+        print(f"refused: {str(err).splitlines()[0]}", file=sys.stderr)
+        return 2
+
+
 def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
     """Periodic jobs. Jobs that lift evidence-store guards run as separate short-lived processes (A-02)."""
     import time as _time
@@ -395,7 +445,8 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
     from zoneinfo import ZoneInfo
 
     _settings()
-    frequent = ["expire-approvals", "break-glass-due", "follow-up-reminders", "erasure-audit", "disk-usage"]
+    frequent = ["expire-approvals", "break-glass-due", "follow-up-reminders", "erasure-audit", "disk-usage",
+                "catalog-activation", "catalog-media-scan"]  # fmt: skip
     daily = {
         "01:30": "snapshot",
         "02:00": "invariants",
@@ -404,6 +455,7 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
         "03:30": "purge",
         "04:00": "lead-retention",
         "04:15": "estimate-retention",
+        "04:30": "catalog-media-retention",
         "05:00": "restore-verify",
         "09:00": "spam-review",
     }
@@ -588,6 +640,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--approval", default=None)
     p.set_defaults(fn=cmd_estimator)
+    p = sub.add_parser("catalog")
+    p.add_argument("action", choices=["migrate-v2", "seed-slice", "validate-release", "list-releases"])
+    p.add_argument("file", nargs="?", default=None)
+    p.add_argument("--code", default=None, help="release code")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(fn=cmd_catalog)
     p = sub.add_parser("outbox")
     p.add_argument("action", choices=["dead", "retire", "requeue"])
     p.add_argument("--id", default=None)

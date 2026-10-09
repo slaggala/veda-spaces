@@ -244,3 +244,34 @@ def test_staging_estimator_with_its_policy_link_passes_and_production_still_refu
     assert config.validate_environment(staging) == []
     production = deployed_env(monkeypatch, "production", VEDA_ESTIMATOR_ENABLED="true", VEDA_WARRANTY_POLICY_URL=url)
     assert "VEDA_ESTIMATOR_ENABLED is not authorised in production yet" in config.validate_environment(production)
+
+
+@pytest.mark.parametrize("name", ["VEDA_CATALOG_ESTIMATOR_ENABLED", "VEDA_CATALOG_ANALYTICS_ENABLED"])
+def test_catalog_v3_flags_are_refused_in_production_and_allowed_on_staging(monkeypatch, name):
+    """ADR-013 D9: V3 and its analytics stay off in production until separately approved."""
+    media = {"VEDA_CATALOG_MEDIA_BACKEND": "s3", "VEDA_CATALOG_MEDIA_BUCKET": "veda-catalog-media",
+             "VEDA_CATALOG_MEDIA_SCANNER": "clamd"}  # fmt: skip
+    assert config.validate_environment(deployed_env(monkeypatch, "staging", **{name: "true"}, **media)) == []
+    problems = config.validate_environment(deployed_env(monkeypatch, "production", **{name: "true"}, **media))
+    assert any(name in p for p in problems), problems
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["VEDA_CATALOG_ADMIN_ENABLED", "VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", "VEDA_CATALOG_3D_ENABLED"],
+)
+def test_catalog_admin_media_and_3d_flags_are_refused_in_production(monkeypatch, name):
+    problems = config.validate_environment(deployed_env(monkeypatch, "production", **{name: "true"}))
+    assert any(name in p for p in problems), problems
+
+
+def test_a_deployed_catalog_needs_the_private_bucket_and_a_scanner(monkeypatch):
+    """Remediation F2: no catalog media from local disk or unscanned in staging."""
+    problems = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_CATALOG_ADMIN_ENABLED="true"))
+    assert any("VEDA_CATALOG_MEDIA_BACKEND=s3" in p for p in problems)
+    assert any("VEDA_CATALOG_MEDIA_SCANNER=clamd" in p for p in problems)
+
+
+def test_catalog_four_eyes_cannot_be_switched_off_when_deployed(monkeypatch):
+    problems = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_CATALOG_FOUR_EYES="false"))
+    assert any("VEDA_CATALOG_FOUR_EYES" in p for p in problems), problems

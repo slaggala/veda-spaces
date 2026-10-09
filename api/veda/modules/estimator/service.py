@@ -121,6 +121,8 @@ def activate_card(s: Session, version: str, approval_reference: str, actor_id: s
     """Make a DRAFT (or a RETIRED card, for rollback) the one ACTIVE card; the previous one is RETIRED."""
     if len((approval_reference or "").strip()) < 10:
         raise CardError("activation needs the owner's approval reference (at least 10 characters)")
+    if version.startswith("CATALOG-"):  # ADR-013 D9: a compiled catalog card prices V3 only, never V1/V2
+        raise CardError(f"{version} is a compiled catalog card; catalog releases are activated in the catalog")
     row = _by_version(s, version)
     if row.status == "ACTIVE":
         raise CardError(f"{version} is already active")

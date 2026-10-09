@@ -142,6 +142,19 @@ KNOWN_COMMITS = {
     "a5a59a741bfcb8a3586bd90eb5c1c72e90773916": ("Merge pull request #11 from slaggala/fix/rr18-accessibility-remnants", "PR #11: RR-18"),  # pragma: allowlist secret (commit SHA)
     "9361d104fef8dcef608ac6e925157eb8896a5ae3": ("Merge pull request #15 from slaggala/docs/bootstrap-authorization", "commit applied by the first bootstrap (AUT-002)"),  # pragma: allowlist secret (commit SHA)
     "c94af47700cc107a8524bac5994e577d82b065a2": ("Merge pull request #62 from slaggala/feature/estimator-v2-final-pre-activation", "PR #62: Estimator V2 final pre-activation closure (approval package and round 1 review)"),  # pragma: allowlist secret (commit SHA)
+    "18dcf0a59a4240f41eba6a1e3bd4a3e1090a94a3": ("Merge pull request #65 from slaggala/fix/session-stack-home-sizes", "main at the start of the catalog V3 branch"),  # pragma: allowlist secret (commit SHA)
+    "8735df792737bd11063649af2a54fcb9c7df092e": ("Catalog V3 phase 1: ADR-013, flags, least-privilege permissions, Pillow", "Catalog V3 phase 1"),  # pragma: allowlist secret (commit SHA)
+    "6b5732cd971836968b7428187beeeaa03cf7da26": ("Catalog V3 phase 2: versioned catalog, releases, pricing adapter, rules, media, migration, API", "Catalog V3 phase 2"),  # pragma: allowlist secret (commit SHA)
+    "727029175736210ff1876279b21da879da114eb5": ("Catalog V3 phase 3: tests (lifecycle, four-eyes, slice, security, V2/V3 equivalence)", "Catalog V3 phase 3"),  # pragma: allowlist secret (commit SHA)
+    "03310cce637579a17aa118015ddefda0b01f56ca": ("Catalog V3 phase 4: workspace catalog screen, V3 customer page, staging gate, browser journey", "Catalog V3 phase 4"),  # pragma: allowlist secret (commit SHA)
+    "79f97303a790dc59d4d4656bcaf4fd432f3dba44": ("V3 remediation A1: zero new mypy errors (typed catalog accessors, precise narrowing)", "V3 remediation A1"),  # pragma: allowlist secret (commit SHA)
+    "77bed5dbb3aad3941bcdb88f37868ff4efc1aedf": ("V3 remediation B: four-eyes over every contributor, rollback as a new release, scheduled rejection, import duties", "V3 remediation B"),  # pragma: allowlist secret (commit SHA)
+    "12ced303c46740664a71671c3cc45eb0e1b0b904": ("V3 remediation C/D: visibility, strict rule paths, package pricing, allowlisted configuration, retention", "V3 remediation C/D"),  # pragma: allowlist secret (commit SHA)
+    "1b68b14103e6f53c6c073c64d92d575537f3417f": ("V3 remediation E: promise governance, slice against Essential 1.1, result disclosures", "V3 remediation E"),  # pragma: allowlist secret (commit SHA)
+    "63960cd0f6caa3792218a01057ec9b5de7a25fd0": ("V3 remediation F/G: image pixel limit, scan states, sanitised GLB only, media withdrawal and retention, flags", "V3 remediation F/G"),  # pragma: allowlist secret (commit SHA)
+    "80d7d33f89c3631454300f2a85a818344b9502c6": ("V3 remediation H/A11y: corrected browser journey, accessibility and performance checks, admin safeguards", "V3 remediation accessibility"),  # pragma: allowlist secret (commit SHA)
+    "5e95cf0cf06608c58ac6a9e64adc12f16d6dafe6": ("V3 remediation A3/H3: isolation tests and real-card equivalence (local only)", "V3 remediation A3/H3"),  # pragma: allowlist secret (commit SHA)
+    "5eeb149966f487debdfe563c408a647d5faac484": ("Catalog V3 phase 5: independent-review package, OpenAPI contract, public-route pin", "Catalog V3 phase 5"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

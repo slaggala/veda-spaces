@@ -52,6 +52,14 @@ REVISIONS: dict[str, list[str]] = {
         "estimate_event",
     ],
     "0102_estimator_spec": ["estimator_customer_spec", "estimator_customer_spec_item", "estimator_spec_event"],
+    "0103_catalog": [
+        "catalog_record",
+        "catalog_release",
+        "catalog_event",
+        "catalog_media_object",
+        "catalog_configuration",
+        "catalog_analytics_daily",
+    ],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

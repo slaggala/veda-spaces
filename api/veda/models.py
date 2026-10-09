@@ -5,6 +5,14 @@ imports ``veda.models``.
 """
 
 from veda.kernel.base import Base, finalize_metadata
+from veda.modules.catalog.models import (
+    CatalogAnalyticsDaily,
+    CatalogConfiguration,
+    CatalogEvent,
+    CatalogMediaObject,
+    CatalogRecord,
+    CatalogRelease,
+)
 from veda.modules.crm.leads.models import Lead, LeadActivity, LeadNote
 from veda.modules.estimator.models import (
     BudgetEstimate,
@@ -45,6 +53,12 @@ __all__ = [
     "BudgetEstimateLeadLink",
     "BudgetEstimateLine",
     "BudgetEstimateProjectItem",
+    "CatalogAnalyticsDaily",
+    "CatalogConfiguration",
+    "CatalogEvent",
+    "CatalogMediaObject",
+    "CatalogRecord",
+    "CatalogRelease",
     "EstimateEvent",
     "EstimatorCustomerSpec",
     "EstimatorCustomerSpecItem",

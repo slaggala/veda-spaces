@@ -78,8 +78,20 @@ export function checkV2Approval(copyFile, approvalFile = APPROVAL) {
   if (problems.length) throw new Error(`STAGING_ESTIMATOR_UX=v2 is refused: ${problems.join('; ')}`);
 }
 
+/** The catalog-driven estimator V3 (ADR-013) needs its own approved activation record for staging; none exists yet. */
+export const V3_APPROVAL = fileURLToPath(new URL('../../api/veda/modules/catalog/approved/v3-staging-approval.json', import.meta.url));
+export function checkV3Approval(approvalFile = V3_APPROVAL) {
+  let approval;
+  try { approval = JSON.parse(readFileSync(approvalFile, 'utf8')); } catch { approval = null; }
+  const scope = approval?.scope || {};
+  const ok = approval && approval.status === 'APPROVED' && approval.owner && approval.approved_on && approval.release
+    && (scope.environments || []).includes('staging') && scope.version === 'v3' && scope.public_intake === false;
+  if (!ok) throw new Error('STAGING_ESTIMATOR_VERSION=v3 is refused: no approved V3 staging activation record');
+}
+
 export function buildSite(src, out, key, estimator = estimatorFlags(process.env)) {
   if (estimator.enabled && estimator.ux === 'v2') checkV2Approval(join(src, 'assets/estimate-v2-copy.js'), estimator.approvalFile);
+  if (estimator.version === 'v3') checkV3Approval(estimator.v3ApprovalFile);
   siteKey(key);
   rmSync(out, { recursive: true, force: true });
   cpSync(src, out, { recursive: true });
@@ -102,6 +114,14 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
     if (estimator.ux === 'v2') est = setMeta(est, 'veda-estimator-ux', 'v2'); // UX V2; V1 stays the default
   }
   writeFileSync(join(out, 'estimate.html'), est);
+  // V3 ships only with its approval (checked above); otherwise its page and assets are not in the build at all.
+  if (estimator.version === 'v3' && estimator.enabled) {
+    let v3 = readFileSync(join(out, 'estimate-v3.html'), 'utf8');
+    for (const [name, value] of [['veda-api-base', STAGING_API], ['veda-turnstile-sitekey', key], ['veda-api-credentials', 'include'], ['veda-estimator-version', 'v3']]) v3 = setMeta(v3, name, value);
+    writeFileSync(join(out, 'estimate-v3.html'), v3);
+  } else {
+    for (const f of ['estimate-v3.html', 'assets/estimate-v3.js', 'assets/estimate-v3.css']) rmSync(join(out, f), { force: true });
+  }
   writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
   writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
   rmSync(join(out, 'sitemap.xml'), { force: true });
@@ -130,7 +150,10 @@ export function estimatorFlags(env) {
   }
   const ux = env.STAGING_ESTIMATOR_UX || 'v1';
   if (!['v1', 'v2'].includes(ux)) throw new Error(`STAGING_ESTIMATOR_UX must be v1 or v2 (got ${ux})`);
-  return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes, ux };
+  // STAGING_ESTIMATOR_VERSION: v1/v2 follow STAGING_ESTIMATOR_UX; v3 is the catalog-driven estimator (ADR-013).
+  const version = env.STAGING_ESTIMATOR_VERSION || 'v2';
+  if (!['v1', 'v2', 'v3'].includes(version)) throw new Error(`STAGING_ESTIMATOR_VERSION must be v1, v2 or v3 (got ${version})`);
+  return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes, ux, version };
 }
 
 export function buildApp(key) {

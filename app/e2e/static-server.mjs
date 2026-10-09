@@ -49,7 +49,18 @@ http.createServer((req, res) => {
   if (!apiOrigin && res.getHeader('Content-Security-Policy')) {
     res.setHeader('Content-Security-Policy', String(res.getHeader('Content-Security-Policy')).replace(' upgrade-insecure-requests', ''));
   }
+  // V3 (ADR-013) shows catalog images served by the API. Only locally may its page load them: staging and production
+  // keep the site-wide policy until the media host is decided.
+  if (apiOrigin && file.endsWith('estimate-v3.html') && res.getHeader('Content-Security-Policy')) {
+    res.setHeader('Content-Security-Policy', String(res.getHeader('Content-Security-Policy')).replace("img-src 'self' data:", `img-src 'self' data: ${apiOrigin}`));
+  }
   let body = fs.readFileSync(file);
+  if (apiOrigin && file.endsWith('estimate-v3.html')) {
+    body = Buffer.from(body.toString()
+      .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)
+      .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
+      .replace('<meta name="veda-estimator-version" content="">', '<meta name="veda-estimator-version" content="v3">'));
+  }
   if (apiOrigin && (file.endsWith('index.html') || file.endsWith('estimate.html'))) {
     body = Buffer.from(body.toString()
       .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)

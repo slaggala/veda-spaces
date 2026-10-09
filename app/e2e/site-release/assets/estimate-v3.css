@@ -1,0 +1,47 @@
+/* Budgetary Estimate V3 (catalog-driven, ADR-013). Builds on estimate.css. */
+.v3-screen { margin-top: 1.5rem; }
+.v3-screen h2:focus { outline: none; }
+.v3-sub, .v3-note { color: #5b4b40; font-size: 0.92rem; }
+.v3-summary { border: 2px solid #9b2c1f; border-radius: 8px; padding: 0.75rem 1rem; margin: 1rem 0; background: #fff6f4; }
+.v3-group { border: 0; padding: 0; margin: 1rem 0; }
+.v3-group legend { font-weight: 600; margin-bottom: 0.5rem; }
+.v3-choices { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.v3-choice, .v3-check { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.6rem 0.8rem; border: 1px solid #d9cfc4;
+  border-radius: 8px; background: #fff; cursor: pointer; }
+.v3-choice span { display: grid; }
+.v3-choice small { color: #5b4b40; }
+.v3-choice:focus-within, .v3-check:focus-within { outline: 3px solid #281a13; outline-offset: 2px; }
+.v3-off { opacity: 0.55; cursor: not-allowed; }
+.v3-rooms { display: grid; gap: 1rem; }
+.v3-room { border: 1px solid #d9cfc4; border-radius: 12px; padding: 1rem; background: #fffdfa; }
+.v3-room-off > :not(.v3-room-title):not(.v3-figure) { display: none; }
+.v3-room-title { border: 0; padding: 0; background: none; }
+.v3-room-title h3 { margin: 0; }
+.v3-product, .v3-extra { border-top: 1px solid #ece4da; padding-top: 0.75rem; margin-top: 0.75rem; }
+.v3-figure { margin: 0.5rem 0; }
+.v3-img { width: 100%; max-width: 40rem; height: auto; border-radius: 8px; display: block; }
+.v3-thumb { max-width: 12rem; }
+.v3-img-missing { display: block; padding: 1rem; background: #f3eee8; border-radius: 8px; color: #5b4b40; }
+.v3-badge { display: inline-block; font-size: 0.75rem; letter-spacing: 0.02em; padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: #281a13; color: #fff; }
+.v3-what summary, .v3-more summary { cursor: pointer; font-weight: 600; }
+.v3-actions { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.v3-primary, .v3-ghost { min-height: 44px; padding: 0.6rem 1.1rem; border-radius: 8px; font: inherit; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; }
+.v3-primary { background: #281a13; color: #fff; border: 0; }
+.v3-ghost { background: transparent; color: #281a13; border: 1px solid #281a13; }
+.v3-primary:focus-visible, .v3-ghost:focus-visible { outline: 3px solid #b5651d; outline-offset: 2px; }
+.v3-range { font-size: 1.6rem; margin: 0.5rem 0; }
+.v3-rooms-total { list-style: none; padding: 0; }
+.v3-rooms-total li { display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid #ece4da; }
+.v3-field { display: grid; gap: 0.25rem; margin: 0.75rem 0; }
+.v3-field input { min-height: 44px; max-width: 12rem; }
+.v3-3d { margin-top: 0.5rem; }
+.v3-3d model-viewer { width: 100%; height: 22rem; }
+.v3-dialog { max-width: 48rem; width: calc(100% - 2rem); border: 0; border-radius: 12px; padding: 1rem; }
+.v3-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.v3-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.v3-block { border-top: 1px solid #ece4da; margin-top: 1rem; padding-top: 0.5rem; }
+.v3-block h3 { font-size: 1.05rem; margin: 0.25rem 0; }
+.v3-consult { display: inline-block; margin-top: 0.25rem; color: #281a13; }

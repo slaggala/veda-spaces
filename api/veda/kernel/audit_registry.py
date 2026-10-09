@@ -139,6 +139,13 @@ register(AuditPolicy("estimate_event", FULL))
 register(AuditPolicy("estimator_customer_spec", FULL, excluded=frozenset({"document"})))
 register(AuditPolicy("estimator_customer_spec_item", FULL, parent=("estimator_customer_spec", "customer_spec_id")))
 register(AuditPolicy("estimator_spec_event", FULL))
+# ADR-013: catalog documents may hold private rates (pricing records); the audit trail keeps their digests only.
+register(AuditPolicy("catalog_record", FULL, excluded=frozenset({"document"})))
+register(AuditPolicy("catalog_release", FULL, excluded=frozenset({"compiled", "validation"})))
+register(AuditPolicy("catalog_event", FULL))
+register(AuditPolicy("catalog_media_object", FULL))
+register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
+register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))
 register(AuditPolicy("refresh_token", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-007", "EXC-009")))

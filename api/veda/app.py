@@ -23,6 +23,8 @@ log = logging.getLogger("veda.app")
 
 
 def _register_modules(app: Flask) -> None:
+    from veda.modules.catalog.routes import api as catalog_api
+    from veda.modules.catalog.routes import public_api as catalog_public_api
     from veda.modules.crm.leads import events as _lead_events  # noqa: F401  (registers handlers/resolvers)
     from veda.modules.crm.leads.routes import api as leads_api
     from veda.modules.estimator import events as _estimate_events  # noqa: F401  (registers resolvers)
@@ -48,6 +50,8 @@ def _register_modules(app: Flask) -> None:
         leads_api,
         estimator_public_api,
         estimator_api,
+        catalog_public_api,
+        catalog_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -87,6 +91,15 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
     "RBX-005": frozenset({("POST", "/api/v1/public/leads")}),
     # ADR-011/012: the only anonymous estimator endpoints (default deny, exact paths, feature-flagged off).
     "RBX-007": frozenset({("POST", "/api/v1/public/estimates"), ("POST", "/api/v1/public/enquiries")}),
+    # ADR-013: the catalog-driven estimator (V3); flagged off by default and refused in production.
+    "RBX-008": frozenset(
+        {
+            ("GET", "/api/v1/public/catalog"),
+            ("POST", "/api/v1/public/catalog/estimates"),
+            ("GET", "/api/v1/public/catalog/media/<sha>"),
+            ("POST", "/api/v1/public/catalog/events"),
+        }
+    ),
     "RBX-006": frozenset(
         {("GET", "/health/live"), ("GET", "/health/ready"), ("GET", "/api/v1/auth/.well-known/jwks.json")}
     ),
