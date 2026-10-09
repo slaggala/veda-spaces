@@ -34,8 +34,12 @@ export class VsCatalogPage extends SessionElement {
   static override properties = {
     tab: { state: true }, problem: { state: true }, dashboard: { state: true }, records: { state: true }, releases: { state: true },
     media: { state: true }, record: { state: true }, release: { state: true }, draft: { state: true }, kind: { state: true },
-    preview: { state: true }, transfer: { state: true }, busy: { state: true },
+    preview: { state: true }, transfer: { state: true }, busy: { state: true }, dirty: { state: true }, disabled: { state: true },
   };
+  /** The draft editor has changes that are not saved yet (warned before they are lost). */
+  declare dirty: boolean;
+  /** The staff catalog API answered 404: the workspace is not enabled in this environment. */
+  declare disabled: boolean;
   declare tab: Tab;
   declare problem: ApiProblem | null;
   declare dashboard: Record<string, unknown> | null;
@@ -73,17 +77,39 @@ export class VsCatalogPage extends SessionElement {
     this.preview = null;
     this.transfer = null;
     this.busy = false;
+    this.dirty = false;
+    this.disabled = false;
+  }
+
+  private readonly beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty) e.preventDefault(); };
+
+  override disconnectedCallback() {
+    window.removeEventListener('beforeunload', this.beforeUnload);
+    super.disconnectedCallback();
+  }
+
+  /** Close the record drawer, warning first when the draft has unsaved changes. */
+  private closeRecord() {
+    if (this.dirty && !confirm('Discard the unsaved changes to this draft?')) return;
+    this.dirty = false;
+    this.record = null;
   }
 
   override connectedCallback() {
     super.connectedCallback();
+    window.addEventListener('beforeunload', this.beforeUnload);
     void this.load();
   }
 
   private async run<T>(fn: () => Promise<T>): Promise<T | undefined> {
     this.problem = null;
     this.busy = true;
-    try { return await fn(); } catch (e) { this.problem = e as ApiProblem; return undefined; } finally { this.busy = false; }
+    try { return await fn(); } catch (e) {
+      const problem = e as ApiProblem;
+      if (problem.status === 404 && problem.code === 'NOT_FOUND' && this.tab === 'dashboard' && !this.dashboard) this.disabled = true;
+      else this.problem = problem;
+      return undefined;
+    } finally { this.busy = false; }
   }
 
   private async load() {
@@ -103,7 +129,7 @@ export class VsCatalogPage extends SessionElement {
   private async recordAction(path: string, body?: unknown, method: 'post' | 'put' = 'post') {
     if (!this.record) return;
     const r = await this.run(() => (method === 'put' ? api.put<CatalogRecord>(path, body) : api.post<CatalogRecord>(path, body)));
-    if (r) { this.record = r.data; this.draft = JSON.stringify(r.data.document ?? {}, null, 2); void this.load(); }
+    if (r) { this.record = r.data; this.draft = JSON.stringify(r.data.document ?? {}, null, 2); this.dirty = false; void this.load(); }
   }
 
   private parsedDraft(): Record<string, unknown> | null {
@@ -176,11 +202,11 @@ export class VsCatalogPage extends SessionElement {
           <label class="field"><span class="label">Key</span><input .value=${r.key} @input=${(e: Event) => (this.record = { ...r, key: (e.target as HTMLInputElement).value.trim() })} /></label></div>`
         : html`<p class="small muted">${humanize(r.kind)} · <span class="mono">${r.key}</span> · version ${r.version} · ${humanize(r.status)}${r.review_note ? ` · note: ${r.review_note}` : ''}</p>`}
       ${r.document === undefined && !isNew ? html`<p>Pricing details need catalog pricing access.</p>`
-        : html`<label class="field"><span class="label">Document (validated by the server)</span><textarea ?readonly=${!editable} .value=${this.draft} @input=${(e: Event) => (this.draft = (e.target as HTMLTextAreaElement).value)}></textarea></label>`}
+        : html`<label class="field"><span class="label">Document (validated by the server)</span><textarea ?readonly=${!editable} .value=${this.draft} @input=${(e: Event) => { this.draft = (e.target as HTMLTextAreaElement).value; this.dirty = true; }}></textarea></label>`}
       <div class="row">
         ${isNew ? html`<button class="btn primary" ?disabled=${this.busy} @click=${async () => { const doc = this.parsedDraft(); if (!doc) return;
           const created = await this.run(() => api.post<CatalogRecord>('/api/v1/catalog/records', { kind: r.kind, key: r.key, document: doc }));
-          if (created) { this.record = created.data; void this.load(); } }}>Create draft</button>` : nothing}
+          if (created) { this.record = created.data; this.dirty = false; void this.load(); } }}>Create draft</button>` : nothing}
         ${!isNew && editable && r.status === 'DRAFT' ? html`<button class="btn" @click=${() => { const doc = this.parsedDraft(); if (doc) void this.recordAction(`/api/v1/catalog/records/${r.id}`, { document: doc }, 'put'); }}>Save draft</button>
           <button class="btn primary" @click=${() => this.recordAction(`/api/v1/catalog/records/${r.id}/submit`)}>Submit for review</button>` : nothing}
         ${!isNew && r.status === 'IN_REVIEW' && this.can('catalog.review') ? html`<button class="btn primary" @click=${() => this.recordAction(`/api/v1/catalog/records/${r.id}/approve`, {})}>Approve</button>
@@ -266,13 +292,18 @@ export class VsCatalogPage extends SessionElement {
       { id: 'dashboard', label: 'Dashboard' }, { id: 'records', label: 'Records' }, { id: 'releases', label: 'Releases' },
       { id: 'media', label: 'Media' }, { id: 'transfer', label: 'Import and export', hidden: !this.can('catalog.admin') },
     ];
+    if (this.disabled) {
+      return html`<div class="page"><div class="page-head"><div><p class="eyebrow">Estimator</p><h1 class="display">Catalog</h1></div></div>
+        <div class="card"><vs-empty-state heading="The estimator catalog is not enabled in this environment."></vs-empty-state></div></div>`;
+    }
     return html`<div class="page">
       <div class="page-head"><div><p class="eyebrow">Estimator</p><h1 class="display">Catalog</h1></div></div>
+      ${this.dirty ? html`<p class="small muted" role="status">Unsaved changes in the open draft.</p>` : nothing}
       <vs-problem-banner .problem=${this.problem}></vs-problem-banner>
       <vs-tabs label="Catalog" .tabs=${tabs} .selected=${this.tab} @tab-change=${(e: CustomEvent<Tab>) => { this.tab = e.detail; this.transfer = null; void this.load(); }}>
         ${{ dashboard: () => this.renderDashboard(), records: () => this.renderRecords(), releases: () => this.renderReleases(), media: () => this.renderMedia(), transfer: () => this.renderTransfer() }[this.tab]()}
       </vs-tabs>
-      <vs-drawer wide .open=${Boolean(this.record)} heading=${this.record ? (this.record.status === 'NEW' ? 'New catalog record' : this.record.title) : ''} @close=${() => (this.record = null)}>${this.renderRecordDrawer()}</vs-drawer>
+      <vs-drawer wide .open=${Boolean(this.record)} heading=${this.record ? (this.record.status === 'NEW' ? 'New catalog record' : this.record.title) : ''} @close=${() => this.closeRecord()}>${this.renderRecordDrawer()}</vs-drawer>
       <vs-drawer wide .open=${Boolean(this.release)} heading=${this.release ? `Release ${this.release.code}` : ''} @close=${() => (this.release = null)}>${this.renderReleaseDrawer()}</vs-drawer>
     </div>`;
   }

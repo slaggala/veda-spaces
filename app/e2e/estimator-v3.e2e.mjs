@@ -66,10 +66,8 @@ try {
   await page.click('text=See examples');
   check('the gallery opens as a dialog', await page.locator('#v3-gallery[open] img').count() >= 2);
   await page.click('#v3-gallery-close');
-  await page.click('text=View in 3D');
-  check('3D falls back to the gallery without a renderer', await page.locator('#v3-gallery[open]').count() === 1
-    && await page.locator('.v3-3d', { hasText: 'not available on this device' }).count() === 1);
-  await page.click('#v3-gallery-close');
+  check('3D is unavailable by default: no 3D control, the gallery remains', await page.locator('text=View in 3D').count() === 0
+    && await page.locator('text=See examples').count() >= 1);
   await axe('rooms');
   await shot('rooms');
 
@@ -107,6 +105,84 @@ try {
   const csp = await page.evaluate(() => window.__csp || []);
   check('no Content-Security-Policy violation', csp.length === 0, csp.join('; '));
   check('no page error', errors.length === 0, errors.join('; '));
+
+  // --- accessibility and performance (remediation: 360 px, keyboard, focus, overflow, slow network, media failure) ---
+  const fresh = async (opts = {}) => {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, ...opts });
+    await ctx.route('https://challenges.cloudflare.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: TURNSTILE_STUB }));
+    const pg = await ctx.newPage();
+    const errs = [];
+    pg.on('pageerror', (e) => errs.push(String(e)));
+    return { ctx, pg, errs };
+  };
+  const overflow = (pg) => pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+
+  { // 360 px, keyboard only, focus order, no horizontal overflow, reduced motion
+    const { ctx, pg, errs } = await fresh({ reducedMotion: 'reduce' });
+    await pg.goto(`${ON}/estimate-v3`);
+    await pg.waitForSelector('#v3:not([hidden])');
+    let overflowed = await overflow(pg);
+    const order = [];
+    for (let i = 0; i < 40; i += 1) {
+      await pg.keyboard.press('Tab');
+      const id = await pg.evaluate(() => document.activeElement?.id || document.activeElement?.textContent?.trim().slice(0, 30) || '');
+      order.push(id);
+      if (id === 'v3-to-rooms') break;
+    }
+    const positive = await pg.evaluate(() => [...document.querySelectorAll('[tabindex]')].filter((n) => Number(n.getAttribute('tabindex')) > 0).length);
+    check('keyboard: Tab reaches "Choose rooms" in document order (no positive tabindex)', order.at(-1) === 'v3-to-rooms' && positive === 0, order.join(' > '));
+    await pg.keyboard.press('Enter');
+    await pg.waitForSelector('[data-v3="2"]:not([hidden])');
+    check('focus moves to the new screen heading', await pg.evaluate(() => document.activeElement?.id) === 'v3-h2');
+    overflowed ||= await overflow(pg);
+    let reached = false;
+    for (let i = 0; i < 80 && !reached; i += 1) {
+      await pg.keyboard.press('Tab');
+      reached = await pg.evaluate(() => document.activeElement?.id === 'v3-estimate');
+    }
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.keyboard.press('Enter');
+    check('keyboard only: the estimate is reached', reached && (await res).status() === 201);
+    await pg.waitForSelector('[data-v3="3"]:not([hidden])');
+    overflowed ||= await overflow(pg);
+    check('360 px: no horizontal overflow on any screen', !overflowed);
+    check('reduced motion is respected', await pg.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior !== 'smooth'));
+    check('no page error (keyboard run)', errs.length === 0, errs.join('; '));
+    await ctx.close();
+  }
+
+  { // slow network: every API call delayed, images slower still; the page stays usable
+    const { ctx, pg, errs } = await fresh();
+    await ctx.route('**/api/v1/public/catalog/media/**', async (route) => { await new Promise((r) => setTimeout(r, 3000)); await route.continue(); });
+    await ctx.route('**/api/v1/public/catalog', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+    await ctx.route('**/api/v1/public/catalog/estimates', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+    await pg.goto(`${ON}/estimate-v3`);
+    await pg.waitForSelector('#v3:not([hidden])', { timeout: 15000 });
+    await pg.click('#v3-to-rooms');
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'), { timeout: 15000 });
+    await pg.click('#v3-estimate');
+    check('slow network: the estimate still completes', (await res).status() === 201);
+    check('no page error (slow network)', errs.length === 0, errs.join('; '));
+    await ctx.close();
+  }
+
+  { // media fails to load: text fallbacks, no critical content only in media, the estimate still works
+    const { ctx, pg, errs } = await fresh();
+    await ctx.route('**/api/v1/public/catalog/media/**', (route) => route.abort());
+    await pg.goto(`${ON}/estimate-v3`);
+    await pg.waitForSelector('#v3:not([hidden])');
+    await pg.click('#v3-to-rooms');
+    await pg.waitForSelector('.v3-img-missing');
+    const textOnly = await pg.locator('#v3-rooms').innerText();
+    check('image failure: accessible text replaces each image', await pg.locator('.v3-img-missing').count() >= 2);
+    check('no critical content only in media: rooms, items and finishes are text',
+      ['Living room', 'TV unit', 'Laminate', 'Feature wall'].every((x) => textOnly.includes(x)));
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('estimate generation without media', (await res).status() === 201);
+    check('no page error (no media)', errs.length === 0, errs.join('; '));
+    await ctx.close();
+  }
 } catch (err) {
   check('journey completed', false, String(err));
   await shot('failure');
