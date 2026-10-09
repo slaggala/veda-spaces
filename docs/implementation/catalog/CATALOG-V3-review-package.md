@@ -10,12 +10,38 @@
 
 Nothing here activates V3, changes V1 or V2, enables public intake, or changes production behaviour.
 
+## Post-merge status and corrections (pre-activation closure)
+
+PR #66 was re-certified **for merge with pre-activation conditions** and merged. Four claims in this package were
+inaccurate when it was written and are corrected here:
+
+1. **"Every customer-visible string is promise checked" is withdrawn.**
+   - `Package.badge` was free-form text that did not pass the promise-governance controls.
+   - Other short-text fields are inventoried in the pre-activation closure.
+   - R2/R3 stay open until every customer-visible text path is governed.
+2. **"R9 is fully resolved" is withdrawn.**
+   - Rollback restores a manifest as a new release, but its target came from `previous_release_id`, which is fixed
+     when the release is drafted and can be stale.
+   - Rollback-target selection is subject to remediation.
+3. **R12 is open** until GLB upload and delivery are safely disabled or fully sanitised.
+4. **Soft-close storage is blocked by release-gate validation and the promise-matrix status.**
+   - Its matrix row `spec.soft_close` is BLOCKED, so promise validation fails.
+   - Its option group is absent from the TV unit, so reference validation fails.
+   - `BLOCKED_FROM_RELEASE` in `seed.py` is a test and local-tool helper that keeps those records out of test
+     releases. It is **not** the production enforcement mechanism.
+
+Also stated plainly:
+- Protected staging is **not certified**.
+- Media infrastructure (bucket, scanner, media host) **remains unavailable**.
+- Full-catalog expansion is **not approved**.
+- Production V3 **remains prohibited**.
+
 ## Merge versus activation boundaries
 
 | Boundary | What it allows | Status |
 |---|---|---|
-| **Merge** | The code on `main` with every switch off: public V3 routes return 404, the staff catalog API returns 404, no media is served, and the V3 page is not in staging builds | Eligible once CI is green and the reviewer re-certifies |
-| **Protected-staging review** | V3 on staging behind Cloudflare Access with `VEDA_CATALOG_ADMIN_ENABLED`, then `VEDA_CATALOG_ESTIMATOR_ENABLED` | Blocked: §25 |
+| **Merge** | The code on `main` with every switch off: public V3 routes return 404, the staff catalog API returns 404, no media is served, and the V3 page is not in staging builds | Merged after re-certification with pre-activation conditions |
+| **Protected-staging review** | V3 on staging behind Cloudflare Access with `VEDA_CATALOG_ADMIN_ENABLED`, then `VEDA_CATALOG_ESTIMATOR_ENABLED` | **Not certified.** Blocked: §25 and the pre-activation conditions |
 | **Public intake** | Customers using V3 | Blocked: §26 |
 | **Production** | Any V3 switch in production | Refused by configuration validation: §27 |
 
@@ -30,16 +56,17 @@ there is no suppression or broad `Any`. Typing also exposed real defects, each n
 | Finding | Resolution | Evidence |
 |---|---|---|
 | R1 four-eyes | Each record version keeps an append-only contributor set: creator, every editor and the submitter. Approval reads that set together with the creator and submitter fields and the create/edit/submit events, so clearing one source never opens approval. Release approval is refused to anyone who contributed to a record the release adds or changes (pricing, copy, rules, media mappings). An edit clears an earlier review | `test_catalog_lifecycle.py`: self-approval; editor cannot approve; uninvolved approves; contributor removal; stale review; release approver |
-| R2, R3 promise wording | Promise-like wording is refused in every customer-visible descriptive string and in non-promise copy, with no exemptions: warranty, guarantee, certification, free, included, excluded, installation, delivery, timelines, grades, brands, service, soft-close. A promise is a copy record that names its matrix row and the products, rooms or packages it applies to. It must be registered text of a confirmed ESSENTIAL-1.1 row with named owners | `test_catalog_promises.py`: 18 phrases × 4 places; matrix linkage cases |
+| R2, R3 promise wording (**open**: `Package.badge` and the short-text inventory) | Promise-like wording is refused in descriptive strings (names, descriptions, explanations, option and measurement labels, media text) and in non-promise copy, with no exemptions: warranty, guarantee, certification, free, included, excluded, installation, delivery, timelines, grades, brands, service, soft-close. A promise is a copy record that names its matrix row and the products, rooms or packages it applies to. It must be registered text of a confirmed ESSENTIAL-1.1 row with named owners | `test_catalog_promises.py`: 18 phrases × 4 places; matrix linkage cases |
 | R4 staff-only visibility | Staff-only products, variants, choices, extras, rooms, packages, homes and staff_only rule subjects are removed before serialisation, references included, and refused in public configurations | `test_staff_only_items_are_neither_shown_nor_selectable` |
 | R5 rule paths | Every rule path must name a real product, variant, group, choice, extra or room. `#boxx` fails validation | 6 misspellings refused; valid paths pass |
 | R6 package and extra pricing | Phased resolution: engine selections are built only after schema, visibility, package filtering, applicability and rules all pass. Excluded items are refused, never priced. Selected = resolved normal form = priced request = stored snapshot | `test_selected_resolved_priced_and_stored_configurations_reconcile` |
 | R7 raw customer JSON | A strict allowlisted schema: catalog keys, closed literals, bounded numbers, no free text, no city. The snapshot stores only the normal form. Snapshots follow estimate retention (audited soft delete plus event), and staff can action deletion requests | 6 free-text and unknown-field cases; retention; deletion |
 | R8 public errors | Malformed payloads get 4xx with fixed messages. Path segments that are not keys or indexes are masked. No value, schema detail, identifier or stack trace is returned | 24 malformed payloads, non-JSON, wrong types |
-| R9 rollback | Rollback creates a new release with the previous manifest's exact entries (`rollback_of_id`), re-validated and activated. No release row is reset | Exact versions, rules, pricing, copy and media restored; card identical; estimates untouched |
+| R9 rollback (**open**: target selection) | Rollback creates a new release with a previous manifest's exact entries (`rollback_of_id`), re-validated and activated. No release row is reset. The target is `previous_release_id`, fixed at draft time, so it can be stale | Exact versions, rules, pricing, copy and media restored; card identical; estimates untouched |
 | R10 scheduled rejection | One step clears the schedule and every approval and returns SCHEDULED records to APPROVED. The event records what was cleared | `test_rejecting_a_scheduled_release_clears_everything_and_keeps_history` |
 | R11 image limit | 24,000,000 pixels and 8,000 per side, checked from the header before decoding | Boundary at, below and above; forged bomb headers |
-| R12, R13 | **Not supplied in the remediation instruction.** No finding text was provided for these, so nothing is claimed resolved under these numbers. Layers F (media infrastructure) and G (3D safety) were implemented as written | The reviewer is asked to confirm what R12 and R13 refer to |
+| R12 (**open**) | GLB upload and delivery: open until they are safely disabled or fully sanitised (pre-activation closure) | — |
+| R13 | No finding text was supplied, so nothing is claimed under this number | — |
 | R14 matrix conflicts | Veneer is consultation-only. Choices priced alike fail validation unless declared price-neutral or consultation-only. Panelling maps to Essential `surface` and the feature wall to `decorative`. Soft-close is blocked | `test_the_slice_follows_essential_1_1`, `test_choices_priced_alike_need_a_decision` |
 | R15 import | Each row needs the edit permission of its kind (`catalog.admin` alone is not enough). Repeated imports are a deterministic `NO_CHANGE`. Rows are DRAFT only | Duty per kind; three applies; route all-or-nothing |
 
@@ -206,7 +233,8 @@ Living Room → TV Unit:
 - **Veneer:** consultation-only (R14, H1).
 - **Feature wall:** priced and measured. Essential `decorative`; no material is promised.
 - **Gallery:** shown. 3D is off.
-- **Soft-close storage:** **blocked from every release (H2).** Its matrix row `spec.soft_close` is BLOCKED and its owner
+- **Soft-close storage:** **blocked by release-gate validation and promise-matrix status (H2)**, not by the test helper
+  `BLOCKED_FROM_RELEASE`. Its matrix row `spec.soft_close` is BLOCKED and its owner
   UNASSIGNED; there is no explicit price rule and no confirmed applicability.
 - **Snapshot:** the normal form re-resolves to the identical request.
 
