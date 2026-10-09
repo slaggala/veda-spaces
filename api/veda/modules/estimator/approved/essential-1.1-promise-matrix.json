@@ -1,7 +1,7 @@
 {
- "schema": "veda.estimator.promise-matrix/2",
+ "schema": "veda.estimator.promise-matrix/3",
  "spec_code": "ESSENTIAL-1.1",
- "statuses": "OPERATIONALLY_CONFIRMED | SALES_CONFIRMED | OWNER_CONFIRMED | BLOCKED | REMOVED; activation needs every row confirmed (or REMOVED) with a named accountable owner",
+ "statuses": "Activation requires every visible promise to be OPERATIONALLY_CONFIRMED (or REMOVED, and then not shown) with a named accountable owner, a named backup and a confirmation date. Anything else is BLOCKED. SALES_CONFIRMED and OWNER_CONFIRMED record wording decisions only and do not satisfy activation.",
  "rows": [
   {
    "id": "spec.structure",
@@ -43,7 +43,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.board",
@@ -74,7 +77,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.doors",
@@ -107,7 +113,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.surface",
@@ -148,7 +157,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.edges",
@@ -184,7 +196,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.soft_close",
@@ -220,7 +235,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.hardware",
@@ -261,7 +279,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.handles",
@@ -292,7 +313,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.accessories",
@@ -326,7 +350,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.decorative",
@@ -356,7 +383,10 @@
    "equivalent_rule": "Each item is specified by material and finish in your detailed quotation.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.ceiling",
@@ -390,7 +420,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.lighting",
@@ -427,7 +460,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.painting",
@@ -462,7 +498,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.electrical",
@@ -495,7 +534,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner"
+   "blocked_on": "sales confirmation of the wording and material; operations confirmation of each check and a named owner",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "spec.package",
@@ -522,7 +564,10 @@
    "equivalent_rule": "Approved brands such as the named examples, or an approved equivalent of the same grade and specification.",
    "exception_process": "Any substitution or deviation is recorded as a quotation revision approved by the designer and accepted by the customer before procurement",
    "status": "BLOCKED",
-   "blocked_on": "sales confirmation"
+   "blocked_on": "sales confirmation",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "lead",
@@ -545,7 +590,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "availability",
@@ -570,7 +618,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the 'coming soon' wording"
+   "blocked_on": "owner approval of the 'coming soon' wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "luxury",
@@ -592,7 +643,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Owner decision (ADR-012 decision log 20): Luxury only as 'Priced after a design consultation')",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "rooms_sub",
@@ -615,7 +670,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "package_subtitle",
@@ -638,7 +696,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "sales decision (checklist item 9)"
+   "blocked_on": "sales decision (checklist item 9)",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "includes",
@@ -662,7 +723,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Trust finalisation Phase 1 (owner wording))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "gst",
@@ -685,7 +750,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "markers",
@@ -711,7 +779,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Trust finalisation Phase 9 (owner wording); each backed by e2e-tested behaviour)",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "why_range",
@@ -738,7 +810,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "build_note",
@@ -761,7 +836,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "rooms_note",
@@ -784,7 +862,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "sales and owner confirmation that every room amount includes installation"
+   "blocked_on": "sales and owner confirmation that every room amount includes installation",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "materials_fallback",
@@ -809,7 +890,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "included_badge",
@@ -831,7 +915,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Owner decisions T5 and T6; engine (package and allowance inside the range))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "package_text",
@@ -853,7 +941,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Owner decision T5 / Phase 6 (owner wording))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "package_components",
@@ -881,7 +973,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "operations confirmation of how each component is carried out and checked"
+   "blocked_on": "operations confirmation of how each component is carried out and checked",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "package_other",
@@ -905,7 +1000,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "allowance_text",
@@ -927,7 +1025,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Owner decision T6 / Phase 7 (owner wording))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "allowance_notes",
@@ -952,7 +1054,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "allowance_examples",
@@ -980,7 +1085,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Phase 7 (owner list))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "manufacturer_warranty",
@@ -1003,7 +1112,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "operations: warranty documents for each product filed and handed over"
+   "blocked_on": "operations: warranty documents for each product filed and handed over",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "service_support",
@@ -1025,7 +1137,11 @@
    "warranty_source": "Veda Spaces policy",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Warranty, Service & Customer Care Policy (one year of free service from handover); Phase 5 (owner wording))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "service_note",
@@ -1048,7 +1164,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "compare",
@@ -1082,7 +1201,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "supplied",
@@ -1105,7 +1227,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "assumptions_summary",
@@ -1135,7 +1260,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "next_steps",
@@ -1163,7 +1291,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "operations confirmation of the process and owner approval of the wording"
+   "blocked_on": "operations confirmation of the process and owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "callback",
@@ -1188,7 +1319,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "sales decision (checklist item 10): the one-working-day commitment"
+   "blocked_on": "sales decision (checklist item 10): the one-working-day commitment",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "consultation",
@@ -1213,7 +1347,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "sales approval of the wording"
+   "blocked_on": "sales approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "refine_intro",
@@ -1236,7 +1373,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner approval of the wording"
+   "blocked_on": "owner approval of the wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "consent",
@@ -1259,7 +1399,10 @@
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
    "status": "BLOCKED",
-   "blocked_on": "owner confirmation of the consent wording"
+   "blocked_on": "owner confirmation of the consent wording",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Awaiting approval"
   },
   {
    "id": "engine_disclaimer",
@@ -1281,16 +1424,21 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Engine DISCLAIMER (ADR-012, owner-approved))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "engine_assumptions",
    "kind": "page",
    "where": "Estimate response (technical assumptions)",
    "statements": [
-    "{room} – {product}: {input} assumed {value} {unit} (typical for {size})."
+    "{room} – {product}: {input} assumed {value} {unit} (typical for {size}).",
+    "{room} – {product}: {input} assumed {value} (typical for {size})."
    ],
-   "source_of_truth": "Engine assumption text (ADR-012 D3 typical sizes)",
+   "source_of_truth": "Engine assumption text (ADR-012 D3 typical sizes); counts carry no unit",
    "responsible_role": "Product owner",
    "accountable_owner": "UNASSIGNED",
    "quotation_mapping": "Not applicable: wording about the estimate itself, with no material supplied",
@@ -1303,7 +1451,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Engine assumption text (ADR-012 D3 typical sizes))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "card_exclusions",
@@ -1327,7 +1479,11 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Rate card exclusions (draft 4, owner approval 2026-10-08))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
   },
   {
    "id": "card_client_scope",
@@ -1352,7 +1508,170 @@
    "warranty_source": "Not applicable",
    "equivalent_rule": "Not applicable",
    "exception_process": "Not applicable",
-   "status": "OWNER_CONFIRMED"
+   "status": "BLOCKED",
+   "backup_owner": "UNASSIGNED",
+   "confirmed_on": null,
+   "wording": "Owner-approved wording (Rate card client scope (draft 4, owner approval 2026-10-08))",
+   "blocked_on": "operations: named accountable and backup owners, verification path confirmed"
+  },
+  {
+   "id": "room_inclusions",
+   "kind": "page",
+   "where": "V2 page",
+   "statements": [
+    "Bathroom vanity",
+    "Bedside table",
+    "Ceiling asta chakra",
+    "Crockery unit",
+    "Dressing unit",
+    "Electrical work",
+    "False ceiling with lights",
+    "Feature wall",
+    "King bed with storage",
+    "Modular kitchen with wall units and loft",
+    "Painting",
+    "Partition",
+    "Pooja unit with doors",
+    "Profile lighting",
+    "Queen bed with storage",
+    "Sofa-back beading",
+    "Study desk",
+    "TV unit",
+    "TV unit with wall panelling",
+    "Tall pantry storage",
+    "Utility unit",
+    "Veneer arch",
+    "Wardrobe with loft",
+    "Wash-basin unit",
+    "Window seating"
+   ],
+   "source_of_truth": "Room bundles in estimate-v2.js mapped to card products and options (ADR-012 D3 typical scope)",
+   "responsible_role": "Designer",
+   "accountable_owner": "UNASSIGNED",
+   "backup_owner": "UNASSIGNED",
+   "quotation_mapping": "Each named item is a quotation line for that room",
+   "procurement_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "receipt_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "execution_check": "Site supervisor checks each quoted item is built",
+   "installation_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "handover_evidence": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_document_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_source": "Not applicable",
+   "equivalent_rule": "Not applicable",
+   "exception_process": "Not applicable",
+   "status": "BLOCKED",
+   "blocked_on": "sales confirmation that each named item is what the room includes; operations owner",
+   "wording": "Awaiting approval",
+   "confirmed_on": null
+  },
+  {
+   "id": "approved_examples",
+   "kind": "page",
+   "where": "V2 page",
+   "statements": [
+    "Approved examples: {brands}, or an approved equivalent"
+   ],
+   "source_of_truth": "ESSENTIAL-1.1 brand examples and equivalent rule",
+   "responsible_role": "Sales lead",
+   "accountable_owner": "UNASSIGNED",
+   "backup_owner": "UNASSIGNED",
+   "quotation_mapping": "Not applicable: wording about the estimate itself, with no material supplied",
+   "procurement_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "receipt_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "execution_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "installation_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "handover_evidence": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_document_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_source": "Not applicable",
+   "equivalent_rule": "Approved equivalent of the same grade and specification",
+   "exception_process": "Not applicable",
+   "status": "BLOCKED",
+   "blocked_on": "sales decision S8; operations owner",
+   "wording": "Awaiting approval",
+   "confirmed_on": null
+  },
+  {
+   "id": "gst_line",
+   "kind": "page",
+   "where": "V2 page",
+   "statements": [
+    "GST at {pct}% is extra: about {low} – {high}"
+   ],
+   "source_of_truth": "Engine GST computation (ADR-012)",
+   "responsible_role": "Finance",
+   "accountable_owner": "UNASSIGNED",
+   "backup_owner": "UNASSIGNED",
+   "quotation_mapping": "Quotation shows GST separately",
+   "procurement_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "receipt_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "execution_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "installation_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "handover_evidence": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_document_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_source": "Not applicable",
+   "equivalent_rule": "Not applicable",
+   "exception_process": "Not applicable",
+   "status": "BLOCKED",
+   "blocked_on": "owner approval of the wording; operations owner",
+   "wording": "Awaiting approval",
+   "confirmed_on": null
+  },
+  {
+   "id": "basis",
+   "kind": "page",
+   "where": "V2 page",
+   "statements": [
+    "Based on typical {size} sizes",
+    "Including your measurements"
+   ],
+   "source_of_truth": "Engine typical sizes and measured inputs (ADR-012 D3)",
+   "responsible_role": "Product owner",
+   "accountable_owner": "UNASSIGNED",
+   "backup_owner": "UNASSIGNED",
+   "quotation_mapping": "Not applicable: wording about the estimate itself, with no material supplied",
+   "procurement_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "receipt_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "execution_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "installation_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "handover_evidence": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_document_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_source": "Not applicable",
+   "equivalent_rule": "Not applicable",
+   "exception_process": "Not applicable",
+   "status": "BLOCKED",
+   "blocked_on": "owner approval of the wording; operations owner",
+   "wording": "Awaiting approval",
+   "confirmed_on": null
+  },
+  {
+   "id": "fallbacks",
+   "kind": "page",
+   "where": "V2 page",
+   "statements": [
+    "specification confirmed in your quotation",
+    "None added.",
+    "Your detailed quotation lists what is and is not included.",
+    "optional"
+   ],
+   "source_of_truth": "V2 behaviour when a statement is not available or not registered",
+   "responsible_role": "Product owner",
+   "accountable_owner": "UNASSIGNED",
+   "backup_owner": "UNASSIGNED",
+   "quotation_mapping": "Not applicable: wording about the estimate itself, with no material supplied",
+   "procurement_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "receipt_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "execution_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "installation_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "handover_evidence": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_document_check": "Not applicable: wording about the estimate itself, with no material supplied",
+   "warranty_source": "Not applicable",
+   "equivalent_rule": "Not applicable",
+   "exception_process": "Not applicable",
+   "status": "BLOCKED",
+   "blocked_on": "owner approval of the wording; operations owner",
+   "wording": "Awaiting approval",
+   "confirmed_on": null
   }
- ]
+ ],
+ "version": "1"
 }

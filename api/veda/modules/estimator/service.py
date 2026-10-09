@@ -23,7 +23,7 @@ from veda.kernel.context import ActorContext, acting
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.ids import WEB_INTAKE_USER_ID
 
-from . import customer_spec, engine, promise_matrix, ratecard
+from . import activation, customer_spec, engine, promise_matrix, ratecard
 from .models import (
     BudgetEstimate,
     BudgetEstimateAssumption,
@@ -262,22 +262,85 @@ def active_spec(s: Session, package: str) -> EstimatorCustomerSpec | None:
     ).scalar_one_or_none()
 
 
-def activation_blockers(document: dict, matrix: dict | None) -> list[str]:
-    """Why a specification may not be activated on a deployed environment (pre-activation closure guards).
+def _active_card_sha(s: Session) -> str | None:
+    row = _active(s)
+    return row.document_sha256 if row is not None else None
 
-    A specification with room promises needs its customer-promise matrix, structurally complete, with every visible
-    promise confirmed by sales, operations or the owner and a named accountable owner. One without room promises
-    (ESSENTIAL-1.0) is handled by `ux_v1_confirmed` instead: V2 must not run on it.
-    """
-    if not customer_spec.room_promises(customer_spec.parse(document)):
-        return []
-    if matrix is None:
-        return ["the customer-promise matrix is required (--matrix)"]
-    try:
-        promise_matrix.validate(document, matrix)
-    except promise_matrix.MatrixError as err:
-        return [f"matrix: {err}"]
-    return promise_matrix.blockers(matrix)
+
+def activation_report(s: Session, document: dict, *, env: str, approval_reference: str | None = None) -> dict:
+    """Every guard for activating `document` on `env`, read-only (the `activation-check` report)."""
+    spec = validate_spec(document)
+    digest = _sha(document)
+    blocked: list[str] = []
+    evidence: dict = {"spec": spec.spec_code, "specification_sha256": digest}
+    if not customer_spec.room_promises(spec):
+        blocked.append(
+            f"{spec.spec_code} has no room promises: UX V2 must not run on it; it may only be (re)activated with "
+            "STAGING_ESTIMATOR_UX=v1 deployed and --ux-v1-confirmed"
+        )
+    else:
+        gate_blocked, evidence = activation.gate(
+            document, digest, env=env, active_card_sha256=_active_card_sha(s), approval_reference=approval_reference
+        )
+        blocked += gate_blocked
+    current = _spec_by_code_or_none(s, spec.spec_code)
+    if current is not None and current.status == "ACTIVE":
+        blocked.append(f"{spec.spec_code} is already active")
+    if current is not None and current.document_sha256 != digest:
+        blocked.append(f"the loaded {spec.spec_code} is not this document")
+    return {"blockers": blocked, "evidence": evidence, "digests": activation.digests(spec.spec_code)}
+
+
+def _spec_by_code_or_none(s: Session, spec_code: str) -> EstimatorCustomerSpec | None:
+    return s.execute(
+        sa.select(EstimatorCustomerSpec).where(EstimatorCustomerSpec.spec_code == spec_code)
+    ).scalar_one_or_none()
+
+
+def _gate_or_refuse(
+    s: Session, row: EstimatorCustomerSpec, approval_reference: str, *, ux_v1_confirmed: bool, release: str | None
+) -> dict:
+    """Run every guard for (re)activating `row`; refuse, failing closed, on any blocker. Returns the evidence."""
+    if len((approval_reference or "").strip()) < 10:
+        raise SpecError("activation needs the owner's approval reference (at least 10 characters)")
+    if row.document_sha256 != _sha(row.document):
+        raise SpecError(f"{row.spec_code}: the stored document does not match its SHA-256; refusing")
+    spec = validate_spec(row.document)
+    evidence: dict = {"spec": row.spec_code, "specification_sha256": row.document_sha256}
+    if not customer_spec.room_promises(spec):
+        if not ux_v1_confirmed:
+            raise SpecError(
+                f"{row.spec_code} has no room promises, so UX V2 must not run on it: set STAGING_ESTIMATOR_UX=v1, "
+                "redeploy the staging site, then repeat with --ux-v1-confirmed"
+            )
+        evidence["ux_v1_confirmed"] = True
+        return evidence
+    env = settings().env
+    if env in activation.DEPLOYED:
+        if not release or not activation.RELEASE_RE.match(release):
+            raise SpecError("give the deployed release commit (--release <commit>) so the activation records it")
+        blocked, evidence = activation.gate(
+            row.document,
+            row.document_sha256,
+            env=env,
+            active_card_sha256=_active_card_sha(s),
+            approval_reference=approval_reference,
+        )
+        if blocked:
+            raise SpecError(f"{row.spec_code} is not ready for activation: {'; '.join(blocked[:5])}")
+    return evidence
+
+
+def _activation_record(evidence: dict, approval_reference: str, release: str | None, operator: str | None, now) -> dict:
+    """What every activation and reactivation records (M1): commit, digests, decision versions, approval, operator."""
+    return {
+        **evidence,
+        "release": release or activation.repository_commit(),
+        "approval_reference": approval_reference.strip()[:200],
+        "operator": (operator or "")[:120] or None,
+        "environment": settings().env,
+        "at": now.isoformat(),
+    }
 
 
 def activate_spec(
@@ -286,55 +349,51 @@ def activate_spec(
     approval_reference: str,
     actor_id: str | None = None,
     *,
-    matrix: dict | None = None,
     ux_v1_confirmed: bool = False,
+    release: str | None = None,
+    operator: str | None = None,
 ) -> EstimatorCustomerSpec:
-    """Make a DRAFT (or a RETIRED version, for rollback) the one ACTIVE specification of its package.
+    """Make a DRAFT (or a RETIRED version) the one ACTIVE specification of its package, after every guard.
 
-    Guards: a specification without room promises is activated only with `ux_v1_confirmed` (the operator has set
-    STAGING_ESTIMATOR_UX=v1 first; V2 also withholds every material promise for it). On staging and production a
-    specification with room promises also needs a matrix with no blockers.
+    On staging and production a specification with room promises passes the whole activation gate (the reviewed
+    records packaged with this release, approved and current); one without room promises needs `ux_v1_confirmed`.
     """
-    if len((approval_reference or "").strip()) < 10:
-        raise SpecError("activation needs the owner's approval reference (at least 10 characters)")
     row = _spec_by_code(s, spec_code)
     if row.status == "ACTIVE":
         raise SpecError(f"{spec_code} is already active")
-    if row.document_sha256 != _sha(row.document):
-        raise SpecError(f"{spec_code}: the stored document does not match its SHA-256; refusing")
-    validate_spec(row.document)
-    if not customer_spec.room_promises(customer_spec.parse(row.document)) and not ux_v1_confirmed:
-        raise SpecError(
-            f"{spec_code} has no room promises, so UX V2 must not run on it: set STAGING_ESTIMATOR_UX=v1, "
-            "redeploy the staging site, then repeat with --ux-v1-confirmed"
-        )
-    if settings().env in ("staging", "production"):
-        blocked = activation_blockers(row.document, matrix)
-        if blocked:
-            raise SpecError(f"{spec_code} is not ready for activation: {'; '.join(blocked[:5])}")
+    evidence = _gate_or_refuse(s, row, approval_reference, ux_v1_confirmed=ux_v1_confirmed, release=release)
+    return _make_active(
+        s, row, approval_reference, actor_id, evidence, release, operator, rollback=row.status == "RETIRED"
+    )
+
+
+def _make_active(s, row, approval_reference, actor_id, evidence, release, operator, *, rollback: bool):
     now = db.tx_time(s)
     previous = active_spec(s, row.package)
     if previous is not None:
         previous.status, previous.retired_on = "RETIRED", now
-        _spec_event(s, "SPEC_RETIRED", previous, {"spec": previous.spec_code, "by": spec_code})
+        _spec_event(s, "SPEC_RETIRED", previous, {"spec": previous.spec_code, "by": row.spec_code})
         s.flush()
-    rollback = row.status == "RETIRED"
     row.status, row.activated_on, row.retired_on = "ACTIVE", now, None
     row.activated_by, row.approval_reference = actor_id, approval_reference.strip()[:200]
-    _spec_event(
-        s,
-        "SPEC_ROLLED_BACK" if rollback else "SPEC_ACTIVATED",
-        row,
-        {"spec": spec_code, "previous": previous.spec_code if previous else None},
-    )
+    record = _activation_record(evidence, approval_reference, release, operator, now)
+    record["previous"] = previous.spec_code if previous else None
+    _spec_event(s, "SPEC_ROLLED_BACK" if rollback else "SPEC_ACTIVATED", row, record)
     return row
 
 
 def rollback_spec(
-    s: Session, package: str, approval_reference: str, actor_id: str | None = None, *, ux_v1_confirmed: bool = False
+    s: Session,
+    package: str,
+    approval_reference: str,
+    actor_id: str | None = None,
+    *,
+    ux_v1_confirmed: bool = False,
+    release: str | None = None,
+    operator: str | None = None,
 ):
-    """Re-activate the most recently retired specification of a package (its matrix was checked when it was first
-    activated; a target without room promises still needs `ux_v1_confirmed`)."""
+    """Re-activate the most recently retired specification of a package. A reactivation is a new activation: it runs
+    the whole gate again (M2), so no earlier activation counts as standing approval."""
     previous = s.execute(
         sa.select(EstimatorCustomerSpec)
         .where(EstimatorCustomerSpec.package == package, EstimatorCustomerSpec.status == "RETIRED")
@@ -343,30 +402,8 @@ def rollback_spec(
     ).scalar_one_or_none()
     if previous is None:
         raise SpecError(f"no retired {package} specification to roll back to")
-    if len((approval_reference or "").strip()) < 10:
-        raise SpecError("rollback needs the owner's approval reference (at least 10 characters)")
-    if previous.document_sha256 != _sha(previous.document):
-        raise SpecError(f"{previous.spec_code}: the stored document does not match its SHA-256; refusing")
-    if not customer_spec.room_promises(customer_spec.parse(previous.document)) and not ux_v1_confirmed:
-        raise SpecError(
-            f"rolling back to {previous.spec_code}, which has no room promises: set STAGING_ESTIMATOR_UX=v1, "
-            "redeploy the staging site, then repeat with --ux-v1-confirmed"
-        )
-    now = db.tx_time(s)
-    current = active_spec(s, package)
-    if current is not None:
-        current.status, current.retired_on = "RETIRED", now
-        _spec_event(s, "SPEC_RETIRED", current, {"spec": current.spec_code, "by": previous.spec_code})
-        s.flush()
-    previous.status, previous.activated_on, previous.retired_on = "ACTIVE", now, None
-    previous.activated_by, previous.approval_reference = actor_id, approval_reference.strip()[:200]
-    _spec_event(
-        s,
-        "SPEC_ROLLED_BACK",
-        previous,
-        {"spec": previous.spec_code, "previous": current.spec_code if current else None},
-    )
-    return previous
+    evidence = _gate_or_refuse(s, previous, approval_reference, ux_v1_confirmed=ux_v1_confirmed, release=release)
+    return _make_active(s, previous, approval_reference, actor_id, evidence, release, operator, rollback=True)
 
 
 def list_specs(s: Session) -> list[dict]:
@@ -565,7 +602,22 @@ def public_view(row: BudgetEstimate) -> dict:
     session = object_session(row)
     view["specification"] = _snapshot_spec(session, row) if session is not None else None
     view["room_details"] = room_details(session, row) if session is not None else []
+    view["v2_copy"] = _registered_copy(session, row, view) if session is not None else {"approved": False}
     return view
+
+
+def _registered_copy(s: Session, row: BudgetEstimate, view: dict) -> dict:
+    """The runtime texts V2 may show (M3): only those the reviewed promise matrix of the estimate's own specification
+    snapshot registers. Without a matching packaged matrix nothing is approved and V2 shows none of them."""
+    spec_row = s.get(EstimatorCustomerSpec, row.customer_spec_id) if row.customer_spec_id else None
+    matrix = promise_matrix.load(spec_row.spec_code) if spec_row is not None else None
+    if spec_row is None or matrix is None:
+        return {"approved": False}
+    try:
+        promise_matrix.validate(spec_row.document, matrix)
+    except promise_matrix.MatrixError:
+        return {"approved": False}
+    return promise_matrix.registered_text(matrix, view, view["room_details"])
 
 
 _CUSTOMER_KEYS = frozenset(
