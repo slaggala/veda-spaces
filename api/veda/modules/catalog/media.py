@@ -318,6 +318,20 @@ def sanitize_glb(data: bytes) -> SanitizedModel:
     return SanitizedModel(out, len(clean.get("meshes") or []), len(clean.get("materials") or []), vertices)
 
 
+def three_d_uploads_ready() -> bool:
+    """R12 safe disablement: a GLB is accepted only when the approved private store, the malware scanner, approved
+    media delivery and the 3D switch are all in place. None of them is today, so GLB uploads are refused everywhere,
+    including local and test. The sanitiser above is kept for when 3D is approved."""
+    cfg = settings()
+    return bool(
+        cfg.catalog_3d_enabled
+        and cfg.catalog_media_backend == "s3"
+        and cfg.catalog_media_bucket
+        and cfg.catalog_media_scanner == "clamd"
+        and cfg.catalog_media_delivery_enabled
+    )
+
+
 # --- scanning --------------------------------------------------------------------------------------------------------
 def clamd_scan(data: bytes, address: str) -> bool:
     """True when clamd reports the stream clean, False when it finds something; an error raises."""
@@ -390,7 +404,9 @@ def upload(s: Session, data: bytes) -> Uploaded:
     if kind == "VIDEO":
         raise MediaError("video uploads are not accepted; use an approved external embed (owner decision)")
     if kind in ("USDZ", "GLTF"):
-        raise MediaError("USDZ and glTF are disabled; only a sanitised GLB is accepted")
+        raise MediaError("USDZ and glTF are not supported")
+    if kind == "GLB" and not three_d_uploads_ready():
+        raise MediaError("3D uploads are disabled until approved storage, scanning, delivery and 3D are in place")
     limit = MAX_MODEL_BYTES if kind == "GLB" else MAX_IMAGE_BYTES
     if len(data) > limit:
         raise MediaError(f"the file is larger than {limit // (1024 * 1024)} MB")
@@ -553,5 +569,7 @@ def deliverable(s: Session, sha: str, *, release: CatalogRelease | None = None) 
         )
     ).scalar_one_or_none()
     if row is None or row.scan_status != "CLEAN" or row.withdrawn_on is not None or row.purged_on is not None:
+        return None
+    if row.media_kind != "IMAGE":  # R12: a 3D object is never served, whatever references it or whoever knows its hash
         return None
     return row

@@ -14,8 +14,8 @@ Synthetic and DRAFT only.
 - **Soft-close storage is BLOCKED (H2).** The hardware, the extra, the promise (registered text of the matrix row
   `spec.soft_close`, which is BLOCKED and has an UNASSIGNED owner) and the rule are seeded staff-only. They are
   listed in BLOCKED_FROM_RELEASE, and no release may contain them.
-- **Media:** generated placeholder images labelled "Illustrative example", galleries, and a generated GLB with a
-  preview image and a fallback gallery. 3D stays off for customers until approved, and it never prices anything.
+- **Media:** generated placeholder images labelled "Illustrative example", and galleries. There is no 3D model: GLB is
+  planned but disabled (R12). `_glb()` builds a synthetic model for the sanitiser's tests only.
 - **Copy:** descriptive statements with no promise wording, labels, the disclaimers and the rule messages.
 
 No person is named anywhere. Pricing is not seeded: a release compiles only with pricing records from a card (the
@@ -96,8 +96,6 @@ def _media_records(s: Session) -> list[tuple[str, str, dict]]:
           (110, 90, 80))  # fmt: skip
     image("img.soft-close", "Storage drawers", "Closed storage drawers below a TV unit", (230, 230, 230),
           (90, 90, 90))  # fmt: skip
-    image("img.tv-preview", "TV unit, 3D preview", "A still preview of the TV unit model", (240, 240, 236),
-          (130, 110, 95), products=["tv-unit"])  # fmt: skip
     out.append(("media", "gallery.tv-unit", {
         "type": "GALLERY", "title": "TV unit ideas", "label": PLACEHOLDER, "rights": RIGHTS,
         "items": ["img.tv-laminate", "img.tv-veneer", "img.feature-wall"], "products": ["tv-unit"],
@@ -106,19 +104,7 @@ def _media_records(s: Session) -> list[tuple[str, str, dict]]:
         "type": "GALLERY", "title": "Living room ideas", "label": PLACEHOLDER, "rights": RIGHTS,
         "items": ["img.living-room", "img.tv-laminate", "img.feature-wall"], "rooms": ["LIVING"],
     }))  # fmt: skip
-    model = media.upload(s, _glb())
-    out.append(("media", "model.tv-unit", {
-        "type": "GLB", "title": "TV unit, 3D view", "alt": "An interactive 3D view of the TV unit",
-        "label": PLACEHOLDER, "rights": RIGHTS, "objects": model.objects(), "products": ["tv-unit"],
-        "three_d": {
-            "model_version": "1", "preview_image": "img.tv-preview", "fallback_gallery": "gallery.tv-unit",
-            "dimensions_mm": {"w": 2400, "h": 2100, "d": 450},
-            "variant_map": {"panelled": "node:Panel"},
-            "finish_map": {"laminate.matte": "material:Laminate", "veneer.natural": "material:Veneer"},
-            "hotspots": [{"key": "panel", "label": "Wall panelling", "position": [0.5, 0.6, 0.0]}],
-            "camera_presets": [{"key": "front", "label": "Front", "orbit": "0deg 80deg 3m"}],
-        },
-    }))  # fmt: skip
+    # No 3D model: GLB is planned but disabled (R12); the slice is gallery-only.
     return out
 
 
@@ -173,7 +159,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
             "name": "TV unit", "family": "tv-units", "rooms": ["LIVING"], "packages": ["ESSENTIAL"],
             "description": "A unit for the TV wall, with laminate wall panelling or as a simple box.",
             "what_is_this": "The cabinet and wall finish around your TV.",
-            "media": ["img.tv-laminate", "gallery.tv-unit", "model.tv-unit"], "default_variant": "panelled",
+            "media": ["img.tv-laminate", "gallery.tv-unit"], "default_variant": "panelled",
             "variants": [
                 {"key": "panelled", "name": "With wall panelling", "engine_product": "TV_UNIT",
                  "engine_options": {"STYLE": "PANELLED"}, "media": ["img.tv-laminate"],

@@ -585,6 +585,25 @@
         "title": "CatalogReleaseIn",
         "type": "object"
       },
+      "CatalogRollbackIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_reference": {
+            "title": "Approval Reference",
+            "type": "string"
+          },
+          "expected_release": {
+            "title": "Expected Release",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_release",
+          "approval_reference"
+        ],
+        "title": "CatalogRollbackIn",
+        "type": "object"
+      },
       "CatalogScheduleIn": {
         "additionalProperties": false,
         "properties": {
@@ -5727,7 +5746,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CatalogApprovalIn"
+                "$ref": "#/components/schemas/CatalogRollbackIn"
               }
             }
           },

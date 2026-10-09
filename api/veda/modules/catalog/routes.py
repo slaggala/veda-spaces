@@ -71,6 +71,11 @@ class CatalogApprovalIn(Closed):
     approval_reference: str
 
 
+class CatalogRollbackIn(Closed):
+    expected_release: str  # the release the admin means to roll back; refused if another is active by then
+    approval_reference: str
+
+
 class CatalogScheduleIn(Closed):
     at: datetime
 
@@ -379,10 +384,11 @@ def activate_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.activate_release)
 
 
-@api.route("POST", "/rollback", permission="catalog.admin", body=CatalogApprovalIn, requirement="CAT-008")
+@api.route("POST", "/rollback", permission="catalog.admin", body=CatalogRollbackIn, requirement="CAT-008")
 def rollback(req: Req):
     try:
-        return ok(_release_view(service.rollback(req.session, req.body.approval_reference), detail=True))
+        restored = service.rollback(req.session, req.body.approval_reference, req.body.expected_release)
+        return ok(_release_view(restored, detail=True))
     except service.CatalogError as err:
         raise _err(err) from err
 

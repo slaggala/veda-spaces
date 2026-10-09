@@ -8,8 +8,7 @@ from veda.modules.catalog import compile as catalog_compile
 from veda.modules.catalog import kinds, rules
 from veda.modules.catalog.permissions import MATRIX, PERMISSIONS, edit_permission
 
-CTX = rules.Context(property_type="APARTMENT", home_size="3BHK", project_kind="NEW_HOME", package="ESSENTIAL",
-                    market="Hyderabad")  # fmt: skip
+CTX = rules.Context(property_type="APARTMENT", home_size="3BHK", project_kind="NEW_HOME", package="ESSENTIAL")  # fmt: skip
 
 
 def catalog(*records):
@@ -34,7 +33,7 @@ PRODUCT = ("product", "tv", {"name": "TV unit", "family": "f1", "rooms": ["LIVIN
          "INCOMPATIBLE"),
         ({"type": "available_only_for", "subject": "extra:x1", "condition": {"home_sizes": ["2BHK"]}}, {"extra:x1"},
          "UNAVAILABLE"),
-        ({"type": "hidden_when", "subject": "extra:x1", "condition": {"markets": ["hyderabad"]}}, {"extra:x1"},
+        ({"type": "hidden_when", "subject": "extra:x1", "condition": {"home_sizes": ["3BHK"]}}, {"extra:x1"},
          "UNAVAILABLE"),
         ({"type": "requires_consultation", "subject": "extra:x1"}, {"extra:x1"}, "CONSULTATION_REQUIRED"),
         ({"type": "unavailable_online", "subject": "extra:x1"}, {"extra:x1"}, "UNAVAILABLE_ONLINE"),

@@ -47,8 +47,17 @@ def public_catalog(s: Session) -> dict:
     release = _active(s)
     key = (release.id, release.manifest_sha256)
     if key not in _view_cache:
-        _view_cache[key] = catalog_compile.customer_view(catalog_compile.load_release(s, release))
+        _view_cache[key] = catalog_compile.customer_view(_load(s, release))
     return _view_cache[key]
+
+
+def _load(s: Session, release: CatalogRelease) -> catalog_compile.Catalog:
+    """The active release's records, or 503: content that no longer validates (a manifest that drifted, or a record
+    the current rules refuse, such as a market condition) makes V3 unavailable rather than half-evaluated."""
+    try:
+        return catalog_compile.load_release(s, release)
+    except ValueError as err:
+        raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.") from err
 
 
 def _card(s: Session, release: CatalogRelease) -> tuple[EstimatorRateCard, ratecard.RateCard]:
@@ -82,7 +91,7 @@ def create_public(s: Session, config: dict, *, ip, ua, request_id) -> dict:
         s, ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=ua)
     ):
         release = _active(s)
-        cat = catalog_compile.load_release(s, release)
+        cat = _load(s, release)
         try:
             resolved = catalog_compile.resolve(cat, config, public=True)
         except catalog_compile.CompileError as err:

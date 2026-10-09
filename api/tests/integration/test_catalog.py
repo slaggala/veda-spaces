@@ -420,7 +420,7 @@ def test_images_are_reencoded_without_metadata(people):
         (b"MZ\x90\x00" + b"\0" * 100, "unsupported file type"),
         (b"\x00\x00\x00\x18ftypmp42" + b"\0" * 100, "video uploads are not accepted"),
         (b"\xff\xd8\xff\xe0" + b"\0" * 100, "decoded safely"),
-        (b"glTF" + b"\x02\x00\x00\x00" + b"\x10\x00\x00\x00" + b"\0" * 4, "truncated"),
+        (b"glTF" + b"\x02\x00\x00\x00" + b"\x10\x00\x00\x00" + b"\0" * 4, "3D uploads are disabled"),
     ],
 )
 def test_unsafe_uploads_are_refused(people, data, match):

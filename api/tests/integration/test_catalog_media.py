@@ -153,7 +153,7 @@ def test_glb_container_structure():
 
 @pytest.mark.parametrize("data", [b"PK\x03\x04" + b"\0" * 100, b'{"asset": {"version": "2.0"}}'])
 def test_usdz_and_gltf_are_disabled(people, data):
-    with pytest.raises(media.MediaError, match="disabled"):
+    with pytest.raises(media.MediaError, match="not supported"):
         upload(people[0], data)
 
 
@@ -192,11 +192,12 @@ def test_3d_is_hidden_from_customers_unless_enabled(people):
 
 
 @pytest.mark.settings(catalog_3d_enabled=True)
-def test_3d_is_shown_when_enabled(people):
+def test_no_3d_reaches_customers_even_with_the_switch(people):
+    """R12: with the 3D switch on, a release still cannot contain a 3D object, so customers stay gallery-only."""
     rel = _live(people)
     with db.unit_of_work(write=False) as s:
         view = catalog_compile.customer_view(catalog_compile.load_release(s, s.get(CatalogRelease, rel)))
-    assert view["media"]["model.tv-unit"]["three_d"]["fallback_gallery"] == "gallery.tv-unit"
+    assert not [m for m in view["media"].values() if m["type"] in kinds.THREE_D_TYPES]
 
 
 # --- G3: withdrawal and retention ---------------------------------------------------------------------------------
