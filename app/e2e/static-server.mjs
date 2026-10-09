@@ -26,6 +26,10 @@ function parseHeaders(text) {
 const rules = parseHeaders(fs.readFileSync(path.join(root, '_headers'), 'utf8'));
 const matches = (pattern, url) => (pattern.endsWith('*') ? url.startsWith(pattern.slice(0, -1)) : url === pattern);
 
+// The home sizes the page offers: the synthetic test card prices 2 and 3 BHK; a real card (session stack, real-card
+// runs) prices only what staging offers, so those scripts pass SITE_HOME_SIZES=3BHK.
+const HOME_SIZES = process.env.SITE_HOME_SIZES || '2BHK,3BHK';
+
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x').pathname;
   let file = path.join(root, url === '/' ? 'index.html' : url);
@@ -51,7 +55,7 @@ http.createServer((req, res) => {
       .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)
       .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
       .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">')
-      .replace('<meta name="veda-estimator-home-sizes" content="">', '<meta name="veda-estimator-home-sizes" content="2BHK,3BHK">')
+      .replace('<meta name="veda-estimator-home-sizes" content="">', `<meta name="veda-estimator-home-sizes" content="${HOME_SIZES}">`)
       .replace('<meta name="veda-estimator-property-types" content="">', '<meta name="veda-estimator-property-types" content="APARTMENT">')
       .replace('<meta name="veda-estimator-ux" content="">', `<meta name="veda-estimator-ux" content="${new URL(req.url, 'http://x').searchParams.get('ux') === 'v2' ? 'v2' : ''}">`));
   }
