@@ -1,2 +1,2 @@
-issue_id,summary,screen,section,severity,participants,participant_count,segments,rule_met,recommended_change,promise_matrix_rows,status,round_found,retest_round
-ISS-EXAMPLE,"Reads the allowance as an extra charge on top of the range",result,Design Personalisation Allowance,Critical,"EXAMPLE",1,friends_family,no (1 participant: watch list),,allowance_text,watch,1,2 (EXAMPLE ROW: delete before use)
+issue_id,summary,screen,section,severity,participants,participant_count,segments,policy_action,investigation_outcome,investigation_evidence,recommended_change,promise_matrix_rows,status,round_found,retest_round
+ISS-EXAMPLE,"Reads the allowance as an extra charge on top of the range",result,Design Personalisation Allowance,Critical,"EXAMPLE",1,friends_family,"Critical: activation blocker, owner told same day",open,"recording 00:14:20; probe was neutral",,allowance_text,open,1,2 (EXAMPLE ROW: delete before use)
