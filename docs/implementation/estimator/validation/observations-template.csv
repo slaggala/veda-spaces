@@ -1,0 +1,3 @@
+participant_code,segment,round,date,device,mode,scenario,item_type,item_id,outcome,time_seconds,seq,score,rating,screen,section,verbatim,expected,misconception,proposed_severity,issue_id,notes
+EXAMPLE,friends_family,1,2026-10-10,phone_360,in_person,1,task,T1,U,95,6,,,rooms,,"Oh, it already picked my rooms",,,,,EXAMPLE ROW: delete before use
+EXAMPLE,friends_family,1,2026-10-10,phone_360,in_person,1,measure,M4,,,,0,,result,Design Personalisation Allowance,"So they add this on top at the end?","Included in the range","Allowance is an extra charge",Critical,ISS-EXAMPLE,EXAMPLE ROW: delete before use
