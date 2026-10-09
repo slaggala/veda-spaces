@@ -30,6 +30,8 @@ Every participant explains, in their own words, the answers to ten validation qu
 8. What happens next?
 9. What information would make the estimate more trustworthy?
 10. Would they request a detailed quotation?
+11. If another interior company quoted ₹2 lakh lower, what would they check before choosing? (Added for Round 1;
+    neutral follow-ups only; see the [Round 1 session package](ROUND-1-SESSION-PACKAGE.md) §6.4.)
 
 **Measured for every participant:**
 - unassisted completion and time to the first estimate;
@@ -161,6 +163,7 @@ A 0 that matches a Critical misconception is logged at once as a Critical findin
 | Q8 | "What happens next, if you go ahead?" | Narrow the estimate or request a consultation, then site measurement, confirm design and materials, detailed quotation, approve scope before work | Wrong next step, for example "work starts now" (High) |
 | Q9 | "What information would make this estimate more trustworthy for you?" | (Open: record verbatim; no score) | — |
 | Q10 | "Would you request a detailed quotation? How likely, 0–10? What would stop you?" | (Intent: record the answer, the rating and the reason) | Distrust ("a sales trick") (High) |
+| Q11 | "If another interior company gave you a quotation that was ₹2 lakh lower, what would you check before deciding which company to choose?" | (Open: record verbatim, and which checks were unprompted; no score) | Never suggest what to check or steer towards Veda Spaces |
 
 **Also recorded:**
 - **Per task:** outcome (unaided, assisted or failed), time, Single Ease Question (1–7), and which disclosures were opened.

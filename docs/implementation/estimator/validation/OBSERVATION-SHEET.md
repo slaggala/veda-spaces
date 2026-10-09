@@ -51,6 +51,7 @@ Afterwards, copy each observation into a row of [observations-template.csv](obse
 | Q8 | What happens next? | | | |
 | Q9 | What would make the estimate more trustworthy? | — | | |
 | Q10 | Would they request a detailed quotation? Likelihood (0–10) and what stops them | — | | |
+| Q11 | Another company's quotation is ₹2 lakh lower: what would they check? (verbatim, in order; note which checks were unprompted: scope, materials, brands, hardware, inclusions, exclusions, GST, warranty, installation) | — | | |
 
 A score of 0 that matches a Critical misconception is a **Critical finding**: tell the research lead the same day.
 
