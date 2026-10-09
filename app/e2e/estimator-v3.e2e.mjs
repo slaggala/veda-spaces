@@ -30,6 +30,8 @@ const TURNSTILE_STUB = `(() => {
       if (c.expireAfter && !(c.expireOnce && o.expired)) o.e = setTimeout(() => { o.expired = true; o.token = ''; o.opts['expired-callback'] && o.opts['expired-callback'](); }, c.expireAfter);
     }, cfg().delay);
   }
+  // A test can expire every live token at an exact moment (for example while a request is in flight).
+  window.__tsExpire = () => Object.values(w).forEach((o) => { clearTimeout(o.e); o.token = ''; o.opts['expired-callback'] && o.opts['expired-callback'](); });
   window.turnstile = { render(sel, opts) { const id = 'w' + (++n); w[id] = { opts }; issue(id); return id; },
     reset(id) { if (w[id]) issue(id); }, getResponse(id) { return (w[id] && w[id].token) || ''; }, remove() {} };
 })();`;
@@ -228,7 +230,7 @@ try {
   const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 
   { // 1, 2: before the script loads, and after the renderer but before the token callback: nothing is sent
-    const { ctx, pg, errs } = await fresh({}, { delay: 2500 });
+    const { ctx, pg, errs } = await fresh({}, { delay: 6000 }); // a wide window between renderer and token
     let release; const gate = new Promise((r) => { release = r; });
     await ctx.route('https://challenges.cloudflare.com/**', async (route) => { await gate; await route.fulfill({ status: 200, contentType: 'text/javascript', body: TURNSTILE_STUB }); });
     const sent = posts(pg);
@@ -276,9 +278,12 @@ try {
   }
 
   { // 6: the token expires before submitting: nothing is sent, the customer is told, a fresh token follows
-    const { ctx, pg } = await fresh({}, { delay: 300, expireAfter: 400 });
+    const { ctx, pg } = await fresh();
     const sent = posts(pg);
     await toRooms(pg);
+    await ready(pg);
+    // Expire the live token now, and make its renewal slow, so the next click is certainly made without a token.
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, delay: 4000 }; window.__tsExpire(); });
     await pg.waitForFunction(() => document.querySelector('#v3-ts-estimate-status')?.textContent.includes('expired'), null, { timeout: 5000 });
     check('6. an expired token disables submission and is announced', await pg.getAttribute('#v3-estimate', 'aria-disabled') === 'true');
     await pg.click('#v3-estimate', { force: true });
@@ -292,14 +297,18 @@ try {
   }
 
   { // 7: the token expires while the request is in flight: one request, it completes, no duplicate
-    const { ctx, pg } = await fresh({}, { delay: 300, expireAfter: 500 });
-    await ctx.route('**/api/v1/public/catalog/estimates', async (route) => { await settle(1500); await route.continue(); });
+    const { ctx, pg } = await fresh();
+    await ctx.route('**/api/v1/public/catalog/estimates', async (route) => { await settle(2000); await route.continue(); });
     const sent = posts(pg);
     await toRooms(pg);
     await ready(pg);
+    const request = pg.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/v1/public/catalog/estimates'));
     const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'), { timeout: 15000 });
     await pg.click('#v3-estimate');
-    check('7. expiry during submission: the request completes once', (await res).status() === 201 && sent.length === 1);
+    await request; // the request is in flight (held by the route) ...
+    await pg.evaluate(() => window.__tsExpire()); // ... when its token expires
+    await pg.click('#v3-estimate', { force: true }); // a second activation meanwhile is ignored
+    check('7. expiry during submission: the request completes once', (await res).status() === 201 && sent.length === 1, String(sent.length));
     await ctx.close();
   }
 
