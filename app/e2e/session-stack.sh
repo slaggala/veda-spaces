@@ -37,7 +37,8 @@ echo "specification ESSENTIAL-1.1 (local only; inactive on staging)"
     VEDA_EMAIL_CAPTURE_DIR=var/mail VEDA_ARGON2_MEMORY_KIB=19456 VEDA_ARGON2_TIME_COST=2 \
     VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors VEDA_ESTIMATOR_ENABLED=true \
     "$PY" -m flask --app wsgi run --port 5000 ) > "$OUT/api.log" 2>&1 & pids+=($!)
-node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)
+# The page offers only what the real card prices (3 BHK), as staging does.
+SITE_HOME_SIZES=3BHK node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)
 wait_for http://127.0.0.1:5000/health/live && wait_for http://localhost:8000/ || exit 1
 echo "ready: http://localhost:8000/estimate?ux=v2  (new private window per participant; Ctrl+C ends the day)"
 wait
