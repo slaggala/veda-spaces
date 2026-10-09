@@ -5,6 +5,7 @@ and independent substantiation for an absolute claim). Factual fields may make n
 contain a claim-like substring are not claims. Synthetic data only."""
 
 import copy
+import json
 
 import pytest
 
@@ -183,3 +184,26 @@ def test_import_refuses_claims(people):
     with db.unit_of_work(write=False) as s:
         report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
     assert not report["ok"] and all(r["errors"] for r in report["rows"])
+
+
+@pytest.mark.parametrize("leak", ["Only Rs 1200 per sqft", "12K/sft fitted", "Supplier price list", "Flat 10 percent off",
+                                  "1\u200b200/sqft"])  # fmt: skip
+def test_import_refuses_rates_and_prices(people, leak):
+    """Imported copy goes through the same canonical checks as authored copy (rates in every format)."""
+    a, _ = people
+    rows = [importexport.ImportRow("product_family", "beds", {"name": "Beds", "category": "beds", "description": leak}),
+            importexport.ImportRow("copy", "copy.c2", {"statement": leak, "category": "label", "promise": False})]  # fmt: skip
+    with db.unit_of_work(write=False) as s:
+        report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
+    assert not report["ok"] and all(r["errors"] for r in report["rows"])
+    assert not any("1200" in json.dumps(r["errors"]) for r in report["rows"]), "the report does not echo the rate"
+
+
+def test_the_seeded_slice_passes_the_canonical_checks(people):
+    """Seeded copy is authored through the same gate: every seeded record's text passes."""
+    from veda.modules.catalog import seed
+
+    records = tx(people[0], seed.records)  # seeding stores its synthetic media objects, so it runs as a user
+    assert records
+    for kind, key, doc in records:
+        assert kinds.text_problems(kind, kinds.load_model(kind, doc)) == [], (kind, key)
