@@ -14,16 +14,17 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from veda.config import settings
+from veda.kernel import db
 from veda.kernel.context import ActorContext, acting
 from veda.kernel.errors import ApiError
 from veda.kernel.ids import WEB_INTAKE_USER_ID
 from veda.modules.estimator import engine, ratecard
 from veda.modules.estimator import service as estimator_service
-from veda.modules.estimator.models import EstimatorRateCard
+from veda.modules.estimator.models import BudgetEstimate, EstimatorRateCard
 
 from . import compile as catalog_compile
 from . import kinds, rules, service
-from .models import ANALYTICS_EVENTS, CatalogAnalyticsDaily, CatalogConfiguration, CatalogRelease
+from .models import ANALYTICS_EVENTS, CatalogAnalyticsDaily, CatalogConfiguration, CatalogEvent, CatalogRelease
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # pragma: allowlist secret (an alphabet)
 _view_cache: dict[tuple[str, str], dict] = {}
@@ -77,8 +78,6 @@ def _refused(err: catalog_compile.CompileError) -> ApiError:
 
 def create_public(s: Session, config: dict, *, ip, ua, request_id) -> dict:
     """Price a customer configuration with the ACTIVE release; store the estimate and its configuration snapshot."""
-    if not isinstance(config, dict):
-        raise ApiError(422, "VALIDATION_FAILED", "Some choices need attention.")
     with acting(
         s, ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=ua)
     ):
@@ -107,7 +106,7 @@ def snapshot(s: Session, release: CatalogRelease, resolved: catalog_compile.Reso
         release_id=release.id,
         manifest_sha256=release.manifest_sha256,
         versions=versions,
-        selections=resolved.selections,
+        selections=resolved.configuration.model_dump(mode="json"),  # the allowlisted normal form only
         resolved_request=resolved.request.model_dump(mode="json"),
         estimate_id=estimate_id,
     )
@@ -144,7 +143,9 @@ def preview(s: Session, release_id: str, config: dict, *, public: bool = True) -
 def reopen(s: Session, reference: str) -> dict:
     """Staff: a stored configuration exactly as it was priced (its versions, selections and engine request)."""
     row = s.execute(
-        sa.select(CatalogConfiguration).where(CatalogConfiguration.configuration_reference == reference)
+        sa.select(CatalogConfiguration).where(
+            CatalogConfiguration.configuration_reference == reference, CatalogConfiguration.is_deleted.is_(False)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise ApiError(404, "NOT_FOUND", "No such configuration.")
@@ -226,3 +227,44 @@ def analytics(s: Session, days: int = 30) -> list[dict]:
         {"day": r.day, "event": r.event, "subject": r.subject, "release": r.release_code, "count": r.count}
         for r in rows
     ]
+
+
+# --- retention (R7) -----------------------------------------------------------------------------------------------
+def purge(s: Session, *, dry_run: bool = False) -> int:
+    """Configuration snapshots follow their estimate's retention (ADR-012 D7): once the estimate is purged, the snapshot
+    is soft-deleted too (audited like every soft delete) with a CONFIGURATION_PURGED event. A snapshot holds no personal
+    data (an allowlisted configuration, record versions and the engine request), so an estimate that a lead still
+    references keeps it."""
+    rows = list(
+        s.execute(
+            sa.select(CatalogConfiguration)
+            .join(BudgetEstimate, BudgetEstimate.id == CatalogConfiguration.estimate_id)
+            .where(BudgetEstimate.is_deleted.is_(True), CatalogConfiguration.is_deleted.is_(False))
+            .execution_options(include_deleted=True)  # the purged estimates are soft-deleted rows
+        ).scalars()
+    )
+    if not dry_run:
+        for row in rows:
+            _delete(s, row, "estimate retention")
+    return len(rows)
+
+
+def delete(s: Session, reference: str, reason: str) -> None:
+    """A deletion request for one stored configuration (staff, catalog.admin). The estimate it priced keeps its own
+    snapshots; only the catalog configuration is removed."""
+    if len((reason or "").strip()) < 10:
+        raise ApiError(422, "VALIDATION_FAILED", "Say why the configuration is deleted (at least 10 characters).")
+    row = s.execute(
+        sa.select(CatalogConfiguration).where(
+            CatalogConfiguration.configuration_reference == reference, CatalogConfiguration.is_deleted.is_(False)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ApiError(404, "NOT_FOUND", "No such configuration.")
+    _delete(s, row, reason.strip()[:200])
+
+
+def _delete(s: Session, row: CatalogConfiguration, reason: str) -> None:
+    row.is_deleted, row.deleted_on = True, db.tx_time(s)
+    s.add(CatalogEvent(event_type="CONFIGURATION_PURGED",
+                       detail={"reference": row.configuration_reference, "reason": reason}))  # fmt: skip

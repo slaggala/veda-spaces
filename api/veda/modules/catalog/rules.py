@@ -175,3 +175,32 @@ def contradictions(cat: Catalog) -> list[str]:
                 if third != other and third in exc.get(other, set()):
                     found.append(f"{subject} requires {other} and {third}, which exclude each other")
     return sorted(set(found))
+
+
+def path_problem(cat: Catalog, path: str) -> str | None:
+    """Why a rule path does not name something real (R5), or None. Every part must exist: the product, extra or room;
+    the variant; the option group in that variant (or in some variant when none is named); the choice in that group.
+    A misspelled path such as `product:tv-unit#boxx` is an error, never an always-false condition."""
+    kind, _, rest = path.partition(":")
+    if kind == "extra":
+        return None if cat.one(kinds.Extra, rest) else f"no extra {rest}"
+    if kind == "room":
+        return None if cat.one(kinds.RoomTemplate, rest) else f"no room template {rest}"
+    head, _, option = rest.partition("@")
+    key, _, vkey = head.partition("#")
+    product = cat.one(kinds.Product, key)
+    if product is None:
+        return f"no product {key}"
+    variants = product.variants
+    if vkey:
+        variants = tuple(v for v in product.variants if v.key == vkey)
+        if not variants:
+            return f"product {key} has no variant {vkey}"
+    if option:
+        gkey, _, ckey = option.partition("=")
+        groups = [g for v in variants for g in v.option_groups if g.key == gkey]
+        if not groups:
+            return f"product {key} has no option group {gkey}"
+        if not any(c.key == ckey for g in groups for c in g.choices):
+            return f"option group {gkey} of product {key} has no choice {ckey}"
+    return None

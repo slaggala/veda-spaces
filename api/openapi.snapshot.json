@@ -4264,6 +4264,56 @@
       }
     },
     "/api/v1/catalog/configurations/{reference}": {
+      "delete": {
+        "operationId": "catalog_delete_configuration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reference",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A deletion request for one stored configuration (audited; the estimate keeps its own snapshots).",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      },
       "get": {
         "operationId": "catalog_reopen_configuration",
         "parameters": [

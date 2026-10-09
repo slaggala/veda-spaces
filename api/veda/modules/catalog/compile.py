@@ -10,8 +10,9 @@ an input: only the catalog's engine product, options and the customer's measurem
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -20,7 +21,7 @@ from veda.modules.estimator import engine, ratecard
 from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import EstimatorRateCard
 
-from . import kinds, rules
+from . import configuration, kinds, rules
 from .models import CatalogRecord, CatalogRelease
 
 M = TypeVar("M", bound=kinds._Model)
@@ -117,16 +118,58 @@ def store_card(s: Session, release: CatalogRelease) -> EstimatorRateCard:
     return estimator_service.load_card(s, document)
 
 
+# --- visibility (R4) -------------------------------------------------------------------------------------------------
+def hidden_paths(cat: Catalog) -> set[str]:
+    """Every reference path no customer may see or select: records, variants and choices with staff visibility, and the
+    subjects of staff_only rules. Applied to the customer view before serialisation and to every public configuration."""
+    out = set(rules.staff_only_subjects(cat))
+    for key, p in cat.of(kinds.Product).items():
+        if p.visibility == "staff":
+            out.add(f"product:{key}")
+        for v in p.variants:
+            if v.visibility == "staff":
+                out.add(f"product:{key}#{v.key}")
+            for g in v.option_groups:
+                for c in g.choices:
+                    if c.visibility == "staff":
+                        out.add(f"product:{key}#{v.key}@{g.key}={c.key}")
+    for kind, prefix in (
+        ("extra", "extra"),
+        ("room_template", "room"),
+        ("package", "package"),
+        ("home_config", "home"),
+    ):
+        for key, m in cat.models_of(kind).items():
+            if getattr(m, "visibility", "customer") == "staff":
+                out.add(f"{prefix}:{key}")
+    return out
+
+
+def _variant_hidden(hidden: set[str], pkey: str, vkey: str) -> bool:
+    return bool({f"product:{pkey}", f"product:{pkey}#{vkey}"} & hidden)
+
+
+def _choice_hidden(hidden: set[str], pkey: str, vkey: str, gkey: str, ckey: str) -> bool:
+    return _variant_hidden(hidden, pkey, vkey) or bool(
+        {f"product:{pkey}#{vkey}@{gkey}={ckey}", f"product:{pkey}@{gkey}={ckey}"} & hidden
+    )
+
+
 # --- the customer view -----------------------------------------------------------------------------------------------
-_STAFF_FIELDS = {"staff_note", "warranty_source", "note", "visibility", "governance", "rights", "objects"}
+# Staff-only fields, and material and hardware specification fields: a grade, a thickness, a brand, a load capacity or
+# a soft-close capability is a promise, shown only through a governed copy statement (R2/R3).
+_STAFF_FIELDS = {
+    "staff_note", "warranty_source", "note", "visibility", "governance", "rights", "objects", "brands", "grade",
+    "thickness", "load_capacity_kg", "soft_close", "compatible_families", "matrix_row", "applies_to",
+}  # fmt: skip
 
 
-def _public(model: kinds._Model) -> dict:
-    data = model.model_dump(mode="json", exclude_none=True)
-    return _strip(data)
+def _public(model: kinds._Model) -> dict[str, Any]:
+    stripped = _strip(model.model_dump(mode="json", exclude_none=True))
+    return stripped if isinstance(stripped, dict) else {}
 
 
-def _strip(value):
+def _strip(value: object) -> object:
     if isinstance(value, dict):
         return {k: _strip(v) for k, v in value.items() if k not in _STAFF_FIELDS}
     if isinstance(value, list):
@@ -142,39 +185,86 @@ def media_view(m: kinds.Media) -> dict:
     return view
 
 
+def _product_view(key: str, p: kinds.Product, hidden: set[str]) -> dict:
+    view = _public(p)
+    variants = []
+    for v, vview in zip(p.variants, view["variants"], strict=True):
+        if _variant_hidden(hidden, key, v.key):
+            continue
+        groups = []
+        for g, gview in zip(v.option_groups, vview.get("option_groups", []), strict=True):
+            choices = [cv for c, cv in zip(g.choices, gview["choices"], strict=True)
+                       if not _choice_hidden(hidden, key, v.key, g.key, c.key)]  # fmt: skip
+            if choices:
+                groups.append({**gview, "choices": choices})
+        variants.append({**vview, "option_groups": groups})
+    view["variants"] = variants
+    return view
+
+
 def customer_view(cat: Catalog) -> dict:
-    """Everything the V3 page may show for this release. Staff-only records, pricing and staff-only rules are left out;
-    copy is reduced to its statement."""
+    """Everything the V3 page may show for this release, filtered before serialisation: no staff-only record, variant,
+    choice, extra, room, package or home; no pricing; no staff or specification field; copy reduced to its statement;
+    references to hidden things removed."""
+    hidden = hidden_paths(cat)
+
+    def shown(prefix: str, key: str) -> bool:
+        return f"{prefix}:{key}" not in hidden
+
     out: dict = {"release": cat.release_code, "manifest_sha256": cat.manifest_sha256}
-    for kind in ("property_type", "home_config", "room_template", "product_family", "product", "extra", "material",
-                 "hardware", "package"):  # fmt: skip
-        out[kind] = {
-            k: _public(m)
-            for k, m in sorted(cat.models_of(kind).items())
-            if getattr(m, "visibility", "customer") == "customer"
-        }
-    for p in out["product"].values():
-        p["variants"] = [v for v in p["variants"] if v.get("visibility", "customer") == "customer"]
+    out["product"] = {
+        k: _product_view(k, p, hidden) for k, p in sorted(cat.of(kinds.Product).items()) if shown("product", k)
+    }
+    out["product"] = {k: v for k, v in out["product"].items() if v["variants"]}
+    out["extra"] = {k: _public(e) for k, e in sorted(cat.of(kinds.Extra).items()) if shown("extra", k)}
+    rooms = {}
+    for k, r in sorted(cat.of(kinds.RoomTemplate).items()):
+        if not shown("room", k):
+            continue
+        view = _public(r)
+        view["included"] = [s for s in view["included"] if s["product"] in out["product"]]
+        view["extras"] = [x for x in view["extras"] if x in out["extra"]]
+        rooms[k] = view
+    out["room_template"] = rooms
+    out["package"] = {}
+    for k, pk in sorted(cat.of(kinds.Package).items()):
+        if shown("package", k):
+            view = _public(pk)
+            for f in ("included_products", "optional_products"):
+                view[f] = [x for x in view.get(f, []) if x in out["product"]]
+            for f in ("included_extras", "excluded_extras"):
+                view[f] = [x for x in view.get(f, []) if x in out["extra"]]
+            out["package"][k] = view
+    out["home_config"] = {}
+    for k, h in sorted(cat.of(kinds.HomeConfig).items()):
+        if shown("home", k):
+            view = _public(h)
+            view["rooms"] = [r for r in view["rooms"] if r["room_template"] in rooms]
+            view["packages"] = [x for x in view["packages"] if x in out["package"]]
+            out["home_config"][k] = view
+    for kind in ("property_type", "product_family", "material", "hardware"):
+        out[kind] = {k: _public(m) for k, m in sorted(cat.models_of(kind).items())
+                     if getattr(m, "visibility", "customer") == "customer"}  # fmt: skip
     out["media"] = {k: media_view(m) for k, m in sorted(cat.of(kinds.Media).items())}
     out["copy"] = {k: {"statement": m.statement, "category": m.category} for k, m in sorted(cat.of(kinds.Copy).items())}
-    out["rule"] = {
-        k: _public(m) for k, m in sorted(cat.of(kinds.Rule).items()) if m.type != "staff_only"
-    }  # mirrored in the browser for feedback only; the server is authoritative
-    out["hidden"] = sorted(rules.staff_only_subjects(cat))
+    # Rules are mirrored in the browser for feedback only (the server is authoritative); staff-only ones never are.
+    out["rule"] = {k: _public(m) for k, m in sorted(cat.of(kinds.Rule).items())
+                   if m.type != "staff_only" and m.subject not in hidden}  # fmt: skip
     return out
 
 
-# --- configuration → engine request ---------------------------------------------------------------------------------
+# --- configuration → engine request (R6) ------------------------------------------------------------------------------
 @dataclass
 class Resolved:
     request: engine.EstimateRequest
     versions: dict[str, dict[str, int]]
-    selections: dict
+    configuration: configuration.Configuration  # the normal form: exactly what was priced, as stored in the snapshot
 
 
-def _use(used: dict, cat: Catalog, kind: str, key: str | None) -> None:
-    if key:
-        used.setdefault(kind, {})[key] = cat.version(kind, key)
+def _use(used: dict[str, dict[str, int]], cat: Catalog, kind: str, key: str | None) -> None:
+    if not key:
+        return
+    used.setdefault(kind, {})[key] = cat.version(kind, key)
     model = cat.model(kind, key)
     if isinstance(model, (kinds.Material, kinds.Hardware)):  # the governed statements shown with it
         for statement in model.statements:
@@ -187,218 +277,253 @@ def _use(used: dict, cat: Catalog, kind: str, key: str | None) -> None:
             _use(used, cat, "media", model.three_d.fallback_gallery)
 
 
-def _use_all(used: dict, cat: Catalog, kind: str, keys) -> None:
+def _use_all(used: dict[str, dict[str, int]], cat: Catalog, kind: str, keys: Iterable[str | None]) -> None:
     for key in keys:
         _use(used, cat, kind, key)
 
 
-def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
-    """Resolve a customer configuration to the engine request. Every unknown or unsupported choice fails closed.
+@dataclass
+class _Planned:
+    """One engine selection, decided but not yet built (built only when the whole configuration is valid)."""
 
-    config = {home, project_kind, package, city?, rooms: [{room, products: {product: {variant?, options?, removed?,
-    measurements?}}, extras: {extra: {count?, measurements?}}}]}
+    room_code: str
+    engine_product: str
+    options: dict[str, str]
+    measurements: dict[str, engine.Measurement]
+
+
+@dataclass
+class _Plan:
+    errors: list[dict] = field(default_factory=list)
+    active: set[str] = field(default_factory=set)
+    measures: dict[str, dict[str, float]] = field(default_factory=dict)
+    used: dict[str, dict[str, int]] = field(default_factory=dict)
+    selections: list[_Planned] = field(default_factory=list)
+    rooms: list[configuration.RoomChoice] = field(default_factory=list)
+
+    def fail(self, where: str, code: str, message: str) -> None:
+        self.errors.append({"field": where, "code": code, "message": message})
+
+
+def resolve(cat: Catalog, raw: object, *, public: bool = True) -> Resolved:
+    """Resolve a customer configuration to the engine request, failing closed on anything unknown or unsupported.
+
+    The phases run in a fixed order:
+    1. Schema: the strict allowlist.
+    2. Plan: home, package and room availability, visibility, package filtering, applicability, options and
+       measurement bounds.
+    3. Rules: compatibility and dependencies.
+    4. Only if nothing failed, the engine request and the normal form are built.
+
+    The selections priced are therefore exactly the normalised configuration that is stored, and re-resolving the
+    normal form gives the same request.
     """
-    errors: list[dict] = []
-
-    def fail(where: str, code: str, message: str) -> None:
-        errors.append({"field": where, "code": code, "message": message})
-
-    used: dict[str, dict[str, int]] = {}
-    home = cat.one(kinds.HomeConfig, config.get("home"))
-    package = cat.one(kinds.Package, config.get("package"))
-    if home is None:
+    try:
+        config = raw if isinstance(raw, configuration.Configuration) else configuration.parse(raw)
+    except configuration.ConfigurationError as err:
+        raise CompileError(err.errors) from None
+    hidden = hidden_paths(cat) if public else set()
+    home = cat.one(kinds.HomeConfig, config.home)
+    package = cat.one(kinds.Package, config.package)
+    if home is None or f"home:{config.home}" in hidden:
         raise CompileError([{"field": "home", "code": "UNKNOWN_HOME", "message": "Choose a home type."}])
-    if package is None or config.get("package") not in home.packages:
+    if package is None or config.package not in home.packages or f"package:{config.package}" in hidden:
         raise CompileError([{"field": "package", "code": "PACKAGE_UNAVAILABLE", "message": "Choose a package."}])
     ptype = cat.one(kinds.PropertyType, home.property_type)
     if ptype is None:
         raise CompileError("the home's property type is not in this release")
-    _use(used, cat, "home_config", config["home"])
-    _use(used, cat, "package", config["package"])
-    _use(used, cat, "property_type", home.property_type)
-    ctx = rules.Context(
-        property_type=ptype.code,
-        home_size=home.home_size,
-        project_kind=_project_kind(config.get("project_kind")),
-        package=package.engine_package,
-        market=config.get("city"),
-        public=public,
-    )
+    plan = _Plan()
+    _use(plan.used, cat, "home_config", config.home)
+    _use(plan.used, cat, "package", config.package)
+    _use(plan.used, cat, "property_type", home.property_type)
+    _use(plan.used, cat, "copy", package.public_summary)
+    ctx = rules.Context(property_type=ptype.code, home_size=home.home_size, project_kind=config.project_kind,
+                        package=package.engine_package, public=public)  # fmt: skip
     if package.consultation_only:
-        fail("package", "CONSULTATION_REQUIRED", "This package is priced after a design consultation.")
-    _use(used, cat, "copy", package.public_summary)
+        plan.fail("package", "CONSULTATION_REQUIRED", "This package is priced after a design consultation.")
+    allowed_products = set(package.included_products) | set(package.optional_products)  # empty: every product
     allowed_rooms = {slot.room_template for slot in home.rooms}
-    active: set[str] = set()
-    measures: dict[str, dict[str, float]] = {}
-    selections: list[engine.Selection] = []
-    rooms_in = config.get("rooms") or []
     seen_rooms: set[str] = set()
-    for ri, room_in in enumerate(rooms_in):
-        rkey = room_in.get("room")
-        where = f"rooms[{ri}]"
-        room = cat.one(kinds.RoomTemplate, rkey)
-        if room is None or rkey not in allowed_rooms:
-            fail(f"{where}.room", "ROOM_UNAVAILABLE", "This room is not offered for this home.")
+    for ri, room_in in enumerate(config.rooms):
+        where = f"rooms.{ri}"
+        room = cat.one(kinds.RoomTemplate, room_in.room)
+        if room is None or room_in.room not in allowed_rooms or f"room:{room_in.room}" in hidden:
+            plan.fail(f"{where}.room", "ROOM_UNAVAILABLE", "This room is not offered for this home.")
             continue
-        if rkey in seen_rooms:
-            fail(f"{where}.room", "DUPLICATE_ROOM", "This room is listed twice.")
+        if room_in.room in seen_rooms:
+            plan.fail(f"{where}.room", "DUPLICATE_ROOM", "This room is listed twice.")
             continue
-        seen_rooms.add(rkey)
-        _use(used, cat, "room_template", rkey)
-        _use_all(used, cat, "media", (room.image, room.gallery))
-        active.add(f"room:{rkey}")
-        products_in = room_in.get("products") or {}
-        slots = {slot.product: slot for slot in room.included}
-        for unknown in set(products_in) - set(slots):
-            fail(f"{where}.products.{unknown}", "PRODUCT_UNAVAILABLE", "This item is not offered in this room.")
-        extras_in = room_in.get("extras") or {}
-        for unknown in set(extras_in) - set(room.extras):
-            fail(f"{where}.extras.{unknown}", "EXTRA_UNAVAILABLE", "This extra is not offered in this room.")
-        # Option changes requested by selected extras (set_option), applied to the room's included products.
-        forced: dict[str, dict[str, str]] = {}
-        for ekey in room.extras:
-            if ekey not in extras_in:
-                continue
-            extra = cat.one(kinds.Extra, ekey)
-            if extra is not None and extra.set_option is not None:
-                forced.setdefault(extra.set_option.product, {})[extra.set_option.group] = extra.set_option.choice
-        for pkey, slot in slots.items():
-            pin = products_in.get(pkey) or {}
-            pwhere = f"{where}.products.{pkey}"
-            if pin.get("removed"):
-                if not slot.removable:
-                    fail(pwhere, "NOT_REMOVABLE", "This item is part of the room.")
-                continue
-            sel = _product_selection(cat, room, slot, pin, forced.get(pkey, {}), ctx, pwhere, fail, used, active,
-                                     measures)  # fmt: skip
-            if sel is not None:
-                selections.append(sel)
-        for ekey in room.extras:  # the room's order, as the V2 page sends them
-            if ekey not in extras_in:
-                continue
-            ein = extras_in[ekey]
-            sel = _extra_selection(cat, room, ekey, ein or {}, slots, products_in, ctx, f"{where}.extras.{ekey}", fail,
-                                   used, active, measures)  # fmt: skip
-            selections.extend(sel)
-    if not rooms_in:
-        fail("rooms", "NO_ROOMS", "Choose at least one room.")
-    errors.extend(rules.evaluate(cat, ctx, active, measures))
-    for kind, keys in rules.rules_used(cat, active).items():
-        for key in keys:
-            _use(used, cat, kind, key)
-    if errors:
-        raise CompileError(errors)
+        seen_rooms.add(room_in.room)
+        _plan_room(cat, plan, ctx, hidden, package, allowed_products, room_in, room, where)
+    plan.errors.extend(rules.evaluate(cat, ctx, plan.active, plan.measures))
+    for kind, keys in rules.rules_used(cat, plan.active).items():
+        _use_all(plan.used, cat, kind, keys)
+    if plan.errors:
+        raise CompileError(plan.errors)
     try:
         request = engine.EstimateRequest(
             property_type=ptype.code,
             home_size=home.home_size,
-            project_kind=ctx.project_kind,
-            city=config.get("city") or None,
+            project_kind=config.project_kind,
             package=package.engine_package,
-            selections=tuple(selections),
+            selections=tuple(
+                engine.Selection(
+                    room=x.room_code, product=x.engine_product, options=x.options, measurements=x.measurements
+                )  # fmt: skip
+                for x in plan.selections
+            ),
         )
     except ValueError as err:
-        raise CompileError("the configuration cannot be priced (too many or invalid selections)") from err
-    return Resolved(request=request, versions=used, selections=config)
+        raise CompileError(
+            [{"field": "rooms", "code": "TOO_MANY", "message": "Too many items for one estimate."}]
+        ) from err
+    normal = configuration.Configuration(home=config.home, package=config.package, project_kind=config.project_kind,
+                                         rooms=plan.rooms)  # fmt: skip
+    return Resolved(request=request, versions=plan.used, configuration=normal)
 
 
-def _project_kind(value: object) -> kinds.ProjectKind:
-    if value is None or value == "NEW_HOME":
-        return "NEW_HOME"
-    if value == "RENOVATION":
-        return "RENOVATION"
-    raise CompileError([{"field": "project_kind", "code": "INVALID", "message": "Choose a new home or a renovation."}])
+def _plan_room(cat: Catalog, plan: _Plan, ctx: rules.Context, hidden: set[str], package: kinds.Package,
+               allowed_products: set[str], room_in: configuration.RoomChoice, room: kinds.RoomTemplate,
+               where: str) -> None:  # fmt: skip
+    _use(plan.used, cat, "room_template", room_in.room)
+    _use_all(plan.used, cat, "media", (room.image, room.gallery))
+    plan.active.add(f"room:{room_in.room}")
+    slots = {slot.product: slot for slot in room.included}
+    for unknown in sorted(set(room_in.products) - set(slots)):
+        plan.fail(f"{where}.products.{unknown}", "PRODUCT_UNAVAILABLE", "This item is not offered in this room.")
+    for unknown in sorted(set(room_in.extras) - set(room.extras)):
+        plan.fail(f"{where}.extras.{unknown}", "EXTRA_UNAVAILABLE", "This extra is not offered in this room.")
+    forced: dict[str, dict[str, str]] = {}  # option changes made by selected set_option extras
+    for ekey in room.extras:
+        extra = cat.one(kinds.Extra, ekey)
+        if ekey in room_in.extras and extra is not None and extra.set_option is not None:
+            forced.setdefault(extra.set_option.product, {})[extra.set_option.group] = extra.set_option.choice
+    products: dict[str, configuration.ProductChoice] = {}
+    for pkey, slot in slots.items():
+        pin = room_in.products.get(pkey, configuration.ProductChoice())
+        pwhere = f"{where}.products.{pkey}"
+        if pin.removed:
+            if not slot.removable:
+                plan.fail(pwhere, "NOT_REMOVABLE", "This item is part of the room.")
+            products[pkey] = configuration.ProductChoice(removed=True)
+            continue
+        if f"product:{pkey}" in hidden or (allowed_products and pkey not in allowed_products):
+            plan.fail(pwhere, "PACKAGE_EXCLUDED", "This item is not part of the chosen package.")
+            continue
+        chosen = _plan_product(cat, plan, ctx, hidden, room, slot, pin, forced.get(pkey, {}), pwhere)
+        if chosen is not None:
+            products[pkey] = chosen
+    extras: dict[str, configuration.ExtraChoice] = {}
+    for ekey in room.extras:  # the room's order, as the V2 page sends them
+        if ekey in room_in.extras:
+            chosen_extra = _plan_extra(cat, plan, hidden, package, room, ekey, room_in.extras[ekey], products,
+                                       f"{where}.extras.{ekey}")  # fmt: skip
+            if chosen_extra is not None:
+                extras[ekey] = chosen_extra
+    plan.rooms.append(configuration.RoomChoice(room=room_in.room, products=products, extras=extras))
 
 
-def _measurements(prompts, given: dict, where: str, fail) -> dict[str, engine.Measurement]:
+def _measurements(plan: _Plan, prompts: tuple[kinds.MeasurementPrompt, ...], given: dict[str, float | int],
+                  where: str) -> dict[str, engine.Measurement]:  # fmt: skip
     out = {}
     by_input = {p.input: p for p in prompts}
-    for name, value in (given or {}).items():
+    for name, value in given.items():
         prompt = by_input.get(name)
         if prompt is None:
-            fail(f"{where}.measurements.{name}", "UNKNOWN_INPUT", "This measurement is not asked for this item.")
+            plan.fail(f"{where}.measurements.{name}", "UNKNOWN_INPUT", "This measurement is not asked for this item.")
             continue
-        if not isinstance(value, int | float) or isinstance(value, bool) or not prompt.min <= value <= prompt.max:
-            fail(
-                f"{where}.measurements.{name}",
-                "OUT_OF_RANGE",
-                f"Enter between {prompt.min:g} and {prompt.max:g} {prompt.unit}.",
-            )
+        if not prompt.min <= value <= prompt.max:
+            plan.fail(f"{where}.measurements.{name}", "OUT_OF_RANGE",
+                      f"Enter between {prompt.min:g} and {prompt.max:g} {prompt.unit}.")  # fmt: skip
             continue
         out[name] = engine.Measurement(value=float(value), unit=prompt.unit)
     return out
 
 
-def _product_selection(cat, room, slot, pin, forced, ctx, where, fail, used, active, measures):
+def _plan_product(cat: Catalog, plan: _Plan, ctx: rules.Context, hidden: set[str], room: kinds.RoomTemplate,
+                  slot: kinds.ProductSlot, pin: configuration.ProductChoice, forced: dict[str, str],
+                  where: str) -> configuration.ProductChoice | None:  # fmt: skip
     product = cat.one(kinds.Product, slot.product)
     if product is None:
-        fail(where, "PRODUCT_UNAVAILABLE", "This item is not available.")
+        plan.fail(where, "PRODUCT_UNAVAILABLE", "This item is not available.")
         return None
-    vkey = pin.get("variant") or slot.variant
+    vkey = pin.variant or slot.variant
     variant = next((v for v in product.variants if v.key == vkey), None)
-    if variant is None or (ctx.public and variant.visibility != "customer"):
-        fail(f"{where}.variant", "VARIANT_UNAVAILABLE", "This option is not available.")
+    if variant is None or _variant_hidden(hidden, slot.product, vkey):
+        plan.fail(f"{where}.variant", "VARIANT_UNAVAILABLE", "This option is not available.")
         return None
     if room.room_code not in product.rooms:
-        fail(where, "PRODUCT_UNAVAILABLE", "This item is not offered in this room.")
+        plan.fail(where, "PRODUCT_UNAVAILABLE", "This item is not offered in this room.")
         return None
     if ctx.package not in product.packages:
-        fail(where, "PACKAGE_UNAVAILABLE", "This item is not part of the chosen package.")
+        plan.fail(where, "PACKAGE_EXCLUDED", "This item is not part of the chosen package.")
         return None
-    _use(used, cat, "product", slot.product)
-    _use(used, cat, "product_family", product.family)
-    active.update({f"product:{slot.product}", f"product:{slot.product}#{vkey}"})
+    _use(plan.used, cat, "product", slot.product)
+    _use(plan.used, cat, "product_family", product.family)
+    plan.active.update({f"product:{slot.product}", f"product:{slot.product}#{vkey}"})
     options = dict(variant.engine_options)
-    defaults = slot.options if vkey == slot.variant else {}  # the room's presets belong to its own variant
-    chosen = {**defaults, **(pin.get("options") or {}), **forced}
-    for gkey in set(chosen) - {g.key for g in variant.option_groups}:
-        fail(f"{where}.options.{gkey}", "UNKNOWN_OPTION", "This choice is not offered for this item.")
+    presets = slot.options if vkey == slot.variant else {}  # the room's presets belong to its own variant
+    wanted = {**presets, **pin.options, **forced}
+    for gkey in sorted(set(wanted) - {g.key for g in variant.option_groups}):
+        plan.fail(f"{where}.options.{gkey}", "UNKNOWN_OPTION", "This choice is not offered for this item.")
+    chosen: dict[str, str] = {}
     for group in variant.option_groups:
-        ckey = chosen.get(group.key, group.default)
+        ckey = wanted.get(group.key, group.default)
         choice = next((c for c in group.choices if c.key == ckey), None)
-        if choice is None or (ctx.public and choice.visibility != "customer"):
-            fail(f"{where}.options.{group.key}", "UNKNOWN_CHOICE", "This choice is not offered for this item.")
+        if choice is None or _choice_hidden(hidden, slot.product, vkey, group.key, ckey):
+            plan.fail(f"{where}.options.{group.key}", "UNKNOWN_CHOICE", "This choice is not offered for this item.")
             continue
+        chosen[group.key] = ckey
         options.update(choice.engine_options)
-        active.add(f"product:{slot.product}#{vkey}@{group.key}={ckey}")
-        active.add(f"product:{slot.product}@{group.key}={ckey}")
-        _use_all(used, cat, "material", choice.materials)
-        _use_all(used, cat, "hardware", choice.hardware)
-        _use_all(used, cat, "media", choice.media)
-    _use_all(used, cat, "material", variant.materials)
-    _use_all(used, cat, "hardware", variant.hardware)
-    _use_all(used, cat, "media", (*product.media, *variant.media))
-    given = _measurements(variant.measurements, pin.get("measurements"), where, fail)
-    measures[f"product:{slot.product}"] = {k: m.value for k, m in given.items()}
-    return engine.Selection(room=room.room_code, product=variant.engine_product, measurements=given, options=options)
-
-
-def _extra_selection(cat, room, ekey, ein, slots, products_in, ctx, where, fail, used, active, measures):
-    extra = cat.one(kinds.Extra, ekey)
-    if extra is None or (ctx.public and extra.visibility != "customer"):
-        fail(where, "EXTRA_UNAVAILABLE", "This extra is not available.")
-        return []
-    _use(used, cat, "extra", ekey)
-    _use_all(used, cat, "material", extra.materials)
-    _use_all(used, cat, "hardware", extra.hardware)
-    _use_all(used, cat, "media", extra.media)
-    active.add(f"extra:{ekey}")
-    count = ein.get("count", 1)
-    if extra.quantity == "fixed":
-        count = 1
-    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= extra.max_count:
-        fail(f"{where}.count", "OUT_OF_RANGE", f"Choose between 1 and {extra.max_count}.")
-        return []
-    if extra.set_option is not None:
-        target = extra.set_option.product
-        if target not in slots or (products_in.get(target) or {}).get("removed"):
-            fail(where, "REQUIRES_ITEM", "This extra needs the item it upgrades.")
-        return []
-    given = _measurements(extra.measurements, ein.get("measurements"), where, fail)
-    measures[f"extra:{ekey}"] = {k: m.value for k, m in given.items()}
-    return [
-        engine.Selection(
-            room=room.room_code, product=extra.add.engine_product, measurements=given, options=extra.add.engine_options
+        plan.active.update(
+            {f"product:{slot.product}#{vkey}@{group.key}={ckey}", f"product:{slot.product}@{group.key}={ckey}"}
         )
-        for _ in range(count)
-    ]
+        _use_all(plan.used, cat, "material", choice.materials)
+        _use_all(plan.used, cat, "hardware", choice.hardware)
+        _use_all(plan.used, cat, "media", choice.media)
+    _use_all(plan.used, cat, "material", variant.materials)
+    _use_all(plan.used, cat, "hardware", variant.hardware)
+    _use_all(plan.used, cat, "media", (*product.media, *variant.media))
+    given = _measurements(plan, variant.measurements, pin.measurements, where)
+    plan.measures[f"product:{slot.product}"] = {k: m.value for k, m in given.items()}
+    plan.selections.append(_Planned(room.room_code, variant.engine_product, options, given))
+    return configuration.ProductChoice(
+        variant=vkey, options=chosen, measurements={k: m.value for k, m in given.items()}
+    )
+
+
+def _plan_extra(cat: Catalog, plan: _Plan, hidden: set[str], package: kinds.Package, room: kinds.RoomTemplate,
+                ekey: str, ein: configuration.ExtraChoice, products: dict[str, configuration.ProductChoice],
+                where: str) -> configuration.ExtraChoice | None:  # fmt: skip
+    extra = cat.one(kinds.Extra, ekey)
+    if extra is None or f"extra:{ekey}" in hidden:
+        plan.fail(where, "EXTRA_UNAVAILABLE", "This extra is not available.")
+        return None
+    if ekey in package.excluded_extras:
+        plan.fail(where, "PACKAGE_EXCLUDED", "This extra is not part of the chosen package.")
+        return None
+    count = 1 if extra.quantity == "fixed" else ein.count
+    if not 1 <= count <= extra.max_count:
+        plan.fail(f"{where}.count", "OUT_OF_RANGE", f"Choose between 1 and {extra.max_count}.")
+        return None
+    _use(plan.used, cat, "extra", ekey)
+    _use_all(plan.used, cat, "material", extra.materials)
+    _use_all(plan.used, cat, "hardware", extra.hardware)
+    _use_all(plan.used, cat, "media", extra.media)
+    plan.active.add(f"extra:{ekey}")
+    if extra.set_option is not None:
+        target = products.get(extra.set_option.product)
+        if target is None or target.removed:
+            plan.fail(where, "REQUIRES_ITEM", "This extra needs the item it upgrades.")
+            return None
+        return configuration.ExtraChoice(count=1)
+    if extra.add is None:  # the schema requires exactly one of add and set_option; refuse rather than assume
+        plan.fail(where, "EXTRA_UNAVAILABLE", "This extra is not available.")
+        return None
+    given = _measurements(plan, extra.measurements, ein.measurements, where)
+    plan.measures[f"extra:{ekey}"] = {k: m.value for k, m in given.items()}
+    for _ in range(count):
+        plan.selections.append(
+            _Planned(room.room_code, extra.add.engine_product, dict(extra.add.engine_options), given)
+        )
+    return configuration.ExtraChoice(count=count, measurements={k: m.value for k, m in given.items()})

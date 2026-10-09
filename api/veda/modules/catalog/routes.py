@@ -400,6 +400,14 @@ def reopen_configuration(req: Req, reference: str):
     return ok(configure.reopen(req.session, reference))
 
 
+@api.route("DELETE", "/configurations/<reference>", permission="catalog.admin", body=CatalogNoteIn, status=204,
+           requirement="CAT-008")  # fmt: skip
+def delete_configuration(req: Req, reference: str):
+    """A deletion request for one stored configuration (audited; the estimate keeps its own snapshots)."""
+    configure.delete(req.session, reference, req.body.note or "")
+    return None
+
+
 # --- staff: media, import/export, analytics --------------------------------------------------------------------------
 @api.route("POST", "/media", permission="catalog.media.edit", body=CatalogMediaIn, status=201, max_body=MEDIA_MAX_BODY,
            requirement="CAT-004")  # fmt: skip

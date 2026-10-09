@@ -50,6 +50,12 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
     _promises(cat, errors["promises"], warnings)
     _media(s, cat, errors["media"], errors["three_d"], warnings, today)
     errors["rules"].extend(rules.contradictions(cat))
+    for key, rule in sorted(cat.of(kinds.Rule).items()):
+        for path in (rule.subject, *rule.objects):
+            problem = rules.path_problem(cat, path)
+            if problem:
+                errors["rules"].append(f"rule {key}: {path}: {problem}")
+    errors["references"].extend(_hidden_defaults(cat))
     if not cat.of(kinds.HomeConfig):
         errors["references"].append("the release has no home configuration")
     _warnings(cat, warnings)
@@ -126,6 +132,21 @@ def _references(cat, out: list[str]) -> None:
             m = cat.one(kinds.Media, getattr(room, attr))
             if m is not None and m.type not in want:
                 out.append(f"room_template {key}: its {attr} must be a {want[0]} media record")
+
+
+def _hidden_defaults(cat: catalog_compile.Catalog) -> list[str]:
+    """A room's preset (variant or choice) that customers cannot see would make its default configuration
+    unpriceable for them: refuse it at validation rather than at the customer."""
+    hidden = catalog_compile.hidden_paths(cat)
+    out = []
+    for key, room in sorted(cat.of(kinds.RoomTemplate).items()):
+        for slot in room.included:
+            if catalog_compile._variant_hidden(hidden, slot.product, slot.variant):
+                out.append(f"room_template {key}: its default {slot.product} variant {slot.variant} is staff-only")
+            for gkey, ckey in slot.options.items():
+                if catalog_compile._choice_hidden(hidden, slot.product, slot.variant, gkey, ckey):
+                    out.append(f"room_template {key}: its preset {slot.product} {gkey}={ckey} is staff-only")
+    return out
 
 
 def _engine_options_ok(spec: ratecard.ProductSpec, options: dict, where: str, out: list[str]) -> None:

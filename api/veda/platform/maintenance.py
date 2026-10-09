@@ -812,7 +812,13 @@ def estimate_retention() -> dict:
     from veda.modules.estimator.service import purge_expired
 
     with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
-        return {"removed": purge_expired(s), "retention_days": settings().estimate_retention_days}
+        removed = purge_expired(s)
+        from veda.modules.catalog import configure as catalog_configure  # V3 snapshots follow their estimates
+
+        s.flush()
+        snapshots = catalog_configure.purge(s)
+        return {"removed": removed, "configurations_removed": snapshots,
+                "retention_days": settings().estimate_retention_days}  # fmt: skip
 
 
 def catalog_activation() -> dict:
