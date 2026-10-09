@@ -274,14 +274,9 @@ def create_release(s: Session, code: str, *, exclude: tuple[tuple[str, str], ...
         for r in sorted(chosen.values(), key=lambda r: (r.kind, r.record_key))
     ]
     manifest = {"release_code": code, "entries": entries}
-    previous = active_release(s)
+    # No predecessor is recorded at draft time: what a release replaces is known only when it is activated (R9).
     release = CatalogRelease(
-        release_code=code,
-        status="DRAFT",
-        manifest=manifest,
-        manifest_sha256=sha(manifest),
-        previous_release_id=previous.id if previous else None,
-        release_owner=_actor_id(),
+        release_code=code, status="DRAFT", manifest=manifest, manifest_sha256=sha(manifest), release_owner=_actor_id()
     )
     s.add(release)
     s.flush()
@@ -428,7 +423,21 @@ def schedule_release(s: Session, release_id: str, at: datetime) -> CatalogReleas
     return release
 
 
-def activate_release(s: Session, release_id: str, *, rollback: bool = False) -> CatalogRelease:
+_ANY = object()
+
+
+def _lock_active(s: Session) -> CatalogRelease | None:
+    """The ACTIVE release, locked for this transaction (PostgreSQL row lock; SQLite has one writer). Activation and
+    rollback both take it, so they serialise; the one-ACTIVE unique index refuses any race that slips through."""
+    return s.execute(
+        sa.select(CatalogRelease)
+        .where(CatalogRelease.status == "ACTIVE", CatalogRelease.is_deleted.is_(False))
+        .with_for_update()
+    ).scalar_one_or_none()
+
+
+def activate_release(s: Session, release_id: str, *, rollback: bool = False,
+                     expected_active: object = _ANY) -> CatalogRelease:  # fmt: skip
     """Make the release the one ACTIVE catalog (re-validated first; fails closed). Its records become ACTIVE, the
     previous release's records RETIRED (unless carried over), and its compiled card is stored for V3 pricing only."""
     from . import compile as catalog_compile
@@ -445,7 +454,9 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False) -> 
     _require_valid(s, release)
     records = release_records(s, release)
     now = db.tx_time(s)
-    current = active_release(s)
+    current = _lock_active(s)
+    if expected_active is not _ANY and (current.id if current else None) != expected_active:
+        raise CatalogError("the active release changed while this one was being activated; refusing")
     keep = {r.id for r in records}
     if current is not None:
         current.status, current.deactivated_on = "RETIRED", now
@@ -470,29 +481,69 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False) -> 
         row.status = "ACTIVE"
     release.rate_card_id = catalog_compile.store_card(s, release).id
     release.status, release.activated_on, release.deactivated_on = "ACTIVE", now, None
+    release.previous_release_id = current.id if current else None  # what it replaced, known only now
+    # The activation history (immutable events) is what rollback trusts: which release this one replaced.
     _event(
         s,
         "RELEASE_ROLLED_BACK" if rollback else "RELEASE_ACTIVATED",
         release=release,
         detail={"code": release.release_code, "manifest_sha256": release.manifest_sha256,
+                "previous_release_id": current.id if current else None,
                 "previous": current.release_code if current else None},
     )  # fmt: skip
     return release
 
 
-def rollback(s: Session, reason: str) -> CatalogRelease:
-    """Restore the previous release's exact manifest as a new release and activate it. No release row is reset or
-    edited: the active one is retired as on any activation, and the restored one is a new, immutable record that
-    names the release it restores (`rollback_of_id`). Validation runs again and fails closed."""
+def predecessor(s: Session, current: CatalogRelease) -> CatalogRelease:
+    """The release that was ACTIVE immediately before `current`, proven from the activation history, or a refusal.
+
+    `current` must have exactly one activation event, and that event must name a predecessor. The predecessor must be
+    RETIRED, retired at the moment `current` was activated, and agree with `current.previous_release_id`. Any gap
+    or disagreement fails closed."""
+    activations = list(
+        s.execute(
+            sa.select(CatalogEvent).where(
+                CatalogEvent.release_id == current.id,
+                CatalogEvent.event_type.in_(("RELEASE_ACTIVATED", "RELEASE_ROLLED_BACK")),
+            )
+        ).scalars()
+    )
+    if len(activations) != 1:
+        raise CatalogError(
+            "the activation history of the active release is missing or ambiguous; refusing to roll back"
+        )
+    prev_id = (activations[0].detail or {}).get("previous_release_id")
+    if not prev_id:
+        raise CatalogError("the active release replaced no release; there is nothing to roll back to")
+    prev = s.get(CatalogRelease, prev_id)
+    if (
+        prev is None
+        or prev.is_deleted
+        or prev.status != "RETIRED"
+        or prev.deactivated_on != current.activated_on
+        or current.previous_release_id != prev_id
+    ):
+        raise CatalogError("the activation history does not prove the previous release; refusing to roll back")
+    return prev
+
+
+def rollback(s: Session, reason: str, expected_release: str) -> CatalogRelease:
+    """Roll back the ACTIVE release, which must be `expected_release`, so a concurrent activation is refused. The
+    manifest that was active immediately before it is found at execution time from the activation history
+    (`predecessor`), restored exactly as a new release (`rollback_of_id`), re-validated and activated. No existing
+    release is changed beyond the usual retirement of the active one."""
     if len((reason or "").strip()) < 10:
         raise CatalogError("a rollback needs its reason or approval reference (at least 10 characters)")
-    current = active_release(s)
-    if current is None or current.previous_release_id is None:
-        raise CatalogError("there is no previous release to roll back to")
-    target = get_release(s, current.previous_release_id)
+    current = _lock_active(s)
+    if current is None:
+        raise CatalogError("there is no active release to roll back")
+    if current.release_code != expected_release:
+        raise CatalogError(f"the active release is {current.release_code}, not {expected_release}; refusing")
+    target = predecessor(s, current)
     release_records(s, target)  # the restored manifest must still match its records exactly
     now = db.tx_time(s)
-    code = f"RB{now:%Y%m%d%H%M%S}"
+    earlier = s.execute(sa.select(sa.func.count()).where(CatalogRelease.rollback_of_id.is_not(None))).scalar_one()
+    code = f"RB{now:%Y%m%d%H%M%S}-{earlier + 1}"
     manifest = {"release_code": code, "entries": [dict(e) for e in target.manifest["entries"]],
                 "rollback_of": target.release_code}  # fmt: skip
     me = _actor_id()
@@ -501,7 +552,6 @@ def rollback(s: Session, reason: str) -> CatalogRelease:
         status="APPROVED",
         manifest=manifest,
         manifest_sha256=sha(manifest),
-        previous_release_id=current.id,
         rollback_of_id=target.id,
         release_owner=me,
         preview_approved_by=target.preview_approved_by,
@@ -514,7 +564,7 @@ def rollback(s: Session, reason: str) -> CatalogRelease:
     s.add(restored)
     s.flush()
     _event(s, "RELEASE_CREATED", release=restored, detail={"code": code, "rollback_of": target.release_code})
-    return activate_release(s, restored.id, rollback=True)
+    return activate_release(s, restored.id, rollback=True, expected_active=current.id)
 
 
 def run_scheduled(s: Session) -> list[str]:

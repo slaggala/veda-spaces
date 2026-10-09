@@ -328,6 +328,9 @@ def _promises(cat: catalog_compile.Catalog, out: list[str], warnings: list[str])
         if not any(cat.one(kinds.Copy, s) is not None for s in item.statements):
             out.append(f"{kind} {key}: no registered statement")
     for key, package in cat.of(kinds.Package).items():
+        badge = cat.one(kinds.Copy, package.badge)
+        if package.badge and (badge is None or badge.category != "badge"):
+            out.append(f"package {key}: its badge must be a badge copy record in the release")
         if package.warranty_copy is None and not package.consultation_only:
             warnings.append(f"package {key}: no warranty statement")
 
@@ -361,7 +364,10 @@ def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str
                 out.append(f"media {key}: {name} file was withdrawn or purged")
             elif obj.scan_status != "CLEAN":
                 out.append(f"media {key}: {name} file is {obj.scan_status}")
-        if m.type in ("GLB", "GLTF", "USDZ"):
+        if m.type in kinds.THREE_D_TYPES:
+            # R12: 3D is planned but disabled. No release may contain a 3D object until 3D is approved, which needs a
+            # reviewed change here; until then this check refuses every one.
+            out3d.append(f"media {key}: 3D media is disabled; no release may contain it")
             t = m.three_d
             preview, fallback = cat.one(kinds.Media, t.preview_image), cat.one(kinds.Media, t.fallback_gallery)
             if preview is None or preview.type != "IMAGE":

@@ -121,7 +121,7 @@ def test_rollback_restores_the_exact_previous_manifest_as_a_new_release(staff, a
     approve_all(a, b)
     second = release(a, b, "SLICE-2")
 
-    restored = tx(a, service.rollback, "Owner asked to restore SLICE-1 (synthetic test)")
+    restored = tx(a, service.rollback, "Owner asked to restore SLICE-1 (synthetic test)", "SLICE-2")
     with db.unit_of_work(write=False) as s:
         active = service.active_release(s)
         assert active.id == restored.id and active.id not in (first, second), "a new release, not a reset"
@@ -144,9 +144,9 @@ def test_rollback_needs_a_reason_and_a_previous_release(staff):
     a, b, *_ = staff
     live_slice((a, b))
     with pytest.raises(service.CatalogError, match="reason"):
-        tx(a, service.rollback, "")
-    with pytest.raises(service.CatalogError, match="no previous release"):
-        tx(a, service.rollback, "Restore the previous catalog (test)")
+        tx(a, service.rollback, "", "SLICE-1")
+    with pytest.raises(service.CatalogError, match="replaced no release"):
+        tx(a, service.rollback, "Restore the previous catalog (test)", "SLICE-1")
 
 
 # --- R10: rejecting a scheduled release ---------------------------------------------------------------------------

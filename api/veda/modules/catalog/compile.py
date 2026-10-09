@@ -203,6 +203,32 @@ def _product_view(key: str, p: kinds.Product, hidden: set[str]) -> dict:
     return view
 
 
+def _reachable_media(cat: Catalog, view: dict) -> set[str]:
+    """Media keys used by what the view shows: rooms, products, their visible variants and choices, extras, and the
+    items, previews and fallbacks of those media."""
+    keys: set[str] = set()
+    for room in view["room_template"].values():
+        keys.update(x for x in (room.get("image"), room.get("gallery")) if x)
+    for pv in view["product"].values():
+        keys.update(pv.get("media", []))
+        for v in pv["variants"]:
+            keys.update(v.get("media", []))
+            for g in v.get("option_groups", []):
+                for c in g["choices"]:
+                    keys.update(c.get("media", []))
+    for ev in view["extra"].values():
+        keys.update(ev.get("media", []))
+    pending = list(keys)
+    while pending:
+        m = cat.one(kinds.Media, pending.pop())
+        if m is None:
+            continue
+        more = set(m.items) | ({m.three_d.preview_image, m.three_d.fallback_gallery} if m.three_d else set())
+        pending.extend(more - keys)
+        keys |= more
+    return keys
+
+
 def customer_view(cat: Catalog) -> dict:
     """Everything the V3 page may show for this release, filtered before serialisation: no staff-only record, variant,
     choice, extra, room, package or home; no pricing; no staff or specification field; copy reduced to its statement;
@@ -248,8 +274,9 @@ def customer_view(cat: Catalog) -> dict:
                      if getattr(m, "visibility", "customer") == "customer"}  # fmt: skip
     # 3D (G1): gallery only until VEDA_CATALOG_3D_ENABLED is approved and on; the models are then simply absent.
     models_shown = settings().catalog_3d_enabled
+    reachable = _reachable_media(cat, out)  # only media something visible uses; orphans never ship
     out["media"] = {k: media_view(m) for k, m in sorted(cat.of(kinds.Media).items())
-                    if models_shown or m.type not in kinds.THREE_D_TYPES}  # fmt: skip
+                    if k in reachable and (models_shown or m.type not in kinds.THREE_D_TYPES)}  # fmt: skip
     for kind in ("product", "extra"):
         for view in out[kind].values():
             view["media"] = [x for x in view.get("media", []) if x in out["media"]]

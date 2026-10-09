@@ -37,33 +37,32 @@ class Context:
     home_size: kinds.HomeSize
     project_kind: kinds.ProjectKind
     package: kinds.PackageCode
-    market: str | None = None
     public: bool = True
     today: date | None = None
 
 
 def matches(condition: kinds.Condition | None, ctx: Context) -> bool:
+    """Whether a rule's condition holds. Market conditions are refused when saved (MARKETS_UNSUPPORTED); one that
+    reaches here anyway (a record written around validation) fails closed: it is treated as not evaluable."""
     if condition is None:
         return True
+    if condition.markets:
+        raise ValueError(kinds.MARKETS_UNSUPPORTED)
     checks = (
         (condition.property_types, ctx.property_type),
         (condition.home_sizes, ctx.home_size),
         (condition.project_kinds, ctx.project_kind),
         (condition.packages, ctx.package),
     )
-    if any(allowed and value not in allowed for allowed, value in checks):
-        return False
-    if condition.markets and (ctx.market or "").strip().lower() not in {m.lower() for m in condition.markets}:
-        return False
-    return True
+    return not any(allowed and value not in allowed for allowed, value in checks)
 
 
 def available(a: kinds.Availability, ctx: Context) -> bool:
     today = ctx.today or date.today()
-    cond = kinds.Condition(
-        property_types=a.property_types, home_sizes=a.home_sizes, project_kinds=a.project_kinds, markets=a.markets
-    )
-    if not matches(cond, ctx):
+    if a.markets:  # refused when saved; fail closed if one is found anyway
+        return False
+    checks = ((a.property_types, ctx.property_type), (a.home_sizes, ctx.home_size), (a.project_kinds, ctx.project_kind))
+    if any(allowed and value not in allowed for allowed, value in checks):
         return False
     return not ((a.effective_from and today < a.effective_from) or (a.effective_to and today > a.effective_to))
 

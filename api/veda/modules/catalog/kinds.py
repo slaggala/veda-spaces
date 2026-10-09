@@ -48,8 +48,23 @@ _PROMISE_WORDS = re.compile(
 )
 
 
+# Marketing claims a short badge or ribbon must not make on its own (in addition to promise wording). A badge with
+# such a claim is a promise: it needs a promise-matrix row and governance like any other.
+_BADGE_CLAIMS = re.compile(
+    r"\b(premium|best|lowest|cheapest|top|unbeatable|number\s*one|no\.?\s*1|exclusive|offer\w*|discount\w*|sale|"
+    r"deal\w*|limited|save|saving\w*|bonus|gift|perfect|quality|luxur\w*)\b|#\s*1\b",
+    re.I,
+)
+
+
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+# The engine has no market or city context yet, so a market condition could never be evaluated: a hidden_when would
+# hide nothing, and a requires_consultation or unavailable_online rule would never fire (the item would be priced).
+# Until market logic exists, such content is refused when it is saved rather than silently dropped.
+MARKETS_UNSUPPORTED = "market or city conditions are not supported yet; remove them (they cannot be evaluated safely)"
 
 
 class Availability(_Model):
@@ -64,6 +79,8 @@ class Availability(_Model):
     def _dates(self):
         if self.effective_from and self.effective_to and self.effective_to < self.effective_from:
             raise ValueError("effective_to is before effective_from")
+        if self.markets:
+            raise ValueError(MARKETS_UNSUPPORTED)
         return self
 
 
@@ -350,7 +367,7 @@ class Package(Described):
     material_promise: tuple[Key, ...] = ()  # copy records
     hardware_promise: tuple[Key, ...] = ()
     warranty_copy: Key | None = None
-    badge: Annotated[str, Field(max_length=30)] | None = None
+    badge: Key | None = None  # a badge-category copy record, never free text (R2/R3)
     recommended: bool = False
     consultation_only: bool = False
 
@@ -399,6 +416,14 @@ class Condition(_Model):
     project_kinds: tuple[ProjectKind, ...] = ()
     packages: tuple[PackageCode, ...] = ()
     markets: tuple[Annotated[str, Field(min_length=2, max_length=60)], ...] = ()
+
+    @model_validator(mode="after")
+    def _supported(self):
+        if self.markets:
+            raise ValueError(MARKETS_UNSUPPORTED)
+        if not (self.property_types or self.home_sizes or self.project_kinds or self.packages):
+            raise ValueError("a condition names at least one property type, home size, project kind or package")
+        return self
 
 
 class Rule(_Model):
@@ -451,7 +476,7 @@ class Copy(_Model):
     statement: Text
     category: Literal[
         "description", "package", "allowance", "warranty", "material", "hardware", "inclusion", "exclusion",
-        "assumption", "disclaimer", "next_step", "label",
+        "assumption", "disclaimer", "next_step", "label", "badge",
     ]  # fmt: skip
     promise: bool = True
     governance: Governance | None = None
@@ -468,6 +493,11 @@ class Copy(_Model):
             self.applies_to.products or self.applies_to.rooms or self.applies_to.packages
         ):
             raise ValueError("applies_to names at least one product, room or package")
+        if self.category == "badge":
+            if len(self.statement) > 30:
+                raise ValueError("a badge is at most 30 characters")
+            if not self.promise and _BADGE_CLAIMS.search(self.statement):
+                raise ValueError("a badge makes a claim; register it as a promise with its matrix row and governance")
         return self
 
 
@@ -504,8 +534,7 @@ def parse(kind: str, document: dict) -> _Model:
                 raise KindError(f"{where} contains {what}; customer text never states it")
         if not governed and _PROMISE_WORDS.search(text):
             raise KindError(
-                f"{where} makes a promise; put it in a registered copy record, or attach the governed material or "
-                "hardware it names"
+                f"{where} makes a promise; only a promise copy record linked to the promise matrix may say it"
             )
     return model
 
@@ -535,6 +564,13 @@ def customer_text(kind: str, model: _Model):
         for f in ("title", "alt", "caption", "attribution"):
             if getattr(model, f):
                 yield f, getattr(model, f), False
+        if not model.attribution:  # the rights owner is shown as the attribution when there is none
+            yield "rights.owner", model.rights.owner, False
+        if model.three_d is not None:
+            for h in model.three_d.hotspots:
+                yield f"three_d.hotspots.{h.key}", h.label, False
+            for cam in model.three_d.camera_presets:
+                yield f"three_d.camera_presets.{cam.key}", cam.label, False
         return
 
     def described(prefix: str, d: Described):
@@ -617,7 +653,8 @@ def references(kind: str, model: _Model) -> list[tuple[str, str]]:
             add("media", [model.three_d.preview_image, model.three_d.fallback_gallery])
             add("material", model.three_d.materials)
     elif isinstance(model, Package):
-        add("copy", [model.public_summary, model.warranty_copy, *model.material_promise, *model.hardware_promise])
+        add("copy", [model.public_summary, model.warranty_copy, model.badge, *model.material_promise,
+                     *model.hardware_promise])  # fmt: skip
         add("product", model.included_products + model.optional_products)
         add("extra", model.included_extras + model.excluded_extras)
     elif isinstance(model, Copy) and model.applies_to is not None:
