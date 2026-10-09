@@ -69,7 +69,7 @@ therefore carry the digests that `veda estimator activation-check` prints at tha
 | Field in `essential-1.1-approval.json` | Value |
 |---|---|
 | `specification_sha256` | `6f798ef6cd3cea06f491041a4143e35776900107e73e6c953fbed4bd37ad286d`, unless a sales CHANGE created a new version |
-| `promise_matrix_sha256` | **New value** after the operations confirmations (not `ed3b14e0…`) |
+| `promise_matrix_sha256` | **New value** after the operations confirmations (not the version 1 digest in Part 1) |
 | `sales_decisions_sha256`, `sales_decisions_version` | New value after the sales decisions |
 | `operations_confirmation_version` | The matrix `version` after the confirmations |
 | `customer_copy_sha256`, `warranty_copy_sha256` | From `activation-check` (unchanged unless a decision changed the copy) |
