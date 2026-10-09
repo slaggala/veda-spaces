@@ -97,8 +97,11 @@ def test_an_unconfirmed_promise_badge_blocks_release(people):
 def test_only_approved_badge_copy_reaches_the_public_payload(api, people):
     a, b = people
     seed_slice(a)
-    tx(a, service.create_record, "copy", "copy.badge.chosen", {"statement": "Most chosen", "category": "badge",
-                                                               "promise": False})  # fmt: skip
+    tx(a, service.create_record, "copy", "copy.badge.chosen", {
+        "statement": "Most chosen", "category": "badge", "promise": False,
+        "applies_to": {"packages": ["slice.essential"]},
+        "claim": {"category": "popularity", "status": "APPROVED", "source": "Order data (synthetic)",
+                  "owner": "Sales lead (role, test)", "effective_from": "2026-10-01"}})  # fmt: skip
     change(a, "package", "slice.essential", lambda d: d.update(badge="copy.badge.chosen"))
     approve_all(a, b)
     release(a, b)

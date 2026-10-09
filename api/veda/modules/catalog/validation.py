@@ -20,7 +20,8 @@ from . import kinds, rules
 from .models import CatalogMediaObject, CatalogRelease
 
 CHECKS = (
-    "schema", "references", "pricing", "measurements", "defaults", "promises", "media", "three_d", "rules", "card",
+    "schema", "references", "pricing", "measurements", "defaults", "promises", "copy", "media", "three_d", "rules",
+    "card",
 )  # fmt: skip
 _UNIT = {"length": "ft", "area": "sqft"}
 
@@ -48,6 +49,7 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
         _pricing(cat, card, errors["pricing"], errors["measurements"])
         _defaults(cat, card, errors["defaults"], today)
     _promises(cat, errors["promises"], warnings)
+    _copy(cat, errors["copy"], today)
     _media(s, cat, errors["media"], errors["three_d"], warnings, today)
     errors["rules"].extend(rules.contradictions(cat))
     for key, rule in sorted(cat.of(kinds.Rule).items()):
@@ -333,6 +335,27 @@ def _promises(cat: catalog_compile.Catalog, out: list[str], warnings: list[str])
             out.append(f"package {key}: its badge must be a badge copy record in the release")
         if package.warranty_copy is None and not package.consultation_only:
             warnings.append(f"package {key}: no warranty statement")
+
+
+def _copy(cat: catalog_compile.Catalog, out: list[str], today: date) -> None:
+    """The text gate (customer-safety closure). Every customer-visible string in the release is checked by the current
+    rules, so a record saved before a rule existed cannot reach a new release. Every claim must be approved, owned,
+    sourced, in effect and, when absolute, independently substantiated."""
+    for kind, models in sorted(cat.models.items()):
+        for key, model in sorted(models.items()):
+            out.extend(f"{kind} {key}: {p}" for p in kinds.text_problems(kind, model))
+    for key, copy in sorted(cat.of(kinds.Copy).items()):
+        c = copy.claim
+        if c is None:
+            continue
+        if c.status != "APPROVED":
+            out.append(f"copy {key}: claim is {c.status}, not approved")
+        if not promise_matrix._named(c.owner):
+            out.append(f"copy {key}: claim has no responsible owner")
+        if c.effective_from > today:
+            out.append(f"copy {key}: claim is not in effect until {c.effective_from.isoformat()}")
+        if c.review_by is not None and c.review_by < today:
+            out.append(f"copy {key}: claim review date {c.review_by.isoformat()} has passed")
 
 
 def _objects(s: Session, shas: set[str]) -> dict[str, CatalogMediaObject]:

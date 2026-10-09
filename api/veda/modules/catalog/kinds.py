@@ -15,7 +15,9 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from veda.modules.estimator import customer_spec, ratecard
+from veda.modules.estimator import ratecard
+
+from . import text
 
 Key = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,99}$")]
 Code = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")]
@@ -30,31 +32,8 @@ PropertyCode = Literal["APARTMENT", "VILLA"]
 ProjectKind = Literal["NEW_HOME", "RENOVATION"]
 PackageCode = Literal["ESSENTIAL", "PREMIUM", "LUXURY"]
 Visibility = Literal["customer", "staff"]
-# Promise-like wording (R2/R3): warranty, guarantee, certification, free or included scope, exclusions, installation,
-# delivery, timelines, material grades, brands and service support. Text with any of it is customer-visible only as a
-# promise copy record linked to an operationally confirmed promise-matrix row; descriptive text never carries it,
-# whatever flag the record has.
-_PROMISE_WORDS = re.compile(
-    r"\b("
-    r"warrant\w*|guarantee\w*|assur\w*|certif\w*|lifetime|life-long|"
-    r"free|complimentary|no[- ]cost|includ\w*|inclusive|exclud\w*|"
-    r"install\w*|deliver\w*|dispatch\w*|timeline\w*|on[- ]time|deadline\w*|\d+\s*(?:days?|weeks?|months?|years?)|"
-    r"grade\w*|BWR|BWP|MR|E[0-2]|IS[ :-]?\d+|marine|waterproof|termite\w*|borer\w*|"
-    r"brand\w*|genuine|original|hettich|hafele|häfele|blum|ebco|century|greenply|merino|greenlam|airolam|"
-    r"servic\w*|support\w*|after[- ]sales|maintenance|repair\w*|replac\w*|"
-    r"soft[- ]clos\w*"
-    r")\b",
-    re.I,
-)
-
-
-# Marketing claims a short badge or ribbon must not make on its own (in addition to promise wording). A badge with
-# such a claim is a promise: it needs a promise-matrix row and governance like any other.
-_BADGE_CLAIMS = re.compile(
-    r"\b(premium|best|lowest|cheapest|top|unbeatable|number\s*one|no\.?\s*1|exclusive|offer\w*|discount\w*|sale|"
-    r"deal\w*|limited|save|saving\w*|bonus|gift|perfect|quality|luxur\w*)\b|#\s*1\b",
-    re.I,
-)
+# Promise and claim vocabularies, and the classification of every text field, live in `text` (customer-safety closure).
+_PROMISE_WORDS = text.PROMISE
 
 
 class _Model(BaseModel):
@@ -469,6 +448,22 @@ class AppliesTo(_Model):
     packages: tuple[Key, ...] = ()
 
 
+class ClaimGovernance(_Model):
+    """A marketing claim's governance: what kind of claim it is, who answers for it, what supports it, and when it
+    holds. Only an APPROVED claim with a named owner, a source, a current effective period and (for an absolute claim
+    such as best, number one, cheapest, lowest or guaranteed) independent substantiation passes the release gate."""
+
+    category: Literal[
+        "factual_descriptor", "popularity", "quality", "price", "warranty", "promotional", "recommendation", "service",
+    ]  # fmt: skip
+    status: Literal["APPROVED", "BLOCKED"] = "BLOCKED"
+    source: Text  # the evidence the claim rests on (sales data, test report, approved policy)
+    owner: Name  # an accountable role or person; UNASSIGNED blocks
+    effective_from: date
+    review_by: date | None = None  # expiry or review date
+    substantiation: Text | None = None  # independent substantiation (required for an absolute claim)
+
+
 class Copy(_Model):
     """A customer statement. A promise (`promise: true`) carries its governance, the promise-matrix row whose registered
     text it is, and the products, rooms or packages it applies to; release validation confirms all three."""
@@ -482,6 +477,7 @@ class Copy(_Model):
     governance: Governance | None = None
     matrix_row: Annotated[str, Field(max_length=60)] | None = None  # the customer-promise matrix row it is text of
     applies_to: AppliesTo | None = None
+    claim: ClaimGovernance | None = None  # set when the statement makes a marketing claim
 
     @model_validator(mode="after")
     def _governed(self):
@@ -493,11 +489,10 @@ class Copy(_Model):
             self.applies_to.products or self.applies_to.rooms or self.applies_to.packages
         ):
             raise ValueError("applies_to names at least one product, room or package")
-        if self.category == "badge":
-            if len(self.statement) > 30:
-                raise ValueError("a badge is at most 30 characters")
-            if not self.promise and _BADGE_CLAIMS.search(self.statement):
-                raise ValueError("a badge makes a claim; register it as a promise with its matrix row and governance")
+        if self.category == "badge" and len(self.statement) > 30:
+            raise ValueError("a badge is at most 30 characters")
+        if self.claim is not None and self.applies_to is None:
+            raise ValueError("a claim names the products, rooms or packages it applies to")
         return self
 
 
@@ -524,19 +519,60 @@ class KindError(ValueError):
     pass
 
 
-def parse(kind: str, document: dict) -> _Model:
+def load_model(kind: str, document: dict) -> _Model:
+    """Schema validation only: used to load released content, which is never re-judged after release (historical
+    releases and snapshots are not altered). New content passes `parse`, and every release passes the text gate."""
     if kind not in SCHEMAS:
         raise KindError(f"unknown catalog kind {kind!r}")
-    model = SCHEMAS[kind].model_validate(document)
-    for where, text, governed in customer_text(kind, model):
-        for pattern, what in customer_spec._FORBIDDEN:
-            if pattern.search(text):
-                raise KindError(f"{where} contains {what}; customer text never states it")
-        if not governed and _PROMISE_WORDS.search(text):
-            raise KindError(
-                f"{where} makes a promise; only a promise copy record linked to the promise matrix may say it"
-            )
+    return SCHEMAS[kind].model_validate(document)
+
+
+def parse(kind: str, document: dict) -> _Model:
+    """Validate a document being authored or imported: its schema and every customer-visible string."""
+    model = load_model(kind, document)
+    problems = text_problems(kind, model)
+    if problems:
+        raise KindError(problems[0])
     return model
+
+
+def text_problems(kind: str, model: _Model) -> list[str]:
+    """Why the customer-visible text of a document is not allowed (empty when it is). Factual text may make no promise
+    and no claim; a copy statement may make a promise only as a promise record, and a claim only with its claim
+    governance (an absolute claim also needs independent substantiation)."""
+    if kind in STAFF_ONLY_KINDS:
+        return []
+    problems = []
+    for where, value, cls in text.visible_text(model):
+        what = text.forbidden_in(value)
+        if what:
+            problems.append(f"{where} contains {what}; customer text never states it")
+            continue
+        claims = text.claims_in(value)
+        promise = bool(_PROMISE_WORDS.search(value))
+        if cls == text.FACTUAL:
+            if promise:
+                problems.append(
+                    f"{where} makes a promise; only a promise copy record linked to the promise matrix may say it"
+                )
+            if claims:
+                problems.append(
+                    f"{where} makes a {', '.join(claims)} claim; only an approved claim copy record may say it"
+                )
+        elif isinstance(model, Copy):
+            if promise and not model.promise:
+                problems.append(f"{where} makes a promise; mark it a promise and link its promise-matrix row")
+            if claims and model.claim is None:
+                problems.append(f"{where} makes a {', '.join(claims)} claim; give it claim governance")
+            if model.claim is not None and text.ABSOLUTE.search(value) and not model.claim.substantiation:
+                problems.append(f"{where} makes an absolute claim; it needs independent substantiation")
+    return problems
+
+
+def customer_text(kind: str, model: _Model):
+    """(where, text, governed) for every customer-visible string (kept for callers of the earlier interface)."""
+    for where, value, cls in text.visible_text(model):
+        yield where, value, cls == text.STATEMENT and isinstance(model, Copy) and model.promise
 
 
 def title(kind: str, model: _Model) -> str:
@@ -549,61 +585,6 @@ def title(kind: str, model: _Model) -> str:
     if isinstance(model, Rule):
         return f"Rule: {model.type} {model.subject}"
     return kind
-
-
-def customer_text(kind: str, model: _Model):
-    """(where, text, governed) for every string a customer can read in this document. Only a promise copy record is
-    `governed` (its matrix row is checked at release validation); every other customer-visible string must be free of
-    promise wording. Staff-only items, staff notes, pricing and rules are not customer text."""
-    if kind in STAFF_ONLY_KINDS or kind == "rule":
-        return
-    if isinstance(model, Copy):
-        yield "statement", model.statement, model.promise
-        return
-    if isinstance(model, Media):
-        for f in ("title", "alt", "caption", "attribution"):
-            if getattr(model, f):
-                yield f, getattr(model, f), False
-        if not model.attribution:  # the rights owner is shown as the attribution when there is none
-            yield "rights.owner", model.rights.owner, False
-        if model.three_d is not None:
-            for h in model.three_d.hotspots:
-                yield f"three_d.hotspots.{h.key}", h.label, False
-            for cam in model.three_d.camera_presets:
-                yield f"three_d.camera_presets.{cam.key}", cam.label, False
-        return
-
-    def described(prefix: str, d: Described):
-        if d.visibility == "staff":
-            return
-        for f in ("name", "description", "what_is_this", "typically_used_for"):
-            if getattr(d, f):
-                yield f"{prefix}{f}", getattr(d, f), False
-
-    if isinstance(model, Described):
-        yield from described("", model)
-        if model.visibility == "staff":
-            return
-    if isinstance(model, Product):
-        for v in model.variants:
-            yield from described(f"variants.{v.key}.", v)
-            if v.visibility == "staff":
-                continue
-            for g in v.option_groups:
-                yield f"variants.{v.key}.{g.key}.name", g.name, False
-                if g.description:
-                    yield f"variants.{v.key}.{g.key}.description", g.description, False
-                for c in g.choices:
-                    yield from described(f"variants.{v.key}.{g.key}.{c.key}.", c)
-            for m in v.measurements:
-                yield f"variants.{v.key}.measurements.{m.input}", " ".join(filter(None, (m.label, m.hint))), False
-    if isinstance(model, Extra):
-        for m in model.measurements:
-            yield f"measurements.{m.input}", " ".join(filter(None, (m.label, m.hint))), False
-    if isinstance(model, Material):
-        for f in ("finish", "colour_family", "texture"):  # shown; grade, thickness and brands never are
-            if getattr(model, f):
-                yield f, getattr(model, f), False
 
 
 def references(kind: str, model: _Model) -> list[tuple[str, str]]:
