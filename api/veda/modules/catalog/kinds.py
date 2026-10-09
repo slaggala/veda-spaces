@@ -252,6 +252,15 @@ class Rights(_Model):
     licence: Name
     usage: Literal["owned", "licensed", "client_permission"]
     expires: date | None = None
+    consent_reference: Annotated[str, Field(max_length=80)] | None = (
+        None  # the client's written permission, by reference
+    )
+
+    @model_validator(mode="after")
+    def _consent(self):
+        if self.usage == "client_permission" and not self.consent_reference:
+            raise ValueError("a client's image needs the reference of their written permission")
+        return self
 
 
 class Objects(_Model):
@@ -288,6 +297,7 @@ class ThreeD(_Model):
 
 
 EMBED_HOSTS = ("www.youtube-nocookie.com", "player.vimeo.com")
+THREE_D_TYPES = frozenset({"GLB", "GLTF", "USDZ"})
 
 
 class Media(_Model):
@@ -320,6 +330,8 @@ class Media(_Model):
             raise ValueError("an image or video needs its delivery variants")
         if self.type in ("GLB", "GLTF", "USDZ") and (self.three_d is None or "web" not in self.objects.variants):
             raise ValueError("a 3D asset needs its web-optimised file and its 3D description")
+        if self.type in ("GLTF", "USDZ"):
+            raise ValueError("glTF and USDZ are disabled; register a sanitised GLB")
         if self.type == "EXTERNAL_EMBED":
             host = re.match(r"^https://([^/]+)/", self.embed_url or "")
             if not host or host.group(1) not in EMBED_HOSTS:

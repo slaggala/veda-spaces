@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_catalog import approve_all, live_slice, pricing_records, release, seed_slice, tx
+from tests.integration.test_catalog import STAFF, approve_all, live_slice, pricing_records, release, seed_slice, tx
 from tests.support.dbh import rows
 from veda.kernel import db
 from veda.modules.catalog import importexport, service
@@ -211,6 +211,7 @@ def test_repeating_an_import_is_a_deterministic_no_op(staff):
     ]
 
 
+@STAFF
 def test_import_route_refuses_rows_beyond_the_admins_edit_permissions(api, factory):
     admin = factory.user("ADMIN")
     factory.grant(admin, "catalog.admin")

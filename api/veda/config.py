@@ -181,6 +181,13 @@ class Settings:
     catalog_media_dir: str = "var/catalog-media"  # local object store (development and tests); staging needs a bucket
     catalog_media_scanner: str = "none"  # none | clamd; with none, uploads stay PENDING_SCAN outside local and test
     catalog_clamd_address: str = "127.0.0.1:3310"  # clamd INSTREAM endpoint when the scanner is clamd
+    catalog_admin_enabled: bool = False  # the staff catalog API and workspace (production refuses it)
+    catalog_media_delivery_enabled: bool = False  # public catalog media (needs bucket and scanner when deployed)
+    catalog_3d_enabled: bool = False  # 3D references for customers (gallery only until approved)
+    catalog_media_backend: str = "local"  # local | s3 (the prepared private bucket; owner decision)
+    catalog_media_bucket: str | None = None
+    catalog_media_kms_key_arn: str | None = None
+    catalog_media_retention_days: int = 180  # unreferenced media sources are purged after this
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -309,6 +316,13 @@ def load_settings(**overrides) -> Settings:
         catalog_media_dir=_str("VEDA_CATALOG_MEDIA_DIR", "var/catalog-media"),
         catalog_media_scanner=_str("VEDA_CATALOG_MEDIA_SCANNER", "none"),
         catalog_clamd_address=_str("VEDA_CATALOG_CLAMD_ADDRESS", "127.0.0.1:3310"),
+        catalog_admin_enabled=_bool("VEDA_CATALOG_ADMIN_ENABLED", False),
+        catalog_media_delivery_enabled=_bool("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", False),
+        catalog_3d_enabled=_bool("VEDA_CATALOG_3D_ENABLED", False),
+        catalog_media_backend=_str("VEDA_CATALOG_MEDIA_BACKEND", "local"),
+        catalog_media_bucket=_env("VEDA_CATALOG_MEDIA_BUCKET"),
+        catalog_media_kms_key_arn=_env("VEDA_CATALOG_MEDIA_KMS_KEY_ARN"),
+        catalog_media_retention_days=_intd("VEDA_CATALOG_MEDIA_RETENTION_DAYS", 180),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -457,6 +471,17 @@ def validate_environment(settings: Settings) -> list[str]:
         problems.append("VEDA_CATALOG_MEDIA_SCANNER must be none or clamd")
     if env in ("staging", "production") and not settings.catalog_four_eyes:
         problems.append(f"VEDA_CATALOG_FOUR_EYES must stay true in {env}")
+    if settings.catalog_media_backend not in ("local", "s3"):
+        problems.append("VEDA_CATALOG_MEDIA_BACKEND must be local or s3")
+    if not 30 <= settings.catalog_media_retention_days <= 3650:
+        problems.append("VEDA_CATALOG_MEDIA_RETENTION_DAYS must be between 30 and 3650")
+    catalog_on = settings.catalog_admin_enabled or settings.catalog_estimator_enabled
+    if env in ("staging", "production") and (catalog_on or settings.catalog_media_delivery_enabled):
+        # F2: deployed catalog media needs the private bucket and a scanner; nothing is served from local disk.
+        if settings.catalog_media_backend != "s3" or not settings.catalog_media_bucket:
+            problems.append(f"the catalog needs VEDA_CATALOG_MEDIA_BACKEND=s3 and a bucket in {env}")
+        if settings.catalog_media_scanner != "clamd":
+            problems.append(f"the catalog needs VEDA_CATALOG_MEDIA_SCANNER=clamd in {env}")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:
@@ -468,6 +493,11 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append("VEDA_CATALOG_ESTIMATOR_ENABLED is not authorised in production (ADR-013)")
         if settings.catalog_analytics_enabled:
             problems.append("VEDA_CATALOG_ANALYTICS_ENABLED is not authorised in production (ADR-013)")
+        for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
+                         ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
+                         ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip
+            if on:
+                problems.append(f"{flag} is not authorised in production (ADR-013)")
         if settings.public_site_credentials:
             problems.append("VEDA_PUBLIC_SITE_CREDENTIALS is staging-only (Cloudflare Access); production refuses it")
         if not settings.sentry_dsn:

@@ -352,7 +352,7 @@ def upgrade() -> None:
             dialect="sqlite"
         ),
         sa.CheckConstraint(
-            "event_type IN ('RECORD_CREATED', 'RECORD_UPDATED', 'RECORD_SUBMITTED', 'RECORD_APPROVED', 'RECORD_REJECTED', 'RECORD_ARCHIVED', 'RELEASE_CREATED', 'RELEASE_VALIDATED', 'RELEASE_PREVIEW_APPROVED', 'RELEASE_SUBMITTED', 'RELEASE_APPROVED', 'RELEASE_REJECTED', 'RELEASE_SCHEDULED', 'RELEASE_ACTIVATED', 'RELEASE_RETIRED', 'RELEASE_ROLLED_BACK', 'CONFIGURATION_PURGED', 'MEDIA_UPLOADED', 'MEDIA_SCANNED', 'IMPORT_APPLIED')",
+            "event_type IN ('RECORD_CREATED', 'RECORD_UPDATED', 'RECORD_SUBMITTED', 'RECORD_APPROVED', 'RECORD_REJECTED', 'RECORD_ARCHIVED', 'RELEASE_CREATED', 'RELEASE_VALIDATED', 'RELEASE_PREVIEW_APPROVED', 'RELEASE_SUBMITTED', 'RELEASE_APPROVED', 'RELEASE_REJECTED', 'RELEASE_SCHEDULED', 'RELEASE_ACTIVATED', 'RELEASE_RETIRED', 'RELEASE_ROLLED_BACK', 'CONFIGURATION_PURGED', 'MEDIA_WITHDRAWN', 'MEDIA_PURGED', 'MEDIA_UPLOADED', 'MEDIA_SCANNED', 'IMPORT_APPLIED')",
             name="ck_catalog_event__event_type",
         ),
         sa.CheckConstraint("length(event_type) <= 30", name="ck_catalog_event__event_type_len").ddl_if(
@@ -420,6 +420,9 @@ def upgrade() -> None:
         sa.Column("scan_status", sa.String(15), nullable=False),
         sa.Column("scanned_on", UTCDateTime(), nullable=True),
         sa.Column("source_object_id", GUID(), nullable=True),
+        sa.Column("withdrawn_on", UTCDateTime(), nullable=True),
+        sa.Column("withdrawal_reason", sa.String(200), nullable=True),
+        sa.Column("purged_on", UTCDateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name="pk_catalog_media_object"),
         sa.ForeignKeyConstraint(
             ["created_by"], ["app_user.id"], name="fk_catalog_media_object__created_by", ondelete="RESTRICT"
@@ -451,9 +454,7 @@ def upgrade() -> None:
         sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_catalog_media_object__is_deleted_bool").ddl_if(
             dialect="sqlite"
         ),
-        sa.CheckConstraint(
-            "media_kind IN ('IMAGE', 'VIDEO', 'GLB', 'GLTF', 'USDZ')", name="ck_catalog_media_object__media_kind"
-        ),
+        sa.CheckConstraint("media_kind IN ('IMAGE', 'GLB')", name="ck_catalog_media_object__media_kind"),
         sa.CheckConstraint("length(media_kind) <= 10", name="ck_catalog_media_object__media_kind_len").ddl_if(
             dialect="sqlite"
         ),
@@ -466,7 +467,7 @@ def upgrade() -> None:
         sa.CheckConstraint("role IN ('SOURCE', 'VARIANT')", name="ck_catalog_media_object__role"),
         sa.CheckConstraint("length(role) <= 10", name="ck_catalog_media_object__role_len").ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
-            "scan_status IN ('PENDING_SCAN', 'CLEAN', 'INFECTED')", name="ck_catalog_media_object__scan_status"
+            "scan_status IN ('PENDING', 'CLEAN', 'INFECTED', 'FAILED')", name="ck_catalog_media_object__scan_status"
         ),
         sa.CheckConstraint("length(scan_status) <= 15", name="ck_catalog_media_object__scan_status_len").ddl_if(
             dialect="sqlite"
@@ -493,11 +494,14 @@ def upgrade() -> None:
             dialect="sqlite"
         ),
         sa.CheckConstraint("version >= 1", name="ck_catalog_media_object__version_positive"),
+        sa.CheckConstraint(
+            "length(withdrawal_reason) <= 200", name="ck_catalog_media_object__withdrawal_reason_len"
+        ).ddl_if(dialect="sqlite"),
     )
     op.create_index(
-        "ux_catalog_media_object__sha",
+        "ux_catalog_media_object__sha_role",
         "catalog_media_object",
-        ["object_sha256"],
+        ["object_sha256", "role"],
         unique=True,
         sqlite_where=sa.text("is_deleted = 0"),
         postgresql_where=sa.text("is_deleted = false"),

@@ -28,7 +28,7 @@ INVITE_LINK="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["i
 # Each server is exec'd so the tracked pid is the server itself and cleanup stops it.
 ( cd "$API" && exec env VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db VEDA_COOKIE_SECURE=false \
     VEDA_EMAIL_CAPTURE_DIR=var/mail VEDA_ARGON2_MEMORY_KIB=19456 VEDA_ARGON2_TIME_COST=2 \
-    VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors VEDA_ESTIMATOR_ENABLED=true VEDA_CATALOG_ESTIMATOR_ENABLED=true \
+    VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors VEDA_ESTIMATOR_ENABLED=true VEDA_CATALOG_ESTIMATOR_ENABLED=true VEDA_CATALOG_MEDIA_DELIVERY_ENABLED=true \
     "$PY" -m flask --app wsgi run --port 5000 ) > "$OUT/api.log" 2>&1 & pids+=($!)
 ( cd "$APP" && exec node node_modules/vite/bin/vite.js --port 5173 --strictPort ) > "$OUT/vite.log" 2>&1 & pids+=($!)
 node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)

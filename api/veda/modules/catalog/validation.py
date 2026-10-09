@@ -337,7 +337,7 @@ def _objects(s: Session, shas: set[str]) -> dict[str, CatalogMediaObject]:
         return {}
     rows = s.execute(
         sa.select(CatalogMediaObject).where(
-            CatalogMediaObject.object_sha256.in_(sorted(shas)), CatalogMediaObject.is_deleted.is_(False)
+            CatalogMediaObject.object_sha256.in_(sorted(shas)), CatalogMediaObject.role == "VARIANT"
         )
     ).scalars()
     return {r.object_sha256: r for r in rows}
@@ -357,6 +357,8 @@ def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str
                 out.append(f"media {key}: {name} file is not stored")
             elif obj.role != "VARIANT":
                 out.append(f"media {key}: {name} is not a generated delivery variant")
+            elif obj.withdrawn_on is not None or obj.purged_on is not None:
+                out.append(f"media {key}: {name} file was withdrawn or purged")
             elif obj.scan_status != "CLEAN":
                 out.append(f"media {key}: {name} file is {obj.scan_status}")
         if m.type in ("GLB", "GLTF", "USDZ"):

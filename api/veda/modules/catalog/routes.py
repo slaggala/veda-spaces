@@ -21,7 +21,7 @@ from flask import Response
 from veda.config import settings
 from veda.kernel.dto import Closed
 from veda.kernel.errors import ApiError
-from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok
+from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response
 from veda.modules.estimator import routes as estimator_routes
 
 from . import configure, importexport, kinds, media, service
@@ -30,6 +30,16 @@ from .permissions import edit_permission
 
 api = Api("catalog", "/api/v1/catalog", tags=("catalog",))
 public_api = Api("catalog_public", "/api/v1/public", tags=("catalog",))
+
+
+@api.blueprint.before_request
+def _staff_enabled():
+    """The staff catalog API exists only where VEDA_CATALOG_ADMIN_ENABLED is on (off by default; production refuses
+    it): every staff route answers 404, before authentication, everywhere else."""
+    if not settings().catalog_admin_enabled:
+        return problem_response(ApiError(404, "NOT_FOUND", "Not found."))
+    return None
+
 
 MEDIA_MAX_BODY = 36 * 1024 * 1024  # 25 MB of model or 15 MB of image, base64-encoded
 
@@ -424,6 +434,15 @@ def upload_media(req: Req):
                "kind": result.source.media_kind}, status=201)  # fmt: skip
 
 
+@api.route("POST", "/media/<sha>/withdraw", permission="catalog.media.edit", body=CatalogNoteIn, requirement="CAT-004")
+def withdraw_media(req: Req, sha: str):
+    """A deletion request or withdrawn consent for one media file (its source and every variant)."""
+    try:
+        return ok({"withdrawn": media.withdraw(req.session, sha, req.body.note or "")})
+    except media.MediaError as err:
+        raise _err(err) from err
+
+
 @api.route("GET", "/media", permission="catalog.view", write=False, requirement="CAT-001")
 def list_media(req: Req):
     import sqlalchemy as sa
@@ -434,7 +453,8 @@ def list_media(req: Req):
     ).scalars()  # fmt: skip
     return ok([{"sha256": r.object_sha256, "role": r.role, "kind": r.media_kind, "variant": r.variant,
                 "mime": r.mime_type, "bytes": r.byte_size, "width": r.width, "height": r.height,
-                "scan_status": r.scan_status, "created_on": r.created_on.isoformat()} for r in rows])  # fmt: skip
+                "scan_status": r.scan_status, "created_on": r.created_on.isoformat(),
+                "withdrawn": r.withdrawn_on is not None, "purged": r.purged_on is not None} for r in rows])  # fmt: skip
 
 
 def _send(row: CatalogMediaObject, *, public: bool) -> Response:
@@ -452,9 +472,11 @@ def staff_media(req: Req, sha: str):
     import sqlalchemy as sa
 
     row = req.session.execute(
-        sa.select(CatalogMediaObject).where(CatalogMediaObject.object_sha256 == sha)
+        sa.select(CatalogMediaObject).where(
+            CatalogMediaObject.object_sha256 == sha, CatalogMediaObject.role == "VARIANT"
+        )
     ).scalar_one_or_none()
-    if row is None or row.role != "VARIANT" or row.scan_status == "INFECTED":
+    if row is None or row.scan_status == "INFECTED" or row.purged_on is not None:
         raise ApiError(404, "NOT_FOUND", "Not found.")
     return _send(row, public=False)
 
@@ -538,6 +560,8 @@ def public_estimate(req: Req):
                   summary="A delivery variant of the active catalog, by content hash")  # fmt: skip
 def public_media(req: Req, sha: str):
     _enabled()
+    if not settings().catalog_media_delivery_enabled:  # F2: no public media until the storage controls exist
+        raise ApiError(404, "NOT_FOUND", "Not found.")
     row = media.deliverable(req.session, sha)
     if row is None:
         raise ApiError(404, "NOT_FOUND", "Not found.")

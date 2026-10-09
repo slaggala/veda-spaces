@@ -17,6 +17,7 @@ from typing import Any, TypeVar
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from veda.config import settings
 from veda.modules.estimator import engine, ratecard
 from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import EstimatorRateCard
@@ -245,7 +246,13 @@ def customer_view(cat: Catalog) -> dict:
     for kind in ("property_type", "product_family", "material", "hardware"):
         out[kind] = {k: _public(m) for k, m in sorted(cat.models_of(kind).items())
                      if getattr(m, "visibility", "customer") == "customer"}  # fmt: skip
-    out["media"] = {k: media_view(m) for k, m in sorted(cat.of(kinds.Media).items())}
+    # 3D (G1): gallery only until VEDA_CATALOG_3D_ENABLED is approved and on; the models are then simply absent.
+    models_shown = settings().catalog_3d_enabled
+    out["media"] = {k: media_view(m) for k, m in sorted(cat.of(kinds.Media).items())
+                    if models_shown or m.type not in kinds.THREE_D_TYPES}  # fmt: skip
+    for kind in ("product", "extra"):
+        for view in out[kind].values():
+            view["media"] = [x for x in view.get("media", []) if x in out["media"]]
     out["copy"] = {k: {"statement": m.statement, "category": m.category} for k, m in sorted(cat.of(kinds.Copy).items())}
     # Rules are mirrored in the browser for feedback only (the server is authoritative); staff-only ones never are.
     out["rule"] = {k: _public(m) for k, m in sorted(cat.of(kinds.Rule).items())

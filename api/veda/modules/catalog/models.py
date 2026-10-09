@@ -52,13 +52,15 @@ EVENT_TYPES = (
     "RELEASE_RETIRED",
     "RELEASE_ROLLED_BACK",
     "CONFIGURATION_PURGED",
+    "MEDIA_WITHDRAWN",
+    "MEDIA_PURGED",
     "MEDIA_UPLOADED",
     "MEDIA_SCANNED",
     "IMPORT_APPLIED",
 )
-MEDIA_KINDS = ("IMAGE", "VIDEO", "GLB", "GLTF", "USDZ")
+MEDIA_KINDS = ("IMAGE", "GLB")  # uploads; video, glTF and USDZ are disabled (remediation G1)
 MEDIA_ROLES = ("SOURCE", "VARIANT")
-SCAN_STATUSES = ("PENDING_SCAN", "CLEAN", "INFECTED")
+SCAN_STATUSES = ("PENDING", "CLEAN", "INFECTED", "FAILED")
 ANALYTICS_EVENTS = (
     "room_selected",
     "room_deselected",
@@ -192,6 +194,9 @@ class CatalogMediaObject(AuditedBase):
     source_object_id: Mapped[str | None] = mapped_column(
         GUID(), ForeignKey("catalog_media_object.id", ondelete="RESTRICT")
     )
+    withdrawn_on: Mapped[datetime | None] = mapped_column(UTCDateTime())  # deletion request or withdrawn consent
+    withdrawal_reason: Mapped[str | None] = mapped_column(sa.String(200))
+    purged_on: Mapped[datetime | None] = mapped_column(UTCDateTime())  # the stored bytes were deleted
 
     __table_args__ = (
         in_check("catalog_media_object", "role", MEDIA_ROLES),
@@ -199,7 +204,7 @@ class CatalogMediaObject(AuditedBase):
         in_check("catalog_media_object", "scan_status", SCAN_STATUSES),
         CheckConstraint("byte_size > 0", name="ck_catalog_media_object__size"),
         CheckConstraint("length(object_sha256) = 64", name="ck_catalog_media_object__sha_len"),
-        Index("ux_catalog_media_object__sha", "object_sha256", unique=True, **live_where()),
+        Index("ux_catalog_media_object__sha_role", "object_sha256", "role", unique=True, **live_where()),
     )
 
 

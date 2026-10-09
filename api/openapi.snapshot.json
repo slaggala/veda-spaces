@@ -4599,6 +4599,58 @@
         "x-requirement": "CAT-001"
       }
     },
+    "/api/v1/catalog/media/{sha}/withdraw": {
+      "post": {
+        "operationId": "catalog_withdraw_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sha",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A deletion request or withdrawn consent for one media file (its source and every variant).",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.media.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-004"
+      }
+    },
     "/api/v1/catalog/records": {
       "get": {
         "operationId": "catalog_list_records",

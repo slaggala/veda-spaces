@@ -24,7 +24,10 @@ from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import BudgetEstimate, EstimatorRateCard
 
 CARD_DOC = json.loads((Path(__file__).parents[1] / "fixtures/estimator/synthetic-rate-card.json").read_text())
-ON = pytest.mark.settings(catalog_estimator_enabled=True)
+ON = pytest.mark.settings(
+    catalog_estimator_enabled=True, catalog_admin_enabled=True, catalog_media_delivery_enabled=True
+)
+STAFF = pytest.mark.settings(catalog_admin_enabled=True)
 SITE = "http://localhost:8000"
 GOVERNED = {"owner": "Procurement lead (role, test)", "backup": "Projects lead (role, test)",
             "quotation_mapping": "Hardware line", "verification": "Site handover checklist (test)",
@@ -346,6 +349,7 @@ def test_public_media_serves_only_active_clean_variants(api, people):
 
 
 # --- staff API and permissions ---------------------------------------------------------------------------------------
+@STAFF
 def test_staff_permissions_least_privilege(api, factory, people):
     live_slice(people)
     admin, sales = factory.user("ADMIN"), factory.user("SALES")
@@ -370,6 +374,7 @@ def test_staff_permissions_least_privilege(api, factory, people):
     assert api.post(f"/api/v1/catalog/records/{created.data['id']}/approve", {}, token=t_admin).status == 403
 
 
+@STAFF
 def test_founder_preview_and_configuration_reopen(api, factory, people):
     rel = live_slice(people)
     founder = factory.user("FOUNDER")
@@ -413,7 +418,7 @@ def test_images_are_reencoded_without_metadata(people):
     [
         (b"<svg xmlns='http://www.w3.org/2000/svg'/>", "unsupported file type"),
         (b"MZ\x90\x00" + b"\0" * 100, "unsupported file type"),
-        (b"\x00\x00\x00\x18ftypmp42" + b"\0" * 100, "transcoder"),
+        (b"\x00\x00\x00\x18ftypmp42" + b"\0" * 100, "video uploads are not accepted"),
         (b"\xff\xd8\xff\xe0" + b"\0" * 100, "decoded safely"),
         (b"glTF" + b"\x02\x00\x00\x00" + b"\x10\x00\x00\x00" + b"\0" * 4, "truncated"),
     ],
@@ -433,8 +438,8 @@ def test_glb_with_external_references_is_refused(people):
     js += b" " * (-len(js) % 4)
     body = len(js).to_bytes(4, "little") + b"JSON" + js
     bad = b"glTF" + (2).to_bytes(4, "little") + (12 + len(body)).to_bytes(4, "little") + body
-    with pytest.raises(media.MediaError, match="external files"):
-        media.validate_glb(bad)
+    with pytest.raises(media.MediaError, match="URIs"):
+        media.sanitize_glb(bad)
 
 
 def test_without_a_scanner_deployed_media_stays_pending(monkeypatch):
@@ -444,9 +449,10 @@ def test_without_a_scanner_deployed_media_stays_pending(monkeypatch):
         catalog_media_scanner, env = "none", "staging"
 
     monkeypatch.setattr(m, "settings", lambda: Fake())
-    assert m.scan_status(b"x") == "PENDING_SCAN"
+    assert m.scan_status(b"x") == "PENDING"
 
 
+@STAFF
 def test_media_upload_route_needs_media_permission(api, factory):
     admin = factory.user("ADMIN")
     token = factory.login(api, admin, set_default=False)
