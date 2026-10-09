@@ -1,0 +1,2 @@
+issue_id,summary,screen,section,severity,participants,participant_count,segments,rule_met,recommended_change,promise_matrix_rows,status,round_found,retest_round
+ISS-EXAMPLE,"Reads the allowance as an extra charge on top of the range",result,Design Personalisation Allowance,Critical,"EXAMPLE",1,friends_family,no (1 participant: watch list),,allowance_text,watch,1,2 (EXAMPLE ROW: delete before use)
