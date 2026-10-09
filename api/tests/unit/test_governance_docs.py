@@ -142,6 +142,11 @@ KNOWN_COMMITS = {
     "a5a59a741bfcb8a3586bd90eb5c1c72e90773916": ("Merge pull request #11 from slaggala/fix/rr18-accessibility-remnants", "PR #11: RR-18"),  # pragma: allowlist secret (commit SHA)
     "9361d104fef8dcef608ac6e925157eb8896a5ae3": ("Merge pull request #15 from slaggala/docs/bootstrap-authorization", "commit applied by the first bootstrap (AUT-002)"),  # pragma: allowlist secret (commit SHA)
     "c94af47700cc107a8524bac5994e577d82b065a2": ("Merge pull request #62 from slaggala/feature/estimator-v2-final-pre-activation", "PR #62: Estimator V2 final pre-activation closure (approval package and round 1 review)"),  # pragma: allowlist secret (commit SHA)
+    "18dcf0a59a4240f41eba6a1e3bd4a3e1090a94a3": ("Merge pull request #65 from slaggala/fix/session-stack-home-sizes", "main at the start of the catalog V3 branch"),  # pragma: allowlist secret (commit SHA)
+    "8735df792737bd11063649af2a54fcb9c7df092e": ("Catalog V3 phase 1: ADR-013, flags, least-privilege permissions, Pillow", "Catalog V3 phase 1"),  # pragma: allowlist secret (commit SHA)
+    "6b5732cd971836968b7428187beeeaa03cf7da26": ("Catalog V3 phase 2: versioned catalog, releases, pricing adapter, rules, media, migration, API", "Catalog V3 phase 2"),  # pragma: allowlist secret (commit SHA)
+    "727029175736210ff1876279b21da879da114eb5": ("Catalog V3 phase 3: tests (lifecycle, four-eyes, slice, security, V2/V3 equivalence)", "Catalog V3 phase 3"),  # pragma: allowlist secret (commit SHA)
+    "03310cce637579a17aa118015ddefda0b01f56ca": ("Catalog V3 phase 4: workspace catalog screen, V3 customer page, staging gate, browser journey", "Catalog V3 phase 4"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

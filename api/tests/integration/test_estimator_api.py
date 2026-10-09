@@ -414,7 +414,16 @@ def test_no_route_exposes_a_rate_card(app):
     paths = [r.rule for r in app.url_map.iter_rules()]
     assert not [p for p in paths if "rate" in p.lower() or "card" in p.lower()]
     public = sorted(p for p in paths if p.startswith("/api/v1/public/"))
-    assert public == ["/api/v1/public/enquiries", "/api/v1/public/estimates", "/api/v1/public/leads"]
+    # ADR-013 adds the catalog estimator's four flagged routes (RBX-008); none of them carries a rate.
+    assert public == [
+        "/api/v1/public/catalog",
+        "/api/v1/public/catalog/estimates",
+        "/api/v1/public/catalog/events",
+        "/api/v1/public/catalog/media/<sha>",
+        "/api/v1/public/enquiries",
+        "/api/v1/public/estimates",
+        "/api/v1/public/leads",
+    ]
 
 
 # --- rate cards ------------------------------------------------------------------------------------------------------------

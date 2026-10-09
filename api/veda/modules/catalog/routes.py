@@ -34,69 +34,69 @@ public_api = Api("catalog_public", "/api/v1/public", tags=("catalog",))
 MEDIA_MAX_BODY = 36 * 1024 * 1024  # 25 MB of model or 15 MB of image, base64-encoded
 
 
-class RecordIn(Closed):
+class CatalogRecordIn(Closed):
     kind: str
     key: str
     document: dict
 
 
-class DocumentIn(Closed):
+class CatalogDocumentIn(Closed):
     document: dict
 
 
-class NoteIn(Closed):
+class CatalogNoteIn(Closed):
     note: str | None = None
 
 
-class KeyIn(Closed):
+class CatalogKeyIn(Closed):
     key: str
 
 
-class ReleaseIn(Closed):
+class CatalogReleaseIn(Closed):
     code: str
     exclude: list[str] = []  # "kind:key" entries to retire
 
 
-class ApprovalIn(Closed):
+class CatalogApprovalIn(Closed):
     approval_reference: str
 
 
-class ScheduleIn(Closed):
+class CatalogScheduleIn(Closed):
     at: datetime
 
 
-class ConfigIn(Closed):
+class CatalogConfigIn(Closed):
     configuration: dict
     staff: bool = False  # price as staff would (unavailable_online and staff_only allowed)
 
 
-class MediaIn(Closed):
+class CatalogMediaIn(Closed):
     data_base64: str
 
 
-class ImportIn(Closed):
+class CatalogImportIn(Closed):
     format: str
     content: str
     apply: bool = False
 
 
-class RecordsQuery(Closed):
+class CatalogRecordsQuery(Closed):
     kind: str | None = None
     status: str | None = None
     key: str | None = None
 
 
-class ExportQuery(Closed):
+class CatalogExportQuery(Closed):
     release_id: str | None = None
     format: str = "json"
 
 
-class PublicEstimateIn(Closed):
+class CatalogPublicEstimateIn(Closed):
     configuration: Any = None
     turnstile_token: Any = None
 
 
-class PublicEventIn(Closed):
+class CatalogPublicEventIn(Closed):
     event: Any = None
     subject: Any = None
 
@@ -162,7 +162,7 @@ def dashboard(req: Req):
     return ok(service.dashboard(req.session, can_price=_can_price(req)))
 
 
-@api.route("GET", "/records", permission="catalog.view", write=False, query=RecordsQuery, requirement="CAT-001")
+@api.route("GET", "/records", permission="catalog.view", write=False, query=CatalogRecordsQuery, requirement="CAT-001")
 def list_records(req: Req):
     import sqlalchemy as sa
 
@@ -186,7 +186,7 @@ def get_record(req: Req, record_id: str):
     return ok(_record_view(req, _record(req, record_id)))
 
 
-@api.route("POST", "/records", permission="catalog.view", body=RecordIn, status=201, requirement="CAT-002")
+@api.route("POST", "/records", permission="catalog.view", body=CatalogRecordIn, status=201, requirement="CAT-002")
 def create_record(req: Req):
     req.ctx.require(edit_permission(req.body.kind))
     try:
@@ -205,7 +205,7 @@ def _edit(req: Req, record_id: str, action, *args):
         raise _err(err) from err
 
 
-@api.route("PUT", "/records/<record_id>", permission="catalog.view", body=DocumentIn, requirement="CAT-002")
+@api.route("PUT", "/records/<record_id>", permission="catalog.view", body=CatalogDocumentIn, requirement="CAT-002")
 def update_record(req: Req, record_id: str):
     return _edit(req, record_id, service.update_draft, req.body.document)
 
@@ -231,7 +231,12 @@ def new_version(req: Req, record_id: str):
 
 
 @api.route(
-    "POST", "/records/<record_id>/clone", permission="catalog.view", body=KeyIn, status=201, requirement="CAT-002"
+    "POST",
+    "/records/<record_id>/clone",
+    permission="catalog.view",
+    body=CatalogKeyIn,
+    status=201,
+    requirement="CAT-002",
 )
 def clone_record(req: Req, record_id: str):
     row = _record(req, record_id)
@@ -242,7 +247,9 @@ def clone_record(req: Req, record_id: str):
         raise _err(err) from err
 
 
-@api.route("POST", "/records/<record_id>/approve", permission="catalog.review", body=NoteIn, requirement="CAT-006")
+@api.route(
+    "POST", "/records/<record_id>/approve", permission="catalog.review", body=CatalogNoteIn, requirement="CAT-006"
+)
 def approve_record(req: Req, record_id: str):
     row = _record(req, record_id)
     try:
@@ -251,7 +258,9 @@ def approve_record(req: Req, record_id: str):
         raise _err(err) from err
 
 
-@api.route("POST", "/records/<record_id>/reject", permission="catalog.review", body=NoteIn, requirement="CAT-006")
+@api.route(
+    "POST", "/records/<record_id>/reject", permission="catalog.review", body=CatalogNoteIn, requirement="CAT-006"
+)
 def reject_record(req: Req, record_id: str):
     row = _record(req, record_id)
     try:
@@ -303,7 +312,7 @@ def _release_action(req: Req, release_id: str, action, *args):
         raise _err(err) from err
 
 
-@api.route("POST", "/releases", permission="catalog.admin", body=ReleaseIn, status=201, requirement="CAT-008")
+@api.route("POST", "/releases", permission="catalog.admin", body=CatalogReleaseIn, status=201, requirement="CAT-008")
 def create_release(req: Req):
     exclude = tuple(tuple(x.split(":", 1)) for x in req.body.exclude if ":" in x)
     try:
@@ -331,19 +340,25 @@ def submit_release(req: Req, release_id: str):
 
 
 @api.route(
-    "POST", "/releases/<release_id>/approve", permission="catalog.approve", body=ApprovalIn, requirement="CAT-007"
+    "POST",
+    "/releases/<release_id>/approve",
+    permission="catalog.approve",
+    body=CatalogApprovalIn,
+    requirement="CAT-007",
 )
 def approve_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.approve_release, req.body.approval_reference)
 
 
-@api.route("POST", "/releases/<release_id>/reject", permission="catalog.approve", body=NoteIn, requirement="CAT-007")
+@api.route(
+    "POST", "/releases/<release_id>/reject", permission="catalog.approve", body=CatalogNoteIn, requirement="CAT-007"
+)
 def reject_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.reject_release, req.body.note or "")
 
 
 @api.route(
-    "POST", "/releases/<release_id>/schedule", permission="catalog.admin", body=ScheduleIn, requirement="CAT-008"
+    "POST", "/releases/<release_id>/schedule", permission="catalog.admin", body=CatalogScheduleIn, requirement="CAT-008"
 )
 def schedule_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.schedule_release, req.body.at)
@@ -373,7 +388,7 @@ def release_customer_view(req: Req, release_id: str):
         raise _err(err) from err
 
 
-@api.route("POST", "/releases/<release_id>/preview-estimate", permission="catalog.view", body=ConfigIn,
+@api.route("POST", "/releases/<release_id>/preview-estimate", permission="catalog.view", body=CatalogConfigIn,
            write=False, requirement="CAT-001")  # fmt: skip
 def preview_estimate(req: Req, release_id: str):
     row = _release(req, release_id)
@@ -386,7 +401,7 @@ def reopen_configuration(req: Req, reference: str):
 
 
 # --- staff: media, import/export, analytics --------------------------------------------------------------------------
-@api.route("POST", "/media", permission="catalog.media.edit", body=MediaIn, status=201, max_body=MEDIA_MAX_BODY,
+@api.route("POST", "/media", permission="catalog.media.edit", body=CatalogMediaIn, status=201, max_body=MEDIA_MAX_BODY,
            requirement="CAT-004")  # fmt: skip
 def upload_media(req: Req):
     try:
@@ -436,7 +451,7 @@ def staff_media(req: Req, sha: str):
     return _send(row, public=False)
 
 
-@api.route("POST", "/import", permission="catalog.admin", body=ImportIn, max_body=8 * 1024 * 1024,
+@api.route("POST", "/import", permission="catalog.admin", body=CatalogImportIn, max_body=8 * 1024 * 1024,
            requirement="CAT-008")  # fmt: skip
 def import_records(req: Req):
     can_price = req.ctx.has("catalog.pricing.edit")
@@ -449,7 +464,7 @@ def import_records(req: Req):
         raise _err(err) from err
 
 
-@api.route("GET", "/export", permission="catalog.admin", write=False, query=ExportQuery, requirement="CAT-008")
+@api.route("GET", "/export", permission="catalog.admin", write=False, query=CatalogExportQuery, requirement="CAT-008")
 def export_records(req: Req):
     try:
         body = importexport.export(req.session, release_id=req.query.release_id, include_pricing=_can_price(req),
@@ -496,7 +511,7 @@ def _estimate_prepare(req: Req):
 
 
 @public_api.route(
-    "POST", "/catalog/estimates", rbx="RBX-008", auth="public", body=PublicEstimateIn, status=201,
+    "POST", "/catalog/estimates", rbx="RBX-008", auth="public", body=CatalogPublicEstimateIn, status=201,
     max_body=PUBLIC_MAX_BODY, requirement="CAT-009", prepare=_estimate_prepare,
     limits=estimator_routes._limits("catalog-estimate", ("10 per minute", "60 per hour"), "120 per hour",
                                     "6 per minute", "600 per hour"),
@@ -519,7 +534,7 @@ def public_media(req: Req, sha: str):
     return _send(row, public=True)
 
 
-@public_api.route("POST", "/catalog/events", rbx="RBX-008", auth="public", body=PublicEventIn, status=204,
+@public_api.route("POST", "/catalog/events", rbx="RBX-008", auth="public", body=CatalogPublicEventIn, status=204,
                   max_body=1024, requirement="CAT-010",
                   limits=[("60 per minute", estimator_routes._ip("catalog-events"))],
                   summary="Staging validation analytics: an event count (no person, no free text)")  # fmt: skip

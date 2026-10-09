@@ -388,6 +388,218 @@
         "title": "CancelLinkIn",
         "type": "object"
       },
+      "CatalogApprovalIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_reference": {
+            "title": "Approval Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_reference"
+        ],
+        "title": "CatalogApprovalIn",
+        "type": "object"
+      },
+      "CatalogConfigIn": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "additionalProperties": true,
+            "title": "Configuration",
+            "type": "object"
+          },
+          "staff": {
+            "default": false,
+            "title": "Staff",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configuration"
+        ],
+        "title": "CatalogConfigIn",
+        "type": "object"
+      },
+      "CatalogDocumentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          }
+        },
+        "required": [
+          "document"
+        ],
+        "title": "CatalogDocumentIn",
+        "type": "object"
+      },
+      "CatalogImportIn": {
+        "additionalProperties": false,
+        "properties": {
+          "apply": {
+            "default": false,
+            "title": "Apply",
+            "type": "boolean"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "content"
+        ],
+        "title": "CatalogImportIn",
+        "type": "object"
+      },
+      "CatalogKeyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "CatalogKeyIn",
+        "type": "object"
+      },
+      "CatalogMediaIn": {
+        "additionalProperties": false,
+        "properties": {
+          "data_base64": {
+            "title": "Data Base64",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_base64"
+        ],
+        "title": "CatalogMediaIn",
+        "type": "object"
+      },
+      "CatalogNoteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "title": "CatalogNoteIn",
+        "type": "object"
+      },
+      "CatalogPublicEstimateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "default": null,
+            "title": "Configuration"
+          },
+          "turnstile_token": {
+            "default": null,
+            "title": "Turnstile Token"
+          }
+        },
+        "title": "CatalogPublicEstimateIn",
+        "type": "object"
+      },
+      "CatalogPublicEventIn": {
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "default": null,
+            "title": "Event"
+          },
+          "subject": {
+            "default": null,
+            "title": "Subject"
+          }
+        },
+        "title": "CatalogPublicEventIn",
+        "type": "object"
+      },
+      "CatalogRecordIn": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "document"
+        ],
+        "title": "CatalogRecordIn",
+        "type": "object"
+      },
+      "CatalogReleaseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exclude": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "CatalogReleaseIn",
+        "type": "object"
+      },
+      "CatalogScheduleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at"
+        ],
+        "title": "CatalogScheduleIn",
+        "type": "object"
+      },
       "ChangeIn": {
         "additionalProperties": false,
         "properties": {
@@ -4020,6 +4232,1423 @@
         "x-requirement": "AUTH-016"
       }
     },
+    "/api/v1/catalog/analytics": {
+      "get": {
+        "operationId": "catalog_analytics",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.analytics",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/configurations/{reference}": {
+      "get": {
+        "operationId": "catalog_reopen_configuration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reference",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.reopen_configuration",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/dashboard": {
+      "get": {
+        "operationId": "catalog_dashboard",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.dashboard",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/export": {
+      "get": {
+        "operationId": "catalog_export_records",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "release_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Release Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.export_records",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/import": {
+      "post": {
+        "operationId": "catalog_import_records",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.import_records",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/media": {
+      "get": {
+        "operationId": "catalog_list_media",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.list_media",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      },
+      "post": {
+        "operationId": "catalog_upload_media",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogMediaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.upload_media",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.media.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-004"
+      }
+    },
+    "/api/v1/catalog/media/{sha}": {
+      "get": {
+        "operationId": "catalog_staff_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sha",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Staff preview of a delivery variant (any scan status except INFECTED; sources are never served).",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/records": {
+      "get": {
+        "operationId": "catalog_list_records",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.list_records",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      },
+      "post": {
+        "operationId": "catalog_create_record",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogRecordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.create_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}": {
+      "get": {
+        "operationId": "catalog_get_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.get_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      },
+      "put": {
+        "operationId": "catalog_update_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogDocumentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.update_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/approve": {
+      "post": {
+        "operationId": "catalog_approve_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.approve_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-006"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/archive": {
+      "post": {
+        "operationId": "catalog_archive_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.archive_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/clone": {
+      "post": {
+        "operationId": "catalog_clone_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.clone_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/events": {
+      "get": {
+        "operationId": "catalog_record_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.record_events",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/new-version": {
+      "post": {
+        "operationId": "catalog_new_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.new_version",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/reject": {
+      "post": {
+        "operationId": "catalog_reject_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.reject_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-006"
+      }
+    },
+    "/api/v1/catalog/records/{record_id}/submit": {
+      "post": {
+        "operationId": "catalog_submit_record",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.submit_record",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-002"
+      }
+    },
+    "/api/v1/catalog/releases": {
+      "get": {
+        "operationId": "catalog_list_releases",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.list_releases",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      },
+      "post": {
+        "operationId": "catalog_create_release",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogReleaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.create_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}": {
+      "get": {
+        "operationId": "catalog_get_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.get_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/activate": {
+      "post": {
+        "operationId": "catalog_activate_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.activate_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/approve": {
+      "post": {
+        "operationId": "catalog_approve_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogApprovalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.approve_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-007"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/customer-view": {
+      "get": {
+        "operationId": "catalog_release_customer_view",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.release_customer_view",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/preview-approval": {
+      "post": {
+        "operationId": "catalog_approve_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.approve_preview",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-007"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/preview-estimate": {
+      "post": {
+        "operationId": "catalog_preview_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogConfigIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.preview_estimate",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/reject": {
+      "post": {
+        "operationId": "catalog_reject_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.reject_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-007"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/schedule": {
+      "post": {
+        "operationId": "catalog_schedule_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.schedule_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/submit": {
+      "post": {
+        "operationId": "catalog_submit_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.submit_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/releases/{release_id}/validate": {
+      "post": {
+        "operationId": "catalog_validate_release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.validate_release",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/catalog/rollback": {
+      "post": {
+        "operationId": "catalog_rollback",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "catalog.rollback",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
+      }
+    },
     "/api/v1/estimates/{estimate_id}": {
       "get": {
         "operationId": "estimator_get_estimate",
@@ -6908,6 +8537,133 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-016"
+      }
+    },
+    "/api/v1/public/catalog": {
+      "get": {
+        "operationId": "catalog_public_public_catalog",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "The active estimator catalog (customer-safe; no rates)",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-008",
+        "x-requirement": "CAT-009"
+      }
+    },
+    "/api/v1/public/catalog/estimates": {
+      "post": {
+        "operationId": "catalog_public_public_estimate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogPublicEstimateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Preliminary Budgetary Estimate from a catalog configuration (anonymous; not a quotation)",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-008",
+        "x-requirement": "CAT-009"
+      }
+    },
+    "/api/v1/public/catalog/events": {
+      "post": {
+        "operationId": "catalog_public_public_event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogPublicEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Staging validation analytics: an event count (no person, no free text)",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-008",
+        "x-requirement": "CAT-010"
+      }
+    },
+    "/api/v1/public/catalog/media/{sha}": {
+      "get": {
+        "operationId": "catalog_public_public_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sha",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "A delivery variant of the active catalog, by content hash",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-008",
+        "x-requirement": "CAT-009"
       }
     },
     "/api/v1/public/enquiries": {
