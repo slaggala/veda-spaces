@@ -47,6 +47,7 @@
     } finally { clearTimeout(timer); }
   }
   const widgets = {};
+  const ready = {}; // the render of each widget, awaited before its token is read (no empty-token race)
   function loadTurnstile() {
     if (window.turnstile) return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -56,7 +57,11 @@
       document.head.appendChild(s);
     });
   }
-  async function widget(name, selector) {
+  function widget(name, selector) {
+    ready[name] = render(name, selector);
+    return ready[name];
+  }
+  async function render(name, selector) {
     try {
       await loadTurnstile();
       if (widgets[name] === undefined) widgets[name] = window.turnstile.render(selector, { sitekey: meta('veda-turnstile-sitekey') });
@@ -282,6 +287,8 @@
     box.hidden = false; box.focus();
   }
   async function estimate(widgetName) {
+    if (!ready[widgetName]) widget(widgetName, widgetName === 'refine' ? '#v3-ts-refine' : '#v3-ts-estimate');
+    await ready[widgetName];
     const r = await call('POST', '/api/v1/public/catalog/estimates', { configuration: configuration(), turnstile_token: token(widgetName) });
     widget(widgetName, widgetName === 'refine' ? '#v3-ts-refine' : '#v3-ts-estimate');
     if (r.status === 201) { state.estimate = r.body.data; return true; }

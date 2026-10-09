@@ -142,7 +142,8 @@ try {
     }
     const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
     await pg.keyboard.press('Enter');
-    check('keyboard only: the estimate is reached', reached && (await res).status() === 201);
+    const kres = await res;
+    check('keyboard only: the estimate is reached', reached && kres.status() === 201, `${kres.status()} ${JSON.stringify((await kres.json().catch(() => ({}))).errors || '')}`);
     await pg.waitForSelector('[data-v3="3"]:not([hidden])');
     overflowed ||= await overflow(pg);
     check('360 px: no horizontal overflow on any screen', !overflowed);
