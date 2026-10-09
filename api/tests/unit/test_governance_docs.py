@@ -155,6 +155,7 @@ KNOWN_COMMITS = {
     "80d7d33f89c3631454300f2a85a818344b9502c6": ("V3 remediation H/A11y: corrected browser journey, accessibility and performance checks, admin safeguards", "V3 remediation accessibility"),  # pragma: allowlist secret (commit SHA)
     "5e95cf0cf06608c58ac6a9e64adc12f16d6dafe6": ("V3 remediation A3/H3: isolation tests and real-card equivalence (local only)", "V3 remediation A3/H3"),  # pragma: allowlist secret (commit SHA)
     "5eeb149966f487debdfe563c408a647d5faac484": ("Catalog V3 phase 5: independent-review package, OpenAPI contract, public-route pin", "Catalog V3 phase 5"),  # pragma: allowlist secret (commit SHA)
+    "006c2039c212ffaa14fc5299c55a0762839dda19": ("Merge pull request #68 from slaggala/fix/catalog-v3-customer-safety-closure", "main where the canonical customer-copy bypasses were reproduced"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

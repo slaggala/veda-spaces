@@ -20,7 +20,7 @@ from veda.config import settings
 from veda.kernel import db
 from veda.kernel.context import current_actor
 
-from . import kinds
+from . import kinds, text
 from .models import CatalogEvent, CatalogRecord, CatalogRelease
 
 KEY_RE = re.compile(r"^[a-z][a-z0-9_.-]{1,99}$")
@@ -49,6 +49,13 @@ def _event(s: Session, event_type: str, *, record=None, release=None, detail=Non
             detail=detail,
         )
     )
+
+
+def text_digests(model: kinds._Model) -> dict[str, dict[str, str]]:
+    """Per customer-visible field: the digest of the display text exactly as stored and of its canonical form (the
+    form every check compares). Audit only; normalisation never rewrites the stored text and never authorises it."""
+    return {where: {"display_sha256": text.display_digest(value), "canonical_sha256": text.canonical_digest(value)}
+            for where, value, _cls in text.visible_text(model)}  # fmt: skip
 
 
 def _four_eyes() -> bool:
@@ -132,7 +139,8 @@ def create_record(s: Session, kind: str, key: str, document: dict) -> CatalogRec
     _contribute(row)
     s.add(row)
     s.flush()
-    _event(s, "RECORD_CREATED", record=row, detail={"kind": kind, "key": key, "version": row.record_version})
+    _event(s, "RECORD_CREATED", record=row, detail={"kind": kind, "key": key, "version": row.record_version,
+                                                    "text": text_digests(model)})  # fmt: skip
     return row
 
 
@@ -159,7 +167,7 @@ def update_draft(s: Session, record_id: str, document: dict) -> CatalogRecord:
     row.document, row.document_sha256, row.title = document, sha(document), kinds.title(row.kind, model)
     row.review_note, row.reviewed_by, row.reviewed_on = None, None, None  # an earlier review no longer applies
     _contribute(row)
-    _event(s, "RECORD_UPDATED", record=row, detail={"version": row.record_version})
+    _event(s, "RECORD_UPDATED", record=row, detail={"version": row.record_version, "text": text_digests(model)})
     return row
 
 
@@ -187,7 +195,8 @@ def approve_record(s: Session, record_id: str, note: str | None = None) -> Catal
     validate(row.kind, row.document)
     row.status, row.reviewed_by, row.reviewed_on = "APPROVED", me, db.tx_time(s)
     row.review_note = (note or "").strip()[:300] or None
-    _event(s, "RECORD_APPROVED", record=row, detail={"version": row.record_version})
+    _event(s, "RECORD_APPROVED", record=row, detail={"version": row.record_version,
+                                                     "text": text_digests(validate(row.kind, row.document))})  # fmt: skip
     return row
 
 
@@ -322,6 +331,32 @@ def _require_valid(s: Session, release: CatalogRelease) -> dict:
     return report
 
 
+def _payload_sha(report: dict) -> str | None:
+    return (report.get("compiled") or {}).get("public_payload_sha256")
+
+
+def _approved_payload(s: Session, release: CatalogRelease, *event_types: str) -> str | None:
+    """The public-payload digest an approval or activation event recorded (the latest such event of this release)."""
+    row = (
+        s.execute(
+            sa.select(CatalogEvent)
+            .where(CatalogEvent.release_id == release.id, CatalogEvent.event_type.in_(event_types))
+            .order_by(CatalogEvent.created_on.desc(), CatalogEvent.id.desc())
+        )
+        .scalars()
+        .first()
+    )
+    return (row.detail or {}).get("public_payload_sha256") if row is not None else None
+
+
+def _require_same_payload(s: Session, release: CatalogRelease, report: dict, event_type: str, what: str) -> None:
+    """Fail closed when the resolved public payload changed since it was approved (a pricing, specification, copy or
+    catalog change): the approval was of different customer text and must be given again."""
+    approved = _approved_payload(s, release, event_type)
+    if approved is None or approved != _payload_sha(report):
+        raise CatalogError(f"the public payload changed since the {what} was approved; approve it again")
+
+
 def _release_contributors(s: Session, release: CatalogRelease) -> set[str]:
     """Contributors to every record this release adds or changes against the active release (pricing, copy, rules,
     media mappings and everything else)."""
@@ -349,10 +384,10 @@ def approve_preview(s: Session, release_id: str) -> CatalogRelease:
     release = get_release(s, release_id)
     if release.status not in ("DRAFT", "IN_REVIEW"):
         raise CatalogError(f"the preview is approved before release approval (release is {release.status})")
-    _require_valid(s, release)
+    report = _require_valid(s, release)
     me = _release_four_eyes(s, release, "customer preview")
     release.preview_approved_by, release.preview_approved_on = me, db.tx_time(s)
-    _event(s, "RELEASE_PREVIEW_APPROVED", release=release)
+    _event(s, "RELEASE_PREVIEW_APPROVED", release=release, detail={"public_payload_sha256": _payload_sha(report)})
     return release
 
 
@@ -375,10 +410,12 @@ def approve_release(s: Session, release_id: str, approval_reference: str) -> Cat
     if len((approval_reference or "").strip()) < 10:
         raise CatalogError("approval needs an approval reference (at least 10 characters)")
     me = _release_four_eyes(s, release, "release", release.submitted_by)
-    _require_valid(s, release)
+    report = _require_valid(s, release)
+    _require_same_payload(s, release, report, "RELEASE_PREVIEW_APPROVED", "customer preview")
     release.status, release.approved_by, release.approved_on = "APPROVED", me, db.tx_time(s)
     release.approval_reference = approval_reference.strip()[:200]
-    _event(s, "RELEASE_APPROVED", release=release, detail={"approval_reference": release.approval_reference})
+    _event(s, "RELEASE_APPROVED", release=release, detail={"approval_reference": release.approval_reference,
+                                                           "public_payload_sha256": _payload_sha(report)})  # fmt: skip
     return release
 
 
@@ -451,7 +488,8 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False,
         raise CatalogError("the release has no approval")
     if release.status == "SCHEDULED" and release.scheduled_for and release.scheduled_for > db.tx_time(s):
         raise CatalogError("the release is scheduled for later")
-    _require_valid(s, release)
+    report = _require_valid(s, release)
+    _require_same_payload(s, release, report, "RELEASE_APPROVED", "release")
     records = release_records(s, release)
     now = db.tx_time(s)
     current = _lock_active(s)
@@ -488,6 +526,7 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False,
         "RELEASE_ROLLED_BACK" if rollback else "RELEASE_ACTIVATED",
         release=release,
         detail={"code": release.release_code, "manifest_sha256": release.manifest_sha256,
+                "public_payload_sha256": _payload_sha(report),
                 "previous_release_id": current.id if current else None,
                 "previous": current.release_code if current else None},
     )  # fmt: skip
@@ -564,6 +603,10 @@ def rollback(s: Session, reason: str, expected_release: str) -> CatalogRelease:
     s.add(restored)
     s.flush()
     _event(s, "RELEASE_CREATED", release=restored, detail={"code": code, "rollback_of": target.release_code})
+    # The restored release is approved as the payload customers last saw from the target; activation re-checks it.
+    _event(s, "RELEASE_APPROVED", release=restored, detail={
+        "approval_reference": restored.approval_reference,
+        "public_payload_sha256": _approved_payload(s, target, "RELEASE_ACTIVATED", "RELEASE_ROLLED_BACK")})  # fmt: skip
     return activate_release(s, restored.id, rollback=True, expected_active=current.id)
 
 

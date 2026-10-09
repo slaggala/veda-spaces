@@ -448,20 +448,78 @@ class AppliesTo(_Model):
     packages: tuple[Key, ...] = ()
 
 
-class ClaimGovernance(_Model):
-    """A marketing claim's governance: what kind of claim it is, who answers for it, what supports it, and when it
-    holds. Only an APPROVED claim with a named owner, a source, a current effective period and (for an absolute claim
-    such as best, number one, cheapest, lowest or guaranteed) independent substantiation passes the release gate."""
+_PLACEHOLDERS = frozenset({
+    "x", "xx", "xxx", "yes", "no", "ok", "okay", "na", "n a", "none", "nil", "tbd", "tba", "todo", "internal", "approved",
+    "test", "testing", "placeholder", "dummy", "sample", "evidence", "source", "see above", "same", "various", "data",
+})  # fmt: skip
 
-    category: Literal[
-        "factual_descriptor", "popularity", "quality", "price", "warranty", "promotional", "recommendation", "service",
-    ]  # fmt: skip
+
+def substantive(value: str | None) -> bool:
+    """A real reference, not a placeholder: at least 12 characters of letters after normalisation."""
+    if not value:
+        return False
+    form = text.canonical(value)
+    return form not in _PLACEHOLDERS and len(form) >= 12 and sum(ch.isalpha() for ch in form) >= 8
+
+
+ClaimCategory = Literal[
+    "factual_descriptor", "ranking", "price", "popularity", "recommendation", "quality", "promotional",
+]  # fmt: skip
+
+
+class ClaimGovernance(_Model):
+    """A marketing claim's governance (canonical customer-copy closure, Phase 5).
+
+    The declared `categories` must equal the categories detected in the statement's canonical form. The record needs a
+    supporting source and an evidence reference (not placeholders), a responsible owner, a named approver, allowed
+    environments, an effective date, and either a review date or an explicit non-expiring policy decision. It must also
+    carry the canonical digest of the approved display text.
+
+    Category rules:
+    - Absolute, ranking and price claims also need independent substantiation and a backup owner.
+    - Ranking, price and popularity claims need the period the evidence covers.
+    - Promotional and price claims must be time-boxed (a review date, never non-expiring).
+
+    The approver attests the claim. The system approval is the record's four-eyes review, which refuses its author,
+    editors and submitter."""
+
+    categories: tuple[ClaimCategory, ...] = Field(min_length=1)
     status: Literal["APPROVED", "BLOCKED"] = "BLOCKED"
-    source: Text  # the evidence the claim rests on (sales data, test report, approved policy)
+    source: Text  # what the claim rests on (sales data, test report, approved policy)
+    evidence_reference: Text  # where the evidence is kept (document, report or dataset reference)
+    evidence_period: Annotated[str, Field(max_length=80)] | None = None  # the period the evidence covers
     owner: Name  # an accountable role or person; UNASSIGNED blocks
+    backup_owner: Name | None = None
+    approver: Name  # who attests the claim (distinct from the record's author: four-eyes)
     effective_from: date
-    review_by: date | None = None  # expiry or review date
-    substantiation: Text | None = None  # independent substantiation (required for an absolute claim)
+    review_by: date | None = None  # expiry or mandatory review date
+    non_expiring_policy: Text | None = None  # the explicit policy decision when there is no review date
+    environments: tuple[Literal["local", "test", "staging", "production"], ...] = Field(min_length=1)
+    substantiation: Text | None = None  # independent substantiation (absolute, ranking and price claims)
+    canonical_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]  # of the approved display text
+
+    @model_validator(mode="after")
+    def _evidence(self):
+        cats = set(self.categories)
+        if (self.review_by is None) == (self.non_expiring_policy is None):
+            raise ValueError("a claim has a review date or an explicit non-expiring policy decision, exactly one")
+        for name in ("source", "evidence_reference", "substantiation", "non_expiring_policy"):
+            value = getattr(self, name)
+            if value is not None and not substantive(value):
+                raise ValueError(f"claim {name} is a placeholder; give a real reference")
+        if text.canonical(self.approver) in {text.canonical(self.owner), text.canonical(self.backup_owner or "")}:
+            raise ValueError("a claim is not approved by its own owner (no self-approval)")
+        if self.review_by is not None and self.review_by <= self.effective_from:
+            raise ValueError("a claim's review date is after its effective date")
+        if cats & {"promotional", "price"} and self.review_by is None:
+            raise ValueError("a promotional or price claim is time-boxed: it needs a review date")
+        if cats & {"ranking", "price"} and not self.substantiation:
+            raise ValueError("a ranking or price claim needs independent substantiation")
+        if cats & {"ranking", "price"} and not self.backup_owner:
+            raise ValueError("a ranking or price claim needs a backup owner")
+        if cats & {"ranking", "price", "popularity"} and not self.evidence_period:
+            raise ValueError("a ranking, price or popularity claim names the period its evidence covers")
+        return self
 
 
 class Copy(_Model):
@@ -530,42 +588,57 @@ def load_model(kind: str, document: dict) -> _Model:
 def parse(kind: str, document: dict) -> _Model:
     """Validate a document being authored or imported: its schema and every customer-visible string."""
     model = load_model(kind, document)
-    problems = text_problems(kind, model)
+    problems = text_problems(kind, model, authoring=True)
     if problems:
         raise KindError(problems[0])
     return model
 
 
-def text_problems(kind: str, model: _Model) -> list[str]:
-    """Why the customer-visible text of a document is not allowed (empty when it is). Factual text may make no promise
-    and no claim; a copy statement may make a promise only as a promise record, and a claim only with its claim
-    governance (an absolute claim also needs independent substantiation)."""
+def text_problems(kind: str, model: _Model, *, authoring: bool = True) -> list[str]:
+    """Why the customer-visible text of a document is not allowed (empty when it is). Every check runs on the
+    canonical form (`text.canonical` / `text.numeric_form`).
+
+    Factual text may make no promise, no claim and no rate. A copy statement may make a promise only as a promise
+    record linked to the matrix (warranty, service and delivery wording included), and a marketing claim only with
+    claim governance whose declared categories equal the detected ones and whose digest is the statement's. New text
+    (`authoring`) may not contain invisible or formatting characters."""
     if kind in STAFF_ONLY_KINDS:
         return []
     problems = []
     for where, value, cls in text.visible_text(model):
+        hidden = text.invisible_chars(value)
+        if authoring and hidden:
+            problems.append(f"{where} contains invisible or formatting characters ({', '.join(hidden)})")
         what = text.forbidden_in(value)
         if what:
             problems.append(f"{where} contains {what}; customer text never states it")
             continue
-        claims = text.claims_in(value)
-        promise = bool(_PROMISE_WORDS.search(value))
+        marketing = text.marketing_claims_in(value)
+        promise = text.promise_in(value)
         if cls == text.FACTUAL:
             if promise:
                 problems.append(
                     f"{where} makes a promise; only a promise copy record linked to the promise matrix may say it"
                 )
-            if claims:
+            if marketing:
                 problems.append(
-                    f"{where} makes a {', '.join(claims)} claim; only an approved claim copy record may say it"
+                    f"{where} makes a {', '.join(marketing)} claim; only an approved claim copy record may say it"
                 )
         elif isinstance(model, Copy):
             if promise and not model.promise:
                 problems.append(f"{where} makes a promise; mark it a promise and link its promise-matrix row")
-            if claims and model.claim is None:
-                problems.append(f"{where} makes a {', '.join(claims)} claim; give it claim governance")
-            if model.claim is not None and text.ABSOLUTE.search(value) and not model.claim.substantiation:
-                problems.append(f"{where} makes an absolute claim; it needs independent substantiation")
+            claim = model.claim
+            if marketing and claim is None:
+                problems.append(f"{where} makes a {', '.join(marketing)} claim; give it claim governance")
+            if claim is not None:
+                declared = set(claim.categories) - {"factual_descriptor"}
+                if declared != set(marketing):
+                    problems.append(f"{where}: declared claim categories {sorted(declared) or ['factual_descriptor']} "
+                                    f"do not match the detected {marketing or ['none']}")  # fmt: skip
+                if claim.canonical_sha256 != text.canonical_digest(value):
+                    problems.append(f"{where}: the claim's canonical digest is not the statement's")
+                if text.absolute_in(value) and not claim.substantiation:
+                    problems.append(f"{where} makes an absolute claim; it needs independent substantiation")
     return problems
 
 

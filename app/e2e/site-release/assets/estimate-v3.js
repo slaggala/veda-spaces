@@ -60,7 +60,7 @@
     TOKEN_AVAILABLE: 'Ready.',
     SUBMITTING: 'Preparing your estimate…',
     SUCCEEDED: '',
-    FAILED: 'The security check could not be completed. Your choices are kept; try again.',
+    FAILED: 'The security check could not be completed. Please retry.',
     EXPIRED: 'The security check expired. It is being renewed…',
   };
   const guards = {
@@ -244,7 +244,12 @@
 
   function radio(name, value, checked, label, sub, onChange) {
     const input = el('input', { type: 'radio', name, value, checked });
-    input.addEventListener('change', onChange);
+    input.addEventListener('change', () => {
+      onChange();
+      // The change re-renders its section: keep keyboard focus on the same choice (never lost to the page body).
+      const again = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);
+      if (again && again !== input) again.focus();
+    });
     return el('label', { class: 'v3-choice' }, input, el('span', {}, el('strong', { text: label }), sub ? el('small', { text: sub }) : null));
   }
   function renderHome() {
@@ -360,16 +365,31 @@
       }),
     };
   }
-  function problems(body) {
-    const list = Array.isArray(body.errors) && body.errors.length ? body.errors.map((e) => e.message) : ['We could not prepare an estimate right now. Please try again.'];
+  function problems(heading, details = []) {
     const box = $('#v3-summary');
-    box.replaceChildren(el('p', { text: 'Please check the following:' }), el('ul', {}, ...[...new Set(list)].map((t) => el('li', { text: t }))));
+    box.replaceChildren(el('p', { 'data-field': 'summary', text: heading }),
+      ...(details.length ? [el('ul', {}, ...[...new Set(details)].map((t) => el('li', { text: t })))] : []));
     box.hidden = false; box.focus();
   }
-  const CONTROLLED = { CAPTCHA_FAILED: 'The security check could not be completed. Your choices are kept; try again.',
-    TIMEOUT: 'This is taking longer than expected. Your choices are kept; try again.',
-    UNREACHABLE: 'We could not reach our server. Your choices are kept; try again.',
-    RATE_LIMITED: 'Too many requests. Please wait a minute and try again.' };
+  // What the customer is told, by what actually happened (canonical customer-copy closure, Phase 8). Only an anti-bot
+  // refusal says the security check failed; a server error, a timeout and a conflict each say what they are.
+  const MESSAGES = {
+    ANTI_BOT: 'The security check could not be completed. Please retry.',
+    422: 'Please review the highlighted information.',
+    409: 'This request conflicts with an earlier submission. Please refresh and try again.',
+    429: 'Too many attempts. Please wait before trying again.',
+    TIMEOUT: 'This is taking longer than expected. Your choices are kept; please try again.',
+    UNREACHABLE: 'We could not reach our server. Your choices are kept; please try again.',
+    SERVER: 'We could not prepare an estimate right now. Your choices are kept; please try again.',
+  };
+  function failure(r) {
+    const code = r.body?.code;
+    if (code === 'CAPTCHA_FAILED') return [MESSAGES.ANTI_BOT, []];
+    if (r.status === 422) return [MESSAGES[422], (r.body?.errors || []).map((e) => e.message).filter(Boolean)];
+    if (r.status === 409 || r.status === 429) return [MESSAGES[r.status], []];
+    if (r.status === 0) return [MESSAGES[code] || MESSAGES.UNREACHABLE, []];
+    return [MESSAGES.SERVER, []];
+  }
   /** Send one estimate request, or nothing. Returns true on success. */
   async function estimate(name) {
     const g = guards[name];
@@ -396,8 +416,7 @@
     if (!lost) g.sent = null; // only a lost response is retried with the same key
     setState(g, 'FAILED');
     renew(g); // a fresh token arrives through the callback; the customer retries when ready
-    const code = r.body?.code;
-    problems(CONTROLLED[code] ? { errors: [{ message: CONTROLLED[code] }] } : r.body);
+    problems(...failure(r));
     return false;
   }
   $('#v3-estimate').addEventListener('click', async () => { if (await estimate('estimate')) { track('estimate_reached'); show(3); } });

@@ -8,6 +8,7 @@ Promise owners in tests are role placeholders, never people.
 import base64
 import io
 import json
+import secrets
 from pathlib import Path
 
 import pytest
@@ -97,9 +98,14 @@ def live_slice(people):
     return release(a, b)
 
 
+def new_key() -> str:
+    """A fresh Idempotency-Key, as the V3 page makes one per request (128 random bits)."""
+    return f"v3-{secrets.token_hex(16)}"
+
+
 def public_estimate(api, configuration):
     return api.post("/api/v1/public/catalog/estimates", {"configuration": configuration, "turnstile_token": "ok-token"},
-                    anonymous=True, headers={"Origin": SITE})  # fmt: skip
+                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": new_key()})  # fmt: skip
 
 
 def living(**room):

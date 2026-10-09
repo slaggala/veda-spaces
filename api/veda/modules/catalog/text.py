@@ -21,105 +21,204 @@ fact); "premium pick", "premium quality" and "luxury choice" are claims. "Top sh
 
 from __future__ import annotations
 
+import hashlib
 import re
 import types
 import typing
+import unicodedata
 from collections.abc import Iterator
 
 from pydantic import BaseModel
 
 from veda.modules.estimator import customer_spec
 
-# --- vocabulary ---------------------------------------------------------------------------------------------------
-# Promise wording (R2/R3): only a promise copy record linked to a confirmed promise-matrix row may say it.
-PROMISE = re.compile(
-    r"\b("
-    r"warrant\w*|guarantee\w*|assur\w*|certif\w*|lifetime|life-long|"
-    r"free|complimentary|no[- ]cost|includ\w*|inclusive|exclud\w*|"
-    r"install\w*|deliver\w*|dispatch\w*|timeline\w*|on[- ]time|deadline\w*|\d+\s*(?:days?|weeks?|months?|years?)|"
-    r"grade\w*|BWR|BWP|MR|E[0-2]|IS[ :-]?\d+|marine|waterproof|termite\w*|borer\w*|"
-    r"brand\w*|genuine|original|hettich|hafele|häfele|blum|ebco|century|greenply|merino|greenlam|airolam|"
-    r"servic\w*|support\w*|after[- ]sales|maintenance|repair\w*|replac\w*|"
-    r"soft[- ]clos\w*"
-    r")\b",
-    re.I,
+# --- canonical normalisation (canonical customer-copy closure) -----------------------------------------------------
+# One normalisation for every check: claims, promises, rates, controlled-copy matching, release validation and the
+# public serialisers' defence-in-depth check. The approved display text is never rewritten; newly authored text with
+# invisible or formatting characters is refused (`invisible_chars`), and detection runs on the canonical forms.
+_CONFUSABLES = str.maketrans({
+    # Cyrillic and Greek letters that look like Latin ones (after case folding), and a few Latin lookalikes.
+    "а": "a", "в": "b", "е": "e", "ё": "e", "к": "k", "м": "m", "н": "h", "о": "o", "р": "p", "с": "c", "т": "t",
+    "у": "y", "х": "x", "і": "i", "ї": "i", "ј": "j", "ѕ": "s", "ԁ": "d", "ӏ": "l", "һ": "h", "ԛ": "q", "ԝ": "w",
+    "ɡ": "g", "ı": "i", "ℓ": "l", "ο": "o", "α": "a", "ν": "v", "ι": "i", "κ": "k", "ρ": "p", "τ": "t", "υ": "u",
+    "χ": "x", "ε": "e", "β": "b", "η": "n", "μ": "u", "ς": "s", "σ": "o",
+})  # fmt: skip
+_SEPARATOR = re.compile(r"[\s_/\\.:|·•‧∙⁄,;!?¡¿\"“”„«»()\[\]{}*~^`+=<>]+")
+_APOSTROPHE = re.compile(r"['’‘ʼ`´]")
+_SPACED_LETTERS = re.compile(r"\b(?:[a-z0-9] ){2,}[a-z0-9]\b")  # "b e s t" → "best" (letter-spacing evasion)
+# Factual compounds whose parts would otherwise read as claims (kept narrow on purpose).
+_FACTUAL_COMPOUNDS = re.compile(
+    r"\b(?:free ?standing|hands ?free|top ?hung|top ?mounted|best ?fit ?hinge|leading ?edges?)\b"
 )
 
-_S = r"[\s-]*"  # space or hyphen between the words of a phrase
+
+def _invisible(ch: str) -> bool:
+    cp = ord(ch)
+    return (
+        (unicodedata.category(ch) in ("Cf", "Cc", "Co", "Cs", "Cn") and ch not in "\t\n\r")
+        or 0xFE00 <= cp <= 0xFE0F
+        or 0xE0100 <= cp <= 0xE01EF
+        or 0x180B <= cp <= 0x180F
+        or cp == 0x034F
+    )
+
+
+def invisible_chars(text: str) -> list[str]:
+    """The invisible or formatting characters in a text (zero-width, joiners, word joiner, BOM, soft hyphen,
+    directional controls, variation selectors and other format or control characters). New customer text with any of
+    them is refused."""
+    return sorted({f"U+{ord(ch):04X}" for ch in text if _invisible(ch)})
+
+
+def _base(text: str) -> str:
+    s = unicodedata.normalize("NFKC", text)  # fullwidth and compatibility forms, ligatures, non-breaking spaces
+    s = "".join(ch for ch in s if not _invisible(ch)).casefold().translate(_CONFUSABLES)
+    s = "".join(" " if unicodedata.category(ch) in ("Zs", "Zl", "Zp") else ch for ch in s)
+    return s
+
+
+_SLASHES = str.maketrans({"\u2044": "/", "\u2215": "/", "\u29f8": "/", "\uff0f": "/", "\u2216": "\\"})
+
+
+def numeric_form(text: str) -> str:
+    """Canonical form that keeps digits and punctuation (for amounts and rates)."""
+    s = "".join("-" if unicodedata.category(ch) == "Pd" else ch for ch in _base(text)).translate(_SLASHES)
+    s = re.sub(r"\bpercent\b|\bpct\b|\bper cent\b", "%", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def canonical(text: str) -> str:
+    """The comparison form: NFKC, case-folded, invisible characters removed, lookalikes mapped, every separator
+    (space, underscore, any dash, slash, backslash, dot, colon, pipe, punctuation) a single space, letter-spaced runs
+    joined. Detection matches whole words and phrases in this form, never substrings."""
+    s = "".join(" " if unicodedata.category(ch) == "Pd" else ch for ch in _base(text))
+    s = _APOSTROPHE.sub("", s)
+    s = _SEPARATOR.sub(" ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    s = _SPACED_LETTERS.sub(lambda m: m.group(0).replace(" ", ""), s)
+    return re.sub(r"\s+", " ", _FACTUAL_COMPOUNDS.sub(" ", s)).strip()
+
+
+def canonical_digest(text: str) -> str:
+    return hashlib.sha256(canonical(text).encode()).hexdigest()
+
+
+def display_digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+# --- vocabulary (matched on the canonical form) -------------------------------------------------------------------
+def _words(*alternatives: str) -> re.Pattern[str]:
+    return re.compile(r"(?<![a-z0-9])(?:" + "|".join(alternatives) + r")(?![a-z0-9])")
+
+
+# Promise wording (R2/R3): only a promise copy record linked to a confirmed promise-matrix row may say it. Warranty,
+# service and delivery claims are promises: they are governed by the promise matrix.
+PROMISE = _words(
+    r"warrant\w*", r"guarantee\w*", r"assur\w*", r"certif\w*", r"lifetime", r"life ?long", r"free", r"complimentary",
+    r"no cost", r"includ\w*", r"inclusive", r"exclud\w*", r"install\w*", r"deliver\w*", r"dispatch\w*", r"timeline\w*",
+    r"on ?time", r"deadline\w*", r"\d+ ?(?:days?|weeks?|months?|years?|hours?|hrs?)", r"within \w+ (?:days?|hours?)",
+    r"grade\w*", r"bwr", r"bwp", r"mr", r"e[0-2]", r"is ?\d+", r"marine", r"water ?proof", r"\w+ ?proof",
+    r"termite\w*", r"borer\w*", r"brand\w*", r"genuine", r"original", r"hettich", r"hafele", r"hafele", r"blum", r"ebco",
+    r"century", r"greenply", r"merino", r"greenlam", r"airolam", r"servic\w*", r"support\w*", r"after ?sales",
+    r"maintenance(?: free)?", r"repair\w*", r"replac\w*", r"soft ?clos\w*", r"call ?back\w*", r"one ?day",
+    r"24 ?(?:x ?)?7",
+)  # fmt: skip
+
+MARKETING = ("ranking", "price", "popularity", "recommendation", "quality", "promotional")  # need claim governance
 CLAIMS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    (
-        "ranking",
-        re.compile(
-            rf"\bbest\b|\bno\.?{_S}1\b|#{_S}1\b|\bnumber{_S}one\b|\bunbeatable\b|\bunmatched\b|"
-            rf"\btop{_S}(?:rated|ranked|sell\w*|pick|choice|quality|brand|class)\b|\bworld{_S}class\b|"
-            rf"\bleading\b|\b(?:india|hyderabad)'?s{_S}(?:best|favourite|favorite|leading)\b",
-            re.I,
-        ),
-    ),
-    (
-        "price",
-        re.compile(
-            rf"\bcheapest\b|\blowest\b|\bunbeatable\b|\bbudget{_S}friendly\b|\baffordabl\w*\b|"
-            rf"\bvalue{_S}for{_S}money\b|\bbargain\w*\b",
-            re.I,
-        ),
-    ),
-    (
-        "popularity",
-        re.compile(
-            rf"\bmost{_S}(?:popular|chosen|loved|ordered|wanted|requested)\b|\bpopular\b|"
-            rf"\bbest{_S}?sell\w*\b|\btrending\b|\bfavou?rite\b|\bcustomer{_S}favou?rite\b",
-            re.I,
-        ),
-    ),
-    (
-        "recommendation",
-        re.compile(
-            rf"\brecommend\w*\b|\b(?:our|editor'?s|staff|designer'?s){_S}(?:premium{_S})?pick\b|"
-            rf"\bmust{_S}have\b",
-            re.I,
-        ),
-    ),
-    (
-        "quality",
-        re.compile(
-            rf"\bpremium{_S}(?:pick|choice|quality|grade|finish|range|selection|materials?|look|feel)\b|"
-            rf"\bour{_S}premium\b|\b(?:high|best|top|superior|finest|great|excellent|premium){_S}quality\b|"
-            rf"\bluxur\w*{_S}(?:choice|pick|finish|look|feel|quality|living)\b|\bfinest\b|\bsuperior\b|"
-            rf"\bflawless\b|\bperfect\w*\b|\bbest{_S}in{_S}class\b",
-            re.I,
-        ),
-    ),
-    (
-        "promotional",
-        re.compile(
-            rf"\blimited{_S}(?:time|period|offer|stock|edition)\b|"
-            rf"\b(?:special|exclusive|festive|launch|introductory|seasonal){_S}offers?\b|"
-            rf"\bexclusiv\w*\b|\bdiscount\w*\b|\bsale\b|\bdeals?\b|\bbonus\b|\bgift\w*\b|"
-            rf"\bsave{_S}(?:up{_S}to|\d)|\bhurry\b|\btoday{_S}only\b|\bnew{_S}arrival\w*\b",
-            re.I,
-        ),
-    ),
-)
+    ("ranking", _words(r"best", r"finest", r"no ?1", r"number ?(?:one|1)", r"# ?1", r"first choice", r"top (?:rated|ranked)",
+                       r"leading", r"unbeatable", r"unmatched", r"world class", r"best in class", r"second to none",
+                       r"(?:india|hyderabad|bengaluru|bangalore)s (?:best|leading|favou?rite|top)")),
+    ("price", _words(r"cheapest", r"lowest", r"budget friendly", r"affordabl\w*", r"value for money", r"bargain\w*",
+                     r"best price", r"price match\w*", r"most economical")),
+    ("popularity", _words(r"best ?sell\w*", r"most (?:popular|chosen|loved|ordered|wanted|requested|booked)", r"popular",
+                          r"trending", r"favou?rite\w*", r"top (?:choice|seller|selling)", r"in demand", r"hot ?selling")),
+    ("recommendation", _words(r"recommend\w*", r"(?:our|editors|staff|designers|experts) (?:premium )?(?:pick|choice)",
+                              r"premium (?:pick|choice)", r"luxury (?:pick|choice)", r"must ?have", r"top pick")),
+    ("quality", _words(r"premium (?:quality|grade|finish|range|selection|materials?|look|feel)", r"our premium",
+                       r"(?:high|highest|best|top|superior|finest|great|excellent|premium|world class) quality",
+                       r"luxur\w* (?:finish|look|feel|quality|living)", r"superior", r"flawless", r"perfect\w*",
+                       r"top notch", r"impeccable")),
+    ("promotional", _words(r"free", r"limited (?:time|period|offer|stock|edition)", r"offer ends? soon", r"ends soon",
+                           r"(?:special|exclusive|festive|launch|introductory|seasonal|today s) offers?", r"exclusiv\w*",
+                           r"discount\w*", r"sale", r"deals?", r"bonus", r"gift\w*", r"save (?:up to|\d)", r"hurry",
+                           r"today only", r"new arrivals?", r"\d+ ?% ?off", r"% ?off", r"cash ?back", r"coupon\w*",
+                           r"promo\w*", r"flat \d+ ?%", r"up ?to \d+ ?%")),
+    ("warranty", _words(r"lifetime", r"warrant\w*", r"guarantee\w*", r"certif\w*", r"\w+ ?proof", r"maintenance free",
+                        r"water ?proof")),
+    ("service", _words(r"(?:guaranteed |on ?time )?deliver\w*", r"one ?day call ?back", r"call ?back\w*",
+                       r"free (?:service|consultation|visit|design)", r"24 ?(?:x ?)?7", r"after ?sales", r"servic\w*")),
+)  # fmt: skip
 # Claims that stay prohibited unless independently substantiated and explicitly approved.
-ABSOLUTE = re.compile(
-    rf"\bbest\b|\bno\.?{_S}1\b|#{_S}1\b|\bnumber{_S}one\b|\bcheapest\b|\blowest\b|\bguarantee\w*\b|"
-    rf"\bunbeatable\b|\bunmatched\b",
-    re.I,
-)
+ABSOLUTE = _words(r"best", r"no ?1", r"number ?(?:one|1)", r"# ?1", r"first choice", r"cheapest", r"lowest",
+                  r"guarantee\w*", r"unbeatable", r"unmatched", r"finest", r"highest quality", r"leading")  # fmt: skip
+
+# Rates and prices (matched on the numeric form). Public totals are numbers in their own fields, never text.
+RATES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("a currency amount", re.compile(r"(?:₹|\brs\b\.?|\binr\b|\brupees?\b)\s*[\d.,]+")),
+    ("an amount written with /-", re.compile(r"\d\s*/\s*-")),
+    ("a grouped amount", re.compile(r"(?<![\d.])\d{1,3}(?:,\d{2,3})+(?![\d])")),
+    ("a per-area rate", re.compile(
+        r"\d[\d.,]*\s*k?\s*(?:/|per|an?|each)?\s*(?:sq\.?\s*f(?:ee)?t|sq\.?\s*ft\.?|sqft|sft|rft|r\.?\s*f\.?\s*t|"
+        r"r\.?\s*ft|psf|p\.?s\.?f|sq\.?\s*m|sqm|running\s*f(?:oo|ee)t|rf|r\.?m|rmt)\b")),
+    ("a per-unit rate", re.compile(r"\d[\d.,]*\s*k?\s*(?:/|per|each)\s*(?:unit|piece|pc|nos?|item)\b")),
+    ("a rate per unit", re.compile(r"(?:/|\bper\b)\s*(?:sq\.?\s*f(?:ee)?t|sqft|sft|rft|psf|running\s*f(?:oo|ee)t|sq\.?\s*m)\b")),
+    ("an amount in thousands", re.compile(r"(?<![\w.])\d+(?:\.\d+)?\s*k\b")),
+    ("a percentage discount", re.compile(r"\d+(?:\.\d+)?\s*%\s*(?:off|discount|cash\s*back|less|saving)|"
+                                         r"(?:flat|up\s*to|upto|extra)\s*\d+(?:\.\d+)?\s*%")),
+    ("internal commercial wording", re.compile(
+        r"\b(?:mrp|margins?|mark\s*-?\s*ups?|procurement|supplier|suppliers|dealer|wholesale|cost\s*price|"
+        r"purchase\s*price|landed\s*cost|price\s*(?:cap|ceiling|list)|ceiling\s*price|cashback|emi)\b")),
+)  # fmt: skip
 
 
 def claims_in(text: str) -> list[str]:
-    """The claim categories a text makes (empty for factual text)."""
-    return sorted({category for category, pattern in CLAIMS if pattern.search(text)})
+    """The claim categories a text makes (empty for factual text), detected on its canonical form."""
+    form = canonical(text)
+    return sorted({category for category, pattern in CLAIMS if pattern.search(form)})
+
+
+def marketing_claims_in(text: str) -> list[str]:
+    return [c for c in claims_in(text) if c in MARKETING]
+
+
+def promise_in(text: str) -> bool:
+    return bool(PROMISE.search(canonical(text)))
+
+
+def absolute_in(text: str) -> bool:
+    return bool(ABSOLUTE.search(canonical(text)))
+
+
+def rate_in(text: str) -> str | None:
+    """Why a text could leak a rate or price (None when it cannot)."""
+    form = numeric_form(text)
+    for what, pattern in RATES:
+        if pattern.search(form):
+            return what
+    return None
 
 
 def forbidden_in(text: str) -> str | None:
-    """Content never allowed in customer text (amounts, pricing words, durations, contact details)."""
-    for pattern, what in customer_spec._FORBIDDEN:
-        if pattern.search(text):
-            return what
-    return None
+    """Content never allowed in customer text: amounts and rates, pricing words, durations, contact details. Checked
+    on both the original and the numeric form, so lookalikes and invisible characters do not hide it."""
+    for candidate in (text, numeric_form(text), canonical(text)):
+        for pattern, what in customer_spec._FORBIDDEN:
+            if pattern.search(candidate):
+                return what
+    return rate_in(text)
+
+
+def leak_in(text: str) -> str | None:
+    """Content never allowed even in promise-governed estimator text (which may state a timeline or the word price):
+    an amount of money, a rate or internal commercial wording, an email address or a phone number."""
+    money, _words_, _duration, email, phone = customer_spec._FORBIDDEN
+    for candidate in (text, numeric_form(text), canonical(text)):
+        for pattern, what in (money, email, phone):
+            if pattern.search(candidate):
+                return what
+    return rate_in(text)
 
 
 # --- field inventory ----------------------------------------------------------------------------------------------
@@ -188,8 +287,12 @@ FIELD_CLASSES: dict[tuple[str, str], str] = {
     ("Governance", "owner"): STAFF, ("Governance", "backup"): STAFF, ("Governance", "quotation_mapping"): STAFF,
     ("Governance", "verification"): STAFF, ("Governance", "warranty_source"): STAFF, ("Governance", "status"): STAFF,
     ("AppliesTo", "products"): IDENTIFIER, ("AppliesTo", "rooms"): IDENTIFIER, ("AppliesTo", "packages"): IDENTIFIER,
-    ("ClaimGovernance", "category"): STAFF, ("ClaimGovernance", "status"): STAFF, ("ClaimGovernance", "source"): STAFF,
-    ("ClaimGovernance", "owner"): STAFF, ("ClaimGovernance", "substantiation"): STAFF,
+    ("ClaimGovernance", "categories"): STAFF, ("ClaimGovernance", "status"): STAFF,
+    ("ClaimGovernance", "source"): STAFF, ("ClaimGovernance", "evidence_reference"): STAFF,
+    ("ClaimGovernance", "evidence_period"): STAFF, ("ClaimGovernance", "owner"): STAFF,
+    ("ClaimGovernance", "backup_owner"): STAFF, ("ClaimGovernance", "approver"): STAFF,
+    ("ClaimGovernance", "non_expiring_policy"): STAFF, ("ClaimGovernance", "environments"): STAFF,
+    ("ClaimGovernance", "substantiation"): STAFF, ("ClaimGovernance", "canonical_sha256"): STAFF,
     ("Copy", "statement"): STATEMENT, ("Copy", "category"): IDENTIFIER, ("Copy", "matrix_row"): STAFF,
 }  # fmt: skip
 # Fields the remediation instruction names that the catalog does not have (and so cannot carry text).

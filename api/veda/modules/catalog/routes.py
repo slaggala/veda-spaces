@@ -540,21 +540,23 @@ def public_catalog(req: Req):
     return result
 
 
-def _idempotency_key() -> str | None:
+def _idempotency_key() -> str:
+    """The request's Idempotency-Key (required for V3 estimates), as its stored digest scoped to the browser."""
     key = request.headers.get("Idempotency-Key")
     if key is None:
-        return None
+        raise ApiError(422, "VALIDATION_FAILED", "Please review the highlighted information.",
+                       errors=[{"field": "Idempotency-Key", "code": "REQUIRED", "message": "An Idempotency-Key is required."}])  # fmt: skip
     if not configure.IDEMPOTENCY_KEY.match(key):
-        raise ApiError(422, "VALIDATION_FAILED", "Invalid Idempotency-Key.",
-                       errors=[{"field": "Idempotency-Key", "code": "INVALID", "message": "16–64 characters [A-Za-z0-9_-]."}])  # fmt: skip
-    return key
+        raise ApiError(422, "VALIDATION_FAILED", "Please review the highlighted information.",
+                       errors=[{"field": "Idempotency-Key", "code": "INVALID", "message": "32–64 characters [A-Za-z0-9_-]."}])  # fmt: skip
+    return configure.key_digest(key, request.headers.get("X-Veda-Client"))
 
 
 def _estimate_prepare(req: Req):
     _enabled()
     key = _idempotency_key()
     # A repeat of a request already answered is replayed before the anti-bot check: its token was single-use.
-    if key and configure.stored_for_key(req.session, key) is not None:
+    if configure.stored_for_key(req.session, key) is not None:
         return {"captcha": False, "replay": key}
     if settings().estimate_turnstile_required:
         req.session.rollback()

@@ -9,8 +9,9 @@ import copy
 import pytest
 
 from tests.integration.test_catalog import approve_all, seed_slice, tx
+from tests.support import claims
 from veda.kernel import db
-from veda.modules.catalog import importexport, kinds, service, text
+from veda.modules.catalog import importexport, kinds, service
 
 CLAIMS = [
     "Best seller TV unit", "Our premium pick", "Premium pick", "Most popular", "Recommended", "No. 1", "Best quality",
@@ -91,16 +92,8 @@ def test_3d_labels_are_checked():
         kinds.parse("media", doc)
 
 
-def claim_copy(statement, *, status="APPROVED", owner="Sales lead (role, test)", substantiation=None, review_by=None,
-               category="popularity"):  # fmt: skip
-    claim = {"category": category, "status": status, "source": "Order data 2026-Q3 (synthetic)", "owner": owner,
-             "effective_from": "2026-10-01"}  # fmt: skip
-    if substantiation:
-        claim["substantiation"] = substantiation
-    if review_by:
-        claim["review_by"] = review_by
-    return {"statement": statement, "category": "badge", "promise": False, "claim": claim,
-            "applies_to": {"packages": ["slice.essential"]}}  # fmt: skip
+def claim_copy(statement, **over):
+    return claims.claim_copy(statement, **over)
 
 
 def test_a_claim_copy_needs_governance_and_what_it_applies_to():
@@ -113,20 +106,16 @@ def test_a_claim_copy_needs_governance_and_what_it_applies_to():
     kinds.parse("copy", claim_copy("Most chosen"))
 
 
-@pytest.mark.parametrize("statement", ["Best seller", "No. 1 choice", "Lowest cost", "Cheapest unit"])
-def test_absolute_claims_need_independent_substantiation(statement):
-    if text.forbidden_in(statement):
-        with pytest.raises(ValueError):
-            kinds.parse("copy", claim_copy(statement, substantiation="Independent audit (synthetic)"))
-        return
+@pytest.mark.parametrize("statement", ["Best seller", "No. 1 choice", "Cheapest unit", "Top rated"])
+def test_absolute_and_ranking_claims_need_independent_substantiation(statement):
     with pytest.raises(ValueError, match="substantiation"):
-        kinds.parse("copy", claim_copy(statement))
-    kinds.parse("copy", claim_copy(statement, substantiation="Independent audit 2026 (synthetic)"))
+        kinds.parse("copy", claim_copy(statement, substantiation=None))
+    kinds.parse("copy", claim_copy(statement))
 
 
 def test_guaranteed_lowest_price_is_never_customer_text():
     with pytest.raises(ValueError, match="pricing wording"):
-        kinds.parse("copy", claim_copy("Guaranteed lowest price", substantiation="x1 x1 x1"))
+        kinds.parse("copy", claim_copy("Guaranteed lowest price"))
 
 
 @pytest.fixture
@@ -153,7 +142,7 @@ def _release_with_badge(people, doc, code="SLICE-C"):
     [
         (claim_copy("Most chosen", status="BLOCKED"), "not approved"),
         (claim_copy("Most chosen", owner="UNASSIGNED"), "no responsible owner"),
-        (claim_copy("Most chosen", review_by="2026-01-01"), "review date"),
+        (claim_copy("Most chosen", effective_from="2025-06-01", review_by="2026-01-01"), "review date"),
     ],
 )
 def test_unsupported_claims_block_release(people, doc, problem):
