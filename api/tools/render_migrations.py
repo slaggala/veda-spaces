@@ -77,6 +77,8 @@ DEFERRED_COLUMNS = {
     "mfa_challenge": {"factor_id", "enrollment_path"},
     # 0102_estimator_spec adds the customer-specification snapshot to budget_estimate (ADR-012 T9).
     "budget_estimate": {"customer_spec_id", "customer_spec_sha256"},
+    # 0104_catalog_idempotency adds public idempotency to catalog_configuration.
+    "catalog_configuration": {"idempotency_key", "request_fingerprint"},
 }
 
 

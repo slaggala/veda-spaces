@@ -222,9 +222,20 @@ class CatalogConfiguration(AuditedBase):
     selections: Mapped[dict] = mapped_column(JSONType(), nullable=False)  # what the customer chose
     resolved_request: Mapped[dict] = mapped_column(JSONType(), nullable=False)  # the engine input (pricing inputs)
     estimate_id: Mapped[str | None] = mapped_column(GUID(), ForeignKey("budget_estimate.id", ondelete="RESTRICT"))
+    # Public idempotency (customer-safety closure, 0104): a repeat of the same request returns this estimate.
+    idempotency_key: Mapped[str | None] = mapped_column(sa.String(64))
+    request_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
 
     __table_args__ = (
         CheckConstraint("length(manifest_sha256) = 64", name="ck_catalog_configuration__sha_len"),
+        Index(
+            "ux_catalog_configuration__idempotency_key",
+            "idempotency_key",
+            unique=True,
+            **where(
+                "idempotency_key IS NOT NULL AND is_deleted = 0", "idempotency_key IS NOT NULL AND is_deleted = false"
+            ),
+        ),
         Index("ux_catalog_configuration__reference", "configuration_reference", unique=True, **live_where()),
         Index("ix_catalog_configuration__estimate", "estimate_id", **live_where()),
     )

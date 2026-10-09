@@ -16,7 +16,7 @@ import binascii
 from datetime import datetime
 from typing import Any
 
-from flask import Response
+from flask import Response, request
 
 from veda.config import settings
 from veda.kernel.dto import Closed
@@ -540,12 +540,26 @@ def public_catalog(req: Req):
     return result
 
 
+def _idempotency_key() -> str | None:
+    key = request.headers.get("Idempotency-Key")
+    if key is None:
+        return None
+    if not configure.IDEMPOTENCY_KEY.match(key):
+        raise ApiError(422, "VALIDATION_FAILED", "Invalid Idempotency-Key.",
+                       errors=[{"field": "Idempotency-Key", "code": "INVALID", "message": "16–64 characters [A-Za-z0-9_-]."}])  # fmt: skip
+    return key
+
+
 def _estimate_prepare(req: Req):
     _enabled()
+    key = _idempotency_key()
+    # A repeat of a request already answered is replayed before the anti-bot check: its token was single-use.
+    if key and configure.stored_for_key(req.session, key) is not None:
+        return {"captcha": False, "replay": key}
     if settings().estimate_turnstile_required:
         req.session.rollback()
         estimator_routes._captcha(req.body.turnstile_token, req.ip)
-    return {"captcha": True}
+    return {"captcha": True, "replay": None, "key": key}
 
 
 @public_api.route(
@@ -556,8 +570,13 @@ def _estimate_prepare(req: Req):
     summary="Preliminary Budgetary Estimate from a catalog configuration (anonymous; not a quotation)",
 )  # fmt: skip
 def public_estimate(req: Req):
+    prepared = req.prepared or {}
+    if prepared.get("replay"):
+        result = ok(configure.replay(req.session, prepared["replay"], req.body.configuration), status=201)
+        result.headers["Idempotent-Replayed"] = "true"
+        return _no_store(result)
     data = configure.create_public(req.session, req.body.configuration, ip=req.ip, ua=req.user_agent,
-                                   request_id=req.request_id)  # fmt: skip
+                                   request_id=req.request_id, idempotency_key=prepared.get("key"))  # fmt: skip
     return _no_store(ok(data, status=201))
 
 

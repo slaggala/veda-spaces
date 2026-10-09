@@ -8,6 +8,7 @@ from veda import config
 
 API = Path(__file__).resolve().parents[2]
 MIGRATION = API / "migrations/versions/0103_catalog.py"
+MIGRATION_0104 = API / "migrations/versions/0104_catalog_idempotency.py"
 
 
 def test_every_v3_switch_defaults_off():
@@ -39,3 +40,11 @@ def test_the_only_estimator_change_is_the_catalog_card_guard():
     assert source.count("CATALOG-") == 1 and "compiled catalog card" in source
     engine = (API / "veda/modules/estimator/engine.py").read_text()
     assert "catalog" not in engine.lower(), "the pricing engine knows nothing about the catalog"
+
+
+def test_migration_0104_only_adds_nullable_columns_and_an_index():
+    source = MIGRATION_0104.read_text()
+    assert 'down_revision = "0103_catalog"' in source
+    for forbidden in ("drop_", "alter_column", "DROP ", "UPDATE ", "DELETE "):
+        assert forbidden not in source, forbidden
+    assert source.count("ADD COLUMN") == 2 and "nullable=True" in source and "op.create_index(" in source

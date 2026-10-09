@@ -7,10 +7,14 @@ the release, the manifest digest, every record version used, the selections and 
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 import secrets
 from datetime import date
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from veda.config import settings
@@ -85,8 +89,44 @@ def _refused(err: catalog_compile.CompileError) -> ApiError:
     return ApiError(422, "VALIDATION_FAILED", "Some choices need attention.", errors=err.errors)
 
 
-def create_public(s: Session, config: dict, *, ip, ua, request_id) -> dict:
-    """Price a customer configuration with the ACTIVE release; store the estimate and its configuration snapshot."""
+IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+
+
+def fingerprint(config: object) -> str:
+    """The SHA-256 of the configuration exactly as sent (canonical JSON), to tell a repeat from a different request."""
+    return hashlib.sha256(json.dumps(config, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+
+
+def stored_for_key(s: Session, key: str) -> CatalogConfiguration | None:
+    return s.execute(
+        sa.select(CatalogConfiguration).where(
+            CatalogConfiguration.idempotency_key == key, CatalogConfiguration.is_deleted.is_(False)
+        )
+    ).scalar_one_or_none()
+
+
+def replay(s: Session, key: str, config: object) -> dict:
+    """The response first given for this key, or 409 when the key was used for different choices."""
+    snap = stored_for_key(s, key)
+    if snap is None or snap.estimate_id is None:
+        raise ApiError(409, "IDEMPOTENCY_CONFLICT", "This request is still being processed. Try again.")
+    if snap.request_fingerprint != fingerprint(config):
+        raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "This request was already used for different choices.")
+    from veda.modules.estimator.models import BudgetEstimate
+
+    row = s.get(BudgetEstimate, snap.estimate_id)
+    release = s.get(CatalogRelease, snap.release_id)
+    if row is None or release is None:
+        raise ApiError(409, "IDEMPOTENCY_CONFLICT", "This request cannot be repeated. Start a new estimate.")
+    view = estimator_service.public_view(row)
+    view["configuration_reference"] = snap.configuration_reference
+    view["catalog_release"] = release.release_code
+    return view
+
+
+def create_public(s: Session, config: dict, *, ip, ua, request_id, idempotency_key: str | None = None) -> dict:
+    """Price a customer configuration with the ACTIVE release; store the estimate and its configuration snapshot.
+    With an idempotency key, a repeat of the same request returns this estimate (see `replay`) instead of a second."""
     with acting(
         s, ActorContext(actor_id=WEB_INTAKE_USER_ID, via="PUBLIC_FORM", request_id=request_id, ip=ip, user_agent=ua)
     ):
@@ -102,6 +142,12 @@ def create_public(s: Session, config: dict, *, ip, ua, request_id) -> dict:
         est = estimator_service.calculate(card, resolved.request)
         row = estimator_service.store(s, card_row, resolved.request, est, origin="PUBLIC")
         snap = snapshot(s, release, resolved, estimate_id=row.id)
+        if idempotency_key:
+            snap.idempotency_key, snap.request_fingerprint = idempotency_key, fingerprint(config)
+            try:
+                s.flush()
+            except IntegrityError as err:  # the same key arrived twice at once: one wins, the other is refused
+                raise ApiError(409, "IDEMPOTENCY_CONFLICT", "This request is already being processed.") from err
         view = estimator_service.public_view(row)
         view["configuration_reference"] = snap.configuration_reference
         view["catalog_release"] = release.release_code
