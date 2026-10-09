@@ -229,7 +229,7 @@ def cmd_estimator(args) -> int:
     from veda.modules.estimator import service
 
     _settings()
-    if args.action.endswith("-spec") or args.action == "list-specs":
+    if args.action.endswith("-spec") or args.action in ("list-specs", "activation-check"):
         return _estimator_spec(args)
     try:
         if args.action in ("validate-card", "load-card"):
@@ -268,7 +268,8 @@ def _estimator_spec(args) -> int:
     from veda.modules.estimator import service
 
     try:
-        if args.action in ("validate-spec", "load-spec"):
+        matrix = json.loads(Path(args.matrix).read_text()) if args.matrix else None
+        if args.action in ("validate-spec", "load-spec", "activation-check"):
             if not args.file:
                 raise service.SpecError("give the customer specification file")
             document = json.loads(Path(args.file).read_text())
@@ -277,15 +278,31 @@ def _estimator_spec(args) -> int:
                 out: dict[str, object] = {"valid": True, "spec": spec.spec_code, "sha256": service._sha(document)}
                 print(json.dumps(out))
                 return 0
+            if args.action == "activation-check":  # read-only: every pre-activation guard in one report
+                spec = service.validate_spec(document)
+                digest = service._sha(document)
+                blocked = service.activation_blockers(document, matrix)
+                if not args.expect_sha:
+                    blocked.insert(0, "give the owner-approved document SHA-256 (--expect-sha)")
+                elif args.expect_sha != digest:
+                    blocked.insert(0, "the document SHA-256 is not the owner-approved digest")
+                with db.unit_of_work(write=False) as s:
+                    active = [x["spec"] for x in service.list_specs(s) if x["status"] == "ACTIVE"]
+                out = {"spec": spec.spec_code, "sha256": digest, "blockers": blocked, "active_now": active}
+                out["ready"] = not blocked
+                print(json.dumps(out))
+                return 0 if not blocked else 3
         with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
             if args.action == "load-spec":
                 row = service.load_spec(s, document)
                 out = {"loaded": row.spec_code, "status": row.status, "sha256": row.document_sha256}
             elif args.action == "activate-spec":
-                row = service.activate_spec(s, args.spec or "", args.approval or "")
+                row = service.activate_spec(
+                    s, args.spec or "", args.approval or "", matrix=matrix, ux_v1_confirmed=args.ux_v1_confirmed
+                )
                 out = {"active": row.spec_code, "package": row.package}
             elif args.action == "rollback-spec":
-                row = service.rollback_spec(s, args.package, args.approval or "")
+                row = service.rollback_spec(s, args.package, args.approval or "", ux_v1_confirmed=args.ux_v1_confirmed)
                 out = {"active": row.spec_code, "package": row.package, "rolled_back": True}
             else:
                 out = {"specs": service.list_specs(s)}
@@ -523,12 +540,20 @@ def main(argv: list[str] | None = None) -> int:
             "activate-spec",
             "rollback-spec",
             "list-specs",
+            "activation-check",
         ],
     )
     p.add_argument("file", nargs="?", default=None)
     p.add_argument("--version", default=None)
     p.add_argument("--spec", default=None, help="customer specification code, for example ESSENTIAL-1.0")
     p.add_argument("--package", default="ESSENTIAL", choices=["ESSENTIAL", "PREMIUM", "LUXURY"])
+    p.add_argument("--matrix", default=None, help="the customer-promise matrix JSON (activation guards)")
+    p.add_argument("--expect-sha", default=None, help="the owner-approved specification document SHA-256")
+    p.add_argument(
+        "--ux-v1-confirmed",
+        action="store_true",
+        help="STAGING_ESTIMATOR_UX=v1 is set and deployed (needed for a specification without room promises)",
+    )
     p.add_argument("--approval", default=None)
     p.set_defaults(fn=cmd_estimator)
     p = sub.add_parser("outbox")

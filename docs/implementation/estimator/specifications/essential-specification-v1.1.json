@@ -41,7 +41,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -106,7 +107,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -147,7 +149,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -210,7 +213,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -278,7 +282,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -339,7 +344,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -394,7 +400,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -450,7 +457,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -496,7 +504,18 @@
       "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
       "applies_to": {
         "rooms": [
-          "KITCHEN"
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -532,7 +551,8 @@
           "BEDROOM_4",
           "KIDS_ROOM",
           "STUDY",
-          "POOJA"
+          "POOJA",
+          "WHOLE_HOME"
         ],
         "products": [],
         "lines": [
@@ -569,6 +589,17 @@
       "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
       "applies_to": {
         "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA",
           "WHOLE_HOME"
         ],
         "products": [],
@@ -605,6 +636,17 @@
       "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
       "applies_to": {
         "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA",
           "WHOLE_HOME"
         ],
         "products": [],
@@ -640,6 +682,17 @@
       "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
       "applies_to": {
         "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA",
           "WHOLE_HOME"
         ],
         "products": [],
@@ -674,6 +727,17 @@
       "warranty_summary": "Manufacturer’s warranty for the supplied product, on the manufacturer’s documented terms.",
       "applies_to": {
         "rooms": [
+          "KITCHEN",
+          "UTILITY",
+          "LIVING",
+          "DINING",
+          "MASTER_BEDROOM",
+          "BEDROOM_2",
+          "BEDROOM_3",
+          "BEDROOM_4",
+          "KIDS_ROOM",
+          "STUDY",
+          "POOJA",
           "WHOLE_HOME"
         ],
         "products": [],

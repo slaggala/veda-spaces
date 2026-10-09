@@ -251,7 +251,7 @@ The committed CI run repeats the check on the synthetic card.
 3. Sales review of ESSENTIAL-1.1, using the checklist in the specification document.
 4. Operations confirms the promise matrix; each row moves from PROPOSED to CONFIRMED with a named owner.
 5. Warranty: the reconciliation is complete for what V2 shows (no material durations). The open rows block only the showing of a material duration.
-6. Load and activate ESSENTIAL-1.1 (runbook §6.8), checking the document SHA-256 `b9a5ea24d249cc4b9a6fb4b0ee513a5f27f2b321a39c066654007bfc59091902` on the host before activation.
+6. Load and activate ESSENTIAL-1.1 (runbook §6.8). The digest and the guards were superseded by the [pre-activation closure](ESTIMATOR-V2-PRE-ACTIVATION-CLOSURE.md): 1.1 was re-authored, so every category covers every room and the priced lines decide.
 7. Set `STAGING_ESTIMATOR_UX=v2`. V1 stays available as `v1`.
 8. Keep `public_intake` disabled and staging behind Access.
 9. Optionally repeat the equivalence on staging. It is proven locally against the same card fingerprint.
