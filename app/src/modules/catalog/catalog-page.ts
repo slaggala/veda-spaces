@@ -195,7 +195,7 @@ export class VsCatalogPage extends SessionElement {
         const code = prompt('Release code (capital letters, digits, . _ -)'); if (!code) return;
         const r = await this.run(() => api.post<Release>('/api/v1/catalog/releases', { code }));
         if (r) { void this.load(); void this.openRelease(r.data.id); } }}>New release from approved records</button>
-        <button class="btn" @click=${async () => { if (confirm('Roll back to the previous release (its whole manifest)?')) { await this.run(() => api.post('/api/v1/catalog/rollback')); void this.load(); } }}>Roll back</button></div>` : nothing}
+        <button class="btn" @click=${async () => { const reason = prompt('Roll back to the previous release (its whole manifest, restored as a new release). Reason or approval reference:'); if (reason) { await this.run(() => api.post('/api/v1/catalog/rollback', { approval_reference: reason })); void this.load(); } }}>Roll back</button></div>` : nothing}
       ${!this.releases.length ? html`<div class="card"><vs-empty-state heading="No releases yet."></vs-empty-state></div>`
         : html`<div class="table-wrap"><table class="cards"><thead><tr><th>Release</th><th>Status</th><th>Entries</th><th>Valid</th><th>Created</th></tr></thead>
           <tbody>${this.releases.map((r) => html`<tr class="clickable" tabindex="0" @click=${() => this.openRelease(r.id)} @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.openRelease(r.id)}>

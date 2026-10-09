@@ -3,7 +3,7 @@
 Records: DRAFT → IN_REVIEW → APPROVED (then SCHEDULED, ACTIVE, RETIRED, ARCHIVED through releases). Only a DRAFT is
 edited; changing reviewed, approved or active content creates a new DRAFT version. Releases: an immutable manifest of
 exact record versions; DRAFT → IN_REVIEW → APPROVED → SCHEDULED → ACTIVE → RETIRED. Activation re-runs the whole
-validation suite and fails closed; rollback re-activates the previous release's whole manifest.
+validation suite and fails closed; rollback restores the previous release's whole manifest as a new release.
 """
 
 from __future__ import annotations
@@ -88,6 +88,29 @@ def _errors(err) -> str:
     return str(err).splitlines()[0]
 
 
+def _contribute(row: CatalogRecord) -> None:
+    """Record the acting user as a contributor of this version (append-only; never removed)."""
+    me = _actor_id()
+    if me and me not in (row.contributors or []):
+        row.contributors = [*(row.contributors or []), me]
+
+
+def contributors(s: Session, row: CatalogRecord) -> set[str]:
+    """Everyone who created, edited or submitted this version: the stored set, the row's creator and submitter, and
+    the authors of its create/edit/submit events, so that clearing one source never clears the others."""
+    found = set(row.contributors or [])
+    found.update(x for x in (row.created_by, row.submitted_by) if x)  # not updated_by: a reviewer's action sets it
+    found.update(
+        s.execute(
+            sa.select(CatalogEvent.created_by).where(
+                CatalogEvent.record_id == row.id,
+                CatalogEvent.event_type.in_(("RECORD_CREATED", "RECORD_UPDATED", "RECORD_SUBMITTED")),
+            )
+        ).scalars()
+    )
+    return found
+
+
 def create_record(s: Session, kind: str, key: str, document: dict) -> CatalogRecord:
     """A new DRAFT: version 1 of a new key, or the next version of an existing key (one open draft at a time)."""
     if not KEY_RE.match(key or ""):
@@ -104,7 +127,9 @@ def create_record(s: Session, kind: str, key: str, document: dict) -> CatalogRec
         title=kinds.title(kind, model),
         document=document,
         document_sha256=sha(document),
+        contributors=[],
     )
+    _contribute(row)
     s.add(row)
     s.flush()
     _event(s, "RECORD_CREATED", record=row, detail={"kind": kind, "key": key, "version": row.record_version})
@@ -132,7 +157,8 @@ def update_draft(s: Session, record_id: str, document: dict) -> CatalogRecord:
         raise CatalogError(f"only a DRAFT is edited (this version is {row.status}); create a new version")
     model = validate(row.kind, document)
     row.document, row.document_sha256, row.title = document, sha(document), kinds.title(row.kind, model)
-    row.review_note = None
+    row.review_note, row.reviewed_by, row.reviewed_on = None, None, None  # an earlier review no longer applies
+    _contribute(row)
     _event(s, "RECORD_UPDATED", record=row, detail={"version": row.record_version})
     return row
 
@@ -145,6 +171,8 @@ def submit(s: Session, record_id: str) -> CatalogRecord:
     if row.document_sha256 != sha(row.document):
         raise CatalogError("the stored document does not match its SHA-256; refusing")
     row.status, row.submitted_by, row.submitted_on = "IN_REVIEW", _actor_id(), db.tx_time(s)
+    row.reviewed_by, row.reviewed_on = None, None
+    _contribute(row)
     _event(s, "RECORD_SUBMITTED", record=row, detail={"version": row.record_version})
     return row
 
@@ -154,8 +182,8 @@ def approve_record(s: Session, record_id: str, note: str | None = None) -> Catal
     if row.status != "IN_REVIEW":
         raise CatalogError(f"only a record IN_REVIEW is approved (this version is {row.status})")
     me = _actor_id()
-    if _four_eyes() and me in (row.updated_by, row.created_by, row.submitted_by):
-        raise CatalogError("four-eyes review: a record is approved by someone who did not edit or submit it")
+    if _four_eyes() and (me is None or me in contributors(s, row)):
+        raise CatalogError("four-eyes review: a record is approved by someone who did not create, edit or submit it")
     validate(row.kind, row.document)
     row.status, row.reviewed_by, row.reviewed_on = "APPROVED", me, db.tx_time(s)
     row.review_note = (note or "").strip()[:300] or None
@@ -299,16 +327,35 @@ def _require_valid(s: Session, release: CatalogRelease) -> dict:
     return report
 
 
+def _release_contributors(s: Session, release: CatalogRelease) -> set[str]:
+    """Contributors to every record this release adds or changes against the active release (pricing, copy, rules,
+    media mappings and everything else)."""
+    changed = diff(s, release)
+    keys = {(e["kind"], e["key"], e["version"]) for e in [*changed["added"], *changed["changed"]]}
+    found: set[str] = set()
+    for e in release.manifest["entries"]:
+        if (e["kind"], e["key"], e["version"]) in keys:
+            row = s.get(CatalogRecord, e["record_id"])
+            if row is not None:
+                found |= contributors(s, row)
+    return found
+
+
+def _release_four_eyes(s: Session, release: CatalogRelease, what: str, *also: str | None) -> str | None:
+    me = _actor_id()
+    if _four_eyes() and (me is None or me in {release.created_by, *also} or me in _release_contributors(s, release)):
+        raise CatalogError(
+            f"four-eyes review: the {what} is approved by someone who did not author the release or change its records"
+        )
+    return me
+
+
 def approve_preview(s: Session, release_id: str) -> CatalogRelease:
     release = get_release(s, release_id)
     if release.status not in ("DRAFT", "IN_REVIEW"):
         raise CatalogError(f"the preview is approved before release approval (release is {release.status})")
     _require_valid(s, release)
-    me = _actor_id()
-    if _four_eyes() and me == release.created_by:
-        raise CatalogError(
-            "four-eyes review: the customer preview is approved by someone other than the release author"
-        )
+    me = _release_four_eyes(s, release, "customer preview")
     release.preview_approved_by, release.preview_approved_on = me, db.tx_time(s)
     _event(s, "RELEASE_PREVIEW_APPROVED", release=release)
     return release
@@ -332,9 +379,7 @@ def approve_release(s: Session, release_id: str, approval_reference: str) -> Cat
         raise CatalogError(f"only a release IN_REVIEW is approved (this one is {release.status})")
     if len((approval_reference or "").strip()) < 10:
         raise CatalogError("approval needs an approval reference (at least 10 characters)")
-    me = _actor_id()
-    if _four_eyes() and me in (release.created_by, release.submitted_by):
-        raise CatalogError("four-eyes review: a release is approved by someone who did not create or submit it")
+    me = _release_four_eyes(s, release, "release", release.submitted_by)
     _require_valid(s, release)
     release.status, release.approved_by, release.approved_on = "APPROVED", me, db.tx_time(s)
     release.approval_reference = approval_reference.strip()[:200]
@@ -343,12 +388,29 @@ def approve_release(s: Session, release_id: str, approval_reference: str) -> Cat
 
 
 def reject_release(s: Session, release_id: str, note: str) -> CatalogRelease:
+    """Send a release back to DRAFT: every approval, the schedule and any SCHEDULED record state are cleared in one
+    step (nothing is left half-scheduled); the event keeps what was cleared."""
     release = get_release(s, release_id)
     if release.status not in ("IN_REVIEW", "APPROVED", "SCHEDULED"):
         raise CatalogError(f"a {release.status} release is not rejected")
-    release.status, release.preview_approved_by, release.preview_approved_on = "DRAFT", None, None
-    release.scheduled_for = None
-    _event(s, "RELEASE_REJECTED", release=release, detail={"note": (note or "")[:300]})
+    if len((note or "").strip()) < 5:
+        raise CatalogError("say why it is rejected (at least 5 characters)")
+    cleared = {
+        "status": release.status,
+        "preview_approved_by": release.preview_approved_by,
+        "submitted_by": release.submitted_by,
+        "approved_by": release.approved_by,
+        "approval_reference": release.approval_reference,
+        "scheduled_for": release.scheduled_for.isoformat() if release.scheduled_for else None,
+    }
+    for row in release_records(s, release):
+        if row.status == "SCHEDULED":
+            row.status = "APPROVED"  # approved content stays approved and editable through a new version
+    release.status = "DRAFT"
+    release.preview_approved_by = release.preview_approved_on = None
+    release.submitted_by = release.approved_by = release.approved_on = None
+    release.approval_reference = release.scheduled_for = None
+    _event(s, "RELEASE_REJECTED", release=release, detail={"note": note.strip()[:300], "cleared": cleared})
     return release
 
 
@@ -372,9 +434,10 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False) -> 
     from . import compile as catalog_compile
 
     release = get_release(s, release_id)
-    allowed = ("RETIRED",) if rollback else ("APPROVED", "SCHEDULED")
-    if release.status not in allowed:
-        raise CatalogError(f"a {release.status} release cannot be {'rolled back to' if rollback else 'activated'}")
+    if release.status not in ("APPROVED", "SCHEDULED"):
+        raise CatalogError(f"a {release.status} release cannot be activated")
+    if rollback != (release.rollback_of_id is not None):
+        raise CatalogError("only a rollback release is activated as a rollback")
     if release.approved_on is None:
         raise CatalogError("the release has no approval")
     if release.status == "SCHEDULED" and release.scheduled_for and release.scheduled_for > db.tx_time(s):
@@ -417,12 +480,41 @@ def activate_release(s: Session, release_id: str, *, rollback: bool = False) -> 
     return release
 
 
-def rollback(s: Session) -> CatalogRelease:
-    """Re-activate the release the active one replaced: its whole manifest, never individual rows."""
+def rollback(s: Session, reason: str) -> CatalogRelease:
+    """Restore the previous release's exact manifest as a new release and activate it. No release row is reset or
+    edited: the active one is retired as on any activation, and the restored one is a new, immutable record that
+    names the release it restores (`rollback_of_id`). Validation runs again and fails closed."""
+    if len((reason or "").strip()) < 10:
+        raise CatalogError("a rollback needs its reason or approval reference (at least 10 characters)")
     current = active_release(s)
     if current is None or current.previous_release_id is None:
         raise CatalogError("there is no previous release to roll back to")
-    return activate_release(s, current.previous_release_id, rollback=True)
+    target = get_release(s, current.previous_release_id)
+    release_records(s, target)  # the restored manifest must still match its records exactly
+    now = db.tx_time(s)
+    code = f"RB{now:%Y%m%d%H%M%S}"
+    manifest = {"release_code": code, "entries": [dict(e) for e in target.manifest["entries"]],
+                "rollback_of": target.release_code}  # fmt: skip
+    me = _actor_id()
+    restored = CatalogRelease(
+        release_code=code,
+        status="APPROVED",
+        manifest=manifest,
+        manifest_sha256=sha(manifest),
+        previous_release_id=current.id,
+        rollback_of_id=target.id,
+        release_owner=me,
+        preview_approved_by=target.preview_approved_by,
+        preview_approved_on=target.preview_approved_on,
+        submitted_by=me,
+        approved_by=me,
+        approved_on=now,
+        approval_reference=f"Rollback to {target.release_code}: {reason.strip()}"[:200],
+    )
+    s.add(restored)
+    s.flush()
+    _event(s, "RELEASE_CREATED", release=restored, detail={"code": code, "rollback_of": target.release_code})
+    return activate_release(s, restored.id, rollback=True)
 
 
 def run_scheduled(s: Session) -> list[str]:

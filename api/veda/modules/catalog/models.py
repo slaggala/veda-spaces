@@ -51,6 +51,7 @@ EVENT_TYPES = (
     "RELEASE_ACTIVATED",
     "RELEASE_RETIRED",
     "RELEASE_ROLLED_BACK",
+    "CONFIGURATION_PURGED",
     "MEDIA_UPLOADED",
     "MEDIA_SCANNED",
     "IMPORT_APPLIED",
@@ -91,6 +92,8 @@ class CatalogRecord(AuditedBase):
     reviewed_by: Mapped[str | None] = mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"))
     reviewed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     review_note: Mapped[str | None] = mapped_column(sa.String(300))
+    # Everyone who created, edited or submitted this version (append-only; four-eyes also reads the event trail).
+    contributors: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)
 
     __table_args__ = (
         in_check("catalog_record", "kind", KINDS),
@@ -124,6 +127,9 @@ class CatalogRelease(AuditedBase):
     validation: Mapped[dict | None] = mapped_column(JSONType())  # the last validation report
     rate_card_id: Mapped[str | None] = mapped_column(GUID(), ForeignKey("estimator_rate_card.id", ondelete="RESTRICT"))
     previous_release_id: Mapped[str | None] = mapped_column(
+        GUID(), ForeignKey("catalog_release.id", ondelete="RESTRICT")
+    )
+    rollback_of_id: Mapped[str | None] = mapped_column(  # a rollback release restores this release's manifest
         GUID(), ForeignKey("catalog_release.id", ondelete="RESTRICT")
     )
     release_owner: Mapped[str | None] = mapped_column(GUID(), ForeignKey("app_user.id", ondelete="RESTRICT"))

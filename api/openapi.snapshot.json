@@ -5621,6 +5621,16 @@
     "/api/v1/catalog/rollback": {
       "post": {
         "operationId": "catalog_rollback",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogApprovalIn"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Success"

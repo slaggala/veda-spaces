@@ -369,10 +369,10 @@ def activate_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.activate_release)
 
 
-@api.route("POST", "/rollback", permission="catalog.admin", requirement="CAT-008")
+@api.route("POST", "/rollback", permission="catalog.admin", body=CatalogApprovalIn, requirement="CAT-008")
 def rollback(req: Req):
     try:
-        return ok(_release_view(service.rollback(req.session), detail=True))
+        return ok(_release_view(service.rollback(req.session, req.body.approval_reference), detail=True))
     except service.CatalogError as err:
         raise _err(err) from err
 
@@ -454,12 +454,14 @@ def staff_media(req: Req, sha: str):
 @api.route("POST", "/import", permission="catalog.admin", body=CatalogImportIn, max_body=8 * 1024 * 1024,
            requirement="CAT-008")  # fmt: skip
 def import_records(req: Req):
-    can_price = req.ctx.has("catalog.pricing.edit")
+    def can_edit(kind: str) -> bool:
+        return bool(req.ctx.has(edit_permission(kind)))
+
     try:
         rows = importexport.parse_rows(req.body.content, req.body.format)
         if req.body.apply:
-            return ok(importexport.apply(req.session, rows, can_price=can_price))
-        return ok(importexport.dry_run(req.session, rows, can_price=can_price))
+            return ok(importexport.apply(req.session, rows, can_edit=can_edit))
+        return ok(importexport.dry_run(req.session, rows, can_edit=can_edit))
     except (importexport.ImportError_, service.CatalogError) as err:
         raise _err(err) from err
 

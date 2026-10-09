@@ -48,6 +48,7 @@ def upgrade() -> None:
         sa.Column("reviewed_by", GUID(), nullable=True),
         sa.Column("reviewed_on", UTCDateTime(), nullable=True),
         sa.Column("review_note", sa.String(300), nullable=True),
+        sa.Column("contributors", JSONType(), nullable=False),
         sa.PrimaryKeyConstraint("id", name="pk_catalog_record"),
         sa.ForeignKeyConstraint(
             ["created_by"], ["app_user.id"], name="fk_catalog_record__created_by", ondelete="RESTRICT"
@@ -64,6 +65,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["updated_by"], ["app_user.id"], name="fk_catalog_record__updated_by", ondelete="RESTRICT"
         ),
+        sa.CheckConstraint(
+            "contributors IS NULL OR json_valid(contributors)", name="ck_catalog_record__contributors_json"
+        ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
             "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
             name="ck_catalog_record__created_by_format",
@@ -164,6 +168,7 @@ def upgrade() -> None:
         sa.Column("validation", JSONType(), nullable=True),
         sa.Column("rate_card_id", GUID(), nullable=True),
         sa.Column("previous_release_id", GUID(), nullable=True),
+        sa.Column("rollback_of_id", GUID(), nullable=True),
         sa.Column("release_owner", GUID(), nullable=True),
         sa.Column("preview_approved_by", GUID(), nullable=True),
         sa.Column("preview_approved_on", UTCDateTime(), nullable=True),
@@ -201,6 +206,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["release_owner"], ["app_user.id"], name="fk_catalog_release__release_owner", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["rollback_of_id"], ["catalog_release.id"], name="fk_catalog_release__rollback_of_id", ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(
             ["submitted_by"], ["app_user.id"], name="fk_catalog_release__submitted_by", ondelete="RESTRICT"
@@ -255,6 +263,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "release_owner IS NULL OR (length(release_owner) = 32 AND release_owner NOT GLOB '*[^0-9a-f]*' AND substr(release_owner, 13, 1) = '7' AND substr(release_owner, 17, 1) IN ('8', '9', 'a', 'b'))",
             name="ck_catalog_release__release_owner_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "rollback_of_id IS NULL OR (length(rollback_of_id) = 32 AND rollback_of_id NOT GLOB '*[^0-9a-f]*' AND substr(rollback_of_id, 13, 1) = '7' AND substr(rollback_of_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_catalog_release__rollback_of_id_format",
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint("length(manifest_sha256) = 64", name="ck_catalog_release__sha_len"),
         sa.CheckConstraint(
@@ -340,7 +352,7 @@ def upgrade() -> None:
             dialect="sqlite"
         ),
         sa.CheckConstraint(
-            "event_type IN ('RECORD_CREATED', 'RECORD_UPDATED', 'RECORD_SUBMITTED', 'RECORD_APPROVED', 'RECORD_REJECTED', 'RECORD_ARCHIVED', 'RELEASE_CREATED', 'RELEASE_VALIDATED', 'RELEASE_PREVIEW_APPROVED', 'RELEASE_SUBMITTED', 'RELEASE_APPROVED', 'RELEASE_REJECTED', 'RELEASE_SCHEDULED', 'RELEASE_ACTIVATED', 'RELEASE_RETIRED', 'RELEASE_ROLLED_BACK', 'MEDIA_UPLOADED', 'MEDIA_SCANNED', 'IMPORT_APPLIED')",
+            "event_type IN ('RECORD_CREATED', 'RECORD_UPDATED', 'RECORD_SUBMITTED', 'RECORD_APPROVED', 'RECORD_REJECTED', 'RECORD_ARCHIVED', 'RELEASE_CREATED', 'RELEASE_VALIDATED', 'RELEASE_PREVIEW_APPROVED', 'RELEASE_SUBMITTED', 'RELEASE_APPROVED', 'RELEASE_REJECTED', 'RELEASE_SCHEDULED', 'RELEASE_ACTIVATED', 'RELEASE_RETIRED', 'RELEASE_ROLLED_BACK', 'CONFIGURATION_PURGED', 'MEDIA_UPLOADED', 'MEDIA_SCANNED', 'IMPORT_APPLIED')",
             name="ck_catalog_event__event_type",
         ),
         sa.CheckConstraint("length(event_type) <= 30", name="ck_catalog_event__event_type_len").ddl_if(

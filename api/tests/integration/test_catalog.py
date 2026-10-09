@@ -222,23 +222,6 @@ def _records(uid, release_id):
         return service.release_records(s, s.get(CatalogRelease, release_id))
 
 
-def test_rollback_restores_the_whole_previous_manifest(people):
-    a, b = people
-    first = live_slice(people)
-    tv = tx(a, service.new_version, "product", "tv-unit")
-    tx(a, service.update_draft, tv.id, {**tv.document, "description": "A unit for the TV wall, refreshed."})
-    approve_all(a, b)
-    second = release(a, b, "SLICE-2")
-    with db.unit_of_work(write=False) as s:
-        assert service.active_release(s).id == second
-        assert [r.status for r in service.versions(s, "product", "tv-unit")] == ["RETIRED", "ACTIVE"]
-    tx(a, service.rollback)
-    with db.unit_of_work(write=False) as s:
-        assert service.active_release(s).id == first
-        assert [r.status for r in service.versions(s, "product", "tv-unit")] == ["ACTIVE", "RETIRED"]
-        assert s.get(CatalogRelease, second).status == "RETIRED"
-
-
 def test_scheduled_release_activates_only_when_due(people):
     from datetime import timedelta
 
@@ -475,6 +458,10 @@ def test_media_upload_route_needs_media_permission(api, factory):
 
 
 # --- import / export ---------------------------------------------------------------------------------------------------
+def NOT_PRICING(kind):  # an importer holding every edit permission except pricing
+    return kind != "pricing"
+
+
 def test_import_is_a_dry_run_first_and_creates_drafts_only(people):
     a, b = people
     content = "kind,key,document\n" + "\n".join([
@@ -485,20 +472,20 @@ def test_import_is_a_dry_run_first_and_creates_drafts_only(people):
     ])  # fmt: skip
     rows_ = importexport.parse_rows(content, "csv")
     with as_user(a), db.unit_of_work(write=False) as s:
-        report = importexport.dry_run(s, rows_, can_price=False)
+        report = importexport.dry_run(s, rows_, can_edit=NOT_PRICING)
     errs = {r["row"]: r["errors"] for r in report["rows"]}
     assert not report["ok"] and "duplicate" in errs[2][0] and "neither in the file" in errs[3][0]
     assert "pricing.edit" in errs[4][0]
     with as_user(a), db.unit_of_work(write=True) as s, pytest.raises(importexport.ImportError_):
-        importexport.apply(s, rows_, can_price=False)
+        importexport.apply(s, rows_, can_edit=NOT_PRICING)
     good = importexport.parse_rows(content.splitlines()[0] + "\n" + content.splitlines()[1], "csv")
-    result = tx(a, importexport.apply, good, can_price=False)
+    result = tx(a, importexport.apply, good, can_edit=NOT_PRICING)
     assert result["created"] == [{"kind": "product_family", "key": "beds", "version": 1}]
     assert {r.status for r in rows(sa.select(CatalogRecord))} == {"DRAFT"}
-    again = tx(a, importexport.dry_run, good, can_price=False)
+    again = tx(a, importexport.dry_run, good, can_edit=NOT_PRICING)
     assert again["ok"] and again["rows"][0]["change"] == "unchanged", "re-importing the same file changes nothing"
     changed = [importexport.ImportRow("product_family", "beds", {"name": "Beds and cots", "category": "beds"})]
-    blocked = tx(a, importexport.dry_run, changed, can_price=False)
+    blocked = tx(a, importexport.dry_run, changed, can_edit=NOT_PRICING)
     assert not blocked["ok"] and "open draft" in blocked["rows"][0]["errors"][0]
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,8 +22,10 @@ from sqlalchemy.orm import Session
 
 from . import kinds, service
 from .models import CatalogRecord, CatalogRelease
+from .permissions import edit_permission
 
 MAX_ROWS = 2000
+CanEdit = Callable[[str], bool]  # does the importing user hold the edit permission of this kind?
 COLUMNS = ("kind", "key", "document")
 
 
@@ -105,13 +108,13 @@ def _latest(s: Session, kind: str, key: str) -> CatalogRecord | None:
 
 
 def _check(s: Session, i: int, r: ImportRow, seen: set[tuple[str, str]], in_file: set[tuple[str, str]],
-           can_price: bool) -> RowReport:  # fmt: skip
+           can_edit: CanEdit) -> RowReport:  # fmt: skip
     report = RowReport(row=i, kind=r.kind, key=r.key)
     if r.kind not in kinds.SCHEMAS:
         report.errors.append("unknown kind")
         return report
-    if r.kind == "pricing" and not can_price:
-        report.errors.append("pricing rows need catalog.pricing.edit")
+    if not can_edit(r.kind):  # the same duty as editing the record by hand; catalog.admin alone is not enough
+        report.errors.append(f"{r.kind} rows need {edit_permission(r.kind)}")
         return report
     if (r.kind, r.key) in seen:
         report.errors.append("duplicate kind and key in this file")
@@ -145,17 +148,30 @@ def _check(s: Session, i: int, r: ImportRow, seen: set[tuple[str, str]], in_file
     return report
 
 
-def dry_run(s: Session, rows: list[ImportRow], *, can_price: bool) -> dict[str, object]:
+def _reports(s: Session, rows: list[ImportRow], can_edit: CanEdit) -> list[RowReport]:
     seen: set[tuple[str, str]] = set()
     in_file = {(r.kind, r.key) for r in rows}
-    reports = [_check(s, i, r, seen, in_file, can_price) for i, r in enumerate(rows, start=1)]
-    return {"ok": all(not r.errors for r in reports), "rows": [r.as_dict() for r in reports]}
+    return [_check(s, i, r, seen, in_file, can_edit) for i, r in enumerate(rows, start=1)]
 
 
-def apply(s: Session, rows: list[ImportRow], *, can_price: bool) -> dict[str, object]:
-    seen: set[tuple[str, str]] = set()
-    in_file = {(r.kind, r.key) for r in rows}
-    reports = [_check(s, i, r, seen, in_file, can_price) for i, r in enumerate(rows, start=1)]
+def content_sha(rows: list[ImportRow]) -> str:
+    return service.sha({"rows": [[r.kind, r.key, r.document] for r in rows]})
+
+
+def dry_run(s: Session, rows: list[ImportRow], *, can_edit: CanEdit) -> dict[str, object]:
+    reports = _reports(s, rows, can_edit)
+    return {
+        "ok": all(not r.errors for r in reports),
+        "content_sha256": content_sha(rows),
+        "rows": [r.as_dict() for r in reports],
+        "would_create": sum(1 for r in reports if not r.errors and r.change not in (None, "unchanged")),
+    }
+
+
+def apply(s: Session, rows: list[ImportRow], *, can_edit: CanEdit) -> dict[str, object]:
+    """Create a DRAFT for each new or changed row (all-or-nothing). Repeating the same file is a deterministic no-op:
+    every row is then `unchanged`, nothing is created, and the result says NO_CHANGE."""
+    reports = _reports(s, rows, can_edit)
     if any(r.errors for r in reports):
         raise ImportError_("the import has errors; correct them and run the dry run again")
     created: list[dict[str, object]] = []
@@ -164,8 +180,14 @@ def apply(s: Session, rows: list[ImportRow], *, can_price: bool) -> dict[str, ob
             continue
         row = service.create_record(s, r.kind, r.key, r.document)  # always DRAFT
         created.append({"kind": row.kind, "key": row.record_key, "version": row.record_version})
-    service._event(s, "IMPORT_APPLIED", detail={"created": len(created), "rows": len(rows)})
-    return {"created": created, "unchanged": sum(1 for r in reports if r.change == "unchanged")}
+    digest = content_sha(rows)
+    service._event(s, "IMPORT_APPLIED", detail={"created": len(created), "rows": len(rows), "content_sha256": digest})
+    return {
+        "result": "CREATED" if created else "NO_CHANGE",
+        "content_sha256": digest,
+        "created": created,
+        "unchanged": sum(1 for r in reports if r.change == "unchanged"),
+    }
 
 
 def export(s: Session, *, release_id: str | None = None, include_pricing: bool, fmt: str = "json") -> str:
