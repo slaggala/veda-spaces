@@ -132,3 +132,23 @@ All checks fail closed.
   defaults.
 - Copy with `promise: false` may not contain promise words, so the flag cannot be used to skip governance.
 - Extras may name hardware or materials; their names are then governed by those records' statements.
+
+## Remediation (independent review, PR #66)
+
+The review found defects in four-eyes approval, rollback, scheduled rejection, import duties, visibility, rule paths,
+package pricing, configuration privacy, public errors, promise governance, the image limit and the slice. All are
+fixed, as recorded in the [review package](../../implementation/catalog/CATALOG-V3-review-package.md). Decisions
+that changed:
+
+- **Separate switches:** the staff catalog API (`VEDA_CATALOG_ADMIN_ENABLED`), public media
+  (`VEDA_CATALOG_MEDIA_DELIVERY_ENABLED`) and 3D (`VEDA_CATALOG_3D_ENABLED`) each have one. All are off by default,
+  and production refuses each.
+- **Promises:** a promise is a copy record linked to a confirmed ESSENTIAL-1.1 promise-matrix row. Descriptive text
+  never carries promise wording.
+- **Configurations:** a configuration is an allowlisted schema, and its snapshot is the normal form that was priced.
+- **Rollback:** a rollback is a new release restoring the previous manifest.
+- **Media:**
+  - images are limited to 24,000,000 pixels;
+  - only a sanitised GLB is accepted for 3D;
+  - scan states are PENDING, CLEAN, INFECTED and FAILED;
+  - the private S3 store is prepared but inactive ([design](../../implementation/catalog/CATALOG-V3-media-infrastructure.md)).
