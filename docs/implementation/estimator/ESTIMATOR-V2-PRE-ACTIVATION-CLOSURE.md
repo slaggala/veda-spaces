@@ -53,7 +53,7 @@ The package value stays visible. The detailed quotation and the staff view keep 
 
 ## Customer-promise matrix: complete
 
-[essential-1.1-promise-matrix.json](specifications/essential-1.1-promise-matrix.json) (schema
+[essential-1.1-promise-matrix.json](../../../api/veda/modules/estimator/approved/essential-1.1-promise-matrix.json) (schema
 `veda.estimator.promise-matrix/2`, [rendered](specifications/essential-1.1-promise-matrix.md)) has 49 rows:
 - 14 specification categories;
 - the package-level statements;

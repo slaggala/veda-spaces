@@ -33,7 +33,7 @@ that line is priced. Wording is from [ESSENTIAL-1.1](specifications/essential-sp
 ## Recording a decision
 
 For each item, sales records the following, in a pull request that changes
-[`essential-1.1-promise-matrix.json`](specifications/essential-1.1-promise-matrix.json) (and the specification when
+[`essential-1.1-promise-matrix.json`](../../../api/veda/modules/estimator/approved/essential-1.1-promise-matrix.json) (and the specification when
 the decision is "change"):
 - the decision: approve, or change with the new wording or technical scope;
 - the name of the accountable owner;
