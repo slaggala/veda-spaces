@@ -220,7 +220,7 @@ def test_a_stale_draft_time_target_is_not_used(people):
     assert rolled_from == d and entries == _entries(d), "the release active immediately before C (D), not B"
 
 
-def test_multiple_rollbacks_walk_the_activation_history(people):
+def test_rolling_back_a_rollback_is_undo(people):
     a, b = people
     seed_slice(a)
     approve_all(a, b)
