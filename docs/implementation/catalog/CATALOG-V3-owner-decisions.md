@@ -10,7 +10,7 @@ approved. Each one names what the code does today until the owner decides.
 | 3 | Malware scanner | ClamAV first, failing closed, with reviewed size and resource limits | Media stays PENDING outside local and test, and no release with media validates |
 | 4 | Image processing | Pillow with a hard pixel limit of 24,000,000 pixels and 8,000 per side; an async worker deferred until scale needs it | Enforces that limit synchronously in the upload request |
 | 5 | Video | Approved external embeds only (youtube-nocookie.com, player.vimeo.com) | Refuses video uploads |
-| 6 | 3D | Gallery only until the vertical slice is validated with people | Customers see no 3D (`VEDA_CATALOG_3D_ENABLED=false`); glTF and USDZ are refused, and a GLB is only stored after sanitisation |
+| 6 | 3D | Gallery only until the vertical slice is validated with people | GLB is planned but disabled: uploads, releases and delivery all refuse it. glTF and USDZ are not supported. Customers see the gallery only |
 | 7 | XLSX import | Deferred; keep the validated CSV and JSON import | CSV and JSON only |
 | 8 | Media manifest | Manual for the representative slice | No manifest import |
 | 9 | Noncurrent-version window in the bucket | 30 days | n/a until the bucket exists |

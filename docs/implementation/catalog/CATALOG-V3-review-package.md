@@ -36,6 +36,103 @@ Also stated plainly:
 - Full-catalog expansion is **not approved**.
 - Production V3 **remains prohibited**.
 
+## Pre-activation closure (follow-up to PR #66)
+
+### R2/R3: every customer-visible catalog text path governed
+
+- **Badges:** `Package.badge` is a key to a `badge` copy record, never free text.
+  - Badge copy (30 characters at most) refuses promise wording and marketing claims, such as premium, best, lowest,
+    cheapest, number one, offers, discounts, free, guaranteed and quality, unless it is a promise linked to a
+    confirmed promise-matrix row with governance.
+  - A badge that is not a badge copy record in the release fails validation, and so does an unconfirmed promise badge.
+  - The public payload carries only copy approved in the active release.
+- **Inventory of short-text fields that reach customers:**
+
+  | Field | Control |
+  |---|---|
+  | Names, descriptions, "What is this?", "Typically used for" of homes, rooms, families, products, variants, choices, extras, packages, materials; material finish, colour family, texture | Promise check |
+  | Option-group names and descriptions; measurement labels and hints | Promise check |
+  | Media title, alternate text, caption, attribution, **and the rights owner shown when there is no attribution** | Promise check (rights owner new) |
+  | 3D hotspot and camera labels | Promise check (new). 3D is disabled anyway |
+  | Badges | Badge copy, claims check, matrix governance (new) |
+  | Package subtitles (`public_summary`), rule messages, disclaimers, labels | Copy records: promise check, or matrix governance for promises |
+  | Media `label` | A fixed choice: "Design reference" or "Illustrative example" |
+  | Ribbons, recommendation labels, promotional labels | No such catalog field exists. `Package.recommended` is a boolean the page does not render as text |
+  | Grades, thicknesses, brands, load capacity, soft-close capability | Never sent to customers |
+
+- **Guard test:** walks the entire public catalog payload. Every string is a key, code, hash, path or date, a
+  matrix-governed promise statement, or free of promise wording.
+- **Outside the catalog:**
+  - the V3 page's fixed headings, such as "Exclusions" and "What you supply";
+  - the estimate's engine text (assumptions, exclusions, client scope, package inclusions), governed by the V2
+    customer copy and the ESSENTIAL-1.1 matrix like V2.
+
+  Neither is catalog content.
+
+### R9: rollback target selection, closed
+
+- What a release replaced is recorded when it is **activated**, in its immutable activation event. Drafts record
+  nothing.
+- Rollback runs at execution time:
+  - it reads the active release's single activation event;
+  - it proves the predecessor (RETIRED, retired at the instant the active release went live, matching the row);
+  - it restores that exact manifest as a new release.
+- Missing, duplicate or inconsistent history fails closed.
+- The caller names the release they mean to roll back; a different active release is refused. Activation and rollback
+  lock the active release; the one-ACTIVE index backs that up.
+- **Tests:**
+  - A→B→C, then rollback C restores B;
+  - a stale draft (C drafted under B, D activated, then C), then rollback C restores D;
+  - repeated rollbacks walk the history;
+  - a concurrent change is refused;
+  - four kinds of corrupted history are refused.
+
+### R12: closed by safe disablement
+
+**GLB is planned but disabled. glTF and USDZ are not supported. No real 3D customer asset is active.**
+- **Upload:** a GLB is refused until approved private storage, the malware scanner, approved media delivery and the
+  3D switch all exist. Today that means everywhere, including local and test.
+- **Releases:** no release may contain a 3D media record.
+- **Delivery:** images only. A known hash never fetches a model, even one written around every other control.
+- **Customers:** see the gallery only. The slice has no model.
+- **Planned code:** the GLB sanitiser is kept, and tested, for when 3D is approved. It is not reachable today.
+
+### Market-condition rules
+
+- The engine has no market context. Market or city conditions, and market availability, are refused when saved,
+  rather than evaluated as "never matches". That evaluation would hide nothing under `hidden_when` and never trigger
+  `requires_consultation` or `unavailable_online`.
+- Conditions with no criteria, unknown fields (for example `city`), wrong operand types, empty or misspelled markets,
+  and conflicting market rules are all refused.
+- Market content written around validation into a live release makes V3 unavailable (503); nothing is shown or
+  priced.
+
+### Soft-close enforcement
+
+Soft-close storage is blocked by **release-gate validation and promise-matrix status**. Tests make every other
+condition hold:
+- an option and a visible extra exist;
+- the copy's own governance is confirmed;
+- nothing is held back by the test helper.
+
+The release still fails promises validation because the matrix row `spec.soft_close` is BLOCKED, with its owner
+UNASSIGNED. It therefore cannot activate, reach the public payload, be priced, or appear in an estimate or snapshot.
+`BLOCKED_FROM_RELEASE` is only a test and local-tool helper.
+
+### Closure validation (local; CI is reported in the PR)
+
+| Check | Result |
+|---|---|
+| API on SQLite and PostgreSQL | 2424 tests, 0 failures, 0 errors, 14 skipped: the same 11 engine-specific skips and 3 local-only real-card tests listed in §18 |
+| Real draft-4 equivalence | Run locally on both engines: pass |
+| mypy ratchet | 157 (baseline 157) |
+| ruff, OpenAPI, bandit, pip-audit, secret scan, deploy-check | Pass |
+| Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
+| V3 browser journey | 34/34, three consecutive runs |
+
+A keyboard-speed race found in this round, an estimate sent before the Turnstile widget rendered, is fixed: the page
+now awaits the widget.
+
 ## Merge versus activation boundaries
 
 | Boundary | What it allows | Status |
