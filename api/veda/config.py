@@ -174,6 +174,13 @@ class Settings:
         90  # unlinked estimates (no personal data) are removed this long after creation, never while valid (D7)
     )
     warranty_policy_url: str = ""  # the full Warranty, Service & Customer Care Policy, linked from every estimate
+    # Catalog-driven estimator, V3 (ADR-013). Off by default: every V3 public route answers 404 until enabled.
+    catalog_estimator_enabled: bool = False
+    catalog_analytics_enabled: bool = False  # staging validation analytics (counts only); production refuses it
+    catalog_four_eyes: bool = True  # an approver must not be the record's editor or submitter, or the release's author
+    catalog_media_dir: str = "var/catalog-media"  # local object store (development and tests); staging needs a bucket
+    catalog_media_scanner: str = "none"  # none | clamd; with none, uploads stay PENDING_SCAN outside local and test
+    catalog_clamd_address: str = "127.0.0.1:3310"  # clamd INSTREAM endpoint when the scanner is clamd
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -296,6 +303,12 @@ def load_settings(**overrides) -> Settings:
         lead_retention_enabled=_bool("VEDA_LEAD_RETENTION_ENABLED", False),
         estimator_enabled=_bool("VEDA_ESTIMATOR_ENABLED", False),
         estimate_turnstile_required=_bool("VEDA_ESTIMATE_TURNSTILE_REQUIRED", True),
+        catalog_estimator_enabled=_bool("VEDA_CATALOG_ESTIMATOR_ENABLED", False),
+        catalog_analytics_enabled=_bool("VEDA_CATALOG_ANALYTICS_ENABLED", False),
+        catalog_four_eyes=_bool("VEDA_CATALOG_FOUR_EYES", True),
+        catalog_media_dir=_str("VEDA_CATALOG_MEDIA_DIR", "var/catalog-media"),
+        catalog_media_scanner=_str("VEDA_CATALOG_MEDIA_SCANNER", "none"),
+        catalog_clamd_address=_str("VEDA_CATALOG_CLAMD_ADDRESS", "127.0.0.1:3310"),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -440,6 +453,10 @@ def validate_environment(settings: Settings) -> list[str]:
     ):
         # Every estimate links the Warranty, Service & Customer Care Policy: never a broken or placeholder link.
         problems.append(f"VEDA_WARRANTY_POLICY_URL must be a real https URL in {env} when the estimator is enabled")
+    if settings.catalog_media_scanner not in ("none", "clamd"):
+        problems.append("VEDA_CATALOG_MEDIA_SCANNER must be none or clamd")
+    if env in ("staging", "production") and not settings.catalog_four_eyes:
+        problems.append(f"VEDA_CATALOG_FOUR_EYES must stay true in {env}")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:
@@ -447,6 +464,10 @@ def validate_environment(settings: Settings) -> list[str]:
             # Production behaviour must not change until the implementation is reviewed and the owner enables it
             # (owner instruction 2026-10-08). Enabling it is a reviewed change to this check.
             problems.append("VEDA_ESTIMATOR_ENABLED is not authorised in production yet")
+        if settings.catalog_estimator_enabled:
+            problems.append("VEDA_CATALOG_ESTIMATOR_ENABLED is not authorised in production (ADR-013)")
+        if settings.catalog_analytics_enabled:
+            problems.append("VEDA_CATALOG_ANALYTICS_ENABLED is not authorised in production (ADR-013)")
         if settings.public_site_credentials:
             problems.append("VEDA_PUBLIC_SITE_CREDENTIALS is staging-only (Cloudflare Access); production refuses it")
         if not settings.sentry_dsn:
