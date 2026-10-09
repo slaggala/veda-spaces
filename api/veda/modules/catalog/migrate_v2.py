@@ -86,7 +86,7 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
     items, refine = bundle["items"], bundle["refine"]
     prompts: dict[str, list[dict]] = {}
     for f in refine:
-        spec = card.product(items[f["item"]]["product"])
+        spec = _priced(card, items[f["item"]]["product"])
         inp = next(i for i in spec.inputs if i.name == f["input"])
         prompts.setdefault(f["item"], []).append({
             "input": f["input"], "label": f"{_label(labels, f['item'])}: {inp.label.lower()}", "unit": f["unit"],
@@ -96,8 +96,8 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
     included_ids = {i for r in rooms for i in r["includes"]}
     for item_id in sorted(included_ids):
         item = items[item_id]
-        spec = card.product(item["product"])
-        variant = {"key": "standard", "name": _label(labels, item_id), "engine_product": item["product"],
+        spec = _priced(card, item["product"])
+        variant: dict[str, object] = {"key": "standard", "name": _label(labels, item_id), "engine_product": item["product"],
                    "engine_options": item["options"], "measurements": prompts.get(item_id, [])}  # fmt: skip
         if item_id == "pooja":
             variant["option_groups"] = [{"key": "asta", "name": _label(labels, "asta"), "default": "no", "choices": [
@@ -116,7 +116,7 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
             continue
         seen_extras.add(key)
         item = items[extra_id]
-        doc = {"name": _label(labels, extra_id), "kind": "room_extra",
+        doc: dict[str, object] = {"name": _label(labels, extra_id), "kind": "room_extra",
                "rooms": sorted({f"v2.{r['id']}" for r in rooms if any(e['id'] == extra_id for e in r['extras'])})}  # fmt: skip
         if item["product"] is None:  # the asta chakra: an option of the pooja unit
             doc["set_option"] = {"product": "pooja", "group": "asta", "choice": "yes"}
@@ -141,6 +141,17 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
     return out
 
 
+class MigrationError(ValueError):
+    """The V2 inputs do not fit together (a bundle item the card does not price)."""
+
+
+def _priced(card: ratecard.RateCard, code: str) -> ratecard.ProductSpec:
+    spec = card.product(code)
+    if spec is None:
+        raise MigrationError(f"the V2 bundles use {code}, which the card does not price")
+    return spec
+
+
 def _label(labels: dict, item_id: str) -> str:
     return labels.get(item_id) or item_id.replace("_", " ").capitalize()
 
@@ -153,9 +164,9 @@ def _settings_fields():
 
 def apply(
     s: Session, card_document: dict, bundle: dict | None = None, copy: dict | None = None, *, dry_run: bool = False
-) -> dict:
+) -> dict[str, list[str]]:
     """Create a DRAFT for every record that is new or changed; report the rest. Idempotent."""
-    report = {"created": [], "unchanged": [], "draft_pending": []}
+    report: dict[str, list[str]] = {"created": [], "unchanged": [], "draft_pending": []}
     for kind, key, document in records(card_document, bundle, copy):
         existing = (
             s.execute(

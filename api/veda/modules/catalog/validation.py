@@ -50,7 +50,7 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
     _promises(cat, errors["promises"], warnings)
     _media(s, cat, errors["media"], errors["three_d"], warnings, today)
     errors["rules"].extend(rules.contradictions(cat))
-    if not cat.all("home_config"):
+    if not cat.of(kinds.HomeConfig):
         errors["references"].append("the release has no home configuration")
     _warnings(cat, warnings)
     compiled = None
@@ -79,11 +79,11 @@ def _references(cat, out: list[str]) -> None:
     for kind, models in sorted(cat.models.items()):
         for key, model in sorted(models.items()):
             for rkind, rkey in kinds.references(kind, model):
-                if cat.get(rkind, rkey) is None:
+                if cat.model(rkind, rkey) is None:
                     out.append(f"{kind} {key} refers to {rkind} {rkey}, which is not in the release")
-    for key, room in cat.all("room_template").items():
+    for key, room in cat.of(kinds.RoomTemplate).items():
         for slot in room.included:
-            product = cat.get("product", slot.product)
+            product = cat.one(kinds.Product, slot.product)
             if product is None:
                 continue
             variant = next((v for v in product.variants if v.key == slot.variant), None)
@@ -97,16 +97,16 @@ def _references(cat, out: list[str]) -> None:
             if room.room_code not in product.rooms:
                 out.append(f"room_template {key}: {slot.product} is not offered in {room.room_code}")
         for ekey in room.extras:
-            extra = cat.get("extra", ekey)
+            extra = cat.one(kinds.Extra, ekey)
             if extra is not None and extra.set_option is not None:
                 if extra.set_option.product not in {slot.product for slot in room.included}:
                     out.append(
                         f"room_template {key}: extra {ekey} upgrades {extra.set_option.product}, not in the room"
                     )
-    for key, extra in cat.all("extra").items():
+    for key, extra in cat.of(kinds.Extra).items():
         if extra.set_option is None:
             continue
-        product = cat.get("product", extra.set_option.product)
+        product = cat.one(kinds.Product, extra.set_option.product)
         found = product is not None and any(
             g.key == extra.set_option.group and extra.set_option.choice in {c.key for c in g.choices}
             for v in product.variants
@@ -115,15 +115,15 @@ def _references(cat, out: list[str]) -> None:
         if not found:
             out.append(f"extra {key}: {extra.set_option.product} has no choice "
                        f"{extra.set_option.group}={extra.set_option.choice}")  # fmt: skip
-    for key, media in cat.all("media").items():
+    for key, media in cat.of(kinds.Media).items():
         if media.type == "GALLERY":
             for item in media.items:
-                m = cat.get("media", item)
+                m = cat.one(kinds.Media, item)
                 if m is not None and m.type in ("GALLERY", "EXTERNAL_EMBED"):
                     out.append(f"media {key}: gallery item {item} is a {m.type}")
-    for key, room in cat.all("room_template").items():
+    for key, room in cat.of(kinds.RoomTemplate).items():
         for attr, want in (("image", ("IMAGE",)), ("gallery", ("GALLERY",))):
-            m = cat.get("media", getattr(room, attr))
+            m = cat.one(kinds.Media, getattr(room, attr))
             if m is not None and m.type not in want:
                 out.append(f"room_template {key}: its {attr} must be a {want[0]} media record")
 
@@ -137,7 +137,7 @@ def _engine_options_ok(spec: ratecard.ProductSpec, options: dict, where: str, ou
 
 def _pricing(cat, card: ratecard.RateCard, out: list[str], mout: list[str]) -> None:
     """Every selectable item resolves to an engine product and options that the compiled card prices."""
-    for key, product in cat.all("product").items():
+    for key, product in cat.of(kinds.Product).items():
         if not set(product.packages) & set(card.enabled_packages()):
             out.append(f"product {key}: none of its packages is priced")
         for v in product.variants:
@@ -156,7 +156,7 @@ def _pricing(cat, card: ratecard.RateCard, out: list[str], mout: list[str]) -> N
             inputs = {i.name: i for i in spec.inputs}
             for prompt in v.measurements:
                 _prompt_ok(card, inputs, prompt, where, mout)
-    for key, extra in cat.all("extra").items():
+    for key, extra in cat.of(kinds.Extra).items():
         if extra.add is None:
             continue
         spec = card.product(extra.add.engine_product)
@@ -168,10 +168,10 @@ def _pricing(cat, card: ratecard.RateCard, out: list[str], mout: list[str]) -> N
         for prompt in extra.measurements:
             _prompt_ok(card, inputs, prompt, f"extra {key}", mout)
         for rkey in extra.rooms:
-            room = cat.get("room_template", rkey)
+            room = cat.one(kinds.RoomTemplate, rkey)
             if room is not None and room.room_code not in spec.rooms:
                 out.append(f"extra {key}: {extra.add.engine_product} is not priced in {room.room_code}")
-    for key, package in cat.all("package").items():
+    for key, package in cat.of(kinds.Package).items():
         if not package.consultation_only and package.engine_package not in card.enabled_packages():
             out.append(f"package {key}: {package.engine_package} is not priced (mark it consultation-only)")
         if package.engine_package == "LUXURY" and not package.consultation_only:
@@ -191,15 +191,15 @@ def _prompt_ok(card, inputs, prompt, where, out) -> None:
 
 
 def default_configuration(cat, home_key: str, package_key: str) -> dict:
-    home = cat.get("home_config", home_key)
+    home = cat.one(kinds.HomeConfig, home_key)
     rooms = []
     for slot in home.rooms:
         if not slot.default_selected:
             continue
-        room = cat.get("room_template", slot.room_template)
-        extras = {}
+        room = cat.one(kinds.RoomTemplate, slot.room_template)
+        extras: dict[str, dict[str, object]] = {}
         for ekey in room.extras if room else ():
-            extra = cat.get("extra", ekey)
+            extra = cat.one(kinds.Extra, ekey)
             if extra is not None and extra.default_selected:
                 extras[ekey] = {}
         rooms.append({"room": slot.room_template, "products": {}, "extras": extras})
@@ -208,12 +208,12 @@ def default_configuration(cat, home_key: str, package_key: str) -> dict:
 
 def _defaults(cat, card, out: list[str], today: date) -> None:
     """Every home's default configuration resolves and prices, under every package it offers online."""
-    for hkey, home in sorted(cat.all("home_config").items()):
-        ptype = cat.get("property_type", home.property_type)
+    for hkey, home in sorted(cat.of(kinds.HomeConfig).items()):
+        ptype = cat.one(kinds.PropertyType, home.property_type)
         if ptype is None:
             continue
         for pkey in home.packages:
-            package = cat.get("package", pkey)
+            package = cat.one(kinds.Package, pkey)
             if package is None or package.consultation_only:
                 continue
             config = default_configuration(cat, hkey, pkey)
@@ -235,7 +235,7 @@ def _defaults(cat, card, out: list[str], today: date) -> None:
 def _promises(cat, out: list[str], warnings: list[str]) -> None:
     """Every customer statement is a registered copy record; a promise needs its owner, backup, verification path and
     operational confirmation (the M3 rule of the V2 closure, applied to catalog copy)."""
-    for key, copy in sorted(cat.all("copy").items()):
+    for key, copy in sorted(cat.of(kinds.Copy).items()):
         if not copy.promise:
             continue
         g = copy.governance
@@ -246,10 +246,10 @@ def _promises(cat, out: list[str], warnings: list[str]) -> None:
         if g.status != "OPERATIONALLY_CONFIRMED" or g.confirmed_on is None:
             out.append(f"copy {key}: promise is not operationally confirmed")
     for kind in ("material", "hardware"):
-        for key, m in cat.all(kind).items():
-            if not any(cat.get("copy", s) is not None for s in m.statements):
+        for key, m in cat.models_of(kind).items():
+            if not any(cat.one(kinds.Copy, s) is not None for s in m.statements):
                 out.append(f"{kind} {key}: no registered statement")
-    for key, package in cat.all("package").items():
+    for key, package in cat.of(kinds.Package).items():
         if package.warranty_copy is None and not package.consultation_only:
             warnings.append(f"package {key}: no warranty statement")
 
@@ -266,9 +266,9 @@ def _objects(s: Session, shas: set[str]) -> dict[str, CatalogMediaObject]:
 
 
 def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str], today: date) -> None:
-    shas = {sha for m in cat.all("media").values() for sha in m.objects.variants.values()}
+    shas = {sha for m in cat.of(kinds.Media).values() for sha in m.objects.variants.values()}
     found = _objects(s, shas)
-    for key, m in sorted(cat.all("media").items()):
+    for key, m in sorted(cat.of(kinds.Media).items()):
         if m.rights.expires and m.rights.expires < today:
             out.append(f"media {key}: usage rights expired on {m.rights.expires.isoformat()}")
         if m.objects.source and m.objects.source in set(m.objects.variants.values()):
@@ -283,7 +283,7 @@ def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str
                 out.append(f"media {key}: {name} file is {obj.scan_status}")
         if m.type in ("GLB", "GLTF", "USDZ"):
             t = m.three_d
-            preview, fallback = cat.get("media", t.preview_image), cat.get("media", t.fallback_gallery)
+            preview, fallback = cat.one(kinds.Media, t.preview_image), cat.one(kinds.Media, t.fallback_gallery)
             if preview is None or preview.type != "IMAGE":
                 out3d.append(f"media {key}: the 3D preview must be an IMAGE in the release")
             if fallback is None or fallback.type != "GALLERY":
@@ -292,27 +292,27 @@ def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str
             if web is not None and web.media_kind not in ("GLB", "GLTF", "USDZ"):
                 out3d.append(f"media {key}: the web file is not a validated 3D model")
             for vkey in t.variant_map:
-                if not any(vkey == v.key for p in cat.all("product").values() for v in p.variants):
+                if not any(vkey == v.key for p in cat.of(kinds.Product).values() for v in p.variants):
                     out3d.append(f"media {key}: variant_map names unknown variant {vkey}")
             for mkey in t.finish_map:
-                if cat.get("material", mkey) is None:
+                if cat.one(kinds.Material, mkey) is None:
                     out3d.append(f"media {key}: finish_map names material {mkey}, not in the release")
 
 
 def _warnings(cat, warnings: list[str]) -> None:
-    for key, p in cat.all("product").items():
+    for key, p in cat.of(kinds.Product).items():
         if not p.media and not any(v.media for v in p.variants):
             warnings.append(f"product {key}: no image")
-    for key, e in cat.all("extra").items():
+    for key, e in cat.of(kinds.Extra).items():
         if not e.what_is_this:
             warnings.append(f"extra {key}: no 'What is this?' explanation")
         if not e.media:
             warnings.append(f"extra {key}: no image")
-    for key, room in cat.all("room_template").items():
+    for key, room in cat.of(kinds.RoomTemplate).items():
         if room.image is None:
             warnings.append(f"room_template {key}: no representative image")
     referenced = {(k, x) for kind, ms in cat.models.items() for m in ms.values() for k, x in kinds.references(kind, m)}
     for kind in ("product", "extra", "material", "hardware", "media", "copy"):
-        for key in cat.all(kind):
+        for key in cat.models_of(kind):
             if (kind, key) not in referenced:
                 warnings.append(f"{kind} {key}: not used by anything in the release")

@@ -23,16 +23,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import TYPE_CHECKING
 
 from . import kinds
+
+if TYPE_CHECKING:  # compile imports rules
+    from .compile import Catalog
 
 
 @dataclass(frozen=True)
 class Context:
-    property_type: str
-    home_size: str
-    project_kind: str
-    package: str
+    property_type: kinds.PropertyCode
+    home_size: kinds.HomeSize
+    project_kind: kinds.ProjectKind
+    package: kinds.PackageCode
     market: str | None = None
     public: bool = True
     today: date | None = None
@@ -64,8 +68,8 @@ def available(a: kinds.Availability, ctx: Context) -> bool:
     return not ((a.effective_from and today < a.effective_from) or (a.effective_to and today > a.effective_to))
 
 
-def _message(cat, rule: kinds.Rule, default: str) -> str:
-    copy = cat.get("copy", rule.message)
+def _message(cat: Catalog, rule: kinds.Rule, default: str) -> str:
+    copy = cat.one(kinds.Copy, rule.message)
     return copy.statement if copy is not None else default
 
 
@@ -75,7 +79,7 @@ def _subject_kind_key(path: str) -> tuple[str, str]:
     return {"product": "product", "extra": "extra", "room": "room_template"}[kind], key
 
 
-def evaluate(cat, ctx: Context, active: set[str], measures: dict[str, dict[str, float]]) -> list[dict]:
+def evaluate(cat: Catalog, ctx: Context, active: set[str], measures: dict[str, dict[str, float]]) -> list[dict]:
     errors: list[dict] = []
 
     def refuse(path: str, code: str, message: str) -> None:
@@ -86,13 +90,13 @@ def evaluate(cat, ctx: Context, active: set[str], measures: dict[str, dict[str, 
         if "#" in path or "@" in path:
             continue
         kind, key = _subject_kind_key(path)
-        model = cat.get(kind, key)
+        model = cat.model(kind, key)
         if model is None:
             refuse(path, "UNAVAILABLE", "This choice is not available.")
             continue
         if isinstance(model, kinds.Described) and not available(model.availability, ctx):
             refuse(path, "UNAVAILABLE", "This choice is not available for this home.")
-    for _key, rule in sorted(cat.all("rule").items()):
+    for _key, rule in sorted(cat.of(kinds.Rule).items()):
         if rule.subject not in active:
             continue
         objects = set(rule.objects)
@@ -107,6 +111,9 @@ def evaluate(cat, ctx: Context, active: set[str], measures: dict[str, dict[str, 
         elif rule.type == "hidden_when" and matches(rule.condition, ctx):
             refuse(rule.subject, "UNAVAILABLE", _message(cat, rule, "This choice is not available for this home."))
         elif rule.type == "measurement_bounds":
+            if rule.input is None or rule.min is None or rule.max is None:  # the schema requires all three
+                refuse(rule.subject, "INVALID_RULE", "This choice cannot be checked right now.")
+                continue
             value = measures.get(rule.subject.split("#")[0].split("@")[0], {}).get(rule.input)
             if value is not None and not rule.min <= value <= rule.max:
                 refuse(
@@ -127,19 +134,19 @@ def evaluate(cat, ctx: Context, active: set[str], measures: dict[str, dict[str, 
     return errors
 
 
-def defaults(cat, ctx: Context) -> set[str]:
+def defaults(cat: Catalog, ctx: Context) -> set[str]:
     """Subjects preselected in this context by default_when rules."""
-    return {r.subject for r in cat.all("rule").values() if r.type == "default_when" and matches(r.condition, ctx)}
+    return {r.subject for r in cat.of(kinds.Rule).values() if r.type == "default_when" and matches(r.condition, ctx)}
 
 
-def staff_only_subjects(cat) -> set[str]:
-    return {r.subject for r in cat.all("rule").values() if r.type == "staff_only"}
+def staff_only_subjects(cat: Catalog) -> set[str]:
+    return {r.subject for r in cat.of(kinds.Rule).values() if r.type == "staff_only"}
 
 
-def rules_used(cat, active: set[str]) -> dict[str, set[str]]:
+def rules_used(cat: Catalog, active: set[str]) -> dict[str, set[str]]:
     """The rule (and message copy) records a configuration was checked against, for its snapshot."""
     out: dict[str, set[str]] = {}
-    for key, rule in cat.all("rule").items():
+    for key, rule in cat.of(kinds.Rule).items():
         if rule.subject in active:
             out.setdefault("rule", set()).add(key)
             if rule.message:
@@ -147,13 +154,13 @@ def rules_used(cat, active: set[str]) -> dict[str, set[str]]:
     return out
 
 
-def contradictions(cat) -> list[str]:
+def contradictions(cat: Catalog) -> list[str]:
     """Rules that can never all hold: A requires B while A (or B) excludes the other, a subject that requires or
     excludes itself, or a measurement range that is empty."""
     found = []
     req: dict[str, set[str]] = {}
     exc: dict[str, set[str]] = {}
-    for key, rule in sorted(cat.all("rule").items()):
+    for key, rule in sorted(cat.of(kinds.Rule).items()):
         if rule.subject in rule.objects:
             found.append(f"rule {key}: {rule.type} names its own subject")
         if rule.type == "requires":

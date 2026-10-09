@@ -499,6 +499,9 @@ def dashboard(s: Session, *, can_price: bool) -> dict:
         "unpriced_items": [e for e in errors if "is not priced" in e] if can_price else None,
         "unsupported_combinations": [e for e in errors if e.startswith("rules:")],
         "validation_errors": len(errors),
-        "scheduled": [{"release": r.release_code, "at": r.scheduled_for.isoformat()} for r in scheduled],
+        "scheduled": [
+            {"release": r.release_code, "at": r.scheduled_for.isoformat() if r.scheduled_for else None}
+            for r in scheduled
+        ],
         "recent": [{"event": e.event_type, "on": e.created_on.isoformat(), "by": e.created_by} for e in recent],
     }

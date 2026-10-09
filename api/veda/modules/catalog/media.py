@@ -23,6 +23,7 @@ import struct
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -100,11 +101,11 @@ def _image_variants(data: bytes) -> tuple[list[tuple[str, bytes, int, int]], int
             if img.format not in IMAGE_FORMATS:
                 raise MediaError("unsupported image format")
             img.load()
-            img = ImageOps.exif_transpose(img)
-            width, height = img.size
+            upright = ImageOps.exif_transpose(img)
+            width, height = upright.size
             if min(width, height) < 320:
                 raise MediaError("images need at least 320 pixels on each side")
-            base = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+            base = upright.convert("RGBA" if "A" in upright.getbands() else "RGB")
     except MediaError:
         raise
     except Exception as err:  # noqa: BLE001 — any decoder failure (truncated, bomb, malformed) refuses the upload
@@ -340,7 +341,10 @@ def deliverable(s: Session, sha: str, *, release=None) -> CatalogMediaObject | N
     if not media_ids:
         return None
     referenced = False
-    for doc in s.execute(sa.select(CatalogRecord.document).where(CatalogRecord.id.in_(media_ids))).scalars():
+    docs: list[dict[str, Any]] = list(
+        s.execute(sa.select(CatalogRecord.document).where(CatalogRecord.id.in_(media_ids))).scalars()
+    )
+    for doc in docs:
         if sha in ((doc.get("objects") or {}).get("variants") or {}).values():
             referenced = True
             break

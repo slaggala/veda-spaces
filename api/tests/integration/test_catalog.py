@@ -497,7 +497,7 @@ def test_import_is_a_dry_run_first_and_creates_drafts_only(people):
     assert {r.status for r in rows(sa.select(CatalogRecord))} == {"DRAFT"}
     again = tx(a, importexport.dry_run, good, can_price=False)
     assert again["ok"] and again["rows"][0]["change"] == "unchanged", "re-importing the same file changes nothing"
-    changed = [{"kind": "product_family", "key": "beds", "document": {"name": "Beds and cots", "category": "beds"}}]
+    changed = [importexport.ImportRow("product_family", "beds", {"name": "Beds and cots", "category": "beds"})]
     blocked = tx(a, importexport.dry_run, changed, can_price=False)
     assert not blocked["ok"] and "open draft" in blocked["rows"][0]["errors"][0]
 

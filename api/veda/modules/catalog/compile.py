@@ -11,6 +11,7 @@ an input: only the catalog's engine product, options and the customer's measurem
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -22,6 +23,7 @@ from veda.modules.estimator.models import EstimatorRateCard
 from . import kinds, rules
 from .models import CatalogRecord, CatalogRelease
 
+M = TypeVar("M", bound=kinds._Model)
 CARD_PREFIX = "CATALOG-"
 PUBLIC_MEDIA_PATH = "/api/v1/public/catalog/media/"
 
@@ -43,11 +45,21 @@ class Catalog:
     records: dict[str, dict[str, CatalogRecord]] = field(default_factory=dict)
     models: dict[str, dict[str, kinds._Model]] = field(default_factory=dict)
 
-    def get(self, kind: str, key: str | None):
+    def model(self, kind: str, key: str | None) -> kinds._Model | None:
+        """Any record by kind and key (for kind-generic checks such as reference integrity)."""
         return self.models.get(kind, {}).get(key) if key else None
 
-    def all(self, kind: str) -> dict[str, kinds._Model]:
+    def models_of(self, kind: str) -> dict[str, kinds._Model]:
         return self.models.get(kind, {})
+
+    def one(self, cls: type[M], key: str | None) -> M | None:
+        """The record of `cls`'s kind with this key, typed."""
+        found = self.model(kinds.KIND_OF[cls], key)
+        return found if isinstance(found, cls) else None
+
+    def of(self, cls: type[M]) -> dict[str, M]:
+        """Every record of `cls`'s kind, by key, typed."""
+        return {k: m for k, m in self.models_of(kinds.KIND_OF[cls]).items() if isinstance(m, cls)}
 
     def version(self, kind: str, key: str) -> int:
         return self.records[kind][key].record_version
@@ -70,11 +82,12 @@ def load_release(s: Session, release: CatalogRelease) -> Catalog:
 # --- the rate card ---------------------------------------------------------------------------------------------------
 def card_document(cat: Catalog) -> dict:
     """The compiled rate card document. Exactly one settings pricing record; products in (position, product) order."""
-    settings_rows = [m for m in cat.all("pricing").values() if m.scope == "settings"]
+    settings_rows = [m for m in cat.of(kinds.Pricing).values() if m.scope == "settings"]
     if len(settings_rows) != 1:
         raise CompileError(f"a release holds exactly one card-settings pricing record (found {len(settings_rows)})")
     products = sorted(
-        (m for m in cat.all("pricing").values() if m.scope == "product"), key=lambda m: (m.position, m.engine_product)
+        (m for m in cat.of(kinds.Pricing).values() if m.scope == "product"),
+        key=lambda m: (m.position, m.engine_product),
     )
     codes = [m.engine_product for m in products]
     if len(set(codes)) != len(codes):
@@ -137,15 +150,15 @@ def customer_view(cat: Catalog) -> dict:
                  "hardware", "package"):  # fmt: skip
         out[kind] = {
             k: _public(m)
-            for k, m in sorted(cat.all(kind).items())
+            for k, m in sorted(cat.models_of(kind).items())
             if getattr(m, "visibility", "customer") == "customer"
         }
     for p in out["product"].values():
         p["variants"] = [v for v in p["variants"] if v.get("visibility", "customer") == "customer"]
-    out["media"] = {k: media_view(m) for k, m in sorted(cat.all("media").items())}
-    out["copy"] = {k: {"statement": m.statement, "category": m.category} for k, m in sorted(cat.all("copy").items())}
+    out["media"] = {k: media_view(m) for k, m in sorted(cat.of(kinds.Media).items())}
+    out["copy"] = {k: {"statement": m.statement, "category": m.category} for k, m in sorted(cat.of(kinds.Copy).items())}
     out["rule"] = {
-        k: _public(m) for k, m in sorted(cat.all("rule").items()) if m.type != "staff_only"
+        k: _public(m) for k, m in sorted(cat.of(kinds.Rule).items()) if m.type != "staff_only"
     }  # mirrored in the browser for feedback only; the server is authoritative
     out["hidden"] = sorted(rules.staff_only_subjects(cat))
     return out
@@ -162,7 +175,7 @@ class Resolved:
 def _use(used: dict, cat: Catalog, kind: str, key: str | None) -> None:
     if key:
         used.setdefault(kind, {})[key] = cat.version(kind, key)
-    model = cat.get(kind, key) if key else None
+    model = cat.model(kind, key)
     if isinstance(model, (kinds.Material, kinds.Hardware)):  # the governed statements shown with it
         for statement in model.statements:
             _use(used, cat, "copy", statement)
@@ -191,13 +204,13 @@ def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
         errors.append({"field": where, "code": code, "message": message})
 
     used: dict[str, dict[str, int]] = {}
-    home = cat.get("home_config", config.get("home"))
-    package = cat.get("package", config.get("package"))
+    home = cat.one(kinds.HomeConfig, config.get("home"))
+    package = cat.one(kinds.Package, config.get("package"))
     if home is None:
         raise CompileError([{"field": "home", "code": "UNKNOWN_HOME", "message": "Choose a home type."}])
     if package is None or config.get("package") not in home.packages:
         raise CompileError([{"field": "package", "code": "PACKAGE_UNAVAILABLE", "message": "Choose a package."}])
-    ptype = cat.get("property_type", home.property_type)
+    ptype = cat.one(kinds.PropertyType, home.property_type)
     if ptype is None:
         raise CompileError("the home's property type is not in this release")
     _use(used, cat, "home_config", config["home"])
@@ -206,7 +219,7 @@ def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
     ctx = rules.Context(
         property_type=ptype.code,
         home_size=home.home_size,
-        project_kind=config.get("project_kind", "NEW_HOME"),
+        project_kind=_project_kind(config.get("project_kind")),
         package=package.engine_package,
         market=config.get("city"),
         public=public,
@@ -223,7 +236,7 @@ def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
     for ri, room_in in enumerate(rooms_in):
         rkey = room_in.get("room")
         where = f"rooms[{ri}]"
-        room = cat.get("room_template", rkey)
+        room = cat.one(kinds.RoomTemplate, rkey)
         if room is None or rkey not in allowed_rooms:
             fail(f"{where}.room", "ROOM_UNAVAILABLE", "This room is not offered for this home.")
             continue
@@ -246,7 +259,7 @@ def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
         for ekey in room.extras:
             if ekey not in extras_in:
                 continue
-            extra = cat.get("extra", ekey)
+            extra = cat.one(kinds.Extra, ekey)
             if extra is not None and extra.set_option is not None:
                 forced.setdefault(extra.set_option.product, {})[extra.set_option.group] = extra.set_option.choice
         for pkey, slot in slots.items():
@@ -289,6 +302,14 @@ def resolve(cat: Catalog, config: dict, *, public: bool = True) -> Resolved:
     return Resolved(request=request, versions=used, selections=config)
 
 
+def _project_kind(value: object) -> kinds.ProjectKind:
+    if value is None or value == "NEW_HOME":
+        return "NEW_HOME"
+    if value == "RENOVATION":
+        return "RENOVATION"
+    raise CompileError([{"field": "project_kind", "code": "INVALID", "message": "Choose a new home or a renovation."}])
+
+
 def _measurements(prompts, given: dict, where: str, fail) -> dict[str, engine.Measurement]:
     out = {}
     by_input = {p.input: p for p in prompts}
@@ -309,7 +330,7 @@ def _measurements(prompts, given: dict, where: str, fail) -> dict[str, engine.Me
 
 
 def _product_selection(cat, room, slot, pin, forced, ctx, where, fail, used, active, measures):
-    product = cat.get("product", slot.product)
+    product = cat.one(kinds.Product, slot.product)
     if product is None:
         fail(where, "PRODUCT_UNAVAILABLE", "This item is not available.")
         return None
@@ -353,7 +374,7 @@ def _product_selection(cat, room, slot, pin, forced, ctx, where, fail, used, act
 
 
 def _extra_selection(cat, room, ekey, ein, slots, products_in, ctx, where, fail, used, active, measures):
-    extra = cat.get("extra", ekey)
+    extra = cat.one(kinds.Extra, ekey)
     if extra is None or (ctx.public and extra.visibility != "customer"):
         fail(where, "EXTRA_UNAVAILABLE", "This extra is not available.")
         return []

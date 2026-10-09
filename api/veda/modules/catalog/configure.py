@@ -22,7 +22,7 @@ from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import EstimatorRateCard
 
 from . import compile as catalog_compile
-from . import rules, service
+from . import kinds, rules, service
 from .models import ANALYTICS_EVENTS, CatalogAnalyticsDaily, CatalogConfiguration, CatalogRelease
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # pragma: allowlist secret (an alphabet)
@@ -149,6 +149,8 @@ def reopen(s: Session, reference: str) -> dict:
     if row is None:
         raise ApiError(404, "NOT_FOUND", "No such configuration.")
     release = s.get(CatalogRelease, row.release_id)
+    if release is None:  # the foreign key makes this unreachable; refuse rather than guess
+        raise ApiError(404, "NOT_FOUND", "No such configuration.")
     return {
         "configuration_reference": row.configuration_reference,
         "release": release.release_code,
@@ -166,14 +168,17 @@ def defaults(s: Session, home: str, package: str) -> dict:
 
     release = _active(s)
     cat = catalog_compile.load_release(s, release)
-    if cat.get("home_config", home) is None or cat.get("package", package) is None:
+    home_model, package_model = cat.one(kinds.HomeConfig, home), cat.one(kinds.Package, package)
+    if home_model is None or package_model is None:
         raise ApiError(404, "NOT_FOUND", "No such home or package.")
-    ptype = cat.get("property_type", cat.get("home_config", home).property_type)
+    ptype = cat.one(kinds.PropertyType, home_model.property_type)
+    if ptype is None:
+        raise ApiError(404, "NOT_FOUND", "No such home or package.")
     ctx = rules.Context(
-        property_type=ptype.code if ptype else "APARTMENT",
-        home_size=cat.get("home_config", home).home_size,
+        property_type=ptype.code,
+        home_size=home_model.home_size,
         project_kind="NEW_HOME",
-        package=cat.get("package", package).engine_package,
+        package=package_model.engine_package,
     )
     out = validation.default_configuration(cat, home, package)
     out["preselected"] = sorted(rules.defaults(cat, ctx))

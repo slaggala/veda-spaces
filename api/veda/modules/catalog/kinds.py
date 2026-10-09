@@ -445,6 +445,7 @@ SCHEMAS: dict[str, type[_Model]] = {
     "rule": Rule,
     "copy": Copy,
 }
+KIND_OF: dict[type[_Model], str] = {cls: kind for kind, cls in SCHEMAS.items()}
 STAFF_ONLY_KINDS = frozenset({"pricing"})
 
 

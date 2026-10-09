@@ -413,8 +413,8 @@ def cmd_catalog(args) -> int:
                 if not args.file:
                     raise service.CatalogError("give the private V2 rate-card file")
                 document = json.loads(Path(args.file).read_text())
-                out: dict[str, object] = migrate_v2.apply(s, document, dry_run=args.dry_run)
-                out = {k: len(v) for k, v in out.items()} | {"dry_run": args.dry_run}
+                report = migrate_v2.apply(s, document, dry_run=args.dry_run)
+                out: dict[str, object] = {k: len(v) for k, v in report.items()} | {"dry_run": args.dry_run}
             elif args.action == "seed-slice":
                 out = seed.apply(s)
             elif args.action == "validate-release":
