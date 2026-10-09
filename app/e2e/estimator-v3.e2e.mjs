@@ -53,8 +53,11 @@ try {
   await page.click('#v3-to-rooms');
   await page.waitForSelector('[data-v3="2"]:not([hidden])');
   check('the living room card comes from the catalog', await page.locator('.v3-room h3', { hasText: 'Living room' }).count() === 1);
-  check('the TV unit and its finishes are offered', await page.locator('.v3-product h4', { hasText: 'TV unit' }).count() === 1
-    && await page.locator('input[value="laminate"]').isChecked() && await page.locator('input[value="veneer"]').count() === 1);
+  check('the TV unit and its laminate finish are offered', await page.locator('.v3-product h4', { hasText: 'TV unit' }).count() === 1
+    && await page.locator('input[value="laminate"]').isChecked());
+  check('veneer is consultation-only: shown, not selectable, routed to a consultation',
+    await page.locator('input[value="veneer"]').isDisabled() && await page.locator('.v3-consult[href="/#contact"]').count() >= 1);
+  check('soft-close storage is not offered (blocked)', await page.locator('text=Soft-close').count() === 0);
   await page.waitForFunction(() => [...document.querySelectorAll('.v3-room img')].some((i) => i.complete && i.naturalWidth > 0));
   check('catalog images load (delivery variants, by hash)', true);
   check('images are labelled as illustrative', await page.locator('.v3-badge', { hasText: 'Illustrative example' }).count() > 0);
@@ -73,23 +76,23 @@ try {
   const base = await estimate(() => page.click('#v3-estimate'));
   check('an estimate from the default configuration', base.status === 201 && /^C[0-9A-Z]{8}$/.test(base.body.data.configuration_reference), String(base.status));
   await page.waitForSelector('[data-v3="3"]:not([hidden])');
-  check('the result shows the range, the reference and the disclaimer', (await page.locator('#v3-result').innerText()).includes(base.body.data.configuration_reference)
-    && (await page.locator('#v3-result').innerText()).includes('not a final quotation'));
+  const shown = await page.locator('#v3-result').innerText();
+  const d = base.body.data;
+  const expected = [d.configuration_reference, d.catalog_release, `GST at ${d.gst.pct}%`, 'Site Execution & Handover Package',
+    'Design Personalisation Allowance', `Valid for ${d.validity_days} days`, d.expires_on, 'not a final quotation',
+    d.timeline.label, ...d.assumptions, ...d.exclusions, ...d.client_scope, ...(d.project_preparation.inclusions || [])];
+  const missing = expected.filter((x) => !shown.includes(x));
+  check('every customer-critical field of the response is on the result page', missing.length === 0, missing.join(' | '));
+  check('the specification version is shown', /Specification: /.test(shown));
   await axe('result');
   await shot('result');
 
   await page.click('[data-v3-back="2"]');
   await page.check('input[name="v3-living-room-tv-unit-variant"][value="box"]');
   const box = await estimate(() => page.click('#v3-estimate'));
-  await page.click('[data-v3-back="2"]');
-  await page.locator('.v3-extra', { hasText: 'Soft-close storage' }).locator('input[type="checkbox"]').check();
-  const soft = await estimate(() => page.click('#v3-estimate'));
-  check('soft-close storage changes the estimate', box.status === 201 && soft.status === 201 && soft.body.data.range.low_minor > box.body.data.range.low_minor);
+  check('the style choice changes the estimate', box.status === 201 && box.body.data.range.low_minor < base.body.data.range.low_minor);
   await page.click('[data-v3-back="2"]');
   await page.check('input[name="v3-living-room-tv-unit-variant"][value="panelled"]');
-  const refused = await estimate(() => page.click('#v3-estimate'));
-  check('an unsupported combination is refused and explained', refused.status === 422 && await page.locator('#v3-summary:not([hidden]) li').count() >= 1);
-  await page.locator('.v3-extra', { hasText: 'Soft-close storage' }).locator('input[type="checkbox"]').uncheck();
   await page.locator('.v3-extra', { hasText: 'Feature wall' }).locator('input[type="checkbox"]').check();
   const wall = await estimate(() => page.click('#v3-estimate'));
   check('the feature wall adds to the estimate', wall.status === 201 && wall.body.data.range.low_minor > base.body.data.range.low_minor);

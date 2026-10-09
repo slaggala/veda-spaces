@@ -1,18 +1,25 @@
-"""The representative vertical slice (owner instruction): Living Room → TV Unit, synthetic and DRAFT only.
+"""The representative vertical slice (owner instruction, corrected by the V3 remediation): Living Room → TV Unit.
+Synthetic and DRAFT only.
 
-- Room: living room, with a representative image and a gallery.
-- Product: TV unit, two variants (wall-panelled; box) mapped to the engine's TV_UNIT styles.
-- Options: laminate or veneer panelling (materials), soft-close storage on the box variant (hardware).
-- Extras: a feature wall (adds the engine's FEATURE_WALL, measured) and soft-close storage (sets the box option).
-- Media: generated placeholder images labelled "Illustrative example", a gallery, an optional 3D model (a generated
-  GLB) with a preview image first and the gallery as its fallback. The model never prices anything.
-- Rules: soft-close storage requires the box variant; TV wall width online is 3–20 ft.
-- Copy: descriptive statements (no promise words). The soft-close statement is a promise: its owner is UNASSIGNED
-  and it is BLOCKED, so no release containing it can activate until the business assigns and confirms it. No person
-  is named anywhere.
+- **Room:** living room, with a representative image and a gallery.
+- **Product:** TV unit, in two variants mapped to the engine's TV_UNIT styles:
+  - with laminate wall panelling (PANELLED; Essential 1.1 `surface` covers the PANEL line);
+  - box (BOX).
+- **Finish choices:**
+  - laminate is priced;
+  - veneer is consultation-only (a `requires_consultation` rule). No card has a veneer input, and Essential 1.1
+    lists veneer as a decorative finish chosen during design. It is never priced as laminate (R14, H1).
+- **Feature wall:** an extra that adds the engine's FEATURE_WALL, measured. Its copy promises no material
+  (Essential 1.1 `decorative`).
+- **Soft-close storage is BLOCKED (H2).** The hardware, the extra, the promise (registered text of the matrix row
+  `spec.soft_close`, which is BLOCKED and has an UNASSIGNED owner) and the rule are seeded staff-only. They are
+  listed in BLOCKED_FROM_RELEASE, and no release may contain them.
+- **Media:** generated placeholder images labelled "Illustrative example", galleries, and a generated GLB with a
+  preview image and a fallback gallery. 3D stays off for customers until approved, and it never prices anything.
+- **Copy:** descriptive statements with no promise wording, labels, the disclaimers and the rule messages.
 
-Pricing is not seeded: a release compiles only with pricing records, which come from a card (`migrate_v2`) supplied
-by the operator; tests use the synthetic card. The images are drawn here, so no third-party or customer image is used.
+No person is named anywhere. Pricing is not seeded: a release compiles only with pricing records from a card (the
+operator's, or the synthetic test card).
 """
 
 from __future__ import annotations
@@ -28,6 +35,11 @@ from . import media, service
 from .models import CatalogRecord
 
 PLACEHOLDER = "Illustrative example"
+# Seeded for review but never released until the business assigns, prices and confirms them (H2).
+BLOCKED_FROM_RELEASE = frozenset({
+    ("extra", "tv-soft-close-storage"), ("hardware", "hinge.soft-close"), ("copy", "copy.soft-close.promise"),
+    ("rule", "rule.soft-close-needs-box"), ("copy", "copy.rule.soft-close"),
+})  # fmt: skip
 RIGHTS = {"owner": "Veda Spaces", "licence": "Generated placeholder (synthetic)", "usage": "owned"}
 UNASSIGNED = "UNASSIGNED"
 
@@ -120,13 +132,19 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
         ("copy.disclaimer", "This is a preliminary budgetary estimate for planning purposes and is not a final quotation "
          "or contractual offer.", "disclaimer"),
         ("copy.next-step", "Measurements can be added later; our team confirms them at a site visit.", "next_step"),
+        ("copy.rule.veneer", "Veneer is chosen with you during design, so we discuss it in a consultation.", "assumption"),
+        ("copy.image-disclaimer", "Images show the kind of work, not the exact design you will receive. The final "
+         "design, dimensions, materials and finishes are confirmed separately in your quotation.", "disclaimer"),
+        ("copy.label.site-package", "Site Execution & Handover Package", "label"),
+        ("copy.label.allowance", "Design Personalisation Allowance", "label"),
     ]  # fmt: skip
     out: list[tuple[str, str, dict]] = [
         ("copy", key, {"statement": text, "category": cat, "promise": False}) for key, text, cat in copy
     ]
+    # Registered text of the soft-close row of the ESSENTIAL-1.1 promise matrix, which is BLOCKED (owner UNASSIGNED).
     out.append(("copy", "copy.soft-close.promise", {
-        "statement": "Soft-close hinges and channels on storage shutters and drawers.", "category": "hardware",
-        "promise": True,
+        "statement": "Soft-close TV-unit hardware", "category": "hardware", "promise": True,
+        "matrix_row": "spec.soft_close", "applies_to": {"products": ["tv-unit"], "rooms": ["living-room"]},
         "governance": {"owner": UNASSIGNED, "backup": UNASSIGNED, "quotation_mapping": "Hardware line of the quotation",
                        "verification": UNASSIGNED, "warranty_source": UNASSIGNED, "status": "BLOCKED"},
     }))  # fmt: skip
@@ -142,7 +160,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
             "warranty_source": "Not shown to customers in this slice",
         }),
         ("hardware", "hinge.soft-close", {
-            "name": "Soft-close hinges and channels", "category": "hinge", "soft_close": True,
+            "name": "Soft-close hinges and channels", "category": "hinge", "soft_close": True, "visibility": "staff",
             "compatible_families": ["tv-units"], "statements": ["copy.soft-close.promise"],
             "warranty_source": UNASSIGNED,
         }),
@@ -153,7 +171,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
         ("product_family", "tv-units", {"name": "TV units", "category": "media_units"}),
         ("product", "tv-unit", {
             "name": "TV unit", "family": "tv-units", "rooms": ["LIVING"], "packages": ["ESSENTIAL"],
-            "description": "A unit for the TV wall, with panelling or a simple box and optional storage.",
+            "description": "A unit for the TV wall, with laminate wall panelling or as a simple box.",
             "what_is_this": "The cabinet and wall finish around your TV.",
             "media": ["img.tv-laminate", "gallery.tv-unit", "model.tv-unit"], "default_variant": "panelled",
             "variants": [
@@ -169,14 +187,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
                                          "media": ["img.tv-veneer"]},
                                     ]}]},
                 {"key": "box", "name": "Box unit", "engine_product": "TV_UNIT", "engine_options": {"STYLE": "BOX"},
-                 "measurements": [{"input": "WIDTH", "label": "TV wall width", "unit": "ft", "min": 3, "max": 20}],
-                 "option_groups": [{"key": "storage", "name": "Storage", "default": "open",
-                                    "choices": [
-                                        {"key": "open", "name": "Open shelves"},
-                                        {"key": "soft-close", "name": "Soft-close storage drawers",
-                                         "engine_options": {"STYLE": "BOX_STORAGE"}, "hardware": ["hinge.soft-close"],
-                                         "media": ["img.soft-close"]},
-                                    ]}]},
+                 "measurements": [{"input": "WIDTH", "label": "TV wall width", "unit": "ft", "min": 3, "max": 20}]},
             ],
         }),
         ("extra", "feature-wall", {
@@ -189,6 +200,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
         }),
         ("extra", "tv-soft-close-storage", {
             "name": "Soft-close storage", "kind": "product_extra", "rooms": ["living-room"], "products": ["tv-unit"],
+            "visibility": "staff",
             "what_is_this": "Closed drawers below the TV unit that shut gently.",
             "set_option": {"product": "tv-unit", "group": "storage", "choice": "soft-close"},
             "hardware": ["hinge.soft-close"], "media": ["img.soft-close"],
@@ -197,7 +209,7 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
             "name": "Living room", "room_code": "LIVING", "image": "img.living-room", "gallery": "gallery.living-room",
             "description": "The TV wall and the space around your seating.",
             "included": [{"product": "tv-unit", "variant": "panelled", "options": {"panel-finish": "laminate"}}],
-            "extras": ["feature-wall", "tv-soft-close-storage"],
+            "extras": ["feature-wall"],
         }),
         ("package", "slice.essential", {
             "name": "Essential", "engine_package": "ESSENTIAL", "public_summary": "copy.slice.essential",
@@ -210,6 +222,10 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
         ("rule", "rule.soft-close-needs-box", {
             "type": "requires", "subject": "extra:tv-soft-close-storage", "objects": ["product:tv-unit#box"],
             "message": "copy.rule.soft-close",
+        }),
+        ("rule", "rule.veneer-consultation", {
+            "type": "requires_consultation", "subject": "product:tv-unit@panel-finish=veneer",
+            "message": "copy.rule.veneer",
         }),
         ("rule", "rule.tv-width", {
             "type": "measurement_bounds", "subject": "product:tv-unit", "input": "WIDTH", "min": 3, "max": 20,

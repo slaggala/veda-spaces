@@ -68,7 +68,7 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
             out.append(("copy", summary, {
                 "statement": copy["promise"]["packageSubtitle"], "category": "package", "promise": True,
                 "governance": _blocked_governance("V2 package subtitle (promise matrix)"),
-                "matrix_row": "package-subtitle",
+                "matrix_row": "package_subtitle", "applies_to": {"packages": ["essential"]},
             }))  # fmt: skip
         else:
             text = (

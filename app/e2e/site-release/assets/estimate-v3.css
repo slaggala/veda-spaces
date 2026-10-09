@@ -42,3 +42,6 @@
 .v3-dialog::backdrop { background: rgb(0 0 0 / 55%); }
 .v3-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.v3-block { border-top: 1px solid #ece4da; margin-top: 1rem; padding-top: 0.5rem; }
+.v3-block h3 { font-size: 1.05rem; margin: 0.25rem 0; }
+.v3-consult { display: inline-block; margin-top: 0.25rem; color: #281a13; }

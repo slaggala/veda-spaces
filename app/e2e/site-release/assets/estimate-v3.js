@@ -87,7 +87,7 @@
     if (!g) return;
     track('gallery_viewed', key);
     $('#v3-gallery-title').textContent = g.title;
-    $('#v3-gallery-body').replaceChildren(el('p', { class: 'v3-note', text: 'Images show the kind of work, not the exact design you will receive.' }),
+    $('#v3-gallery-body').replaceChildren(el('p', { class: 'v3-note', text: statement('copy.image-disclaimer', '') }),
       ...(g.items || []).map((k) => picture(k, { sizes: '(max-width: 700px) 100vw, 700px' })).filter(Boolean));
     $('#v3-gallery').showModal();
   }
@@ -135,6 +135,13 @@
     const p = C.product[pkey];
     return p.variants.find((v) => v.key === (ps.variant || slot.variant)) || p.variants[0];
   };
+  // A choice under a requires_consultation rule (no condition) is consultation-only: its message, or null.
+  const consultation = (pkey, vkey, gkey, ckey) => {
+    const paths = new Set([`product:${pkey}@${gkey}=${ckey}`, `product:${pkey}#${vkey}@${gkey}=${ckey}`]);
+    const rule = Object.values(C.rule || {}).find((r) => r.type === 'requires_consultation' && !r.condition && paths.has(r.subject));
+    return rule ? (C.copy[rule.message]?.statement || 'Discussed in a consultation.') : null;
+  };
+  const statement = (key, fallback) => C.copy[key]?.statement || fallback;
   const describe = (d) => [d.description && el('p', { text: d.description }),
     d.what_is_this && el('details', { class: 'v3-what' }, el('summary', { text: 'What is this?' }), el('p', { text: d.what_is_this }),
       d.typically_used_for ? el('p', { class: 'v3-note', text: `Typically used for: ${d.typically_used_for}` }) : null)];
@@ -191,8 +198,15 @@
       const current = (ps.options || {})[g.key] || preset || g.default;
       block.append(el('fieldset', { class: 'v3-group' }, el('legend', { text: g.name }),
         ...g.choices.map((c) => {
-          const label = radio(`v3-${rkey}-${slot.product}-${g.key}`, c.key, c.key === current, c.name, c.description,
+          const consult = consultation(slot.product, v.key, g.key, c.key);
+          const label = radio(`v3-${rkey}-${slot.product}-${g.key}`, c.key, c.key === current && !consult, c.name, c.description,
             () => { ps.options = { ...(ps.options || {}), [g.key]: c.key }; renderRooms(); });
+          if (consult) { // never priced online: shown, not selectable, and routed to a consultation
+            label.querySelector('input').disabled = true;
+            label.classList.add('v3-off');
+            label.querySelector('span').append(el('small', { class: 'v3-note', text: consult }),
+              el('a', { href: '/#contact', class: 'v3-consult', text: 'Ask about this in a consultation', onclick: () => track('quotation_requested', slot.product) }));
+          }
           const cm = (c.materials || []).map((m) => C.material[m]).filter(Boolean);
           if (cm.length) label.querySelector('span').append(el('small', { class: 'v3-note', text: cm.map((m) => C.copy[m.statements?.[0]]?.statement || m.name).join(' ') }));
           return label;
@@ -224,6 +238,7 @@
     return box;
   }
   function renderRooms() {
+    $('#v3-image-note').textContent = statement('copy.image-disclaimer', '');
     $('#v3-rooms').replaceChildren(...home().rooms.map((slot) => {
       const room = C.room_template[slot.room_template];
       if (!room) return null;
@@ -232,7 +247,7 @@
       toggle.addEventListener('change', () => { rs.on = toggle.checked; track(rs.on ? 'room_selected' : 'room_deselected', slot.room_template); renderRooms(); });
       const card = el('article', { class: `v3-room${rs.on ? '' : ' v3-room-off'}`, 'aria-label': room.name },
         picture(room.image), el('label', { class: 'v3-check v3-room-title' }, toggle, el('h3', { text: room.name })),
-        el('p', { class: 'v3-note', text: `${room.included.length} included · ${Object.keys(rs.extras).length} extras selected` }), ...describe(room));
+        el('p', { class: 'v3-note', text: `${room.included.length} items · ${Object.keys(rs.extras).length} extras chosen` }), ...describe(room));
       if (room.gallery) card.append(el('button', { type: 'button', class: 'v3-ghost', text: 'Room ideas', onclick: () => openGallery(room.gallery) }));
       if (rs.on) {
         card.append(...room.included.map((s) => productBlock(slot.room_template, s)).filter(Boolean));
@@ -278,12 +293,29 @@
   function renderResult() {
     const e = state.estimate;
     const copyOf = (category) => Object.values(C.copy).filter((c) => c.category === category).map((c) => c.statement);
+    // Every customer-critical field of the estimate response (E3); headings are page labels, names come from
+    // registered catalog copy where it exists, otherwise from the estimate itself.
+    const list = (items) => el('ul', {}, ...(items || []).map((x) => el('li', { text: x })));
+    const block = (heading, ...kids) => el('section', { class: 'v3-block', 'aria-label': heading }, el('h3', { text: heading }), ...kids);
+    const pp = e.project_preparation || {};
+    const al = e.custom_features_allowance || {};
+    const spec = e.specification;
     $('#v3-result').replaceChildren(
-      el('p', { class: 'v3-range' }, el('strong', { text: `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}` })),
-      el('ul', { class: 'v3-rooms-total' }, ...(e.rooms || []).map((r) => el('li', {}, el('span', { text: r.label }), el('span', { text: rupees(r.amount_minor) })))),
-      el('p', { class: 'v3-note', text: `Reference ${e.configuration_reference} · catalog ${e.catalog_release}` }),
-      ...copyOf('next_step').map((t) => el('p', { text: t })),
-      ...copyOf('disclaimer').map((t) => el('p', { class: 'v3-note', text: t })),
+      el('p', { class: 'v3-range', 'data-field': 'range' }, el('strong', { text: `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}` })),
+      el('p', { 'data-field': 'gst', text: `GST at ${e.gst.pct}% is added to this range: about ${rupees(e.gst.low_minor)} – ${rupees(e.gst.high_minor)}.` }),
+      block('Your rooms', el('ul', { class: 'v3-rooms-total' }, ...(e.rooms || []).map((r) => el('li', {}, el('span', { text: r.label }), el('span', { text: rupees(r.amount_minor) }))))),
+      block(statement('copy.label.site-package', pp.label), el('p', { 'data-field': 'project_preparation', text: `${rupees(pp.amount_minor || 0)}. ${pp.description || ''}` }), list(pp.inclusions)),
+      block(statement('copy.label.allowance', al.label), el('p', { 'data-field': 'allowance', text: `${rupees(al.low_minor || 0)} – ${rupees(al.high_minor || 0)}. ${al.description || ''}` })),
+      block('Timeline', el('p', { 'data-field': 'timeline', text: e.timeline ? `${e.timeline.label}: about ${e.timeline.min_days} – ${e.timeline.max_days} days` : '' })),
+      block('Assumptions', list(e.assumptions)),
+      block('Exclusions', list(e.exclusions)),
+      block('What you supply', list(e.client_scope)),
+      block('About this estimate',
+        el('p', { 'data-field': 'validity', text: `Valid for ${e.validity_days} days, until ${e.expires_on}.` }),
+        el('p', { 'data-field': 'specification', text: spec ? `Specification: ${spec.name || spec.spec_code} (${spec.spec_code})` : 'Specification: confirmed in your detailed quotation.' }),
+        el('p', { 'data-field': 'release', text: `Reference ${e.configuration_reference} · catalog release ${e.catalog_release}` }),
+        ...copyOf('next_step').map((t) => el('p', { text: t })),
+        el('p', { class: 'v3-note', 'data-field': 'disclaimer', text: statement('copy.disclaimer', e.disclaimer) })),
     );
     // Refinement: the measurement prompts of the items chosen (estimate first, measurements later).
     const fields = [];

@@ -30,9 +30,21 @@ PropertyCode = Literal["APARTMENT", "VILLA"]
 ProjectKind = Literal["NEW_HOME", "RENOVATION"]
 PackageCode = Literal["ESSENTIAL", "PREMIUM", "LUXURY"]
 Visibility = Literal["customer", "staff"]
-# Promise words in descriptive text: such a statement must be a governed `copy` record instead.
+# Promise-like wording (R2/R3): warranty, guarantee, certification, free or included scope, exclusions, installation,
+# delivery, timelines, material grades, brands and service support. Text with any of it is customer-visible only as a
+# promise copy record linked to an operationally confirmed promise-matrix row; descriptive text never carries it,
+# whatever flag the record has.
 _PROMISE_WORDS = re.compile(
-    r"\b(warrant\w*|guarantee\w*|lifetime|brand\w*|soft[- ]close|included|free|complimentary|certified)\b", re.I
+    r"\b("
+    r"warrant\w*|guarantee\w*|assur\w*|certif\w*|lifetime|life-long|"
+    r"free|complimentary|no[- ]cost|includ\w*|inclusive|exclud\w*|"
+    r"install\w*|deliver\w*|dispatch\w*|timeline\w*|on[- ]time|deadline\w*|\d+\s*(?:days?|weeks?|months?|years?)|"
+    r"grade\w*|BWR|BWP|MR|E[0-2]|IS[ :-]?\d+|marine|waterproof|termite\w*|borer\w*|"
+    r"brand\w*|genuine|original|hettich|hafele|häfele|blum|ebco|century|greenply|merino|greenlam|airolam|"
+    r"servic\w*|support\w*|after[- ]sales|maintenance|repair\w*|replac\w*|"
+    r"soft[- ]clos\w*"
+    r")\b",
+    re.I,
 )
 
 
@@ -126,6 +138,9 @@ class OptionGroup(_Model):
     key: Key
     name: Name
     description: Text | None = None
+    # True only when the choices are deliberately priced alike (a colour, say). Otherwise two choices with the same
+    # engine options fail validation unless one is consultation-only: veneer is never silently priced as laminate.
+    price_neutral: bool = False
     choices: tuple[Choice, ...] = Field(min_length=1)
     default: Key
 
@@ -411,8 +426,15 @@ class Governance(_Model):
     confirmed_on: date | None = None
 
 
+class AppliesTo(_Model):
+    products: tuple[Key, ...] = ()
+    rooms: tuple[Key, ...] = ()
+    packages: tuple[Key, ...] = ()
+
+
 class Copy(_Model):
-    """A customer statement. A promise (`promise: true`) needs its governance confirmed before any release shows it."""
+    """A customer statement. A promise (`promise: true`) carries its governance, the promise-matrix row whose registered
+    text it is, and the products, rooms or packages it applies to; release validation confirms all three."""
 
     statement: Text
     category: Literal[
@@ -421,12 +443,19 @@ class Copy(_Model):
     ]  # fmt: skip
     promise: bool = True
     governance: Governance | None = None
-    matrix_row: Annotated[str, Field(max_length=60)] | None = None  # the V2 customer-promise matrix row, if any
+    matrix_row: Annotated[str, Field(max_length=60)] | None = None  # the customer-promise matrix row it is text of
+    applies_to: AppliesTo | None = None
 
     @model_validator(mode="after")
     def _governed(self):
-        if self.promise and self.governance is None:
-            raise ValueError("a promise statement carries its governance")
+        if self.promise and (self.governance is None or not self.matrix_row or self.applies_to is None):
+            raise ValueError(
+                "a promise statement carries its governance, its promise-matrix row and what it applies to"
+            )
+        if self.applies_to is not None and not (
+            self.applies_to.products or self.applies_to.rooms or self.applies_to.packages
+        ):
+            raise ValueError("applies_to names at least one product, room or package")
         return self
 
 
@@ -482,13 +511,12 @@ def title(kind: str, model: _Model) -> str:
 
 
 def customer_text(kind: str, model: _Model):
-    """(where, text, governed) for every string a customer can read in this document. `governed` is true where a
-    promise word is backed by governed records (a copy statement, or a variant or option that names its material or
-    hardware). Staff notes, pricing and rule notes are never customer text."""
+    """(where, text, governed) for every string a customer can read in this document. Only a promise copy record is
+    `governed` (its matrix row is checked at release validation); every other customer-visible string must be free of
+    promise wording. Staff-only items, staff notes, pricing and rules are not customer text."""
     if kind in STAFF_ONLY_KINDS or kind == "rule":
         return
     if isinstance(model, Copy):
-        # Only a governed promise may use promise words: `promise: false` never carries one past governance.
         yield "statement", model.statement, model.promise
         return
     if isinstance(model, Media):
@@ -497,29 +525,37 @@ def customer_text(kind: str, model: _Model):
                 yield f, getattr(model, f), False
         return
 
-    def described(prefix: str, d: Described, governed: bool = False):
+    def described(prefix: str, d: Described):
+        if d.visibility == "staff":
+            return
         for f in ("name", "description", "what_is_this", "typically_used_for"):
             if getattr(d, f):
-                yield f"{prefix}{f}", getattr(d, f), governed
+                yield f"{prefix}{f}", getattr(d, f), False
 
     if isinstance(model, Described):
-        governed = isinstance(model, (Material, Hardware)) or (
-            isinstance(model, Extra) and bool(model.materials or model.hardware)
-        )
-        yield from described("", model, governed)
+        yield from described("", model)
+        if model.visibility == "staff":
+            return
     if isinstance(model, Product):
         for v in model.variants:
-            yield from described(f"variants.{v.key}.", v, bool(v.materials or v.hardware))
+            yield from described(f"variants.{v.key}.", v)
+            if v.visibility == "staff":
+                continue
             for g in v.option_groups:
                 yield f"variants.{v.key}.{g.key}.name", g.name, False
+                if g.description:
+                    yield f"variants.{v.key}.{g.key}.description", g.description, False
                 for c in g.choices:
-                    yield from described(f"variants.{v.key}.{g.key}.{c.key}.", c, bool(c.materials or c.hardware))
+                    yield from described(f"variants.{v.key}.{g.key}.{c.key}.", c)
+            for m in v.measurements:
+                yield f"variants.{v.key}.measurements.{m.input}", " ".join(filter(None, (m.label, m.hint))), False
+    if isinstance(model, Extra):
+        for m in model.measurements:
+            yield f"measurements.{m.input}", " ".join(filter(None, (m.label, m.hint))), False
     if isinstance(model, Material):
-        for f in ("grade", "finish", "colour_family", "texture"):
+        for f in ("finish", "colour_family", "texture"):  # shown; grade, thickness and brands never are
             if getattr(model, f):
-                yield f, getattr(model, f), True
-        for t in model.thickness:
-            yield "thickness", t, True
+                yield f, getattr(model, f), False
 
 
 def references(kind: str, model: _Model) -> list[tuple[str, str]]:
@@ -572,6 +608,10 @@ def references(kind: str, model: _Model) -> list[tuple[str, str]]:
         add("copy", [model.public_summary, model.warranty_copy, *model.material_promise, *model.hardware_promise])
         add("product", model.included_products + model.optional_products)
         add("extra", model.included_extras + model.excluded_extras)
+    elif isinstance(model, Copy) and model.applies_to is not None:
+        add("product", model.applies_to.products)
+        add("room_template", model.applies_to.rooms)
+        add("package", model.applies_to.packages)
     elif isinstance(model, Rule):
         add("copy", [model.message])
         for path in (model.subject, *model.objects):

@@ -6,7 +6,6 @@ Promise owners in tests are role placeholders, never people.
 """
 
 import base64
-import copy
 import io
 import json
 from pathlib import Path
@@ -53,23 +52,21 @@ def people(factory):
     return a.id, b.id
 
 
-def seed_slice(author, *, governed=True):
+def seed_slice(author):
     def run(s):
         seed.apply(s)
         for kind, key, doc in pricing_records():
             service.create_record(s, kind, key, doc)
-        if governed:
-            row = service.versions(s, "copy", "copy.soft-close.promise")[-1]
-            doc = copy.deepcopy(row.document)
-            doc["governance"] = GOVERNED
-            service.update_draft(s, row.id, doc)
 
     tx(author, run)
 
 
-def approve_all(author, reviewer):
+def approve_all(author, reviewer, *, include_blocked=False):
+    """Submit and approve every draft, except the slice's blocked soft-close records (H2) unless asked."""
+
     def ids(s, status):
-        return [r.id for r in s.execute(sa.select(CatalogRecord).where(CatalogRecord.status == status)).scalars()]
+        found = s.execute(sa.select(CatalogRecord).where(CatalogRecord.status == status)).scalars()
+        return [r.id for r in found if include_blocked or (r.kind, r.record_key) not in seed.BLOCKED_FROM_RELEASE]
 
     with as_user(author), db.unit_of_work(write=True) as s:
         for rid in ids(s, "DRAFT"):
@@ -170,8 +167,8 @@ def test_pricing_body_is_validated_by_the_engine_schema(people):
 # --- releases --------------------------------------------------------------------------------------------------------
 def test_release_validation_fails_closed_on_an_unconfirmed_promise(people):
     a, b = people
-    seed_slice(a, governed=False)
-    approve_all(a, b)
+    seed_slice(a)
+    approve_all(a, b, include_blocked=True)
     rel = tx(a, service.create_release, "SLICE-0")
     report = tx(a, service.validate_release, rel.id)
     assert not report["ok"] and report["checks"]["promises"] == "fail"
@@ -299,11 +296,14 @@ def test_vertical_slice_estimate_and_snapshot(api, people):
         assert r.status == 201, r
         return r.data["range"]["low_minor"]
 
-    veneer = low(living(products={"tv-unit": {"options": {"panel-finish": "veneer"}}}))
-    assert veneer == base.data["range"]["low_minor"], "the synthetic card prices both finishes alike"
+    veneer = public_estimate(api, living(products={"tv-unit": {"options": {"panel-finish": "veneer"}}}))
+    assert veneer.status == 422 and veneer.json["errors"][0]["code"] == "CONSULTATION_REQUIRED", (
+        "veneer is never priced"
+    )
     box = low(living(products={"tv-unit": {"variant": "box"}}))
-    soft = low(living(products={"tv-unit": {"variant": "box"}}, extras={"tv-soft-close-storage": {}}))
-    assert box < soft, "soft-close storage moves the estimate"
+    assert box < base.data["range"]["low_minor"], "the panelled style moves the estimate"
+    soft = public_estimate(api, living(extras={"tv-soft-close-storage": {}}))
+    assert soft.status == 422 and soft.json["errors"][0]["code"] == "EXTRA_UNAVAILABLE", "soft-close is blocked (H2)"
     wall = low(living(extras={"feature-wall": {}}))
     assert wall > base.data["range"]["low_minor"], "the feature wall adds to the estimate"
     wide = low(living(products={"tv-unit": {"measurements": {"WIDTH": 18}}}))
@@ -315,7 +315,8 @@ def test_vertical_slice_estimate_and_snapshot(api, people):
     "config,code",
     [
         (living(products={"tv-unit": {"measurements": {"WIDTH": 25}}}), "OUT_OF_RANGE"),
-        (living(extras={"tv-soft-close-storage": {}}), "REQUIRES"),
+        (living(extras={"tv-soft-close-storage": {}}), "EXTRA_UNAVAILABLE"),
+        (living(products={"tv-unit": {"options": {"panel-finish": "veneer"}}}), "CONSULTATION_REQUIRED"),
         (living(products={"wardrobe": {}}), "PRODUCT_UNAVAILABLE"),
         (living(products={"tv-unit": {"variant": "floating"}}), "VARIANT_UNAVAILABLE"),
         (living(products={"tv-unit": {"options": {"panel-finish": "marble"}}}), "UNKNOWN_CHOICE"),

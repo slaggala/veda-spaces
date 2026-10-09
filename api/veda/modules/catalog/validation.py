@@ -177,6 +177,7 @@ def _pricing(cat, card: ratecard.RateCard, out: list[str], mout: list[str]) -> N
             inputs = {i.name: i for i in spec.inputs}
             for prompt in v.measurements:
                 _prompt_ok(card, inputs, prompt, where, mout)
+            out.extend(_same_price_choices(cat, key, v))
     for key, extra in cat.of(kinds.Extra).items():
         if extra.add is None:
             continue
@@ -197,6 +198,30 @@ def _pricing(cat, card: ratecard.RateCard, out: list[str], mout: list[str]) -> N
             out.append(f"package {key}: {package.engine_package} is not priced (mark it consultation-only)")
         if package.engine_package == "LUXURY" and not package.consultation_only:
             out.append(f"package {key}: Luxury is never priced online (ADR-012 D2); mark it consultation-only")
+
+
+def _consultation_only(cat: catalog_compile.Catalog, pkey: str, vkey: str, gkey: str, ckey: str) -> bool:
+    paths = {f"product:{pkey}@{gkey}={ckey}", f"product:{pkey}#{vkey}@{gkey}={ckey}"}
+    return any(r.type == "requires_consultation" and r.condition is None and r.subject in paths
+               for r in cat.of(kinds.Rule).values())  # fmt: skip
+
+
+def _same_price_choices(cat: catalog_compile.Catalog, pkey: str, v: kinds.Variant) -> list[str]:
+    """Choices that would be priced identically must be declared so (price_neutral), or all but one must be
+    consultation-only: an unpriced alternative is never silently priced as another (veneer as laminate, R14)."""
+    out = []
+    for g in v.option_groups:
+        if g.price_neutral:
+            continue
+        priced: dict[tuple[tuple[str, str], ...], list[str]] = {}
+        for c in g.choices:
+            if not _consultation_only(cat, pkey, v.key, g.key, c.key):
+                priced.setdefault(tuple(sorted(c.engine_options.items())), []).append(c.key)
+        for same in priced.values():
+            if len(same) > 1:
+                out.append(f"product {pkey}#{v.key}@{g.key}: choices {', '.join(same)} price identically; give each "
+                           "its own engine option, mark the group price-neutral, or make one consultation-only")  # fmt: skip
+    return out
 
 
 def _prompt_ok(card, inputs, prompt, where, out) -> None:
@@ -253,23 +278,55 @@ def _defaults(cat, card, out: list[str], today: date) -> None:
                     )
 
 
-def _promises(cat, out: list[str], warnings: list[str]) -> None:
-    """Every customer statement is a registered copy record; a promise needs its owner, backup, verification path and
-    operational confirmation (the M3 rule of the V2 closure, applied to catalog copy)."""
+MATRIX_SPEC = "ESSENTIAL-1.1"  # the specification whose reviewed promise matrix catalog promises are linked to
+
+
+def matrix() -> dict | None:
+    """The packaged, reviewed customer-promise matrix (never a file supplied at run time)."""
+    return promise_matrix.load(MATRIX_SPEC)
+
+
+def _promises(cat: catalog_compile.Catalog, out: list[str], warnings: list[str]) -> None:
+    """A promise is customer-visible only as a copy record that is registered text of a promise-matrix row whose owner,
+    backup and verification are named and operationally confirmed, with its own governance confirmed and its products,
+    rooms or packages in the release (R2/R3, the M3 rule of the V2 closure). Non-promise copy cannot carry promise
+    wording at all (refused when saved)."""
+    reviewed = matrix()
+    rows = {r["id"]: r for r in (reviewed or {}).get("rows", [])}
     for key, copy in sorted(cat.of(kinds.Copy).items()):
         if not copy.promise:
             continue
+        row = rows.get(copy.matrix_row or "")
+        if row is None:
+            out.append(f"copy {key}: promise is not linked to a row of the {MATRIX_SPEC} promise matrix")
+        else:
+            if copy.statement not in row.get("statements", []):
+                out.append(f"copy {key}: promise is not registered text of matrix row {row['id']}")
+            if (
+                row.get("status") != promise_matrix.READY
+                or not all(promise_matrix._named(row.get(f)) for f in ("accountable_owner", "backup_owner"))
+                or not row.get("confirmed_on")
+            ):
+                out.append(
+                    f"copy {key}: matrix row {row['id']} is {row.get('status')} (owner, backup and confirmation needed)"
+                )
         g = copy.governance
+        if g is None:  # the schema requires it for a promise
+            out.append(f"copy {key}: promise has no governance")
+            continue
         named = all(promise_matrix._named(x) for x in (g.owner, g.backup, g.verification, g.quotation_mapping,
                                                        g.warranty_source))  # fmt: skip
         if not named:
             out.append(f"copy {key}: promise has an unassigned owner, backup or verification path")
         if g.status != "OPERATIONALLY_CONFIRMED" or g.confirmed_on is None:
             out.append(f"copy {key}: promise is not operationally confirmed")
-    for kind in ("material", "hardware"):
-        for key, m in cat.models_of(kind).items():
-            if not any(cat.one(kinds.Copy, s) is not None for s in m.statements):
-                out.append(f"{kind} {key}: no registered statement")
+    specified: list[tuple[str, str, kinds.Material | kinds.Hardware]] = [
+        *(("material", k, m) for k, m in cat.of(kinds.Material).items()),
+        *(("hardware", k, h) for k, h in cat.of(kinds.Hardware).items()),
+    ]
+    for kind, key, item in specified:
+        if not any(cat.one(kinds.Copy, s) is not None for s in item.statements):
+            out.append(f"{kind} {key}: no registered statement")
     for key, package in cat.of(kinds.Package).items():
         if package.warranty_copy is None and not package.consultation_only:
             warnings.append(f"package {key}: no warranty statement")

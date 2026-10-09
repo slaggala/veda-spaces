@@ -3,13 +3,12 @@
     VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db .venv/bin/python tools/e2e_catalog.py
 
 Refuses outside local and test. The author is the system user and the reviewer the first Founder in the database,
-so four-eyes review holds. Pricing is the SYNTHETIC test card; the soft-close promise gets placeholder role owners
-("local demo") so the slice can be released locally. No real person is named, nothing reaches staging or production.
+so four-eyes review holds. Pricing is the SYNTHETIC test card. The blocked soft-close records (H2) are left out of
+the release. No real person is named, and nothing reaches staging or production.
 """
 
 from __future__ import annotations
 
-import copy
 import json
 import sys
 from pathlib import Path
@@ -27,9 +26,6 @@ from veda.modules.catalog.models import CatalogRecord  # noqa: E402
 from veda.platform.identity.models import User  # noqa: E402
 
 CARD = Path(__file__).resolve().parents[1] / "tests/fixtures/estimator/synthetic-rate-card.json"
-DEMO = {"owner": "Local demo owner (role)", "backup": "Local demo backup (role)", "quotation_mapping": "Hardware line",
-        "verification": "Local demo verification", "warranty_source": "Local demo terms",
-        "status": "OPERATIONALLY_CONFIRMED", "confirmed_on": "2026-10-09"}  # fmt: skip
 CODE = "LOCAL-SLICE"
 
 
@@ -48,11 +44,9 @@ def main() -> int:
         for kind, key, doc in migrate_v2.records(json.loads(CARD.read_text())):
             if kind == "pricing" and not service.versions(s, kind, key):
                 service.create_record(s, kind, key, doc)
-        row = service.versions(s, "copy", "copy.soft-close.promise")[-1]
-        if row.status == "DRAFT":
-            service.update_draft(s, row.id, {**copy.deepcopy(row.document), "governance": DEMO})
         for r in s.execute(sa.select(CatalogRecord).where(CatalogRecord.status == "DRAFT")).scalars().all():
-            service.submit(s, r.id)
+            if (r.kind, r.record_key) not in seed.BLOCKED_FROM_RELEASE:  # soft-close stays blocked (H2)
+                service.submit(s, r.id)
     with actor(ActorContext(actor_id=reviewer, via="CLI")), db.unit_of_work(write=True) as s:
         for r in s.execute(sa.select(CatalogRecord).where(CatalogRecord.status == "IN_REVIEW")).scalars().all():
             service.approve_record(s, r.id)

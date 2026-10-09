@@ -10,7 +10,7 @@ from datetime import timedelta
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_catalog import ON, SLICE, living, public_estimate, release, seed_slice, tx
+from tests.integration.test_catalog import ON, SLICE, approve_all, living, public_estimate, release, seed_slice, tx
 from tests.support.dbh import rows
 from veda.kernel import clock, db
 from veda.kernel.context import actor, system_context
@@ -39,12 +39,7 @@ def edit(uid, kind, key, change):
 def approve_and_release(a, b, code="SLICE-1", extra_records=()):
     for kind, key, doc in extra_records:
         tx(a, service.create_record, kind, key, doc)
-    with db.unit_of_work(write=False) as s:
-        ids = [r.id for r in s.execute(sa.select(CatalogRecord).where(CatalogRecord.status == "DRAFT")).scalars()]
-    for rid in ids:
-        tx(a, service.submit, rid)
-    for rid in ids:
-        tx(b, service.approve_record, rid)
+    approve_all(a, b)  # never the blocked soft-close records
     return release(a, b, code)
 
 
@@ -64,14 +59,14 @@ def test_staff_only_items_are_neither_shown_nor_selectable(api, people):
 
     edit(a, "product", "tv-unit", hide)
     edit(a, "extra", "feature-wall", lambda d: d.update(visibility="staff"))
-    approve_and_release(a, b, extra_records=[("rule", "rule.staff-wall", {
-        "type": "staff_only", "subject": "extra:tv-soft-close-storage"})])  # fmt: skip
+    approve_and_release(a, b, extra_records=[("rule", "rule.staff-box", {
+        "type": "staff_only", "subject": "product:tv-unit#box"})])  # fmt: skip
     view = api.get("/api/v1/public/catalog", anonymous=True).data
     tvu = view["product"]["tv-unit"]
     assert [v["key"] for v in tvu["variants"]] == ["panelled"]
     assert [c["key"] for c in tvu["variants"][0]["option_groups"][0]["choices"]] == ["laminate"]
     assert "feature-wall" not in view["extra"] and "feature-wall" not in view["room_template"]["living-room"]["extras"]
-    assert "tv-soft-close-storage" not in json.dumps(view["rule"])
+    assert "rule.staff-box" not in view["rule"] and "tv-soft-close-storage" not in json.dumps(view)
     for config, code in (
         (living(products={"tv-unit": {"variant": "box"}}), "VARIANT_UNAVAILABLE"),
         (living(products={"tv-unit": {"options": {"panel-finish": "veneer"}}}), "UNKNOWN_CHOICE"),
