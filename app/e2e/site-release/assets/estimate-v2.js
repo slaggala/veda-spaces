@@ -36,58 +36,58 @@
   const ROOM_CODE = { kitchen: 'KITCHEN', living: 'LIVING', dining: 'DINING', master: 'MASTER_BEDROOM', bed2: 'BEDROOM_2',
     bed3: 'BEDROOM_3', bed4: 'BEDROOM_4', pooja: 'POOJA', utility: 'UTILITY', whole: 'WHOLE_HOME' };
   const ITEMS = {
-    kitchen: { label: 'Modular kitchen with wall units and loft', product: 'KITCHEN' },
-    pantry: { label: 'Tall pantry storage', product: 'STORAGE_BOXES' },
-    living_tv: { label: 'TV unit with wall panelling', product: 'TV_UNIT', options: { STYLE: 'PANELLED' } },
-    living_wall: { label: 'Feature wall', product: 'FEATURE_WALL' },
-    living_beading: { label: 'Sofa-back beading', product: 'VENEER_ACCENTS', options: { STYLE: 'BEADING' } },
-    living_partition: { label: 'Partition', product: 'PARTITION' },
-    living_window: { label: 'Window seating', product: 'WINDOW_SEATING' },
-    dining_crockery: { label: 'Crockery unit', product: 'CROCKERY_UNIT' },
-    dining_basin: { label: 'Wash-basin unit', product: 'VANITY_UNIT', options: { TYPE: 'DRESSER' } },
-    dining_wall: { label: 'Feature wall', product: 'FEATURE_WALL' },
-    dining_arch: { label: 'Veneer arch', product: 'VENEER_ACCENTS' },
-    wardrobe: { label: 'Wardrobe with loft', product: 'WARDROBE' },
-    bed_king: { label: 'King bed with storage', product: 'BED', options: { SIZE: 'KING' } },
-    bed_queen: { label: 'Queen bed with storage', product: 'BED' },
-    bath_vanity: { label: 'Bathroom vanity', product: 'VANITY_UNIT', options: { TYPE: 'TOILET' } },
-    dressing: { label: 'Dressing unit', product: 'VANITY_UNIT', options: { TYPE: 'DRESSER' } },
-    study: { label: 'Study desk', product: 'STUDY_UNIT' },
-    bed_tv: { label: 'TV unit', product: 'TV_UNIT', options: { STYLE: 'BOX' } },
-    bed_window: { label: 'Window seating', product: 'WINDOW_SEATING' },
-    bed_wall: { label: 'Feature wall', product: 'FEATURE_WALL' },
-    bedside: { label: 'Bedside table', product: 'STORAGE_BOXES', options: { TYPE: 'BEDSIDE_TABLE' } },
-    pooja: { label: 'Pooja unit with doors', product: 'POOJA_UNIT' },
-    asta: { label: 'Ceiling asta chakra', product: null }, // an option of the pooja unit, not a selection
-    utility: { label: 'Utility unit', product: 'UTILITY' },
-    ceiling: { label: 'False ceiling with lights', product: 'FALSE_CEILING' },
-    profile: { label: 'Profile lighting', product: 'CEILING_PROFILE_LIGHTING' },
-    painting: { label: 'Painting', product: 'PAINTING', optional: true },
-    electrical: { label: 'Electrical work', product: 'ELECTRICAL', optional: true },
+    kitchen: { label: P.items.kitchen, product: 'KITCHEN' },
+    pantry: { label: P.items.pantry, product: 'STORAGE_BOXES' },
+    living_tv: { label: P.items.living_tv, product: 'TV_UNIT', options: { STYLE: 'PANELLED' } },
+    living_wall: { label: P.items.living_wall, product: 'FEATURE_WALL' },
+    living_beading: { label: P.items.living_beading, product: 'VENEER_ACCENTS', options: { STYLE: 'BEADING' } },
+    living_partition: { label: P.items.living_partition, product: 'PARTITION' },
+    living_window: { label: P.items.living_window, product: 'WINDOW_SEATING' },
+    dining_crockery: { label: P.items.dining_crockery, product: 'CROCKERY_UNIT' },
+    dining_basin: { label: P.items.dining_basin, product: 'VANITY_UNIT', options: { TYPE: 'DRESSER' } },
+    dining_wall: { label: P.items.dining_wall, product: 'FEATURE_WALL' },
+    dining_arch: { label: P.items.dining_arch, product: 'VENEER_ACCENTS' },
+    wardrobe: { label: P.items.wardrobe, product: 'WARDROBE' },
+    bed_king: { label: P.items.bed_king, product: 'BED', options: { SIZE: 'KING' } },
+    bed_queen: { label: P.items.bed_queen, product: 'BED' },
+    bath_vanity: { label: P.items.bath_vanity, product: 'VANITY_UNIT', options: { TYPE: 'TOILET' } },
+    dressing: { label: P.items.dressing, product: 'VANITY_UNIT', options: { TYPE: 'DRESSER' } },
+    study: { label: P.items.study, product: 'STUDY_UNIT' },
+    bed_tv: { label: P.items.bed_tv, product: 'TV_UNIT', options: { STYLE: 'BOX' } },
+    bed_window: { label: P.items.bed_window, product: 'WINDOW_SEATING' },
+    bed_wall: { label: P.items.bed_wall, product: 'FEATURE_WALL' },
+    bedside: { label: P.items.bedside, product: 'STORAGE_BOXES', options: { TYPE: 'BEDSIDE_TABLE' } },
+    pooja: { label: P.items.pooja, product: 'POOJA_UNIT' },
+    asta: { label: P.items.asta, product: null }, // an option of the pooja unit, not a selection
+    utility: { label: P.items.utility, product: 'UTILITY' },
+    ceiling: { label: P.items.ceiling, product: 'FALSE_CEILING' },
+    profile: { label: P.items.profile, product: 'CEILING_PROFILE_LIGHTING' },
+    painting: { label: P.items.painting, product: 'PAINTING', optional: true },
+    electrical: { label: P.items.electrical, product: 'ELECTRICAL', optional: true },
   };
   const BEDROOM = (bed) => ({ includes: ['wardrobe', bed, 'bath_vanity'],
     extras: [{ id: 'dressing' }, { id: 'study' }, { id: 'bed_tv' }, { id: 'bed_window' }, { id: 'bed_wall' }, { id: 'bedside', count: 2 }] });
   const ROOMS_BY_SIZE = {
     '3BHK': [
-      { id: 'kitchen', label: 'Kitchen', includes: ['kitchen'], extras: [{ id: 'pantry' }] },
-      { id: 'living', label: 'Living room', includes: ['living_tv'], extras: [{ id: 'living_wall' }, { id: 'living_beading' }, { id: 'living_partition' }, { id: 'living_window' }] },
-      { id: 'dining', label: 'Dining', includes: ['dining_crockery'], extras: [{ id: 'dining_basin' }, { id: 'dining_wall' }, { id: 'dining_arch' }] },
-      { id: 'master', label: 'Master bedroom', ...BEDROOM('bed_king') },
-      { id: 'bed2', label: 'Bedroom 2', ...BEDROOM('bed_queen') },
-      { id: 'bed3', label: 'Bedroom 3', ...BEDROOM('bed_queen') },
-      { id: 'pooja', label: 'Pooja room', includes: ['pooja'], extras: [{ id: 'asta' }] },
-      { id: 'utility', label: 'Utility', includes: ['utility'], extras: [] },
-      { id: 'whole', label: 'Whole home', includes: ['ceiling', 'profile'], extras: [{ id: 'painting', note: 'optional' }, { id: 'electrical', note: 'optional' }] },
+      { id: 'kitchen', label: U.rooms.kitchen, includes: ['kitchen'], extras: [{ id: 'pantry' }] },
+      { id: 'living', label: U.rooms.living, includes: ['living_tv'], extras: [{ id: 'living_wall' }, { id: 'living_beading' }, { id: 'living_partition' }, { id: 'living_window' }] },
+      { id: 'dining', label: U.rooms.dining, includes: ['dining_crockery'], extras: [{ id: 'dining_basin' }, { id: 'dining_wall' }, { id: 'dining_arch' }] },
+      { id: 'master', label: U.rooms.master, ...BEDROOM('bed_king') },
+      { id: 'bed2', label: U.rooms.bed2, ...BEDROOM('bed_queen') },
+      { id: 'bed3', label: U.rooms.bed3, ...BEDROOM('bed_queen') },
+      { id: 'pooja', label: U.rooms.pooja, includes: ['pooja'], extras: [{ id: 'asta' }] },
+      { id: 'utility', label: U.rooms.utility, includes: ['utility'], extras: [] },
+      { id: 'whole', label: U.rooms.whole, includes: ['ceiling', 'profile'], extras: [{ id: 'painting', note: P.optionalNote }, { id: 'electrical', note: P.optionalNote }] },
     ],
   };
   // Engine limits enforced here, so no request can be refused (ESTIMATOR-UX-V2 §3.2).
   const LIMITS = { VANITY_UNIT: 6, STORAGE_BOXES: 10, FEATURE_WALL: 6, WINDOW_SEATING: 6, TV_UNIT: 6, _TOTAL: 40 };
   // Refinement: the measurements that move the price most, in customer words (feet and square feet only).
   const REFINE = [
-    { room: 'kitchen', item: 'kitchen', input: 'RUN', label: 'Kitchen counter length', unit: 'ft', min: 0.5, max: 150, hint: U.hints.RUN },
-    { room: 'master', item: 'wardrobe', input: 'WIDTH', label: 'Master bedroom wardrobe width', unit: 'ft', min: 0.5, max: 150, hint: U.hints.WIDTH_WARDROBE },
-    { room: 'living', item: 'living_tv', input: 'WIDTH', label: 'Living room TV wall width', unit: 'ft', min: 0.5, max: 150, hint: U.hints.WIDTH_TV },
-    { room: 'whole', item: 'ceiling', input: 'AREA', label: 'False ceiling area', unit: 'sq ft', api: 'sqft', min: 10, max: 10000, hint: U.hints.AREA },
+    { room: 'kitchen', item: 'kitchen', input: 'RUN', label: U.refine.RUN.label, unit: U.refine.RUN.unit, min: 0.5, max: 150, hint: U.hints.RUN },
+    { room: 'master', item: 'wardrobe', input: 'WIDTH', label: U.refine.WIDTH_WARDROBE.label, unit: U.refine.WIDTH_WARDROBE.unit, min: 0.5, max: 150, hint: U.hints.WIDTH_WARDROBE },
+    { room: 'living', item: 'living_tv', input: 'WIDTH', label: U.refine.WIDTH_TV.label, unit: U.refine.WIDTH_TV.unit, min: 0.5, max: 150, hint: U.hints.WIDTH_TV },
+    { room: 'whole', item: 'ceiling', input: 'AREA', label: U.refine.AREA.label, unit: U.refine.AREA.unit, api: 'sqft', min: 10, max: 10000, hint: U.hints.AREA },
   ];
 
   // --- customer copy: estimate-v2-copy.js (every promise is in the customer-promise matrix) ---------------------------
@@ -95,7 +95,7 @@
   const ALLOWANCE_NAME = P.includes[2];
   const PACKAGES = [['ESSENTIAL', 'Essential', P.packageSubtitle], ['PREMIUM', 'Premium', ''], ['LUXURY', 'Luxury', '']];
   const SIZE_LABEL = { '1BHK': '1 BHK', '2BHK': '2 BHK', '3BHK': '3 BHK', '4BHK': '4 BHK', CUSTOM: 'Custom' };
-  const TYPE_LABEL = { APARTMENT: ['Apartment', 'Flat in a building or gated community'], VILLA: ['Villa or independent house', ''] };
+  const TYPE_LABEL = { APARTMENT: [U.labels.typeApartment, U.labels.typeApartmentSub], VILLA: [U.labels.typeVilla, ''] };
 
   // --- state -----------------------------------------------------------------------------------------------------------
   const KEY = 'veda-estimate-v2';
@@ -153,7 +153,7 @@
     document.querySelectorAll('#est-v2 .v2-screen').forEach((s) => { s.hidden = Number(s.dataset.v2) !== n; });
     const step = n <= 5 ? n : 0;
     $('#v2-progress').hidden = !step;
-    if (step) { $('#v2-progress-text').textContent = `Step ${step} of 5`; $('#v2-progress-fill').className = `v2-w${step}`; }
+    if (step) { $('#v2-progress-text').textContent = fmt(U.labels.step, { step }); $('#v2-progress-fill').className = `v2-w${step}`; }
     clearSummary();
     ({ 1: renderTypes, 2: renderSizes, 4: renderRooms, 5: renderPackages, 6: renderResult, 7: renderLead, 8: renderRefine, 10: renderSpec })[n]?.();
     if (n === 5) widget('estimate', '#v2-ts-estimate');
@@ -204,22 +204,22 @@
     box.replaceChildren();
     for (const room of rooms()) {
       const r = roomState(room.id);
-      const toggle = el('input', { type: 'checkbox', role: 'switch', 'aria-label': `Include ${room.label}`, checked: r.on });
+      const toggle = el('input', { type: 'checkbox', role: 'switch', 'aria-label': fmt(U.labels.includeRoom, { room: room.label }), checked: r.on });
       toggle.addEventListener('change', () => { r.on = toggle.checked; state.estimate = null; save(); renderRooms(); });
       const card = el('article', { class: `v2-room${r.on ? '' : ' v2-room-off'}`, 'aria-label': room.label },
-        el('div', { class: 'v2-room-head' }, el('h3', { text: room.label }), el('label', { class: 'v2-toggle' }, el('span', { text: r.on ? 'Included' : 'Not included' }), toggle)),
+        el('div', { class: 'v2-room-head' }, el('h3', { text: room.label }), el('label', { class: 'v2-toggle' }, el('span', { text: r.on ? U.labels.included : U.labels.notIncluded }), toggle)),
         el('p', { class: 'v2-includes', text: room.includes.map((id) => ITEMS[id].label).join(' · ') }));
       if (room.extras.length && r.on) {
         const picked = room.extras.filter((x) => (x.count ? r.extras[x.id] > 0 : r.extras[x.id])).length;
-        const details = el('details', { class: 'v2-extras', open: state.openExtras?.[room.id] || false }, el('summary', { text: picked ? `Extras (${picked} added)` : `Add extras (${room.extras.length})` }));
+        const details = el('details', { class: 'v2-extras', open: state.openExtras?.[room.id] || false }, el('summary', { text: picked ? fmt(U.labels.extrasAdded, { count: picked }) : fmt(U.labels.addExtras, { count: room.extras.length }) }));
         details.addEventListener('toggle', () => { state.openExtras = { ...(state.openExtras || {}), [room.id]: details.open }; save(); });
         for (const x of room.extras) {
           const item = ITEMS[x.id];
           if (x.count) {
             const v = r.extras[x.id] || 0;
             const blocked = !canAdd(x.id);
-            const minus = el('button', { type: 'button', 'aria-label': `Fewer ${item.label.toLowerCase()}s`, 'aria-disabled': v === 0 ? 'true' : null, text: '−' });
-            const plus = el('button', { type: 'button', 'aria-label': `More ${item.label.toLowerCase()}s`, 'aria-disabled': v >= x.count || blocked ? 'true' : null, text: '+' });
+            const minus = el('button', { type: 'button', 'aria-label': fmt(U.labels.fewer, { item: item.label.toLowerCase() }), 'aria-disabled': v === 0 ? 'true' : null, text: '−' });
+            const plus = el('button', { type: 'button', 'aria-label': fmt(U.labels.more, { item: item.label.toLowerCase() }), 'aria-disabled': v >= x.count || blocked ? 'true' : null, text: '+' });
             minus.addEventListener('click', () => { if (v > 0) { r.extras[x.id] = v - 1; state.estimate = null; save(); renderRooms(); } });
             plus.addEventListener('click', () => { if (v < x.count && !blocked) { r.extras[x.id] = v + 1; state.estimate = null; save(); renderRooms(); } });
             details.append(el('div', { class: 'v2-extra' }, el('span', {}, `${item.label}s`, blocked && v < x.count ? el('small', { text: U.limitReached }) : null),
@@ -246,11 +246,11 @@
       const luxury = code === 'LUXURY';
       const on = luxury || enabledPackages.includes(code);
       const input = el('input', { type: 'radio', name: 'v2-pkg', value: code, checked: state.pkg === code, disabled: !on });
-      input.addEventListener('change', () => { state.pkg = code; save(); $('#v2-see').textContent = code === 'LUXURY' ? 'Request a design consultation →' : 'See my budget →'; });
+      input.addEventListener('change', () => { state.pkg = code; save(); $('#v2-see').textContent = code === 'LUXURY' ? U.labels.requestConsultation : U.labels.seeBudget; });
       return el('label', { class: `v2-choice${on ? '' : ' v2-off'}` }, input,
         el('span', {}, el('strong', { text: label }), el('small', { text: luxury ? P.luxuryConsult : on ? desc : P.premiumSoon })));
     }));
-    $('#v2-see').textContent = state.pkg === 'LUXURY' ? 'Request a design consultation →' : 'See my budget →';
+    $('#v2-see').textContent = state.pkg === 'LUXURY' ? U.labels.requestConsultation : U.labels.seeBudget;
   }
 
   // --- API ---------------------------------------------------------------------------------------------------------------
@@ -301,7 +301,10 @@
   const ul = (items) => el('ul', {}, ...items.map((t) => el('li', { text: t })));
   const button = (cls, text, fn) => { const b = el('button', { class: cls, type: 'button', text }); b.addEventListener('click', fn); return b; };
   // A specification without room promises (ESSENTIAL-1.0) is treated as none: V2 shows no material promise for it.
-  const spec = () => (state.estimate?.specification?.room_promises ? state.estimate.specification : null);
+  // Material promises only from a specification with room promises whose reviewed matrix registers it (F1, M3).
+  const spec = () => (state.estimate?.specification?.room_promises && state.estimate?.v2_copy?.approved ? state.estimate.specification : null);
+  // Runtime API text only as the reviewed matrix registers it (M3); otherwise nothing, or the approved fallback.
+  const approved = () => (state.estimate?.v2_copy?.approved ? state.estimate.v2_copy : { approved: false, disclaimer: null, exclusions: [], client_scope: [], assumptions: {} });
   const roomIdOf = (code) => Object.keys(ROOM_CODE).find((k) => ROOM_CODE[k] === code);
   const nearest = (minor) => Math.round(minor / 100000) * 100000; // ₹1,000, as the room amounts are rounded
   const signed = (minor) => `${minor < 0 ? '−' : '+'}${rupees(Math.abs(minor))}`;
@@ -335,6 +338,7 @@
     if (measured.length) out.push(fmt(A.measured, { items: measured.join(', ') }));
     return out;
   }
+  const roomAssumptions = (code) => approved().assumptions?.[code] || [];
   function roomCard(r, details) {
     const s = spec();
     const id = roomIdOf(r.room);
@@ -344,16 +348,16 @@
     const m = details?.materials;
     const cats = s && m ? m.categories.map((code) => s.categories.find((c) => c.code === code)).filter(Boolean) : [];
     const material = cats.map((c) => el('div', { class: 'v2-spec-cat' }, el('p', {}, el('strong', { text: `${c.label}: ` }), c.requirement),
-      c.brand_examples.length ? el('p', { class: 'v2-small', text: `Approved examples: ${c.brand_examples.join(', ')}, or an approved equivalent` }) : null));
+      c.brand_examples.length ? el('p', { class: 'v2-small', text: fmt(P.approvedExamples, { brands: c.brand_examples.join(', ') }) }) : null));
     return el('article', { class: 'v2-room-card', 'aria-label': def?.label || r.label },
       el('div', { class: 'v2-room-row' }, el('h4', { text: def?.label || r.label }), el('span', { class: 'v2-room-amount', text: roomAmount(r.amount_minor) })),
       el('p', { class: 'v2-room-std', text: [...std, ...extras.map((x) => `+ ${x}`)].join(' · ') }),
-      m?.line ? el('p', { class: 'v2-spec-line' }, el('strong', { text: 'Essential specification: ' }), m.line) : null,
-      disclosure('View inclusions & materials',
-        el('h5', { text: 'Included items' }), ul(std),
-        el('h5', { text: 'Material specification' }), ...(material.length ? [...material, el('p', { class: 'v2-small', text: s.final_selection })] : [el('p', { text: P.materialsFallback })]),
-        el('h5', { text: 'Optional or selected extras' }), extras.length ? ul(extras) : el('p', { text: 'None added.' }),
-        el('h5', { text: 'Assumptions' }), details?.assumptions?.length ? ul(details.assumptions) : el('p', { text: P.measuredRoom })));
+      s && m?.line ? el('p', { class: 'v2-spec-line' }, el('strong', { text: U.labels.essentialSpec }), m.line) : null,
+      disclosure(U.labels.viewInclusions,
+        el('h5', { text: U.labels.includedItems }), ul(std),
+        el('h5', { text: U.labels.materialSpec }), ...(material.length ? [...material, el('p', { class: 'v2-small', text: s.final_selection })] : [el('p', { text: P.materialsFallback })]),
+        el('h5', { text: U.labels.extras }), extras.length ? ul(extras) : el('p', { text: P.noneAdded }),
+        el('h5', { text: U.labels.assumptions }), roomAssumptions(r.room).length ? ul(roomAssumptions(r.room)) : el('p', { text: P.measuredRoom })));
   }
   // The package components the engine priced for this scope, in the owner's wording (T5); never a fixed list.
   function packageParts(e) {
@@ -365,89 +369,94 @@
     const e = state.estimate;
     if (!e) return;
     const s = spec();
+    const t = approved();
     const b = buildUp(e);
-    const gstText = `GST at ${e.gst.pct}% is extra: about ${rupees(e.gst.low_minor)} – ${rupees(e.gst.high_minor)}`;
-    $('#v2-range').textContent = `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}`;
-    $('#v2-gst').textContent = gstText;
+    const Lb = U.labels;
+    const range = (low, high) => `${rupees(low)} – ${rupees(high)}`;
+    $('#v2-range').textContent = range(e.range.low_minor, e.range.high_minor);
+    $('#v2-gst').textContent = fmt(P.gstExtra, { pct: e.gst.pct, low: rupees(e.gst.low_minor), high: rupees(e.gst.high_minor) });
     const measured = Object.values(state.measures).some((v) => Number(v) > 0);
-    $('#v2-basis').textContent = `${SIZE_LABEL[state.size]} ${state.type === 'VILLA' ? 'villa' : 'apartment'} · ${state.kind === 'NEW_HOME' ? 'New home' : 'Renovation'} · Essential · ${measured ? 'Including your measurements' : `Based on typical ${SIZE_LABEL[state.size]} sizes`}`;
+    $('#v2-basis').textContent = fmt(Lb.basis, { size: SIZE_LABEL[state.size], type: state.type === 'VILLA' ? Lb.villa : Lb.apartment,
+      kind: state.kind === 'NEW_HOME' ? Lb.newHome : Lb.renovation, basis: measured ? P.basisMeasured : fmt(P.basisTypical, { size: SIZE_LABEL[state.size] }) });
     const toRefine = () => show(8);
     const toQuote = () => { state.consult = null; save(); show(7); };
     const toDesigner = () => { state.consult = 'designer'; save(); show(7); };
-    const markers = P.markers.filter((t) => s || t !== P.markers[2]);
+    const markers = P.markers.filter((m) => s || m !== P.markers[2]);
     $('#v2-top').replaceChildren(
-      el('div', { class: 'v2-block v2-includes-block' }, el('h3', { text: 'Your estimate includes' }),
+      el('div', { class: 'v2-block v2-includes-block' }, el('h3', { text: Lb.yourEstimateIncludes }),
         ul(P.includes), el('p', { class: 'v2-small', text: P.gstSeparate })),
-      el('ul', { class: 'v2-markers', 'aria-label': 'About this estimate' }, ...markers.map((t) => el('li', { text: t }))),
-      el('div', { class: 'v2-block' }, el('h3', { text: 'Why is this a range?' }), ul(P.whyRange),
-        button('v2-primary v2-wide', 'Personalise and narrow my estimate', toRefine)),
-      el('p', {}, el('a', { class: 'v2-link', href: '#v2-next-steps', text: 'What happens next ↓' })));
+      el('ul', { class: 'v2-markers', 'aria-label': Lb.aboutEstimate }, ...markers.map((m) => el('li', { text: m }))),
+      el('div', { class: 'v2-block' }, el('h3', { text: Lb.whyRange }), ul(P.whyRange),
+        button('v2-primary v2-wide', Lb.personalise, toRefine)),
+      el('p', {}, el('a', { class: 'v2-link', href: '#v2-next-steps', text: Lb.whatNextLink })));
     const details = Object.fromEntries((e.room_details || []).map((d) => [d.room, d]));
     const policy = e.warranty?.policy_url || '/warranty';
     const build = el('dl', { class: 'v2-build', id: 'v2-build' },
-      ...amountRow('Your selected rooms', rupees(b.rooms), [b.rooms, b.rooms]),
-      ...(b.optional ? amountRow('+ Optional items you added', rupees(b.optional), [b.optional, b.optional]) : []),
+      ...amountRow(Lb.rowRooms, rupees(b.rooms), [b.rooms, b.rooms]),
+      ...(b.optional ? amountRow(Lb.rowOptional, rupees(b.optional), [b.optional, b.optional]) : []),
       ...amountRow(`+ ${PACKAGE_NAME}`, rupees(b.pkg), [b.pkg, b.pkg]),
-      ...amountRow(`+ ${ALLOWANCE_NAME}`, `${rupees(b.allowLow)} – ${rupees(b.allowHigh)}`, [b.allowLow, b.allowHigh]),
-      ...amountRow('Size and site variation', `${signed(b.varLow)} to ${signed(b.varHigh)}`, [b.varLow, b.varHigh]),
-      el('dt', { class: 'v2-total', text: 'Your estimated range' }), el('dd', { class: 'v2-total', text: `${rupees(e.range.low_minor)} – ${rupees(e.range.high_minor)}`, 'data-low': e.range.low_minor, 'data-high': e.range.high_minor }),
-      el('dt', { text: 'GST, shown separately' }), el('dd', { text: `about ${rupees(e.gst.low_minor)} – ${rupees(e.gst.high_minor)}` }));
+      ...amountRow(`+ ${ALLOWANCE_NAME}`, range(b.allowLow, b.allowHigh), [b.allowLow, b.allowHigh]),
+      ...amountRow(Lb.rowVariation, fmt(Lb.variation, { low: signed(b.varLow), high: signed(b.varHigh) }), [b.varLow, b.varHigh]),
+      el('dt', { class: 'v2-total', text: Lb.rowRange }), el('dd', { class: 'v2-total', text: range(e.range.low_minor, e.range.high_minor), 'data-low': e.range.low_minor, 'data-high': e.range.high_minor }),
+      el('dt', { text: Lb.rowGst }), el('dd', { text: fmt(Lb.about, { low: rupees(e.gst.low_minor), high: rupees(e.gst.high_minor) }) }));
+    // Only registered runtime text reaches the page (M3): exclusions and client scope from the approved block.
+    const notIncluded = [...t.exclusions, ...(t.client_scope.length ? [fmt(P.supplied, { items: t.client_scope.join(', ') })] : [])];
+    const technical = (e.room_details || []).filter((d) => roomAssumptions(d.room).length)
+      .flatMap((d) => [el('h4', { text: (rooms().find((x) => x.id === roomIdOf(d.room)) || {}).label || d.room }), ul(roomAssumptions(d.room))]);
     $('#v2-result-body').replaceChildren(
-      section('How your estimate is built', build,
-        el('p', { class: 'v2-small', text: P.buildNote })),
-      section('What Essential includes', ...(s ? [el('p', { class: 'v2-small', text: s.summary }),
-        disclosure(`See all ${s.categories.length} material categories`, el('dl', { class: 'v2-promise' }, ...s.categories.flatMap((c) => [el('dt', { text: c.label }), el('dd', { text: c.summary })]))),
+      section(Lb.howBuilt, build, el('p', { class: 'v2-small', text: P.buildNote })),
+      section(Lb.whatEssential, ...(s ? [el('p', { class: 'v2-small', text: s.summary }),
+        disclosure(fmt(Lb.seeCategories, { count: s.categories.length }), el('dl', { class: 'v2-promise' }, ...s.categories.flatMap((c) => [el('dt', { text: c.label }), el('dd', { text: c.summary })]))),
         el('p', { class: 'v2-small', text: `${s.equivalent_policy} ${s.final_selection}` }),
-        button('v2-link', 'View detailed material specification →', () => { state.specReturn = 6; show(10); })]
+        button('v2-link', Lb.viewSpec, () => { state.specReturn = 6; show(10); })]
         : [el('p', { text: P.materialsFallback })])),
-      section('Your rooms', ...e.rooms.map((r) => roomCard(r, details[r.room])), el('p', { class: 'v2-small', text: P.roomsNote })),
+      section(Lb.roomsTitle, ...e.rooms.map((r) => roomCard(r, details[r.room])), el('p', { class: 'v2-small', text: P.roomsNote })),
       section(PACKAGE_NAME, el('p', { class: 'v2-amount', text: rupees(b.pkg) }), el('p', { class: 'v2-badge', text: P.includedBadge }),
         el('p', { text: P.packageText }),
-        disclosure('What it covers', ul(packageParts(e)), el('p', { class: 'v2-small', text: P.packageQuoteNote }))),
-      section(ALLOWANCE_NAME, el('p', { class: 'v2-amount', text: `${rupees(b.allowLow)} – ${rupees(b.allowHigh)}` }), el('p', { class: 'v2-badge', text: P.includedBadge }),
+        disclosure(Lb.whatItCovers, ul(packageParts(e)), el('p', { class: 'v2-small', text: P.packageQuoteNote }))),
+      section(ALLOWANCE_NAME, el('p', { class: 'v2-amount', text: range(b.allowLow, b.allowHigh) }), el('p', { class: 'v2-badge', text: P.includedBadge }),
         el('p', { text: P.allowanceText }), ul(P.allowanceNotes),
-        disclosure('What it usually covers', ul(P.allowanceExamples))),
-      section('Warranty and service',
-        el('h4', { text: 'Manufacturer-backed protection' }), el('p', { text: s?.warranty_summary || P.manufacturer }),
-        el('h4', { text: 'Veda Spaces service support' }), el('p', { text: P.service }), el('p', { class: 'v2-small', text: P.serviceNote }),
-        el('p', {}, el('a', { href: policy, text: 'View full warranty and exclusions' }))),
-      section('Not included', ul([...e.exclusions, ...(e.client_scope.length ? [fmt(P.supplied, { items: e.client_scope.join(', ') })] : [])])),
-      section('How to compare this estimate', el('p', { text: P.compareIntro }), ul(P.compare)),
-      section(measured ? 'Assumptions used' : `Typical ${SIZE_LABEL[state.size]} assumptions used`, ul(typicalAssumptions()),
-        disclosure('View technical assumptions', ...(e.room_details || []).filter((d) => d.assumptions.length).flatMap((d) => [el('h4', { text: (rooms().find((x) => x.id === roomIdOf(d.room)) || {}).label || d.room }), ul(d.assumptions)]),
-          ...(e.room_details ? [] : [ul(e.assumptions)]))),
-      el('section', { class: 'v2-block v2-next-steps', id: 'v2-next-steps', 'aria-label': 'What happens next?' }, el('h3', { text: 'What happens next?' }),
-        el('ol', { class: 'v2-steps' }, ...P.nextSteps.map((t) => el('li', { text: t }))),
-        button('v2-primary v2-wide', 'Personalise and narrow my estimate', toRefine),
-        button('v2-ghost v2-wide', 'Get my detailed quotation', toQuote),
-        button('v2-link', 'Talk to a designer', toDesigner)),
+        disclosure(Lb.whatUsuallyCovers, ul(P.allowanceExamples))),
+      section(Lb.warrantyTitle,
+        el('h4', { text: Lb.manufacturerTitle }), el('p', { text: s?.warranty_summary || P.manufacturer }),
+        el('h4', { text: Lb.serviceTitle }), el('p', { text: P.service }), el('p', { class: 'v2-small', text: P.serviceNote }),
+        el('p', {}, el('a', { href: policy, text: Lb.policyLink }))),
+      section(Lb.notIncludedTitle, notIncluded.length ? ul(notIncluded) : el('p', { text: P.exclusionsFallback })),
+      section(Lb.compareTitle, el('p', { text: P.compareIntro }), ul(P.compare)),
+      section(measured ? Lb.assumptionsUsed : fmt(Lb.typicalAssumptions, { size: SIZE_LABEL[state.size] }), ul(typicalAssumptions()),
+        disclosure(Lb.technicalAssumptions, ...technical)),
+      el('section', { class: 'v2-block v2-next-steps', id: 'v2-next-steps', 'aria-label': Lb.nextTitle }, el('h3', { text: Lb.nextTitle }),
+        el('ol', { class: 'v2-steps' }, ...P.nextSteps.map((m) => el('li', { text: m }))),
+        button('v2-primary v2-wide', Lb.personalise, toRefine),
+        button('v2-ghost v2-wide', Lb.quotation, toQuote),
+        button('v2-link', Lb.designer, toDesigner)),
     );
-    $('#v2-disclaimer').textContent = e.disclaimer;
-    $('#v2-meta').textContent = `Estimate ${e.reference} · valid until ${e.expires_on} · ${s ? `${s.name} ${s.version}` : 'specification confirmed in your quotation'}`;
+    $('#v2-disclaimer').textContent = t.disclaimer || P.disclaimer;
+    $('#v2-meta').textContent = fmt(Lb.meta, { ref: e.reference, date: e.expires_on, spec: s ? `${s.name} ${s.version}` : P.specificationFallback });
   }
   function renderSpec() {
     const s = spec();
-    $('#v2-spec-sub').textContent = s ? `${s.name} ${s.version}. ${s.equivalent_policy} ${s.final_selection}` : '';
+    $('#v2-spec-sub').textContent = s ? fmt(U.labels.specSub, { name: s.name, version: s.version, policy: s.equivalent_policy, final: s.final_selection }) : '';
     // Each category keeps the four parts apart (T3): what is promised, brand examples, the equivalent rule, final selection.
     const row = (term, value) => (value ? [el('dt', { text: term }), el('dd', { text: value })] : []);
     $('#v2-spec').replaceChildren(...(s ? s.categories.map((c) => el('section', { class: 'v2-spec-cat' }, el('h3', { text: c.label }),
       el('dl', { class: 'v2-spec-dl' },
-        ...row('Material requirement', c.requirement),
-        ...row('Grade', c.grade),
-        ...row('Thickness', c.thickness.join('; ')),
-        ...row('Finish', c.finish),
-        ...row('Approved brand examples', c.brand_examples.join(', ')),
-        ...row('Approved equivalent', c.equivalent_rule),
-        ...row('Final selection', c.final_selection),
-        ...row('Warranty', c.warranty_summary)),
+        ...row(U.labels.requirement, c.requirement),
+        ...row(U.labels.grade, c.grade),
+        ...row(U.labels.thickness, c.thickness.join('; ')),
+        ...row(U.labels.finish, c.finish),
+        ...row(U.labels.brands, c.brand_examples.join(', ')),
+        ...row(U.labels.equivalent, c.equivalent_rule),
+        ...row(U.labels.finalSelection, c.final_selection),
+        ...row(U.labels.warranty, c.warranty_summary)),
       c.details.length ? ul(c.details) : null))
       : [el('p', { text: P.materialsFallback })]));
   }
   function renderLead() {
     const c = state.consult;
-    $('#v2-h7').textContent = c ? 'Request a design consultation' : 'Get my detailed quotation';
+    $('#v2-h7').textContent = c ? U.labels.consultTitle : U.labels.quoteTitle;
     $('#v2-lead-sub').textContent = c === 'luxury' ? P.leadLuxury : c === 'designer' ? P.leadDesigner : P.leadQuote;
-    $('#v2-send').textContent = c ? 'Request my consultation →' : 'Send my request →';
+    $('#v2-send').textContent = c ? U.labels.sendConsult : U.labels.sendQuote;
     $('#v2-refine-link').hidden = Boolean(c) || !state.estimate;
   }
   function renderRefine() {
@@ -458,7 +467,7 @@
       if (!picked.some((p) => p.room === f.room && p.id === f.item)) continue;
       const key = `${f.room}:${f.item}`;
       const id = `v2-m-${f.room}-${f.item}`;
-      const input = el('input', { id, type: 'number', inputmode: 'decimal', min: String(f.min), max: String(f.max), step: 'any', placeholder: 'typical size', value: state.measures[key] || '', 'aria-describedby': `${id}-h` });
+      const input = el('input', { id, type: 'number', inputmode: 'decimal', min: String(f.min), max: String(f.max), step: 'any', placeholder: U.labels.placeholder, value: state.measures[key] || '', 'aria-describedby': `${id}-h` });
       input.addEventListener('input', () => { state.measures[key] = input.value; save(); });
       box.append(el('label', { class: 'v2-measure', for: id }, el('span', {}, f.label, input), el('span', { class: 'v2-unit', text: f.unit }),
         el('small', { id: `${id}-h`, text: fmt(U.hintRange, f) })));

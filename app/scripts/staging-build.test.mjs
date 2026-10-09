@@ -3,11 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import vm from 'node:vm';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { buildSite, checkStaging, estimatorFlags, PRODUCTION_API, siteKey, STAGING_API } from './staging-build.mjs';
+import { APPROVAL, buildSite, canonicalSha256, checkStaging, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API } from './staging-build.mjs';
 
 const SRC = fileURLToPath(new URL('../e2e/site-release', import.meta.url));
 const KEY = '0x4AAAAAAAstagingTestKey01';
@@ -79,9 +78,22 @@ test('the estimator page is off unless STAGING_ESTIMATOR=on, and Essential-only 
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_HOME_SIZES: '5BHK' }), /unknown home sizes/);
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_PROPERTY_TYPES: 'OFFICE' }), /unknown property types/);
   assert.match(onHtml, /<meta name="veda-estimator-ux" content="">/, 'V1 by default');
+  // V2 is refused until the owner approves exactly this customer copy for staging (final pre-activation closure).
   const v2 = join(tmp(), 'site');
-  buildSite(SRC, v2, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_UX: 'v2' }));
+  const flagsV2 = estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_UX: 'v2' });
+  assert.throws(() => buildSite(SRC, v2, KEY, flagsV2), /STAGING_ESTIMATOR_UX=v2 is refused: the owner approval record is PENDING/, 'the committed record is pending');
+  const copy = readCopy(join(SRC, 'assets/estimate-v2-copy.js'));
+  const approved = { ...JSON.parse(readFileSync(APPROVAL, 'utf8')), status: 'APPROVED', owner: 'Test Owner', approved_on: '2026-10-09',
+    customer_copy_sha256: canonicalSha256(copy),
+    warranty_copy_sha256: canonicalSha256({ manufacturer: copy.promise.manufacturer, service: copy.promise.service, serviceNote: copy.promise.serviceNote }) };
+  const approvalFile = join(tmp(), 'approval.json');
+  writeFileSync(approvalFile, JSON.stringify(approved));
+  buildSite(SRC, v2, KEY, { ...flagsV2, approvalFile });
   assert.match(readFileSync(join(v2, 'estimate.html'), 'utf8'), /<meta name="veda-estimator-ux" content="v2">/);
+  writeFileSync(approvalFile, JSON.stringify({ ...approved, customer_copy_sha256: '0'.repeat(64) }));
+  assert.throws(() => buildSite(SRC, v2, KEY, { ...flagsV2, approvalFile }), /customer copy is not the approved copy/, 'stale copy digest');
+  writeFileSync(approvalFile, JSON.stringify({ ...approved, scope: { ...approved.scope, public_intake: true } }));
+  assert.throws(() => buildSite(SRC, v2, KEY, { ...flagsV2, approvalFile }), /does not cover V2 on staging/, 'scope must exclude public intake');
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_UX: 'v3' }), /v1 or v2/);
 });
 
@@ -99,13 +111,14 @@ test('the committed estimator page is off and holds no rates', () => {
     assert.ok(!/rate_minor|_minor\s*:\s*\d|innerHTML/.test(src), `${name}: no rate table, no innerHTML`);
     assert.ok(!/per sq|per sheet|10 years|30-year/i.test(src), `${name}: no rates or warranty durations`);
   }
-  // Every sentence lives in the copy file, so the matrix check below sees all of them.
-  const code = v2js.replace(/^\s*\/\/.*$/gm, '');
-  const stray = [...code.matchAll(/'([^'\n]{12,})'|`([^`\n]{12,})`/g)].map((m) => m[1] || m[2]).filter((t) => /\b\w+ \w+ \w+\b.*[.:]$/.test(t));
-  assert.deepEqual(stray, [], 'UX V2 script: customer sentences belong in estimate-v2-copy.js');
-  const ctx = { window: {} };
-  vm.runInNewContext(copyFile, ctx);
-  const COPY = ctx.window.VEDA_ESTIMATE_COPY;
+  // Every customer-visible string lives in the copy file (L3): no multi-word literal is left in the script.
+  const code = v2js.replace(/^\s*\/\/.*$/gm, '').replace(/\/\/ .*$/gm, '');
+  const literals = [...code.matchAll(/'([^'\n]*)'|`([^`\n]*)`/g)].map((m) => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' '));
+  assert.deepEqual(literals.filter((t) => /[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(t) && t !== 'use strict'), [], 'UX V2 script: customer text belongs in estimate-v2-copy.js');
+  // V2 never renders API text directly, only the block the reviewed matrix registers (M3).
+  assert.ok(!/\be\.(disclaimer|exclusions|client_scope|assumptions|subject_to|title)\b|project_preparation\.(description|note|inclusions)|warranty\.(items|note)|custom_features_allowance\.description/.test(code),
+    'UX V2 script: unregistered API text is never rendered');
+  const COPY = readCopy(join(SRC, 'assets/estimate-v2-copy.js'));
   const leaves = (o) => (typeof o === 'string' ? [o] : Object.values(o).flatMap(leaves));
   const promises = leaves(COPY.promise);
   const copyText = promises.join('\n');
@@ -117,7 +130,7 @@ test('the committed estimator page is off and holds no rates', () => {
   assert.ok(!/\b(complimentary|free)\b/i.test(copyText + code), 'UX V2: required work is never called free or complimentary');
   assert.ok(!/soft-close/i.test(COPY.promise.packageSubtitle), 'the package picker never promises soft-close hardware universally');
   // The customer-promise matrix and the page agree both ways (pre-activation closure).
-  const matrix = JSON.parse(readFileSync(join(SRC, '../../../docs/implementation/estimator/specifications/essential-1.1-promise-matrix.json'), 'utf8'));
+  const matrix = JSON.parse(readFileSync(join(SRC, '../../../api/veda/modules/estimator/approved/essential-1.1-promise-matrix.json'), 'utf8'));
   const listed = new Set(matrix.rows.flatMap((r) => r.statements));
   for (const t of promises) assert.ok(listed.has(t), `page promise missing from the matrix: ${t}`);
   const pageText = readFileSync(join(SRC, 'estimate.html'), 'utf8').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');

@@ -9,7 +9,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 API="$ROOT/api"; APP="$ROOT/app"; OUT="$APP/e2e-artifacts"
 PY="${API_PYTHON:-$API/.venv/bin/python}"
-CARD="${1:-}"; SPEC="$ROOT/docs/implementation/estimator/specifications/essential-specification-v1.1.json"
+CARD="${1:-}"  # tools/e2e_reset.sh activates ESSENTIAL-1.1 locally
 [ -f "$CARD" ] || { echo "usage: $0 <card.json>"; exit 2; }
 CARD="$(cd "$(dirname "$CARD")" && pwd)/$(basename "$CARD")"
 case "$CARD" in "$ROOT"/*) echo "refused: the card must stay outside the repository"; exit 2;; esac
@@ -31,7 +31,6 @@ estimator() { (cd "$API" && VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.d
 VERSION="$("$PY" -I -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$CARD")"
 estimator load-card "$CARD" | "$PY" -I -c 'import json,sys;d=json.loads(sys.stdin.read().strip().splitlines()[-1]);print("card", d["loaded"], "sha256", d["sha256"])' || exit 1
 estimator activate-card --version "$VERSION" --approval "Local homeowner validation session" >/dev/null || exit 1
-estimator load-spec "$SPEC" >/dev/null && estimator activate-spec --spec ESSENTIAL-1.1 --approval "Local homeowner validation session" >/dev/null || exit 1
 echo "specification ESSENTIAL-1.1 (local only; inactive on staging)"
 
 ( cd "$API" && exec env VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db VEDA_COOKIE_SECURE=false \

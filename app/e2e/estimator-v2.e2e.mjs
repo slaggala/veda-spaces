@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CARD = JSON.parse(fs.readFileSync(process.env.E2E_CARD ?? path.join(HERE, '../../api/tests/fixtures/estimator/synthetic-rate-card.json'), 'utf8'));
-const SPEC_CODE = process.env.E2E_SPEC ?? 'SYNTHETIC-ESSENTIAL-1.1';
+const SPEC_CODE = process.env.E2E_SPEC ?? 'ESSENTIAL-1.1';
 const QUIET = Boolean(process.env.E2E_QUIET);
 const ON = process.env.SITE_ON ?? 'http://localhost:8000';
 const V2 = `${ON}/estimate?ux=v2`;
@@ -214,6 +214,39 @@ check('optional items shown in the build-up, which still reconciles', optData.op
   optParts.reduce((a, r) => a + r[1], 0) === optData.range.low_minor && optParts.reduce((a, r) => a + r[2], 0) === optData.range.high_minor &&
   /Premium emulsion/.test(optData.room_details.find((d) => d.room === 'WHOLE_HOME').materials?.line || ''));
 await collectCsp();
+
+// M3: unregistered API text never reaches V2. The raw response fields are tampered with in flight; V2 renders only
+// the block the reviewed matrix registers, so nothing injected may appear.
+const ESTIMATES = '**/api/v1/public/estimates';
+await fresh();
+await page.route(ESTIMATES, async (route) => {
+  const res = await route.fetch();
+  const body = await res.json();
+  if (body.data) {
+    body.data.exclusions = [...body.data.exclusions, 'UNREGISTERED free upgrade'];
+    body.data.client_scope = [...body.data.client_scope, 'UNREGISTERED client item'];
+    body.data.disclaimer = 'UNREGISTERED this is your final price';
+    body.data.room_details = body.data.room_details.map((d) => ({ ...d, assumptions: [...d.assumptions, 'UNREGISTERED assumption'] }));
+  }
+  await route.fulfill({ response: res, json: body });
+});
+await toResult();
+check('unregistered API text never reaches V2', !/UNREGISTERED/.test(await page.locator('#est-v2').textContent()));
+await page.unroute(ESTIMATES);
+await fresh();
+await page.route(ESTIMATES, async (route) => {
+  const res = await route.fetch();
+  const body = await res.json();
+  if (body.data) body.data.v2_copy = { approved: false };
+  await route.fulfill({ response: res, json: body });
+});
+await toResult();
+const unapproved = await page.locator('[data-v2="6"]').textContent();
+check('without registered text V2 shows only approved fallbacks and no material promise',
+  (await page.locator('.v2-spec-line').count()) === 0 && unapproved.includes('Your detailed quotation lists what is and is not included.') &&
+  (await page.textContent('#v2-disclaimer')) === 'This is a preliminary budgetary estimate for planning purposes and is not a final quotation or contractual offer.' &&
+  !unapproved.includes('Civil, plumbing-line and structural changes'));
+await page.unroute(ESTIMATES);
 
 // 7. V1/V2 equivalence: drive V1 with exactly the selections V2 sent (same rooms, products, effective options).
 const defaults = Object.fromEntries(CARD.products.map((p) => [p.code, Object.fromEntries((p.options || []).map((o) => [o.name, o.default]))]));

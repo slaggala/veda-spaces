@@ -26,7 +26,9 @@ VERSION="$("$PY" -I -c 'import json,sys;print(json.load(open(sys.argv[1]))["vers
 estimator load-card "$CARD" | "$PY" -I -c 'import json,sys;d=json.loads(sys.stdin.read().strip().splitlines()[-1]);print("card", d["loaded"], "sha256", d["sha256"])' || exit 1
 estimator activate-card --version "$VERSION" --approval "Local real-card equivalence run" >/dev/null || exit 1
 CODE="$("$PY" -I -c 'import json,sys;print(json.load(open(sys.argv[1]))["spec_code"])' "$SPEC")"
-estimator load-spec "$SPEC" >/dev/null && estimator activate-spec --spec "$CODE" --approval "Local real-card equivalence run" >/dev/null || exit 1
+if [ "$CODE" != "ESSENTIAL-1.1" ]; then  # tools/e2e_reset.sh already activates ESSENTIAL-1.1
+  estimator load-spec "$SPEC" >/dev/null && estimator activate-spec --spec "$CODE" --approval "Local real-card equivalence run" >/dev/null || exit 1
+fi
 echo "specification $CODE"
 
 ( cd "$API" && exec env VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db VEDA_COOKIE_SECURE=false \
