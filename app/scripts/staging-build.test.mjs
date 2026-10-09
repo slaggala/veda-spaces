@@ -1,6 +1,6 @@
 // node --test scripts/staging-build.test.mjs
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -182,4 +182,14 @@ test('the estimator V2 prototype stays on staging: not in the live site, no netw
   const out = join(tmp(), 'site');
   buildSite(SRC, out, KEY, estimatorFlags({}));
   assert.ok(existsSync(join(out, 'prototype/estimator-v2/index.html')), 'served by the staging site (behind Access)');
+});
+
+test('V3 (catalog-driven estimator) is not in a staging build without its approval record (ADR-013)', () => {
+  const out = mkdtempSync(join(tmpdir(), 'veda-v3-'));
+  buildSite(SRC, out, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on' }));
+  for (const f of ['estimate-v3.html', 'assets/estimate-v3.js', 'assets/estimate-v3.css']) assert.ok(!existsSync(join(out, f)), f);
+  assert.throws(() => buildSite(SRC, out, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_VERSION: 'v3' })), /V3 staging activation record/);
+  assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_VERSION: 'v4' }), /v1, v2 or v3/);
+  assert.equal(estimatorFlags({}).version, 'v2');
+  rmSync(out, { recursive: true, force: true });
 });

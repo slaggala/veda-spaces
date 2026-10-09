@@ -17,6 +17,7 @@ const auth = () => import('../../modules/auth/index.js');
 const leads = () => import('../../modules/leads/index.js');
 const admin = () => import('../../modules/admin/index.js');
 const audit = () => import('../../modules/audit/index.js');
+const catalog = () => import('../../modules/catalog/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -50,6 +51,7 @@ export const ROUTES: Def[] = [
     anyOf: ['user.mfa.reset', 'user.email.change', 'user.founder.manage'], load: admin,
   },
   { path: '/admin/founder-actions', title: 'Founder actions', component: 'vs-founder-actions-page', access: 'auth', chrome: true, anyOf: ['user.founder.manage'], load: admin },
+  { path: '/catalog', title: 'Estimator catalog', component: 'vs-catalog-page', access: 'auth', chrome: true, anyOf: ['catalog.view'], load: catalog },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 

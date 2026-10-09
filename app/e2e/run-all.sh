@@ -21,12 +21,14 @@ done
 wait_for() { for _ in $(seq 1 60); do curl -fsS "$1" >/dev/null 2>&1 && return 0; sleep 1; done; echo "timeout: $1"; return 1; }
 
 ( cd "$API" && PYTHON="$PY" tools/e2e_reset.sh ) > "$OUT/bootstrap.txt" || { cat "$OUT/bootstrap.txt"; exit 1; }
+# The catalog-driven estimator V3 (ADR-013): the synthetic slice, released locally only.
+( cd "$API" && VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db "$PY" tools/e2e_catalog.py ) >> "$OUT/bootstrap.txt" || { cat "$OUT/bootstrap.txt"; exit 1; }
 INVITE_LINK="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["invite_link"])' "$API/var/bootstrap.json")"
 
 # Each server is exec'd so the tracked pid is the server itself and cleanup stops it.
 ( cd "$API" && exec env VEDA_ENV=local VEDA_DATABASE_URL=sqlite:///var/e2e.db VEDA_COOKIE_SECURE=false \
     VEDA_EMAIL_CAPTURE_DIR=var/mail VEDA_ARGON2_MEMORY_KIB=19456 VEDA_ARGON2_TIME_COST=2 \
-    VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors VEDA_ESTIMATOR_ENABLED=true \
+    VEDA_PUBLIC_SITE_ORIGINS=http://localhost:8000 VEDA_ANCHOR_DIR=var/anchors VEDA_ESTIMATOR_ENABLED=true VEDA_CATALOG_ESTIMATOR_ENABLED=true \
     "$PY" -m flask --app wsgi run --port 5000 ) > "$OUT/api.log" 2>&1 & pids+=($!)
 ( cd "$APP" && exec node node_modules/vite/bin/vite.js --port 5173 --strictPort ) > "$OUT/vite.log" 2>&1 & pids+=($!)
 node "$APP/e2e/static-server.mjs" "$APP/e2e/site-release" 8000 http://localhost:5000 > "$OUT/site-on.log" 2>&1 & pids+=($!)
@@ -43,5 +45,6 @@ run site.e2e.mjs
 run estimator.e2e.mjs
 run estimator-v2.e2e.mjs
 run estimator-v2-prototype.e2e.mjs
+run estimator-v3.e2e.mjs
 run axe.e2e.mjs
 exit $status

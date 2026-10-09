@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Plan your home interiors budget room by room with the Veda Spaces preliminary budgetary estimate.">
+  <title>Budgetary Estimate (catalog preview) — Veda Spaces</title>
+  <meta name="theme-color" content="#281a13">
+  <!-- Catalog-driven estimator V3 (ADR-013). Off unless veda-estimator-version is "v3" and the intake metas are set.
+       The staging build removes this page unless an approved V3 activation record exists. -->
+  <meta name="veda-estimator-version" content="">
+  <meta name="veda-api-base" content="">
+  <meta name="veda-turnstile-sitekey" content="">
+  <meta name="veda-api-credentials" content="">
+  <meta name="veda-catalog-analytics" content="">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/estimate.css">
+  <link rel="stylesheet" href="/assets/estimate-v3.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="est-header">
+    <a class="est-brand" href="/" aria-label="Veda Spaces home"><img src="/assets/veda-logo.png" alt="Veda Spaces"></a>
+    <a class="est-back" href="/#contact">Talk to us instead →</a>
+  </header>
+
+  <main id="main-content" class="est-main">
+    <p class="eyebrow">Plan your budget</p>
+    <h1>Estimate your interiors budget</h1>
+
+    <section class="est-panel" id="v3-off">
+      <h2>Coming soon</h2>
+      <p>Our online budget estimator is not available yet. Tell us about your home and our design team will call you.</p>
+      <a class="button button-dark" href="/#contact">Book a Consultation →</a>
+    </section>
+
+    <div id="v3" hidden>
+      <div class="v3-summary" id="v3-summary" role="alert" tabindex="-1" hidden></div>
+
+      <section class="v3-screen" data-v3="1" aria-labelledby="v3-h1">
+        <h2 id="v3-h1" tabindex="-1">Your home</h2>
+        <fieldset class="v3-group"><legend>Home</legend><div id="v3-homes" class="v3-choices"></div></fieldset>
+        <fieldset class="v3-group"><legend>New home or renovation?</legend><div id="v3-kinds" class="v3-choices"></div></fieldset>
+        <fieldset class="v3-group"><legend>Package</legend><div id="v3-packages" class="v3-choices"></div></fieldset>
+        <div class="v3-actions"><span></span><button class="v3-primary" type="button" id="v3-to-rooms">Choose rooms →</button></div>
+      </section>
+
+      <section class="v3-screen" data-v3="2" aria-labelledby="v3-h2" hidden>
+        <h2 id="v3-h2" tabindex="-1">Rooms and what goes in them</h2>
+        <p class="v3-sub">Start with what most homes include. Change finishes, add extras, and add measurements later. Images show the kind of work; the final design, dimensions, materials and finishes are confirmed separately in your quotation.</p>
+        <div id="v3-rooms" class="v3-rooms"></div>
+        <div class="v3-ts" id="v3-ts-estimate"></div>
+        <div class="v3-actions"><button class="v3-ghost" type="button" data-v3-back="1">← Back</button><button class="v3-primary" type="button" id="v3-estimate">See my estimate →</button></div>
+      </section>
+
+      <section class="v3-screen" data-v3="3" aria-labelledby="v3-h3" hidden>
+        <h2 id="v3-h3" tabindex="-1">Your preliminary budget</h2>
+        <div id="v3-result" aria-live="polite"></div>
+        <details class="v3-more" id="v3-refine"><summary>Refine with measurements</summary><div id="v3-refine-fields"></div>
+          <div class="v3-ts" id="v3-ts-refine"></div>
+          <button class="v3-primary" type="button" id="v3-reestimate">Update my estimate</button></details>
+        <div class="v3-actions"><button class="v3-ghost" type="button" data-v3-back="2">← Change rooms</button><a class="v3-primary" href="/#contact" id="v3-quote">Request a detailed quotation →</a></div>
+      </section>
+    </div>
+
+    <dialog class="v3-dialog" id="v3-gallery" aria-labelledby="v3-gallery-title">
+      <div class="v3-dialog-head"><h2 id="v3-gallery-title"></h2><button type="button" class="v3-ghost" id="v3-gallery-close">Close</button></div>
+      <div id="v3-gallery-body"></div>
+    </dialog>
+  </main>
+
+  <footer class="est-footer"><span>© 2026 Veda Spaces</span><a href="/warranty">Warranty policy</a></footer>
+  <script src="/assets/estimate-v3.js"></script>
+</body>
+</html>

@@ -62,6 +62,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/admin/roles', label: 'Roles', icon: 'shield', group: 'admin', anyOf: ['role.read'] },
   { path: '/admin/permissions', label: 'Permissions', icon: 'key', group: 'admin', anyOf: ['permission.read'] },
   { path: '/admin/founder-actions', label: 'Founder actions', icon: 'star', group: 'admin', anyOf: ['user.founder.manage'] },
+  { path: '/catalog', label: 'Estimator catalog', icon: 'list', group: 'admin', anyOf: ['catalog.view'] },
   { path: '/audit', label: 'Audit log', icon: 'list', group: 'admin', anyOf: ['audit.read', 'security_event.read'] },
   { path: '/profile', label: 'Profile', icon: 'settings', group: 'account', anyOf: ['profile.read'], mobile: true },
 ];
