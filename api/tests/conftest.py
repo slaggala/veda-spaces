@@ -104,6 +104,7 @@ def make_settings(database_url: str, **overrides):
         app_origin="http://localhost:5173",
         public_site_origins=["http://localhost:8000"],
         anchor_dir=str(Path(tempfile.mkdtemp(prefix="veda-anchor-"))),
+        catalog_media_dir=str(Path(tempfile.mkdtemp(prefix="veda-catalog-media-"))),
         testing=True,
     )
     base.update(overrides)

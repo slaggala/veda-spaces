@@ -244,3 +244,16 @@ def test_staging_estimator_with_its_policy_link_passes_and_production_still_refu
     assert config.validate_environment(staging) == []
     production = deployed_env(monkeypatch, "production", VEDA_ESTIMATOR_ENABLED="true", VEDA_WARRANTY_POLICY_URL=url)
     assert "VEDA_ESTIMATOR_ENABLED is not authorised in production yet" in config.validate_environment(production)
+
+
+@pytest.mark.parametrize("name", ["VEDA_CATALOG_ESTIMATOR_ENABLED", "VEDA_CATALOG_ANALYTICS_ENABLED"])
+def test_catalog_v3_flags_are_refused_in_production_and_allowed_on_staging(monkeypatch, name):
+    """ADR-013 D9: V3 and its analytics stay off in production until separately approved."""
+    assert config.validate_environment(deployed_env(monkeypatch, "staging", **{name: "true"})) == []
+    problems = config.validate_environment(deployed_env(monkeypatch, "production", **{name: "true"}))
+    assert any(name in p for p in problems), problems
+
+
+def test_catalog_four_eyes_cannot_be_switched_off_when_deployed(monkeypatch):
+    problems = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_CATALOG_FOUR_EYES="false"))
+    assert any("VEDA_CATALOG_FOUR_EYES" in p for p in problems), problems
