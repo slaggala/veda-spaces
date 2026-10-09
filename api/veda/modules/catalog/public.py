@@ -261,7 +261,7 @@ class PublicGst(_Dto):
 
 class PublicRoomTotal(_Dto):
     room: CODE
-    label: S60
+    label: S120
     amount_minor: Minor
 
 
@@ -269,7 +269,7 @@ class PublicPreparation(_Dto):
     label: S120
     description: S500
     amount_minor: Minor
-    inclusions: tuple[S300, ...] = Field(max_length=12)
+    inclusions: tuple[S500, ...] = Field(max_length=24)
 
 
 class PublicAllowance(_Dto):
@@ -302,9 +302,9 @@ class PublicEstimate(_Dto):
     project_preparation: PublicPreparation
     custom_features_allowance: PublicAllowance
     timeline: PublicTimeline
-    assumptions: tuple[S300, ...] = Field(max_length=60)
-    exclusions: tuple[S300, ...] = Field(max_length=40)
-    client_scope: tuple[S300, ...] = Field(max_length=40)
+    assumptions: tuple[S500, ...] = Field(max_length=200)
+    exclusions: tuple[S500, ...] = Field(max_length=80)
+    client_scope: tuple[S500, ...] = Field(max_length=80)
     validity_days: Annotated[int, Field(ge=1, le=90)]
     expires_on: S30
     reference: S30
@@ -647,9 +647,7 @@ def build_catalog(cat) -> PublicCatalog:  # cat: compile.Catalog (imported lazil
         hardware=described(kinds.Hardware, PublicHardware, statements=lambda m: tuple(m.statements)),
         package=packages,
         media=media,
-        copy={
-            k: PublicCopy(statement=m.statement, category=m.category) for k, m in sorted(cat.of(kinds.Copy).items())
-        },
+        copy={k: PublicCopy(statement=m.statement, category=m.category) for k, m in sorted(cat.of(kinds.Copy).items())},
         rule={
             k: PublicRule(
                 type=r.type,

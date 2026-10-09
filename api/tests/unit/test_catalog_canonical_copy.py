@@ -249,7 +249,7 @@ def test_public_dtos_refuse_unknown_fields_and_oversized_values():
     with pytest.raises(ValidationError):
         public.PublicCopy(statement="A" * 501, category="label")
     with pytest.raises(ValidationError):
-        public.PublicPreparation(label="Site", description="d", amount_minor=1, inclusions=tuple("x" * 13))
+        public.PublicPreparation(label="Site", description="d", amount_minor=1, inclusions=tuple("x" * 25))
     with pytest.raises(ValidationError):
         public.PublicMedia(type="GLB", title="t", label="Design reference", attribution="a", items=(), urls={}, sort=1)
 
