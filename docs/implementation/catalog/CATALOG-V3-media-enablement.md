@@ -1,6 +1,6 @@
 # Catalog V3: targeted media enablement on protected staging
 
-**Status: prepared, not applied, not deployed.** Nothing has been created in AWS. No setting has been turned on.
+**Status: merged (PR #70), not applied, not deployed. Protected-staging activation remains blocked. Real-card evidence remains pending.** Nothing has been created in AWS. No setting has been turned on.
 
 | Item | State |
 |---|---|
@@ -21,9 +21,9 @@ The work extends the existing staging platform. It creates no new platform, no C
 
 | Layer | Change | Where |
 |---|---|---|
-| Storage | One more bucket-map entry, `veda-stg-media-<account>`. It inherits every existing control: SSE-KMS under the data key with a bucket key, versioning, all public access blocked, ownership enforced, a TLS-only and account-only policy, `prevent_destroy`. It adds: uploads refused unless SSE-KMS under the data key (key ARN or alias ARN); noncurrent versions expire after `media.noncurrent_days` (30); expired delete markers removed. No Object Lock (withdrawal deletes bytes), no website, no allow statement at all. | `infra/terraform/modules/storage` |
+| Storage | One more bucket-map entry, `veda-stg-media-<account>`. It inherits every existing control: SSE-KMS under the data key with a bucket key, versioning, all public access blocked, ownership enforced, a TLS-only and account-only policy, `prevent_destroy`. It adds: uploads refused unless SSE-KMS under the data key (key ARN or alias ARN); noncurrent versions expire after `media.noncurrent_days` (30); expired delete markers removed. No Object Lock, so a withdrawal can remove the current version at once; prior noncurrent versions remain until the 30-day window expires them. No website, no allow statement at all. | `infra/terraform/modules/storage` |
 | IAM | The host role gains `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on `media/source/*` and `media/variant/*`, and `s3:ListBucket` under those prefixes only. No KMS change: the existing data-key grant matches by alias. No version delete, tagging, ACL or bucket permission; the explicit administration deny still covers the bucket. A production media bucket is refused by the module. | `infra/terraform/modules/runtime-iam` |
-| SSM | Media settings and flags under `/veda/staging/config`. Values are plain and non-secret. The scanner address and image appear only once a scanner is decided; the rights approver only once named. | `infra/terraform/envs/staging-core` |
+| SSM | 13 media settings and flags under `/veda/staging/config`. Values are plain and non-secret. The scanner address and image are always present and inactive unless the scanner mode is `clamd` (§17); the rights approver appears only once named. | `infra/terraform/envs/staging-core` |
 | Scanner | A pinned `clamd` service in the Compose `scanner` profile: private network only, no host port, read-only root, all capabilities dropped except the entrypoint's user switch, no-new-privileges, bounded memory, a persistent signature volume, a health check. `deploy.sh` starts it only when the configuration selects `clamd`, refuses an image not pinned by digest, and refuses to continue until clamd answers `PING`. **Not running today.** | `api/deploy/docker-compose.yml`, `api/deploy/deploy.sh` |
 | Monitoring | Eight log metric filters and alarms on the existing topic. One host metric, the scanner restart count. Signals carry counts and ages only. | `infra/terraform/modules/monitoring`, `infra/host/health.sh` |
 | Evidence | `veda-collect` also records the scanner-capacity facts, read-only. | `infra/terraform/modules/deploy` |
@@ -100,9 +100,10 @@ Do not run a scanner to measure it. Collect facts on the running host:
 
    The evidence object and its SHA-256 go to the evidence bucket under its COMPLIANCE lock.
 2. Read the host memory history on the existing CloudWatch dashboard: `CWAgent mem_used_percent`, 14 days, maximum. Note the peak.
-3. Record the projection from the clamd documentation for the pinned version. These are not measured here:
-   - the steady memory with the full signature database loaded;
-   - the peak during a signature reload. With `ConcurrentDatabaseReload no` there is no doubling, but scans pause during the reload.
+3. Record the projection from the authoritative guidance, the ClamAV documentation "Running ClamAV in Docker", section "Memory (RAM) Requirements" (https://docs.clamav.net/manual/Installing/Docker.html). These figures were read on 2026-10-10; re-read them for the pinned version:
+   - **Minimum 3 GiB, preferred 4 GiB** of RAM for the ClamAV container.
+   - "upwards of 1.2 GiB of RAM simply to load the signature definitions".
+   - During a database reload clamd "will use twice the amount of RAM for a brief period". `ConcurrentDatabaseReload no` avoids this, but scans block until the reload completes.
 4. The capacity rule for **option A**:
 
    `MemTotal − (peak current service memory + projected clamd reservation + projected reload peak) ≥ the approved reserve`
@@ -116,17 +117,17 @@ Do not run a scanner to measure it. Collect facts on the running host:
 |---|---|---|---|
 | Security posture | Synchronous scan before storing; unscanned or failed objects are never served | Same as A | Scan after upload; objects quarantined until a verdict; equivalent if the adapter quarantines |
 | Operational burden | One container, signature updates, alarms already prepared | Same as A, plus a host change | A managed or isolated service, events, adapter code |
-| Memory impact | Shares 2 GiB with five services; eligible **only** if §4 shows the reserve | Removes the pressure | None on the host |
+| Memory impact | **Precluded.** The ClamAV minimum (3 GiB) exceeds the whole 2 GiB host, so the §4 reserve rule cannot pass, whatever the measured service memory. Only a deliberate owner change to the capacity policy could reopen it | Removes the pressure: the host must give clamd its 3 to 4 GiB beyond the reserve and the current services (t4g.medium is 4 GiB in total, so the size is to be derived from the §4 evidence) | None on the host |
 | Infrastructure changes | Decide `media_scanner` (A, `clamd`, image digest) | A reviewed `compute.instance_type` change in staging-platform.json (a stop and start of the host), then as A | New service resources and an event path |
 | Application changes | None | None | A new scanner adapter. The app accepts only `none` or `clamd` today, and staging-core refuses any other mode. |
 | Monthly cost (plan evidence) | No new AWS resource (container on the existing host) | The instance-type difference shown by that plan; must fit the $25 budget (AUT-112) | The managed service's per-GB and per-object charges, from its plan |
 | Failure mode | Memory pressure can restart services; the scanner fails to FAILED (never served) | Same as A, with headroom | Delayed verdicts; PENDING until scanned |
 | Rollback | `mode: none`, redeploy: the scanner stops and uploads stay PENDING | Same as A; the size change reverts by a reviewed plan | Revert the adapter and the mode |
-| Recommendation | Only if the measured evidence passes the reserve | Preferred if A fails and the cost is approved | Only if A and B are both unacceptable |
+| Requires | Not available under the current policy and host | A reviewed host-resize plan; owner cost approval; a validated, pinned ARM64 ClamAV image; the capacity reserve; a rollout and rollback plan | An approved application adapter; an isolated scan architecture; a security and operational review |
 
 ## 6. ClamAV implementation readiness (if A or B is chosen)
 
-The service is prepared but **not ready to run**. The image placeholder (`scanner-image-not-decided`) is deliberate, and every gate refuses it: the Terraform precondition, `render-env.sh` and `deploy.sh`. Before the decision is recorded:
+**ClamAV is not ready to run, and is not claimed to be.** The image digest is still a placeholder (`scanner-image-not-decided` in Compose, `none-selected` in SSM), and every gate refuses it: the Terraform precondition, the host media preflight and `deploy.sh`. ARM64 support, non-root behaviour, the health check and the configuration all still need validating for whichever image is selected. Before the decision is recorded:
 
 1. Choose the official image and tag, and record it **pinned by digest** (`<name>:<tag>@sha256:<64 hex>`) in `media_scanner.clamd_image`.
 2. Validate the image on ARM64: the host is Graviton (t4g).
@@ -277,7 +278,7 @@ The expected resource delta, from the configuration:
 |---|---|
 | Media bucket | 1 bucket, plus ownership, public access block, versioning, encryption, lifecycle and policy (7 creates) |
 | Host role | The runtime policy updated in place (2 statements added) |
-| SSM | 11 configuration parameters created |
+| SSM | 13 configuration parameters created (11 common media settings and flags, plus the inactive clamd address and image) |
 | Monitoring | 8 metric filters, 8 application alarms and 1 host alarm created; the dashboard unchanged |
 | Evidence document | `veda-collect` updated in place (capacity facts added) |
 
@@ -306,3 +307,62 @@ There is no replacement and no destroy. There is no KMS key, CloudFront distribu
 - no production media bucket, scanner, media hostname or CDN;
 - no production CSP change;
 - an owner production decision and a separate review.
+
+## 17. Pre-plan closure (follow-up to PR #70)
+
+**Approval record, schema 2.** The record now carries an explicit review and expiry policy:
+
+| Field | Rule |
+|---|---|
+| `environment` | `staging` only; the schema refuses production |
+| `approval_scope.protected` | `true`: behind Cloudflare Access |
+| `approved_at` | Required; not in the future |
+| `review_by` | Required; within 90 days of approval; the approval lapses on that date |
+| `expires_at` | Required unless an explicit `non_expiring_decision` is recorded (exactly one of the two) |
+| `revoked_at`, `revocation_reason` | Both required for REVOKED, and only for REVOKED |
+
+The approver must be independent of the author, and every evidence item must carry a SHA or SHA-256. Owner values and dates are never filled in automatically; the template stays DRAFT.
+
+The same rules run at four points:
+
+| Where | How |
+|---|---|
+| Plan | Terraform parses and judges the record whenever a V3 flag is on, against the plan time (`plantimestamp()`): status, schema, scope, independence, evidence, review and expiry dates, digest binding. Any problem fails the plan before an activation change is computed. With every flag off, no record is needed. |
+| Build | `staging-build.mjs` repeats the checks against today's date. |
+| Deployment preflight | `deploy.sh` runs `python -m veda.modules.catalog.staging_approval` in the new image when V3 is requested, before any snapshot, migration or restart. |
+| Activation | On staging, every public V3 request checks the packaged record. A revoked, expired or past-review approval answers 503 at once, so an existing deployment does not stay eligible after its approval expires. |
+
+Changing the policy (any field) changes the record's SHA-256, so the plan and the build refuse the old binding.
+
+**Scanner rollback model.** The scanner states are `none` and `clamd`; an isolated asynchronous scanner is reserved and refused today. The 13 media parameters are always planned:
+- **Common:** backend, bucket, KMS ARN, the two prefixes, and the delivery, 3D, video, estimator and admin flags.
+- **Scanner-specific:** the clamd address and image. With `none` they are present and inactive (`none-selected`).
+
+So a scanner rollback (`clamd` → `none`) changes values in place and **removes no SSM parameter**. It needs no destroy and no plan-guard exception. The guard is unchanged: tests prove it still refuses removal of any SSM parameter (scanner-specific, common or unrelated), deletion of the media bucket, and replacement of the data key.
+
+The emergency order is enforced by the plan: V3 flags cannot be on with scanner `none`, so the flags go off in the same change or before. The bucket, its bytes, the KMS key, the media records and their audit trail are untouched, and PENDING media is never served.
+
+**Deployment order.**
+
+1. Merge.
+2. Reviewed plan.
+3. Approved apply.
+4. Deployment preflight (`infra/host/media-preflight.sh`, run by `render-env.sh` before `api.env` is replaced).
+5. Deployment.
+
+The preflight prints names, never values, and refuses before anything on the host changes. Its states:
+
+| State | Effect |
+|---|---|
+| **MEDIA INFRASTRUCTURE NOT APPLIED** | A common setting is missing: apply staging-core first. Refused. |
+| **SCANNER SETTINGS INCOMPLETE** | `clamd` without a pinned image. Refused. |
+| **PARTIAL ACTIVATION** | Some V3 flags on, others off. Refused. |
+| V3 activation without clamd | Refused. |
+| scanner not selected | Informational; the deploy continues. |
+| V3 intentionally disabled | Informational; the deploy continues. |
+| **V3 ACTIVATION REQUESTED** | `deploy.sh` then requires a current APPROVED record; otherwise **APPROVAL RECORD INVALID** is refused. |
+
+An unrelated staging deployment after the merge, but before the apply, therefore fails visibly at the first step, with nothing deployed. Production has no such path.
+
+The staging-plan inspection checklist is [CATALOG-V3-staging-plan-inspection.md](CATALOG-V3-staging-plan-inspection.md).
+

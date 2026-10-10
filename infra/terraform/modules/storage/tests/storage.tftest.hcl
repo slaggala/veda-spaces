@@ -162,7 +162,7 @@ run "bucket_names_outside_the_bootstrap_scope_refused" {
 }
 
 # Targeted media enablement: the media bucket reuses every control, plus KMS-only uploads and a withdrawal-friendly
-# lifecycle. It has no Object Lock (a withdrawal deletes the bytes), no website, no public principal.
+# lifecycle. It has no Object Lock (a withdrawal removes the current version; old versions expire by lifecycle), no website, no public principal.
 run "media_bucket_private_kms_only_and_withdrawable" {
   command = plan
 
