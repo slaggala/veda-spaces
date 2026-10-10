@@ -125,11 +125,14 @@ def records(s: Session) -> list[tuple[str, str, dict]]:
         ("copy.label.allowance", "Design Personalisation Allowance", "label"),
     ]  # fmt: skip
     out: list[tuple[str, str, dict]] = [
-        ("copy", key, {"statement": text, "category": cat, "promise": False}) for key, text, cat in copy
-    ]
+        ("copy", key, {"statement": text, "category": cat, "promise": False,
+                       "content_policy": "CONTROLLED_LEGAL_COPY" if cat in ("disclaimer", "next_step") else "FACTUAL_TEXT"})
+        for key, text, cat in copy
+    ]  # fmt: skip
     # Registered text of the soft-close row of the ESSENTIAL-1.1 promise matrix, which is BLOCKED (owner UNASSIGNED).
     out.append(("copy", "copy.soft-close.promise", {
         "statement": "Soft-close TV-unit hardware", "category": "hardware", "promise": True,
+        "content_policy": "GOVERNED_CLAIM_REFERENCE",
         "matrix_row": "spec.soft_close", "applies_to": {"products": ["tv-unit"], "rooms": ["living-room"]},
         "governance": {"owner": UNASSIGNED, "backup": UNASSIGNED, "quotation_mapping": "Hardware line of the quotation",
                        "verification": UNASSIGNED, "warranty_source": UNASSIGNED, "status": "BLOCKED"},

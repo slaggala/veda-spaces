@@ -14,7 +14,7 @@ from __future__ import annotations
 import base64
 import binascii
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from flask import Response, request
 
@@ -74,6 +74,13 @@ class CatalogApprovalIn(Closed):
 class CatalogRollbackIn(Closed):
     expected_release: str  # the release the admin means to roll back; refused if another is active by then
     approval_reference: str
+
+
+class CatalogClaimControlIn(Closed):
+    action: Literal["WITHDRAW", "UNASSIGN_OWNER", "ASSIGN_OWNER", "RESTRICT_APPLICABILITY", "REINSTATE"]
+    reason: str
+    owner: str | None = None
+    applies_to: dict | None = None
 
 
 class CatalogScheduleIn(Closed):
@@ -316,6 +323,7 @@ def get_release(req: Req, release_id: str):
             e for e in view["validation"]["errors"] if not e.startswith(("pricing:", "card:"))
         ]}  # fmt: skip
     view["diff"] = service.diff(req.session, row)
+    view["public_copy"] = service.public_copy_report(req.session, row)  # new and changed customer text, for review
     return ok(view)
 
 
@@ -382,6 +390,44 @@ def schedule_release(req: Req, release_id: str):
 @api.route("POST", "/releases/<release_id>/activate", permission="catalog.admin", requirement="CAT-008")
 def activate_release(req: Req, release_id: str):
     return _release_action(req, release_id, service.activate_release)
+
+
+@api.route("GET", "/claims", permission="catalog.view", write=False, requirement="CAT-001")
+def list_claims(req: Req):
+    """The ACTIVE release's governed claims, each with its current control and whether it may be shown today."""
+    from . import claims
+    from . import compile as catalog_compile
+
+    release = service.active_release(req.session)
+    if release is None:
+        return ok([])
+    cat = catalog_compile.load_release(req.session, release)
+    current = claims.controls(req.session)
+    out = []
+    for key, copy in sorted(claims.governed(cat).items()):
+        single = catalog_compile.Catalog(release_code=cat.release_code, manifest_sha256=cat.manifest_sha256,
+                                         records=cat.records, models={**cat.models, "copy": {key: copy}})  # fmt: skip
+        problems = claims.problems(single, current=current)
+        ctl = current.get(key)
+        out.append({"key": key, "statement": copy.statement, "kind": "claim" if copy.claim else "promise",
+                    "review_by": copy.claim.review_by.isoformat() if copy.claim and copy.claim.review_by else None,
+                    "control": ctl.action if ctl else None, "valid": not problems, "problems": problems})  # fmt: skip
+    return ok(out)
+
+
+@api.route("POST", "/claims/<key>/control", permission="catalog.admin", body=CatalogClaimControlIn,
+           requirement="CAT-008")  # fmt: skip
+def control_claim(req: Req, key: str):
+    """Withdraw a released claim, remove or reassign its owner, narrow its applicability, or reinstate it. It takes
+    effect on the next public serve (fail closed), without a release."""
+    from . import claims
+
+    try:
+        row = claims.control(req.session, key, req.body.action, req.body.reason, owner=req.body.owner,
+                             applies_to=req.body.applies_to)  # fmt: skip
+    except (claims.ClaimError, ValueError) as err:
+        raise _err(err) from err
+    return ok({"key": row.copy_key, "action": row.action, "id": row.id})
 
 
 @api.route("POST", "/rollback", permission="catalog.admin", body=CatalogRollbackIn, requirement="CAT-008")
@@ -535,26 +581,33 @@ def _no_store(result):
                   summary="The active estimator catalog (customer-safe; no rates)")  # fmt: skip
 def public_catalog(req: Req):
     _enabled()
-    result = ok(configure.public_catalog(req.session))
-    result.headers["Cache-Control"] = "public, max-age=60"
+    view, max_age = configure.served_catalog(req.session)
+    result = ok(view)
+    result.headers["Cache-Control"] = f"public, max-age={max_age}"  # never past the next claim boundary
     return result
 
 
-def _idempotency_key() -> str | None:
+def _idempotency_key() -> str:
+    """The request's Idempotency-Key (required for V3 estimates), as its stored digest scoped to the browser."""
     key = request.headers.get("Idempotency-Key")
     if key is None:
-        return None
+        raise ApiError(422, "VALIDATION_FAILED", "Please review the highlighted information.",
+                       errors=[{"field": "Idempotency-Key", "code": "REQUIRED", "message": "An Idempotency-Key is required."}])  # fmt: skip
     if not configure.IDEMPOTENCY_KEY.match(key):
-        raise ApiError(422, "VALIDATION_FAILED", "Invalid Idempotency-Key.",
-                       errors=[{"field": "Idempotency-Key", "code": "INVALID", "message": "16–64 characters [A-Za-z0-9_-]."}])  # fmt: skip
-    return key
+        raise ApiError(422, "VALIDATION_FAILED", "Please review the highlighted information.",
+                       errors=[{"field": "Idempotency-Key", "code": "INVALID", "message": "32–64 characters [A-Za-z0-9_-]."}])  # fmt: skip
+    client = request.headers.get("X-Veda-Client")
+    if client is None or not configure.valid_client(client):
+        raise ApiError(422, "VALIDATION_FAILED", "Please review the highlighted information.",
+                       errors=[{"field": "X-Veda-Client", "code": "REQUIRED", "message": "The browser token is required."}])  # fmt: skip
+    return configure.key_digest(key, client)
 
 
 def _estimate_prepare(req: Req):
     _enabled()
     key = _idempotency_key()
     # A repeat of a request already answered is replayed before the anti-bot check: its token was single-use.
-    if key and configure.stored_for_key(req.session, key) is not None:
+    if configure.stored_for_key(req.session, key) is not None:
         return {"captcha": False, "replay": key}
     if settings().estimate_turnstile_required:
         req.session.rollback()

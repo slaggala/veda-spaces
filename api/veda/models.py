@@ -7,6 +7,7 @@ imports ``veda.models``.
 from veda.kernel.base import Base, finalize_metadata
 from veda.modules.catalog.models import (
     CatalogAnalyticsDaily,
+    CatalogClaimControl,
     CatalogConfiguration,
     CatalogEvent,
     CatalogMediaObject,
@@ -54,6 +55,7 @@ __all__ = [
     "BudgetEstimateLine",
     "BudgetEstimateProjectItem",
     "CatalogAnalyticsDaily",
+    "CatalogClaimControl",
     "CatalogConfiguration",
     "CatalogEvent",
     "CatalogMediaObject",

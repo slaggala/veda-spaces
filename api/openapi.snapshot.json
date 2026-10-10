@@ -402,6 +402,57 @@
         "title": "CatalogApprovalIn",
         "type": "object"
       },
+      "CatalogClaimControlIn": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "WITHDRAW",
+              "UNASSIGN_OWNER",
+              "ASSIGN_OWNER",
+              "RESTRICT_APPLICABILITY",
+              "REINSTATE"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "applies_to": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Applies To"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
+        ],
+        "title": "CatalogClaimControlIn",
+        "type": "object"
+      },
       "CatalogConfigIn": {
         "additionalProperties": false,
         "properties": {
@@ -4280,6 +4331,89 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/claims": {
+      "get": {
+        "operationId": "catalog_list_claims",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The ACTIVE release's governed claims, each with its current control and whether it may be shown today.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-001"
+      }
+    },
+    "/api/v1/catalog/claims/{key}/control": {
+      "post": {
+        "operationId": "catalog_control_claim",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogClaimControlIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a released claim, remove or reassign its owner, narrow its applicability, or reinstate it. It takes",
+        "tags": [
+          "catalog"
+        ],
+        "x-permission": [
+          "catalog.admin"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CAT-008"
       }
     },
     "/api/v1/catalog/configurations/{reference}": {

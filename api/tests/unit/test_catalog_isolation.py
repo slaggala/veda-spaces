@@ -48,3 +48,19 @@ def test_migration_0104_only_adds_nullable_columns_and_an_index():
     for forbidden in ("drop_", "alter_column", "DROP ", "UPDATE ", "DELETE "):
         assert forbidden not in source, forbidden
     assert source.count("ADD COLUMN") == 2 and "nullable=True" in source and "op.create_index(" in source
+
+
+def test_migration_0105_only_adds_the_claim_control_table():
+    source = (API / "migrations/versions/0105_catalog_claim_control.py").read_text()
+    assert 'down_revision = "0104_catalog_idempotency"' in source
+    tree = ast.parse(source)
+    calls = {
+        f"{n.func.value.id}.{n.func.attr}"
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
+        and n.func.value.id == "op"
+    }  # fmt: skip
+    assert calls == {"op.create_table", "op.create_index"}, calls
+    assert source.count("op.create_table(") == 1 and '"catalog_claim_control"' in source
+    for forbidden in ("drop_", "alter_column", "DROP ", "UPDATE ", "DELETE "):
+        assert forbidden not in source, forbidden

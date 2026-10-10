@@ -5,12 +5,14 @@ and independent substantiation for an absolute claim). Factual fields may make n
 contain a claim-like substring are not claims. Synthetic data only."""
 
 import copy
+import json
 
 import pytest
 
 from tests.integration.test_catalog import approve_all, seed_slice, tx
+from tests.support import claims
 from veda.kernel import db
-from veda.modules.catalog import importexport, kinds, service, text
+from veda.modules.catalog import importexport, kinds, service
 
 CLAIMS = [
     "Best seller TV unit", "Our premium pick", "Premium pick", "Most popular", "Recommended", "No. 1", "Best quality",
@@ -61,8 +63,8 @@ def placements(claim):
         ("media", {**MEDIA, "caption": claim}),
         ("media", {**MEDIA, "type": "GALLERY", "items": ["img.a1"], "caption": claim}),
         ("media", {**MEDIA, "rights": {**MEDIA["rights"], "owner": claim}}),
-        ("copy", {"statement": claim, "category": "badge" if len(claim) <= 30 else "label", "promise": False}),
-        ("copy", {"statement": claim, "category": "description", "promise": False}),
+        ("copy", {"statement": claim, "category": "badge" if len(claim) <= 30 else "label", "promise": False, "content_policy": "FACTUAL_TEXT"}),
+        ("copy", {"statement": claim, "category": "description", "promise": False, "content_policy": "FACTUAL_TEXT"}),
     ]  # fmt: skip
 
 
@@ -91,21 +93,16 @@ def test_3d_labels_are_checked():
         kinds.parse("media", doc)
 
 
-def claim_copy(statement, *, status="APPROVED", owner="Sales lead (role, test)", substantiation=None, review_by=None,
-               category="popularity"):  # fmt: skip
-    claim = {"category": category, "status": status, "source": "Order data 2026-Q3 (synthetic)", "owner": owner,
-             "effective_from": "2026-10-01"}  # fmt: skip
-    if substantiation:
-        claim["substantiation"] = substantiation
-    if review_by:
-        claim["review_by"] = review_by
-    return {"statement": statement, "category": "badge", "promise": False, "claim": claim,
-            "applies_to": {"packages": ["slice.essential"]}}  # fmt: skip
+def claim_copy(statement, **over):
+    return claims.claim_copy(statement, **over)
 
 
 def test_a_claim_copy_needs_governance_and_what_it_applies_to():
-    with pytest.raises(ValueError, match="claim governance"):
-        kinds.parse("copy", {"statement": "Most chosen", "category": "badge", "promise": False})
+    with pytest.raises(ValueError, match="governed claim record"):
+        kinds.parse(
+            "copy",
+            {"statement": "Most chosen", "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"},
+        )
     doc = claim_copy("Most chosen")
     del doc["applies_to"]
     with pytest.raises(ValueError, match="applies to"):
@@ -113,20 +110,22 @@ def test_a_claim_copy_needs_governance_and_what_it_applies_to():
     kinds.parse("copy", claim_copy("Most chosen"))
 
 
-@pytest.mark.parametrize("statement", ["Best seller", "No. 1 choice", "Lowest cost", "Cheapest unit"])
-def test_absolute_claims_need_independent_substantiation(statement):
-    if text.forbidden_in(statement):
-        with pytest.raises(ValueError):
-            kinds.parse("copy", claim_copy(statement, substantiation="Independent audit (synthetic)"))
-        return
+@pytest.mark.parametrize("statement", ["Best seller", "No. 1 choice", "Cheapest unit", "Top rated"])
+def test_absolute_and_ranking_claims_need_independent_substantiation(statement):
     with pytest.raises(ValueError, match="substantiation"):
-        kinds.parse("copy", claim_copy(statement))
-    kinds.parse("copy", claim_copy(statement, substantiation="Independent audit 2026 (synthetic)"))
+        kinds.parse("copy", claim_copy(statement, substantiation=None))
+    kinds.parse("copy", claim_copy(statement))
 
 
-def test_guaranteed_lowest_price_is_never_customer_text():
-    with pytest.raises(ValueError, match="pricing wording"):
-        kinds.parse("copy", claim_copy("Guaranteed lowest price", substantiation="x1 x1 x1"))
+def test_guaranteed_lowest_price_is_a_governed_claim_never_factual_text():
+    """A price claim is not money (no amount), so it may be shown only as a fully governed, time-boxed, substantiated
+    claim record; as factual copy it is refused."""
+    with pytest.raises(ValueError):
+        kinds.parse("copy", {"statement": "Guaranteed lowest price", "category": "label", "promise": False,
+                             "content_policy": "FACTUAL_TEXT"})  # fmt: skip
+    with pytest.raises(ValueError, match="substantiation"):
+        kinds.parse("copy", claim_copy("Guaranteed lowest price", substantiation=None))
+    kinds.parse("copy", claim_copy("Guaranteed lowest price"))
 
 
 @pytest.fixture
@@ -153,7 +152,10 @@ def _release_with_badge(people, doc, code="SLICE-C"):
     [
         (claim_copy("Most chosen", status="BLOCKED"), "not approved"),
         (claim_copy("Most chosen", owner="UNASSIGNED"), "no responsible owner"),
-        (claim_copy("Most chosen", review_by="2026-01-01"), "review date"),
+        (
+            claim_copy("Most chosen", approved_on="2025-05-01", effective_from="2025-06-01", review_by="2026-01-01"),
+            "review date",
+        ),
     ],
 )
 def test_unsupported_claims_block_release(people, doc, problem):
@@ -190,7 +192,30 @@ def test_a_record_saved_before_the_rule_cannot_reach_a_new_release(people):
 def test_import_refuses_claims(people):
     a, _ = people
     rows = [importexport.ImportRow("product_family", "beds", {"name": "Best beds", "category": "beds"}),
-            importexport.ImportRow("copy", "copy.c1", {"statement": "Most popular", "category": "badge", "promise": False})]  # fmt: skip
+            importexport.ImportRow("copy", "copy.c1", {"statement": "Most popular", "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"})]  # fmt: skip
     with db.unit_of_work(write=False) as s:
         report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
     assert not report["ok"] and all(r["errors"] for r in report["rows"])
+
+
+@pytest.mark.parametrize("leak", ["Only Rs 1200 per sqft", "12K/sft fitted", "Supplier price list", "Flat 10 percent off",
+                                  "1\u200b200/sqft"])  # fmt: skip
+def test_import_refuses_rates_and_prices(people, leak):
+    """Imported copy goes through the same canonical checks as authored copy (rates in every format)."""
+    a, _ = people
+    rows = [importexport.ImportRow("product_family", "beds", {"name": "Beds", "category": "beds", "description": leak}),
+            importexport.ImportRow("copy", "copy.c2", {"statement": leak, "category": "label", "promise": False, "content_policy": "FACTUAL_TEXT"})]  # fmt: skip
+    with db.unit_of_work(write=False) as s:
+        report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
+    assert not report["ok"] and all(r["errors"] for r in report["rows"])
+    assert not any("1200" in json.dumps(r["errors"]) for r in report["rows"]), "the report does not echo the rate"
+
+
+def test_the_seeded_slice_passes_the_canonical_checks(people):
+    """Seeded copy is authored through the same gate: every seeded record's text passes."""
+    from veda.modules.catalog import seed
+
+    records = tx(people[0], seed.records)  # seeding stores its synthetic media objects, so it runs as a user
+    assert records
+    for kind, key, doc in records:
+        assert kinds.text_problems(kind, kinds.load_model(kind, doc)) == [], (kind, key)

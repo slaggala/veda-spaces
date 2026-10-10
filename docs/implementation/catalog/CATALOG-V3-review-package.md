@@ -10,6 +10,346 @@
 
 Nothing here activates V3, changes V1 or V2, enables public intake, or changes production behaviour.
 
+## B1 final closure (follow-up to the PR #69 re-review)
+
+The re-review passed B2, B3, the 503 fix and migration 0105, and failed B1 narrowly. These forms still passed:
+- an amount per a countable noun (`1200 per shutter`, `per door`, `per room`, `per day`, `per hour`, `per wardrobe`,
+  `per module`);
+- an amount with a price qualifier (`1200 extra`, `1200 only`);
+- commission (`120000 commission`);
+- savings with a multi-digit percentage (`Save 20%`, `Save 20% on wardrobes`).
+
+**Closure: category-level classification, not example patterns** (`veda.modules.catalog.text.money_categories`,
+used by every prose policy, at authoring and by the release gate). The earlier list of rate patterns is replaced.
+
+Every number in customer prose is classified by the role its context gives it, whatever its value and however it is
+written (digits, grouping, decimals, magnitudes such as k, lakh and crore, or words such as "twelve hundred"). A
+number is allowed only in an allowlisted role:
+
+| Allowlisted role | How it is recognised | Examples |
+|---|---|---|
+| MEASUREMENT | A length, area, volume, weight, angle or electrical unit, after unit spellings are folded (sq-ft, s.ft, ft², square feet, running foot) | `900 sq ft`, `10 ft`, `4 m`, `18 mm board`, `8′ TV wall` |
+| DURATION | A time unit | `Up to 45 days`, `about 2 months` |
+| QUANTITY | A number counting a named thing, with no rate connector after it | `3 rooms`, `2 wardrobes selected`, `2 extra drawers` |
+| RANGE | Two numbers joined by to, a dash, a slash, or or by; the second number carries the role | `from 3 to 20 feet`, `16/18 mm`, `8-10 days` |
+| DATE or YEAR | An ISO or day/month date, a time, or a year after in, since or established | `in 2010` |
+| LABEL INDEX | After a series label (bedroom, option, step, version, specification and the like), never after an ordinary noun | `Bedroom 2`, `Specification 1.1` |
+| CODE | A number glued after letters, unless the letters are a currency | `E1`, `x1`; but `Rs1200` is money |
+
+Every other number is money, in one of four categories:
+
+| Category | How it is recognised |
+|---|---|
+| RATE | A number followed by per, /, each, every or for every and **any** noun (so no noun list is needed). Also: a or an and a unit or noun; per-area abbreviations (psf); rate wording before or after it; a measurement followed by a rate connector and an amount. |
+| DISCOUNT | Any percentage near saving, discount, off, cashback, rebate, deal or offer wording, on either side. Any other percentage in prose counts as a RATE. |
+| COMMISSION | Commission, brokerage or referral wording, with or without a number |
+| PROMOTIONAL PRICE | A currency sign or word, a magnitude, a price qualifier (only, extra, starting at, onwards), or **any number with no allowlisted role** (`Cabinets 1200`) |
+
+Commercial vocabulary is classified by category whether or not a number is present: trade, list, net or basic price;
+vendor cost; margin; rate card. The `save N%` claim pattern now matches multi-digit percentages.
+
+**Evidence** (`test_catalog_content_policy.py` unless stated):
+
+| Test | What it covers |
+|---|---|
+| `test_money_categories_are_classified_whatever_the_number_and_noun` | Generated cases: 18 number forms, including 0, single digits, grouping, decimals and spelled words, × 26 nouns, including invented ones, × 26 templates across the four categories. Each must be classified. |
+| `test_measurements_durations_quantities_and_labels_are_allowed_whatever_the_number` | Generated allowlist cases × every number |
+| `test_b1_final_countable_rates_qualifiers_commission_and_savings_are_refused` | Every reviewer example and variant, in every prose policy and at authoring |
+| `test_b1_final_does_not_regress_measurements_and_quantities` | The reviewer's measurement list |
+| `test_catalog_public_payload.py::test_b1_final_every_reviewer_example_fails_release_validation` | Each reviewer example fails release validation on SQLite and PostgreSQL, and is not echoed |
+
+The generated tests found a gap that the examples had not: the label-index allowance let "Door: 0" and "per shutter 0"
+through. Label indexes are now limited to series labels, and rate wording is checked first.
+
+**Proof of quantity** (follow-up review). QUANTITY was being inferred whenever a word followed a number, so
+`1200 apiece`, `1200 monthly`, `1200 plus GST`, `1200 on every door`, `1200 for installation` and `1.2 lakh monthly`
+passed. QUANTITY must now be proven, and only quantity-role assignment changed. A number is a QUANTITY only when it
+counts an approved business entity (`text.QUANTITY_NOUNS`: the schema's rooms and the furniture, joinery and visits
+the catalog prices, singular and plural), possibly after approved descriptive words (`QUANTITY_DESCRIPTORS`, for
+example "2 extra drawers", "3 base units", "1 L-shaped counter", "2-door wardrobe"). Labels and codes keep their own
+roles: `Package 3`, `Bedroom 2`, `Specification 1.1`, `I-401`, `E1`, `3D`, and ranking labels such as `No. 1` or `Top 10`, which the claim rules govern. Structured quantities stay structured
+fields. Everything else is money:
+
+| Form | Category |
+|---|---|
+| A periodic or per-piece word (daily, weekly, monthly, annually, hourly, apiece, a piece) | RATE |
+| on / at / for / in followed by every / each / per / a | RATE |
+| A tax add-on (plus, including or excluding GST or tax) | PROMOTIONAL PRICE |
+| A money magnitude anywhere in the number (lakh, crore, million) | PROMOTIONAL PRICE, or RATE when a connector follows |
+| A number followed by any unapproved word | PROMOTIONAL PRICE |
+
+**Tests** (`test_catalog_content_policy.py`):
+
+| Test | What it covers |
+|---|---|
+| `test_reviewer_quantity_false_negatives_are_money` | The reviewer's 13 false negatives |
+| `test_labels_and_codes_are_allowed` | The reviewer's 5 labels and codes |
+| `test_adversarial_periodic_tax_and_every_wordings_are_money_for_any_number` | 13 wordings × 18 number forms × 6 entities |
+| `test_a_following_word_never_makes_a_quantity_unless_it_is_an_approved_entity` | 15 unproven words × every number are money; approved entities × every integer are allowed |
+| `test_the_quantity_lookup_includes_the_schemas_rooms` | The schema's rooms are in the lookup |
+
+B2 and B3 are unchanged by this closure.
+
+## Claim and public-pricing policy closure (follow-up to the PR #69 review)
+
+The independent review did not certify PR #69 and named three application blockers:
+- **B1:** rates could leak through customer prose.
+- **B2:** warranty, certification, quality, popularity and delivery promises could appear in estimator and rate-card
+  customer text without a governed claim record.
+- **B3:** time-bounded claims were checked at activation but not at serve time.
+
+It also found a customer-facing `503`: the typical-area assumption "area assumed 900 sq ft" was read as a rate.
+
+This round replaces the remaining denylist-dependent behaviour with an allowlist-driven content policy.
+
+### Status
+
+| Item | Status |
+|---|---|
+| V3 | **Disabled** everywhere |
+| Infrastructure | **Not started** |
+| Public intake | **Disabled** |
+| Production V3 | **Prohibited** |
+| V1 and V2 | Unchanged |
+
+### What this package now states
+
+1. **Claim detection is defence in depth.** It is not the primary control and is not claimed to be complete.
+2. **Governed claim records and four-eyes review are the primary controls.**
+   - Every public field has exactly one of eleven content policies (`PUBLIC_FIELD_POLICIES`).
+   - A copy author must select a content policy.
+   - A claim or promise is shown only as a `GOVERNED_CLAIM_REFERENCE` to its approved record.
+   - The preview approver reviews the "new and changed public copy" report, whose digest is kept with the approval.
+3. **Customer prose cannot contain rates.** Every prose policy refuses money, rates and internal commercial wording.
+   This includes estimator and card text (exclusions, client scope, timeline labels, site-package text, product and
+   input labels) and imported and seeded copy.
+4. **Public money appears only through typed engine-generated fields.**
+   - These are the eight `ENGINE_GENERATED_AMOUNT` integers: range, GST, rounded room subtotals, site-package amount
+     and allowance band.
+   - They are computed by the engine from the approved card the estimate names in `pricing_card_version`, and they
+     are part of the estimate snapshot.
+5. **Measurements are structured and distinct from rates.**
+   - Typical-size assumptions are `PublicAssumption` objects: a value, a unit enum (`FT`, `SQ_FT`, `NOS`), a type
+     (`LENGTH`, `AREA`, `QUANTITY`, `DIMENSION`) and the basis `TYPICAL_ASSUMPTION`. The page renders them.
+   - `RATE` and `TOTAL_AMOUNT` are never public measurement types.
+   - "900 sq ft" without a rate connector is never money.
+6. **Time-bounded claims are checked at serve time.**
+   - Every public serve re-validates the release's governed claims: catalog, estimate creation and replay. The checks
+     are approval, withdrawal, effective date, review date (lapsing on that date), owner, environment and
+     applicability.
+   - Changes after activation are recorded as append-only claim controls (migration 0105).
+   - The catalog's cache lifetime never reaches past the next claim boundary.
+7. **Real-card execution remains separate owner evidence.** It has **not** been run for this head:
+   **REAL-CARD EVIDENCE PENDING.**
+8. V3 remains disabled.
+9. Infrastructure has not started.
+10. Public intake remains disabled.
+11. Production V3 remains prohibited.
+
+### Superseded statements
+
+These statements of the canonical customer-copy closure below are withdrawn:
+- **"Estimator and card text may state promise-matrix scope (PROMISE_GOVERNED_COPY)."** It allowed warranty,
+  certification and delivery wording in estimator and card text (B2). No such policy remains. Estimator wording is an
+  allowlist of engine texts; card text is structured and may carry no claim.
+- **"Promise-matrix content: warranty, quality-proofing, service and delivery wording... or estimator text within the
+  V2 matrix scope."** Only a promise record linked to its confirmed matrix row may now carry warranty, service or
+  durability wording. Any other claim category needs a claim record.
+- **"Checked at activation" as the only expiry control.** Superseded by serve-time validity (B3).
+- **The rate detection that read "900 sq ft" as a rate.** The "per" connector was optional in the per-area pattern.
+  The pattern now requires a currency, a magnitude or a rate connector, and assumptions are no longer prose.
+
+### Reviewer B1/B2/B3 closure matrix
+
+| Blocker | Reproduced | Closure | Evidence |
+|---|---|---|---|
+| B1 | Rates in customer prose, for example `1200 per square foot`, `1200/ft²`, `INR1200`, `1.2 L`, `trade price`, `net rate`, `percentage discount` | No money in any prose policy. Amounts exist only as typed engine integers linked to the card version. Detection covers amount-before-unit, unit-before-amount, missing currency, alternate symbols and units, superscripts, fraction slashes and zero-width splits. | `test_catalog_content_policy.py::test_money_and_rates_are_refused_in_every_prose_policy` (55 examples); `test_amounts_exist_only_as_typed_engine_integers`; `test_customer_text_in_the_staff_only_card_is_governed`; `test_import_refuses_rates_and_prices` |
+| B2 | Warranty, certification, quality, popularity and delivery wording in estimator and card text | One rule for catalog, estimator and card text: a claim of any of 13 categories only through a governed claim reference. Estimator wording is allowlisted. Copy needs an author-selected policy. | `test_every_claim_example_needs_a_governed_claim_reference` (the 19 B2 examples plus 45 synonyms); `test_no_claim_outside_a_governed_claim_reference`; `test_estimator_wording_is_an_allowlist`; `test_claim_or_money_cannot_be_authored_as_factual_or_legal_copy` |
+| B3 | Expiry checked only at activation | Serve-time validity on every catalog serve, estimate and replay. Append-only claim controls. Cache bounded by the next claim boundary. | `test_catalog_claim_validity.py` (before, at and after the review date; withdrawal; owner removal; applicability; environment; cache lifetime; staff API) |
+| 503 | `area assumed 900 sq ft` read as a rate | Structured assumptions, and a rate requires a connector. | `test_every_v2_state_builds_a_valid_structured_public_estimate`; `test_the_area_assumption_that_caused_a_503_is_structured_and_safe`; `test_measurements_quantities_and_timelines_are_not_money` |
+
+### Other items in this round
+
+- **Normalisation gaps.** Closed: combining marks, Latin small capitals, narrow leetspeak (claim detection only),
+  superscript and subscript digits, fraction slashes, uncommon Unicode spaces, and mixed-script words (refused at
+  authoring and in payloads). Tested in `test_remaining_normalisation_gaps_are_closed`.
+- **Public rule DTO.** It now uses the authoritative reference-path pattern for the subject and objects, bounded
+  collections, positive bounds and the source model's rule types without `staff_only`. Unknown properties are refused.
+- **Rollback.**
+  - Rollback stays fail-closed.
+  - A digest defect found in this round is fixed: the per-release card version is now neutralised in the payload
+    digest, like the release code.
+  - Incident runbook: [CATALOG-V3-incident-runbook.md](CATALOG-V3-incident-runbook.md).
+- **Idempotency.**
+  - The key is bound to the required browser token, the request type and the normalised request digest.
+  - The digest version is `idempotency/2`.
+  - See [CATALOG-V3-idempotency.md](CATALOG-V3-idempotency.md).
+
+### Validation of this round (local; CI is reported in the PR)
+
+| Check | Result |
+|---|---|
+| API on SQLite and PostgreSQL | 3063 tests, 14 skipped (the same 11 engine-specific and 3 local-only real-card skips). The first full run had 10 failures: the tests pinning the migration head and order needed 0105, and the conformance rule refused a column named `applies_to` (renamed `scope`). The affected suites were re-run on both engines and pass. |
+| mypy ratchet | 157 (baseline 157) |
+| ruff, format, OpenAPI (additive: two staff claim routes), bandit, secret scan, deploy-check | Pass |
+| Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
+| V3 browser journey | 88/88 |
+| Real-card equivalence | **REAL-CARD EVIDENCE PENDING** (not run by the implementer; not simulated) |
+
+## Canonical customer-copy closure (follow-up to PR #68)
+
+### Current status
+
+| Item | Status |
+|---|---|
+| V3 | **Off** in every environment. Every switch defaults off, and production refuses each one. |
+| Protected staging | **Uncertified.** |
+| Protected-staging infrastructure (bucket, KMS, malware scanner, CDN, CSP for media) | **Not started.** |
+| Public intake | **Disabled.** |
+| Real media and 3D | **Disabled.** No real media or 3D asset is uploaded. |
+| Production V3 | **Prohibited.** |
+
+### Corrections to the customer-safety closure
+
+1. **This statement is withdrawn:** "Every customer-visible text path is inventoried and is either factual,
+   controlled-copy governed, or promise-matrix governed."
+   - It covered catalog records only.
+   - Estimate response text and the customer text kept in the pricing card were outside that inventory and its
+     checks.
+   - The independent reviewer reproduced two defects on `main` at `006c203`:
+     - estimate and card text bypassed the inventory;
+     - claims and rates passed when written with invisible characters, fullwidth forms, Cyrillic lookalikes,
+       separators or informal pricing (10 of 13 variants).
+2. **Governance is claimed only as far as the final-payload tests prove it.** A field counts as governed when:
+   - it is a field of a strict public DTO;
+   - its classification is in `PUBLIC_FIELD_CLASSES`;
+   - its strings pass the one canonical checker in release validation and in its serialiser.
+
+   Record approval alone is not evidence.
+3. **Earlier journey counts were stale.** The "34/34" counts below are historical. The V3 browser journey now has
+   **88 checks**.
+
+### The distinct inventories
+
+| Inventory | What it covers | How it is governed | Evidence |
+|---|---|---|---|
+| **Catalog inventory** | 151 string-bearing fields of the catalog record models (authoring) | `text.FIELD_CLASSES`: factual, statement, staff or identifier. Text checks run at authoring, submission and release. | `test_catalog_text_inventory.py`, `test_catalog_claims.py` |
+| **Public catalog payload** | Every field of `PublicCatalog` and its nested DTOs | Eight classes. `check_payload` runs at release validation and in `configure.public_catalog`, which fails closed with 503. | `test_catalog_canonical_copy.py`, `test_catalog_public_payload.py` |
+| **Estimate and pricing inventory** | Every field of `PublicEstimate`. The pricing card's customer-visible text: exclusions, client scope, timeline labels, site-package labels and inclusions, product and input labels. | Estimate text is PROMISE_GOVERNED_COPY: the V2 promise matrix scope, with no rate, amount, contact or marketing claim. It is checked in representative estimates at release, in `create_public`, and on replay. Card text is checked at release although the card is staff-only. | `test_catalog_public_payload.py` |
+| **Controlled claims** | Copy records with claim governance | The declared categories must equal those detected in canonical form. The record needs source, evidence reference and period, owner, backup owner, an approver who is not the owner, an effective date, a review date or an explicit non-expiring policy, environments, and the canonical digest. Placeholders, self-approval, an expired claim, a claim not allowed in this environment, and an ownerless or unapproved claim all fail closed. | `test_catalog_canonical_copy.py`, `test_catalog_claims.py` |
+| **Promise-matrix content** | Warranty, quality-proofing, service and delivery wording: lifetime warranty, guaranteed, certified, waterproof, termite or scratch proof, maintenance free, guaranteed or on-time delivery, one-day callback, free service or consultation | Only a promise copy record linked to its confirmed matrix row (ESSENTIAL-1.1), or estimator text within the V2 matrix scope | `test_catalog_canonical_copy.py`, `test_catalog_closure.py` |
+| **Public totals (allowed)** | The range, GST, rounded room subtotals, site-package amount, allowance band | PRICE_OR_RATE_COPY: integers computed by the engine, never text | `test_public_totals_are_numbers_not_text` |
+| **Prohibited rates** | Unit rates, line amounts, margins, markups, procurement, supplier, dealer or cost prices, price ceilings, discounts | In no public DTO, and refused in every customer string in every format, including `₹1200`, `Rs 1200`, `INR 1200`, `1200/-`, `1,200`, `1,20,000`, `/sqft`, `per sq ft`, `12k per sqft`, `12K/sft`, `psf`, `rft`, `per running foot`, `per unit`, `/pc`, `% off`, `percent off`, fullwidth digits, the fraction slash and zero-width splits | `test_rates_and_prices_are_refused_everywhere` (34 formats); `test_sizes_counts_and_timelines_are_not_rates` (negatives) |
+
+### Canonical normalisation
+
+`veda.modules.catalog.text` decodes once and builds the canonical form. Every check compares in that form. The steps:
+
+1. NFKC.
+2. Remove invisible and format characters: Cf, Cc, Co, Cs, Cn, variation selectors, Mongolian free variation
+   selectors and U+034F.
+3. Casefold.
+4. Map a narrow Cyrillic, Greek and Latin lookalike set to Latin.
+5. Make every Unicode space a space.
+6. Make every dash and the separators `_ - / \ . : |` and punctuation a single space.
+7. Remove apostrophes and join letter-spaced runs, so "b e s t" becomes "best".
+8. Drop a short list of factual compounds: free-standing, hands-free, top-hung, top-mounted, best-fit hinge, leading
+   edge.
+
+Detection matches whole words and phrases in this form, never substrings.
+
+Normalisation is comparison only:
+- Stored display text is never rewritten (`test_rows_are_never_rewritten_by_normalisation`).
+- New text containing invisible or format characters is refused at authoring.
+- Every record event (created, updated, approved) audits both the display digest and the canonical digest of each
+  customer-visible field.
+- Normalising text never authorises it.
+
+### Release-wide payload validation
+
+`validation._public_payload` builds the complete resolved public catalog payload and the representative estimate
+payloads:
+- each home under each online package and project kind;
+- then each customer extra added to, and each other customer variant chosen in, a default room.
+
+It also checks the card's customer text. Every string goes through the same `check_text`.
+
+The digest of the payloads (`public_payload_sha256`) has the release identifiers neutralised. It is:
+- recorded at preview approval and at release approval;
+- compared at release approval and again at activation.
+
+A change to pricing, specification, copy or catalog after approval refuses activation, and approval must be given
+again (`test_a_payload_change_after_approval_refuses_activation`). A rollback carries the digest its target was
+activated with, so a restore of what customers saw is allowed and anything else is refused.
+
+### Reviewer-reproduced bypasses and their closure
+
+| Reproduced on `006c203` | Closure evidence |
+|---|---|
+| Estimate and card text outside the inventory | `PublicEstimate` and `card_texts` are classified and checked: `test_estimator_text_with_a_claim_blocks_the_release`, `test_customer_text_in_the_staff_only_card_is_governed`, `test_the_serialiser_refuses_a_stored_estimate_whose_text_fails` |
+| Zero-width split `B\u200best seller` | `test_reproduced_bypasses_are_detected`, `test_invisible_and_format_characters_are_reported` |
+| Fullwidth `Ｂｅｓｔ ｓｅｌｌｅｒ` | `test_reproduced_bypasses_are_detected` |
+| Cyrillic `Bеst seller`, `Тop rated` | `test_reproduced_bypasses_are_detected` |
+| Underscore, en and em dash, slash, backslash, colon, pipe, NBSP, spaced dots, letter spacing, repeated punctuation | `test_reproduced_bypasses_are_detected` (27 variants) |
+| `1200/sqft`, `12k per sft`, `1,20,000`, `20% off` | `test_rates_and_prices_are_refused_everywhere` |
+| A string unclassified or weakly typed | `test_no_public_dto_has_a_weak_type`, `test_every_public_field_is_classified_and_the_registry_has_no_stale_entries`, `test_an_unclassified_or_weak_public_field_fails_closed` |
+
+### Other closures in this round
+
+- **Idempotency.**
+  - The key is required, with at least 128 bits.
+  - It is stored only as a SHA-256 scoped to the browser's `X-Veda-Client` token, so no other browser can replay it.
+  - It expires after 24 hours (`409 IDEMPOTENCY_KEY_EXPIRED`).
+  - Concurrency, timeout-then-retry, original-response recovery and 409 key replacement are tested.
+  - See [CATALOG-V3-idempotency.md](CATALOG-V3-idempotency.md).
+- **Turnstile.**
+  - Mocked Cloudflare siteverify covers rejected, used (`timeout-or-duplicate`), wrong-hostname, unreachable, empty
+    and oversized tokens (`test_catalog_turnstile.py`).
+  - The browser journey adds a callback error, an empty token, a token past its accepted age, a mismatched token, a
+    redelivered used token, a server used-token rejection, and waiting and submitting double clicks.
+  - Customer messages are mapped by what happened:
+
+    | Situation | Message |
+    |---|---|
+    | 422 | "Please review the highlighted information." |
+    | 409 | "This request conflicts with an earlier submission. Please refresh and try again." |
+    | 429 | "Too many attempts. Please wait before trying again." |
+    | Anti-bot refusal only | "The security check could not be completed. Please retry." |
+
+    A 500 or 503 is never labelled an anti-bot failure.
+- **Accessibility.**
+  - Images are checked as really decoded from hashed delivery paths with alt text, and really failing to text with
+    no broken image left.
+  - The focus walk covers radios, checkboxes, buttons, links, panels and the gallery dialog, which returns focus on
+    Escape.
+  - The keyboard run selects a style and an extra and verifies them in the request.
+  - Overflow is checked on the initial page, an expanded panel, the gallery, the result, the error summary and the
+    longest text.
+  - **Defect found and fixed:** choosing a style re-rendered the room and dropped keyboard focus to the page body.
+    Focus now stays on the chosen option.
+- **Real-card evidence.**
+  - An owner-run procedure and tool exist. **It has not been run on the real card**, and no real-card artifact
+    exists.
+  - Real-card equivalence is therefore not claimed as verified for this head.
+  - See [CATALOG-V3-real-card-evidence.md](CATALOG-V3-real-card-evidence.md).
+- **V3 estimate response.**
+  - It is now the strict `PublicEstimate`.
+  - The V2-only blocks are no longer sent to V3: `v2_copy`, `room_details`, `warranty`, `subject_to`,
+    `optional_items_minor`, `rate_card_version`, the preparation note and component codes.
+  - The V3 page never rendered them. V1 and V2 responses are unchanged.
+
+### Closure validation (local; CI is reported in the PR)
+
+| Check | Result |
+|---|---|
+| API on SQLite and PostgreSQL | 2740 tests: 1 failure, since fixed (a docs registry entry for the cited `006c203`), 0 errors, 14 skipped. The skips are the same 11 engine-specific ones and 3 local-only real-card tests as in §18. |
+| Canonical-copy, payload, claims, idempotency and Cloudflare-path suites | Pass |
+| mypy ratchet | 157 (baseline 157) |
+| ruff, format, OpenAPI snapshot, bandit, secret scan, deploy-check | Pass. pip-audit runs in CI; no dependency changed. |
+| Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
+| V3 browser journey | 86/86 |
+| Real-card equivalence | **Not run on the real card for this head.** The procedure was dry-run end to end on the synthetic card (both engines: PASS, artifact intact). That proves the tool, not the real card. |
+
 ## Post-merge status and corrections (pre-activation closure)
 
 PR #66 was re-certified **for merge with pre-activation conditions** and merged. Four claims in this package were
@@ -128,7 +468,7 @@ UNASSIGNED. It therefore cannot activate, reach the public payload, be priced, o
 | mypy ratchet | 157 (baseline 157) |
 | ruff, OpenAPI, bandit, pip-audit, secret scan, deploy-check | Pass |
 | Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
-| V3 browser journey | 34/34, three consecutive runs |
+| V3 browser journey | 34/34, three consecutive runs (historical: the journey had 34 checks then; it now has 88) |
 
 A keyboard-speed race found in this round, an estimate sent before the Turnstile widget rendered, is fixed: the page
 now awaits the widget.
@@ -409,7 +749,7 @@ No amount appears in any output.
 | mypy ratchet | 157 (baseline 157), 0 new |
 | ruff, format, OpenAPI | Pass |
 | Workspace on Node 22.23.3 (the CI version): lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
-| V3 browser journey | 34/34 |
+| V3 browser journey | 34/34 (historical; the journey now has 88 checks) |
 
 **The 14 skips:**
 

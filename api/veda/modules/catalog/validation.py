@@ -15,13 +15,13 @@ from sqlalchemy.orm import Session
 
 from veda.modules.estimator import engine, promise_matrix, ratecard
 
+from . import claims, kinds, public, rules
 from . import compile as catalog_compile
-from . import kinds, rules
 from .models import CatalogMediaObject, CatalogRelease
 
 CHECKS = (
     "schema", "references", "pricing", "measurements", "defaults", "promises", "copy", "media", "three_d", "rules",
-    "card",
+    "card", "public_payload",
 )  # fmt: skip
 _UNIT = {"length": "ft", "area": "sqft"}
 
@@ -33,7 +33,7 @@ def _digest(document) -> str:
 def validate(s: Session, release: CatalogRelease, *, today: date | None = None) -> dict:
     errors: dict[str, list[str]] = {c: [] for c in CHECKS}
     warnings: list[str] = []
-    today = today or date.today()
+    today = today or claims.today()
     try:
         cat = catalog_compile.load_release(s, release)
     except Exception as err:  # noqa: BLE001 — any schema or integrity failure refuses the release
@@ -49,7 +49,7 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
         _pricing(cat, card, errors["pricing"], errors["measurements"])
         _defaults(cat, card, errors["defaults"], today)
     _promises(cat, errors["promises"], warnings)
-    _copy(cat, errors["copy"], today)
+    _copy(cat, errors["copy"], today, claims.controls(s))
     _media(s, cat, errors["media"], errors["three_d"], warnings, today)
     errors["rules"].extend(rules.contradictions(cat))
     for key, rule in sorted(cat.of(kinds.Rule).items()):
@@ -61,6 +61,7 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
     if not cat.of(kinds.HomeConfig):
         errors["references"].append("the release has no home configuration")
     _warnings(cat, warnings)
+    payload_sha = _public_payload(s, cat, card, errors["public_payload"]) if card is not None else None
     compiled = None
     if card is not None and not any(errors.values()):
         view = catalog_compile.customer_view(cat)
@@ -68,8 +69,105 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
             "card_version": card.version,
             "card_sha256": _digest(catalog_compile.card_document(cat)),
             "view_sha256": _digest(view),
+            "public_payload_sha256": payload_sha,
         }
     return _report(errors, warnings, compiled)
+
+
+# --- the final resolved public payload (canonical customer-copy closure, Phase 7) -----------------------------------
+# Representative estimates carry fixed placeholder identifiers so their digest depends only on the content.
+_PLACEHOLDER = {"reference": "E-RELEASE-CHECK", "expires_on": "2000-01-01", "configuration_reference": "C00000000"}
+
+
+def representative_configurations(cat) -> list[dict]:
+    """Every home's default under each online package and project kind, then each customer extra added to and each
+    other customer variant chosen in a default room: the estimate texts each of them produces are what is checked."""
+    hidden = catalog_compile.hidden_paths(cat)
+    out = []
+    for hkey, home in sorted(cat.of(kinds.HomeConfig).items()):
+        for pkey in home.packages:
+            package = cat.one(kinds.Package, pkey)
+            if package is None or package.consultation_only or package.engine_package == "LUXURY":
+                continue
+            for project_kind in home.availability.project_kinds or ("NEW_HOME",):
+                base = {**default_configuration(cat, hkey, pkey), "project_kind": project_kind}
+                out.append(base)
+                for i, room in enumerate(base["rooms"]):
+                    template = cat.one(kinds.RoomTemplate, room["room"])
+                    if template is None:
+                        continue
+                    for ekey in template.extras:
+                        if f"extra:{ekey}" not in hidden and ekey not in room["extras"]:
+                            out.append(_with(base, i, extras={**room["extras"], ekey: {}}))
+                    for slot in template.included:
+                        product = cat.one(kinds.Product, slot.product)
+                        for v in product.variants if product else ():
+                            if v.key != slot.variant and not catalog_compile._variant_hidden(
+                                hidden, slot.product, v.key
+                            ):
+                                out.append(_with(base, i, products={slot.product: {"variant": v.key}}))
+    return out
+
+
+def _with(base: dict, i: int, **room) -> dict:
+    rooms = [dict(r) for r in base["rooms"]]
+    rooms[i] = {**rooms[i], **room}
+    return {**base, "rooms": rooms}
+
+
+def _public_payload(s: Session, cat, card, out: list[str]) -> str | None:
+    """Build the complete public catalog payload and the representative estimate payloads exactly as they would be
+    served, traverse every string through the one canonical checker, check the card's customer-visible text (the card
+    is staff-only; its text is not), and return the digest of everything checked. Unclassified fields, weak types
+    and payloads that do not build fail closed."""
+    from veda.modules.estimator import service as estimator_service
+
+    payloads: list = []
+    try:
+        dto = public.build_catalog(cat)
+    except (ValueError, KeyError) as err:
+        out.append(f"the public catalog payload does not build: {str(err).splitlines()[0][:200]}")
+        return None
+    # The digest covers customer content: the release's own identifiers are neutralised, so a rollback that restores
+    # exactly what customers saw has the same digest as the release it restores.
+    payloads.append(
+        dto.model_copy(update={"release": _PLACEHOLDER["configuration_reference"], "manifest_sha256": "0" * 64})
+    )
+    out.extend(public.check_payload(dto, records=cat.of(kinds.Copy)))
+    for where, value, policy in public.card_texts(card):
+        out.extend(public.check_text(where, value, policy))
+    seen = set()
+    for config in representative_configurations(cat):
+        try:
+            resolved = catalog_compile.resolve(cat, config)
+            est = engine.calculate(card, resolved.request)
+        except (catalog_compile.CompileError, engine.EstimateError):
+            continue  # an unsupported combination is refused to customers too; the defaults check covers the rest
+        result = json.loads(json.dumps(est.staff_view(), default=str))
+        spec_row = estimator_service.active_spec(s, est.package)
+        spec = customer_spec_view(spec_row)
+        try:
+            estimate = public.build_estimate(result, card=card, catalog_release="RELEASE", specification=spec,
+                                             **_PLACEHOLDER)  # fmt: skip
+        except (ValueError, KeyError) as err:
+            out.append(f"the estimate payload for {config['home']} / {config['package']} does not build: "
+                       f"{str(err).splitlines()[0][:200]}")  # fmt: skip
+            continue
+        key = estimate.model_dump_json()
+        if key in seen:
+            continue
+        seen.add(key)
+        payloads.append(estimate.model_copy(update={"pricing_card_version": "CARD"}))  # an identifier, neutralised
+        for problem in public.check_payload(estimate):
+            out.append(f"estimate {config['home']} / {config['package']}: {problem}")
+    out[:] = list(dict.fromkeys(out))
+    return public.digest(payloads)
+
+
+def customer_spec_view(row) -> dict | None:
+    from veda.modules.estimator import customer_spec
+
+    return customer_spec.customer_view(row.document) if row is not None else None
 
 
 def _report(errors: dict[str, list[str]], warnings: list[str], compiled) -> dict:
@@ -337,25 +435,14 @@ def _promises(cat: catalog_compile.Catalog, out: list[str], warnings: list[str])
             warnings.append(f"package {key}: no warranty statement")
 
 
-def _copy(cat: catalog_compile.Catalog, out: list[str], today: date) -> None:
+def _copy(cat: catalog_compile.Catalog, out: list[str], today: date, current_controls=None) -> None:
     """The text gate (customer-safety closure). Every customer-visible string in the release is checked by the current
     rules, so a record saved before a rule existed cannot reach a new release. Every claim must be approved, owned,
     sourced, in effect and, when absolute, independently substantiated."""
     for kind, models in sorted(cat.models.items()):
         for key, model in sorted(models.items()):
             out.extend(f"{kind} {key}: {p}" for p in kinds.text_problems(kind, model))
-    for key, copy in sorted(cat.of(kinds.Copy).items()):
-        c = copy.claim
-        if c is None:
-            continue
-        if c.status != "APPROVED":
-            out.append(f"copy {key}: claim is {c.status}, not approved")
-        if not promise_matrix._named(c.owner):
-            out.append(f"copy {key}: claim has no responsible owner")
-        if c.effective_from > today:
-            out.append(f"copy {key}: claim is not in effect until {c.effective_from.isoformat()}")
-        if c.review_by is not None and c.review_by < today:
-            out.append(f"copy {key}: claim review date {c.review_by.isoformat()} has passed")
+    out.extend(claims.problems(cat, on=today, current=current_controls))
 
 
 def _objects(s: Session, shas: set[str]) -> dict[str, CatalogMediaObject]:

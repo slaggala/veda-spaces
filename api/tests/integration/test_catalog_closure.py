@@ -18,11 +18,13 @@ from tests.integration.test_catalog import (
     seed_slice,
     tx,
 )  # fmt: skip
+from tests.support import claims
 from tests.support.dbh import rows
 from veda.kernel import db
 from veda.kernel.context import actor, system_context
 from veda.modules.catalog import compile as catalog_compile
 from veda.modules.catalog import kinds, media, seed, service
+from veda.modules.catalog import text as text_rules
 from veda.modules.catalog.models import (
     CatalogConfiguration,
     CatalogEvent,
@@ -57,7 +59,9 @@ def change(uid, kind, key, fn):
                                   "Premium pick", "Certified quality", "Delivery included", "#1 choice"])  # fmt: skip
 def test_badge_claims_cannot_be_registered_without_governance(text):
     with pytest.raises(ValueError):
-        kinds.parse("copy", {"statement": text, "category": "badge", "promise": False})
+        kinds.parse(
+            "copy", {"statement": text, "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"}
+        )
 
 
 def test_free_form_badge_text_is_refused():
@@ -80,7 +84,8 @@ def test_an_unconfirmed_promise_badge_blocks_release(people):
     a, b = people
     seed_slice(a)
     tx(a, service.create_record, "copy", "copy.badge.warranty", {
-        "statement": "Manufacturer’s warranty", "category": "badge", "promise": True, "matrix_row": "manufacturer_warranty",
+        "statement": "Manufacturer’s warranty", "category": "badge", "promise": True,
+        "content_policy": "GOVERNED_CLAIM_REFERENCE", "matrix_row": "manufacturer_warranty",
         "applies_to": {"packages": ["slice.essential"]},
         "governance": {"owner": "UNASSIGNED", "backup": "UNASSIGNED", "quotation_mapping": "x1", "verification": "x1",
                        "warranty_source": "x1"}})  # fmt: skip
@@ -97,17 +102,18 @@ def test_an_unconfirmed_promise_badge_blocks_release(people):
 def test_only_approved_badge_copy_reaches_the_public_payload(api, people):
     a, b = people
     seed_slice(a)
-    tx(a, service.create_record, "copy", "copy.badge.chosen", {
-        "statement": "Most chosen", "category": "badge", "promise": False,
-        "applies_to": {"packages": ["slice.essential"]},
-        "claim": {"category": "popularity", "status": "APPROVED", "source": "Order data (synthetic)",
-                  "owner": "Sales lead (role, test)", "effective_from": "2026-10-01"}})  # fmt: skip
+    tx(a, service.create_record, "copy", "copy.badge.chosen", claims.claim_copy("Most chosen"))
     change(a, "package", "slice.essential", lambda d: d.update(badge="copy.badge.chosen"))
     approve_all(a, b)
     release(a, b)
     view = api.get("/api/v1/public/catalog", anonymous=True).data
     assert view["package"]["slice.essential"]["badge"] == "copy.badge.chosen"
-    assert view["copy"]["copy.badge.chosen"]["statement"] == "Most chosen"
+    assert view["claim"]["copy.badge.chosen"] == {
+        "statement": "Most chosen",
+        "category": "badge",
+        "claim_categories": ["popularity"],
+    }
+    assert "copy.badge.chosen" not in view["copy"], "a claim is served only as a governed claim reference"
     for claim in ("Lifetime warranty", "Guaranteed lowest price", "Free installation"):
         assert claim not in json.dumps(view)
 
@@ -165,7 +171,7 @@ def test_every_string_in_the_customer_payload_is_governed(people):
         if KEYISH.match(text) or text in promise_statements:
             continue
         checked += 1
-        assert not kinds._PROMISE_WORDS.search(text), (path, text)
+        assert not text_rules.promise_in(text), (path, text)
     assert checked > 40
 
 

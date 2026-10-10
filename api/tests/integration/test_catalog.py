@@ -8,6 +8,7 @@ Promise owners in tests are role placeholders, never people.
 import base64
 import io
 import json
+import secrets
 from pathlib import Path
 
 import pytest
@@ -97,9 +98,17 @@ def live_slice(people):
     return release(a, b)
 
 
+CLIENT = "test-browser-0123456789abcdef"  # the V3 page's per-browser token (X-Veda-Client)
+
+
+def new_key() -> str:
+    """A fresh Idempotency-Key, as the V3 page makes one per request (128 random bits)."""
+    return f"v3-{secrets.token_hex(16)}"
+
+
 def public_estimate(api, configuration):
     return api.post("/api/v1/public/catalog/estimates", {"configuration": configuration, "turnstile_token": "ok-token"},
-                    anonymous=True, headers={"Origin": SITE})  # fmt: skip
+                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": new_key(), "X-Veda-Client": CLIENT})  # fmt: skip
 
 
 def living(**room):
@@ -141,7 +150,16 @@ def test_reject_needs_a_reason_and_returns_to_draft(people):
         ("product_family", {"name": "TV units with a lifetime warranty", "category": "x1"}, "promise"),
         ("product_family", {"name": "TV units from ₹40,000", "category": "x1"}, "amount of money"),
         ("product_family", {"name": "TV units", "category": "x1", "colour": "red"}, "Extra inputs"),
-        ("copy", {"statement": "Branded hinges included", "category": "hardware", "promise": False}, "promise"),
+        (
+            "copy",
+            {
+                "statement": "Branded hinges included",
+                "category": "hardware",
+                "promise": False,
+                "content_policy": "FACTUAL_TEXT",
+            },
+            "promise",
+        ),
         ("copy", {"statement": "Soft-close hinges", "category": "hardware"}, "governance"),
         (
             "media",

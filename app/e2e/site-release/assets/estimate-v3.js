@@ -60,7 +60,7 @@
     TOKEN_AVAILABLE: 'Ready.',
     SUBMITTING: 'Preparing your estimate…',
     SUCCEEDED: '',
-    FAILED: 'The security check could not be completed. Your choices are kept; try again.',
+    FAILED: 'The security check could not be completed. Please retry.',
     EXPIRED: 'The security check expired. It is being renewed…',
   };
   const guards = {
@@ -224,9 +224,11 @@
   const consultation = (pkey, vkey, gkey, ckey) => {
     const paths = new Set([`product:${pkey}@${gkey}=${ckey}`, `product:${pkey}#${vkey}@${gkey}=${ckey}`]);
     const rule = Object.values(C.rule || {}).find((r) => r.type === 'requires_consultation' && !r.condition && paths.has(r.subject));
-    return rule ? (C.copy[rule.message]?.statement || 'Discussed in a consultation.') : null;
+    return rule ? (copyText(rule.message) || 'Discussed in a consultation.') : null;
   };
-  const statement = (key, fallback) => C.copy[key]?.statement || fallback;
+  // Approved copy and governed claims are served separately (a claim only as a reference to a valid claim record).
+  const copyText = (key) => (key && (C.copy[key]?.statement || C.claim?.[key]?.statement)) || '';
+  const statement = (key, fallback) => copyText(key) || fallback;
   const describe = (d) => [d.description && el('p', { text: d.description }),
     d.what_is_this && el('details', { class: 'v3-what' }, el('summary', { text: 'What is this?' }), el('p', { text: d.what_is_this }),
       d.typically_used_for ? el('p', { class: 'v3-note', text: `Typically used for: ${d.typically_used_for}` }) : null)];
@@ -244,7 +246,12 @@
 
   function radio(name, value, checked, label, sub, onChange) {
     const input = el('input', { type: 'radio', name, value, checked });
-    input.addEventListener('change', onChange);
+    input.addEventListener('change', () => {
+      onChange();
+      // The change re-renders its section: keep keyboard focus on the same choice (never lost to the page body).
+      const again = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);
+      if (again && again !== input) again.focus();
+    });
     return el('label', { class: 'v3-choice' }, input, el('span', {}, el('strong', { text: label }), sub ? el('small', { text: sub }) : null));
   }
   function renderHome() {
@@ -256,7 +263,7 @@
     const pkgs = home().packages.map((k) => [k, C.package[k]]).filter(([, p]) => p);
     if (!state.pkg) state.pkg = (pkgs.find(([, p]) => p.recommended && !p.consultation_only) || pkgs.find(([, p]) => !p.consultation_only) || [])[0];
     $('#v3-packages').replaceChildren(...pkgs.map(([k, p]) => {
-      const summary = C.copy[p.public_summary]?.statement;
+      const summary = copyText(p.public_summary);
       const choice = radio('v3-pkg', k, state.pkg === k, p.name, summary, () => { state.pkg = k; });
       if (p.consultation_only) { choice.querySelector('input').disabled = true; choice.classList.add('v3-off'); }
       return choice;
@@ -293,7 +300,7 @@
               el('a', { href: '/#contact', class: 'v3-consult', text: 'Ask about this in a consultation', onclick: () => track('quotation_requested', slot.product) }));
           }
           const cm = (c.materials || []).map((m) => C.material[m]).filter(Boolean);
-          if (cm.length) label.querySelector('span').append(el('small', { class: 'v3-note', text: cm.map((m) => C.copy[m.statements?.[0]]?.statement || m.name).join(' ') }));
+          if (cm.length) label.querySelector('span').append(el('small', { class: 'v3-note', text: cm.map((m) => copyText(m.statements?.[0]) || m.name).join(' ') }));
           return label;
         })));
     }
@@ -360,16 +367,31 @@
       }),
     };
   }
-  function problems(body) {
-    const list = Array.isArray(body.errors) && body.errors.length ? body.errors.map((e) => e.message) : ['We could not prepare an estimate right now. Please try again.'];
+  function problems(heading, details = []) {
     const box = $('#v3-summary');
-    box.replaceChildren(el('p', { text: 'Please check the following:' }), el('ul', {}, ...[...new Set(list)].map((t) => el('li', { text: t }))));
+    box.replaceChildren(el('p', { 'data-field': 'summary', text: heading }),
+      ...(details.length ? [el('ul', {}, ...[...new Set(details)].map((t) => el('li', { text: t })))] : []));
     box.hidden = false; box.focus();
   }
-  const CONTROLLED = { CAPTCHA_FAILED: 'The security check could not be completed. Your choices are kept; try again.',
-    TIMEOUT: 'This is taking longer than expected. Your choices are kept; try again.',
-    UNREACHABLE: 'We could not reach our server. Your choices are kept; try again.',
-    RATE_LIMITED: 'Too many requests. Please wait a minute and try again.' };
+  // What the customer is told, by what actually happened (canonical customer-copy closure, Phase 8). Only an anti-bot
+  // refusal says the security check failed; a server error, a timeout and a conflict each say what they are.
+  const MESSAGES = {
+    ANTI_BOT: 'The security check could not be completed. Please retry.',
+    422: 'Please review the highlighted information.',
+    409: 'This request conflicts with an earlier submission. Please refresh and try again.',
+    429: 'Too many attempts. Please wait before trying again.',
+    TIMEOUT: 'This is taking longer than expected. Your choices are kept; please try again.',
+    UNREACHABLE: 'We could not reach our server. Your choices are kept; please try again.',
+    SERVER: 'We could not prepare an estimate right now. Your choices are kept; please try again.',
+  };
+  function failure(r) {
+    const code = r.body?.code;
+    if (code === 'CAPTCHA_FAILED') return [MESSAGES.ANTI_BOT, []];
+    if (r.status === 422) return [MESSAGES[422], (r.body?.errors || []).map((e) => e.message).filter(Boolean)];
+    if (r.status === 409 || r.status === 429) return [MESSAGES[r.status], []];
+    if (r.status === 0) return [MESSAGES[code] || MESSAGES.UNREACHABLE, []];
+    return [MESSAGES.SERVER, []];
+  }
   /** Send one estimate request, or nothing. Returns true on success. */
   async function estimate(name) {
     const g = guards[name];
@@ -396,8 +418,7 @@
     if (!lost) g.sent = null; // only a lost response is retried with the same key
     setState(g, 'FAILED');
     renew(g); // a fresh token arrives through the callback; the customer retries when ready
-    const code = r.body?.code;
-    problems(CONTROLLED[code] ? { errors: [{ message: CONTROLLED[code] }] } : r.body);
+    problems(...failure(r));
     return false;
   }
   $('#v3-estimate').addEventListener('click', async () => { if (await estimate('estimate')) { track('estimate_reached'); show(3); } });
@@ -408,6 +429,10 @@
     // Every customer-critical field of the estimate response (E3); headings are page labels, names come from
     // registered catalog copy where it exists, otherwise from the estimate itself.
     const list = (items) => el('ul', {}, ...(items || []).map((x) => el('li', { text: x })));
+    // Typical-size assumptions arrive as structured parts (a number and a unit), never as prose with figures in it.
+    const UNIT = { FT: 'ft', SQ_FT: 'sq ft', NOS: '' };
+    const assumption = (a) => `${a.room_label} – ${a.item_label}${a.instance > 1 ? ` (${a.instance})` : ''}: typical `
+      + `${a.measurement_label.toLowerCase()} assumed: ${Number(a.value).toLocaleString('en-IN')}${UNIT[a.unit] ? ` ${UNIT[a.unit]}` : ''}`;
     const block = (heading, ...kids) => el('section', { class: 'v3-block', 'aria-label': heading }, el('h3', { text: heading }), ...kids);
     const pp = e.project_preparation || {};
     const al = e.custom_features_allowance || {};
@@ -419,7 +444,7 @@
       block(statement('copy.label.site-package', pp.label), el('p', { 'data-field': 'project_preparation', text: `${rupees(pp.amount_minor || 0)}. ${pp.description || ''}` }), list(pp.inclusions)),
       block(statement('copy.label.allowance', al.label), el('p', { 'data-field': 'allowance', text: `${rupees(al.low_minor || 0)} – ${rupees(al.high_minor || 0)}. ${al.description || ''}` })),
       block('Timeline', el('p', { 'data-field': 'timeline', text: e.timeline ? `${e.timeline.label}: about ${e.timeline.min_days} – ${e.timeline.max_days} days` : '' })),
-      block('Assumptions', list(e.assumptions)),
+      block('Assumptions', list((e.assumptions || []).map(assumption))),
       block('Exclusions', list(e.exclusions)),
       block('What you supply', list(e.client_scope)),
       block('About this estimate',

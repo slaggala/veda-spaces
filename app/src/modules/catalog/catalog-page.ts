@@ -18,6 +18,11 @@ interface Release {
   manifest?: Array<{ kind: string; key: string; version: number; sha256: string }>;
   validation?: { ok: boolean; checks: Record<string, string>; errors: string[]; warnings: string[] } | null;
   diff?: { against: string | null; added: unknown[]; removed: unknown[]; changed: unknown[] };
+  public_copy?: PublicCopyItem[];
+}
+interface PublicCopyItem {
+  entity: string; field: string; previous: string | null; new: string | null; policy: string; claim: string | null;
+  owner: string | null; reviewer: string | null; evidence: string; expiry: string;
 }
 interface MediaObject { sha256: string; role: string; kind: string; variant: string; mime: string; bytes: number; width: number | null; height: number | null; scan_status: string; created_on: string }
 
@@ -250,6 +255,14 @@ export class VsCatalogPage extends SessionElement {
           ${v.warnings.length ? html`<details><summary>${v.warnings.length} warnings</summary><ul class="plain">${v.warnings.map((w) => html`<li>${w}</li>`)}</ul></details>` : nothing}</div>` : nothing}
       ${r.diff ? html`<div class="card"><h3>Changes against ${r.diff.against ?? 'nothing (first release)'}</h3>
           <p>${r.diff.added.length} added · ${r.diff.changed.length} changed · ${r.diff.removed.length} removed</p></div>` : nothing}
+      ${r.public_copy ? html`<div class="card"><h3>New and changed public copy (${r.public_copy.length})</h3>
+          <p class="small muted">Every customer-visible text this release adds or changes. Review each item before approving the preview.</p>
+          ${r.public_copy.length ? html`<table class="table"><thead><tr><th>Entity</th><th>Field</th><th>Previous</th><th>New</th><th>Policy</th>
+            <th>Claim</th><th>Owner</th><th>Reviewer</th><th>Evidence</th><th>Expiry</th></tr></thead><tbody>
+            ${r.public_copy.map((c) => html`<tr><td data-label="Entity" class="mono">${c.entity}</td><td data-label="Field" class="mono">${c.field}</td>
+              <td data-label="Previous">${c.previous ?? '—'}</td><td data-label="New">${c.new ?? '(removed)'}</td><td data-label="Policy">${humanize(c.policy)}</td>
+              <td data-label="Claim">${c.claim ?? '—'}</td><td data-label="Owner">${c.owner ?? '—'}</td><td data-label="Reviewer" class="mono">${c.reviewer ?? 'not yet reviewed'}</td>
+              <td data-label="Evidence">${c.evidence}</td><td data-label="Expiry">${c.expiry}</td></tr>`)}</tbody></table>` : html`<p>No customer text changes.</p>`}</div>` : nothing}
       ${this.preview ? html`<div class="card"><h3>Customer preview</h3>
           ${Object.values((this.preview.room_template ?? {}) as Record<string, { name: string; included: Array<{ product: string }>; extras: string[] }>).map((room) => html`
             <h4>${room.name}</h4><ul class="plain">${room.included.map((s) => html`<li>${(this.preview!.product as Record<string, { name: string }>)[s.product]?.name ?? s.product}</li>`)}

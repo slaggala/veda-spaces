@@ -16,24 +16,29 @@ const ON = process.env.SITE_ON ?? 'http://localhost:8000';
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };
 // An asynchronous Turnstile stand-in that behaves like the real widget: render() returns at once, the token arrives
-// later through the callback, and it may expire, fail first, or be one the server refuses (prefix "fail"). Behaviour
-// is read from window.__tsConfig at each issue, so a test can change it mid-flow. No scenario gets an instant token.
+// later through the callback, and it may expire, fail first, be empty, be redelivered after use, differ from what
+// getResponse() reports, or be one the server refuses (prefix "fail"). Behaviour is read from window.__tsConfig at each
+// issue, so a test can change it mid-flow. No scenario gets an instant token.
 const TURNSTILE_STUB = `(() => {
-  const cfg = () => Object.assign({ delay: 700, expireAfter: 0, expireOnce: true, errorFirst: false, prefix: 'stub' }, window.__tsConfig || {});
+  const cfg = () => Object.assign({ delay: 700, expireAfter: 0, expireOnce: true, errorFirst: false, prefix: 'stub',
+    empty: false, repeat: false, mismatch: false }, window.__tsConfig || {});
   let n = 0; const w = {};
   function issue(id) {
-    const o = w[id]; clearTimeout(o.t); clearTimeout(o.e); o.token = '';
+    const o = w[id]; clearTimeout(o.t); clearTimeout(o.e); const last = o.token || o.last; o.token = '';
     o.t = setTimeout(() => {
       const c = cfg();
       if (c.errorFirst && !o.errored) { o.errored = true; o.opts['error-callback'] && o.opts['error-callback'](); return; }
-      o.token = c.prefix + '-' + (++n); o.opts.callback && o.opts.callback(o.token);
+      if (c.empty) { o.opts.callback && o.opts.callback(''); return; }
+      o.token = c.repeat && last ? last : c.prefix + '-' + (++n); o.last = o.token; o.opts.callback && o.opts.callback(o.token);
       if (c.expireAfter && !(c.expireOnce && o.expired)) o.e = setTimeout(() => { o.expired = true; o.token = ''; o.opts['expired-callback'] && o.opts['expired-callback'](); }, c.expireAfter);
     }, cfg().delay);
   }
   // A test can expire every live token at an exact moment (for example while a request is in flight).
   window.__tsExpire = () => Object.values(w).forEach((o) => { clearTimeout(o.e); o.token = ''; o.opts['expired-callback'] && o.opts['expired-callback'](); });
+  window.__tsReissue = () => Object.keys(w).forEach(issue);
   window.turnstile = { render(sel, opts) { const id = 'w' + (++n); w[id] = { opts }; issue(id); return id; },
-    reset(id) { if (w[id]) issue(id); }, getResponse(id) { return (w[id] && w[id].token) || ''; }, remove() {} };
+    reset(id) { if (w[id]) issue(id); },
+    getResponse(id) { const t = (w[id] && w[id].token) || ''; return t && cfg().mismatch ? t + '-other' : t; }, remove() {} };
 })();`;
 
 // The estimate route keeps its production rate limit (10 a minute per network); the journey paces itself under it.
@@ -90,8 +95,13 @@ try {
   check('veneer is consultation-only: shown, not selectable, routed to a consultation',
     await page.locator('input[value="veneer"]').isDisabled() && await page.locator('.v3-consult[href="/#contact"]').count() >= 1);
   check('soft-close storage is not offered (blocked)', await page.locator('text=Soft-close').count() === 0);
-  await page.waitForFunction(() => [...document.querySelectorAll('.v3-room img')].some((i) => i.complete && i.naturalWidth > 0));
-  check('catalog images load (delivery variants, by hash)', true);
+  await page.waitForFunction(() => [...document.querySelectorAll('#v3-rooms img')].length > 0
+    && [...document.querySelectorAll('#v3-rooms img')].every((i) => i.complete), null, { timeout: 15000 });
+  const images = await page.evaluate(() => [...document.querySelectorAll('#v3-rooms img')].map((i) => ({
+    src: i.currentSrc || i.src, loaded: i.complete && i.naturalWidth > 0, alt: i.getAttribute('alt') })));
+  check('catalog images really load (each decoded, from a hashed delivery path, with alt text)', images.length >= 2
+    && images.every((i) => i.loaded && /\/api\/v1\/public\/catalog\/media\/[0-9a-f]{64}$/.test(i.src) && i.alt),
+    JSON.stringify(images.filter((i) => !i.loaded).map((i) => i.src)));
   check('images are labelled as illustrative', await page.locator('.v3-badge', { hasText: 'Illustrative example' }).count() > 0);
   await page.locator('.v3-extra summary', { hasText: 'What is this?' }).first().click();
   check('“What is this?” explains an extra', (await page.locator('.v3-extra details[open] p').first().innerText()).length > 10);
@@ -110,10 +120,17 @@ try {
   const d = base.body.data;
   const expected = [d.configuration_reference, d.catalog_release, `GST at ${d.gst.pct}%`, 'Site Execution & Handover Package',
     'Design Personalisation Allowance', `Valid for ${d.validity_days} days`, d.expires_on, 'not a final quotation',
-    d.timeline.label, ...d.assumptions, ...d.exclusions, ...d.client_scope, ...(d.project_preparation.inclusions || [])];
+    d.timeline.label, ...d.assumptions.flatMap((a) => [a.item_label, `assumed: ${Number(a.value).toLocaleString('en-IN')}`]), ...d.exclusions, ...d.client_scope, ...(d.project_preparation.inclusions || [])];
   const missing = expected.filter((x) => !shown.includes(x));
   check('every customer-critical field of the response is on the result page', missing.length === 0, missing.join(' | '));
   check('the specification version is shown', /Specification: /.test(shown));
+  check('assumptions are structured (number, unit enum, type), never prose with figures', d.assumptions.length > 0
+    && d.assumptions.every((a) => typeof a.value === 'number' && ['FT', 'SQ_FT', 'NOS'].includes(a.unit)
+      && ['LENGTH', 'AREA', 'QUANTITY', 'DIMENSION'].includes(a.measurement_type) && a.basis === 'TYPICAL_ASSUMPTION'),
+    JSON.stringify(d.assumptions[0] || {}));
+  check('money only in typed engine amounts, linked to the pricing-card version', Number.isInteger(d.range.low_minor)
+    && Number.isInteger(d.project_preparation.amount_minor) && typeof d.pricing_card_version === 'string'
+    && !/₹|\brs\b|\binr\b|\d\s*(?:\/|per)\s*(?:sq|ft|rft)/i.test([d.timeline.label, ...d.exclusions, ...d.client_scope].join(' ')));
   await axe('result');
   await shot('result');
 
@@ -150,39 +167,111 @@ try {
     pg.on('pageerror', (e) => errs.push(String(e)));
     return { ctx, pg, errs };
   };
-  const overflow = (pg) => pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  // Overflow: the document never scrolls sideways, and no visible element extends past the viewport (longest text).
+  const overflow = (pg) => pg.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    if (document.documentElement.scrollWidth > width) return 'document';
+    const wide = [...document.querySelectorAll('main *')].find((n) => {
+      const r = n.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden' && (r.right > width + 1 || r.left < -1);
+    });
+    return wide ? `${wide.tagName.toLowerCase()}${wide.id ? `#${wide.id}` : ''}.${wide.className}` : '';
+  });
+  const focused = (pg) => pg.evaluate(() => {
+    const a = document.activeElement;
+    if (!a || a === document.body) return { kind: 'body' };
+    const kind = a.tagName === 'INPUT' ? a.type : a.tagName.toLowerCase();
+    return { kind, id: a.id || '', name: a.name || '', value: a.value || '', inDialog: !!a.closest('dialog[open]'),
+      extra: a.closest('.v3-extra')?.querySelector('strong')?.textContent || '', text: (a.textContent || '').trim().slice(0, 40) };
+  });
 
-  { // 360 px, keyboard only, focus order, no horizontal overflow, reduced motion
+  { // 360 px, keyboard only: focus order through every control kind, real selections, dialog, overflow, reduced motion
     const { ctx, pg, errs } = await fresh({ reducedMotion: 'reduce' });
+    const sent = [];
+    pg.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/v1/public/catalog/estimates')) sent.push(r); });
     await pg.goto(`${ON}/estimate-v3`);
     await pg.waitForSelector('#v3:not([hidden])');
-    let overflowed = await overflow(pg);
+    const where = { initial: await overflow(pg) };
     const order = [];
     for (let i = 0; i < 40; i += 1) {
       await pg.keyboard.press('Tab');
-      const id = await pg.evaluate(() => document.activeElement?.id || document.activeElement?.textContent?.trim().slice(0, 30) || '');
-      order.push(id);
-      if (id === 'v3-to-rooms') break;
+      const f = await focused(pg);
+      order.push(f.id || f.kind);
+      if (f.id === 'v3-to-rooms') break;
     }
     const positive = await pg.evaluate(() => [...document.querySelectorAll('[tabindex]')].filter((n) => Number(n.getAttribute('tabindex')) > 0).length);
     check('keyboard: Tab reaches "Choose rooms" in document order (no positive tabindex)', order.at(-1) === 'v3-to-rooms' && positive === 0, order.join(' > '));
     await pg.keyboard.press('Enter');
     await pg.waitForSelector('[data-v3="2"]:not([hidden])');
     check('focus moves to the new screen heading', await pg.evaluate(() => document.activeElement?.id) === 'v3-h2');
-    overflowed ||= await overflow(pg);
-    let reached = false;
-    for (let i = 0; i < 80 && !reached; i += 1) {
+    // Pass 1: walk the whole rooms screen by keyboard and record every kind of control focus reaches, in order.
+    const kinds = new Set();
+    let lost = 0;
+    for (let i = 0; i < 160; i += 1) {
       await pg.keyboard.press('Tab');
-      reached = await pg.evaluate(() => document.activeElement?.id === 'v3-estimate');
+      const f = await focused(pg);
+      kinds.add(f.kind);
+      if (f.kind === 'body') lost += 1;
+      if (f.id === 'v3-estimate') break;
     }
+    // Pass 2, from the screen heading: open the gallery dialog and close it with Escape, open a "What is this?" panel,
+    // choose the box style (arrow keys in the radio group), tick the feature wall (Space), then estimate.
+    await pg.focus('#v3-h2');
+    let styled = false; let walled = false; let galleried = false; let opened = false; let reached = false;
+    for (let i = 0; i < 160 && !reached; i += 1) {
+      await pg.keyboard.press('Tab');
+      const f = await focused(pg);
+      if (f.kind === 'body') lost += 1;
+      if (!galleried && f.kind === 'button' && f.text === 'See examples') {
+        await pg.keyboard.press('Enter');
+        await pg.waitForSelector('#v3-gallery[open]');
+        const inside = await focused(pg);
+        where.gallery = await overflow(pg);
+        await pg.keyboard.press('Escape');
+        await pg.waitForFunction(() => !document.querySelector('#v3-gallery').open);
+        const back = await focused(pg);
+        galleried = inside.inDialog && back.text === 'See examples';
+        check('keyboard: the gallery dialog takes focus, Escape closes it, focus returns to its button', galleried, `${JSON.stringify(inside)} → ${JSON.stringify(back)}`);
+        if (inside.inDialog) kinds.add('dialog');
+      } else if (!opened && f.kind === 'summary') {
+        await pg.keyboard.press('Enter');
+        opened = await pg.evaluate(() => !!document.activeElement?.closest('details[open]'));
+        where.expanded = await overflow(pg);
+      } else if (!styled && f.kind === 'radio' && f.name === 'v3-living-room-tv-unit-variant') {
+        await pg.keyboard.press(f.value === 'box' ? 'Space' : 'ArrowDown');
+        const after = await focused(pg);
+        styled = after.value === 'box' && await pg.locator('input[name="v3-living-room-tv-unit-variant"][value="box"]').isChecked();
+        check('keyboard: choosing a style keeps focus on the choice (not lost after re-render)', after.kind === 'radio' && after.value === 'box', JSON.stringify(after));
+      } else if (!walled && f.kind === 'checkbox' && f.extra === 'Feature wall') {
+        await pg.keyboard.press('Space');
+        walled = await pg.locator('.v3-extra', { hasText: 'Feature wall' }).locator('input[type="checkbox"]').isChecked();
+      }
+      reached = f.id === 'v3-estimate';
+    }
+    check('keyboard: focus order covers radios, checkboxes, buttons, links, panels and the dialog, never lost',
+      ['radio', 'checkbox', 'button', 'a', 'summary', 'dialog'].every((k) => kinds.has(k)) && lost === 0, `${[...kinds].join(', ')}; lost ${lost}`);
+    check('keyboard: a style and an extra are really selected by keyboard', styled && walled && opened);
     await ready(pg); // the keyboard user waits for "Ready." announced by the status region
     const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
     await pg.keyboard.press('Enter');
     const kres = await res;
-    check('keyboard only: the estimate is reached', reached && kres.status() === 201, `${kres.status()} ${JSON.stringify((await kres.json().catch(() => ({}))).errors || '')}`);
+    const body = JSON.parse(sent.at(-1)?.postData() || '{}');
+    const room = (body.configuration?.rooms || [])[0] || {};
+    check('keyboard only: the estimate is reached with the keyboard selections', reached && kres.status() === 201
+      && room.products?.['tv-unit']?.variant === 'box' && 'feature-wall' in (room.extras || {}),
+      `${kres.status()} ${JSON.stringify(room)}`);
     await pg.waitForSelector('[data-v3="3"]:not([hidden])');
-    overflowed ||= await overflow(pg);
-    check('360 px: no horizontal overflow on any screen', !overflowed);
+    where.result = await overflow(pg);
+    // The longest customer text: the longest catalog name and statement, rendered at 360 px, stay inside the viewport.
+    where.longest = await pg.evaluate(() => {
+      const longest = [...document.querySelectorAll('main li, main p, main strong, main h3, main h4, main small')]
+        .sort((a, b) => b.textContent.length - a.textContent.length).slice(0, 5);
+      const width = document.documentElement.clientWidth;
+      return longest.filter((n) => n.getBoundingClientRect().right > width + 1).map((n) => n.textContent.slice(0, 40)).join(' | ');
+    });
+    const failing = Object.entries(where).filter(([, v]) => v);
+    check('360 px: no horizontal overflow (initial, expanded panel, gallery, result, longest text)', failing.length === 0
+      && Object.keys(where).length === 5, JSON.stringify(where));
     check('reduced motion is respected', await pg.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior !== 'smooth'));
     check('no page error (keyboard run)', errs.length === 0, errs.join('; '));
     await ctx.close();
@@ -212,7 +301,9 @@ try {
     await pg.click('#v3-to-rooms');
     await pg.waitForSelector('.v3-img-missing');
     const textOnly = await pg.locator('#v3-rooms').innerText();
-    check('image failure: accessible text replaces each image', await pg.locator('.v3-img-missing').count() >= 2);
+    await pg.waitForFunction(() => document.querySelectorAll('#v3-rooms img').length === 0, null, { timeout: 15000 });
+    check('image failure: every image really fails and is replaced by its accessible text (no broken image left)',
+      await pg.locator('.v3-img-missing').count() >= 2 && await pg.locator('#v3-rooms img').count() === 0);
     check('no critical content only in media: rooms, items and finishes are text',
       ['Living room', 'TV unit', 'Laminate', 'Feature wall'].every((x) => textOnly.includes(x)));
     await ready(pg);
@@ -326,7 +417,10 @@ try {
     check('8. a failed script load sends nothing and offers a retry', sent.length === 0
       && (await statusText(pg)).includes('could not be completed'));
     failing = false;
-    await pg.click('#v3-ts-estimate-retry');
+    check('8. the retry control is keyboard reachable', await pg.evaluate(() => {
+      const b = document.querySelector('#v3-ts-estimate-retry'); return !!b && !b.hidden && b.tabIndex >= 0 && !b.disabled; }));
+    await pg.focus('#v3-ts-estimate-retry');
+    await pg.keyboard.press('Enter');
     await ready(pg);
     const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
     await pg.click('#v3-estimate');
@@ -349,6 +443,8 @@ try {
     check('9. the message is controlled (no security detail)', summary.includes('security check could not be completed')
       && !/turnstile|captcha|token|siteverify/i.test(summary), summary);
     check('12. focus moves to the error summary', await pg.evaluate(() => document.activeElement?.id) === 'v3-summary');
+    const summaryOverflow = await overflow(pg);
+    check('360 px: the error summary does not overflow', !summaryOverflow, summaryOverflow);
     check('13. waiting and error states are announced', await pg.getAttribute('#v3-summary', 'role') === 'alert'
       && await pg.getAttribute('#v3-ts-estimate-status', 'role') === 'status');
     check('9. the choices are kept', await pg.locator('.v3-extra', { hasText: 'Feature wall' }).locator('input[type="checkbox"]').isChecked());
@@ -383,6 +479,158 @@ try {
     check('11. after a lost response the retry reuses the idempotency key', sent.length === 2
       && sent[0].headers()['idempotency-key'] === sent[1].headers()['idempotency-key']);
     check('11. the server replays the same estimate (no duplicate)', second.status() === 201 && second.headers()['idempotent-replayed'] === 'true');
+    await ctx.close();
+  }
+
+  // --- canonical customer-copy closure, Phase 8: the remaining token cases and the customer messages ----------------
+  { // a Turnstile error callback: nothing is sent, the anti-bot message and a retry are offered, the retry works
+    const { ctx, pg } = await fresh({}, { errorFirst: true });
+    const sent = posts(pg);
+    await toRooms(pg);
+    await pg.waitForSelector('#v3-ts-estimate-retry:not([hidden])', { timeout: 15000 });
+    const said = await statusText(pg);
+    await pg.click('#v3-estimate', { force: true });
+    await settle(200);
+    check('14. a Turnstile error callback sends nothing and says the security check failed', sent.length === 0
+      && said.includes('The security check could not be completed. Please retry.'), said);
+    await pg.click('#v3-ts-estimate-retry');
+    await ready(pg);
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('14. after the error callback a retry succeeds', (await res).status() === 201 && sent.length === 1);
+    await ctx.close();
+  }
+
+  { // an empty token from the callback is not a token
+    const { ctx, pg } = await fresh({}, { empty: true });
+    const sent = posts(pg);
+    await toRooms(pg);
+    await settle(1500);
+    await pg.click('#v3-estimate', { force: true });
+    await settle(200);
+    check('15. an empty token keeps submission disabled and sends nothing', sent.length === 0
+      && await pg.getAttribute('#v3-estimate', 'aria-disabled') === 'true');
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, empty: false }; window.__tsReissue(); });
+    await ready(pg);
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('15. a real token then succeeds', (await res).status() === 201 && sent.length === 1);
+    await ctx.close();
+  }
+
+  { // a token older than the accepted age is never sent: it is renewed first
+    const { ctx, pg } = await fresh();
+    const sent = posts(pg);
+    await toRooms(pg);
+    await ready(pg);
+    await pg.evaluate(() => { const real = Date.now; window.__realNow = real; Date.now = () => real() + 290000; });
+    await pg.click('#v3-estimate');
+    await settle(200);
+    check('16. a stale token (older than its accepted age) is not sent', sent.length === 0
+      && (await statusText(pg)).includes('expired'), await statusText(pg));
+    await pg.evaluate(() => { Date.now = window.__realNow; });
+    await ready(pg);
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('16. the renewed token succeeds', (await res).status() === 201 && sent.length === 1);
+    await ctx.close();
+  }
+
+  { // the widget's live response differs from the token the callback delivered: never sent
+    const { ctx, pg } = await fresh();
+    const sent = posts(pg);
+    await toRooms(pg);
+    await ready(pg);
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, mismatch: true }; });
+    await pg.click('#v3-estimate');
+    await settle(200);
+    check('17. a token that does not match the widget is not sent', sent.length === 0);
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, mismatch: false }; window.__tsReissue(); });
+    await ready(pg);
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('17. a matching token then succeeds', (await res).status() === 201 && sent.length === 1);
+    await ctx.close();
+  }
+
+  { // a used token delivered again (after a success) is ignored; the next request waits for a new one
+    const { ctx, pg } = await fresh();
+    const sent = posts(pg);
+    await toRooms(pg);
+    await ready(pg);
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, repeat: true }; });
+    const first = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('18. the first request succeeds', (await first).status() === 201);
+    await pg.click('[data-v3-back="2"]');
+    await settle(1500); // the renewal redelivers the same (used) token
+    await pg.click('#v3-estimate', { force: true });
+    await settle(200);
+    check('18. a redelivered used token is never sent again', sent.length === 1
+      && await pg.getAttribute('#v3-estimate', 'aria-disabled') === 'true');
+    await pg.evaluate(() => { window.__tsConfig = { ...window.__tsConfig, repeat: false }; window.__tsReissue(); });
+    await ready(pg);
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('18. a new token then succeeds', (await res).status() === 201 && sent.length === 2
+      && new Set(sent.map((r) => JSON.parse(r.postData()).turnstile_token)).size === 2);
+    await ctx.close();
+  }
+
+  { // waiting for a token: the button is disabled and a double click while waiting sends nothing, then exactly one
+    const { ctx, pg } = await fresh({}, { delay: 3000 });
+    const sent = posts(pg);
+    await toRooms(pg);
+    check('19. the button is disabled while the check is pending', await pg.getAttribute('#v3-estimate', 'aria-disabled') === 'true'
+      && (await pg.getAttribute('#v3-estimate', 'class') || '').includes('v3-waiting'));
+    await pg.dblclick('#v3-estimate', { force: true });
+    await settle(200);
+    check('19. a double click while waiting sends nothing', sent.length === 0);
+    await ready(pg);
+    await ctx.route('**/api/v1/public/catalog/estimates', async (route) => { await settle(800); await route.continue(); });
+    const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates'));
+    await pg.click('#v3-estimate');
+    check('19. while submitting the button is disabled', await pg.getAttribute('#v3-estimate', 'aria-disabled') === 'true');
+    await pg.dblclick('#v3-estimate', { force: true });
+    check('19. then exactly one request is sent', (await res).status() === 201 && sent.length === 1, String(sent.length));
+    await ctx.close();
+  }
+
+  // Each status gets its own message; only an anti-bot refusal mentions the security check. These responses are
+  // simulated by the browser route (the server's own 409 and 422 paths are covered by the API tests).
+  const mapped = [
+    ['20. a server used-token rejection', 422, { code: 'CAPTCHA_FAILED', detail: 'x' }, 'The security check could not be completed. Please retry.'],
+    ['21. a 422', 422, { code: 'VALIDATION_FAILED', errors: [{ field: 'rooms', code: 'OUT_OF_RANGE', message: 'TV wall width must be between 3 and 20 ft.' }] }, 'Please review the highlighted information.'],
+    ['22. a 409', 409, { code: 'IDEMPOTENCY_KEY_REUSED' }, 'This request conflicts with an earlier submission. Please refresh and try again.'],
+    ['23. a 429', 429, { code: 'RATE_LIMITED' }, 'Too many attempts. Please wait before trying again.'],
+    ['24. a 500', 500, { code: 'INTERNAL' }, 'We could not prepare an estimate right now.'],
+    ['25. a 503', 503, { code: 'ESTIMATOR_UNAVAILABLE' }, 'We could not prepare an estimate right now.'],
+  ];
+  for (const [name, status, body, message] of mapped) {
+    const { ctx, pg } = await fresh();
+    let answered = false;
+    await ctx.route('**/api/v1/public/catalog/estimates', async (route) => {
+      if (answered) return route.continue();
+      answered = true;
+      return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+    const sent = posts(pg);
+    await toRooms(pg);
+    await ready(pg);
+    await pg.click('#v3-estimate');
+    await pg.waitForSelector('#v3-summary:not([hidden])', { timeout: 15000 });
+    const summary = await pg.locator('#v3-summary').innerText();
+    const antiBot = /security check/i.test(summary);
+    check(`${name} shows its own message`, summary.includes(message) && (status === 422 && body.code === 'CAPTCHA_FAILED' ? antiBot : !antiBot), summary);
+    if (body.errors) check(`${name} lists the highlighted problem`, summary.includes(body.errors[0].message), summary);
+    if (status === 409) {
+      await ready(pg);
+      const res = pg.waitForResponse((r) => r.url().endsWith('/api/v1/public/catalog/estimates') && r.request().method() === 'POST');
+      await pg.click('#v3-estimate');
+      const retried = await res;
+      check('22. after a 409 the page drops its key and the retry succeeds with a new one', retried.status() === 201
+        && sent.length === 2 && sent[0].headers()['idempotency-key'] !== sent[1].headers()['idempotency-key']);
+    }
     await ctx.close();
   }
 } catch (err) {
