@@ -1789,7 +1789,16 @@ MONPLAN="$HERE/fixtures/aut110-monitoring-plan.json"
 monmod() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq --arg a "module.monitoring.$1" "(.resource_changes[] | select(.address == \$a) | .change) |= ($2)" "$MONPLAN" >"$f"; echo "$f"; }
 monadd() { local f="$TMP/mon.$RANDOM$RANDOM.json"; jq ".resource_changes += [{address: \"module.monitoring.$1.$2\", type: \"$1\", change: {actions: [\"create\"], after: $3, after_unknown: {}}}]" "$MONPLAN" >"$f"; echo "$f"; }
 check "AUT-110 the real monitoring plan passes the guard" ok "plan guard: no destroy" -- guard "$MONPLAN"
-check "  ... seven log metric filters, all in Veda/App (no EMF: bounded custom metrics)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
+
+# Pre-plan closure, gap 2: the guard needs no exception for the scanner rollback (it removes no parameter), and it
+# still refuses every media-related removal or replacement.
+deladd() { local f="$TMP/del.$RANDOM$RANDOM.json"; jq --arg a "$1" --arg t "$2" --argjson x "$3" '.resource_changes += [{address: $a, type: $t, change: {actions: $x, before: {}, after: null, after_unknown: {}}}]' "$MONPLAN" >"$f"; echo "$f"; }
+check "MEDIA the guard refuses removing a scanner-specific SSM parameter" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_CATALOG_CLAMD_IMAGE"]' aws_ssm_parameter '["delete"]')"
+check "MEDIA the guard refuses removing a common media SSM parameter" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_CATALOG_MEDIA_BUCKET"]' aws_ssm_parameter '["delete"]')"
+check "MEDIA the guard refuses an unrelated SSM parameter removal" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_LOG_LEVEL"]' aws_ssm_parameter '["delete"]')"
+check "MEDIA the guard refuses deleting the media bucket" fail "delete|destroy" -- guard "$(deladd 'module.storage.aws_s3_bucket.this["media"]' aws_s3_bucket '["delete"]')"
+check "MEDIA the guard refuses replacing the data key" fail "delete|destroy" -- guard "$(deladd 'module.kms.aws_kms_key.this["data"]' aws_kms_key '["delete","create"]')"
+check "  ... the recorded AUT-110 plan has seven log metric filters, all in Veda/App (historical fixture; the module now plans fifteen)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
 check "  ... every alarm is veda-stg-* and notifies only the alarm topic (known at plan time)" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | (.alarm_name | startswith("veda-stg-")) and .alarm_actions == ["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"] and .ok_actions == .alarm_actions] | all' "$MONPLAN"
 check "AUT-110 an unencrypted topic is refused" fail "SNS topic without KMS encryption" -- guard "$(monmod aws_sns_topic.alarms '.after.kms_master_key_id = null | .after_unknown.kms_master_key_id = false')"
 check "AUT-110 an HTTPS subscription is refused (data could leave)" fail "subscription protocol https" -- guard "$(monmod aws_sns_topic_subscription.owner '.after.protocol = "https" | .after.endpoint = "https://example.com/hook"')"
@@ -2059,8 +2068,36 @@ check "  ... its parameters only accept a tag, a digest and a SHA-256" ok '^\^sh
 # shellcheck disable=SC2016 # expanded by the inner bash
 check "DEPLOY veda-deploy installs every host configuration file beside the scripts" ok '^cloudflared.yml cloudwatch-agent.json$' -- bash -c 'cmd="$(jq -r ".resource_changes[] | select(.address == \"module.deploy.aws_ssm_document.deploy\") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[]" "$1")"; for f in "$2"/*; do b="${f##*/}"; case "$b" in *.sh|README.md) continue ;; esac; grep -qF "\"\$REL\"/infra/host/$b " <<<"$cmd" && printf "%s\n" "$b"; done | paste -sd" " -' _ "$DEPDOC" "$INFRA/host"
 check "DEPLOY the host renders the environment only with every secret seeded (AUT-302)" ok "refusing: secrets not seeded" -- cat "$INFRA/host/render-env.sh"
-check "MEDIA the host renders the environment only with every catalog media setting planned" ok "refusing: catalog media settings not planned" -- cat "$INFRA/host/render-env.sh"
-check "MEDIA a clamd scanner without a pinned digest is refused at render" ok "selected without an image pinned by digest" -- cat "$INFRA/host/render-env.sh"
+check "MEDIA render-env runs the media preflight before replacing api.env" ok "media-preflight.sh\" \"[$]TMP\"" -- cat "$INFRA/host/render-env.sh"
+# The media preflight on rendered files (pre-plan closure, phase 7): plain-words states, names only, never values.
+MPF="$TMP/mpf"; mkdir -p "$MPF"
+mpf_env() {
+  local f="$MPF/env.$RANDOM$RANDOM" kv
+  printf '%s\n' 'VEDA_CATALOG_MEDIA_BACKEND="s3"' 'VEDA_CATALOG_MEDIA_BUCKET="veda-stg-media-111122223333"' \
+    'VEDA_CATALOG_MEDIA_KMS_KEY_ARN="arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data"' \
+    'VEDA_CATALOG_MEDIA_SOURCE_PREFIX="source/"' 'VEDA_CATALOG_MEDIA_VARIANT_PREFIX="variant/"' 'VEDA_CATALOG_MEDIA_SCANNER="none"' \
+    'VEDA_CATALOG_MEDIA_DELIVERY_ENABLED="false"' 'VEDA_CATALOG_3D_ENABLED="false"' 'VEDA_CATALOG_VIDEO_ENABLED="false"' \
+    'VEDA_CATALOG_ESTIMATOR_ENABLED="false"' 'VEDA_CATALOG_ADMIN_ENABLED="false"' 'VEDA_CATALOG_CLAMD_ADDRESS="clamd:3310"' \
+    'VEDA_CATALOG_CLAMD_IMAGE="none-selected"' >"$f"
+  for kv in "$@"; do
+    grep -v "^${kv%%=*}=" "$f" >"$f.t" || true
+    printf '%s="%s"\n' "${kv%%=*}" "${kv#*=}" >>"$f.t"
+    mv "$f.t" "$f"
+  done
+  echo "$f"
+}
+PIN="clamav/clamav:1.4@sha256:$(printf 'c%.0s' $(seq 64))"
+check "MEDIA preflight: settings absent -> MEDIA INFRASTRUCTURE NOT APPLIED" fail "MEDIA INFRASTRUCTURE NOT APPLIED: 13 setting" -- "$INFRA/host/media-preflight.sh" "$(printf 'VEDA_ENV="staging"\n' >"$MPF/empty"; echo "$MPF/empty")"
+check "MEDIA preflight: one setting absent names it, not its value" fail "NOT APPLIED: 1 setting.*VEDA_CATALOG_MEDIA_BUCKET" -- "$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v BUCKET "$f" >"$f.x"; echo "$f.x")"
+check "MEDIA preflight: present, flags off, scanner none -> V3 intentionally disabled" ok "V3 intentionally disabled" -- "$INFRA/host/media-preflight.sh" "$(mpf_env)"
+check "MEDIA preflight: scanner none is reported as not selected" ok "scanner not selected" -- "$INFRA/host/media-preflight.sh" "$(mpf_env)"
+check "MEDIA preflight: clamd with the placeholder image -> SCANNER SETTINGS INCOMPLETE" fail "SCANNER SETTINGS INCOMPLETE" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_MEDIA_SCANNER=clamd)"
+check "MEDIA preflight: clamd pinned, flags off -> safe" ok "V3 intentionally disabled" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_MEDIA_SCANNER=clamd "VEDA_CATALOG_CLAMD_IMAGE=$PIN")"
+check "MEDIA preflight: a partial activation is refused" fail "PARTIAL ACTIVATION: 1 of 3" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_ESTIMATOR_ENABLED=true)"
+check "MEDIA preflight: activation without clamd is refused" fail "without the clamd scanner" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_ESTIMATOR_ENABLED=true VEDA_CATALOG_ADMIN_ENABLED=true VEDA_CATALOG_MEDIA_DELIVERY_ENABLED=true)"
+check "MEDIA preflight: full activation hands the approval check to deploy.sh" ok "V3 ACTIVATION REQUESTED" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_MEDIA_SCANNER=clamd "VEDA_CATALOG_CLAMD_IMAGE=$PIN" VEDA_CATALOG_ESTIMATOR_ENABLED=true VEDA_CATALOG_ADMIN_ENABLED=true VEDA_CATALOG_MEDIA_DELIVERY_ENABLED=true)"
+check "MEDIA preflight: video on is refused" fail "VIDEO_ENABLED must be false" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_VIDEO_ENABLED=true)"
+absent "MEDIA preflight never prints a setting's value" "veda-stg-media-111122223333|alias/veda-stg-data" "$("$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v BUCKET "$f" >"$f.y"; cat "$f" >/dev/null; echo "$f")" 2>&1; "$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v SCANNER= "$f" >"$f.z"; echo "$f.z")" 2>&1 || true)"
 check "MEDIA the health heartbeat reports scanner restarts only when the scanner runs" ok "ScannerRestarts" -- cat "$INFRA/host/health.sh"
 check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
 # shellcheck disable=SC2016 # matched literally in the script

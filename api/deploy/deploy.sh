@@ -28,6 +28,8 @@ readonly DB="$DATA_DIR/veda.db"
 readonly EDGE_DIR=/etc/veda/cloudflared
 # The rendered application configuration (render-env.sh from SSM): it decides whether the malware scanner runs.
 readonly API_ENV="${VEDA_API_ENV:-/etc/veda/api.env}"
+# render-env.sh writes NAME="value"; a plain NAME=value is read the same way.
+setting() { [[ -r "$API_ENV" ]] || return 0; sed -n "s/^$1=//p" "$API_ENV" | tail -1 | sed -e 's/^"//' -e 's/"$//'; }
 
 # Litestream serves replication metrics on 127.0.0.1:9090 once it has opened the database.
 replicating() {
@@ -76,6 +78,17 @@ print(r if type(r) is int else "invalid")')
 if [[ "$RELEASE" == "invalid" ]] || (( RELEASE < RELEASE_FLOOR )); then
   echo "Refusing: image $TAG reports release '$RELEASE', below release floor $RELEASE_FLOOR (runbook §2.1: forward-fix)"
   exit 1
+fi
+
+# Catalog V3 activation (pre-plan closure, phase 7): only with the V3 staging approval record packaged in this image
+# APPROVED and current (review date and expiry not reached, not revoked). Checked before any snapshot, migration or
+# restart, so a refusal changes nothing. With V3 off (the normal case) nothing is checked here.
+if [[ "$(setting VEDA_CATALOG_ESTIMATOR_ENABLED)" == "true" ]]; then
+  echo "0b. V3 activation requested: the approval record in image $TAG must be APPROVED and current"
+  if ! "${COMPOSE[@]}" run --rm --no-deps api python -m veda.modules.catalog.staging_approval; then
+    echo "APPROVAL RECORD INVALID: refusing to deploy V3 (turn every catalog_v3 flag off, or approve a current record)"
+    exit 1
+  fi
 fi
 
 echo "1. Pre-flight: single-worker configuration and replication"
@@ -136,8 +149,6 @@ fi
 
 # Catalog V3 malware scanner (targeted media enablement): only when the configuration selects clamd, only with an
 # image pinned by digest, and the scanner must answer PING before the API restarts. Otherwise it is not running.
-# render-env.sh writes NAME="value"; a plain NAME=value is read the same way.
-setting() { [[ -r "$API_ENV" ]] || return 0; sed -n "s/^$1=//p" "$API_ENV" | tail -1 | sed -e 's/^"//' -e 's/"$//'; }
 SCANNER="$(setting VEDA_CATALOG_MEDIA_SCANNER)"
 if [[ "$SCANNER" == "clamd" ]]; then
   echo "4c. Scanner: clamd on the private Compose network"
