@@ -2059,6 +2059,9 @@ check "  ... its parameters only accept a tag, a digest and a SHA-256" ok '^\^sh
 # shellcheck disable=SC2016 # expanded by the inner bash
 check "DEPLOY veda-deploy installs every host configuration file beside the scripts" ok '^cloudflared.yml cloudwatch-agent.json$' -- bash -c 'cmd="$(jq -r ".resource_changes[] | select(.address == \"module.deploy.aws_ssm_document.deploy\") | .change.after.content | fromjson | .mainSteps[0].inputs.runCommand[]" "$1")"; for f in "$2"/*; do b="${f##*/}"; case "$b" in *.sh|README.md) continue ;; esac; grep -qF "\"\$REL\"/infra/host/$b " <<<"$cmd" && printf "%s\n" "$b"; done | paste -sd" " -' _ "$DEPDOC" "$INFRA/host"
 check "DEPLOY the host renders the environment only with every secret seeded (AUT-302)" ok "refusing: secrets not seeded" -- cat "$INFRA/host/render-env.sh"
+check "MEDIA the host renders the environment only with every catalog media setting planned" ok "refusing: catalog media settings not planned" -- cat "$INFRA/host/render-env.sh"
+check "MEDIA a clamd scanner without a pinned digest is refused at render" ok "selected without an image pinned by digest" -- cat "$INFRA/host/render-env.sh"
+check "MEDIA the health heartbeat reports scanner restarts only when the scanner runs" ok "ScannerRestarts" -- cat "$INFRA/host/health.sh"
 check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
 # shellcheck disable=SC2016 # matched literally in the script
 check "DEPLOY the data volume is formatted only when it carries no filesystem" ok 'if ! blkid "\$DEVICE"' -- cat "$INFRA/host/host-setup.sh"

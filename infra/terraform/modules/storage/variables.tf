@@ -28,6 +28,16 @@ variable "data_key_arn" {
   type        = string
 }
 
+variable "data_key_alias_arn" {
+  description = "AUT-102 data key by its alias ARN (the media bucket accepts uploads naming the key either way)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:alias/veda-stg-data$", var.data_key_alias_arn))
+    error_message = "data_key_alias_arn must be the alias ARN of the staging data key (alias/veda-stg-data)."
+  }
+}
+
 variable "audit_key_arn" {
   description = "AUT-102 audit key: logs (trail, flow logs) and evidence."
   type        = string
@@ -49,11 +59,17 @@ variable "retention" {
     logs_flow_expire_days       = number
     evidence_lock_mode          = string
     evidence_lock_days          = number
+    media_noncurrent_days       = number
   })
 
   validation {
     condition     = var.retention.evidence_lock_mode == "COMPLIANCE" && var.retention.evidence_lock_days >= 1 && var.retention.evidence_lock_days <= 365
     error_message = "Evidence is locked in COMPLIANCE mode for 1 to 365 days (GOVERNANCE could be bypassed; longer is a reviewed change)."
+  }
+
+  validation {
+    condition     = var.retention.media_noncurrent_days >= 1 && var.retention.media_noncurrent_days <= 90
+    error_message = "Withdrawn media bytes may survive in old versions for 1 to 90 days only (staging decision media.noncurrent_days)."
   }
 
   validation {

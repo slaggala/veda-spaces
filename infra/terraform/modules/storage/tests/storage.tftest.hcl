@@ -2,12 +2,13 @@
 mock_provider "aws" {}
 
 variables {
-  name_prefix   = "veda-stg"
-  account_id    = "111122223333"
-  region        = "ap-south-1"
-  data_key_arn  = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-00000000da7a"
-  audit_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-0000000a0d17"
-  trail_name    = "veda-stg-trail"
+  name_prefix        = "veda-stg"
+  account_id         = "111122223333"
+  region             = "ap-south-1"
+  data_key_arn       = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-00000000da7a"
+  data_key_alias_arn = "arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data"
+  audit_key_arn      = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-0000000a0d17"
+  trail_name         = "veda-stg-trail"
   retention = {
     litestream_noncurrent_days  = 7
     snapshots_expire_days       = 42
@@ -17,22 +18,24 @@ variables {
     logs_flow_expire_days       = 30
     evidence_lock_mode          = "COMPLIANCE"
     evidence_lock_days          = 30
+    media_noncurrent_days       = 30
   }
 }
 
-run "the_six_bootstrap_names" {
+run "the_bootstrap_names_and_the_media_bucket" {
   command = plan
 
   assert {
     condition = toset([for b in aws_s3_bucket.this : b.bucket]) == toset([
       "veda-stg-litestream-111122223333", "veda-stg-snapshots-111122223333", "veda-stg-anchor-111122223333",
       "veda-stg-artifacts-111122223333", "veda-evidence-111122223333", "veda-stg-logs-111122223333",
+      "veda-stg-media-111122223333",
     ])
     error_message = "the bucket names the bootstrap roles and data-read denies are scoped to"
   }
 
   assert {
-    condition     = [for k in ["snapshots", "anchor", "evidence"] : aws_s3_bucket.this[k].object_lock_enabled] == [true, true, true] && !aws_s3_bucket.this["litestream"].object_lock_enabled
+    condition     = [for k in ["snapshots", "anchor", "evidence"] : aws_s3_bucket.this[k].object_lock_enabled] == [true, true, true] && !aws_s3_bucket.this["litestream"].object_lock_enabled && !aws_s3_bucket.this["media"].object_lock_enabled
     error_message = "Object Lock on snapshots, anchors and evidence only"
   }
 }
@@ -121,6 +124,7 @@ run "governance_lock_refused" {
       logs_flow_expire_days       = 30
       evidence_lock_mode          = "GOVERNANCE"
       evidence_lock_days          = 30
+      media_noncurrent_days       = 30
     }
   }
 
@@ -140,6 +144,7 @@ run "snapshots_expiring_inside_their_lock_refused" {
       logs_flow_expire_days       = 30
       evidence_lock_mode          = "COMPLIANCE"
       evidence_lock_days          = 30
+      media_noncurrent_days       = 30
     }
   }
 
@@ -154,4 +159,73 @@ run "bucket_names_outside_the_bootstrap_scope_refused" {
   }
 
   expect_failures = [var.name_prefix]
+}
+
+# Targeted media enablement: the media bucket reuses every control, plus KMS-only uploads and a withdrawal-friendly
+# lifecycle. It has no Object Lock (a withdrawal deletes the bytes), no website, no public principal.
+run "media_bucket_private_kms_only_and_withdrawable" {
+  command = plan
+
+  assert {
+    condition     = one(one(aws_s3_bucket_server_side_encryption_configuration.this["media"].rule).apply_server_side_encryption_by_default).kms_master_key_id == var.data_key_arn
+    error_message = "media is encrypted with the existing data key (no new key)"
+  }
+
+  assert {
+    condition = length([for s in jsondecode(aws_s3_bucket_policy.this["media"].policy).Statement : s
+    if s.Effect == "Deny" && contains(["DenyUploadsWithoutTheDataKey", "DenyUploadsWithoutKms"], s.Sid) && s.Action == "s3:PutObject"]) == 2
+    error_message = "media uploads without SSE-KMS under the data key are refused"
+  }
+
+  assert {
+    condition = toset(jsondecode(aws_s3_bucket_policy.this["media"].policy).Statement[2].Condition.StringNotEqualsIfExists["s3:x-amz-server-side-encryption-aws-kms-key-id"]) == toset([
+    var.data_key_arn, var.data_key_alias_arn])
+    error_message = "the data key by key ARN or alias ARN, nothing else"
+  }
+
+  assert {
+    condition     = length([for s in jsondecode(aws_s3_bucket_policy.this["media"].policy).Statement : s if s.Effect == "Allow"]) == 0
+    error_message = "the media bucket allows nothing by policy: no public or anonymous read, list or write"
+  }
+
+  assert {
+    condition = anytrue([for r in aws_s3_bucket_lifecycle_configuration.this["media"].rule :
+    r.id == "noncurrent-media" && one(r.noncurrent_version_expiration).noncurrent_days == 30 && one(r.expiration).expired_object_delete_marker])
+    error_message = "withdrawn bytes leave old versions after the decided window; delete markers are removed"
+  }
+
+  assert {
+    condition     = aws_s3_bucket.this["media"].tags.purpose == "media" && aws_s3_bucket.this["media"].tags.Name == "veda-stg-media-111122223333"
+    error_message = "deterministic tags"
+  }
+}
+
+run "media_noncurrent_window_out_of_range_refused" {
+  command = plan
+
+  variables {
+    retention = {
+      litestream_noncurrent_days  = 7
+      snapshots_expire_days       = 42
+      artifacts_expire_days       = 90
+      artifacts_noncurrent_days   = 30
+      logs_cloudtrail_expire_days = 90
+      logs_flow_expire_days       = 30
+      evidence_lock_mode          = "COMPLIANCE"
+      evidence_lock_days          = 30
+      media_noncurrent_days       = 365
+    }
+  }
+
+  expect_failures = [var.retention]
+}
+
+run "a_media_key_other_than_the_data_key_alias_refused" {
+  command = plan
+
+  variables {
+    data_key_alias_arn = "arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-media"
+  }
+
+  expect_failures = [var.data_key_alias_arn]
 }

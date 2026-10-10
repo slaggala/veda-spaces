@@ -80,10 +80,13 @@ variable "instance_id" {
 variable "thresholds" {
   description = "Alarm thresholds (staging-platform.json monitoring)."
   type = object({
-    server_errors_per_5min = number
-    cpu_percent            = number
-    memory_percent         = number
-    data_disk_percent      = number
-    root_disk_percent      = number
+    server_errors_per_5min  = number
+    cpu_percent             = number
+    memory_percent          = number
+    data_disk_percent       = number
+    root_disk_percent       = number
+    media_pending_seconds   = optional(number, 3600)
+    scanner_signature_hours = optional(number, 48)
+    scanner_restarts        = optional(number, 3)
   })
 }

@@ -24,18 +24,36 @@ locals {
     ScheduledJobFailed   = { pattern = "{ $.ScheduledJobFailed >= 1 }", value = "1" }
     SnapshotCompleted    = { pattern = "{ $.SnapshotCompleted >= 1 }", value = "1" }
     ChainAnchorFailed    = { pattern = "{ $.ChainAnchorFailed >= 1 }", value = "1" }
+    # Catalog V3 media (targeted media enablement). The signals carry counts and ages only: no filename, key,
+    # customer identifier, rate or content reaches a metric or an alarm.
+    MediaScannerUnavailable   = { pattern = "{ $.MediaScannerUnavailable >= 1 }", value = "1" }
+    MediaScanFailed           = { pattern = "{ $.MediaScanFailed >= 1 }", value = "1" }
+    MediaInfected             = { pattern = "{ $.MediaInfected >= 1 }", value = "1" }
+    MediaPendingMaxAgeSeconds = { pattern = "{ $.MediaPendingMaxAgeSeconds >= 0 }", value = "$.MediaPendingMaxAgeSeconds" }
+    MediaSignatureAgeHours    = { pattern = "{ $.MediaSignatureAgeHours >= 0 }", value = "$.MediaSignatureAgeHours" }
+    MediaNonCleanRequested    = { pattern = "{ $.MediaNonCleanRequested >= 1 }", value = "1" }
+    MediaStorageAccessDenied  = { pattern = "{ $.MediaStorageAccessDenied >= 1 }", value = "1" }
+    MediaKmsAccessDenied      = { pattern = "{ $.MediaKmsAccessDenied >= 1 }", value = "1" }
   }
 
   # name => metric, statistic, threshold, comparison, period, missing-data treatment, description
   app_alarms = {
-    "app-5xx"               = { deployed = true, ns = "Veda/App", metric = "ServerErrors", stat = "Sum", threshold = var.thresholds.server_errors_per_5min, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "API 5xx responses" }
-    "lead-intake-failures"  = { deployed = true, ns = "Veda/App", metric = "LeadIntakeFailures", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Public lead submissions failing (5xx)" }
-    "notification-failures" = { deployed = true, ns = "Veda/App", metric = "NotificationFailures", stat = "Sum", threshold = 3, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "Email and other outbox handlers failing (the lead stays committed, NOTIF-008)" }
-    "outbox-dead"           = { deployed = true, ns = "Veda/App", metric = "OutboxDead", stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Outbox events dead-lettered" }
-    "scheduled-job-failed"  = { deployed = true, ns = "Veda/App", metric = "ScheduledJobFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A scheduled job failed" }
-    "snapshot-missing"      = { deployed = true, ns = "Veda/App", metric = "SnapshotCompleted", stat = "Sum", threshold = 1, cmp = "LessThanThreshold", period = 86400, missing = "breaching", what = "No completed snapshot in 24 hours (RR-14)" }
-    "chain-anchor-failed"   = { deployed = true, ns = "Veda/App", metric = "ChainAnchorFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A security-chain anchor failed (FC-01)" }
-    "audit-tampering"       = { deployed = false, ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
+    "app-5xx"                   = { deployed = true, ns = "Veda/App", metric = "ServerErrors", stat = "Sum", threshold = var.thresholds.server_errors_per_5min, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "API 5xx responses" }
+    "lead-intake-failures"      = { deployed = true, ns = "Veda/App", metric = "LeadIntakeFailures", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Public lead submissions failing (5xx)" }
+    "notification-failures"     = { deployed = true, ns = "Veda/App", metric = "NotificationFailures", stat = "Sum", threshold = 3, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "Email and other outbox handlers failing (the lead stays committed, NOTIF-008)" }
+    "outbox-dead"               = { deployed = true, ns = "Veda/App", metric = "OutboxDead", stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Outbox events dead-lettered" }
+    "scheduled-job-failed"      = { deployed = true, ns = "Veda/App", metric = "ScheduledJobFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A scheduled job failed" }
+    "snapshot-missing"          = { deployed = true, ns = "Veda/App", metric = "SnapshotCompleted", stat = "Sum", threshold = 1, cmp = "LessThanThreshold", period = 86400, missing = "breaching", what = "No completed snapshot in 24 hours (RR-14)" }
+    "chain-anchor-failed"       = { deployed = true, ns = "Veda/App", metric = "ChainAnchorFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A security-chain anchor failed (FC-01)" }
+    "media-scanner-unavailable" = { deployed = true, ns = "Veda/App", metric = "MediaScannerUnavailable", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "The malware scanner could not be reached (uploads stay FAILED and are never served)" }
+    "media-scan-failed"         = { deployed = true, ns = "Veda/App", metric = "MediaScanFailed", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A media scan did not complete (the object stays FAILED and is retried)" }
+    "media-infected"            = { deployed = true, ns = "Veda/App", metric = "MediaInfected", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "An uploaded file was detected as malware (refused, nothing stored)" }
+    "media-pending-age"         = { deployed = true, ns = "Veda/App", metric = "MediaPendingMaxAgeSeconds", stat = "Maximum", threshold = var.thresholds.media_pending_seconds, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "Media waiting for a scan for too long" }
+    "media-signatures-outdated" = { deployed = true, ns = "Veda/App", metric = "MediaSignatureAgeHours", stat = "Maximum", threshold = var.thresholds.scanner_signature_hours, cmp = "GreaterThanThreshold", period = 3600, missing = "notBreaching", what = "The scanner's signatures are older than allowed (freshclam not updating)" }
+    "media-non-clean-requested" = { deployed = true, ns = "Veda/App", metric = "MediaNonCleanRequested", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Delivery was asked for a released object that is not CLEAN (refused)" }
+    "media-s3-access-denied"    = { deployed = true, ns = "Veda/App", metric = "MediaStorageAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "S3 refused the host on the media bucket" }
+    "media-kms-access-denied"   = { deployed = true, ns = "Veda/App", metric = "MediaKmsAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "KMS refused the host for media" }
+    "audit-tampering"           = { deployed = false, ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
   }
 
   host_alarms = !var.host_alarms_enabled ? {} : {
@@ -44,6 +62,7 @@ locals {
     "host-memory"       = { deployed = true, ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }
     "host-data-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/var/lib/veda" }, stat = "Maximum", threshold = var.thresholds.data_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Data volume (/var/lib/veda) filling up" }
     "host-root-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/" }, stat = "Maximum", threshold = var.thresholds.root_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Root volume filling up (images, logs)" }
+    "scanner-restarts"  = { deployed = true, ns = "Veda/Host", metric = "ScannerRestarts", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = var.thresholds.scanner_restarts, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "The malware scanner keeps restarting (memory or signature reload)" }
     "api-health"        = { deployed = true, ns = "Veda/Host", metric = "HealthReady", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, missing = "breaching", what = "/health/ready failing or not reporting (uptime)" }
   }
 }

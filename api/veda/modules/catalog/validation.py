@@ -462,6 +462,10 @@ def _media(s: Session, cat, out: list[str], out3d: list[str], warnings: list[str
     for key, m in sorted(cat.of(kinds.Media).items()):
         if m.rights.expires and m.rights.expires < today:
             out.append(f"media {key}: usage rights expired on {m.rights.expires.isoformat()}")
+        if m.rights.effective_from and m.rights.effective_from > today:
+            out.append(f"media {key}: usage rights are not in effect until {m.rights.effective_from.isoformat()}")
+        if m.rights.review_by and m.rights.review_by <= today:
+            out.append(f"media {key}: usage rights review date {m.rights.review_by.isoformat()} has been reached")
         if m.objects.source and m.objects.source in set(m.objects.variants.values()):
             out.append(f"media {key}: the private source is listed as a delivery variant")
         for name, sha in sorted(m.objects.variants.items()):

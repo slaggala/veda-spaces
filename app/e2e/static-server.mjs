@@ -18,6 +18,7 @@ function parseHeaders(text) {
   for (const line of text.split('\n')) {
     if (!line.trim() || line.trim().startsWith('#')) continue;
     if (!line.startsWith(' ')) { current = { pattern: line.trim(), headers: {} }; rules.push(current); continue; }
+    if (line.trim().startsWith('! ')) { current.headers[line.trim().slice(2).trim()] = null; continue; } // Pages: detach
     const [name, ...rest] = line.trim().split(':');
     current.headers[name.trim()] = rest.join(':').trim();
   }
@@ -42,6 +43,7 @@ http.createServer((req, res) => {
   for (const rule of rules) {
     if (!matches(rule.pattern, url)) continue;
     for (const [k, v] of Object.entries(rule.headers)) {
+      if (v === null) { res.removeHeader(k); continue; }
       res.setHeader(k, apiOrigin && k === 'Content-Security-Policy'
         ? v.replace('https://api.vedaspaces.com', apiOrigin).replace(' upgrade-insecure-requests', '') : v);
     }

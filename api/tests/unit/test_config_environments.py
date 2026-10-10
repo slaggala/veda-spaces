@@ -249,8 +249,10 @@ def test_staging_estimator_with_its_policy_link_passes_and_production_still_refu
 @pytest.mark.parametrize("name", ["VEDA_CATALOG_ESTIMATOR_ENABLED", "VEDA_CATALOG_ANALYTICS_ENABLED"])
 def test_catalog_v3_flags_are_refused_in_production_and_allowed_on_staging(monkeypatch, name):
     """ADR-013 D9: V3 and its analytics stay off in production until separately approved."""
-    media = {"VEDA_CATALOG_MEDIA_BACKEND": "s3", "VEDA_CATALOG_MEDIA_BUCKET": "veda-catalog-media",
-             "VEDA_CATALOG_MEDIA_SCANNER": "clamd"}  # fmt: skip
+    media = {"VEDA_CATALOG_MEDIA_BACKEND": "s3", "VEDA_CATALOG_MEDIA_BUCKET": "veda-stg-media-111122223333",
+             "VEDA_CATALOG_MEDIA_SCANNER": "clamd",
+             "VEDA_CATALOG_MEDIA_KMS_KEY_ARN": "arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data",
+             "VEDA_CATALOG_MEDIA_RIGHTS_APPROVER": "Brand lead (role, test)"}  # fmt: skip
     assert config.validate_environment(deployed_env(monkeypatch, "staging", **{name: "true"}, **media)) == []
     problems = config.validate_environment(deployed_env(monkeypatch, "production", **{name: "true"}, **media))
     assert any(name in p for p in problems), problems

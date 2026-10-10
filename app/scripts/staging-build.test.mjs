@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { APPROVAL, buildSite, canonicalSha256, checkStaging, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API } from './staging-build.mjs';
+import { APPROVAL, buildSite, canonicalSha256, checkStaging, checkV3Approval, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API, V3_DIGEST_EVIDENCE, V3_GIT_EVIDENCE, v3ImageCsp } from './staging-build.mjs';
+import { createHash } from 'node:crypto';
 
 const SRC = fileURLToPath(new URL('../e2e/site-release', import.meta.url));
 const KEY = '0x4AAAAAAAstagingTestKey01';
@@ -192,4 +193,78 @@ test('V3 (catalog-driven estimator) is not in a staging build without its approv
   assert.throws(() => estimatorFlags({ STAGING_ESTIMATOR_VERSION: 'v4' }), /v1, v2 or v3/);
   assert.equal(estimatorFlags({}).version, 'v2');
   rmSync(out, { recursive: true, force: true });
+});
+
+
+// --- targeted media enablement: the V3 staging approval gate and the V3-only CSP delta ---------------------------------
+function v3Record(over = {}) {
+  const evidence = Object.fromEntries([...V3_GIT_EVIDENCE.map((k) => [k, { git_sha: 'a'.repeat(40), reference: `git ${k} (synthetic)` }]),
+    ...V3_DIGEST_EVIDENCE.map((k) => [k, { sha256: 'b'.repeat(64), reference: `evidence ${k} (synthetic)` }])]);
+  return { schema: 'veda.catalog.v3-staging-approval/1', status: 'APPROVED', release: 'V3-STAGING-1', author: 'Catalog lead (role, test)',
+    approver: 'Owner (role, test)', approved_on: '2026-10-10',
+    scope: { environments: ['staging'], version: 'v3', public_intake: false, media_delivery: true, three_d: false, video: false }, evidence, ...over };
+}
+function v3Files(record, bind = true) {
+  const dir = mkdtempSync(join(tmpdir(), 'veda-v3-approval-'));
+  const approvalFile = join(dir, 'v3-staging-approval.json');
+  writeFileSync(approvalFile, JSON.stringify(record, null, 2));
+  const sha = createHash('sha256').update(readFileSync(approvalFile)).digest('hex');
+  const platformFile = join(dir, 'staging-platform.json');
+  writeFileSync(platformFile, JSON.stringify({ catalog_v3: { approval_record_sha256: bind ? sha : null } }));
+  return { dir, approvalFile, platformFile };
+}
+
+test('V3: an APPROVED, complete, independent, digest-bound record opens the gate; anything else is refused', () => {
+  const ok = v3Files(v3Record());
+  checkV3Approval(ok.approvalFile, ok.platformFile);
+  const cases = [
+    [v3Record({ status: 'DRAFT' }), true, /record is DRAFT/],
+    [v3Record({ status: 'REVOKED' }), true, /record is REVOKED/],
+    [v3Record({ approver: 'Catalog lead (role, test)' }), true, /not independent/],
+    [v3Record({ approver: '[OWNER TO FILL]' }), true, /not independent/],
+    [v3Record({ evidence: {} }), true, /evidence without a digest/],
+    [v3Record({ evidence: { ...v3Record().evidence, real_card_evidence: { reference: 'pending' } } }), true, /real_card_evidence/],
+    [v3Record({ scope: { ...v3Record().scope, public_intake: true } }), true, /staging only/],
+    [v3Record({ scope: { ...v3Record().scope, environments: ['staging', 'production'] } }), true, /staging only/],
+    [v3Record(), false, /not the one bound/],
+  ];
+  for (const [record, bind, why] of cases) {
+    const f = v3Files(record, bind);
+    assert.throws(() => checkV3Approval(f.approvalFile, f.platformFile), why);
+    rmSync(f.dir, { recursive: true, force: true });
+  }
+  rmSync(ok.dir, { recursive: true, force: true });
+});
+
+test('V3 CSP delta: only the V3 page, only img-src, only the staging API host; the site policy is untouched', () => {
+  const site = readFileSync(join(SRC, '_headers'), 'utf8').replaceAll(PRODUCTION_API, STAGING_API);
+  const out = v3ImageCsp(site);
+  assert.ok(out.startsWith(site.replace(/\n*$/, '\n')), 'the existing rules are unchanged');
+  const rule = out.slice(out.indexOf('/estimate-v3*'));
+  assert.match(rule, /^\/estimate-v3\*\n {2}! Content-Security-Policy\n {2}Content-Security-Policy: /);
+  const v3 = rule.split('Content-Security-Policy: ')[1].trim();
+  const base = site.split('\n').find((l) => l.trim().startsWith('Content-Security-Policy:')).trim().slice('Content-Security-Policy:'.length).trim();
+  assert.equal(v3, base.replace("img-src 'self' data:", `img-src 'self' data: ${STAGING_API}`), 'exactly one change');
+  assert.ok(!/\*|blob:|media-src|worker-src/.test(v3.match(/img-src [^;]*/)[0] + (v3.includes('media-src') ? ' media-src' : '') + (v3.includes('worker-src') ? ' worker-src' : '')), 'no wildcard, blob, media-src or worker-src');
+  assert.ok(!out.includes('api.vedaspaces.com'), 'no production host');
+});
+
+test('V3 CSP delta: a build without the approved V3 page carries no V3 rule (production and staging unchanged)', () => {
+  const out = mkdtempSync(join(tmpdir(), 'veda-v3-off-'));
+  buildSite(SRC, out, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on' }));
+  const headers = readFileSync(join(out, '_headers'), 'utf8');
+  assert.ok(!headers.includes('/estimate-v3*') && !headers.includes(`img-src 'self' data: ${STAGING_API}`));
+  rmSync(out, { recursive: true, force: true });
+  const prod = readFileSync(join(SRC, '_headers'), 'utf8');
+  assert.ok(!prod.includes('/estimate-v3*') && !prod.includes('api-staging'), 'the production _headers never names the staging host');
+});
+
+test('V3 with its approved, bound record: the page ships with the V3-only image policy', () => {
+  const f = v3Files(v3Record());
+  const out = mkdtempSync(join(tmpdir(), 'veda-v3-on-'));
+  buildSite(SRC, out, KEY, { ...estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_VERSION: 'v3' }), v3ApprovalFile: f.approvalFile, platformFile: f.platformFile });
+  assert.ok(existsSync(join(out, 'estimate-v3.html')));
+  assert.ok(readFileSync(join(out, '_headers'), 'utf8').includes(`/estimate-v3*\n  ! Content-Security-Policy\n`));
+  rmSync(out, { recursive: true, force: true });
+  rmSync(f.dir, { recursive: true, force: true });
 });

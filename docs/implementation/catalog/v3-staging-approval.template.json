@@ -1,0 +1,19 @@
+{
+  "schema": "veda.catalog.v3-staging-approval/1",
+  "status": "DRAFT",
+  "release": "V3-STAGING-1",
+  "author": "[AUTHOR TO FILL]",
+  "approver": null,
+  "approved_on": null,
+  "scope": {
+    "environments": [
+      "staging"
+    ],
+    "version": "v3",
+    "public_intake": false,
+    "media_delivery": false,
+    "three_d": false,
+    "video": false
+  },
+  "evidence": {}
+}

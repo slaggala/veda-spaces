@@ -32,3 +32,44 @@ output "network" {
   })
 }
 
+
+# Catalog V3 media and flags (targeted media enablement): what is planned, and the gates that refuse the rest.
+output "catalog_v3" {
+  description = "Catalog V3 on staging: media settings and flags (all off until an APPROVED, digest-bound approval record)."
+  value = {
+    media_bucket    = module.storage.bucket_names["media"]
+    scanner_mode    = local.scanner.mode
+    scanner_option  = local.scanner.option
+    flags_on        = alltrue(local.catalog_v3_flags)
+    approval_record = local.catalog_v3.approval_record_sha256
+    rights_approver = local.rights.approver
+    noncurrent_days = local.media.noncurrent_days
+  }
+
+  precondition {
+    condition     = contains(["none", "clamd"], local.scanner.mode)
+    error_message = "media.scanner_mode is none or clamd (the application supports no other scanner; option C needs an application adapter first)."
+  }
+
+  precondition {
+    condition = local.scanner.mode != "clamd" || (
+      contains(["A", "B"], coalesce(local.scanner.option, "-")) &&
+      can(regex("^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$", coalesce(local.scanner.clamd_image, "-")))
+    )
+    error_message = "clamd needs the owner's scanner decision (option A or B, after the capacity evidence) and an image pinned by digest; a placeholder is refused."
+  }
+
+  precondition {
+    condition     = alltrue(local.catalog_v3_flags) || !anytrue(local.catalog_v3_flags)
+    error_message = "catalog_v3 flags turn on together or not at all (no partial activation)."
+  }
+
+  precondition {
+    condition = !anytrue(local.catalog_v3_flags) || (
+      local.scanner.status == "DECIDED" && local.scanner.mode == "clamd" && local.rights.status == "DECIDED" &&
+      !strcontains(local.rights.approver, "OWNER TO FILL") && trimspace(local.rights.approver) != "" &&
+      fileexists(local.approval_record) && local.catalog_v3.approval_record_sha256 == filesha256(local.approval_record)
+    )
+    error_message = "A catalog_v3 flag is on without its gates: media_scanner DECIDED with clamd, media_rights DECIDED, an assigned media-rights approver, and approval_record_sha256 equal to the SHA-256 of api/veda/modules/catalog/approved/v3-staging-approval.json (which the build accepts only when APPROVED)."
+  }
+}

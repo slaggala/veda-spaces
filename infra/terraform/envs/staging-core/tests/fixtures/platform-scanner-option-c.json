@@ -102,8 +102,8 @@
   "media_scanner": {
     "status": "UNDECIDED",
     "decision": "Not decided. The owner chooses option A (clamd sidecar on the current host, only if the capacity evidence shows the approved reserve), B (resize the host, separately reviewed and cost-approved, then the sidecar) or C (asynchronous S3 scanning; needs an application adapter first) after the scanner-capacity evidence (docs/implementation/catalog/CATALOG-V3-media-enablement.md). Until then mode is none: uploads stay PENDING and nothing is served. clamd needs the image pinned by digest; a placeholder is refused. UNDECIDED does not block other applies or deploys; it blocks V3 activation (output catalog_v3).",
-    "option": null,
-    "mode": "none",
+    "option": "C",
+    "mode": "s3-async",
     "clamd_image": null,
     "capacity_evidence_sha256": null
   },

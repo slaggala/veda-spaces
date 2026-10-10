@@ -54,12 +54,17 @@ variable "audit_key_alias" {
 }
 
 variable "bucket_arns" {
-  description = "AUT-103 bucket ARNs by purpose (litestream, snapshots, anchor, artifacts, evidence, logs)."
+  description = "AUT-103 bucket ARNs by purpose (litestream, snapshots, anchor, artifacts, evidence, logs, media)."
   type        = map(string)
 
   validation {
-    condition     = alltrue([for k in ["litestream", "snapshots", "anchor", "artifacts", "evidence"] : contains(keys(var.bucket_arns), k)])
-    error_message = "bucket_arns must name the litestream, snapshots, anchor, artifacts and evidence buckets."
+    condition     = alltrue([for k in ["litestream", "snapshots", "anchor", "artifacts", "evidence", "media"] : contains(keys(var.bucket_arns), k)])
+    error_message = "bucket_arns must name the litestream, snapshots, anchor, artifacts, evidence and media buckets."
+  }
+
+  validation {
+    condition     = can(regex("^arn:aws:s3:::veda-stg-media-[0-9]{12}$", try(var.bucket_arns["media"], "")))
+    error_message = "the media bucket is the staging media bucket veda-stg-media-<account> (never a production bucket)."
   }
 }
 

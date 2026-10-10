@@ -68,6 +68,22 @@ resource "aws_iam_policy" "runtime" {
         Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:PutObjectRetention"]
         Resource = ["${local.b.snapshots}/*", "${local.b.anchor}/*"]
       },
+      {
+        # Catalog V3 media (targeted media enablement): the API stores, reads (and heads) and deletes content-hash
+        # objects under source/ and variant/ only. No version deletes (old versions expire by lifecycle), no tagging,
+        # no ACL, nothing else in the bucket.
+        Sid      = "CatalogMediaObjects"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = ["${local.b.media}/source/*", "${local.b.media}/variant/*"]
+      },
+      {
+        Sid       = "CatalogMediaListPrefixes"
+        Effect    = "Allow"
+        Action    = "s3:ListBucket"
+        Resource  = local.b.media
+        Condition = { StringLike = { "s3:prefix" = ["source/*", "variant/*"] } }
+      },
       { Sid = "DeployBundles", Effect = "Allow", Action = "s3:GetObject", Resource = "${local.b.artifacts}/*" },
       { Sid = "FileEvidence", Effect = "Allow", Action = "s3:PutObject", Resource = "${local.b.evidence}/*" },
       {

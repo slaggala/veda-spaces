@@ -247,6 +247,8 @@ class Rights(_Model):
     owner: Name
     licence: Name
     usage: Literal["owned", "licensed", "client_permission"]
+    effective_from: date | None = None  # rights not yet in effect are never released or served
+    review_by: date | None = None  # mandatory review of the rights basis (release validation refuses it once passed)
     expires: date | None = None
     consent_reference: Annotated[str, Field(max_length=80)] | None = (
         None  # the client's written permission, by reference
@@ -256,6 +258,8 @@ class Rights(_Model):
     def _consent(self):
         if self.usage == "client_permission" and not self.consent_reference:
             raise ValueError("a client's image needs the reference of their written permission")
+        if self.effective_from and self.expires and self.expires < self.effective_from:
+            raise ValueError("media rights expire after they take effect")
         return self
 
 

@@ -28,6 +28,9 @@ APPROVED_METRICS = frozenset(
         "ChainAnchorFailed", "SecurityLogArchivedRows", "SecurityLogArchiveFailed", "GovernanceInvariantFailures",
         "NoEffectiveRecoveryAdmin", "OutboxDepth", "OutboxOldestAge", "OutboxDead", "SnapshotCompleted",
         "SnapshotBytes", "RestoreVerified", "DiskUsed", "MaintenanceJobFailed", "ScheduledJobFailed",
+        # Catalog V3 media (targeted media enablement): scanner, pending age, delivery refusals, storage denials.
+        "MediaScanFailed", "MediaScannerUnavailable", "MediaInfected", "MediaPendingMaxAgeSeconds",
+        "MediaSignatureAgeHours", "MediaNonCleanRequested", "MediaStorageAccessDenied", "MediaKmsAccessDenied",
     }
 )  # fmt: skip
 

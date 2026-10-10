@@ -188,6 +188,10 @@ class Settings:
     catalog_media_bucket: str | None = None
     catalog_media_kms_key_arn: str | None = None
     catalog_media_retention_days: int = 180  # unreferenced media sources are purged after this
+    catalog_media_source_prefix: str = "source/"  # fixed: the host role may reach only source/ and variant/
+    catalog_media_variant_prefix: str = "variant/"
+    catalog_video_enabled: bool = False  # video is not supported: refused on, everywhere
+    catalog_media_rights_approver: str | None = None  # the owner-assigned media-rights approver (staging, production)
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -323,6 +327,10 @@ def load_settings(**overrides) -> Settings:
         catalog_media_bucket=_env("VEDA_CATALOG_MEDIA_BUCKET"),
         catalog_media_kms_key_arn=_env("VEDA_CATALOG_MEDIA_KMS_KEY_ARN"),
         catalog_media_retention_days=_intd("VEDA_CATALOG_MEDIA_RETENTION_DAYS", 180),
+        catalog_media_source_prefix=_str("VEDA_CATALOG_MEDIA_SOURCE_PREFIX", "source/"),
+        catalog_media_variant_prefix=_str("VEDA_CATALOG_MEDIA_VARIANT_PREFIX", "variant/"),
+        catalog_video_enabled=_bool("VEDA_CATALOG_VIDEO_ENABLED", False),
+        catalog_media_rights_approver=_env("VEDA_CATALOG_MEDIA_RIGHTS_APPROVER"),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -475,6 +483,12 @@ def validate_environment(settings: Settings) -> list[str]:
         problems.append("VEDA_CATALOG_MEDIA_BACKEND must be local or s3")
     if not 30 <= settings.catalog_media_retention_days <= 3650:
         problems.append("VEDA_CATALOG_MEDIA_RETENTION_DAYS must be between 30 and 3650")
+    if (settings.catalog_media_source_prefix, settings.catalog_media_variant_prefix) != ("source/", "variant/"):
+        problems.append(
+            "VEDA_CATALOG_MEDIA_SOURCE_PREFIX and _VARIANT_PREFIX are fixed (source/, variant/): the host role reaches only those"
+        )
+    if settings.catalog_video_enabled:
+        problems.append("VEDA_CATALOG_VIDEO_ENABLED is not supported: video stays disabled (ADR-013)")
     catalog_on = settings.catalog_admin_enabled or settings.catalog_estimator_enabled
     if env in ("staging", "production") and (catalog_on or settings.catalog_media_delivery_enabled):
         # F2: deployed catalog media needs the private bucket and a scanner; nothing is served from local disk.
@@ -482,6 +496,11 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append(f"the catalog needs VEDA_CATALOG_MEDIA_BACKEND=s3 and a bucket in {env}")
         if settings.catalog_media_scanner != "clamd":
             problems.append(f"the catalog needs VEDA_CATALOG_MEDIA_SCANNER=clamd in {env}")
+        if settings.catalog_media_backend == "s3" and not settings.catalog_media_kms_key_arn:
+            problems.append(f"the catalog needs VEDA_CATALOG_MEDIA_KMS_KEY_ARN (the data key) in {env}")
+        approver = (settings.catalog_media_rights_approver or "").strip()
+        if not approver or "OWNER TO FILL" in approver.upper() or approver.upper() == "UNASSIGNED":
+            problems.append(f"the catalog needs an owner-assigned VEDA_CATALOG_MEDIA_RIGHTS_APPROVER in {env}")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:
