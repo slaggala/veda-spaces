@@ -61,6 +61,33 @@ vendor cost; margin; rate card. The `save N%` claim pattern now matches multi-di
 The generated tests found a gap that the examples had not: the label-index allowance let "Door: 0" and "per shutter 0"
 through. Label indexes are now limited to series labels, and rate wording is checked first.
 
+**Proof of quantity** (follow-up review). QUANTITY was being inferred whenever a word followed a number, so
+`1200 apiece`, `1200 monthly`, `1200 plus GST`, `1200 on every door`, `1200 for installation` and `1.2 lakh monthly`
+passed. QUANTITY must now be proven, and only quantity-role assignment changed. A number is a QUANTITY only when it
+counts an approved business entity (`text.QUANTITY_NOUNS`: the schema's rooms and the furniture, joinery and visits
+the catalog prices, singular and plural), possibly after approved descriptive words (`QUANTITY_DESCRIPTORS`, for
+example "2 extra drawers", "3 base units", "1 L-shaped counter", "2-door wardrobe"). Labels and codes keep their own
+roles: `Package 3`, `Bedroom 2`, `Specification 1.1`, `I-401`, `E1`, `3D`, and ranking labels such as `No. 1` or `Top 10`, which the claim rules govern. Structured quantities stay structured
+fields. Everything else is money:
+
+| Form | Category |
+|---|---|
+| A periodic or per-piece word (daily, weekly, monthly, annually, hourly, apiece, a piece) | RATE |
+| on / at / for / in followed by every / each / per / a | RATE |
+| A tax add-on (plus, including or excluding GST or tax) | PROMOTIONAL PRICE |
+| A money magnitude anywhere in the number (lakh, crore, million) | PROMOTIONAL PRICE, or RATE when a connector follows |
+| A number followed by any unapproved word | PROMOTIONAL PRICE |
+
+**Tests** (`test_catalog_content_policy.py`):
+
+| Test | What it covers |
+|---|---|
+| `test_reviewer_quantity_false_negatives_are_money` | The reviewer's 13 false negatives |
+| `test_labels_and_codes_are_allowed` | The reviewer's 5 labels and codes |
+| `test_adversarial_periodic_tax_and_every_wordings_are_money_for_any_number` | 13 wordings × 18 number forms × 6 entities |
+| `test_a_following_word_never_makes_a_quantity_unless_it_is_an_approved_entity` | 15 unproven words × every number are money; approved entities × every integer are allowed |
+| `test_the_quantity_lookup_includes_the_schemas_rooms` | The schema's rooms are in the lookup |
+
 B2 and B3 are unchanged by this closure.
 
 ## Claim and public-pricing policy closure (follow-up to the PR #69 review)

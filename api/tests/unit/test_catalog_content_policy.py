@@ -324,3 +324,57 @@ def test_measurements_durations_quantities_and_labels_are_allowed_whatever_the_n
 def test_a_number_with_no_allowlisted_role_is_never_prose():
     for value in ("Cabinets 1200", "TV unit, 4500.", "Includes the hood (899)", "Call for 3500"):
         assert text.money_categories(value), value
+
+
+# --- QUANTITY is proven, never inferred ----------------------------------------------------------------------------
+QUANTITY_FALSE_NEGATIVES = ["1200 apiece", "1200 plus GST", "1200 additional per door", "1200 on every door",
+                            "1200 for installation", "1200 monthly", "1200 annually", "1200 hourly", "1200 weekly",
+                            "100 apiece", "5000 annually", "25 daily", "1.2 lakh monthly"]  # fmt: skip
+LABELS_AND_CODES = ["Package 3", "Bedroom 2", "Specification 1.1", "I-401", "E1"]
+ADVERSARIAL_WORDINGS = ["{n} daily", "{n} weekly", "{n} monthly", "{n} annually", "{n} apiece", "{n} including GST",
+                        "{n} plus GST", "{n} on every {x}", "{n} additional per {x}", "{n} for installation",
+                        "{n} for each {x}", "{n} incl. GST", "{n} + GST"]  # fmt: skip
+ENTITY_NOUNS = ["door", "shutter", "drawer", "wardrobe", "panel", "room"]
+UNPROVEN_WORDS = ["installation", "fitting", "labour", "service", "gizmos", "approx", "flat", "net", "only", "fitted",
+                  "delivered", "charges", "frobnicators", "upfront", "total"]  # fmt: skip
+
+
+@pytest.mark.parametrize("value", QUANTITY_FALSE_NEGATIVES)
+def test_reviewer_quantity_false_negatives_are_money(value):
+    assert text.money_categories(value), value
+    for policy in PROSE:
+        assert public.check_text("field", value, policy), (value, policy)
+
+
+@pytest.mark.parametrize("value", LABELS_AND_CODES)
+def test_labels_and_codes_are_allowed(value):
+    assert text.money_categories(value) == [], (value, text.money_categories(value))
+
+
+def test_adversarial_periodic_tax_and_every_wordings_are_money_for_any_number():
+    misses = [
+        (w.format(n=n, x=x), text.money_categories(w.format(n=n, x=x)))
+        for w in ADVERSARIAL_WORDINGS for n in NUMBERS for x in ENTITY_NOUNS
+        if not text.money_categories(w.format(n=n, x=x))
+    ]  # fmt: skip
+    assert misses == [], misses[:10]
+
+
+def test_a_following_word_never_makes_a_quantity_unless_it_is_an_approved_entity():
+    digits = [n for n in NUMBERS if n[0].isdigit()]
+    unproven = [(f"{n} {w}", text.money_categories(f"{n} {w}")) for n in digits for w in UNPROVEN_WORDS
+                if not text.money_categories(f"{n} {w}")]  # fmt: skip
+    assert unproven == [], unproven[:10]
+    proven = [(f"{n} {w}s", text.money_categories(f"{n} {w}s")) for n in digits if "." not in n for w in ENTITY_NOUNS
+              if text.money_categories(f"{n} {w}s")]  # fmt: skip
+    assert proven == [], proven[:10]
+    assert {"rooms", "drawers", "wardrobes", "panels", "doors", "shutters"} <= text.QUANTITY_NOUNS
+
+
+def test_the_quantity_lookup_includes_the_schemas_rooms():
+    import typing
+
+    for code in typing.get_args(kinds.RoomCode):
+        word = code.split("_")[0].lower()
+        if word not in ("whole", "kids", "master"):
+            assert word in text.QUANTITY_NOUNS or word + "s" in text.QUANTITY_NOUNS, code

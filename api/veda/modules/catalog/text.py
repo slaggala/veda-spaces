@@ -295,6 +295,35 @@ _CURRENCY_WORDS = frozenset(
 _CURRENCY_SIGNS = frozenset("₹$€£¥")
 _MAGNITUDES = frozenset({"k", "l", "lac", "lacs", "lakh", "lakhs", "cr", "crore", "crores", "mn", "million", "thousand",
                          "hundred", "bn", "billion"})  # fmt: skip
+# The approved countable business entities a number may count (QUANTITY is proven, never inferred): the catalog's
+# rooms (kinds.RoomCode and the engine's room names), the furniture and joinery it prices, and site visits. Singular
+# and plural forms. Extend this lookup, not the classifier, when the catalog adds an entity.
+_ENTITIES = (
+    "room", "bedroom", "bathroom", "kitchen", "utility", "living", "dining", "study", "pooja", "home", "house",
+    "apartment", "villa", "floor", "wall", "ceiling", "drawer", "wardrobe", "panel", "door", "shutter", "shelf",
+    "shelves", "cabinet", "cupboard", "unit", "module", "partition", "window", "bed", "storage", "box", "carcass",
+    "counter", "countertop", "loft", "basket", "hinge", "handle", "channel", "mirror", "light", "sensor", "pelmet",
+    "accessory", "accessories", "item", "piece", "product", "extra", "option", "set", "sheet", "visit", "seater",
+    "tier", "section", "compartment", "rack", "sink", "tap", "chimney", "hob", "appliance", "socket", "point",
+)  # fmt: skip
+QUANTITY_NOUNS = frozenset(
+    {e for e in _ENTITIES} | {e + "s" for e in _ENTITIES if not e.endswith(("s", "x"))} | {"boxes", "carcasses",
+     "wardrobes", "nos", "pcs", "pieces"} | {"cupboards", "lofts", "benches"}
+)  # fmt: skip
+# Descriptive words allowed between a number and its entity ("2 extra drawers", "3 base units", "4 soft-close hinges").
+QUANTITY_DESCRIPTORS = frozenset({
+    "extra", "additional", "more", "base", "wall", "tall", "loft", "sliding", "hinged", "open", "closed", "glass",
+    "soft", "soft-close", "close", "top", "bottom", "side", "corner", "overhead", "standard", "new", "selected",
+    "small", "large", "medium", "full", "half", "single", "double", "built-in", "fitted", "matching", "storage",
+    "kitchen", "tv", "pull-out", "-",
+})  # fmt: skip
+PERIODIC_WORDS = frozenset({"daily", "weekly", "fortnightly", "monthly", "quarterly", "yearly", "annually", "annual",
+                            "hourly", "nightly", "apiece", "pa", "p.a", "pm", "pw"})  # fmt: skip
+_TAX_LEADS = frozenset({"plus", "+", "including", "incl", "inclusive", "excluding", "excl", "exclusive", "with",
+                        "without", "inc", "ex"})  # fmt: skip
+_TAX_WORDS = frozenset({"gst", "tax", "taxes", "vat", "cess", "duty", "duties", "levies"})
+_MONEY_MAGNITUDES = frozenset({"k", "l", "lac", "lacs", "lakh", "lakhs", "cr", "crore", "crores", "mn", "million",
+                               "bn", "billion"})  # fmt: skip
 _RATE_CONNECTORS = frozenset({"per", "/", "each", "every", "pp", "p"})
 _RATE_ABBREVIATIONS = frozenset({"psf", "psm", "prft"})  # per sq ft, per sq m, per running foot
 _RANGE_JOINERS = frozenset({"to", "-", "–", "—", "or", "/", "and", "by", "x", "×"})
@@ -304,9 +333,10 @@ _QUALIFIERS_BEFORE = ("only", "just", "starting at", "starting from", "from just
                       "@", "at only", "worth", "costs", "cost", "priced at", "price", "for rs", "pay")  # fmt: skip
 # Series labels a number may index ("Bedroom 2", "Option 3", "Specification 1.1"); never ordinary nouns, so
 # "Door 1200" or "Shutter: 1200" is still an unattached amount.
-_LABEL_WORDS = frozenset({"bedroom", "bathroom", "option", "step", "phase", "stage", "version", "v", "specification",
+_LABEL_WORDS = frozenset({"package", "bedroom", "bathroom", "option", "step", "phase", "stage", "version", "v", "specification",
                           "spec", "type", "model", "series", "level", "floor", "block", "tower", "wing", "section",
                           "page", "zone", "release", "grade", "class", "iso", "is", "e", "batch"})  # fmt: skip
+_RANK_LABELS = frozenset({"no", "number", "top", "rank", "ranked", "rated"})
 _DATE_LEAD = frozenset({"in", "since", "from", "until", "till", "by", "of", "year", "est", "established", "founded",
                         "©", "before", "after", "during", "fy"})  # fmt: skip
 DISCOUNT_WORDS = frozenset({"save", "saving", "savings", "saved", "discount", "discounts", "discounted", "off",
@@ -329,7 +359,8 @@ _NUMBER_WORDS = frozenset({"zero", "one", "two", "three", "four", "five", "six",
                            "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
                            "hundred", "thousand", "lakh", "lakhs", "crore", "crores", "million", "dozen"})  # fmt: skip
 _TOKEN = re.compile(r"\d[\d,]*(?:\.\d+)?|\.\d+|[a-z]+(?:'[a-z]+)?|[₹$€£¥%/′″'\"@+×°\-–—]|[^\s\w]")
-_CODE = re.compile(r"\b([a-z]+)\d[a-z0-9]*\b")
+_CODE = re.compile(r"\b([a-z]+)-?\d[a-z0-9]*(?:-[a-z0-9]+)*\b")  # "e1", "x1", "i-401", "tv-12b"
+_DIGIT_CODE = re.compile(r"\b(\d+)([a-z]+)\b")
 _DATE = re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}:\d{2}(?::\d{2})?\b")
 
 
@@ -340,6 +371,16 @@ def _tokens(text: str) -> list[str]:
         form = pattern.sub(unit, form)
     # A code glued to letters ("x1", "e1", "r2d2") is an identifier, unless the letters are a currency ("rs1200").
     form = _CODE.sub(lambda m: m.group(0) if m.group(1) in _CURRENCY_WORDS else " ⟨code⟩ ", form)
+    # A digit-led code ("3d", "2a", "5g") is an identifier unless its letters are a unit, magnitude, duration or
+    # currency ("18mm", "12k", "3days", "1200rs" keep their roles).
+    form = _DIGIT_CODE.sub(
+        lambda m: (
+            m.group(0)
+            if m.group(2) in MEASUREMENT_UNITS | DURATION_UNITS | _MAGNITUDES | _CURRENCY_WORDS | PERIODIC_WORDS
+            else " ⟨code⟩ "
+        ),
+        form,
+    )
     return [t for t in _TOKEN.findall(form) if t.strip()]
 
 
@@ -358,6 +399,8 @@ def _role(toks: list[str], i: int) -> str | None:
         j += 1
     before = toks[max(0, i - 4) : i]
     prev = toks[i - 1] if i else None
+    if set(toks[i + 1 : j]) & _MONEY_MAGNITUDES or (toks[i] in _MONEY_MAGNITUDES and i + 1 == j):
+        return _price_kind(toks, j, set(toks[max(0, i - 4) : min(len(toks), j + 4)]))  # "1.2 lakh monthly"
     near = set(toks[max(0, i - 4) : min(len(toks), j + 4)])
     # Currency on either side, or a /- suffix: a stated price.
     if (prev in _CURRENCY_SIGNS or prev in _CURRENCY_WORDS or (j < len(toks) and (toks[j] in _CURRENCY_SIGNS
@@ -395,17 +438,26 @@ def _role(toks: list[str], i: int) -> str | None:
         return _after_measure(toks, j + 1)
     if nxt in _RANGE_JOINERS and after is not None and _is_number(after):
         return None  # "3 to 20 feet", "16/18 mm", "8-10 days": the second number carries the role
-    if nxt == "-" and _word(after):
-        return _after_measure(toks, j + 2) if after in MEASUREMENT_UNITS | DURATION_UNITS else None  # "8-ft", "one-day"
-    if _word(nxt) and nxt not in _QUALIFIERS_AFTER:
-        return _after_measure(toks, j + 1)  # a quantity: "3 rooms", "2 wardrobes selected", "2 extra drawers"
-    if nxt in _QUALIFIERS_AFTER and _word(after):
-        return _after_measure(toks, j + 2)
+    if nxt == "-" and after in MEASUREMENT_UNITS | DURATION_UNITS:
+        return _after_measure(toks, j + 2)  # "8-ft wall", "one-day visit"
+    if nxt in PERIODIC_WORDS or (nxt == "a" and after == "piece"):
+        return RATE  # "1200 monthly", "1200 apiece", "1200 a piece"
+    if nxt in ("on", "at", "for", "in") and after in ("every", "each", "per", "a", "an", "all"):
+        return RATE  # "1200 on every door", "1200 for each shutter"
+    if nxt in _TAX_LEADS and set(toks[j + 1 : j + 4]) & _TAX_WORDS:
+        return PROMOTIONAL_PRICE  # "1200 plus GST", "1200 including GST"
+    # QUANTITY must be proven: the number counts an approved business entity (QUANTITY_NOUNS), possibly after
+    # approved descriptive words. A word after a number does not make it a quantity.
+    counted = _quantity(toks, j)
+    if counted is not None:
+        return _after_measure(toks, counted)
     # No following role: rate wording before it, else a series label index or a year, else an unattached amount.
     if before and set(before) & (_RATE_CONNECTORS | RATE_WORDS):
         return RATE  # "per sqft 1200", "rate: 1200", "per door 5"
     if prev in _LABEL_WORDS:
         return None
+    if prev in _RANK_LABELS or prev == "#" or (prev == "." and i >= 2 and toks[i - 2] in _RANK_LABELS):
+        return None  # "No. 1", "#1", "Top 10": a ranking label, which the claim rules govern (never money)
     if re.fullmatch(r"(?:19|20)\d\d", toks[i]) and prev in _DATE_LEAD:
         return None
     if prev in _MONEY_LEADS or " ".join(toks[max(0, i - 2) : i]) in _QUALIFIERS_BEFORE:
@@ -431,6 +483,28 @@ def _price_kind(toks: list[str], j: int, near: set[str]) -> str:
     if near & DISCOUNT_WORDS:
         return DISCOUNT
     return PROMOTIONAL_PRICE
+
+
+def _quantity(toks: list[str], j: int) -> int | None:
+    """The index after the counted entity when toks[j:] proves a quantity ("3 rooms", "2 extra drawers",
+    "1 L-shaped counter", "2-door wardrobe"), else None."""
+    k = j
+    if k < len(toks) and toks[k] == "-":
+        k += 1  # "2-door"
+    for _ in range(3):
+        if k < len(toks) and toks[k] in QUANTITY_DESCRIPTORS:
+            k += 1
+        elif (
+            k + 2 < len(toks)
+            and len(toks[k]) == 1
+            and toks[k].isalpha()
+            and toks[k + 1] == "-"
+            and toks[k + 2] in ("shaped", "shape")
+        ):
+            k += 3  # "L-shaped", "U-shaped"
+        else:
+            break
+    return k + 1 if k < len(toks) and toks[k] in QUANTITY_NOUNS else None
 
 
 def _after_measure(toks: list[str], k: int) -> str | None:
