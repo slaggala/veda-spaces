@@ -67,16 +67,17 @@ module "kms" {
 module "storage" {
   source = "../../modules/storage"
 
-  name_prefix   = local.name_prefix
-  account_id    = local.account_id
-  region        = var.aws_region
-  data_key_arn  = module.kms.data_key_arn
-  audit_key_arn = module.kms.audit_key_arn
-  trail_name    = local.trail_name
-  retention = {
+  name_prefix        = local.name_prefix
+  account_id         = local.account_id
+  region             = var.aws_region
+  data_key_arn       = module.kms.data_key_arn
+  data_key_alias_arn = local.data_key_alias_arn
+  audit_key_arn      = module.kms.audit_key_arn
+  trail_name         = local.trail_name
+  retention = merge({
     for k in ["litestream_noncurrent_days", "snapshots_expire_days", "artifacts_expire_days", "artifacts_noncurrent_days",
     "logs_cloudtrail_expire_days", "logs_flow_expire_days", "evidence_lock_mode", "evidence_lock_days"] : k => local.platform.storage[k]
-  }
+  }, { media_noncurrent_days = local.media.noncurrent_days })
 }
 
 # AUT-104: CloudTrail (management events; data events by the owner session).
@@ -156,8 +157,41 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config
+    }, local.estimator_config, local.media_config
   )
+}
+
+# Catalog V3 media (targeted media enablement; infra/config/staging-platform.json "media" and "catalog_v3").
+# Settings are planned now, every flag stays off: the media backend and bucket are configured, the scanner is
+# whatever the owner decided (none until then: uploads stay PENDING and nothing is served), delivery, 3D and video
+# are off, and the catalog flags follow catalog_v3, which may turn on only all together and only bound to an APPROVED
+# V3 staging approval record (output "catalog_v3" refuses anything else).
+locals {
+  data_key_alias_arn = "arn:aws:kms:${var.aws_region}:${local.account_id}:${module.kms.aliases["data"]}"
+  media              = local.platform.media
+  scanner            = local.platform.media_scanner
+  rights             = local.platform.media_rights
+  catalog_v3         = local.platform.catalog_v3
+  catalog_v3_flags   = [local.catalog_v3.catalog_estimator_enabled, local.catalog_v3.catalog_admin_enabled, local.catalog_v3.media_delivery_enabled]
+  approval_record    = "${path.module}/../../../../api/veda/modules/catalog/approved/v3-staging-approval.json"
+  media_config = merge({
+    VEDA_CATALOG_MEDIA_BACKEND          = "s3"
+    VEDA_CATALOG_MEDIA_BUCKET           = module.storage.bucket_names["media"]
+    VEDA_CATALOG_MEDIA_KMS_KEY_ARN      = local.data_key_alias_arn
+    VEDA_CATALOG_MEDIA_SOURCE_PREFIX    = "source/"
+    VEDA_CATALOG_MEDIA_VARIANT_PREFIX   = "variant/"
+    VEDA_CATALOG_MEDIA_SCANNER          = local.scanner.mode
+    VEDA_CATALOG_MEDIA_DELIVERY_ENABLED = local.catalog_v3.media_delivery_enabled ? "true" : "false"
+    VEDA_CATALOG_3D_ENABLED             = "false"
+    VEDA_CATALOG_VIDEO_ENABLED          = "false"
+    VEDA_CATALOG_ESTIMATOR_ENABLED      = local.catalog_v3.catalog_estimator_enabled ? "true" : "false"
+    VEDA_CATALOG_ADMIN_ENABLED          = local.catalog_v3.catalog_admin_enabled ? "true" : "false"
+    }, local.scanner.mode == "clamd" ? {
+    VEDA_CATALOG_CLAMD_ADDRESS = "clamd:3310" # the Compose service on the private network (no host port)
+    VEDA_CATALOG_CLAMD_IMAGE   = local.scanner.clamd_image
+    } : {}, local.rights.status == "DECIDED" ? {
+    VEDA_CATALOG_MEDIA_RIGHTS_APPROVER = local.rights.approver
+  } : {})
 }
 
 locals {

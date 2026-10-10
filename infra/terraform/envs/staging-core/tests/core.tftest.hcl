@@ -173,3 +173,90 @@ run "estimator_policy_link_must_be_a_vedaspaces_https_page" {
 
   expect_failures = [var.warranty_policy_url]
 }
+
+# Targeted media enablement: the media bucket and settings are planned with every V3 flag off.
+run "media_settings_planned_with_every_flag_off" {
+  command = plan
+
+  assert {
+    condition     = module.storage.bucket_names["media"] == "veda-stg-media-${local.account_id}"
+    error_message = "the media bucket follows the plan-guard naming convention"
+  }
+
+  assert {
+    condition = (local.app_config["VEDA_CATALOG_MEDIA_BACKEND"] == "s3" && local.app_config["VEDA_CATALOG_MEDIA_SOURCE_PREFIX"] == "source/" &&
+      local.app_config["VEDA_CATALOG_MEDIA_VARIANT_PREFIX"] == "variant/" &&
+    local.app_config["VEDA_CATALOG_MEDIA_KMS_KEY_ARN"] == "arn:aws:kms:ap-south-1:${local.account_id}:alias/veda-stg-data")
+    error_message = "media backend, prefixes and the existing data key by alias"
+  }
+
+  assert {
+    condition = alltrue([for k in ["VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", "VEDA_CATALOG_3D_ENABLED", "VEDA_CATALOG_VIDEO_ENABLED",
+    "VEDA_CATALOG_ESTIMATOR_ENABLED", "VEDA_CATALOG_ADMIN_ENABLED"] : local.app_config[k] == "false"])
+    error_message = "every V3, delivery, 3D and video flag is off"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] == "none" && !contains(keys(local.app_config), "VEDA_CATALOG_CLAMD_ADDRESS") && !contains(keys(local.app_config), "VEDA_CATALOG_CLAMD_IMAGE")
+    error_message = "no scanner (no address, no image) until the owner decides; uploads stay PENDING"
+  }
+
+  assert {
+    condition     = !contains(keys(local.app_config), "VEDA_CATALOG_MEDIA_RIGHTS_APPROVER")
+    error_message = "no media-rights approver is planned until the owner names one (never the placeholder)"
+  }
+
+  assert {
+    condition     = alltrue([for k, v in local.app_config : !can(regex("(?i)secret|password|private", k))])
+    error_message = "no secret in the planned configuration"
+  }
+}
+
+run "a_partial_v3_activation_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-v3-partial.json"
+  }
+  expect_failures = [output.catalog_v3]
+}
+
+run "v3_flags_without_the_approval_record_binding_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-v3-unbound.json"
+  }
+  expect_failures = [output.catalog_v3]
+}
+
+run "clamd_with_a_placeholder_digest_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-clamd-placeholder.json"
+  }
+  expect_failures = [output.catalog_v3]
+}
+
+run "a_scanner_the_application_cannot_use_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-scanner-option-c.json"
+  }
+  expect_failures = [output.catalog_v3]
+}
+
+run "a_decided_pinned_clamd_reaches_ssm_on_the_private_network" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-clamd-pinned.json"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] == "clamd" && local.app_config["VEDA_CATALOG_CLAMD_ADDRESS"] == "clamd:3310" && endswith(local.app_config["VEDA_CATALOG_CLAMD_IMAGE"], "@sha256:${join("", [for i in range(64) : "b"])}")
+    error_message = "the clamd address is the Compose service name (no host port) and the image is the pinned digest"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_ESTIMATOR_ENABLED"] == "false"
+    error_message = "a scanner decision does not enable V3"
+  }
+}

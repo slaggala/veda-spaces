@@ -14,6 +14,9 @@ locals {
     artifacts  = { name = "${var.name_prefix}-artifacts-${var.account_id}", key = var.data_key_arn, lock = false }
     evidence   = { name = "veda-evidence-${var.account_id}", key = var.audit_key_arn, lock = true }
     logs       = { name = "${var.name_prefix}-logs-${var.account_id}", key = var.audit_key_arn, lock = false }
+    # Catalog V3 media (targeted media enablement): private sources and delivery variants under content-hash keys
+    # (source/, variant/). No Object Lock: a media or consent withdrawal must delete the bytes.
+    media = { name = "${var.name_prefix}-media-${var.account_id}", key = var.data_key_arn, lock = false }
   }
 
   arn       = { for k, b in local.buckets : k => "arn:aws:s3:::${b.name}" }
@@ -27,6 +30,9 @@ locals {
     anchor    = []
     artifacts = [{ id = "expire-artifacts", prefix = "", expire_days = var.retention.artifacts_expire_days, noncurrent_days = var.retention.artifacts_noncurrent_days }]
     evidence  = []
+    # A withdrawal or retention purge deletes the current version (the application decides what is served); the old
+    # versions expire after the decided window, and the delete markers left behind are removed.
+    media = [{ id = "noncurrent-media", prefix = "", expire_days = null, noncurrent_days = var.retention.media_noncurrent_days, delete_markers = true }]
     logs = [
       { id = "expire-cloudtrail", prefix = "cloudtrail/", expire_days = var.retention.logs_cloudtrail_expire_days, noncurrent_days = 1 },
       { id = "expire-vpc-flow", prefix = "vpc-flow/", expire_days = var.retention.logs_flow_expire_days, noncurrent_days = 1 },
@@ -74,6 +80,28 @@ locals {
       Principal = "*"
       Action    = ["s3:DeleteObject", "s3:DeleteObjectVersion"]
       Resource  = "bucket/*" # replaced per bucket below
+    },
+  ]
+
+  # The media bucket: every object is written with SSE-KMS under the data key, and only under source/ or variant/
+  # (content-hash keys the API generates). Nothing is ever public; delivery goes through the API route.
+  media_statements = [
+    {
+      Sid       = "DenyUploadsWithoutTheDataKey"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:PutObject"
+      Resource  = "${local.arn["media"]}/*"
+      # The data key, named by its key ARN or by its alias ARN (the application may send either).
+      Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption-aws-kms-key-id" = [var.data_key_arn, var.data_key_alias_arn] } }
+    },
+    {
+      Sid       = "DenyUploadsWithoutKms"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:PutObject"
+      Resource  = "${local.arn["media"]}/*"
+      Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
     },
   ]
 
@@ -213,6 +241,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
         }
       }
 
+      dynamic "expiration" {
+        for_each = try(rule.value.delete_markers, false) ? [true] : []
+        content {
+          expired_object_delete_marker = true
+        }
+      }
+
       noncurrent_version_expiration {
         noncurrent_days = rule.value.noncurrent_days
       }
@@ -232,6 +267,7 @@ resource "aws_s3_bucket_policy" "this" {
       local.common_statements[each.key],
       [for s in local.lock_statements : merge(s, { Resource = "${local.arn[each.key]}/*" }) if contains(["snapshots", "anchor"], each.key)],
       [for s in local.delivery_statements : s if each.key == "logs"],
+      [for s in local.media_statements : s if each.key == "media"],
     )
   })
 

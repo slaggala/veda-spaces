@@ -28,8 +28,8 @@ run "a_fixed_set_of_metric_filters_not_emf" {
   command = plan
 
   assert {
-    condition     = length(aws_cloudwatch_log_metric_filter.app) == 7 && alltrue([for f in aws_cloudwatch_log_metric_filter.app : one(f.metric_transformation).namespace == "Veda/App"])
-    error_message = "seven application metrics, one namespace: the custom-metric count is bounded (cost)"
+    condition     = length(aws_cloudwatch_log_metric_filter.app) == 15 && alltrue([for f in aws_cloudwatch_log_metric_filter.app : one(f.metric_transformation).namespace == "Veda/App"])
+    error_message = "seven application metrics and eight catalog-media metrics, one namespace: the custom-metric count is bounded (cost)"
   }
 
   assert {
@@ -38,8 +38,8 @@ run "a_fixed_set_of_metric_filters_not_emf" {
   }
 
   assert {
-    condition     = output.custom_metric_count == 8
-    error_message = "before the host exists: 7 filters and the tampering metric"
+    condition     = output.custom_metric_count == 16
+    error_message = "before the host exists: 15 filters and the tampering metric"
   }
 }
 
@@ -90,8 +90,8 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = toset(keys(aws_cloudwatch_metric_alarm.host)) == toset(["host-status-check", "host-cpu", "host-memory", "host-data-disk", "host-root-disk", "api-health"])
-    error_message = "status, CPU, memory, both disks and the health heartbeat"
+    condition     = toset(keys(aws_cloudwatch_metric_alarm.host)) == toset(["host-status-check", "host-cpu", "host-memory", "host-data-disk", "host-root-disk", "scanner-restarts", "api-health"])
+    error_message = "status, CPU, memory, both disks, scanner restarts and the health heartbeat"
   }
 
   assert {
@@ -100,8 +100,8 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = output.custom_metric_count == 12
-    error_message = "with the host: plus memory, two disks and the health metric"
+    condition     = output.custom_metric_count == 21
+    error_message = "with the host: plus memory, two disks, the health metric and the scanner restart count"
   }
 }
 
@@ -147,4 +147,36 @@ run "another_prefix_refused" {
   }
 
   expect_failures = [var.name_prefix]
+}
+
+# Targeted media enablement: the media alarms reuse the alarm topic and carry no data in their names or descriptions.
+run "media_alarms_reuse_the_topic_and_carry_no_data" {
+  command = plan
+
+  variables {
+    deployment_alarms_enabled = true
+  }
+
+  assert {
+    condition = alltrue([for k in ["media-scanner-unavailable", "media-scan-failed", "media-infected", "media-pending-age",
+      "media-signatures-outdated", "media-non-clean-requested", "media-s3-access-denied", "media-kms-access-denied"] :
+    contains(keys(aws_cloudwatch_metric_alarm.app), k)])
+    error_message = "every media signal has its alarm"
+  }
+
+  assert {
+    condition = alltrue([for k, a in aws_cloudwatch_metric_alarm.app : a.alarm_actions == toset(["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"])
+    if startswith(k, "media-")])
+    error_message = "media alarms notify the existing alarm topic only"
+  }
+
+  assert {
+    condition     = alltrue([for k, a in aws_cloudwatch_metric_alarm.app : a.treat_missing_data == "notBreaching" if startswith(k, "media-")])
+    error_message = "no scanner (no data) is not an alarm; the scanner-unavailable alarm counts real failures"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.app["media-pending-age"].threshold == 3600 && aws_cloudwatch_metric_alarm.app["media-signatures-outdated"].threshold == 48
+    error_message = "pending for more than an hour, signatures older than 48 hours"
+  }
 }

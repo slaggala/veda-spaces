@@ -8,3 +8,10 @@ value=0
 curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/health/ready && value=1
 aws cloudwatch put-metric-data --region "${AWS_REGION:-ap-south-1}" --namespace Veda/Host --metric-name HealthReady \
   --dimensions "InstanceId=$INSTANCE" --value "$value" --unit Count
+# Catalog V3 media scanner (targeted media enablement): the clamd container's restart count, only when it runs (the
+# scanner service starts only after the owner's scanner decision). Repeated restarts alarm (scanner-restarts).
+restarts="$(docker inspect -f '{{.RestartCount}}' deploy-clamd-1 2>/dev/null || true)"
+if [[ "$restarts" =~ ^[0-9]+$ ]]; then
+  aws cloudwatch put-metric-data --region "${AWS_REGION:-ap-south-1}" --namespace Veda/Host --metric-name ScannerRestarts \
+    --dimensions "InstanceId=$INSTANCE" --value "$restarts" --unit Count
+fi

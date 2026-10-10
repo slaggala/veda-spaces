@@ -15,6 +15,7 @@ variables {
     artifacts  = "arn:aws:s3:::veda-stg-artifacts-111122223333"
     evidence   = "arn:aws:s3:::veda-evidence-111122223333"
     logs       = "arn:aws:s3:::veda-stg-logs-111122223333"
+    media      = "arn:aws:s3:::veda-stg-media-111122223333"
   }
   repository_name  = "veda-api"
   log_group_prefix = "/veda/staging"
@@ -78,9 +79,10 @@ run "locked_buckets_never_deleted_by_the_host" {
 
   assert {
     condition = alltrue([for s in jsondecode(aws_iam_policy.runtime.policy).Statement :
-      s.Effect == "Deny" || !contains(flatten([s.Action]), "s3:DeleteObject") || s.Resource == "${var.bucket_arns.litestream}/*"
+      s.Effect == "Deny" || !contains(flatten([s.Action]), "s3:DeleteObject") || s.Resource == "${var.bucket_arns.litestream}/*" ||
+      toset(flatten([s.Resource])) == toset(["${var.bucket_arns.media}/source/*", "${var.bucket_arns.media}/variant/*"])
     ])
-    error_message = "the host deletes only Litestream objects (WAL retention), never snapshots, anchors or evidence"
+    error_message = "the host deletes only Litestream objects (WAL retention) and withdrawn media under source/ and variant/, never snapshots, anchors or evidence"
   }
 }
 
@@ -115,4 +117,65 @@ run "no_ses_permission_before_aut111" {
     condition     = length([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s if s.Sid == "SendAsTheStagingSender"]) == 0
     error_message = "no send permission until the SES identities exist"
   }
+}
+
+# Targeted media enablement: the host reaches the media bucket only under source/ and variant/, with no administration.
+run "media_access_only_under_the_approved_prefixes" {
+  command = plan
+
+  assert {
+    condition = toset(flatten([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : flatten([s.Resource])
+      if s.Effect == "Allow" && strcontains(jsonencode(s.Resource), "veda-stg-media")])) == toset([
+      "arn:aws:s3:::veda-stg-media-111122223333/source/*", "arn:aws:s3:::veda-stg-media-111122223333/variant/*",
+      "arn:aws:s3:::veda-stg-media-111122223333",
+    ])
+    error_message = "the media bucket is reachable only under source/ and variant/ (and listed only there)"
+  }
+
+  assert {
+    condition = toset(one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Action if s.Sid == "CatalogMediaObjects"])) == toset([
+    "s3:GetObject", "s3:PutObject", "s3:DeleteObject"])
+    error_message = "get (and head), put and delete only: no version delete, tagging, ACL or policy action"
+  }
+
+  assert {
+    condition     = one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "CatalogMediaListPrefixes"]) == ["source/*", "variant/*"]
+    error_message = "listing only under the approved prefixes"
+  }
+
+  assert {
+    condition = alltrue([for s in jsondecode(aws_iam_policy.runtime.policy).Statement :
+    !(s.Effect == "Allow" && strcontains(jsonencode(s.Resource), "veda-stg-media") && anytrue([for a in flatten([s.Action]) : startswith(a, "s3:PutBucket") || startswith(a, "s3:DeleteBucket") || a == "s3:PutObjectAcl" || a == "s3:DeleteObjectVersion"]))])
+    error_message = "no bucket configuration, ACL or version-delete permission on the media bucket"
+  }
+
+  assert {
+    condition = alltrue([for a in ["s3:PutBucket*", "s3:PutObjectAcl", "s3:PutLifecycleConfiguration", "s3:PutAccountPublicAccessBlock"] :
+    contains(one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Action if s.Sid == "DenyAdministration"]), a)])
+    error_message = "the explicit deny of bucket administration still covers the media bucket"
+  }
+
+  assert {
+    condition = length([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s
+    if s.Effect == "Allow" && anytrue([for a in flatten([s.Action]) : startswith(a, "kms:")]) && s.Sid != "DataKey" && s.Sid != "AuditKeyThroughS3Only"]) == 0
+    error_message = "no new KMS permission: media uses the existing data-key grant by alias"
+  }
+}
+
+run "a_production_media_bucket_refused" {
+  command = plan
+
+  variables {
+    bucket_arns = {
+      litestream = "arn:aws:s3:::veda-stg-litestream-111122223333"
+      snapshots  = "arn:aws:s3:::veda-stg-snapshots-111122223333"
+      anchor     = "arn:aws:s3:::veda-stg-anchor-111122223333"
+      artifacts  = "arn:aws:s3:::veda-stg-artifacts-111122223333"
+      evidence   = "arn:aws:s3:::veda-evidence-111122223333"
+      logs       = "arn:aws:s3:::veda-stg-logs-111122223333"
+      media      = "arn:aws:s3:::veda-prod-media-111122223333"
+    }
+  }
+
+  expect_failures = [var.bucket_arns]
 }

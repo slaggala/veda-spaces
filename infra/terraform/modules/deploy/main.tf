@@ -76,6 +76,10 @@ resource "aws_ssm_document" "collect" {
           "{ findmnt /var/lib/veda; df -h; } >storage.txt 2>&1",
           "{ systemctl list-timers veda-health.timer --no-pager; /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status; } >services.txt 2>&1",
           "tail -n 200 /var/log/veda/deploy.log >deploy-log-tail.txt 2>/dev/null || echo 'no deploy yet' >deploy-log-tail.txt",
+          # Scanner-capacity evidence (targeted media enablement, decision gate): memory facts only, read-only.
+          "{ free -m; echo; swapon --show; echo; grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Committed_AS)' /proc/meminfo; echo; cat /proc/pressure/memory 2>/dev/null || echo 'no PSI'; } >capacity-memory.txt 2>&1",
+          "{ docker stats --no-stream --format json; echo; docker inspect $(docker ps -aq) | python3 -c 'import json,sys; [print(c[\"Name\"], \"restarts=%s\" % c[\"RestartCount\"], \"oom_killed=%s\" % c[\"State\"][\"OOMKilled\"], \"started=%s\" % c[\"State\"][\"StartedAt\"], \"mem_limit=%s\" % c[\"HostConfig\"][\"Memory\"]) for c in json.load(sys.stdin)]'; } >capacity-containers.txt 2>&1",
+          "{ journalctl -k --since '-14 days' --no-pager 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -n 50 || true; echo 'end of kernel OOM history (14 days)'; } >capacity-oom.txt 2>&1",
           "sha256sum *.txt *.json >MANIFEST.sha256",
           "tar -czf \"/tmp/$LABEL-$TS.tgz\" -C \"$D\" .",
           "SUM=$(sha256sum \"/tmp/$LABEL-$TS.tgz\" | cut -d' ' -f1); KEY=\"host/$(date -u +%Y-%m-%d)/$IID/$LABEL-$TS.tgz\"",

@@ -77,3 +77,20 @@ run "another_document_prefix_refused" {
 
   expect_failures = [var.name_prefix]
 }
+
+# Targeted media enablement: the scanner-capacity evidence is part of every collection, read-only and without data.
+run "collector_records_the_scanner_capacity_facts" {
+  command = plan
+
+  assert {
+    condition = alltrue([for f in ["capacity-memory.txt", "capacity-containers.txt", "capacity-oom.txt"] :
+    anytrue([for c in jsondecode(aws_ssm_document.collect.content).mainSteps[0].inputs.runCommand : strcontains(c, f)])])
+    error_message = "memory and swap, per-container memory, restarts and OOM kills, and the kernel OOM history"
+  }
+
+  assert {
+    condition = !anytrue([for c in jsondecode(aws_ssm_document.collect.content).mainSteps[0].inputs.runCommand :
+    strcontains(c, "clamd") && (strcontains(c, "up -d") || strcontains(c, "docker run"))])
+    error_message = "evidence collection never starts a scanner"
+  }
+}

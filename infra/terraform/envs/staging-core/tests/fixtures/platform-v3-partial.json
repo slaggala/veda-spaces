@@ -94,7 +94,7 @@
   "catalog_v3": {
     "status": "DECIDED",
     "decision": "VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT: every V3 catalog flag stays off in staging. A flag may be turned on only together, by a reviewed change that sets approval_record_sha256 to the canonical SHA-256 of an APPROVED api/veda/modules/catalog/approved/v3-staging-approval.json; staging-core refuses any flag on without that binding, and refuses a partial activation. Rollback: every flag false and approval_record_sha256 null. Production refuses V3 in the API whatever this says.",
-    "catalog_estimator_enabled": false,
+    "catalog_estimator_enabled": true,
     "catalog_admin_enabled": false,
     "media_delivery_enabled": false,
     "approval_record_sha256": null

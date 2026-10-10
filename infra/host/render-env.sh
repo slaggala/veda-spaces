@@ -9,6 +9,12 @@ PATH_ROOT=/veda/staging
 OUT=/etc/veda/api.env
 REQUIRED_SECRETS=(VEDA_JWT_PRIVATE_KEY_PEM VEDA_JWT_KID VEDA_CHAIN_KEY VEDA_CHAIN_KEY_LABEL VEDA_RECOVERY_CODE_HMAC_KEY
   VEDA_EMAIL_HASH_HMAC_KEY VEDA_ACTION_TOKEN_KEY VEDA_TURNSTILE_SECRET)
+# Catalog V3 media settings planned by staging-core (targeted media enablement): all must be present, every flag
+# explicit (an absent flag would fall back to a default instead of the reviewed value).
+REQUIRED_MEDIA_SETTINGS=(VEDA_CATALOG_MEDIA_BACKEND VEDA_CATALOG_MEDIA_BUCKET VEDA_CATALOG_MEDIA_KMS_KEY_ARN
+  VEDA_CATALOG_MEDIA_SOURCE_PREFIX VEDA_CATALOG_MEDIA_VARIANT_PREFIX VEDA_CATALOG_MEDIA_SCANNER
+  VEDA_CATALOG_MEDIA_DELIVERY_ENABLED VEDA_CATALOG_3D_ENABLED VEDA_CATALOG_VIDEO_ENABLED VEDA_CATALOG_ESTIMATOR_ENABLED
+  VEDA_CATALOG_ADMIN_ENABLED)
 
 fetch() { # fetch <path> [--with-decryption]: NAME<TAB>base64(value) per parameter
   aws ssm get-parameters-by-path --region "$REGION" --path "$1" --recursive "${@:2}" --output json |
@@ -32,6 +38,15 @@ missing=()
 for s in "${REQUIRED_SECRETS[@]}"; do grep -q "^$s=" "$TMP" || missing+=("$s"); done
 if ((${#missing[@]})); then
   echo "refusing: secrets not seeded under $PATH_ROOT/app (AUT-302): ${missing[*]}" >&2
+  exit 1
+fi
+for s in "${REQUIRED_MEDIA_SETTINGS[@]}"; do grep -q "^$s=" "$TMP" || missing+=("$s"); done
+if ((${#missing[@]})); then
+  echo "refusing: catalog media settings not planned under $PATH_ROOT/config (apply staging-core first): ${missing[*]}" >&2
+  exit 1
+fi
+if grep -q '^VEDA_CATALOG_MEDIA_SCANNER="clamd"$' "$TMP" && ! grep -qE '^VEDA_CATALOG_CLAMD_IMAGE="[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}"$' "$TMP"; then
+  echo "refusing: the clamd scanner is selected without an image pinned by digest" >&2
   exit 1
 fi
 # Keep a declared schema-ahead acceptance across renders (deploy.sh rollback, runbook §2).
