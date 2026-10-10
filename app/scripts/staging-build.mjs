@@ -39,6 +39,23 @@ function stagingHeaders(text) {
   return text.replaceAll(PRODUCTION_API, STAGING_API).replace(/^\/\*\n/m, '/*\n  X-Robots-Tag: noindex, nofollow\n');
 }
 
+/**
+ * Targeted media enablement: the V3 page (and only it) may load catalog images from the protected staging API. Cloudflare
+ * Pages combines the headers of every matching rule, and two CSPs only narrow each other, so the V3 rule detaches the
+ * site-wide policy (`! Content-Security-Policy`) and restates it with exactly one change: the staging API host in
+ * img-src. No wildcard, no blob:, no media-src or worker-src change (video and 3D stay disabled).
+ */
+export const V3_PATH_RULE = '/estimate-v3*';
+export function v3ImageCsp(headersText) {
+  const csp = headersText.split('\n').find((l) => l.trim().startsWith('Content-Security-Policy:'));
+  if (!csp) throw new Error('_headers: no site-wide Content-Security-Policy to restate for V3');
+  const value = csp.trim().slice('Content-Security-Policy:'.length).trim();
+  const img = "img-src 'self' data:";
+  if ((value.match(/img-src [^;]*/g) || []).join() !== img) throw new Error(`_headers: expected "${img}" in the site CSP`);
+  const v3 = value.replace(img, `${img} ${STAGING_API}`);
+  return `${headersText.replace(/\n*$/, '\n')}\n${V3_PATH_RULE}\n  ! Content-Security-Policy\n  Content-Security-Policy: ${v3}\n`;
+}
+
 /** Refuse any output that names the production API, or that lacks the staging API. */
 export function checkStaging(dir) {
   const hits = files(dir).filter((f) => readFileSync(f, 'latin1').includes(PRODUCTION_API));
@@ -78,20 +95,47 @@ export function checkV2Approval(copyFile, approvalFile = APPROVAL) {
   if (problems.length) throw new Error(`STAGING_ESTIMATOR_UX=v2 is refused: ${problems.join('; ')}`);
 }
 
-/** The catalog-driven estimator V3 (ADR-013) needs its own approved activation record for staging; none exists yet. */
+/**
+ * The catalog-driven estimator V3 (ADR-013) needs its owner-approved staging record (api/veda/modules/catalog/
+ * staging_approval.py defines it; none exists yet). The build accepts only an APPROVED record with every evidence
+ * digest, an approver who is not the author, the staging-only scope, and whose file SHA-256 is the
+ * catalog_v3.approval_record_sha256 bound in infra/config/staging-platform.json.
+ */
 export const V3_APPROVAL = fileURLToPath(new URL('../../api/veda/modules/catalog/approved/v3-staging-approval.json', import.meta.url));
-export function checkV3Approval(approvalFile = V3_APPROVAL) {
+export const PLATFORM = fileURLToPath(new URL('../../infra/config/staging-platform.json', import.meta.url));
+export const V3_GIT_EVIDENCE = ['application_commit', 'pr69_merge'];
+export const V3_DIGEST_EVIDENCE = ['application_certification', 'real_card_evidence', 'infrastructure_plan', 'infrastructure_apply',
+  'scanner_capacity', 'scanner_decision', 'media_bucket', 'iam', 'ssm_settings', 'csp', 'media_smoke_test',
+  'promise_owner_approval', 'media_rights_approver'];
+export function checkV3Approval(approvalFile = V3_APPROVAL, platformFile = PLATFORM) {
+  let raw;
   let approval;
-  try { approval = JSON.parse(readFileSync(approvalFile, 'utf8')); } catch { approval = null; }
-  const scope = approval?.scope || {};
-  const ok = approval && approval.status === 'APPROVED' && approval.owner && approval.approved_on && approval.release
-    && (scope.environments || []).includes('staging') && scope.version === 'v3' && scope.public_intake === false;
-  if (!ok) throw new Error('STAGING_ESTIMATOR_VERSION=v3 is refused: no approved V3 staging activation record');
+  try { raw = readFileSync(approvalFile); approval = JSON.parse(raw.toString('utf8')); } catch { approval = null; }
+  const problems = [];
+  if (!approval) problems.push('no approved V3 staging activation record');
+  else {
+    const scope = approval.scope || {};
+    const same = (a, b) => String(a || '').trim().toLowerCase().replace(/\s+/g, ' ') === String(b || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (approval.schema !== 'veda.catalog.v3-staging-approval/1') problems.push('not a V3 staging approval record');
+    if (approval.status !== 'APPROVED') problems.push(`the V3 staging activation record is ${approval.status}`);
+    if (!approval.approver || !approval.approved_on || !approval.release) problems.push('the record names no approver, date or release');
+    if (same(approval.approver, approval.author) || /OWNER TO FILL/i.test(`${approval.approver} ${approval.author}`)) problems.push('the approver is not independent of the author');
+    if (JSON.stringify(scope.environments) !== '["staging"]' || scope.version !== 'v3' || scope.public_intake !== false
+      || scope.three_d !== false || scope.video !== false) problems.push('the record does not cover V3 on staging only, without public intake, 3D or video');
+    const ev = approval.evidence || {};
+    const missing = [...V3_GIT_EVIDENCE.filter((k) => !/^[0-9a-f]{40}$/.test(ev[k]?.git_sha || '')),
+      ...V3_DIGEST_EVIDENCE.filter((k) => !/^[0-9a-f]{64}$/.test(ev[k]?.sha256 || ''))];
+    if (missing.length) problems.push(`evidence without a digest: ${missing.join(', ')}`);
+    let bound;
+    try { bound = JSON.parse(readFileSync(platformFile, 'utf8')).catalog_v3?.approval_record_sha256; } catch { bound = null; }
+    if (bound !== createHash('sha256').update(raw).digest('hex')) problems.push('the record is not the one bound in staging-platform.json (catalog_v3.approval_record_sha256)');
+  }
+  if (problems.length) throw new Error(`STAGING_ESTIMATOR_VERSION=v3 is refused: ${problems.join('; ')}`);
 }
 
 export function buildSite(src, out, key, estimator = estimatorFlags(process.env)) {
   if (estimator.enabled && estimator.ux === 'v2') checkV2Approval(join(src, 'assets/estimate-v2-copy.js'), estimator.approvalFile);
-  if (estimator.version === 'v3') checkV3Approval(estimator.v3ApprovalFile);
+  if (estimator.version === 'v3') checkV3Approval(estimator.v3ApprovalFile, estimator.platformFile);
   siteKey(key);
   rmSync(out, { recursive: true, force: true });
   cpSync(src, out, { recursive: true });
@@ -122,7 +166,9 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
   } else {
     for (const f of ['estimate-v3.html', 'assets/estimate-v3.js', 'assets/estimate-v3.css']) rmSync(join(out, f), { force: true });
   }
-  writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
+  let headers = stagingHeaders(readFileSync(join(out, '_headers'), 'utf8'));
+  if (estimator.version === 'v3' && estimator.enabled) headers = v3ImageCsp(headers); // only with the approved V3 page
+  writeFileSync(join(out, '_headers'), headers);
   writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
   rmSync(join(out, 'sitemap.xml'), { force: true });
   checkStaging(out);

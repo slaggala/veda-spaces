@@ -48,6 +48,8 @@ DOCKER = textwrap.dedent(
         for g in filter(None, os.environ.get("SHIM_GENERATIONS", "").split(",")):
             print(f"s3    {g}  0s   2026-10-01T00:00:00Z  2026-10-06T00:00:00Z")
         sys.exit(int(os.environ.get("SHIM_GENERATIONS_EXIT", "0")))
+    if "zPING" in " ".join(args):  # the scanner readiness probe (deploy.sh step 4c)
+        sys.exit(1 if os.environ.get("SHIM_SCANNER") == "down" else 0)
     if "exec" in args:
         print('{"status": "ok", "checks": {"migrations": "head"}}'); sys.exit(0)
     print("{}")

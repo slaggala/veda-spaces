@@ -41,13 +41,13 @@ import warnings
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from veda.config import settings
-from veda.kernel import db
+from veda.kernel import clock, db, metrics
 
 from .models import CatalogEvent, CatalogMediaObject, CatalogRecord, CatalogRelease
 
@@ -125,15 +125,41 @@ class S3Storage:
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         extra = {"SSEKMSKeyId": self.kms_key_arn} if self.kms_key_arn else {}
-        self.client.put_object(Bucket=self.bucket, Key=_check_key(key), Body=data, ContentType=content_type,
-                               ServerSideEncryption="aws:kms", **extra)  # fmt: skip
+        with _storage_errors("put"):
+            self.client.put_object(Bucket=self.bucket, Key=_check_key(key), Body=data, ContentType=content_type,
+                                   ServerSideEncryption="aws:kms", **extra)  # fmt: skip
 
     def get(self, key: str) -> bytes:
-        body = self.client.get_object(Bucket=self.bucket, Key=_check_key(key))["Body"].read()
+        with _storage_errors("get"):
+            body = self.client.get_object(Bucket=self.bucket, Key=_check_key(key))["Body"].read()
         return bytes(body)
 
     def delete(self, key: str) -> None:
-        self.client.delete_object(Bucket=self.bucket, Key=_check_key(key))
+        with _storage_errors("delete"):
+            self.client.delete_object(Bucket=self.bucket, Key=_check_key(key))
+
+
+class _storage_errors:  # noqa: N801 - a context manager used as `with _storage_errors(op)`
+    """Count S3 and KMS access denials (MediaStorageAccessDenied, MediaKmsAccessDenied) and re-raise. The signal names
+    the operation and the error code only: never the key, the bucket, a filename or the content."""
+
+    def __init__(self, op: str):
+        self.op = op
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, kind, err, tb) -> Literal[False]:
+        code = str(getattr(err, "response", {}).get("Error", {}).get("Code", "")) if err is not None else ""
+        if code.startswith("KMS") or code in (
+            "KMS.AccessDeniedException",
+            "AccessDeniedException",
+            "KMS.DisabledException",
+        ):
+            metrics.emit("MediaKmsAccessDenied", 1, dimensions={"Operation": self.op})
+        elif code in ("AccessDenied", "AllAccessDisabled", "InvalidObjectState"):
+            metrics.emit("MediaStorageAccessDenied", 1, dimensions={"Operation": self.op})
+        return False
 
 
 def storage() -> ObjectStore:
@@ -351,14 +377,46 @@ def clamd_scan(data: bytes, address: str) -> bool:
 
 
 def scan_status(data: bytes) -> str:
-    """CLEAN, INFECTED or FAILED with a scanner; without one, CLEAN only in local and test, otherwise PENDING."""
+    """CLEAN, INFECTED or FAILED with a scanner; without one, CLEAN only in local and test, otherwise PENDING.
+    Every outcome is counted for the alarms (no filename, key or content in the signal); a scanner that cannot be
+    reached or does not answer leaves the object FAILED, which is never served and is retried."""
     cfg = settings()
     if cfg.catalog_media_scanner == "clamd":
         try:
-            return "CLEAN" if clamd_scan(data, cfg.catalog_clamd_address) else "INFECTED"
-        except (OSError, MediaError, ValueError):
+            clean = clamd_scan(data, cfg.catalog_clamd_address)
+        except OSError:
+            metrics.emit("MediaScannerUnavailable", 1)
             return "FAILED"
+        except (MediaError, ValueError):
+            metrics.emit("MediaScanFailed", 1)
+            return "FAILED"
+        if not clean:
+            metrics.emit("MediaInfected", 1)
+        return "CLEAN" if clean else "INFECTED"
     return "CLEAN" if cfg.env in ("local", "test") else "PENDING"
+
+
+def clamd_signature_age_hours(address: str, *, now=None) -> float | None:
+    """Hours since the scanner's signature database was built (clamd VERSION: "ClamAV 1.4.1/27400/<date>"), or None
+    when the scanner does not answer (counted as unavailable)."""
+    from email.utils import parsedate_to_datetime
+
+    host, _, port = address.rpartition(":")
+    try:
+        with socket.create_connection((host, int(port)), timeout=10) as sock:
+            sock.sendall(b"zVERSION\0")
+            reply = sock.recv(512).decode(errors="replace").strip("\0\n ")
+    except OSError:
+        metrics.emit("MediaScannerUnavailable", 1)
+        return None
+    parts = reply.split("/")
+    try:
+        built = parsedate_to_datetime(parts[2].strip() + " +0000") if len(parts) >= 3 else None
+    except (TypeError, ValueError):
+        built = None
+    if built is None:
+        return None
+    return max(0.0, ((now or clock.now()) - built).total_seconds() / 3600)
 
 
 # --- upload ----------------------------------------------------------------------------------------------------------
@@ -463,7 +521,17 @@ def rescan_pending(s: Session) -> int:
             CatalogMediaObject.withdrawn_on.is_(None),
         )
     ).scalars()
-    for src in list(rows):
+    pending = list(rows)
+    now = clock.now()
+    ages = [(now - (r.created_on if r.created_on.tzinfo else r.created_on.replace(tzinfo=now.tzinfo))).total_seconds()
+            for r in pending]  # fmt: skip
+    metrics.emit("MediaPendingMaxAgeSeconds", max(ages) if ages else 0, "Seconds")
+    cfg = settings()
+    if cfg.catalog_media_scanner == "clamd":
+        age = clamd_signature_age_hours(cfg.catalog_clamd_address)
+        if age is not None:
+            metrics.emit("MediaSignatureAgeHours", age, "None")
+    for src in pending:
         status = scan_status(storage().get(src.storage_key))
         if status in ("PENDING", "FAILED") and status == src.scan_status:
             continue
@@ -561,14 +629,23 @@ def deliverable(s: Session, sha: str, *, release: CatalogRelease | None = None) 
     docs: list[dict[str, Any]] = list(
         s.execute(sa.select(CatalogRecord.document).where(CatalogRecord.id.in_(media_ids))).scalars()
     )
-    if not any(sha in ((doc.get("objects") or {}).get("variants") or {}).values() for doc in docs):
+    referencing = [doc for doc in docs if sha in ((doc.get("objects") or {}).get("variants") or {}).values()]
+    if not referencing:
         return None
+    today = clock.now().date()
+    for doc in referencing:  # rights checked at serve time too: expired or not-yet-effective rights stop serving
+        rights = doc.get("rights") or {}
+        expires, effective = rights.get("expires"), rights.get("effective_from")
+        if (expires and str(expires) < today.isoformat()) or (effective and str(effective) > today.isoformat()):
+            return None
     row = s.execute(
         sa.select(CatalogMediaObject).where(
             CatalogMediaObject.object_sha256 == sha, CatalogMediaObject.role == "VARIANT"
         )
     ).scalar_one_or_none()
     if row is None or row.scan_status != "CLEAN" or row.withdrawn_on is not None or row.purged_on is not None:
+        if row is not None and row.scan_status != "CLEAN":
+            metrics.emit("MediaNonCleanRequested", 1)  # a released, referenced object that is not CLEAN was asked for
         return None
     if row.media_kind != "IMAGE":  # R12: a 3D object is never served, whatever references it or whoever knows its hash
         return None

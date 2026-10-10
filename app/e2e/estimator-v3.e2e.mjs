@@ -633,6 +633,29 @@ try {
     }
     await ctx.close();
   }
+
+  // --- targeted media enablement: the V3 image policy admits the API host only ---------------------------------------
+  { // an image from any other origin is refused by the page's Content-Security-Policy (no wildcard, no blob:)
+    const { ctx, pg } = await fresh();
+    await ctx.addInitScript(() => {
+      window.__cspImg = [];
+      document.addEventListener('securitypolicyviolation', (e) => { if (e.violatedDirective.startsWith('img-src')) window.__cspImg.push(e.blockedURI); });
+    });
+    await pg.goto(`${ON}/estimate-v3`);
+    await pg.waitForSelector('#v3:not([hidden])');
+    await pg.evaluate(async () => {
+      const blobUrl = URL.createObjectURL(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
+      for (const src of ['https://example.org/x.png', 'https://media.vedaspaces.com/x.png', blobUrl]) {
+        const img = document.createElement('img'); img.src = src; document.body.append(img);
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    });
+    const blocked = await pg.evaluate(() => window.__cspImg || []);
+    const policy = await pg.evaluate(async () => (await fetch(location.href)).headers.get('content-security-policy') || '');
+    check('CSP: images from any origin but the API host are blocked on the V3 page', blocked.length >= 3, JSON.stringify(blocked));
+    check('CSP: the V3 image policy adds exactly the API host to img-src', /img-src 'self' data: http:\/\/[^ ;]+;/.test(policy) && !/img-src[^;]*(\*|blob:)/.test(policy), policy.match(/img-src[^;]*/)?.[0] || '');
+    await ctx.close();
+  }
 } catch (err) {
   check('journey completed', false, String(err));
   await shot('failure');

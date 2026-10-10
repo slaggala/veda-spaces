@@ -293,15 +293,26 @@ def test_estimator_flag_is_staging_only():
         and ".terraform" not in p.parts
         and ".tools" not in p.parts
         and p.suffix in (".tf", ".json", ".sh", ".yml", ".hcl", ".env")
-        and re.search(r"VEDA_ESTIMATOR_ENABLED|estimator_enabled", p.read_text(errors="ignore"))
+        # The V1/V2 estimator flag (not the separate V3 catalog flags, catalog_estimator_enabled).
+        and re.search(r"VEDA_ESTIMATOR_ENABLED|(?<!catalog_)estimator_enabled", p.read_text(errors="ignore"))
     )
+    # Root-test fixtures (copies of the committed platform decisions, for the V3 media gates) carry the same value.
+    fixtures = [f for f in setters if f.startswith("infra/terraform/envs/staging-core/tests/fixtures/platform-")]
     assert setters == [
+        "infra/config/staging-platform.json",
+        "infra/terraform/envs/staging-core/main.tf",
+        "infra/terraform/envs/staging-core/outputs.tf",
+        "infra/terraform/envs/staging-core/tests/core.tftest.hcl",
+        *fixtures,
+    ] or sorted(set(setters) - set(fixtures)) == [
         "infra/config/staging-platform.json",
         "infra/terraform/envs/staging-core/main.tf",
         "infra/terraform/envs/staging-core/outputs.tf",
         "infra/terraform/envs/staging-core/tests/core.tftest.hcl",
     ], setters
     platform = json.loads((REPO / "infra/config/staging-platform.json").read_text())
+    for f in fixtures:
+        assert json.loads((REPO / f).read_text())["ssm"]["estimator_enabled"] == platform["ssm"]["estimator_enabled"], f
     assert platform["ssm"]["estimator_enabled"] is True and "VEDA_ENV" not in platform["ssm"]
     main = (REPO / "infra/terraform/envs/staging-core/main.tf").read_text()
     assert (

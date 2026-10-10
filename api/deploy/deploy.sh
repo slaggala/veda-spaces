@@ -26,6 +26,8 @@ readonly DATA_DIR=/var/lib/veda
 readonly DB="$DATA_DIR/veda.db"
 # The Cloudflare tunnel configuration render-edge.sh writes when the owner seeded /veda/staging/edge (AUT-201).
 readonly EDGE_DIR=/etc/veda/cloudflared
+# The rendered application configuration (render-env.sh from SSM): it decides whether the malware scanner runs.
+readonly API_ENV="${VEDA_API_ENV:-/etc/veda/api.env}"
 
 # Litestream serves replication metrics on 127.0.0.1:9090 once it has opened the database.
 replicating() {
@@ -130,6 +132,36 @@ if [[ $FIRST -eq 1 ]]; then
   echo "4b. Replication: start Litestream on the new database; it must report before the API starts"
   "${COMPOSE[@]}" up -d --no-deps litestream
   replicating || { echo "Refusing to start the API without replication; worker and scheduler stay stopped"; exit 1; }
+fi
+
+# Catalog V3 malware scanner (targeted media enablement): only when the configuration selects clamd, only with an
+# image pinned by digest, and the scanner must answer PING before the API restarts. Otherwise it is not running.
+# render-env.sh writes NAME="value"; a plain NAME=value is read the same way.
+setting() { [[ -r "$API_ENV" ]] || return 0; sed -n "s/^$1=//p" "$API_ENV" | tail -1 | sed -e 's/^"//' -e 's/"$//'; }
+SCANNER="$(setting VEDA_CATALOG_MEDIA_SCANNER)"
+if [[ "$SCANNER" == "clamd" ]]; then
+  echo "4c. Scanner: clamd on the private Compose network"
+  VEDA_CLAMD_IMAGE="$(setting VEDA_CATALOG_CLAMD_IMAGE)"
+  [[ "$VEDA_CLAMD_IMAGE" =~ ^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$ ]] ||
+    { echo "Refusing to start the scanner: VEDA_CATALOG_CLAMD_IMAGE is not pinned by digest"; exit 1; }
+  export VEDA_CLAMD_IMAGE
+  "${COMPOSE[@]}" --profile scanner up -d --no-deps clamd
+  scanner_ready=0
+  for _ in $(seq 1 90); do
+    if "${COMPOSE[@]}" run --rm --no-deps api python -c '
+import socket, sys
+try:
+    with socket.create_connection(("clamd", 3310), timeout=5) as s:
+        s.sendall(b"zPING\0")
+        sys.exit(0 if s.recv(16).strip(b"\0\n ") == b"PONG" else 1)
+except OSError:
+    sys.exit(1)' >/dev/null 2>&1; then scanner_ready=1; break; fi
+    sleep 10
+  done
+  (( scanner_ready )) || { echo "Refusing to continue: the scanner did not answer (uploads would stay FAILED)"; exit 1; }
+else
+  echo "4c. Scanner: not selected (VEDA_CATALOG_MEDIA_SCANNER=${SCANNER:-unset}); media uploads stay PENDING"
+  "${COMPOSE[@]}" --profile scanner rm -s -f clamd
 fi
 
 echo "5. Deploy: restart the API on image $TAG; /health/ready must pass with migrations: $EXPECTED"
