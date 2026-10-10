@@ -11,7 +11,7 @@ def governance(statement: str, **over) -> dict:
         "source": "Order data export 2026-Q3 (synthetic)", "evidence_reference": "Synthetic sales dataset 2026-Q3 v1",
         "evidence_period": "2026-07-01 to 2026-09-30", "owner": "Sales lead (role, test)",
         "backup_owner": "Marketing lead (role, test)", "approver": "Compliance lead (role, test)",
-        "effective_from": "2026-10-01", "review_by": "2027-03-31", "environments": ["test"],
+        "approved_on": "2026-09-30", "effective_from": "2026-10-01", "review_by": "2027-03-31", "environments": ["test"],
         "canonical_sha256": text.canonical_digest(statement),
     }  # fmt: skip
     if text.absolute_in(statement) or set(cats) & {"ranking", "price"}:
@@ -22,4 +22,4 @@ def governance(statement: str, **over) -> dict:
 
 def claim_copy(statement: str, *, category: str = "badge", packages=("slice.essential",), **over) -> dict:
     return {"statement": statement, "category": category, "promise": False, "claim": governance(statement, **over),
-            "applies_to": {"packages": list(packages)}}  # fmt: skip
+            "applies_to": {"packages": list(packages)}, "content_policy": "GOVERNED_CLAIM_REFERENCE"}  # fmt: skip

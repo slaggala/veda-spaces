@@ -67,6 +67,7 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
         if code == "ESSENTIAL" and copy["promise"].get("packageSubtitle"):
             out.append(("copy", summary, {
                 "statement": copy["promise"]["packageSubtitle"], "category": "package", "promise": True,
+                "content_policy": "GOVERNED_CLAIM_REFERENCE",
                 "governance": _blocked_governance("V2 package subtitle (promise matrix)"),
                 "matrix_row": "package_subtitle", "applies_to": {"packages": ["essential"]},
             }))  # fmt: skip
@@ -74,9 +75,10 @@ def records(card_document: dict, bundle: dict | None = None, copy: dict | None =
             text = (
                 f"{_PACKAGE_LABEL[code]} package"
                 if priced
-                else f"{_PACKAGE_LABEL[code]}: discussed in a design consultation"
+                else f"{_PACKAGE_LABEL[code]} package: discussed in a design consultation"
             )
-            out.append(("copy", summary, {"statement": text, "category": "label", "promise": False}))
+            out.append(("copy", summary, {"statement": text, "category": "label", "promise": False,
+                                          "content_policy": "FACTUAL_TEXT"}))  # fmt: skip
         out.append(("package", _key(code), {
             "name": _PACKAGE_LABEL[code], "engine_package": code, "public_summary": summary,
             "consultation_only": not priced, "recommended": code == "ESSENTIAL",

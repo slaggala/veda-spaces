@@ -15,7 +15,8 @@ import copy
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_catalog import ON, SITE, approve_all, release, seed_slice, tx
+from tests.integration.test_catalog import CLIENT, ON, SITE, approve_all, release, seed_slice, tx
+from tests.support import claims as claims_support
 from tests.support.dbh import rows
 from veda.kernel import db
 from veda.kernel.context import actor, system_context
@@ -85,6 +86,12 @@ def test_customer_text_in_the_staff_only_card_is_governed(people, leak):
     assert not any("1200" in e for e in report["errors"]), "no rate is printed"
 
 
+def _retitle(monkeypatch):
+    """A controlled estimator wording change (allowlisted, so only the payload digest tells it apart)."""
+    monkeypatch.setattr(engine, "TITLE", "VEDA SPACES INDICATIVE ESTIMATE")
+    monkeypatch.setattr(public, "CONTROLLED_ESTIMATOR_TEXT", public.CONTROLLED_ESTIMATOR_TEXT | {engine.TITLE})
+
+
 def _approved(people):
     a, b, rel = draft_release(people)
     report = tx(a, service.validate_release, rel.id)
@@ -107,7 +114,7 @@ def test_a_payload_change_after_approval_refuses_activation(people, monkeypatch)
     """Estimator text changed after approval (standing in for a pricing, specification or copy change): the payload
     customers would see is not the approved one, so activation fails closed."""
     a, _b, rel, _sha = _approved(people)
-    monkeypatch.setattr(engine, "TITLE", "VEDA SPACES INDICATIVE ESTIMATE")
+    _retitle(monkeypatch)
     with pytest.raises(service.CatalogError, match="public payload changed"):
         tx(a, service.activate_release, rel.id)
     with db.unit_of_work(write=False) as s:
@@ -119,7 +126,7 @@ def test_a_payload_change_after_preview_refuses_release_approval(people, monkeyp
     assert tx(a, service.validate_release, rel.id)["ok"]
     tx(b, service.approve_preview, rel.id)
     tx(a, service.submit_release, rel.id)
-    monkeypatch.setattr(engine, "TITLE", "VEDA SPACES INDICATIVE ESTIMATE")
+    _retitle(monkeypatch)
     with pytest.raises(service.CatalogError, match="public payload changed since the customer preview"):
         tx(b, service.approve_release, rel.id, "Owner approval 2026-10-09 (synthetic test release)")
 
@@ -135,7 +142,7 @@ def _post(api, key=KEY):
     config = {"home": "slice.apartment-3bhk", "package": "slice.essential", "project_kind": "NEW_HOME",
               "rooms": [{"room": "living-room"}]}  # fmt: skip
     return api.post("/api/v1/public/catalog/estimates", {"configuration": config, "turnstile_token": "ok-token"},
-                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": key})  # fmt: skip
+                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": key, "X-Veda-Client": CLIENT})  # fmt: skip
 
 
 @ON
@@ -211,3 +218,65 @@ def test_record_events_audit_the_display_and_canonical_digests(people):
                        "canonical_sha256": text.canonical_digest("TV units")}  # fmt: skip
     assert digests["display_sha256"] != text.display_digest("TV units"), "the display text is audited as stored"
     assert stored["name"] == "TV units", "normalisation never rewrites what was stored"
+
+
+def test_every_v2_state_builds_a_valid_structured_public_estimate():
+    """The full migrated catalog (every room, product and typical measurement, including the area assumptions that
+    once read as rates and made V3 answer 503) builds a strict public estimate that passes every content policy."""
+    import json as _json
+    from types import SimpleNamespace
+
+    from tests.integration.test_catalog import CARD_DOC, STATES, v3_configuration
+    from veda.modules.catalog import migrate_v2
+
+    cat = catalog_compile.load([SimpleNamespace(kind=k, record_key=key, record_version=1, document=d)
+                                for k, key, d in migrate_v2.records(CARD_DOC)], "V2-STATES", "0" * 64)  # fmt: skip
+    card = catalog_compile.compile_card(cat)
+    bundle = migrate_v2.bundles()
+    units = set()
+    for state in STATES:
+        resolved = catalog_compile.resolve(cat, v3_configuration(bundle, state))
+        result = _json.loads(_json.dumps(engine.calculate(card, resolved.request).staff_view(), default=str))
+        dto = public.build_estimate(result, card=card, reference="E-TEST", expires_on="2000-01-01",
+                                    configuration_reference="C00000000", catalog_release="V2-STATES",
+                                    specification=None)  # fmt: skip
+        assert public.check_payload(dto) == [], state
+        assert len(dto.assumptions) == len(result["assumption_details"])
+        units |= {(a.measurement_type, a.unit) for a in dto.assumptions}
+        assert "assumed" not in _json.dumps(dto.model_dump(mode="json")["assumptions"]), "no assumption prose"
+    assert ("AREA", "SQ_FT") in units and ("LENGTH", "FT") in units
+
+
+def test_the_preview_reviewer_sees_every_new_and_changed_public_text(people):
+    from tests.integration.test_catalog_closure import change
+
+    a, b = people
+    seed_slice(a)
+    approve_all(a, b)
+    release(a, b, "COPY-A")
+    change(a, "product", "tv-unit", lambda d: d.update(description="A unit for the TV wall, refreshed."))
+    tx(a, service.create_record, "copy", "copy.badge.loved", claims_support.claim_copy("Most loved"))
+    approve_all(a, b)
+    rel = tx(a, service.create_release, "COPY-B")
+    with db.unit_of_work(write=False) as s:
+        report = service.public_copy_report(s, s.get(CatalogRelease, rel.id))
+    by_entity = {(r["entity"].split(" v")[0], r["field"]): r for r in report}
+    desc = by_entity[("product tv-unit", "description")]
+    assert desc["previous"] != desc["new"] == "A unit for the TV wall, refreshed." and desc["policy"] == "FACTUAL_TEXT"
+    assert desc["reviewer"], "the four-eyes reviewer of the record"
+    claim = by_entity[("copy copy.badge.loved", "statement")]
+    assert (
+        claim["previous"] is None and claim["policy"] == "GOVERNED_CLAIM_REFERENCE" and claim["claim"] == "claim record"
+    )
+    assert (
+        claim["owner"] == "Sales lead (role, test)"
+        and claim["expiry"] == "2027-03-31"
+        and "2026-Q3" in claim["evidence"]
+    )
+    assert not any(r["entity"].startswith("material") for r in report), "unchanged records are not listed"
+    assert tx(a, service.validate_release, rel.id)["ok"]
+    tx(b, service.approve_preview, rel.id)
+    with db.unit_of_work(write=False) as s:
+        detail = s.execute(sa.select(CatalogEvent.detail).where(CatalogEvent.release_id == rel.id,
+                                                                CatalogEvent.event_type == "RELEASE_PREVIEW_APPROVED")).scalar_one()  # fmt: skip
+    assert detail["public_copy_items"] == len(report) and len(detail["public_copy_sha256"]) == 64

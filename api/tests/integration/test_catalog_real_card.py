@@ -16,7 +16,16 @@ from types import SimpleNamespace
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_catalog import STATES, approve_all, new_key, release, tx, v2_selections, v3_configuration
+from tests.integration.test_catalog import (
+    CLIENT,
+    STATES,
+    approve_all,
+    new_key,
+    release,
+    tx,
+    v2_selections,
+    v3_configuration,
+)
 from tests.support.dbh import rows
 from veda.kernel import db
 from veda.modules.catalog import compile as catalog_compile
@@ -86,7 +95,7 @@ def test_corrected_slice_on_the_real_card(api, people):
 
     def post(config):
         return api.post("/api/v1/public/catalog/estimates", {"configuration": config, "turnstile_token": "ok"},
-                        anonymous=True, headers={"Origin": "http://localhost:8000", "Idempotency-Key": new_key()})  # fmt: skip
+                        anonymous=True, headers={"Origin": "http://localhost:8000", "Idempotency-Key": new_key(), "X-Veda-Client": CLIENT})  # fmt: skip
 
     base = {"home": "slice.apartment-3bhk", "package": "slice.essential", "rooms": [{"room": "living-room"}]}
     laminate = post(base)

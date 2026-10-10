@@ -59,7 +59,9 @@ def change(uid, kind, key, fn):
                                   "Premium pick", "Certified quality", "Delivery included", "#1 choice"])  # fmt: skip
 def test_badge_claims_cannot_be_registered_without_governance(text):
     with pytest.raises(ValueError):
-        kinds.parse("copy", {"statement": text, "category": "badge", "promise": False})
+        kinds.parse(
+            "copy", {"statement": text, "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"}
+        )
 
 
 def test_free_form_badge_text_is_refused():
@@ -82,7 +84,8 @@ def test_an_unconfirmed_promise_badge_blocks_release(people):
     a, b = people
     seed_slice(a)
     tx(a, service.create_record, "copy", "copy.badge.warranty", {
-        "statement": "Manufacturer’s warranty", "category": "badge", "promise": True, "matrix_row": "manufacturer_warranty",
+        "statement": "Manufacturer’s warranty", "category": "badge", "promise": True,
+        "content_policy": "GOVERNED_CLAIM_REFERENCE", "matrix_row": "manufacturer_warranty",
         "applies_to": {"packages": ["slice.essential"]},
         "governance": {"owner": "UNASSIGNED", "backup": "UNASSIGNED", "quotation_mapping": "x1", "verification": "x1",
                        "warranty_source": "x1"}})  # fmt: skip
@@ -105,7 +108,12 @@ def test_only_approved_badge_copy_reaches_the_public_payload(api, people):
     release(a, b)
     view = api.get("/api/v1/public/catalog", anonymous=True).data
     assert view["package"]["slice.essential"]["badge"] == "copy.badge.chosen"
-    assert view["copy"]["copy.badge.chosen"]["statement"] == "Most chosen"
+    assert view["claim"]["copy.badge.chosen"] == {
+        "statement": "Most chosen",
+        "category": "badge",
+        "claim_categories": ["popularity"],
+    }
+    assert "copy.badge.chosen" not in view["copy"], "a claim is served only as a governed claim reference"
     for claim in ("Lifetime warranty", "Guaranteed lowest price", "Free installation"):
         assert claim not in json.dumps(view)
 

@@ -58,7 +58,9 @@ def test_promise_wording_is_refused_in_descriptive_text_even_with_materials(text
         with pytest.raises(kinds.KindError, match="promise"):
             kinds.parse(kind, doc)
     with pytest.raises(kinds.KindError, match="promise"):
-        kinds.parse("copy", {"statement": text, "category": "description", "promise": False})
+        kinds.parse(
+            "copy", {"statement": text, "category": "description", "promise": False, "content_policy": "FACTUAL_TEXT"}
+        )
 
 
 def test_staff_only_text_is_not_customer_text():
@@ -81,6 +83,7 @@ def test_a_promise_copy_names_its_matrix_row_and_what_it_applies_to():
 
 def _promise(statement="Soft-close TV-unit hardware", row="spec.soft_close", status="OPERATIONALLY_CONFIRMED"):
     return {"statement": statement, "category": "hardware", "promise": True, "matrix_row": row,
+            "content_policy": "GOVERNED_CLAIM_REFERENCE",
             "applies_to": {"products": ["tv-unit"], "rooms": ["living-room"]},
             "governance": {"owner": "Procurement lead (role, test)", "backup": "Projects lead (role, test)",
                            "quotation_mapping": "Hardware line", "verification": "Handover checklist (test)",

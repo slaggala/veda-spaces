@@ -27,13 +27,14 @@ from veda.modules.estimator import engine, ratecard
 from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import BudgetEstimate, EstimatorRateCard
 
+from . import claims, kinds, public, rules, service
 from . import compile as catalog_compile
-from . import kinds, public, rules, service
 from .models import ANALYTICS_EVENTS, CatalogAnalyticsDaily, CatalogConfiguration, CatalogEvent, CatalogRelease
 
 log = structlog.get_logger("veda.catalog")
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # pragma: allowlist secret (an alphabet)
-_view_cache: dict[tuple[str, str], dict] = {}
+_view_cache: dict[tuple[str, str], tuple[dict, catalog_compile.Catalog]] = {}
+CATALOG_MAX_AGE = 60  # seconds a browser or CDN may reuse the public catalog, never past a claim boundary
 _card_cache: dict[tuple[str, str], ratecard.RateCard] = {}
 
 
@@ -49,15 +50,36 @@ def _active(s: Session) -> CatalogRelease:
 
 
 def public_catalog(s: Session) -> dict:
-    """The ACTIVE release's customer view (cached by release and manifest digest)."""
+    return served_catalog(s)[0]
+
+
+def served_catalog(s: Session) -> tuple[dict, int]:
+    """The ACTIVE release's customer view and how long it may be cached. The built payload is cached by release and
+    manifest digest, but its governed claims are re-validated on every serve (expiry, review date, withdrawal, owner,
+    environment, applicability) and any invalid claim fails closed: a cached release never keeps showing a lapsed or
+    withdrawn claim. The cache lifetime ends before the next claim boundary."""
     release = _active(s)
     key = (release.id, release.manifest_sha256)
     if key not in _view_cache:
         cat = _load(s, release)
         dto = public.build_catalog(cat)
-        _served(public.check_payload(dto, governed=cat.of(kinds.Copy)), "catalog", release.release_code)
-        _view_cache[key] = dto.model_dump(mode="json", by_alias=True, exclude_none=True)
-    return _view_cache[key]
+        _served(public.check_payload(dto, records=cat.of(kinds.Copy)), "catalog", release.release_code)
+        _view_cache[key] = (dto.model_dump(mode="json", by_alias=True, exclude_none=True), cat)
+    view, cat = _view_cache[key]
+    _claims_valid(s, cat, release.release_code)
+    return view, _max_age(cat)
+
+
+def _claims_valid(s: Session, cat: catalog_compile.Catalog, release_code: str) -> None:
+    _served(claims.problems(cat, current=claims.controls(s)), "claims", release_code)
+
+
+def _max_age(cat: catalog_compile.Catalog) -> int:
+    edge = claims.valid_until(cat)
+    if edge is None:
+        return CATALOG_MAX_AGE
+    boundary = datetime.combine(edge, datetime.min.time(), tzinfo=claims.BUSINESS_TZ)
+    return max(0, min(CATALOG_MAX_AGE, int((boundary - clock.now()).total_seconds())))
 
 
 def _served(problems: list[str], what: str, release_code: str) -> None:
@@ -68,10 +90,14 @@ def _served(problems: list[str], what: str, release_code: str) -> None:
         raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
 
 
-def public_estimate(s: Session, row: BudgetEstimate, snap: CatalogConfiguration, release: CatalogRelease) -> dict:
-    """The V3 estimate response: the strict public DTO built from the stored result, checked before it is served."""
+def public_estimate(s: Session, row: BudgetEstimate, snap: CatalogConfiguration, release: CatalogRelease,
+                    cat: catalog_compile.Catalog | None = None) -> dict:  # fmt: skip
+    """The V3 estimate response: the strict public DTO built from the stored result and the card that priced it,
+    checked under its content policies, with the release's claims still valid, before it is served."""
+    _claims_valid(s, cat if cat is not None else _load(s, release), release.release_code)
     spec = estimator_service._snapshot_spec(s, row)
-    dto = public.build_estimate(row.result, reference=row.public_reference,
+    _row, card = _card_of(s, row.rate_card_id)
+    dto = public.build_estimate(row.result, card=card, reference=row.public_reference,
                                 expires_on=row.expires_on.date().isoformat(),
                                 configuration_reference=snap.configuration_reference,
                                 catalog_release=release.release_code, specification=spec)  # fmt: skip
@@ -89,7 +115,11 @@ def _load(s: Session, release: CatalogRelease) -> catalog_compile.Catalog:
 
 
 def _card(s: Session, release: CatalogRelease) -> tuple[EstimatorRateCard, ratecard.RateCard]:
-    row = s.get(EstimatorRateCard, release.rate_card_id)
+    return _card_of(s, release.rate_card_id)
+
+
+def _card_of(s: Session, card_id: str | None) -> tuple[EstimatorRateCard, ratecard.RateCard]:
+    row = s.get(EstimatorRateCard, card_id) if card_id else None
     if row is None or row.document_sha256 != estimator_service._sha(row.document):
         raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
     key = (row.id, row.document_sha256)
@@ -118,17 +148,27 @@ IDEMPOTENCY_TTL = timedelta(hours=24)
 _CLIENT = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 
-def key_digest(key: str, client: str | None) -> str:
-    """What is stored for an Idempotency-Key: a SHA-256 of the key scoped to the browser's X-Veda-Client token, never
-    the key itself. Another browser presenting the same key has a different scope, so it can never replay (or learn)
-    someone else's estimate; a database reader cannot replay a request either."""
-    scope = client if client and _CLIENT.match(client) else "-"
-    return hashlib.sha256(f"veda.catalog.idempotency/1\0{scope}\0{key}".encode()).hexdigest()
+REQUEST_TYPE = "catalog-estimate"  # the one request type V3 idempotency covers
 
 
-def fingerprint(config: object) -> str:
-    """The SHA-256 of the configuration exactly as sent (canonical JSON), to tell a repeat from a different request."""
-    return hashlib.sha256(json.dumps(config, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+def valid_client(client: str | None) -> bool:
+    return bool(client and _CLIENT.match(client))
+
+
+def key_digest(key: str, client: str, request_type: str = REQUEST_TYPE) -> str:
+    """What is stored for an Idempotency-Key: a SHA-256 of the key bound to the browser's X-Veda-Client token and the
+    request type, never the key itself. Another browser (or another kind of request) presenting the same key has a
+    different scope, so it can never replay or learn someone else's estimate; a database reader cannot replay either."""
+    if not valid_client(client):
+        raise ValueError("an idempotency scope needs the browser's client token")
+    return hashlib.sha256(f"veda.catalog.idempotency/2\0{request_type}\0{client}\0{key}".encode()).hexdigest()
+
+
+def fingerprint(config: object, request_type: str = REQUEST_TYPE) -> str:
+    """The normalised request digest: SHA-256 of the request type and the configuration as canonical JSON (sorted
+    keys, no insignificant whitespace), to tell a repeat from a different request."""
+    body = json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(f"{request_type}\0{body}".encode()).hexdigest()
 
 
 def stored_for_key(s: Session, key: str) -> CatalogConfiguration | None:
@@ -170,6 +210,7 @@ def create_public(s: Session, config: dict, *, ip, ua, request_id, idempotency_k
     ):
         release = _active(s)
         cat = _load(s, release)
+        _claims_valid(s, cat, release.release_code)  # no estimate is created while a shown claim is invalid
         try:
             resolved = catalog_compile.resolve(cat, config, public=True)
         except catalog_compile.CompileError as err:
@@ -186,7 +227,7 @@ def create_public(s: Session, config: dict, *, ip, ua, request_id, idempotency_k
                 s.flush()
             except IntegrityError as err:  # the same key arrived twice at once: one wins, the other is refused
                 raise ApiError(409, "IDEMPOTENCY_CONFLICT", "This request is already being processed.") from err
-        return public_estimate(s, row, snap, release)
+        return public_estimate(s, row, snap, release, cat)
 
 
 def snapshot(s: Session, release: CatalogRelease, resolved: catalog_compile.Resolved, *, estimate_id=None):

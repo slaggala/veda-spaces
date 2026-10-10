@@ -224,9 +224,11 @@
   const consultation = (pkey, vkey, gkey, ckey) => {
     const paths = new Set([`product:${pkey}@${gkey}=${ckey}`, `product:${pkey}#${vkey}@${gkey}=${ckey}`]);
     const rule = Object.values(C.rule || {}).find((r) => r.type === 'requires_consultation' && !r.condition && paths.has(r.subject));
-    return rule ? (C.copy[rule.message]?.statement || 'Discussed in a consultation.') : null;
+    return rule ? (copyText(rule.message) || 'Discussed in a consultation.') : null;
   };
-  const statement = (key, fallback) => C.copy[key]?.statement || fallback;
+  // Approved copy and governed claims are served separately (a claim only as a reference to a valid claim record).
+  const copyText = (key) => (key && (C.copy[key]?.statement || C.claim?.[key]?.statement)) || '';
+  const statement = (key, fallback) => copyText(key) || fallback;
   const describe = (d) => [d.description && el('p', { text: d.description }),
     d.what_is_this && el('details', { class: 'v3-what' }, el('summary', { text: 'What is this?' }), el('p', { text: d.what_is_this }),
       d.typically_used_for ? el('p', { class: 'v3-note', text: `Typically used for: ${d.typically_used_for}` }) : null)];
@@ -261,7 +263,7 @@
     const pkgs = home().packages.map((k) => [k, C.package[k]]).filter(([, p]) => p);
     if (!state.pkg) state.pkg = (pkgs.find(([, p]) => p.recommended && !p.consultation_only) || pkgs.find(([, p]) => !p.consultation_only) || [])[0];
     $('#v3-packages').replaceChildren(...pkgs.map(([k, p]) => {
-      const summary = C.copy[p.public_summary]?.statement;
+      const summary = copyText(p.public_summary);
       const choice = radio('v3-pkg', k, state.pkg === k, p.name, summary, () => { state.pkg = k; });
       if (p.consultation_only) { choice.querySelector('input').disabled = true; choice.classList.add('v3-off'); }
       return choice;
@@ -298,7 +300,7 @@
               el('a', { href: '/#contact', class: 'v3-consult', text: 'Ask about this in a consultation', onclick: () => track('quotation_requested', slot.product) }));
           }
           const cm = (c.materials || []).map((m) => C.material[m]).filter(Boolean);
-          if (cm.length) label.querySelector('span').append(el('small', { class: 'v3-note', text: cm.map((m) => C.copy[m.statements?.[0]]?.statement || m.name).join(' ') }));
+          if (cm.length) label.querySelector('span').append(el('small', { class: 'v3-note', text: cm.map((m) => copyText(m.statements?.[0]) || m.name).join(' ') }));
           return label;
         })));
     }
@@ -427,6 +429,10 @@
     // Every customer-critical field of the estimate response (E3); headings are page labels, names come from
     // registered catalog copy where it exists, otherwise from the estimate itself.
     const list = (items) => el('ul', {}, ...(items || []).map((x) => el('li', { text: x })));
+    // Typical-size assumptions arrive as structured parts (a number and a unit), never as prose with figures in it.
+    const UNIT = { FT: 'ft', SQ_FT: 'sq ft', NOS: '' };
+    const assumption = (a) => `${a.room_label} – ${a.item_label}${a.instance > 1 ? ` (${a.instance})` : ''}: typical `
+      + `${a.measurement_label.toLowerCase()} assumed: ${Number(a.value).toLocaleString('en-IN')}${UNIT[a.unit] ? ` ${UNIT[a.unit]}` : ''}`;
     const block = (heading, ...kids) => el('section', { class: 'v3-block', 'aria-label': heading }, el('h3', { text: heading }), ...kids);
     const pp = e.project_preparation || {};
     const al = e.custom_features_allowance || {};
@@ -438,7 +444,7 @@
       block(statement('copy.label.site-package', pp.label), el('p', { 'data-field': 'project_preparation', text: `${rupees(pp.amount_minor || 0)}. ${pp.description || ''}` }), list(pp.inclusions)),
       block(statement('copy.label.allowance', al.label), el('p', { 'data-field': 'allowance', text: `${rupees(al.low_minor || 0)} – ${rupees(al.high_minor || 0)}. ${al.description || ''}` })),
       block('Timeline', el('p', { 'data-field': 'timeline', text: e.timeline ? `${e.timeline.label}: about ${e.timeline.min_days} – ${e.timeline.max_days} days` : '' })),
-      block('Assumptions', list(e.assumptions)),
+      block('Assumptions', list((e.assumptions || []).map(assumption))),
       block('Exclusions', list(e.exclusions)),
       block('What you supply', list(e.client_scope)),
       block('About this estimate',

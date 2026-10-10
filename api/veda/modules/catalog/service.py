@@ -386,8 +386,12 @@ def approve_preview(s: Session, release_id: str) -> CatalogRelease:
         raise CatalogError(f"the preview is approved before release approval (release is {release.status})")
     report = _require_valid(s, release)
     me = _release_four_eyes(s, release, "customer preview")
+    copy_report = public_copy_report(s, release)
     release.preview_approved_by, release.preview_approved_on = me, db.tx_time(s)
-    _event(s, "RELEASE_PREVIEW_APPROVED", release=release, detail={"public_payload_sha256": _payload_sha(report)})
+    # The reviewer approved exactly this list of new and changed customer text (its digest is kept with the approval).
+    _event(s, "RELEASE_PREVIEW_APPROVED", release=release, detail={
+        "public_payload_sha256": _payload_sha(report), "public_copy_items": len(copy_report),
+        "public_copy_sha256": sha({"items": copy_report})})  # fmt: skip
     return release
 
 
@@ -690,3 +694,68 @@ def dashboard(s: Session, *, can_price: bool) -> dict:
         ],
         "recent": [{"event": e.event_type, "on": e.created_on.isoformat(), "by": e.created_by} for e in recent],
     }
+
+
+# --- the new and changed public copy (B1-B3 policy closure, Phase 5) ------------------------------------------------
+def public_copy_report(s: Session, release: CatalogRelease) -> list[dict]:
+    """Every customer-visible text item this release adds or changes against the ACTIVE release, for the preview
+    reviewer: entity, field, previous and new text, content policy, claim reference, responsible owner, reviewer,
+    evidence status and expiry status. The pricing card's customer text is included; its amounts never are."""
+    from . import compile as catalog_compile
+    from . import public
+
+    active = active_release(s)
+    before: dict[tuple[str, str], CatalogRecord] = {}
+    if active is not None and active.id != release.id:
+        before = {(r.kind, r.record_key): r for r in release_records(s, active)}
+    out: list[dict] = []
+    for row in release_records(s, release):
+        old_row = before.get((row.kind, row.record_key))
+        if row.kind in kinds.STAFF_ONLY_KINDS or (old_row is not None and old_row.id == row.id):
+            continue
+        model = kinds.load_model(row.kind, row.document)
+        new = {where: value for where, value, _cls in text.visible_text(model)}
+        old = {}
+        if old_row is not None:
+            old = {
+                where: value
+                for where, value, _cls in text.visible_text(kinds.load_model(old_row.kind, old_row.document))
+            }
+        for where in sorted(set(new) | set(old)):
+            if new.get(where) == old.get(where):
+                continue
+            out.append({"entity": f"{row.kind} {row.record_key} v{row.record_version}", "field": where,
+                        "previous": old.get(where), "new": new.get(where), **_copy_governance(model, where),
+                        "reviewer": row.reviewed_by})  # fmt: skip
+    cards = []
+    for rel in (active, release):
+        try:
+            cards.append(
+                catalog_compile.compile_card(catalog_compile.load_release(s, rel)) if rel is not None else None
+            )
+        except (ValueError, CatalogError):
+            cards.append(None)
+    old_card = (
+        {w: v for w, v, _p in public.card_texts(cards[0])} if cards[0] is not None and active is not release else {}
+    )
+    if cards[1] is not None:
+        for where, value, policy in public.card_texts(cards[1]):
+            if old_card.get(where) != value:
+                out.append({"entity": "pricing card (customer text)", "field": where, "previous": old_card.get(where),
+                            "new": value, "policy": policy, "claim": None, "owner": None, "evidence": "n/a",
+                            "expiry": "n/a", "reviewer": None})  # fmt: skip
+    return out
+
+
+def _copy_governance(model: kinds._Model, where: str) -> dict:
+    if not isinstance(model, kinds.Copy) or where != "statement":
+        return {"policy": "FACTUAL_TEXT", "claim": None, "owner": None, "evidence": "n/a", "expiry": "n/a"}
+    c = model.claim
+    if c is not None:
+        expiry = c.review_by.isoformat() if c.review_by else "non-expiring (approved policy)"
+        return {"policy": model.policy, "claim": "claim record", "owner": c.owner,
+                "evidence": f"{c.evidence_reference} ({c.evidence_period or 'no period'})", "expiry": expiry}  # fmt: skip
+    if model.promise and model.governance is not None:
+        return {"policy": model.policy, "claim": f"promise matrix row {model.matrix_row}", "owner": model.governance.owner,
+                "evidence": model.governance.verification, "expiry": "promise matrix (no expiry)"}  # fmt: skip
+    return {"policy": model.policy, "claim": None, "owner": None, "evidence": "n/a", "expiry": "n/a"}

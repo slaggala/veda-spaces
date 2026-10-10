@@ -146,6 +146,7 @@ register(AuditPolicy("catalog_event", FULL))
 register(AuditPolicy("catalog_media_object", FULL))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
+register(AuditPolicy("catalog_claim_control", FULL))
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))
 register(AuditPolicy("refresh_token", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-007", "EXC-009")))

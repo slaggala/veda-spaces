@@ -244,3 +244,24 @@ def test_replay_refuses_a_snapshot_without_its_estimate(people):
         with pytest.raises(ApiError) as err:
             configure.replay(s, "a" * 64, {})
     assert err.value.code == "IDEMPOTENCY_CONFLICT", "no estimate yet: still in flight"
+
+
+@ON
+def test_the_browser_token_is_required_so_there_is_no_shared_anonymous_scope(api, people):
+    live(people)
+    for client in (None, "short", "has spaces in it, not a token"):
+        r = post(api, living(), client=client)
+        assert r.status == 422 and r.json["errors"][0]["field"] == "X-Veda-Client", client
+    assert estimates() == 0
+
+
+def test_the_key_is_bound_to_browser_request_type_and_normalised_request():
+    a = configure.key_digest(KEY, CLIENT)
+    assert a == configure.key_digest(KEY, CLIENT, "catalog-estimate")
+    assert a != configure.key_digest(KEY, CLIENT, "catalog-event"), "another request type is another scope"
+    assert a != configure.key_digest(KEY, OTHER_CLIENT)
+    with pytest.raises(ValueError):
+        configure.key_digest(KEY, "")
+    config = {"home": "h", "rooms": [{"room": "r"}]}
+    assert configure.fingerprint(config) == configure.fingerprint({"rooms": [{"room": "r"}], "home": "h"}), "key order"
+    assert configure.fingerprint(config) != configure.fingerprint(config, "catalog-event")

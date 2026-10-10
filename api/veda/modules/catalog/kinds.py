@@ -384,9 +384,8 @@ RULE_TYPES = (
     "measurement_bounds", "requires_consultation", "unavailable_online", "staff_only",
 )  # fmt: skip
 # A reference to a selectable thing: product:<key>[#<variant>][@<group>=<choice>] or extra:<key> or room:<key>.
-RefPath = Annotated[
-    str, Field(pattern=r"^(product:[a-z][a-z0-9_.-]{1,99}(#[a-z][a-z0-9_.-]{1,99})?(@[a-z][a-z0-9_.-]{1,99}=[a-z][a-z0-9_.-]{1,99})?|extra:[a-z][a-z0-9_.-]{1,99}|room:[a-z][a-z0-9_.-]{1,99})$")
-]  # fmt: skip
+REF_PATH_PATTERN = r"^(product:[a-z][a-z0-9_.-]{1,99}(#[a-z][a-z0-9_.-]{1,99})?(@[a-z][a-z0-9_.-]{1,99}=[a-z][a-z0-9_.-]{1,99})?|extra:[a-z][a-z0-9_.-]{1,99}|room:[a-z][a-z0-9_.-]{1,99})$"
+RefPath = Annotated[str, Field(pattern=REF_PATH_PATTERN)]  # fmt: skip
 
 
 class Condition(_Model):
@@ -463,8 +462,12 @@ def substantive(value: str | None) -> bool:
 
 
 ClaimCategory = Literal[
-    "factual_descriptor", "ranking", "price", "popularity", "recommendation", "quality", "promotional",
+    "factual_descriptor", "ranking", "price", "popularity", "recommendation", "quality", "certification", "award",
+    "warranty", "service", "durability", "environmental", "promotional", "urgency",
 ]  # fmt: skip
+TIME_BOXED = frozenset({"ranking", "price", "popularity", "award", "promotional", "urgency"})
+# The content policy an author selects for a copy record (canonical customer-copy closure, B1-B3 policy).
+CopyPolicy = Literal["FACTUAL_TEXT", "CONTROLLED_LEGAL_COPY", "GOVERNED_CLAIM_REFERENCE"]
 
 
 class ClaimGovernance(_Model):
@@ -484,7 +487,8 @@ class ClaimGovernance(_Model):
     editors and submitter."""
 
     categories: tuple[ClaimCategory, ...] = Field(min_length=1)
-    status: Literal["APPROVED", "BLOCKED"] = "BLOCKED"
+    status: Literal["APPROVED", "BLOCKED", "WITHDRAWN"] = "BLOCKED"
+    approved_on: date  # when the approver attested the claim (the record's four-eyes approval is the system's)
     source: Text  # what the claim rests on (sales data, test report, approved policy)
     evidence_reference: Text  # where the evidence is kept (document, report or dataset reference)
     evidence_period: Annotated[str, Field(max_length=80)] | None = None  # the period the evidence covers
@@ -511,8 +515,13 @@ class ClaimGovernance(_Model):
             raise ValueError("a claim is not approved by its own owner (no self-approval)")
         if self.review_by is not None and self.review_by <= self.effective_from:
             raise ValueError("a claim's review date is after its effective date")
-        if cats & {"promotional", "price"} and self.review_by is None:
-            raise ValueError("a promotional or price claim is time-boxed: it needs a review date")
+        if self.approved_on > self.effective_from:
+            raise ValueError("a claim is approved on or before its effective date")
+        if cats & TIME_BOXED and self.review_by is None:
+            raise ValueError(
+                "a ranking, price, popularity, award, promotional or urgency claim is time-boxed: it needs a review "
+                "date (its evidence is valid only for a period)"
+            )
         if cats & {"ranking", "price"} and not self.substantiation:
             raise ValueError("a ranking or price claim needs independent substantiation")
         if cats & {"ranking", "price"} and not self.backup_owner:
@@ -535,10 +544,27 @@ class Copy(_Model):
     governance: Governance | None = None
     matrix_row: Annotated[str, Field(max_length=60)] | None = None  # the customer-promise matrix row it is text of
     applies_to: AppliesTo | None = None
-    claim: ClaimGovernance | None = None  # set when the statement makes a marketing claim
+    claim: ClaimGovernance | None = None  # set when the statement makes a claim
+    # The author's choice (required when authoring; derived for records saved before it existed): FACTUAL_TEXT (no
+    # claim, promise or money), CONTROLLED_LEGAL_COPY (disclaimers, next steps, labels: no claim or money), or
+    # GOVERNED_CLAIM_REFERENCE (a claim record, or a promise record linked to its confirmed promise-matrix row).
+    content_policy: CopyPolicy | None = None
+
+    @property
+    def policy(self) -> str:
+        if self.content_policy:
+            return self.content_policy
+        if self.claim is not None or self.promise:
+            return "GOVERNED_CLAIM_REFERENCE"
+        return "CONTROLLED_LEGAL_COPY" if self.category in ("disclaimer", "next_step") else "FACTUAL_TEXT"
 
     @model_validator(mode="after")
     def _governed(self):
+        governed = self.claim is not None or self.promise
+        if self.content_policy == "GOVERNED_CLAIM_REFERENCE" and not governed:
+            raise ValueError("a governed claim reference is a claim record or a promise record")
+        if self.content_policy in ("FACTUAL_TEXT", "CONTROLLED_LEGAL_COPY") and governed:
+            raise ValueError("a claim or promise record has the GOVERNED_CLAIM_REFERENCE content policy")
         if self.promise and (self.governance is None or not self.matrix_row or self.applies_to is None):
             raise ValueError(
                 "a promise statement carries its governance, its promise-matrix row and what it applies to"
@@ -586,8 +612,13 @@ def load_model(kind: str, document: dict) -> _Model:
 
 
 def parse(kind: str, document: dict) -> _Model:
-    """Validate a document being authored or imported: its schema and every customer-visible string."""
+    """Validate a document being authored or imported: its schema, the author's content policy for copy, and every
+    customer-visible string."""
     model = load_model(kind, document)
+    if kind == "copy" and not document.get("content_policy"):
+        raise KindError(
+            "select the copy's content policy: FACTUAL_TEXT, CONTROLLED_LEGAL_COPY or GOVERNED_CLAIM_REFERENCE"
+        )
     problems = text_problems(kind, model, authoring=True)
     if problems:
         raise KindError(problems[0])
@@ -595,50 +626,59 @@ def parse(kind: str, document: dict) -> _Model:
 
 
 def text_problems(kind: str, model: _Model, *, authoring: bool = True) -> list[str]:
-    """Why the customer-visible text of a document is not allowed (empty when it is). Every check runs on the
-    canonical form (`text.canonical` / `text.numeric_form`).
+    """Why the customer-visible text of a document is not allowed under its content policy (empty when it is). Every
+    check runs on the canonical forms (`text.canonical`, `text.numeric_form`); detection is defence in depth behind
+    the policies themselves and four-eyes review.
 
-    Factual text may make no promise, no claim and no rate. A copy statement may make a promise only as a promise
-    record linked to the matrix (warranty, service and delivery wording included), and a marketing claim only with
-    claim governance whose declared categories equal the detected ones and whose digest is the statement's. New text
-    (`authoring`) may not contain invisible or formatting characters."""
+    - Factual catalog text and FACTUAL_TEXT copy: no claim of any category, no promise wording, no money, pricing
+      wording, duration or contact detail.
+    - CONTROLLED_LEGAL_COPY: no claim, no money, no contact detail.
+    - GOVERNED_CLAIM_REFERENCE: a claim record whose declared categories equal the detected ones and whose digest is
+      the statement's (absolute claims substantiated), or a promise record linked to its matrix row whose detected
+      categories are only warranty, service or durability.
+    - Everywhere, new text (`authoring`) may not contain invisible characters or words mixing scripts."""
     if kind in STAFF_ONLY_KINDS:
         return []
     problems = []
     for where, value, cls in text.visible_text(model):
-        hidden = text.invisible_chars(value)
-        if authoring and hidden:
-            problems.append(f"{where} contains invisible or formatting characters ({', '.join(hidden)})")
-        what = text.forbidden_in(value)
+        if authoring:
+            hidden = text.invisible_chars(value)
+            if hidden:
+                problems.append(f"{where} contains invisible or formatting characters ({', '.join(hidden)})")
+            mixed = text.mixed_script_words(value)
+            if mixed:
+                problems.append(f"{where} has words that mix scripts ({len(mixed)}); use one script per word")
+        policy = model.policy if isinstance(model, Copy) and cls == text.STATEMENT else "FACTUAL_TEXT"
+        what = text.leak_in(value) if policy != "FACTUAL_TEXT" else text.forbidden_in(value)
         if what:
             problems.append(f"{where} contains {what}; customer text never states it")
             continue
-        marketing = text.marketing_claims_in(value)
-        promise = text.promise_in(value)
-        if cls == text.FACTUAL:
-            if promise:
-                problems.append(
-                    f"{where} makes a promise; only a promise copy record linked to the promise matrix may say it"
-                )
-            if marketing:
-                problems.append(
-                    f"{where} makes a {', '.join(marketing)} claim; only an approved claim copy record may say it"
-                )
+        claims = text.claims_in(value)
+        if policy == "FACTUAL_TEXT":
+            if text.promise_in(value):
+                problems.append(f"{where} makes a promise; only a governed promise or claim record may say it")
+            if claims:
+                problems.append(f"{where} makes a {', '.join(claims)} claim; it must reference a governed claim record")
+        elif policy == "CONTROLLED_LEGAL_COPY":
+            if claims:
+                problems.append(f"{where} makes a {', '.join(claims)} claim; it must reference a governed claim record")
         elif isinstance(model, Copy):
-            if promise and not model.promise:
-                problems.append(f"{where} makes a promise; mark it a promise and link its promise-matrix row")
             claim = model.claim
-            if marketing and claim is None:
-                problems.append(f"{where} makes a {', '.join(marketing)} claim; give it claim governance")
-            if claim is not None:
-                declared = set(claim.categories) - {"factual_descriptor"}
-                if declared != set(marketing):
-                    problems.append(f"{where}: declared claim categories {sorted(declared) or ['factual_descriptor']} "
-                                    f"do not match the detected {marketing or ['none']}")  # fmt: skip
-                if claim.canonical_sha256 != text.canonical_digest(value):
-                    problems.append(f"{where}: the claim's canonical digest is not the statement's")
-                if text.absolute_in(value) and not claim.substantiation:
-                    problems.append(f"{where} makes an absolute claim; it needs independent substantiation")
+            if claim is None:  # a promise record: only promise-matrix categories
+                beyond = sorted(set(claims) - set(text.PROMISE_CATEGORIES))
+                if beyond:
+                    problems.append(f"{where} makes a {', '.join(beyond)} claim; it needs a governed claim record")
+                continue
+            declared = set(claim.categories) - {"factual_descriptor"}
+            if declared != set(claims):
+                problems.append(f"{where}: declared claim categories {sorted(declared) or ['factual_descriptor']} "
+                                f"do not match the detected {claims or ['none']}")  # fmt: skip
+            if claim.canonical_sha256 != text.canonical_digest(value):
+                problems.append(f"{where}: the claim's canonical digest is not the statement's")
+            if text.absolute_in(value) and not (claim.substantiation and claim.backup_owner):
+                problems.append(
+                    f"{where} makes an absolute claim; it needs independent substantiation and a backup owner"
+                )
     return problems
 
 

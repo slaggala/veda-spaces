@@ -120,10 +120,17 @@ try {
   const d = base.body.data;
   const expected = [d.configuration_reference, d.catalog_release, `GST at ${d.gst.pct}%`, 'Site Execution & Handover Package',
     'Design Personalisation Allowance', `Valid for ${d.validity_days} days`, d.expires_on, 'not a final quotation',
-    d.timeline.label, ...d.assumptions, ...d.exclusions, ...d.client_scope, ...(d.project_preparation.inclusions || [])];
+    d.timeline.label, ...d.assumptions.flatMap((a) => [a.item_label, `assumed: ${Number(a.value).toLocaleString('en-IN')}`]), ...d.exclusions, ...d.client_scope, ...(d.project_preparation.inclusions || [])];
   const missing = expected.filter((x) => !shown.includes(x));
   check('every customer-critical field of the response is on the result page', missing.length === 0, missing.join(' | '));
   check('the specification version is shown', /Specification: /.test(shown));
+  check('assumptions are structured (number, unit enum, type), never prose with figures', d.assumptions.length > 0
+    && d.assumptions.every((a) => typeof a.value === 'number' && ['FT', 'SQ_FT', 'NOS'].includes(a.unit)
+      && ['LENGTH', 'AREA', 'QUANTITY', 'DIMENSION'].includes(a.measurement_type) && a.basis === 'TYPICAL_ASSUMPTION'),
+    JSON.stringify(d.assumptions[0] || {}));
+  check('money only in typed engine amounts, linked to the pricing-card version', Number.isInteger(d.range.low_minor)
+    && Number.isInteger(d.project_preparation.amount_minor) && typeof d.pricing_card_version === 'string'
+    && !/₹|\brs\b|\binr\b|\d\s*(?:\/|per)\s*(?:sq|ft|rft)/i.test([d.timeline.label, ...d.exclusions, ...d.client_scope].join(' ')));
   await axe('result');
   await shot('result');
 

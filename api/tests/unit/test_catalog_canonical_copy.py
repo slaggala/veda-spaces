@@ -24,6 +24,7 @@ ZW = "​"
 
 # --- Phase 4: the required claim list, each in its governance route ---------------------------------------------------
 MARKETING = {
+    "urgency": ["Limited-time offer", "Offer ends soon", "Only today", "Act now"],
     "ranking": ["No. 1", "Number 1", "Number one", "First choice", "Top rated", "Leading", "Best", "Finest"],
     "quality": ["Highest quality", "Premium quality"],
     "price": ["Cheapest", "Lowest price", "Guaranteed lowest price"],
@@ -32,8 +33,6 @@ MARKETING = {
     "promotional": [
         "Free",
         "Free installation",
-        "Limited-time offer",
-        "Offer ends soon",
         "20% off",
         "Flat 10 percent discount",
     ],  # fmt: skip
@@ -106,8 +105,8 @@ NOT_RATES = ["Width 12 ft", "Up to 45 days", "Typically 8 to 10 weeks", "3 BHK",
 def test_rates_and_prices_are_refused_everywhere(value):
     assert text.forbidden_in(value), value
     assert text.leak_in(value), value  # even in promise-governed estimator and card text
-    for cls in (public.FACTUAL_CUSTOMER_COPY, public.PROMISE_GOVERNED_COPY):
-        assert public.check_text("x", value, cls), (value, cls)
+    for policy in (public.FACTUAL_TEXT, *public.STRUCTURED_TEXT):
+        assert public.check_text("x", value, policy), (value, policy)
 
 
 @pytest.mark.parametrize("value", NOT_RATES)
@@ -117,10 +116,11 @@ def test_sizes_counts_and_timelines_are_not_rates(value):
 
 def test_public_totals_are_numbers_not_text():
     """Engine totals, ranges and rounded room subtotals are the only amounts a customer sees, always as numbers."""
-    for (dto, field), cls in public.PUBLIC_FIELD_CLASSES.items():
-        if cls == public.PRICE_OR_RATE_COPY:
-            annotation = getattr(public, dto).model_fields[field].annotation
-            assert annotation in (int, float), (dto, field, annotation)
+    amounts = [k for k, p in public.PUBLIC_FIELD_POLICIES.items() if p == public.ENGINE_GENERATED_AMOUNT]
+    assert len(amounts) >= 8
+    for dto, field in amounts:
+        annotation = getattr(public, dto).model_fields[field].annotation
+        assert annotation is int, (dto, field, annotation)
 
 
 # --- Phase 5: claim records ---------------------------------------------------------------------------------------
@@ -228,18 +228,19 @@ def test_no_public_dto_has_a_weak_type():
 
 def test_every_public_field_is_classified_and_the_registry_has_no_stale_entries():
     found = public.fields()
-    assert sorted(found - set(public.PUBLIC_FIELD_CLASSES)) == [], "classify the field in public.PUBLIC_FIELD_CLASSES"
-    assert sorted(set(public.PUBLIC_FIELD_CLASSES) - found) == []
-    assert set(public.PUBLIC_FIELD_CLASSES.values()) <= set(public.CLASSES)
+    assert sorted(found - set(public.PUBLIC_FIELD_POLICIES)) == [], "give the field a policy in PUBLIC_FIELD_POLICIES"
+    assert sorted(set(public.PUBLIC_FIELD_POLICIES) - found) == []
+    assert set(public.PUBLIC_FIELD_POLICIES.values()) <= set(public.POLICIES)
+    assert public.STAFF_ONLY not in public.PUBLIC_FIELD_POLICIES.values(), "staff-only text never reaches a public DTO"
 
 
 def test_an_unclassified_or_weak_public_field_fails_closed():
     class PublicGadget(public._Dto):
         slogan: str
 
-    assert ("PublicGadget", "slogan") in public.fields([PublicGadget]) - set(public.PUBLIC_FIELD_CLASSES)
+    assert ("PublicGadget", "slogan") in public.fields([PublicGadget]) - set(public.PUBLIC_FIELD_POLICIES)
     assert _weak(PublicGadget.model_fields["slogan"].annotation) == ["unbounded string"]
-    with pytest.raises(KeyError, match="not classified"):
+    with pytest.raises(KeyError, match="no content policy"):
         list(public.strings(PublicGadget(slogan="Best ever")))
 
 
@@ -260,32 +261,45 @@ def test_every_public_dto_is_strict_and_frozen():
         assert cls.model_config.get("extra") == "forbid" and cls.model_config.get("frozen"), cls.__name__
 
 
-# --- the shared checker by class ------------------------------------------------------------------------------------
-@pytest.mark.parametrize("cls", [public.FACTUAL_CUSTOMER_COPY, public.PROMISE_GOVERNED_COPY])
+# --- the shared checker by policy -----------------------------------------------------------------------------------
+@pytest.mark.parametrize("policy", [public.FACTUAL_TEXT, public.CONTROLLED_LEGAL_COPY, *public.STRUCTURED_TEXT])
 @pytest.mark.parametrize(
-    "value", ["Best seller", f"B{ZW}est seller", "Ｔｏｐ ｒａｔｅｄ", "Most_popular", "Free installation"]
-)
-def test_the_checker_refuses_claims_in_factual_and_estimator_text(cls, value):
-    assert public.check_text("x", value, cls)
+    "value", ["Best seller", f"B{ZW}est seller", "Ｔｏｐ ｒａｔｅｄ", "Most_popular", "Free installation", "Lifetime warranty",
+              "Guaranteed delivery", "Certified material"]
+)  # fmt: skip
+def test_no_claim_outside_a_governed_claim_reference(policy, value):
+    assert public.check_text("x", value, policy)
 
 
-def test_estimator_text_may_state_a_governed_timeline_but_not_a_rate():
-    assert public.check_text("t", "Up to 45 days", public.PROMISE_GOVERNED_COPY) == []
-    assert public.check_text("t", "Up to 45 days", public.FACTUAL_CUSTOMER_COPY), "factual text states no duration"
-    assert public.check_text("t", "Up to 45 days at 1200/sqft", public.PROMISE_GOVERNED_COPY)
-
-
-def test_controlled_copy_must_be_the_approved_record():
-    record = kinds.parse("copy", claims.claim_copy("Most popular"))
-    governed = {"copy.badge": record}
-    ok = public.check_text(
-        "c", "Most popular", public.CONTROLLED_CUSTOMER_COPY, governed=governed, copy_key="copy.badge"
+def test_timeline_copy_may_state_a_duration_but_never_a_rate_or_commitment():
+    assert (
+        public.check_text("t", "About 2 months and 10 days, plus up to 10 days' grace", public.STRUCTURED_TIMELINE)
+        == []
     )
+    assert public.check_text("t", "Up to 45 days", public.FACTUAL_TEXT), "factual text states no duration"
+    assert public.check_text("t", "Up to 45 days at 1200/sqft", public.STRUCTURED_TIMELINE)
+    assert public.check_text("t", "Guaranteed on-time handover in 45 days", public.STRUCTURED_TIMELINE)
+
+
+def test_estimator_wording_is_an_allowlist():
+    from veda.modules.estimator import engine
+
+    assert public.check_text("title", engine.TITLE, public.CONTROLLED_LEGAL_COPY) == []
+    assert public.check_text("title", "VEDA SPACES QUOTATION", public.CONTROLLED_LEGAL_COPY)
+
+
+def test_a_claim_is_shown_only_as_a_reference_to_its_approved_record():
+    record = kinds.parse("copy", claims.claim_copy("Most popular"))
+    records = {"copy.badge": record}
+    ok = public.check_text("c", "Most popular", public.GOVERNED_CLAIM_REFERENCE, records=records, copy_key="copy.badge")
     assert ok == []
     assert public.check_text(
-        "c", "Best seller", public.CONTROLLED_CUSTOMER_COPY, governed=governed, copy_key="copy.badge"
+        "c", "Best seller", public.GOVERNED_CLAIM_REFERENCE, records=records, copy_key="copy.badge"
     )
-    assert public.check_text("c", "Most popular", public.CONTROLLED_CUSTOMER_COPY, governed=governed, copy_key="copy.x")
+    assert public.check_text("c", "Most popular", public.GOVERNED_CLAIM_REFERENCE, records=records, copy_key="copy.x")
+    assert public.check_text(
+        "c", "Most popular", public.CONTROLLED_LEGAL_COPY, records=records, copy_key="copy.badge"
+    ), "a claim record is never served as ordinary copy"
 
 
 def test_identifiers_and_numbers_are_not_judged_as_prose():

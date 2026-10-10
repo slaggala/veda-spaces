@@ -63,8 +63,8 @@ def placements(claim):
         ("media", {**MEDIA, "caption": claim}),
         ("media", {**MEDIA, "type": "GALLERY", "items": ["img.a1"], "caption": claim}),
         ("media", {**MEDIA, "rights": {**MEDIA["rights"], "owner": claim}}),
-        ("copy", {"statement": claim, "category": "badge" if len(claim) <= 30 else "label", "promise": False}),
-        ("copy", {"statement": claim, "category": "description", "promise": False}),
+        ("copy", {"statement": claim, "category": "badge" if len(claim) <= 30 else "label", "promise": False, "content_policy": "FACTUAL_TEXT"}),
+        ("copy", {"statement": claim, "category": "description", "promise": False, "content_policy": "FACTUAL_TEXT"}),
     ]  # fmt: skip
 
 
@@ -98,8 +98,11 @@ def claim_copy(statement, **over):
 
 
 def test_a_claim_copy_needs_governance_and_what_it_applies_to():
-    with pytest.raises(ValueError, match="claim governance"):
-        kinds.parse("copy", {"statement": "Most chosen", "category": "badge", "promise": False})
+    with pytest.raises(ValueError, match="governed claim record"):
+        kinds.parse(
+            "copy",
+            {"statement": "Most chosen", "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"},
+        )
     doc = claim_copy("Most chosen")
     del doc["applies_to"]
     with pytest.raises(ValueError, match="applies to"):
@@ -114,9 +117,15 @@ def test_absolute_and_ranking_claims_need_independent_substantiation(statement):
     kinds.parse("copy", claim_copy(statement))
 
 
-def test_guaranteed_lowest_price_is_never_customer_text():
-    with pytest.raises(ValueError, match="pricing wording"):
-        kinds.parse("copy", claim_copy("Guaranteed lowest price"))
+def test_guaranteed_lowest_price_is_a_governed_claim_never_factual_text():
+    """A price claim is not money (no amount), so it may be shown only as a fully governed, time-boxed, substantiated
+    claim record; as factual copy it is refused."""
+    with pytest.raises(ValueError):
+        kinds.parse("copy", {"statement": "Guaranteed lowest price", "category": "label", "promise": False,
+                             "content_policy": "FACTUAL_TEXT"})  # fmt: skip
+    with pytest.raises(ValueError, match="substantiation"):
+        kinds.parse("copy", claim_copy("Guaranteed lowest price", substantiation=None))
+    kinds.parse("copy", claim_copy("Guaranteed lowest price"))
 
 
 @pytest.fixture
@@ -143,7 +152,10 @@ def _release_with_badge(people, doc, code="SLICE-C"):
     [
         (claim_copy("Most chosen", status="BLOCKED"), "not approved"),
         (claim_copy("Most chosen", owner="UNASSIGNED"), "no responsible owner"),
-        (claim_copy("Most chosen", effective_from="2025-06-01", review_by="2026-01-01"), "review date"),
+        (
+            claim_copy("Most chosen", approved_on="2025-05-01", effective_from="2025-06-01", review_by="2026-01-01"),
+            "review date",
+        ),
     ],
 )
 def test_unsupported_claims_block_release(people, doc, problem):
@@ -180,7 +192,7 @@ def test_a_record_saved_before_the_rule_cannot_reach_a_new_release(people):
 def test_import_refuses_claims(people):
     a, _ = people
     rows = [importexport.ImportRow("product_family", "beds", {"name": "Best beds", "category": "beds"}),
-            importexport.ImportRow("copy", "copy.c1", {"statement": "Most popular", "category": "badge", "promise": False})]  # fmt: skip
+            importexport.ImportRow("copy", "copy.c1", {"statement": "Most popular", "category": "badge", "promise": False, "content_policy": "FACTUAL_TEXT"})]  # fmt: skip
     with db.unit_of_work(write=False) as s:
         report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
     assert not report["ok"] and all(r["errors"] for r in report["rows"])
@@ -192,7 +204,7 @@ def test_import_refuses_rates_and_prices(people, leak):
     """Imported copy goes through the same canonical checks as authored copy (rates in every format)."""
     a, _ = people
     rows = [importexport.ImportRow("product_family", "beds", {"name": "Beds", "category": "beds", "description": leak}),
-            importexport.ImportRow("copy", "copy.c2", {"statement": leak, "category": "label", "promise": False})]  # fmt: skip
+            importexport.ImportRow("copy", "copy.c2", {"statement": leak, "category": "label", "promise": False, "content_policy": "FACTUAL_TEXT"})]  # fmt: skip
     with db.unit_of_work(write=False) as s:
         report = importexport.dry_run(s, rows, can_edit=lambda kind: True)
     assert not report["ok"] and all(r["errors"] for r in report["rows"])

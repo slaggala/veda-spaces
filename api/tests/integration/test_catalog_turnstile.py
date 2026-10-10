@@ -17,7 +17,7 @@ import json
 import pytest
 import sqlalchemy as sa
 
-from tests.integration.test_catalog import SITE, approve_all, living, new_key, release, seed_slice
+from tests.integration.test_catalog import CLIENT, SITE, approve_all, living, new_key, release, seed_slice
 from tests.support.dbh import rows
 from veda.kernel import turnstile
 from veda.modules.estimator.models import BudgetEstimate
@@ -74,7 +74,7 @@ def live(people):
 
 def post(api, token, key=None):
     return api.post("/api/v1/public/catalog/estimates", {"configuration": living(), "turnstile_token": token},
-                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": key or new_key()})  # fmt: skip
+                    anonymous=True, headers={"Origin": SITE, "Idempotency-Key": key or new_key(), "X-Veda-Client": CLIENT})  # fmt: skip
 
 
 def refused(r):

@@ -60,6 +60,7 @@ REVISIONS: dict[str, list[str]] = {
         "catalog_configuration",
         "catalog_analytics_daily",
     ],
+    "0105_catalog_claim_control": ["catalog_claim_control"],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

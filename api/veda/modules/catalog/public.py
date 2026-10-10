@@ -1,20 +1,25 @@
-"""The V3 public payloads (canonical customer-copy closure, Phases 1, 2 and 7).
+"""The V3 public payloads and their content policy (canonical customer-copy and B1-B3 policy closures).
 
 Every V3 response a customer receives is an explicit, strict, bounded DTO: unknown fields are refused, every string
 and container has a maximum size, and nothing is typed `Any`, `object` or an unbounded dictionary or list.
 
-**Payloads:**
-- `PublicCatalog` is built from typed catalog records.
-- `PublicEstimate` is built from the engine's stored result.
+**Payloads.** `PublicCatalog` is built from typed catalog records; `PublicEstimate` from the engine's stored result
+and the release's card.
 
-**Field inventory.** Every field of every DTO is classified in PUBLIC_FIELD_CLASSES (eight classes). A test enumerates
-the DTOs' fields and fails on an unclassified field or a weak type, and the inventory document is generated from this
-registry.
+**Content policy.** Every field of every DTO has exactly one policy in PUBLIC_FIELD_POLICIES (eleven policies). A test
+enumerates the fields and fails on an unpoliced field or a weak type; the inventory document is generated from the
+registry. The primary controls are structural:
+- Money appears only in ENGINE_GENERATED_AMOUNT fields: integers computed by the engine from the approved card, whose
+  version the estimate names. No prose field may carry money, a rate or internal commercial wording.
+- Measurements and typical-size assumptions are structured (a number, a unit enum and a type), never prose, so a
+  quantity cannot be read as a rate.
+- A claim is shown only as a GOVERNED_CLAIM_REFERENCE to an approved claim (or promise) record, checked for validity
+  every time it is served (`claims.problems`).
+- Estimator wording is CONTROLLED_LEGAL_COPY from an allowlist; card text is structured exclusion, client-scope or
+  timeline copy from the versioned card.
 
-**One checker.** `check_payload` walks a payload by its classification and applies the same canonical checks
-everywhere: catalog serialisation, estimate serialisation, and release validation (the resolved catalog payload and
-representative estimate payloads). It covers claims, promises, rates and invisible characters, and the release gate
-also checks controlled copy, expiry and ownership.
+**One checker.** `check_payload` applies each field's policy, with the canonical checks of `text` as defence in
+depth, in release validation and in every serialiser at serve time.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Iterator
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,17 +35,40 @@ from veda.modules.estimator import engine
 
 from . import kinds, text
 
-# --- classification ---------------------------------------------------------------------------------------------------
-FACTUAL_CUSTOMER_COPY = "FACTUAL_CUSTOMER_COPY"  # catalog descriptive text: no promise, no claim, no rate
-CONTROLLED_CUSTOMER_COPY = "CONTROLLED_CUSTOMER_COPY"  # a copy record's statement (its own governance applies)
-PROMISE_GOVERNED_COPY = "PROMISE_GOVERNED_COPY"  # estimator, card and specification text under the promise matrix
-MARKETING_CLAIM_COPY = "MARKETING_CLAIM_COPY"  # a governed claim (a copy record with claim governance)
-PRICE_OR_RATE_COPY = "PRICE_OR_RATE_COPY"  # an engine-generated public total or range (a number, never text)
-STAFF_ONLY = "STAFF_ONLY"
-IDENTIFIER = "IDENTIFIER"
-NOT_CUSTOMER_VISIBLE = "NOT_CUSTOMER_VISIBLE"
-CLASSES = (FACTUAL_CUSTOMER_COPY, CONTROLLED_CUSTOMER_COPY, PROMISE_GOVERNED_COPY, MARKETING_CLAIM_COPY,
-           PRICE_OR_RATE_COPY, STAFF_ONLY, IDENTIFIER, NOT_CUSTOMER_VISIBLE)  # fmt: skip
+# --- content policies -------------------------------------------------------------------------------------------------
+FACTUAL_TEXT = "FACTUAL_TEXT"  # descriptive prose: no claim, promise, money, duration or contact detail
+GOVERNED_CLAIM_REFERENCE = "GOVERNED_CLAIM_REFERENCE"  # the approved text of a valid claim or promise record
+ENGINE_GENERATED_AMOUNT = "ENGINE_GENERATED_AMOUNT"  # an integer computed by the engine from the approved card
+STRUCTURED_MEASUREMENT = "STRUCTURED_MEASUREMENT"  # a number, a unit enum or a measurement type
+STRUCTURED_TIMELINE = "STRUCTURED_TIMELINE"  # day ranges and the card's versioned timeline wording
+STRUCTURED_ASSUMPTION = "STRUCTURED_ASSUMPTION"  # a typical-size assumption's parts (rendered by the page)
+STRUCTURED_EXCLUSION = "STRUCTURED_EXCLUSION"  # the card's versioned exclusion items
+STRUCTURED_CLIENT_SCOPE = "STRUCTURED_CLIENT_SCOPE"  # the card's versioned client-scope items
+CONTROLLED_LEGAL_COPY = "CONTROLLED_LEGAL_COPY"  # allowlisted estimator wording or an approved non-claim copy record
+STAFF_ONLY = "STAFF_ONLY"  # never in a public DTO (the registry holds none; a test proves it)
+IDENTIFIER = "IDENTIFIER"  # keys, codes, enums, flags, ordering, hashes, dates, URLs: not prose
+POLICIES = (FACTUAL_TEXT, GOVERNED_CLAIM_REFERENCE, ENGINE_GENERATED_AMOUNT, STRUCTURED_MEASUREMENT,
+            STRUCTURED_TIMELINE, STRUCTURED_ASSUMPTION, STRUCTURED_EXCLUSION, STRUCTURED_CLIENT_SCOPE,
+            CONTROLLED_LEGAL_COPY, STAFF_ONLY, IDENTIFIER)  # fmt: skip
+STRUCTURED_TEXT = (STRUCTURED_TIMELINE, STRUCTURED_ASSUMPTION, STRUCTURED_EXCLUSION, STRUCTURED_CLIENT_SCOPE)
+TEXT_POLICIES = (FACTUAL_TEXT, GOVERNED_CLAIM_REFERENCE, CONTROLLED_LEGAL_COPY, *STRUCTURED_TEXT)
+# The estimator wording a V3 estimate may carry (CONTROLLED_LEGAL_COPY): exactly these engine texts.
+CONTROLLED_ESTIMATOR_TEXT = frozenset({engine.TITLE, engine.DISCLAIMER, engine.PREP_PACKAGE, engine.PREP_DESCRIPTION,
+                                       engine.ALLOWANCE, engine.ALLOWANCE_DESCRIPTION})  # fmt: skip
+# Measurement types (Phase 3): only the first four may be public; a rate or total amount is never a measurement.
+MEASUREMENT_TYPES = ("QUANTITY", "DIMENSION", "AREA", "LENGTH", "RATE", "TOTAL_AMOUNT")
+PublicMeasurementType = Literal["QUANTITY", "DIMENSION", "AREA", "LENGTH"]
+PublicUnit = Literal["FT", "SQ_FT", "NOS"]
+_ENGINE_UNITS: dict[str, tuple[PublicMeasurementType, PublicUnit]] = {
+    "ft": ("LENGTH", "FT"),
+    "sq ft": ("AREA", "SQ_FT"),
+    "nos": ("QUANTITY", "NOS"),
+}
+# Claim categories as served (a closed set; a test proves it equals text.CATEGORIES).
+ClaimTag = Literal[
+    "ranking", "price", "popularity", "recommendation", "quality", "certification", "award", "warranty", "service",
+    "durability", "environmental", "promotional", "urgency",
+]  # fmt: skip
 
 S30 = Annotated[str, Field(max_length=30)]
 S60 = Annotated[str, Field(max_length=60)]
@@ -203,9 +231,23 @@ class PublicMedia(_Dto):
     sort: Sort
 
 
+CopyCategory = Literal["description", "package", "allowance", "warranty", "material", "hardware", "inclusion",
+                       "exclusion", "assumption", "disclaimer", "next_step", "label", "badge"]  # fmt: skip
+
+
 class PublicCopy(_Dto):
+    """An approved copy record that makes no claim (factual or controlled legal copy)."""
+
     statement: S500
-    category: S30
+    category: CopyCategory
+
+
+class PublicClaim(_Dto):
+    """An approved, currently valid governed claim (a claim record or a promise record)."""
+
+    statement: S500
+    category: CopyCategory
+    claim_categories: tuple[ClaimTag, ...] = Field(max_length=13)
 
 
 class PublicCondition(_Dto):
@@ -215,15 +257,20 @@ class PublicCondition(_Dto):
     packages: tuple[PackageCode, ...] = Field(default=(), max_length=3)
 
 
+# The authoritative reference-path pattern (kinds.RefPath), bounded for the public DTO.
+REF = Annotated[str, Field(max_length=310, pattern=kinds.REF_PATH_PATTERN)]
+Bound = Annotated[float, Field(gt=0, le=10000)]
+
+
 class PublicRule(_Dto):
     type: Literal["requires", "excludes", "compatible_with", "available_only_for", "hidden_when", "default_when",
                   "measurement_bounds", "requires_consultation", "unavailable_online"]  # fmt: skip
-    subject: S300
-    objects: tuple[S300, ...] = Field(max_length=12)
+    subject: REF
+    objects: tuple[REF, ...] = Field(max_length=12)
     condition: PublicCondition | None = None
     input: CODE | None = None
-    min: float | None = None
-    max: float | None = None
+    min: Bound | None = None
+    max: Bound | None = None
     message: K | None = None
 
 
@@ -241,6 +288,7 @@ class PublicCatalog(_Dto):
     package: dict[K, PublicPackage] = Field(max_length=10)
     media: dict[K, PublicMedia] = Field(max_length=2000)
     copy_: dict[K, PublicCopy] = Field(max_length=2000, alias="copy")
+    claim: dict[K, PublicClaim] = Field(max_length=500)
     rule: dict[K, PublicRule] = Field(max_length=1000)
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True, populate_by_name=True)
@@ -285,6 +333,23 @@ class PublicTimeline(_Dto):
     max_days: Annotated[int, Field(ge=1, le=1000)]
 
 
+class PublicAssumption(_Dto):
+    """A typical size the estimate assumed, as structured parts: the page renders "Living room – TV unit: typical
+    TV wall width assumed: 8 ft". A quantity or area can never be read as a rate."""
+
+    room: CODE
+    room_label: S60
+    item: CODE
+    item_label: S120
+    instance: Annotated[int, Field(ge=1, le=12)]
+    measurement: CODE
+    measurement_label: S120
+    measurement_type: PublicMeasurementType
+    value: Annotated[float, Field(ge=0, le=100000)]
+    unit: PublicUnit
+    basis: Literal["TYPICAL_ASSUMPTION"]
+
+
 class PublicSpecification(_Dto):
     spec_code: S60
     name: S120
@@ -302,9 +367,10 @@ class PublicEstimate(_Dto):
     project_preparation: PublicPreparation
     custom_features_allowance: PublicAllowance
     timeline: PublicTimeline
-    assumptions: tuple[S500, ...] = Field(max_length=200)
+    assumptions: tuple[PublicAssumption, ...] = Field(max_length=200)
     exclusions: tuple[S500, ...] = Field(max_length=80)
     client_scope: tuple[S500, ...] = Field(max_length=80)
+    pricing_card_version: S60  # the approved card every amount and the scope copy come from
     validity_days: Annotated[int, Field(ge=1, le=90)]
     expires_on: S30
     reference: S30
@@ -313,92 +379,179 @@ class PublicEstimate(_Dto):
     specification: PublicSpecification | None = None
 
 
-# Every field of every public DTO (declaring class, field) -> classification. Generated inventory and tests read this.
-_DESCRIBED = {("_Described", "name"): FACTUAL_CUSTOMER_COPY, ("_Described", "description"): FACTUAL_CUSTOMER_COPY,
-              ("_Described", "what_is_this"): FACTUAL_CUSTOMER_COPY,
-              ("_Described", "typically_used_for"): FACTUAL_CUSTOMER_COPY, ("_Described", "sort"): NOT_CUSTOMER_VISIBLE}  # fmt: skip
-PUBLIC_FIELD_CLASSES: dict[tuple[str, str], str] = {
-    **_DESCRIBED,
+# Every field of every public DTO (declaring class, field) -> its one content policy. The inventory and tests read it.
+PUBLIC_FIELD_POLICIES: dict[tuple[str, str], str] = {
+    ("_Described", "name"): FACTUAL_TEXT,
+    ("_Described", "description"): FACTUAL_TEXT,
+    ("_Described", "what_is_this"): FACTUAL_TEXT,
+    ("_Described", "typically_used_for"): FACTUAL_TEXT,
+    ("_Described", "sort"): IDENTIFIER,
     ("PublicAvailability", "project_kinds"): IDENTIFIER,
-    ("PublicPropertyType", "name"): FACTUAL_CUSTOMER_COPY, ("PublicPropertyType", "code"): IDENTIFIER,
-    ("PublicPropertyType", "sort"): NOT_CUSTOMER_VISIBLE,
-    ("PublicRoomSlot", "room_template"): IDENTIFIER, ("PublicRoomSlot", "default_selected"): IDENTIFIER,
-    ("PublicHome", "name"): FACTUAL_CUSTOMER_COPY, ("PublicHome", "description"): FACTUAL_CUSTOMER_COPY,
-    ("PublicHome", "property_type"): IDENTIFIER, ("PublicHome", "home_size"): IDENTIFIER,
-    ("PublicHome", "rooms"): IDENTIFIER, ("PublicHome", "packages"): IDENTIFIER,
-    ("PublicHome", "availability"): IDENTIFIER, ("PublicHome", "sort"): NOT_CUSTOMER_VISIBLE,
-    ("PublicProductSlot", "product"): IDENTIFIER, ("PublicProductSlot", "variant"): IDENTIFIER,
-    ("PublicProductSlot", "options"): IDENTIFIER, ("PublicProductSlot", "removable"): IDENTIFIER,
-    ("PublicRoom", "room_code"): IDENTIFIER, ("PublicRoom", "image"): IDENTIFIER, ("PublicRoom", "gallery"): IDENTIFIER,
-    ("PublicRoom", "included"): IDENTIFIER, ("PublicRoom", "extras"): IDENTIFIER,
-    ("PublicMeasurement", "input"): IDENTIFIER, ("PublicMeasurement", "label"): FACTUAL_CUSTOMER_COPY,
-    ("PublicMeasurement", "unit"): IDENTIFIER, ("PublicMeasurement", "min"): IDENTIFIER,
-    ("PublicMeasurement", "max"): IDENTIFIER, ("PublicMeasurement", "hint"): FACTUAL_CUSTOMER_COPY,
-    ("PublicChoice", "key"): IDENTIFIER, ("PublicChoice", "materials"): IDENTIFIER, ("PublicChoice", "media"): IDENTIFIER,
-    ("PublicOptionGroup", "key"): IDENTIFIER, ("PublicOptionGroup", "name"): FACTUAL_CUSTOMER_COPY,
-    ("PublicOptionGroup", "description"): FACTUAL_CUSTOMER_COPY, ("PublicOptionGroup", "default"): IDENTIFIER,
+    ("PublicPropertyType", "name"): FACTUAL_TEXT,
+    ("PublicPropertyType", "code"): IDENTIFIER,
+    ("PublicPropertyType", "sort"): IDENTIFIER,
+    ("PublicRoomSlot", "room_template"): IDENTIFIER,
+    ("PublicRoomSlot", "default_selected"): IDENTIFIER,
+    ("PublicHome", "name"): FACTUAL_TEXT,
+    ("PublicHome", "description"): FACTUAL_TEXT,
+    ("PublicHome", "property_type"): IDENTIFIER,
+    ("PublicHome", "home_size"): IDENTIFIER,
+    ("PublicHome", "rooms"): IDENTIFIER,
+    ("PublicHome", "packages"): IDENTIFIER,
+    ("PublicHome", "availability"): IDENTIFIER,
+    ("PublicHome", "sort"): IDENTIFIER,
+    ("PublicProductSlot", "product"): IDENTIFIER,
+    ("PublicProductSlot", "variant"): IDENTIFIER,
+    ("PublicProductSlot", "options"): IDENTIFIER,
+    ("PublicProductSlot", "removable"): IDENTIFIER,
+    ("PublicRoom", "room_code"): IDENTIFIER,
+    ("PublicRoom", "image"): IDENTIFIER,
+    ("PublicRoom", "gallery"): IDENTIFIER,
+    ("PublicRoom", "included"): IDENTIFIER,
+    ("PublicRoom", "extras"): IDENTIFIER,
+    ("PublicMeasurement", "input"): IDENTIFIER,
+    ("PublicMeasurement", "label"): FACTUAL_TEXT,
+    ("PublicMeasurement", "unit"): STRUCTURED_MEASUREMENT,
+    ("PublicMeasurement", "min"): STRUCTURED_MEASUREMENT,
+    ("PublicMeasurement", "max"): STRUCTURED_MEASUREMENT,
+    ("PublicMeasurement", "hint"): FACTUAL_TEXT,
+    ("PublicChoice", "key"): IDENTIFIER,
+    ("PublicChoice", "materials"): IDENTIFIER,
+    ("PublicChoice", "media"): IDENTIFIER,
+    ("PublicOptionGroup", "key"): IDENTIFIER,
+    ("PublicOptionGroup", "name"): FACTUAL_TEXT,
+    ("PublicOptionGroup", "description"): FACTUAL_TEXT,
+    ("PublicOptionGroup", "default"): IDENTIFIER,
     ("PublicOptionGroup", "choices"): IDENTIFIER,
-    ("PublicVariant", "key"): IDENTIFIER, ("PublicVariant", "media"): IDENTIFIER,
-    ("PublicVariant", "option_groups"): IDENTIFIER, ("PublicVariant", "measurements"): IDENTIFIER,
-    ("PublicProduct", "family"): IDENTIFIER, ("PublicProduct", "media"): IDENTIFIER,
+    ("PublicVariant", "key"): IDENTIFIER,
+    ("PublicVariant", "media"): IDENTIFIER,
+    ("PublicVariant", "option_groups"): IDENTIFIER,
+    ("PublicVariant", "measurements"): IDENTIFIER,
+    ("PublicProduct", "family"): IDENTIFIER,
+    ("PublicProduct", "media"): IDENTIFIER,
     ("PublicProduct", "variants"): IDENTIFIER,
-    ("PublicExtra", "kind"): IDENTIFIER, ("PublicExtra", "quantity"): IDENTIFIER, ("PublicExtra", "max_count"): IDENTIFIER,
-    ("PublicExtra", "default_selected"): IDENTIFIER, ("PublicExtra", "media"): IDENTIFIER,
+    ("PublicExtra", "kind"): IDENTIFIER,
+    ("PublicExtra", "quantity"): IDENTIFIER,
+    ("PublicExtra", "max_count"): STRUCTURED_MEASUREMENT,
+    ("PublicExtra", "default_selected"): IDENTIFIER,
+    ("PublicExtra", "media"): IDENTIFIER,
     ("PublicExtra", "measurements"): IDENTIFIER,
-    ("PublicPackage", "engine_package"): IDENTIFIER, ("PublicPackage", "public_summary"): IDENTIFIER,
-    ("PublicPackage", "badge"): IDENTIFIER, ("PublicPackage", "recommended"): NOT_CUSTOMER_VISIBLE,
-    ("PublicPackage", "consultation_only"): IDENTIFIER, ("PublicPackage", "included_products"): IDENTIFIER,
-    ("PublicPackage", "optional_products"): IDENTIFIER, ("PublicPackage", "included_extras"): IDENTIFIER,
+    ("PublicPackage", "engine_package"): IDENTIFIER,
+    ("PublicPackage", "public_summary"): IDENTIFIER,
+    ("PublicPackage", "badge"): IDENTIFIER,
+    ("PublicPackage", "recommended"): IDENTIFIER,
+    ("PublicPackage", "consultation_only"): IDENTIFIER,
+    ("PublicPackage", "included_products"): IDENTIFIER,
+    ("PublicPackage", "optional_products"): IDENTIFIER,
+    ("PublicPackage", "included_extras"): IDENTIFIER,
     ("PublicPackage", "excluded_extras"): IDENTIFIER,
-    ("PublicMaterial", "statements"): IDENTIFIER, ("PublicMaterial", "finish"): FACTUAL_CUSTOMER_COPY,
-    ("PublicMaterial", "colour_family"): FACTUAL_CUSTOMER_COPY, ("PublicMaterial", "texture"): FACTUAL_CUSTOMER_COPY,
+    ("PublicMaterial", "statements"): IDENTIFIER,
+    ("PublicMaterial", "finish"): FACTUAL_TEXT,
+    ("PublicMaterial", "colour_family"): FACTUAL_TEXT,
+    ("PublicMaterial", "texture"): FACTUAL_TEXT,
     ("PublicHardware", "statements"): IDENTIFIER,
-    ("PublicMediaUrls", "thumb"): IDENTIFIER, ("PublicMediaUrls", "mobile"): IDENTIFIER,
+    ("PublicMediaUrls", "thumb"): IDENTIFIER,
+    ("PublicMediaUrls", "mobile"): IDENTIFIER,
     ("PublicMediaUrls", "desktop"): IDENTIFIER,
-    ("PublicMedia", "type"): IDENTIFIER, ("PublicMedia", "title"): FACTUAL_CUSTOMER_COPY,
-    ("PublicMedia", "alt"): FACTUAL_CUSTOMER_COPY, ("PublicMedia", "caption"): FACTUAL_CUSTOMER_COPY,
-    ("PublicMedia", "label"): IDENTIFIER, ("PublicMedia", "attribution"): FACTUAL_CUSTOMER_COPY,
-    ("PublicMedia", "items"): IDENTIFIER, ("PublicMedia", "embed_url"): IDENTIFIER, ("PublicMedia", "urls"): IDENTIFIER,
-    ("PublicMedia", "sort"): NOT_CUSTOMER_VISIBLE,
-    ("PublicCopy", "statement"): CONTROLLED_CUSTOMER_COPY, ("PublicCopy", "category"): IDENTIFIER,
-    ("PublicCondition", "property_types"): IDENTIFIER, ("PublicCondition", "home_sizes"): IDENTIFIER,
-    ("PublicCondition", "project_kinds"): IDENTIFIER, ("PublicCondition", "packages"): IDENTIFIER,
-    ("PublicRule", "type"): IDENTIFIER, ("PublicRule", "subject"): IDENTIFIER, ("PublicRule", "objects"): IDENTIFIER,
-    ("PublicRule", "condition"): IDENTIFIER, ("PublicRule", "input"): IDENTIFIER, ("PublicRule", "min"): IDENTIFIER,
-    ("PublicRule", "max"): IDENTIFIER, ("PublicRule", "message"): IDENTIFIER,
-    ("PublicCatalog", "release"): IDENTIFIER, ("PublicCatalog", "manifest_sha256"): IDENTIFIER,
-    ("PublicCatalog", "property_type"): IDENTIFIER, ("PublicCatalog", "home_config"): IDENTIFIER,
-    ("PublicCatalog", "room_template"): IDENTIFIER, ("PublicCatalog", "product_family"): IDENTIFIER,
-    ("PublicCatalog", "product"): IDENTIFIER, ("PublicCatalog", "extra"): IDENTIFIER,
-    ("PublicCatalog", "material"): IDENTIFIER, ("PublicCatalog", "hardware"): IDENTIFIER,
-    ("PublicCatalog", "package"): IDENTIFIER, ("PublicCatalog", "media"): IDENTIFIER,
-    ("PublicCatalog", "copy_"): IDENTIFIER, ("PublicCatalog", "rule"): IDENTIFIER,
-    ("PublicRange", "low_minor"): PRICE_OR_RATE_COPY, ("PublicRange", "high_minor"): PRICE_OR_RATE_COPY,
+    ("PublicMedia", "type"): IDENTIFIER,
+    ("PublicMedia", "title"): FACTUAL_TEXT,
+    ("PublicMedia", "alt"): FACTUAL_TEXT,
+    ("PublicMedia", "caption"): FACTUAL_TEXT,
+    ("PublicMedia", "label"): IDENTIFIER,
+    ("PublicMedia", "attribution"): FACTUAL_TEXT,
+    ("PublicMedia", "items"): IDENTIFIER,
+    ("PublicMedia", "embed_url"): IDENTIFIER,
+    ("PublicMedia", "urls"): IDENTIFIER,
+    ("PublicMedia", "sort"): IDENTIFIER,
+    ("PublicCopy", "statement"): CONTROLLED_LEGAL_COPY,
+    ("PublicCopy", "category"): IDENTIFIER,
+    ("PublicClaim", "statement"): GOVERNED_CLAIM_REFERENCE,
+    ("PublicClaim", "category"): IDENTIFIER,
+    ("PublicClaim", "claim_categories"): IDENTIFIER,
+    ("PublicCondition", "property_types"): IDENTIFIER,
+    ("PublicCondition", "home_sizes"): IDENTIFIER,
+    ("PublicCondition", "project_kinds"): IDENTIFIER,
+    ("PublicCondition", "packages"): IDENTIFIER,
+    ("PublicRule", "type"): IDENTIFIER,
+    ("PublicRule", "subject"): IDENTIFIER,
+    ("PublicRule", "objects"): IDENTIFIER,
+    ("PublicRule", "condition"): IDENTIFIER,
+    ("PublicRule", "input"): IDENTIFIER,
+    ("PublicRule", "min"): STRUCTURED_MEASUREMENT,
+    ("PublicRule", "max"): STRUCTURED_MEASUREMENT,
+    ("PublicRule", "message"): IDENTIFIER,
+    ("PublicCatalog", "release"): IDENTIFIER,
+    ("PublicCatalog", "manifest_sha256"): IDENTIFIER,
+    ("PublicCatalog", "property_type"): IDENTIFIER,
+    ("PublicCatalog", "home_config"): IDENTIFIER,
+    ("PublicCatalog", "room_template"): IDENTIFIER,
+    ("PublicCatalog", "product_family"): IDENTIFIER,
+    ("PublicCatalog", "product"): IDENTIFIER,
+    ("PublicCatalog", "extra"): IDENTIFIER,
+    ("PublicCatalog", "material"): IDENTIFIER,
+    ("PublicCatalog", "hardware"): IDENTIFIER,
+    ("PublicCatalog", "package"): IDENTIFIER,
+    ("PublicCatalog", "media"): IDENTIFIER,
+    ("PublicCatalog", "copy_"): IDENTIFIER,
+    ("PublicCatalog", "claim"): IDENTIFIER,
+    ("PublicCatalog", "rule"): IDENTIFIER,
+    ("PublicRange", "low_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicRange", "high_minor"): ENGINE_GENERATED_AMOUNT,
     ("PublicRange", "currency"): IDENTIFIER,
-    ("PublicGst", "pct"): PRICE_OR_RATE_COPY, ("PublicGst", "low_minor"): PRICE_OR_RATE_COPY,
-    ("PublicGst", "high_minor"): PRICE_OR_RATE_COPY,
-    ("PublicRoomTotal", "room"): IDENTIFIER, ("PublicRoomTotal", "label"): PROMISE_GOVERNED_COPY,
-    ("PublicRoomTotal", "amount_minor"): PRICE_OR_RATE_COPY,
-    ("PublicPreparation", "label"): PROMISE_GOVERNED_COPY, ("PublicPreparation", "description"): PROMISE_GOVERNED_COPY,
-    ("PublicPreparation", "amount_minor"): PRICE_OR_RATE_COPY, ("PublicPreparation", "inclusions"): PROMISE_GOVERNED_COPY,
-    ("PublicAllowance", "label"): PROMISE_GOVERNED_COPY, ("PublicAllowance", "description"): PROMISE_GOVERNED_COPY,
-    ("PublicAllowance", "low_minor"): PRICE_OR_RATE_COPY, ("PublicAllowance", "high_minor"): PRICE_OR_RATE_COPY,
-    ("PublicTimeline", "label"): PROMISE_GOVERNED_COPY, ("PublicTimeline", "min_days"): IDENTIFIER,
-    ("PublicTimeline", "max_days"): IDENTIFIER,
-    ("PublicSpecification", "spec_code"): IDENTIFIER, ("PublicSpecification", "name"): PROMISE_GOVERNED_COPY,
-    ("PublicEstimate", "title"): PROMISE_GOVERNED_COPY, ("PublicEstimate", "disclaimer"): PROMISE_GOVERNED_COPY,
-    ("PublicEstimate", "package"): IDENTIFIER, ("PublicEstimate", "property_type"): IDENTIFIER,
-    ("PublicEstimate", "home_size"): IDENTIFIER, ("PublicEstimate", "range"): IDENTIFIER,
-    ("PublicEstimate", "gst"): IDENTIFIER, ("PublicEstimate", "rooms"): IDENTIFIER,
-    ("PublicEstimate", "project_preparation"): IDENTIFIER, ("PublicEstimate", "custom_features_allowance"): IDENTIFIER,
-    ("PublicEstimate", "timeline"): IDENTIFIER, ("PublicEstimate", "assumptions"): PROMISE_GOVERNED_COPY,
-    ("PublicEstimate", "exclusions"): PROMISE_GOVERNED_COPY, ("PublicEstimate", "client_scope"): PROMISE_GOVERNED_COPY,
-    ("PublicEstimate", "validity_days"): IDENTIFIER, ("PublicEstimate", "expires_on"): IDENTIFIER,
-    ("PublicEstimate", "reference"): IDENTIFIER, ("PublicEstimate", "configuration_reference"): IDENTIFIER,
-    ("PublicEstimate", "catalog_release"): IDENTIFIER, ("PublicEstimate", "specification"): IDENTIFIER,
-}  # fmt: skip
+    ("PublicGst", "pct"): IDENTIFIER,
+    ("PublicGst", "low_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicGst", "high_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicRoomTotal", "room"): IDENTIFIER,
+    ("PublicRoomTotal", "label"): FACTUAL_TEXT,
+    ("PublicRoomTotal", "amount_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicPreparation", "label"): CONTROLLED_LEGAL_COPY,
+    ("PublicPreparation", "description"): CONTROLLED_LEGAL_COPY,
+    ("PublicPreparation", "amount_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicPreparation", "inclusions"): FACTUAL_TEXT,
+    ("PublicAllowance", "label"): CONTROLLED_LEGAL_COPY,
+    ("PublicAllowance", "description"): CONTROLLED_LEGAL_COPY,
+    ("PublicAllowance", "low_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicAllowance", "high_minor"): ENGINE_GENERATED_AMOUNT,
+    ("PublicTimeline", "label"): STRUCTURED_TIMELINE,
+    ("PublicTimeline", "min_days"): STRUCTURED_TIMELINE,
+    ("PublicTimeline", "max_days"): STRUCTURED_TIMELINE,
+    ("PublicAssumption", "room"): IDENTIFIER,
+    ("PublicAssumption", "room_label"): FACTUAL_TEXT,
+    ("PublicAssumption", "item"): IDENTIFIER,
+    ("PublicAssumption", "item_label"): STRUCTURED_ASSUMPTION,
+    ("PublicAssumption", "instance"): STRUCTURED_ASSUMPTION,
+    ("PublicAssumption", "measurement"): IDENTIFIER,
+    ("PublicAssumption", "measurement_label"): STRUCTURED_ASSUMPTION,
+    ("PublicAssumption", "measurement_type"): STRUCTURED_MEASUREMENT,
+    ("PublicAssumption", "value"): STRUCTURED_MEASUREMENT,
+    ("PublicAssumption", "unit"): STRUCTURED_MEASUREMENT,
+    ("PublicAssumption", "basis"): STRUCTURED_ASSUMPTION,
+    ("PublicSpecification", "spec_code"): IDENTIFIER,
+    ("PublicSpecification", "name"): FACTUAL_TEXT,
+    ("PublicEstimate", "title"): CONTROLLED_LEGAL_COPY,
+    ("PublicEstimate", "disclaimer"): CONTROLLED_LEGAL_COPY,
+    ("PublicEstimate", "package"): IDENTIFIER,
+    ("PublicEstimate", "property_type"): IDENTIFIER,
+    ("PublicEstimate", "home_size"): IDENTIFIER,
+    ("PublicEstimate", "range"): IDENTIFIER,
+    ("PublicEstimate", "gst"): IDENTIFIER,
+    ("PublicEstimate", "rooms"): IDENTIFIER,
+    ("PublicEstimate", "project_preparation"): IDENTIFIER,
+    ("PublicEstimate", "custom_features_allowance"): IDENTIFIER,
+    ("PublicEstimate", "timeline"): IDENTIFIER,
+    ("PublicEstimate", "assumptions"): IDENTIFIER,
+    ("PublicEstimate", "exclusions"): STRUCTURED_EXCLUSION,
+    ("PublicEstimate", "client_scope"): STRUCTURED_CLIENT_SCOPE,
+    ("PublicEstimate", "pricing_card_version"): IDENTIFIER,
+    ("PublicEstimate", "validity_days"): IDENTIFIER,
+    ("PublicEstimate", "expires_on"): IDENTIFIER,
+    ("PublicEstimate", "reference"): IDENTIFIER,
+    ("PublicEstimate", "configuration_reference"): IDENTIFIER,
+    ("PublicEstimate", "catalog_release"): IDENTIFIER,
+    ("PublicEstimate", "specification"): IDENTIFIER,
+}
+PUBLIC_FIELD_CLASSES = PUBLIC_FIELD_POLICIES  # the earlier name
 ROOTS: tuple[type[BaseModel], ...] = (PublicCatalog, PublicEstimate)
-TEXT_CLASSES = (FACTUAL_CUSTOMER_COPY, CONTROLLED_CUSTOMER_COPY, PROMISE_GOVERNED_COPY, MARKETING_CLAIM_COPY)
 
 
 def fields(roots: Iterable[type[BaseModel]] = ROOTS) -> set[tuple[str, str]]:
@@ -417,15 +570,15 @@ def fields(roots: Iterable[type[BaseModel]] = ROOTS) -> set[tuple[str, str]]:
     return found
 
 
-def _class_of(model: BaseModel, name: str) -> str:
+def policy_of(model: BaseModel, name: str) -> str:
     key = (text.declaring_class(type(model), name), name)
-    if key not in PUBLIC_FIELD_CLASSES:
-        raise KeyError(f"public field {key} is not classified")  # fails closed (and the inventory test fails first)
-    return PUBLIC_FIELD_CLASSES[key]
+    if key not in PUBLIC_FIELD_POLICIES:
+        raise KeyError(f"public field {key} has no content policy")  # fails closed (and the inventory test fails first)
+    return PUBLIC_FIELD_POLICIES[key]
 
 
-def strings(model: BaseModel, prefix: str = "") -> Iterator[tuple[str, str, str]]:
-    """(path, text, class) for every string in a public DTO, by its classification."""
+def values(model: BaseModel, prefix: str = "") -> Iterator[tuple[str, object, str]]:
+    """(path, value, policy) for every scalar in a public DTO."""
     for name in type(model).model_fields:
         value = getattr(model, name)
         if value is None:
@@ -436,52 +589,85 @@ def strings(model: BaseModel, prefix: str = "") -> Iterator[tuple[str, str, str]
         for k, child in zip(keys, children, strict=True):
             sub = path if k is None else f"{path}.{k}"
             if isinstance(child, BaseModel):
-                yield from strings(child, f"{sub}.")
-            elif isinstance(child, str):
-                yield sub, child, _class_of(model, name)
+                yield from values(child, f"{sub}.")
+            else:
+                yield sub, child, policy_of(model, name)
+
+
+def strings(model: BaseModel, prefix: str = "") -> Iterator[tuple[str, str, str]]:
+    """(path, text, policy) for every string in a public DTO."""
+    for where, value, policy in values(model, prefix):
+        if isinstance(value, str):
+            yield where, value, policy
 
 
 # --- the one checker --------------------------------------------------------------------------------------------------
-def check_text(where: str, value: str, cls: str, *, governed: dict[str, kinds.Copy] | None = None,
+def _claims_problem(where: str, value: str) -> str | None:
+    claims = text.claims_in(value)
+    return f"{where}: makes a {', '.join(claims)} claim; it must reference a governed claim record" if claims else None
+
+
+def check_text(where: str, value: str, policy: str, *, records: dict[str, kinds.Copy] | None = None,
                copy_key: str | None = None) -> list[str]:  # fmt: skip
-    """The canonical checks for one customer-visible string of the given class."""
-    if cls not in TEXT_CLASSES:
-        return []
+    """The checks for one customer-visible string under its content policy. Messages name the field, never the text."""
+    if policy not in TEXT_POLICIES:
+        return [] if policy in (IDENTIFIER, STRUCTURED_MEASUREMENT) else [f"{where}: text in a {policy} field"]
     problems = []
     if text.invisible_chars(value):
         problems.append(f"{where}: contains invisible or formatting characters")
-    what = text.leak_in(value) if cls == PROMISE_GOVERNED_COPY else text.forbidden_in(value)
+    if text.mixed_script_words(value):
+        problems.append(f"{where}: contains words that mix scripts")
+    record = (records or {}).get(copy_key or "") if copy_key else None
+    effective = policy
+    if policy == CONTROLLED_LEGAL_COPY and record is not None and record.policy == "FACTUAL_TEXT":
+        effective = FACTUAL_TEXT  # a factual copy record is held to the factual rule wherever it is shown
+    what = text.forbidden_in(value) if effective == FACTUAL_TEXT else text.leak_in(value)
     if what:
-        problems.append(f"{where}: contains {what}")
-    marketing = text.marketing_claims_in(value)
-    if cls == FACTUAL_CUSTOMER_COPY:
+        problems.append(f"{where}: contains {what}; no money in customer prose")
+    if effective == FACTUAL_TEXT:
         if text.promise_in(value):
             problems.append(f"{where}: factual text makes a promise")
-        if marketing:
-            problems.append(f"{where}: factual text makes a {', '.join(marketing)} claim")
-    elif cls == PROMISE_GOVERNED_COPY:
-        if marketing:  # estimator, card and specification text may state governed scope, never marketing claims
-            problems.append(f"{where}: estimator text makes a {', '.join(marketing)} claim")
-    elif cls == CONTROLLED_CUSTOMER_COPY:
-        record = (governed or {}).get(copy_key or "")
-        if record is None:
-            problems.append(f"{where}: copy that is not a record of this release")
-        else:
-            if text.canonical(record.statement) != text.canonical(value):
-                problems.append(f"{where}: the served text is not the approved copy")
-            if marketing and record.claim is None:
-                problems.append(f"{where}: copy makes a {', '.join(marketing)} claim without claim governance")
-            if text.promise_in(value) and not record.promise:
-                problems.append(f"{where}: copy makes a promise but is not a promise record")
+        problem = _claims_problem(where, value)
+        if problem:
+            problems.append(problem)
+    elif policy in (CONTROLLED_LEGAL_COPY, *STRUCTURED_TEXT):
+        problem = _claims_problem(where, value)
+        if problem:
+            problems.append(problem)
+    if policy == CONTROLLED_LEGAL_COPY:
+        if copy_key is None:
+            if value not in CONTROLLED_ESTIMATOR_TEXT:
+                problems.append(f"{where}: estimator wording that is not on the controlled allowlist")
+        elif record is None or record.claim is not None or record.promise:
+            problems.append(f"{where}: not an approved non-claim copy record of this release")
+        elif text.canonical(record.statement) != text.canonical(value):
+            problems.append(f"{where}: the served text is not the approved copy")
+    if policy == GOVERNED_CLAIM_REFERENCE:
+        if record is None or not (record.claim is not None or record.promise):
+            problems.append(f"{where}: not a governed claim record of this release")
+        elif text.canonical(record.statement) != text.canonical(value):
+            problems.append(f"{where}: the served text is not the approved claim text")
     return problems
 
 
-def check_payload(model: BaseModel, *, governed: dict[str, kinds.Copy] | None = None) -> list[str]:
-    """Every string of a public DTO, through `check_text` by its classification."""
+def check_payload(model: BaseModel, *, records: dict[str, kinds.Copy] | None = None) -> list[str]:
+    """Every value of a public DTO under its content policy (amounts are integers; text passes `check_text`)."""
     problems = []
-    for where, value, cls in strings(model):
-        copy_key = where[len("copy_.") : -len(".statement")] if where.startswith("copy_.") else None
-        problems.extend(check_text(where, value, cls, governed=governed, copy_key=copy_key))
+    for where, value, policy in values(model):
+        if policy == ENGINE_GENERATED_AMOUNT:
+            if not isinstance(value, int) or isinstance(value, bool):
+                problems.append(f"{where}: an amount that is not an engine-generated integer")
+            continue
+        if policy == STAFF_ONLY:
+            problems.append(f"{where}: staff-only content in a public payload")
+            continue
+        if not isinstance(value, str):
+            continue
+        copy_key = None
+        for prefix in ("copy_.", "claim."):
+            if where.startswith(prefix):
+                copy_key = where[len(prefix) : -len(".statement")]
+        problems.extend(check_text(where, value, policy, records=records, copy_key=copy_key))
     return problems
 
 
@@ -647,7 +833,20 @@ def build_catalog(cat) -> PublicCatalog:  # cat: compile.Catalog (imported lazil
         hardware=described(kinds.Hardware, PublicHardware, statements=lambda m: tuple(m.statements)),
         package=packages,
         media=media,
-        copy={k: PublicCopy(statement=m.statement, category=m.category) for k, m in sorted(cat.of(kinds.Copy).items())},
+        copy={
+            k: PublicCopy(statement=m.statement, category=m.category)
+            for k, m in sorted(cat.of(kinds.Copy).items())
+            if m.claim is None and not m.promise
+        },
+        claim={
+            k: PublicClaim(
+                statement=m.statement,
+                category=m.category,
+                claim_categories=cast("tuple[ClaimTag, ...]", tuple(text.claims_in(m.statement))),
+            )
+            for k, m in sorted(cat.of(kinds.Copy).items())
+            if m.claim is not None or m.promise
+        },
         rule={
             k: PublicRule(
                 type=r.type,
@@ -672,10 +871,26 @@ def build_catalog(cat) -> PublicCatalog:  # cat: compile.Catalog (imported lazil
     )
 
 
-def build_estimate(result: dict, *, reference: str, expires_on: str, configuration_reference: str,
+def _assumptions(result: dict, card) -> tuple[PublicAssumption, ...]:
+    """Structured typical-size assumptions from the engine's assumption details (never its prose)."""
+    labels = {p.code: (p.label, {i.name: i.label for i in p.inputs}) for p in card.products}
+    out = []
+    for a in result.get("assumption_details", []):
+        item_label, inputs = labels.get(a["product"], (a["product"], {}))
+        kind, unit = _ENGINE_UNITS[a["unit"]]
+        out.append(PublicAssumption(room=a["room"], room_label=engine.ROOMS.get(a["room"], a["room"]),
+                                    item=a["product"], item_label=item_label, instance=int(a["instance"]),
+                                    measurement=a["input"], measurement_label=inputs.get(a["input"], a["input"]),
+                                    measurement_type=kind, value=float(a["value"]), unit=unit,
+                                    basis="TYPICAL_ASSUMPTION"))  # fmt: skip
+    return tuple(out)
+
+
+def build_estimate(result: dict, *, card, reference: str, expires_on: str, configuration_reference: str,
                    catalog_release: str, specification: dict | None) -> PublicEstimate:  # fmt: skip
-    """The public estimate DTO from the engine's stored result (the staff view): customer fields only, room amounts
-    rounded for customers, nothing else (no line, rate, component amount, warranty block or workflow state)."""
+    """The public estimate DTO from the engine's stored result (the staff view) and the card that priced it: customer
+    fields only, amounts as engine integers (room amounts rounded for customers), assumptions structured, nothing else
+    (no line, rate, component amount, warranty block or workflow state)."""
     prep, allowance, timeline = result["project_preparation"], result["custom_features_allowance"], result["timeline"]
     return PublicEstimate(
         title=result["title"], disclaimer=result["disclaimer"], package=result["package"],
@@ -691,8 +906,9 @@ def build_estimate(result: dict, *, reference: str, expires_on: str, configurati
         custom_features_allowance=PublicAllowance(label=allowance["label"], description=allowance["description"],
                                                   low_minor=allowance["low_minor"], high_minor=allowance["high_minor"]),
         timeline=PublicTimeline(label=timeline["label"], min_days=timeline["min_days"], max_days=timeline["max_days"]),
-        assumptions=tuple(result["assumptions"]), exclusions=tuple(result["exclusions"]),
-        client_scope=tuple(result["client_scope"]), validity_days=result["validity_days"],
+        assumptions=_assumptions(result, card), exclusions=tuple(result["exclusions"]),
+        client_scope=tuple(result["client_scope"]), pricing_card_version=card.version,
+        validity_days=result["validity_days"],
         expires_on=expires_on, reference=reference, configuration_reference=configuration_reference,
         catalog_release=catalog_release,
         specification=PublicSpecification(spec_code=specification["spec_code"], name=specification["name"])
@@ -700,18 +916,19 @@ def build_estimate(result: dict, *, reference: str, expires_on: str, configurati
     )  # fmt: skip
 
 
-def card_texts(card) -> Iterator[tuple[str, str]]:
-    """Customer-visible text that lives in a (staff-only) pricing card: governed even though the card is private."""
+def card_texts(card) -> Iterator[tuple[str, str, str]]:
+    """Customer-visible text kept in a (staff-only) pricing card, with its policy: governed although the card is
+    private (no money, no claim)."""
     for i, value in enumerate(card.exclusions):
-        yield f"card.exclusions.{i}", value
+        yield f"card.exclusions.{i}", value, STRUCTURED_EXCLUSION
     for i, value in enumerate(card.client_scope):
-        yield f"card.client_scope.{i}", value
-    for band in card.timeline:
-        yield f"card.timeline.{band.label}", band.label
+        yield f"card.client_scope.{i}", value, STRUCTURED_CLIENT_SCOPE
+    for i, band in enumerate(card.timeline):
+        yield f"card.timeline.{i}.label", band.label, STRUCTURED_TIMELINE
     for c in card.project_preparation:
-        yield f"card.project_preparation.{c.code}.inclusion", c.inclusion
-        yield f"card.project_preparation.{c.code}.label", c.label
+        yield f"card.project_preparation.{c.code}.inclusion", c.inclusion, FACTUAL_TEXT
+        yield f"card.project_preparation.{c.code}.label", c.label, FACTUAL_TEXT
     for p in card.products:
-        yield f"card.products.{p.code}.label", p.label
+        yield f"card.products.{p.code}.label", p.label, STRUCTURED_ASSUMPTION
         for i in p.inputs:
-            yield f"card.products.{p.code}.inputs.{i.name}.label", i.label
+            yield f"card.products.{p.code}.inputs.{i.name}.label", i.label, STRUCTURED_ASSUMPTION

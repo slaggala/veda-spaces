@@ -175,6 +175,29 @@ class CatalogEvent(AuditedBase):
     )
 
 
+CLAIM_CONTROL_ACTIONS = ("WITHDRAW", "UNASSIGN_OWNER", "ASSIGN_OWNER", "RESTRICT_APPLICABILITY", "REINSTATE")
+
+
+class CatalogClaimControl(AuditedBase):
+    """A change to a released claim's standing after activation (canonical customer-copy closure, B3): a withdrawal,
+    an owner removed or reassigned, applicability narrowed, or a reinstatement. Rows are appended, never edited; the
+    latest row per claim key is its current control. Every public serve applies them (fail closed), so a released
+    claim stops being shown without a new release. No personal data, no rates."""
+
+    __tablename__ = "catalog_claim_control"
+
+    copy_key: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    action: Mapped[str] = mapped_column(sa.String(25), nullable=False)
+    owner: Mapped[str | None] = mapped_column(sa.String(120))  # ASSIGN_OWNER: the new accountable owner (a role)
+    scope: Mapped[dict | None] = mapped_column(JSONType())  # RESTRICT_APPLICABILITY: the narrowed applicability
+    reason: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+
+    __table_args__ = (
+        in_check("catalog_claim_control", "action", CLAIM_CONTROL_ACTIONS),
+        Index("ix_catalog_claim_control__key", "copy_key", "created_on", **live_where()),
+    )
+
+
 class CatalogMediaObject(AuditedBase):
     """A stored media file: an uploaded source (private, never served publicly) or a generated delivery variant."""
 

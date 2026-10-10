@@ -13,11 +13,10 @@ from datetime import date
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from veda.config import settings
 from veda.modules.estimator import engine, promise_matrix, ratecard
 
+from . import claims, kinds, public, rules
 from . import compile as catalog_compile
-from . import kinds, public, rules, text
 from .models import CatalogMediaObject, CatalogRelease
 
 CHECKS = (
@@ -34,7 +33,7 @@ def _digest(document) -> str:
 def validate(s: Session, release: CatalogRelease, *, today: date | None = None) -> dict:
     errors: dict[str, list[str]] = {c: [] for c in CHECKS}
     warnings: list[str] = []
-    today = today or date.today()
+    today = today or claims.today()
     try:
         cat = catalog_compile.load_release(s, release)
     except Exception as err:  # noqa: BLE001 — any schema or integrity failure refuses the release
@@ -50,7 +49,7 @@ def validate(s: Session, release: CatalogRelease, *, today: date | None = None) 
         _pricing(cat, card, errors["pricing"], errors["measurements"])
         _defaults(cat, card, errors["defaults"], today)
     _promises(cat, errors["promises"], warnings)
-    _copy(cat, errors["copy"], today)
+    _copy(cat, errors["copy"], today, claims.controls(s))
     _media(s, cat, errors["media"], errors["three_d"], warnings, today)
     errors["rules"].extend(rules.contradictions(cat))
     for key, rule in sorted(cat.of(kinds.Rule).items()):
@@ -134,9 +133,9 @@ def _public_payload(s: Session, cat, card, out: list[str]) -> str | None:
     payloads.append(
         dto.model_copy(update={"release": _PLACEHOLDER["configuration_reference"], "manifest_sha256": "0" * 64})
     )
-    out.extend(public.check_payload(dto, governed=cat.of(kinds.Copy)))
-    for where, value in public.card_texts(card):
-        out.extend(public.check_text(where, value, public.PROMISE_GOVERNED_COPY))
+    out.extend(public.check_payload(dto, records=cat.of(kinds.Copy)))
+    for where, value, policy in public.card_texts(card):
+        out.extend(public.check_text(where, value, policy))
     seen = set()
     for config in representative_configurations(cat):
         try:
@@ -148,7 +147,8 @@ def _public_payload(s: Session, cat, card, out: list[str]) -> str | None:
         spec_row = estimator_service.active_spec(s, est.package)
         spec = customer_spec_view(spec_row)
         try:
-            estimate = public.build_estimate(result, catalog_release="RELEASE", specification=spec, **_PLACEHOLDER)
+            estimate = public.build_estimate(result, card=card, catalog_release="RELEASE", specification=spec,
+                                             **_PLACEHOLDER)  # fmt: skip
         except (ValueError, KeyError) as err:
             out.append(f"the estimate payload for {config['home']} / {config['package']} does not build: "
                        f"{str(err).splitlines()[0][:200]}")  # fmt: skip
@@ -157,7 +157,7 @@ def _public_payload(s: Session, cat, card, out: list[str]) -> str | None:
         if key in seen:
             continue
         seen.add(key)
-        payloads.append(estimate)
+        payloads.append(estimate.model_copy(update={"pricing_card_version": "CARD"}))  # an identifier, neutralised
         for problem in public.check_payload(estimate):
             out.append(f"estimate {config['home']} / {config['package']}: {problem}")
     out[:] = list(dict.fromkeys(out))
@@ -435,33 +435,14 @@ def _promises(cat: catalog_compile.Catalog, out: list[str], warnings: list[str])
             warnings.append(f"package {key}: no warranty statement")
 
 
-def _copy(cat: catalog_compile.Catalog, out: list[str], today: date) -> None:
+def _copy(cat: catalog_compile.Catalog, out: list[str], today: date, current_controls=None) -> None:
     """The text gate (customer-safety closure). Every customer-visible string in the release is checked by the current
     rules, so a record saved before a rule existed cannot reach a new release. Every claim must be approved, owned,
     sourced, in effect and, when absolute, independently substantiated."""
     for kind, models in sorted(cat.models.items()):
         for key, model in sorted(models.items()):
             out.extend(f"{kind} {key}: {p}" for p in kinds.text_problems(kind, model))
-    env = settings().env
-    for key, copy in sorted(cat.of(kinds.Copy).items()):
-        c = copy.claim
-        if c is None:
-            continue
-        if c.status != "APPROVED":
-            out.append(f"copy {key}: claim is {c.status}, not approved")
-        if not promise_matrix._named(c.owner):
-            out.append(f"copy {key}: claim has no responsible owner")
-        if not promise_matrix._named(c.approver):
-            out.append(f"copy {key}: claim has no approver")
-        absolute = text.absolute_in(copy.statement) or set(c.categories) & {"ranking", "price"}
-        if absolute and not promise_matrix._named(c.backup_owner):
-            out.append(f"copy {key}: an absolute, ranking or price claim needs a backup owner")
-        if c.effective_from > today:
-            out.append(f"copy {key}: claim is not in effect until {c.effective_from.isoformat()}")
-        if c.review_by is not None and c.review_by < today:
-            out.append(f"copy {key}: claim review date {c.review_by.isoformat()} has passed")
-        if env not in c.environments:
-            out.append(f"copy {key}: claim is not approved for the {env} environment")
+    out.extend(claims.problems(cat, on=today, current=current_controls))
 
 
 def _objects(s: Session, shas: set[str]) -> dict[str, CatalogMediaObject]:
