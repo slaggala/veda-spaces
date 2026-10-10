@@ -1,5 +1,9 @@
 # Catalog V3 media infrastructure: prepared design (not active)
 
+> Superseded for staging by [CATALOG-V3-media-enablement.md](CATALOG-V3-media-enablement.md): the bucket is
+> `veda-stg-media-<account>` from the existing storage module, the existing data key is reused (no dedicated key), and
+> delivery stays on the api-staging route (no media hostname or CDN).
+
 **Status:** prepared for owner acceptance, not activated. Nothing here is deployed or applied.
 
 **Until every control below exists on the target environment, no candidate media is served publicly.** The code

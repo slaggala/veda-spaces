@@ -18,7 +18,8 @@ git clone → owner provides AWS + Cloudflare access → 00-bootstrap → infra 
 | AUT-301 infra workflows | `.github/workflows/10-infra-plan.yml` (OIDC plan, live) and `11-infra-apply.yml` (**disabled** until OD-B7: `config/apply-gate.json`); `scripts/stack.sh`, `scripts/oidc-session.sh`; runbook `docs/operations/staging-infra-workflows.md` |
 | AUT-112 budget | `terraform/modules/budgets/` in `envs/staging-core/`: monthly cost budget, forecast alerts at 80% and 100% (O16); decision in `config/staging-budget.json` (limit 25 USD), recipient from the `staging-plan` secret `BUDGET_ALERT_EMAIL`. Written and tested offline; **not applied** |
 | AUT-101 network | `terraform/modules/network/` in `envs/staging-core/`: egress model A (public subnet, no inbound, outbound 443 and the tunnel), S3 gateway endpoint, flow logs; decision in `config/staging-network.json`. Written and tested offline; **not applied** (needs a bootstrap re-apply for the flow-log role, review package §3 B8) |
-| AUT-102 … AUT-111 | not started (see `terraform/modules/README.md`) |
+| AUT-102 … AUT-111 | applied to `veda-staging`: KMS, storage, CloudTrail, ECR, host role, SSM, compute, monitoring, SES (evidence in `docs/release-evidence/STAGING-FIRST-DEPLOY/` and `AUT-202-204-STAGING-FRONTENDS/`); this row previously said "not started" and was stale |
+| Catalog V3 media enablement | prepared, **not applied**: media bucket, host-role prefixes, SSM media settings (every flag off), conditional clamd scanner, media alarms, capacity evidence. Scanner and rights approver UNDECIDED. Runbook: [CATALOG-V3-media-enablement.md](../docs/implementation/catalog/CATALOG-V3-media-enablement.md) |
 
 ## Layout
 
