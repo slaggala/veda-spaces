@@ -10,6 +10,59 @@
 
 Nothing here activates V3, changes V1 or V2, enables public intake, or changes production behaviour.
 
+## B1 final closure (follow-up to the PR #69 re-review)
+
+The re-review passed B2, B3, the 503 fix and migration 0105, and failed B1 narrowly. These forms still passed:
+- an amount per a countable noun (`1200 per shutter`, `per door`, `per room`, `per day`, `per hour`, `per wardrobe`,
+  `per module`);
+- an amount with a price qualifier (`1200 extra`, `1200 only`);
+- commission (`120000 commission`);
+- savings with a multi-digit percentage (`Save 20%`, `Save 20% on wardrobes`).
+
+**Closure: category-level classification, not example patterns** (`veda.modules.catalog.text.money_categories`,
+used by every prose policy, at authoring and by the release gate). The earlier list of rate patterns is replaced.
+
+Every number in customer prose is classified by the role its context gives it, whatever its value and however it is
+written (digits, grouping, decimals, magnitudes such as k, lakh and crore, or words such as "twelve hundred"). A
+number is allowed only in an allowlisted role:
+
+| Allowlisted role | How it is recognised | Examples |
+|---|---|---|
+| MEASUREMENT | A length, area, volume, weight, angle or electrical unit, after unit spellings are folded (sq-ft, s.ft, ft², square feet, running foot) | `900 sq ft`, `10 ft`, `4 m`, `18 mm board`, `8′ TV wall` |
+| DURATION | A time unit | `Up to 45 days`, `about 2 months` |
+| QUANTITY | A number counting a named thing, with no rate connector after it | `3 rooms`, `2 wardrobes selected`, `2 extra drawers` |
+| RANGE | Two numbers joined by to, a dash, a slash, or or by; the second number carries the role | `from 3 to 20 feet`, `16/18 mm`, `8-10 days` |
+| DATE or YEAR | An ISO or day/month date, a time, or a year after in, since or established | `in 2010` |
+| LABEL INDEX | After a series label (bedroom, option, step, version, specification and the like), never after an ordinary noun | `Bedroom 2`, `Specification 1.1` |
+| CODE | A number glued after letters, unless the letters are a currency | `E1`, `x1`; but `Rs1200` is money |
+
+Every other number is money, in one of four categories:
+
+| Category | How it is recognised |
+|---|---|
+| RATE | A number followed by per, /, each, every or for every and **any** noun (so no noun list is needed). Also: a or an and a unit or noun; per-area abbreviations (psf); rate wording before or after it; a measurement followed by a rate connector and an amount. |
+| DISCOUNT | Any percentage near saving, discount, off, cashback, rebate, deal or offer wording, on either side. Any other percentage in prose counts as a RATE. |
+| COMMISSION | Commission, brokerage or referral wording, with or without a number |
+| PROMOTIONAL PRICE | A currency sign or word, a magnitude, a price qualifier (only, extra, starting at, onwards), or **any number with no allowlisted role** (`Cabinets 1200`) |
+
+Commercial vocabulary is classified by category whether or not a number is present: trade, list, net or basic price;
+vendor cost; margin; rate card. The `save N%` claim pattern now matches multi-digit percentages.
+
+**Evidence** (`test_catalog_content_policy.py` unless stated):
+
+| Test | What it covers |
+|---|---|
+| `test_money_categories_are_classified_whatever_the_number_and_noun` | Generated cases: 18 number forms, including 0, single digits, grouping, decimals and spelled words, × 26 nouns, including invented ones, × 26 templates across the four categories. Each must be classified. |
+| `test_measurements_durations_quantities_and_labels_are_allowed_whatever_the_number` | Generated allowlist cases × every number |
+| `test_b1_final_countable_rates_qualifiers_commission_and_savings_are_refused` | Every reviewer example and variant, in every prose policy and at authoring |
+| `test_b1_final_does_not_regress_measurements_and_quantities` | The reviewer's measurement list |
+| `test_catalog_public_payload.py::test_b1_final_every_reviewer_example_fails_release_validation` | Each reviewer example fails release validation on SQLite and PostgreSQL, and is not echoed |
+
+The generated tests found a gap that the examples had not: the label-index allowance let "Door: 0" and "per shutter 0"
+through. Label indexes are now limited to series labels, and rate wording is checked first.
+
+B2 and B3 are unchanged by this closure.
+
 ## Claim and public-pricing policy closure (follow-up to the PR #69 review)
 
 The independent review did not certify PR #69 and named three application blockers:

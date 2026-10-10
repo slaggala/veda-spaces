@@ -215,7 +215,7 @@ CLAIMS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("promotional", _words(r"free", r"complimentary", r"at no (?:extra )?(?:cost|charge)", r"no (?:extra|hidden|additional) (?:costs?|charges?|fees?)",
                            r"great value", r"best value", r"value for money", r"bargain\w*", r"discount\w*", r"sale",
                            r"deals?", r"(?:special|exclusive|festive|launch|introductory|seasonal|limited) offers?",
-                           r"on offer", r"offer price", r"bonus", r"gift\w*", r"save (?:up to|\d|on|big|more|money)",
+                           r"on offer", r"offer price", r"bonus", r"gift\w*", r"save (?:up to|\d+(?:\.\d+)? ?%?|on|big|more|money)",
                            r"savings", r"cash ?back", r"coupon\w*", r"promo\w*", r"\d+ ?% ?off", r"% ?off",
                            r"flat \d+ ?%", r"up ?to \d+ ?%", r"new arrivals?", r"exclusiv\w*")),
     ("urgency", _words(r"only today", r"today only", r"act (?:now|fast|quickly)", r"hurry", r"limited (?:time|period|stock|edition|slots?|availability)",
@@ -254,48 +254,236 @@ def absolute_in(text: str) -> bool:
     return any(ABSOLUTE.search(form) for form in _detection_forms(text))
 
 
-# --- money in prose (matched on the numeric form) -------------------------------------------------------------------
+# --- money in prose: category-level classification (B1) --------------------------------------------------------------
 # The primary control is structural: public money appears only in typed, engine-generated amount fields, and no
-# customer prose field may carry money. These patterns enforce that on prose (and catch internal commercial wording).
-_UNIT = (r"(?:sq\.?\s*-?\s*(?:f(?:ee|oo)?t\.?|m|mtrs?|metres?|meters?|yds?)|square\s*(?:f(?:ee|oo)t|met(?:er|re)s?|yards?)"
-         r"|sqft|sft|s\.\s*ft\.?|sq\s*-\s*ft|ft\s*2|ft\s*\^\s*2|m\s*2|sqm|rft|r\.?\s*f\.?\s*t|r\.?\s*ft"
-         r"|running\s*(?:f(?:ee|oo)?t|met(?:er|re)s?|m)\b|linear\s*(?:f(?:ee|oo)?t|met(?:er|re)s?|m)\b|lin\.?\s*ft|lf|rmt|rm"
-         r"|psf|f(?:ee|oo)?t|met(?:er|re)s?|mtrs?|m|units?|pieces?|pcs?|nos?|items?|sheets?|sets?)")  # fmt: skip
-_CONNECTOR = r"(?:/|\bper\b|\ba\b|\ban\b|\beach\b|\bevery\b|\bfor\s+(?:a|an|one|each|every)\b)"
-_AMOUNT = r"(?<![\w.])\d[\d.,]*\s*(?:k|l|lacs?|lakhs?|cr|crores?)?\s*(?:₹|\$|rs\.?|inr|usd|/-)?"
-MONEY: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("a currency", re.compile(r"[₹$€£]|\b(?:rs|inr|usd|rupees?|dollars?|paise)\.?\s*\d|\d\s*(?:rs|inr|usd|rupees?|dollars?)\b"
-                              r"|\b(?:rs|inr|usd)\d")),
-    ("an amount written with /-", re.compile(r"\d\s*/\s*-")),
-    ("an amount in lakhs, crores or thousands", re.compile(
-        r"(?<![\w.])\d+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|cr|k)\b|(?<![\w.])\d+\.\d+\s*l\b"
-        r"|(?<![\w.])\d+\s*l\b(?!\s*-?\s*shape)")),
-    ("a grouped amount", re.compile(r"(?<![\d.])\d{1,3}(?:,\d{2,3})+(?![\d])")),
-    ("a rate", re.compile(_AMOUNT + r"\s*" + _CONNECTOR + r"\s*(?:1\s*)?" + _UNIT + r"(?![a-z])")),
-    ("a rate", re.compile(r"\d[\d.,]*\s*psf\b")),
-    ("a rate", re.compile(_CONNECTOR + r"\s*" + _UNIT + r"\s*[:=@\-–]?\s*(?:₹|\$|rs\.?|inr|usd)?\s*\d")),
-    ("a rate", re.compile(r"\brates?\s*(?:of|is|at|:|=|@)?\s*(?:₹|\$|rs\.?|inr|usd)?\s*\d")),
-    ("a percentage discount", re.compile(r"\d+(?:\.\d+)?\s*%\s*(?:off|discount|less|saving|cash\s*back|rebate)|"
-                                         r"(?:flat|up\s*to|upto|extra|additional)\s*\d+(?:\.\d+)?\s*%|%\s*(?:off|discount)")),
-    ("internal commercial wording", re.compile(
-        r"\b(?:mrp|margins?|mark\s*-?\s*ups?|procurement|suppliers?|vendors?\s*(?:cost|price|rates?)|dealers?|"
-        r"distributors?\s*price|wholesale|trade\s*price|list\s*price|net\s*rates?|basic\s*rates?|base\s*rates?|"
-        r"unit\s*rates?|cost\s*price|buying\s*price|purchase\s*price|landed\s*cost|price\s*(?:cap|ceiling|list|band)|"
-        r"ceiling\s*price|cashback|emi|rate\s*card|discount\w*|rebate)\b")),
+# customer prose field may carry money. Prose is checked by classifying every number it contains, whatever its value
+# and however it is written (digits, grouping, decimals, magnitudes, spelled-out words), by the role its context gives
+# it. Only allowlisted roles are permitted: a MEASUREMENT (a number with a length, area, volume, weight or angle
+# unit), a DURATION (with a time unit), a QUANTITY (counting a thing: "3 rooms"), a RANGE of those, a DATE or YEAR, or
+# a LABEL INDEX ("Bedroom 2"). Every other number is money and is classified as:
+#   RATE              an amount per anything ("per", "/", "each", "every", "a/an <unit>"), or under rate wording
+#   DISCOUNT          a percentage, or an amount with saving, discount, off or cashback wording
+#   COMMISSION        commission, brokerage or referral wording
+#   PROMOTIONAL PRICE a currency amount, a magnitude (k, lakh, crore), a price qualifier ("only", "extra",
+#                     "starting at"), or a number with no allowlisted role
+# Commercial vocabulary is classified by category whether or not a number is present.
+RATE, DISCOUNT, COMMISSION, PROMOTIONAL_PRICE = "RATE", "DISCOUNT", "COMMISSION", "PROMOTIONAL PRICE"
+MONEY_CATEGORIES = (RATE, DISCOUNT, COMMISSION, PROMOTIONAL_PRICE)
+_LABELS = {RATE: "a rate", DISCOUNT: "a discount", COMMISSION: "a commission", PROMOTIONAL_PRICE: "a promotional price"}
+
+# Unit spellings folded to one token first, so "sq-ft", "s.ft", "ft²", "square feet" and "running foot" read alike.
+_UNIT_FOLDS = (
+    (re.compile(r"\b(?:sq(?:uare)?\.?\s*-?\s*f(?:ee|oo)?t\.?|s\.\s*ft\.?|ft\s*\^?\s*2|sqft|sft)(?![a-z])"), " sqft "),
+    (re.compile(r"\b(?:sq(?:uare)?\.?\s*-?\s*(?:m|mtrs?|met(?:er|re)s?)|m\s*\^?\s*2|sqm)(?![a-z])"), " sqm "),
+    (re.compile(r"\b(?:running|linear|lin\.?)\s*(?:f(?:ee|oo)?t|ft|met(?:er|re)s?|m)(?![a-z])|\br\.?\s*f\.?\s*t\b|\brft\b"), " rft "),
+    (re.compile(r"\b(?:cu(?:bic)?\.?\s*-?\s*f(?:ee|oo)?t|cft)(?![a-z])"), " cft "),
 )  # fmt: skip
-RATES = MONEY  # the earlier name
+MEASUREMENT_UNITS = frozenset({
+    "mm", "cm", "m", "km", "in", "inch", "inches", "ft", "feet", "foot", "yd", "yds", "yard", "yards", "metre",
+    "metres", "meter", "meters", "mtr", "mtrs", "sqft", "sqm", "rft", "cft", "rmt", "kg", "kgs", "g", "gm", "gsm",
+    "litre", "litres", "liter", "liters", "ltr", "ml", "deg", "degree", "degrees", "w", "watt", "watts", "v", "volt",
+    "volts", "amp", "amps", "hp", "bhk", "°", "′", "″", "'", '"', "x", "×",
+})  # fmt: skip
+DURATION_UNITS = frozenset({
+    "sec", "secs", "second", "seconds", "min", "mins", "minute", "minutes", "hr", "hrs", "hour", "hours", "day", "days",
+    "week", "weeks", "fortnight", "fortnights", "month", "months", "year", "years", "yr", "yrs", "working", "business",
+    "calendar",
+})  # fmt: skip
+_CURRENCY_WORDS = frozenset(
+    {"rs", "inr", "usd", "rupee", "rupees", "dollar", "dollars", "paise", "bucks", "grand", "eur"}
+)
+_CURRENCY_SIGNS = frozenset("₹$€£¥")
+_MAGNITUDES = frozenset({"k", "l", "lac", "lacs", "lakh", "lakhs", "cr", "crore", "crores", "mn", "million", "thousand",
+                         "hundred", "bn", "billion"})  # fmt: skip
+_RATE_CONNECTORS = frozenset({"per", "/", "each", "every", "pp", "p"})
+_RATE_ABBREVIATIONS = frozenset({"psf", "psm", "prft"})  # per sq ft, per sq m, per running foot
+_RANGE_JOINERS = frozenset({"to", "-", "–", "—", "or", "/", "and", "by", "x", "×"})
+_QUALIFIERS_AFTER = frozenset({"only", "extra", "onwards", "upwards", "additional", "net", "flat", "inclusive",
+                               "payable", "all-inclusive", "nett", "plus", "+"})  # fmt: skip
+_QUALIFIERS_BEFORE = ("only", "just", "starting at", "starting from", "from just", "at just", "for just", "for only",
+                      "@", "at only", "worth", "costs", "cost", "priced at", "price", "for rs", "pay")  # fmt: skip
+# Series labels a number may index ("Bedroom 2", "Option 3", "Specification 1.1"); never ordinary nouns, so
+# "Door 1200" or "Shutter: 1200" is still an unattached amount.
+_LABEL_WORDS = frozenset({"bedroom", "bathroom", "option", "step", "phase", "stage", "version", "v", "specification",
+                          "spec", "type", "model", "series", "level", "floor", "block", "tower", "wing", "section",
+                          "page", "zone", "release", "grade", "class", "iso", "is", "e", "batch"})  # fmt: skip
+_DATE_LEAD = frozenset({"in", "since", "from", "until", "till", "by", "of", "year", "est", "established", "founded",
+                        "©", "before", "after", "during", "fy"})  # fmt: skip
+DISCOUNT_WORDS = frozenset({"save", "saving", "savings", "saved", "discount", "discounts", "discounted", "off",
+                            "cashback", "cash-back", "rebate", "rebates", "deal", "deals", "offer", "offers", "sale",
+                            "reduction", "reduced", "slashed", "markdown"})  # fmt: skip
+COMMISSION_WORDS = frozenset({"commission", "commissions", "commissioned", "brokerage", "kickback", "kickbacks",
+                              "referral", "finder's", "finders"})  # fmt: skip
+RATE_WORDS = frozenset({"rate", "rates", "mrp", "margin", "margins", "markup", "markups", "mark-up", "procurement",
+                        "supplier", "suppliers", "wholesale", "dealer", "dealers", "tariff", "emi", "emis"})  # fmt: skip
+# Commercial phrases that are money whatever follows (multi-word; matched on the numeric form).
+_COMMERCIAL_PHRASES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (RATE, re.compile(r"\b(?:trade|list|net|basic|base|unit|buying|purchase|cost|landed|vendor|dealer|distributor|"
+                      r"supplier|wholesale|ex-?factory|ex-?showroom)\s*(?:price|rate|cost)s?\b|\bprice\s*(?:cap|ceiling|"
+                      r"list|band|per)\b|\bceiling\s*price\b|\brate\s*card\b|\bper\s*(?:unit|item|piece)\s*(?:cost|"
+                      r"price|rate)\b|\bvendor\s*cost\b")),
+    (COMMISSION, re.compile(r"\breferral\s*(?:fees?|bonus|amount)\b|\bfinder'?s?\s*fees?\b")),
+)  # fmt: skip
+_NUMBER_WORDS = frozenset({"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+                           "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+                           "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+                           "hundred", "thousand", "lakh", "lakhs", "crore", "crores", "million", "dozen"})  # fmt: skip
+_TOKEN = re.compile(r"\d[\d,]*(?:\.\d+)?|\.\d+|[a-z]+(?:'[a-z]+)?|[₹$€£¥%/′″'\"@+×°\-–—]|[^\s\w]")
+_CODE = re.compile(r"\b([a-z]+)\d[a-z0-9]*\b")
+_DATE = re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}:\d{2}(?::\d{2})?\b")
 
 
-def money_in(text: str) -> str | None:
-    """Why a text carries money, a rate or internal commercial information (None when it does not). A measurement
-    ("900 sq ft", "TV wall 8 ft") is not money: a rate needs a currency, a magnitude or a rate connector."""
+def _tokens(text: str) -> list[str]:
     form = numeric_form(text)
-    for what, pattern in MONEY:
-        if pattern.search(form):
-            return what
+    form = _DATE.sub(" ⟨date⟩ ", form)
+    for pattern, unit in _UNIT_FOLDS:
+        form = pattern.sub(unit, form)
+    # A code glued to letters ("x1", "e1", "r2d2") is an identifier, unless the letters are a currency ("rs1200").
+    form = _CODE.sub(lambda m: m.group(0) if m.group(1) in _CURRENCY_WORDS else " ⟨code⟩ ", form)
+    return [t for t in _TOKEN.findall(form) if t.strip()]
+
+
+def _is_number(token: str) -> bool:
+    return token[0].isdigit() or token[0] == "." and token[1:2].isdigit() or token in _NUMBER_WORDS
+
+
+def _word(token: str | None) -> bool:
+    return token is not None and token != "" and token[0].isalpha()
+
+
+def _role(toks: list[str], i: int) -> str | None:
+    """The role of the number at toks[i]: an allowlisted role (None) or a money category."""
+    j = i + 1
+    while j < len(toks) and toks[j] in _NUMBER_WORDS:  # "twelve hundred", "two lakh"
+        j += 1
+    before = toks[max(0, i - 4) : i]
+    prev = toks[i - 1] if i else None
+    near = set(toks[max(0, i - 4) : min(len(toks), j + 4)])
+    # Currency on either side, or a /- suffix: a stated price.
+    if (prev in _CURRENCY_SIGNS or prev in _CURRENCY_WORDS or (j < len(toks) and (toks[j] in _CURRENCY_SIGNS
+            or toks[j] in _CURRENCY_WORDS)) or toks[j : j + 2] == ["/", "-"]):  # fmt: skip
+        return _price_kind(toks, j, near)
+    nxt = toks[j] if j < len(toks) else None
+    after = toks[j + 1] if j + 1 < len(toks) else None
+    if nxt == "%":
+        if near & COMMISSION_WORDS:
+            return COMMISSION
+        return DISCOUNT if near & DISCOUNT_WORDS else RATE  # a percentage in prose is a rate unless it is a saving
+    if nxt in _MAGNITUDES and not (after == "-" or (nxt == "l" and after and after.startswith("shape"))):
+        return _price_kind(toks, j + 1, near)
+    if nxt in COMMISSION_WORDS or (before and set(before) & COMMISSION_WORDS):
+        return COMMISSION
+    if nxt in DISCOUNT_WORDS or (prev in DISCOUNT_WORDS):
+        return DISCOUNT
+    if nxt in _RATE_CONNECTORS and (nxt in ("each", "every") or _word(after) or after in _CURRENCY_SIGNS):
+        return RATE
+    if nxt in _RATE_ABBREVIATIONS or (nxt == "for" and after in ("each", "every", "one", "a", "an", "per")):
+        return RATE  # "1200 psf", "1200 for every square foot"
+    if (
+        nxt in ("a", "an")
+        and after
+        and (after in MEASUREMENT_UNITS or after in DURATION_UNITS or _word(after))
+        and (after not in _NUMBER_WORDS)
+    ):
+        return RATE  # "1200 a shutter", "1200 an hour"
+    if nxt in _QUALIFIERS_AFTER and not _word(after):
+        return PROMOTIONAL_PRICE  # "1200 extra", "1200 only"
+    if nxt in RATE_WORDS:
+        return RATE
+    # Allowlisted roles: a measurement, a duration, a quantity of a named thing, a range of those.
+    if nxt in MEASUREMENT_UNITS or nxt in DURATION_UNITS:
+        return _after_measure(toks, j + 1)
+    if nxt in _RANGE_JOINERS and after is not None and _is_number(after):
+        return None  # "3 to 20 feet", "16/18 mm", "8-10 days": the second number carries the role
+    if nxt == "-" and _word(after):
+        return _after_measure(toks, j + 2) if after in MEASUREMENT_UNITS | DURATION_UNITS else None  # "8-ft", "one-day"
+    if _word(nxt) and nxt not in _QUALIFIERS_AFTER:
+        return _after_measure(toks, j + 1)  # a quantity: "3 rooms", "2 wardrobes selected", "2 extra drawers"
+    if nxt in _QUALIFIERS_AFTER and _word(after):
+        return _after_measure(toks, j + 2)
+    # No following role: rate wording before it, else a series label index or a year, else an unattached amount.
+    if before and set(before) & (_RATE_CONNECTORS | RATE_WORDS):
+        return RATE  # "per sqft 1200", "rate: 1200", "per door 5"
+    if prev in _LABEL_WORDS:
+        return None
+    if re.fullmatch(r"(?:19|20)\d\d", toks[i]) and prev in _DATE_LEAD:
+        return None
+    if prev in _MONEY_LEADS or " ".join(toks[max(0, i - 2) : i]) in _QUALIFIERS_BEFORE:
+        return PROMOTIONAL_PRICE
+    return PROMOTIONAL_PRICE  # a number with no allowlisted role is never shown as prose
+
+
+_MONEY_LEADS = frozenset(q for q in _QUALIFIERS_BEFORE if " " not in q) | {"for", "at", "fee", "fees", "charge",
+                                                                           "charges", "amount", "budget", "total"}  # fmt: skip
+
+
+def _price_kind(toks: list[str], j: int, near: set[str]) -> str:
+    """A stated amount: a rate when a rate connector follows, otherwise its wording decides."""
+    k = j
+    while k < len(toks) and (toks[k] in _MAGNITUDES or toks[k] in _CURRENCY_WORDS or toks[k] in _CURRENCY_SIGNS
+                             or toks[k] in ("/", "-") and k + 1 < len(toks) and toks[k + 1] == "-"):  # fmt: skip
+        k += 1
+    nxt = toks[k] if k < len(toks) else None
+    if nxt in _RATE_CONNECTORS or nxt in ("a", "an") or nxt in RATE_WORDS:
+        return RATE
+    if near & COMMISSION_WORDS:
+        return COMMISSION
+    if near & DISCOUNT_WORDS:
+        return DISCOUNT
+    return PROMOTIONAL_PRICE
+
+
+def _after_measure(toks: list[str], k: int) -> str | None:
+    """A measurement, duration or quantity is allowed unless a rate connector or money word follows it directly
+    ("900 sqft" is allowed; "900 sqft per room" and "3 visits at 1200" are not)."""
+    nxt = toks[k] if k < len(toks) else None
+    after = toks[k + 1] if k + 1 < len(toks) else None
+    if (
+        nxt in ("per", "/")
+        and after is not None
+        and (after in _CURRENCY_SIGNS or after in _CURRENCY_WORDS or _is_number(after))
+    ):
+        return RATE
     return None
 
 
+def money_categories(text: str) -> list[str]:
+    """The money categories a prose text contains (empty when it contains none): every number is classified by its
+    role, and commercial vocabulary by its category."""
+    toks = _tokens(text)
+    found: list[str] = []
+    for i, tok in enumerate(toks):
+        if tok in _CURRENCY_SIGNS:
+            found.append(PROMOTIONAL_PRICE)
+        elif tok in COMMISSION_WORDS:
+            found.append(COMMISSION)
+        elif tok in RATE_WORDS:
+            found.append(RATE)
+        elif tok in ("discount", "discounts", "discounted", "cashback", "cash-back", "rebate", "rebates"):
+            found.append(DISCOUNT)
+        elif _is_number(tok) and not (i and toks[i - 1] in _NUMBER_WORDS and tok in _NUMBER_WORDS):
+            if tok in _NUMBER_WORDS and not _spelled_amount(toks, i):
+                continue  # "one-day", "two rooms": a spelled count reads as a word unless it states money
+            role = _role(toks, i)
+            if role:
+                found.append(role)
+    form = numeric_form(text)
+    found += [category for category, pattern in _COMMERCIAL_PHRASES if pattern.search(form)]
+    return sorted(set(found), key=MONEY_CATEGORIES.index)
+
+
+def _spelled_amount(toks: list[str], i: int) -> bool:
+    """A spelled-out number states money when its role would be money ("twelve hundred per shutter")."""
+    return _role(toks, i) is not None
+
+
+def money_in(text: str) -> str | None:
+    """Why a text carries money (None when it does not): the first money category found, as a phrase."""
+    found = money_categories(text)
+    return _LABELS[found[0]] if found else None
+
+
+RATES = MONEY_CATEGORIES  # the earlier name
 rate_in = money_in
 
 

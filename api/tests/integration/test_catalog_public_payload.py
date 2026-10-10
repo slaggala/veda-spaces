@@ -280,3 +280,24 @@ def test_the_preview_reviewer_sees_every_new_and_changed_public_text(people):
         detail = s.execute(sa.select(CatalogEvent.detail).where(CatalogEvent.release_id == rel.id,
                                                                 CatalogEvent.event_type == "RELEASE_PREVIEW_APPROVED")).scalar_one()  # fmt: skip
     assert detail["public_copy_items"] == len(report) and len(detail["public_copy_sha256"]) == 64
+
+
+B1_FINAL = ["1200 per shutter", "1200 per door", "1200 per drawer", "1200 per panel", "1200 per box", "1200 per room",
+            "1200 per visit", "1200 per day", "1200 per hour", "1200 per item", "1200 per unit",
+            "1200 per shutter installed", "1200 per wardrobe", "1200 per module", "1200 per piece", "1200 extra",
+            "1200 only", "120000 commission", "Save 20%", "Save 20% on wardrobes"]  # fmt: skip
+
+
+@pytest.mark.parametrize("leak", B1_FINAL)
+def test_b1_final_every_reviewer_example_fails_release_validation(people, leak):
+    """Card customer text is not checked when a pricing record is saved (the card is staff-only), so each example
+    reaches the release gate, which must refuse it without echoing it."""
+    a, b = people
+    seed_slice(a)
+    change(a, "pricing", "card-settings", lambda d: d["body"].update(client_scope=[*d["body"]["client_scope"], leak]))
+    approve_all(a, b)
+    rel = tx(a, service.create_release, "B1-FINAL")
+    report = tx(a, service.validate_release, rel.id)
+    assert not report["ok"] and report["checks"]["public_payload"] == "fail", (leak, report["errors"])
+    assert any("client_scope" in e for e in report["errors"])
+    assert not any("1200" in e or "20%" in e for e in report["errors"]), "the report does not echo the text"

@@ -221,3 +221,106 @@ def test_served_claim_categories_are_exactly_the_detected_ones():
     import typing
 
     assert set(typing.get_args(public.ClaimTag)) == set(text.CATEGORIES)
+
+
+# --- B1 final closure: countable-item rates, price qualifiers, commission, percentage savings ---------------------------
+B1_FINAL = ["1200 per shutter", "1200 per door", "1200 per drawer", "1200 per panel", "1200 per box", "1200 per room",
+            "1200 per visit", "1200 per day", "1200 per hour", "1200 per item", "1200 per unit",
+            "1200 per shutter installed", "1200 per wardrobe", "1200 per module", "1200 per piece", "1200 extra",
+            "1200 only", "120000 commission", "commission 1200", "1200 commission", "Save 20%", "Save 20% on wardrobes",
+            "20% off"]  # fmt: skip
+# The rule is generic (COUNTABLE_RATE): any noun after "per" or "/", an amount "each", or "a"/"an" + a countable noun.
+B1_FINAL_VARIANTS = ["1200 per cabinet", "1200 per partition", "1200 per window", "1200 per bed", "1200 per storage",
+                     "1200 per shelf", "1200 per carcass", "1200 per gizmo", "1200/shutter", "1200 each",
+                     "1200 a shutter", "only 1200", "starting at 1200", "1,200 per door", "Rs 1200 per visit",
+                     "12k per module", "Get 15% discount on modules", "Save up to 25%"]  # fmt: skip
+MEASUREMENTS = ["900 sq ft", "120 sq ft", "10 ft", "4 m", "3 rooms", "2 wardrobes selected", "2 extra drawers",
+                "Only the selected rooms", "TV unit for 1 room", "16/18 mm", "Shelves every 2 ft"]  # fmt: skip
+
+
+@pytest.mark.parametrize("value", B1_FINAL + B1_FINAL_VARIANTS)
+def test_b1_final_countable_rates_qualifiers_commission_and_savings_are_refused(value):
+    assert text.money_in(value), value
+    for policy in PROSE:
+        assert public.check_text("field", value, policy), (value, policy)
+    with pytest.raises(ValueError):
+        kinds.parse(
+            "copy", {"statement": value, "category": "label", "promise": False, "content_policy": "FACTUAL_TEXT"}
+        )
+
+
+@pytest.mark.parametrize("value", MEASUREMENTS)
+def test_b1_final_does_not_regress_measurements_and_quantities(value):
+    assert text.money_in(value) is None, (value, text.money_in(value))
+
+
+def test_save_with_a_multi_digit_percentage_is_a_promotional_claim():
+    assert "promotional" in text.claims_in("Save 20% on wardrobes")
+    assert "promotional" in text.claims_in("Save 125 percent")
+
+
+# --- category-level classification, independent of the number used ---------------------------------------------------
+NUMBERS = ["0", "1", "5", "7", "42", "99", "120", "999", "1200", "12345", "120000", "1,200", "1,20,000", "1.5", "12.75",
+           "twelve hundred", "seven", "fifty"]  # fmt: skip
+NOUNS = ["shutter", "door", "drawer", "panel", "box", "room", "visit", "day", "hour", "item", "unit", "piece",
+         "wardrobe", "module", "cabinet", "partition", "window", "bed", "storage", "shelf", "carcass", "gizmo",
+         "frobnicator", "sq ft", "running foot", "metre"]  # fmt: skip
+CATEGORY_TEMPLATES = {
+    text.RATE: [
+        "{n} per {x}",
+        "{n}/{x}",
+        "{n} per {x} installed",
+        "{n} each",
+        "{n} a {x}",
+        "{n} for every {x}",
+        "per {x} {n}",
+        "rate {n}",
+        "{n} per {x}, fitted",
+    ],
+    text.DISCOUNT: ["save {n}%", "Save {n}% on {x}s", "{n}% off", "{n}% discount on every {x}", "get {n}% cashback"],
+    text.COMMISSION: ["{n} commission", "commission {n}", "commission of {n} per {x}", "{n} brokerage"],
+    text.PROMOTIONAL_PRICE: [
+        "{n} extra",
+        "{n} only",
+        "only {n}",
+        "starting at {n}",
+        "Rs {n}",
+        "₹{n}",
+        "{n} lakh",
+        "{x}: {n}",
+    ],
+}
+
+
+@pytest.mark.parametrize("category", list(CATEGORY_TEMPLATES))
+def test_money_categories_are_classified_whatever_the_number_and_noun(category):
+    misses = []
+    for template in CATEGORY_TEMPLATES[category]:
+        for n in NUMBERS:
+            for x in NOUNS:
+                value = template.format(n=n, x=x)
+                found = text.money_categories(value)
+                if not found or (category in (text.DISCOUNT, text.COMMISSION) and category not in found):
+                    misses.append((value, found))
+    assert misses == [], misses[:10]
+
+
+ALLOWED_TEMPLATES = ["{n} ft", "{n} feet", "{n} sq ft", "{n} sqm", "{n} mm board", "{n} m deep", "{n}′ TV wall",
+                     "{n} days", "up to {n} weeks", "about {n} months", "{n} rooms", "{n} wardrobes selected",
+                     "{n} extra drawers", "area assumed {n} sq ft", "TV unit for {n} room", "from {n} to 20 feet",
+                     "{n}-{n} days", "{n} x 3 ft panel", "Bedroom {n}"]  # fmt: skip
+
+
+def test_measurements_durations_quantities_and_labels_are_allowed_whatever_the_number():
+    false = []
+    for template in ALLOWED_TEMPLATES:
+        for n in [n for n in NUMBERS if n[0].isdigit() and "," not in n]:
+            value = template.format(n=n)
+            if text.money_categories(value):
+                false.append((value, text.money_categories(value)))
+    assert false == [], false[:10]
+
+
+def test_a_number_with_no_allowlisted_role_is_never_prose():
+    for value in ("Cabinets 1200", "TV unit, 4500.", "Includes the hood (899)", "Call for 3500"):
+        assert text.money_categories(value), value
