@@ -10,6 +10,112 @@
 
 Nothing here activates V3, changes V1 or V2, enables public intake, or changes production behaviour.
 
+## Claim and public-pricing policy closure (follow-up to the PR #69 review)
+
+The independent review did not certify PR #69 and named three application blockers:
+- **B1:** rates could leak through customer prose.
+- **B2:** warranty, certification, quality, popularity and delivery promises could appear in estimator and rate-card
+  customer text without a governed claim record.
+- **B3:** time-bounded claims were checked at activation but not at serve time.
+
+It also found a customer-facing `503`: the typical-area assumption "area assumed 900 sq ft" was read as a rate.
+
+This round replaces the remaining denylist-dependent behaviour with an allowlist-driven content policy.
+
+### Status
+
+| Item | Status |
+|---|---|
+| V3 | **Disabled** everywhere |
+| Infrastructure | **Not started** |
+| Public intake | **Disabled** |
+| Production V3 | **Prohibited** |
+| V1 and V2 | Unchanged |
+
+### What this package now states
+
+1. **Claim detection is defence in depth.** It is not the primary control and is not claimed to be complete.
+2. **Governed claim records and four-eyes review are the primary controls.**
+   - Every public field has exactly one of eleven content policies (`PUBLIC_FIELD_POLICIES`).
+   - A copy author must select a content policy.
+   - A claim or promise is shown only as a `GOVERNED_CLAIM_REFERENCE` to its approved record.
+   - The preview approver reviews the "new and changed public copy" report, whose digest is kept with the approval.
+3. **Customer prose cannot contain rates.** Every prose policy refuses money, rates and internal commercial wording.
+   This includes estimator and card text (exclusions, client scope, timeline labels, site-package text, product and
+   input labels) and imported and seeded copy.
+4. **Public money appears only through typed engine-generated fields.**
+   - These are the eight `ENGINE_GENERATED_AMOUNT` integers: range, GST, rounded room subtotals, site-package amount
+     and allowance band.
+   - They are computed by the engine from the approved card the estimate names in `pricing_card_version`, and they
+     are part of the estimate snapshot.
+5. **Measurements are structured and distinct from rates.**
+   - Typical-size assumptions are `PublicAssumption` objects: a value, a unit enum (`FT`, `SQ_FT`, `NOS`), a type
+     (`LENGTH`, `AREA`, `QUANTITY`, `DIMENSION`) and the basis `TYPICAL_ASSUMPTION`. The page renders them.
+   - `RATE` and `TOTAL_AMOUNT` are never public measurement types.
+   - "900 sq ft" without a rate connector is never money.
+6. **Time-bounded claims are checked at serve time.**
+   - Every public serve re-validates the release's governed claims: catalog, estimate creation and replay. The checks
+     are approval, withdrawal, effective date, review date (lapsing on that date), owner, environment and
+     applicability.
+   - Changes after activation are recorded as append-only claim controls (migration 0105).
+   - The catalog's cache lifetime never reaches past the next claim boundary.
+7. **Real-card execution remains separate owner evidence.** It has **not** been run for this head:
+   **REAL-CARD EVIDENCE PENDING.**
+8. V3 remains disabled.
+9. Infrastructure has not started.
+10. Public intake remains disabled.
+11. Production V3 remains prohibited.
+
+### Superseded statements
+
+These statements of the canonical customer-copy closure below are withdrawn:
+- **"Estimator and card text may state promise-matrix scope (PROMISE_GOVERNED_COPY)."** It allowed warranty,
+  certification and delivery wording in estimator and card text (B2). No such policy remains. Estimator wording is an
+  allowlist of engine texts; card text is structured and may carry no claim.
+- **"Promise-matrix content: warranty, quality-proofing, service and delivery wording... or estimator text within the
+  V2 matrix scope."** Only a promise record linked to its confirmed matrix row may now carry warranty, service or
+  durability wording. Any other claim category needs a claim record.
+- **"Checked at activation" as the only expiry control.** Superseded by serve-time validity (B3).
+- **The rate detection that read "900 sq ft" as a rate.** The "per" connector was optional in the per-area pattern.
+  The pattern now requires a currency, a magnitude or a rate connector, and assumptions are no longer prose.
+
+### Reviewer B1/B2/B3 closure matrix
+
+| Blocker | Reproduced | Closure | Evidence |
+|---|---|---|---|
+| B1 | Rates in customer prose, for example `1200 per square foot`, `1200/ft²`, `INR1200`, `1.2 L`, `trade price`, `net rate`, `percentage discount` | No money in any prose policy. Amounts exist only as typed engine integers linked to the card version. Detection covers amount-before-unit, unit-before-amount, missing currency, alternate symbols and units, superscripts, fraction slashes and zero-width splits. | `test_catalog_content_policy.py::test_money_and_rates_are_refused_in_every_prose_policy` (55 examples); `test_amounts_exist_only_as_typed_engine_integers`; `test_customer_text_in_the_staff_only_card_is_governed`; `test_import_refuses_rates_and_prices` |
+| B2 | Warranty, certification, quality, popularity and delivery wording in estimator and card text | One rule for catalog, estimator and card text: a claim of any of 13 categories only through a governed claim reference. Estimator wording is allowlisted. Copy needs an author-selected policy. | `test_every_claim_example_needs_a_governed_claim_reference` (the 19 B2 examples plus 45 synonyms); `test_no_claim_outside_a_governed_claim_reference`; `test_estimator_wording_is_an_allowlist`; `test_claim_or_money_cannot_be_authored_as_factual_or_legal_copy` |
+| B3 | Expiry checked only at activation | Serve-time validity on every catalog serve, estimate and replay. Append-only claim controls. Cache bounded by the next claim boundary. | `test_catalog_claim_validity.py` (before, at and after the review date; withdrawal; owner removal; applicability; environment; cache lifetime; staff API) |
+| 503 | `area assumed 900 sq ft` read as a rate | Structured assumptions, and a rate requires a connector. | `test_every_v2_state_builds_a_valid_structured_public_estimate`; `test_the_area_assumption_that_caused_a_503_is_structured_and_safe`; `test_measurements_quantities_and_timelines_are_not_money` |
+
+### Other items in this round
+
+- **Normalisation gaps.** Closed: combining marks, Latin small capitals, narrow leetspeak (claim detection only),
+  superscript and subscript digits, fraction slashes, uncommon Unicode spaces, and mixed-script words (refused at
+  authoring and in payloads). Tested in `test_remaining_normalisation_gaps_are_closed`.
+- **Public rule DTO.** It now uses the authoritative reference-path pattern for the subject and objects, bounded
+  collections, positive bounds and the source model's rule types without `staff_only`. Unknown properties are refused.
+- **Rollback.**
+  - Rollback stays fail-closed.
+  - A digest defect found in this round is fixed: the per-release card version is now neutralised in the payload
+    digest, like the release code.
+  - Incident runbook: [CATALOG-V3-incident-runbook.md](CATALOG-V3-incident-runbook.md).
+- **Idempotency.**
+  - The key is bound to the required browser token, the request type and the normalised request digest.
+  - The digest version is `idempotency/2`.
+  - See [CATALOG-V3-idempotency.md](CATALOG-V3-idempotency.md).
+
+### Validation of this round (local; CI is reported in the PR)
+
+| Check | Result |
+|---|---|
+| API on SQLite and PostgreSQL | 3063 tests, 14 skipped (the same 11 engine-specific and 3 local-only real-card skips). The first full run had 10 failures: the tests pinning the migration head and order needed 0105, and the conformance rule refused a column named `applies_to` (renamed `scope`). The affected suites were re-run on both engines and pass. |
+| mypy ratchet | 157 (baseline 157) |
+| ruff, format, OpenAPI (additive: two staff claim routes), bandit, secret scan, deploy-check | Pass |
+| Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
+| V3 browser journey | 88/88 |
+| Real-card equivalence | **REAL-CARD EVIDENCE PENDING** (not run by the implementer; not simulated) |
+
 ## Canonical customer-copy closure (follow-up to PR #68)
 
 ### Current status
@@ -41,7 +147,7 @@ Nothing here activates V3, changes V1 or V2, enables public intake, or changes p
 
    Record approval alone is not evidence.
 3. **Earlier journey counts were stale.** The "34/34" counts below are historical. The V3 browser journey now has
-   **86 checks**.
+   **88 checks**.
 
 ### The distinct inventories
 
@@ -282,7 +388,7 @@ UNASSIGNED. It therefore cannot activate, reach the public payload, be priced, o
 | mypy ratchet | 157 (baseline 157) |
 | ruff, OpenAPI, bandit, pip-audit, secret scan, deploy-check | Pass |
 | Workspace on Node 22.23.3: lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
-| V3 browser journey | 34/34, three consecutive runs (historical: the journey had 34 checks then; it now has 86) |
+| V3 browser journey | 34/34, three consecutive runs (historical: the journey had 34 checks then; it now has 88) |
 
 A keyboard-speed race found in this round, an estimate sent before the Turnstile widget rendered, is fixed: the page
 now awaits the widget.
@@ -563,7 +669,7 @@ No amount appears in any output.
 | mypy ratchet | 157 (baseline 157), 0 new |
 | ruff, format, OpenAPI | Pass |
 | Workspace on Node 22.23.3 (the CI version): lint, typecheck, tokens, contrast, unit, staging build, build | Pass |
-| V3 browser journey | 34/34 (historical; the journey now has 86 checks) |
+| V3 browser journey | 34/34 (historical; the journey now has 88 checks) |
 
 **The 14 skips:**
 
