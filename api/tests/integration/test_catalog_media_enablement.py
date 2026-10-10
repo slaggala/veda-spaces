@@ -36,11 +36,14 @@ def _clock():
     clock.reset()
 
 
-# --- the V3 staging approval record ---------------------------------------------------------------------------------
+# --- the V3 staging approval record (schema 2: explicit review and expiry policy) -------------------------------------
+TODAY = date(2026, 10, 10)
+
+
 def approved(**over):
     doc = json.loads(TEMPLATE.read_text())
     doc.update(status="APPROVED", author="Catalog lead (role, test)", approver="Owner (role, test)",
-               approved_on="2026-10-10")  # fmt: skip
+               approved_at="2026-10-01", review_by="2026-12-01", expires_at="2027-03-01")  # fmt: skip
     doc["evidence"] = {
         k: {"git_sha": "a" * 40, "reference": f"git {k} (synthetic)"} for k in staging_approval.GIT_EVIDENCE
     }
@@ -52,14 +55,18 @@ def approved(**over):
 
 
 def test_the_committed_template_is_a_draft_and_no_approved_record_exists():
-    template = staging_approval.check(json.loads(TEMPLATE.read_text()))
+    doc = json.loads(TEMPLATE.read_text())
+    template = staging_approval.check(doc)
     assert template.status == "DRAFT" and template.evidence == {} and template.approver is None
-    assert not staging_approval.approves(json.loads(TEMPLATE.read_text()))
+    assert template.review_by is None and template.expires_at is None and template.approved_at is None
+    assert not staging_approval.approves(doc, today=TODAY)
     assert not staging_approval.RECORD.exists(), "no approval record is committed until the owner approves one"
 
 
-def test_a_complete_independent_record_approves():
-    assert staging_approval.approves(approved())
+def test_a_complete_independent_current_record_approves():
+    assert staging_approval.approves(approved(), today=TODAY)
+    assert staging_approval.approves(approved(expires_at=None, non_expiring_decision="Owner decision: reviewed every 90 days instead"),
+                                     today=TODAY)  # fmt: skip
     assert set(staging_approval.REQUIRED_EVIDENCE) == {
         "application_certification", "application_commit", "pr69_merge", "real_card_evidence", "infrastructure_plan",
         "infrastructure_apply", "scanner_capacity", "scanner_decision", "media_bucket", "iam", "ssm_settings", "csp",
@@ -67,21 +74,42 @@ def test_a_complete_independent_record_approves():
 
 
 @pytest.mark.parametrize("over,why", [
+    ({"status": "DRAFT"}, "is DRAFT"),
+    ({"status": "IN_REVIEW"}, "is IN_REVIEW"),
+    ({"status": "REVOKED", "revoked_at": "2026-10-05", "revocation_reason": "Evidence withdrawn (synthetic)"}, "is REVOKED"),
+    ({"expires_at": "2026-10-10"}, "expired"),
+    ({"expires_at": "2026-10-05"}, "expired"),
+    ({"review_by": "2026-10-10"}, "review date"),
+    ({"approved_at": "2026-10-20", "review_by": "2026-12-01"}, "future"),
+])  # fmt: skip
+def test_records_that_do_not_authorise_v3_today(over, why):
+    found = staging_approval.problems(approved(**over), today=TODAY)
+    assert any(why in p for p in found), found
+
+
+@pytest.mark.parametrize("over,why", [
     ({"approver": "Catalog lead (role, test)"}, "four-eyes"),
     ({"approver": "  catalog LEAD (role, test) "}, "four-eyes"),
     ({"approver": "[OWNER TO FILL]"}, "placeholder"),
     ({"approver": None}, "approver"),
+    ({"review_by": None}, "review date"),
+    ({"review_by": "2027-06-01"}, "review date"),  # more than 90 days after approval
+    ({"expires_at": None}, "non-expiring"),
+    ({"non_expiring_decision": "Owner decision: no expiry, reviewed quarterly (test)"}, "exactly one"),
+    ({"expires_at": "2026-09-01"}, "expires after"),
     ({"status": "REVOKED"}, "when and why"),
-    ({"scope": {"environments": ["staging"], "version": "v3", "public_intake": True, "media_delivery": False,
-                "three_d": False, "video": False}}, "public_intake"),
-    ({"scope": {"environments": ["staging"], "version": "v3", "public_intake": False, "media_delivery": False,
-                "three_d": True, "video": False}}, "three_d"),
-    ({"schema": "something-else"}, "not a"),
+    ({"revoked_at": "2026-10-05"}, "only a REVOKED"),
+    ({"environment": "production"}, "environment"),
+    ({"approval_scope": {"version": "v3", "protected": True, "public_intake": True, "media_delivery": False,
+                         "three_d": False, "video": False}}, "public_intake"),
+    ({"approval_scope": {"version": "v3", "protected": False, "public_intake": False, "media_delivery": False,
+                         "three_d": False, "video": False}}, "protected"),
+    ({"schema": "veda.catalog.v3-staging-approval/1"}, "not a"),
 ])  # fmt: skip
-def test_records_that_must_not_satisfy_the_gate(over, why):
+def test_malformed_or_inconsistent_records_are_refused(over, why):
     with pytest.raises(ValueError, match=why):
         staging_approval.check(approved(**over))
-    assert not staging_approval.approves(approved(**over))
+    assert not staging_approval.approves(approved(**over), today=TODAY)
 
 
 @pytest.mark.parametrize("missing", ["real_card_evidence", "scanner_capacity", "media_rights_approver", "pr69_merge"])
@@ -97,6 +125,53 @@ def test_evidence_must_be_a_digest_not_a_placeholder():
     doc["evidence"]["real_card_evidence"] = {"reference": "OWNER-RUN REAL-CARD EVIDENCE PENDING"}
     with pytest.raises(ValueError, match="real_card_evidence"):
         staging_approval.check(doc)
+
+
+def test_a_missing_or_unreadable_record_does_not_authorise(tmp_path):
+    assert staging_approval.problems(None) == ["no V3 staging approval record"]
+    bad = tmp_path / "record.json"
+    bad.write_text("{not json")
+    assert staging_approval.load(bad) is None and not staging_approval.approves(staging_approval.load(bad))
+    assert staging_approval.main(["x", str(bad)]) == 1
+
+
+def test_production_can_never_use_a_staging_approval():
+    with pytest.raises(ValueError):
+        staging_approval.check(approved(environment="production"))
+    assert config.validate_environment(config.Settings(env="production", database_url="sqlite://",
+                                                       catalog_estimator_enabled=True)), "production refuses V3 anyway"  # fmt: skip
+
+
+@ON
+def test_on_staging_v3_stops_serving_when_the_approval_is_not_current(api, people, monkeypatch, tmp_path):
+    """An expired, revoked or missing approval stops V3 at once on staging: not only at plan, build or deploy."""
+    from veda.modules.catalog import configure
+
+    a, b = people
+    seed_slice(a)
+    approve_all(a, b)
+    release(a, b)
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, (
+        "test environment: no approval record needed"
+    )
+    real = configure.settings
+
+    class Staging:
+        def __getattr__(self, name):
+            return "staging" if name == "env" else getattr(real(), name)
+
+    monkeypatch.setattr(configure, "settings", lambda: Staging())
+    configure._view_cache.clear()
+    monkeypatch.setattr(staging_approval, "RECORD", tmp_path / "absent.json")
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503
+    record = tmp_path / "record.json"
+    record.write_text(json.dumps(approved(expires_at="2026-10-05", review_by="2026-10-04", approved_at="2026-10-01")))
+    monkeypatch.setattr(staging_approval, "RECORD", record)
+    monkeypatch.setattr(staging_approval, "load", lambda path=record: json.loads(record.read_text()))
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503, "expired approval: fail closed"
+    record.write_text(json.dumps(approved(approved_at="2026-10-01", review_by="2026-12-01", expires_at="2099-01-01")))
+    clock.set_clock(lambda: datetime(2026, 10, 10, 12, tzinfo=UTC))
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, "a current approval serves"
 
 
 # --- settings fail closed --------------------------------------------------------------------------------------------

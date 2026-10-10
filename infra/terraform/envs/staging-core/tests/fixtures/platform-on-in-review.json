@@ -97,14 +97,14 @@
     "catalog_estimator_enabled": true,
     "catalog_admin_enabled": true,
     "media_delivery_enabled": true,
-    "approval_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    "approval_record_sha256": "d9a2b0d10e4d07780ec399600235f508d295323cda809e0105ce034fd6b2e09b"
   },
   "media_scanner": {
     "status": "DECIDED",
     "decision": "Not decided. The owner chooses option A (clamd sidecar on the current host, only if the capacity evidence shows the approved reserve), B (resize the host, separately reviewed and cost-approved, then the sidecar) or C (asynchronous S3 scanning; needs an application adapter first) after the scanner-capacity evidence (docs/implementation/catalog/CATALOG-V3-media-enablement.md). Until then mode is none: uploads stay PENDING and nothing is served. clamd needs the image pinned by digest; a placeholder is refused. UNDECIDED does not block other applies or deploys; it blocks V3 activation (output catalog_v3).",
-    "option": "A",
+    "option": "B",
     "mode": "clamd",
-    "clamd_image": "clamav/clamav-debian:1.4@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "clamd_image": "clamav/clamav:1.4@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "capacity_evidence_sha256": null
   },
   "media_rights": {

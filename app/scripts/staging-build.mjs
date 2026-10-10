@@ -107,21 +107,26 @@ export const V3_GIT_EVIDENCE = ['application_commit', 'pr69_merge'];
 export const V3_DIGEST_EVIDENCE = ['application_certification', 'real_card_evidence', 'infrastructure_plan', 'infrastructure_apply',
   'scanner_capacity', 'scanner_decision', 'media_bucket', 'iam', 'ssm_settings', 'csp', 'media_smoke_test',
   'promise_owner_approval', 'media_rights_approver'];
-export function checkV3Approval(approvalFile = V3_APPROVAL, platformFile = PLATFORM) {
+export function checkV3Approval(approvalFile = V3_APPROVAL, platformFile = PLATFORM, today = new Date().toISOString().slice(0, 10)) {
   let raw;
   let approval;
   try { raw = readFileSync(approvalFile); approval = JSON.parse(raw.toString('utf8')); } catch { approval = null; }
   const problems = [];
   if (!approval) problems.push('no approved V3 staging activation record');
   else {
-    const scope = approval.scope || {};
+    const scope = approval.approval_scope || {};
     const same = (a, b) => String(a || '').trim().toLowerCase().replace(/\s+/g, ' ') === String(b || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    if (approval.schema !== 'veda.catalog.v3-staging-approval/1') problems.push('not a V3 staging approval record');
+    const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    if (approval.schema !== 'veda.catalog.v3-staging-approval/2') problems.push('not a V3 staging approval record (schema 2)');
     if (approval.status !== 'APPROVED') problems.push(`the V3 staging activation record is ${approval.status}`);
-    if (!approval.approver || !approval.approved_on || !approval.release) problems.push('the record names no approver, date or release');
-    if (same(approval.approver, approval.author) || /OWNER TO FILL/i.test(`${approval.approver} ${approval.author}`)) problems.push('the approver is not independent of the author');
-    if (JSON.stringify(scope.environments) !== '["staging"]' || scope.version !== 'v3' || scope.public_intake !== false
-      || scope.three_d !== false || scope.video !== false) problems.push('the record does not cover V3 on staging only, without public intake, 3D or video');
+    if (approval.environment !== 'staging') problems.push('the record is not for staging');
+    if (!approval.approver || !day(approval.approved_at) || !approval.release) problems.push('the record names no approver, approval date or release');
+    if (same(approval.approver, approval.author) || /TO FILL/i.test(`${approval.approver} ${approval.author}`)) problems.push('the approver is not independent of the author');
+    if (approval.revoked_at || approval.revocation_reason) problems.push('the approval is revoked');
+    if (!day(approval.review_by) || approval.review_by <= today) problems.push('the approval review date is missing or has been reached');
+    if (day(approval.expires_at) ? approval.expires_at <= today : !approval.non_expiring_decision) problems.push('the approval has expired or has no expiry policy');
+    if (scope.version !== 'v3' || scope.protected !== true || scope.public_intake !== false || scope.three_d !== false
+      || scope.video !== false) problems.push('the record does not cover V3 on protected staging only, without public intake, 3D or video');
     const ev = approval.evidence || {};
     const missing = [...V3_GIT_EVIDENCE.filter((k) => !/^[0-9a-f]{40}$/.test(ev[k]?.git_sha || '')),
       ...V3_DIGEST_EVIDENCE.filter((k) => !/^[0-9a-f]{64}$/.test(ev[k]?.sha256 || ''))];
