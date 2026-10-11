@@ -8,6 +8,7 @@
 #   MEDIA INFRASTRUCTURE NOT APPLIED   a common media setting is missing (apply staging-core before deploying)
 #   SCANNER SETTINGS INCOMPLETE        clamd is selected without an image pinned by digest
 #   PARTIAL ACTIVATION                 some V3 flags on, others off (refused at plan too)
+#   APPROVAL DIGEST NOT BOUND          every V3 flag on but VEDA_CATALOG_APPROVAL_SHA256 is not a SHA-256
 #   V3 ACTIVATION REQUESTED            every V3 flag on: deploy.sh then requires a current APPROVED approval record
 #   scanner not selected / V3 intentionally disabled   informational; the deploy continues
 set -euo pipefail
@@ -16,6 +17,8 @@ COMMON=(VEDA_CATALOG_MEDIA_BACKEND VEDA_CATALOG_MEDIA_BUCKET VEDA_CATALOG_MEDIA_
   VEDA_CATALOG_MEDIA_VARIANT_PREFIX VEDA_CATALOG_MEDIA_SCANNER VEDA_CATALOG_MEDIA_DELIVERY_ENABLED VEDA_CATALOG_3D_ENABLED
   VEDA_CATALOG_VIDEO_ENABLED VEDA_CATALOG_ESTIMATOR_ENABLED VEDA_CATALOG_ADMIN_ENABLED VEDA_CATALOG_CLAMD_ADDRESS
   VEDA_CATALOG_CLAMD_IMAGE)
+# VEDA_CATALOG_APPROVAL_SHA256 (activation remediation) is not in COMMON: a host deployed before the staging-core apply
+# that plans it has none, which is the inactive value while V3 is off. It is required only for an activation.
 value() { sed -n "s/^$1=//p" "$FILE" | tail -1 | sed -e 's/^"//' -e 's/"$//'; }
 
 missing=()
@@ -45,6 +48,8 @@ case "$on" in
   0) echo "V3 intentionally disabled: every V3 and media-delivery flag is false" ;;
   3)
     [[ "$scanner" == "clamd" ]] || { echo "REFUSED: V3 activation without the clamd scanner"; exit 1; }
+    [[ "$(value VEDA_CATALOG_APPROVAL_SHA256)" =~ ^[0-9a-f]{64}$ ]] ||
+      { echo "APPROVAL DIGEST NOT BOUND: VEDA_CATALOG_APPROVAL_SHA256 is not the SHA-256 of an approval record"; exit 1; }
     echo "V3 ACTIVATION REQUESTED: deploy.sh requires a current APPROVED V3 staging approval record in the image" ;;
   *) echo "PARTIAL ACTIVATION: $on of 3 V3 flags are on; refused (they turn on together or not at all)"; exit 1 ;;
 esac

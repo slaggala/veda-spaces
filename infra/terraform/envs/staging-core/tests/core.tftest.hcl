@@ -254,104 +254,44 @@ run "a_decided_pinned_clamd_reaches_ssm_on_the_private_network" {
 }
 
 # Pre-plan closure, gap 1: Terraform judges the approval record itself whenever a V3 flag is on.
-run "a_current_independent_fully_evidenced_approved_record_opens_the_gate" {
+# The approval rules themselves are proven case by case in modules/v3-approval (the shared conformance cases); here
+# only the wiring: a passing record opens the gate and binds its digest, any failing code refuses the plan.
+run "an_approval_the_shared_rules_accept_opens_the_gate_and_binds_its_digest" {
   command = plan
   variables {
-    platform_config_path = "tests/fixtures/platform-on-approved.json"
-    approval_record_path = "tests/fixtures/approval-approved.json"
+    platform_config_path = "tests/fixtures/platform-on.json"
+  }
+  override_module {
+    target  = module.v3_approval
+    outputs = { codes = [], messages = [], record_sha256 = "" }
   }
   assert {
     condition     = length(local.approval_problems) == 0 && local.app_config["VEDA_CATALOG_ESTIMATOR_ENABLED"] == "true"
-    error_message = "the valid record opens the gate"
+    error_message = "A record the shared rules accept opens the V3 gate."
+  }
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_APPROVAL_SHA256"] == local.catalog_v3.approval_record_sha256
+    error_message = "The bound digest reaches SSM for the deployment check and the runtime."
   }
 }
 
-run "approval_draft_refused" {
+run "any_failing_approval_code_refuses_the_plan" {
   command = plan
   variables {
-    platform_config_path = "tests/fixtures/platform-on-draft.json"
-    approval_record_path = "tests/fixtures/approval-draft.json"
+    platform_config_path = "tests/fixtures/platform-on.json"
   }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_in_review_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-in-review.json"
-    approval_record_path = "tests/fixtures/approval-in-review.json"
+  override_module {
+    target  = module.v3_approval
+    outputs = { codes = ["EXPIRED"], messages = ["the approval has expired"], record_sha256 = "" }
   }
   expect_failures = [output.catalog_v3]
 }
 
-run "approval_revoked_refused" {
+run "the_shared_rules_refuse_a_draft_record_at_plan" {
   command = plan
   variables {
-    platform_config_path = "tests/fixtures/platform-on-revoked.json"
-    approval_record_path = "tests/fixtures/approval-revoked.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_missing_evidence_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-missing-evidence.json"
-    approval_record_path = "tests/fixtures/approval-missing-evidence.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_expired_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-expired.json"
-    approval_record_path = "tests/fixtures/approval-expired.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_review_passed_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-review-passed.json"
-    approval_record_path = "tests/fixtures/approval-review-passed.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_self_approved_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-self-approved.json"
-    approval_record_path = "tests/fixtures/approval-self-approved.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_wrong_environment_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-wrong-environment.json"
-    approval_record_path = "tests/fixtures/approval-wrong-environment.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_malformed_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-malformed.json"
-    approval_record_path = "tests/fixtures/approval-malformed.json"
-  }
-  expect_failures = [output.catalog_v3]
-}
-
-run "approval_digest_mismatch_refused" {
-  command = plan
-  variables {
-    platform_config_path = "tests/fixtures/platform-on-digest-mismatch.json"
-    approval_record_path = "tests/fixtures/approval-approved.json"
+    platform_config_path = "tests/fixtures/platform-on.json"
+    approval_record_path = "../../../../api/tests/fixtures/v3_approval/draft.json"
   }
   expect_failures = [output.catalog_v3]
 }
@@ -359,10 +299,29 @@ run "approval_digest_mismatch_refused" {
 run "approval_record_missing_refused" {
   command = plan
   variables {
-    platform_config_path = "tests/fixtures/platform-on-approved.json"
+    platform_config_path = "tests/fixtures/platform-on.json"
     approval_record_path = "tests/fixtures/no-such-record.json"
   }
   expect_failures = [output.catalog_v3]
+}
+
+run "scanner_option_a_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-scanner-option-a.json"
+  }
+  expect_failures = [output.catalog_v3]
+}
+
+run "scanner_option_c_may_be_recorded_while_the_mode_stays_none" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-scanner-option-c-undecided-adapter.json"
+  }
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] == "none"
+    error_message = "Option C is a valid decision; until its adapter exists the scanner mode stays none."
+  }
 }
 
 run "all_flags_off_plans_without_any_approval_record" {
@@ -373,6 +332,10 @@ run "all_flags_off_plans_without_any_approval_record" {
   assert {
     condition     = !local.activation && length(local.approval_problems) == 0
     error_message = "infrastructure with every flag off needs no approval record"
+  }
+  assert {
+    condition     = local.app_config["VEDA_CATALOG_APPROVAL_SHA256"] == "none"
+    error_message = "with nothing bound the deployment check and the runtime get the inactive value none"
   }
 }
 
@@ -395,13 +358,13 @@ run "scanner_none_keeps_the_same_parameter_names_as_clamd" {
     condition = alltrue([for k in ["VEDA_CATALOG_CLAMD_ADDRESS", "VEDA_CATALOG_CLAMD_IMAGE", "VEDA_CATALOG_MEDIA_BACKEND",
       "VEDA_CATALOG_MEDIA_BUCKET", "VEDA_CATALOG_MEDIA_KMS_KEY_ARN", "VEDA_CATALOG_MEDIA_SOURCE_PREFIX", "VEDA_CATALOG_MEDIA_VARIANT_PREFIX",
       "VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", "VEDA_CATALOG_3D_ENABLED", "VEDA_CATALOG_VIDEO_ENABLED", "VEDA_CATALOG_ESTIMATOR_ENABLED",
-    "VEDA_CATALOG_ADMIN_ENABLED"] : contains(keys(local.app_config), k)])
+    "VEDA_CATALOG_ADMIN_ENABLED", "VEDA_CATALOG_APPROVAL_SHA256"] : contains(keys(local.app_config), k)])
     error_message = "common and scanner-specific media settings are always planned (none is an inactive value, not a removal)"
   }
 
   assert {
-    condition     = length(local.media_config) == 13
-    error_message = "with none: 13 media parameters, the same names as with clamd"
+    condition     = length(local.media_config) == 14
+    error_message = "with none: 14 media parameters, the same names as with clamd"
   }
 }
 

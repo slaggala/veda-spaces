@@ -97,7 +97,7 @@
     "catalog_estimator_enabled": true,
     "catalog_admin_enabled": true,
     "media_delivery_enabled": true,
-    "approval_record_sha256": "693173a884184739a20f4b50cbe13af91b13608274d995854ddc9403cfc8f7de"
+    "approval_record_sha256": "5b484b70e4caac7a520400410657578f67afa039e1bdf2894897fad28db35df5"
   },
   "media_scanner": {
     "status": "DECIDED",
