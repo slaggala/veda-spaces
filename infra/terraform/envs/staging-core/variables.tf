@@ -62,3 +62,9 @@ variable "warranty_policy_url" {
     error_message = "warranty_policy_url must be an https page on a vedaspaces.com host (no placeholder link)."
   }
 }
+
+variable "approval_record_path" {
+  description = "The V3 staging approval record (tests only; empty means api/veda/modules/catalog/approved/v3-staging-approval.json)."
+  type        = string
+  default     = ""
+}

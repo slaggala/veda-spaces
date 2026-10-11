@@ -200,9 +200,10 @@ test('V3 (catalog-driven estimator) is not in a staging build without its approv
 function v3Record(over = {}) {
   const evidence = Object.fromEntries([...V3_GIT_EVIDENCE.map((k) => [k, { git_sha: 'a'.repeat(40), reference: `git ${k} (synthetic)` }]),
     ...V3_DIGEST_EVIDENCE.map((k) => [k, { sha256: 'b'.repeat(64), reference: `evidence ${k} (synthetic)` }])]);
-  return { schema: 'veda.catalog.v3-staging-approval/1', status: 'APPROVED', release: 'V3-STAGING-1', author: 'Catalog lead (role, test)',
-    approver: 'Owner (role, test)', approved_on: '2026-10-10',
-    scope: { environments: ['staging'], version: 'v3', public_intake: false, media_delivery: true, three_d: false, video: false }, evidence, ...over };
+  return { schema: 'veda.catalog.v3-staging-approval/2', status: 'APPROVED', environment: 'staging', release: 'V3-STAGING-1',
+    author: 'Catalog lead (role, test)', approver: 'Owner (role, test)', approved_at: '2026-10-10', review_by: '2099-01-01',
+    expires_at: '2099-06-01', non_expiring_decision: null, revoked_at: null, revocation_reason: null,
+    approval_scope: { version: 'v3', protected: true, public_intake: false, media_delivery: true, three_d: false, video: false }, evidence, ...over };
 }
 function v3Files(record, bind = true) {
   const dir = mkdtempSync(join(tmpdir(), 'veda-v3-approval-'));
@@ -224,8 +225,15 @@ test('V3: an APPROVED, complete, independent, digest-bound record opens the gate
     [v3Record({ approver: '[OWNER TO FILL]' }), true, /not independent/],
     [v3Record({ evidence: {} }), true, /evidence without a digest/],
     [v3Record({ evidence: { ...v3Record().evidence, real_card_evidence: { reference: 'pending' } } }), true, /real_card_evidence/],
-    [v3Record({ scope: { ...v3Record().scope, public_intake: true } }), true, /staging only/],
-    [v3Record({ scope: { ...v3Record().scope, environments: ['staging', 'production'] } }), true, /staging only/],
+    [v3Record({ approval_scope: { ...v3Record().approval_scope, public_intake: true } }), true, /protected staging only/],
+    [v3Record({ approval_scope: { ...v3Record().approval_scope, protected: false } }), true, /protected staging only/],
+    [v3Record({ environment: 'production' }), true, /not for staging/],
+    [v3Record({ status: 'IN_REVIEW' }), true, /record is IN_REVIEW/],
+    [v3Record({ review_by: '2026-01-01' }), true, /review date/],
+    [v3Record({ expires_at: '2026-01-01' }), true, /expired/],
+    [v3Record({ expires_at: null }), true, /expiry policy/],
+    [v3Record({ revoked_at: '2026-10-11', revocation_reason: 'Evidence withdrawn (test)' }), true, /revoked/],
+    [v3Record({ schema: 'veda.catalog.v3-staging-approval/1' }), true, /schema 2/],
     [v3Record(), false, /not the one bound/],
   ];
   for (const [record, bind, why] of cases) {

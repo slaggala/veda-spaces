@@ -65,11 +65,15 @@ output "catalog_v3" {
   }
 
   precondition {
-    condition = !anytrue(local.catalog_v3_flags) || (
+    condition = !local.activation || (
       local.scanner.status == "DECIDED" && local.scanner.mode == "clamd" && local.rights.status == "DECIDED" &&
-      !strcontains(local.rights.approver, "OWNER TO FILL") && trimspace(local.rights.approver) != "" &&
-      fileexists(local.approval_record) && local.catalog_v3.approval_record_sha256 == filesha256(local.approval_record)
+      !strcontains(local.rights.approver, "OWNER TO FILL") && trimspace(local.rights.approver) != ""
     )
-    error_message = "A catalog_v3 flag is on without its gates: media_scanner DECIDED with clamd, media_rights DECIDED, an assigned media-rights approver, and approval_record_sha256 equal to the SHA-256 of api/veda/modules/catalog/approved/v3-staging-approval.json (which the build accepts only when APPROVED)."
+    error_message = "A catalog_v3 flag is on without media_scanner DECIDED with clamd and media_rights DECIDED with a named approver."
+  }
+
+  precondition {
+    condition     = length(local.approval_problems) == 0
+    error_message = "A catalog_v3 flag is on but the V3 staging approval record is refused: ${join("; ", local.approval_problems)}."
   }
 }

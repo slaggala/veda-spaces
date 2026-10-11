@@ -62,7 +62,7 @@ already enforces that:
 ## Lifecycle and deletion
 
 - **Withdrawal:** a deletion request or withdrawn consent (`POST /api/v1/catalog/media/<sha>/withdraw`, reason
-  required) deletes the bytes of the source and every variant at once and keeps the hashes. Manifests stay intact,
+  required) removes the current version of the source and every variant at once and keeps the hashes; prior noncurrent versions remain until the lifecycle window expires them. Manifests stay intact,
   nothing is served, and new releases naming the media fail validation.
 - **Unreferenced sources:** sources no live media record names are purged after `VEDA_CATALOG_MEDIA_RETENTION_DAYS`
   (default 180) by the `catalog-media-retention` job.

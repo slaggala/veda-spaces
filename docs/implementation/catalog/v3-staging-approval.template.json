@@ -1,15 +1,19 @@
 {
-  "schema": "veda.catalog.v3-staging-approval/1",
+  "schema": "veda.catalog.v3-staging-approval/2",
   "status": "DRAFT",
+  "environment": "staging",
   "release": "V3-STAGING-1",
   "author": "[AUTHOR TO FILL]",
   "approver": null,
-  "approved_on": null,
-  "scope": {
-    "environments": [
-      "staging"
-    ],
+  "approved_at": null,
+  "review_by": null,
+  "expires_at": null,
+  "non_expiring_decision": null,
+  "revoked_at": null,
+  "revocation_reason": null,
+  "approval_scope": {
     "version": "v3",
+    "protected": true,
     "public_intake": false,
     "media_delivery": false,
     "three_d": false,

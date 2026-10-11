@@ -77,3 +77,39 @@ def test_the_rendered_quoted_form_is_read(deploy, tmp_path):  # noqa: F811
     r, calls = deploy("at-floor", env_extra={"VEDA_API_ENV": str(path)})
     assert r.returncode == 0, r.stdout + r.stderr
     assert "--profile scanner up -d --no-deps clamd" in calls
+
+
+# --- deployment order (pre-plan closure, phase 7) -----------------------------------------------------------------
+OFF = {"VEDA_CATALOG_MEDIA_SCANNER": "none", "VEDA_CATALOG_ESTIMATOR_ENABLED": "false"}
+
+
+def test_with_v3_off_no_approval_is_needed_and_the_deploy_proceeds(deploy, tmp_path):  # noqa: F811
+    r, calls = deploy("at-floor", env_extra=env_file(tmp_path, **OFF))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "staging_approval" not in calls and "up -d --no-deps api" in calls
+
+
+@pytest.mark.parametrize(
+    "approval_exit", ["1", "2"]
+)  # DRAFT, IN_REVIEW, REVOKED, expired, missing: the validator exits 1
+def test_v3_activation_without_a_current_approval_is_refused_before_anything_changes(deploy, tmp_path, approval_exit):  # noqa: F811
+    extra = {**env_file(tmp_path, VEDA_CATALOG_MEDIA_SCANNER="clamd", VEDA_CATALOG_CLAMD_IMAGE=PINNED,
+                        VEDA_CATALOG_ESTIMATOR_ENABLED="true"), "SHIM_APPROVAL_EXIT": approval_exit}  # fmt: skip
+    r, calls = deploy("at-floor", env_extra=extra)
+    assert r.returncode != 0 and "APPROVAL RECORD INVALID" in r.stdout
+    for step in (
+        "maintenance snapshot",
+        "stop worker scheduler",
+        "veda.cli migrate",
+        "up -d --no-deps api",
+        "--profile scanner up",
+    ):
+        assert step not in calls, step
+
+
+def test_v3_activation_with_a_current_approval_proceeds(deploy, tmp_path):  # noqa: F811
+    extra = {**env_file(tmp_path, VEDA_CATALOG_MEDIA_SCANNER="clamd", VEDA_CATALOG_CLAMD_IMAGE=PINNED,
+                        VEDA_CATALOG_ESTIMATOR_ENABLED="true"), "SHIM_APPROVAL_EXIT": "0"}  # fmt: skip
+    r, calls = deploy("at-floor", env_extra=extra)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert calls.index("staging_approval") < calls.index("up -d --no-deps api")

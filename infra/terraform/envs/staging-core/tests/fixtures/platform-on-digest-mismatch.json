@@ -54,7 +54,7 @@
   },
   "monitoring": {
     "status": "DECIDED",
-    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue. Implementation note 2026-10-10 (targeted media enablement, not a change of this decision): the monitoring module now plans 15 log metric filters (these 7 plus 8 catalog-media signals) and one more host metric (scanner restarts): 16 custom metrics without the host, 21 with it.",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue.",
     "log_retention_days": 30,
     "thresholds": {
       "server_errors_per_5min": 5,
@@ -88,28 +88,28 @@
   },
   "media": {
     "status": "DECIDED",
-    "decision": "Owner defaults of VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT (2026-10-10), recorded as given: one private media bucket veda-stg-media-<account> from the existing storage module (the plan-guard naming convention); the existing data key by alias (no third key); no Object Lock, so a withdrawal removes the current object version at once (a delete marker; nothing is served); prior noncurrent versions remain, unreadable to anyone but the account, until the 30-day lifecycle window expires them; noncurrent versions expire after noncurrent_days (30, configurable 1 to 90); delivery only through the existing api-staging route behind Cloudflare Access (no CloudFront, no new hostname); media governance is catalog governance with four-eyes approval; 3D, video and public intake stay disabled. Nothing is served until media_scanner and media_rights are decided and catalog_v3 is approved.",
+    "decision": "Owner defaults of VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT (2026-10-10), recorded as given: one private media bucket veda-stg-media-<account> from the existing storage module (the plan-guard naming convention); the existing data key by alias (no third key); no Object Lock, so a media or consent withdrawal deletes the bytes; noncurrent versions expire after noncurrent_days (30, configurable 1 to 90); delivery only through the existing api-staging route behind Cloudflare Access (no CloudFront, no new hostname); media governance is catalog governance with four-eyes approval; 3D, video and public intake stay disabled. Nothing is served until media_scanner and media_rights are decided and catalog_v3 is approved.",
     "noncurrent_days": 30
   },
   "catalog_v3": {
     "status": "DECIDED",
     "decision": "VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT: every V3 catalog flag stays off in staging. A flag may be turned on only together, by a reviewed change that sets approval_record_sha256 to the canonical SHA-256 of an APPROVED api/veda/modules/catalog/approved/v3-staging-approval.json; staging-core refuses any flag on without that binding, and refuses a partial activation. Rollback: every flag false and approval_record_sha256 null. Production refuses V3 in the API whatever this says.",
-    "catalog_estimator_enabled": false,
-    "catalog_admin_enabled": false,
-    "media_delivery_enabled": false,
-    "approval_record_sha256": null
+    "catalog_estimator_enabled": true,
+    "catalog_admin_enabled": true,
+    "media_delivery_enabled": true,
+    "approval_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "media_scanner": {
-    "status": "UNDECIDED",
+    "status": "DECIDED",
     "decision": "Not decided. The owner chooses option A (clamd sidecar on the current host, only if the capacity evidence shows the approved reserve), B (resize the host, separately reviewed and cost-approved, then the sidecar) or C (asynchronous S3 scanning; needs an application adapter first) after the scanner-capacity evidence (docs/implementation/catalog/CATALOG-V3-media-enablement.md). Until then mode is none: uploads stay PENDING and nothing is served. clamd needs the image pinned by digest; a placeholder is refused. UNDECIDED does not block other applies or deploys; it blocks V3 activation (output catalog_v3).",
-    "option": null,
-    "mode": "none",
-    "clamd_image": null,
+    "option": "B",
+    "mode": "clamd",
+    "clamd_image": "clamav/clamav:1.4@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "capacity_evidence_sha256": null
   },
   "media_rights": {
-    "status": "UNDECIDED",
+    "status": "DECIDED",
     "decision": "Not decided: the owner names the accountable media-rights approver (a person or role they choose; never invented). Until then media activation is blocked (output catalog_v3, release validation).",
-    "approver": "[OWNER TO FILL]"
+    "approver": "Brand lead (role, test)"
   }
 }

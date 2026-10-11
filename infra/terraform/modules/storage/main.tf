@@ -15,7 +15,7 @@ locals {
     evidence   = { name = "veda-evidence-${var.account_id}", key = var.audit_key_arn, lock = true }
     logs       = { name = "${var.name_prefix}-logs-${var.account_id}", key = var.audit_key_arn, lock = false }
     # Catalog V3 media (targeted media enablement): private sources and delivery variants under content-hash keys
-    # (source/, variant/). No Object Lock: a media or consent withdrawal must delete the bytes.
+    # (source/, variant/). No Object Lock: a media or consent withdrawal removes the current version at once; prior versions expire by lifecycle.
     media = { name = "${var.name_prefix}-media-${var.account_id}", key = var.data_key_arn, lock = false }
   }
 

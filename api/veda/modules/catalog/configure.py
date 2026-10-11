@@ -42,7 +42,22 @@ def enabled() -> bool:
     return settings().catalog_estimator_enabled
 
 
+def _approved_for_this_environment() -> None:
+    """On protected staging, V3 serves only while the packaged V3 staging approval record is APPROVED and current:
+    a revoked, expired or past-review approval stops every public V3 request at once (fail closed). Production never
+    reaches here (the API refuses the V3 flags there); local and test have no approval record."""
+    if settings().env != "staging":
+        return
+    from . import staging_approval
+
+    found = staging_approval.problems(staging_approval.load(), today=claims.today())
+    if found:
+        log.error("catalog.v3_staging_approval_refused", problems=found[:5])
+        raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
+
+
 def _active(s: Session) -> CatalogRelease:
+    _approved_for_this_environment()
     release = service.active_release(s)
     if release is None or release.rate_card_id is None:
         raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
