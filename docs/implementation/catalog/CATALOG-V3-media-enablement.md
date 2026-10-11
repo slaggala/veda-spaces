@@ -23,7 +23,7 @@ The work extends the existing staging platform. It creates no new platform, no C
 |---|---|---|
 | Storage | One more bucket-map entry, `veda-stg-media-<account>`. It inherits every existing control: SSE-KMS under the data key with a bucket key, versioning, all public access blocked, ownership enforced, a TLS-only and account-only policy, `prevent_destroy`. It adds: uploads refused unless SSE-KMS under the data key (key ARN or alias ARN); noncurrent versions expire after `media.noncurrent_days` (30); expired delete markers removed. No Object Lock, so a withdrawal can remove the current version at once; prior noncurrent versions remain until the 30-day window expires them. No website, no allow statement at all. | `infra/terraform/modules/storage` |
 | IAM | The host role gains `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on `media/source/*` and `media/variant/*`, and `s3:ListBucket` under those prefixes only. No KMS change: the existing data-key grant matches by alias. No version delete, tagging, ACL or bucket permission; the explicit administration deny still covers the bucket. A production media bucket is refused by the module. | `infra/terraform/modules/runtime-iam` |
-| SSM | 13 media settings and flags under `/veda/staging/config`. Values are plain and non-secret. The scanner address and image are always present and inactive unless the scanner mode is `clamd` (§17); the rights approver appears only once named. | `infra/terraform/envs/staging-core` |
+| SSM | 13 media settings and flags under `/veda/staging/config` (applied 2026-10-11; a 14th, the approval digest `VEDA_CATALOG_APPROVAL_SHA256`, is planned by this change, §18). Values are plain and non-secret. The scanner address and image are always present and inactive unless the scanner mode is `clamd` (§17); the rights approver appears only once named. | `infra/terraform/envs/staging-core` |
 | Scanner | A pinned `clamd` service in the Compose `scanner` profile: private network only, no host port, read-only root, all capabilities dropped except the entrypoint's user switch, no-new-privileges, bounded memory, a persistent signature volume, a health check. `deploy.sh` starts it only when the configuration selects `clamd`, refuses an image not pinned by digest, and refuses to continue until clamd answers `PING`. **Not running today.** | `api/deploy/docker-compose.yml`, `api/deploy/deploy.sh` |
 | Monitoring | Eight log metric filters and alarms on the existing topic. One host metric, the scanner restart count. Signals carry counts and ages only. | `infra/terraform/modules/monitoring`, `infra/host/health.sh` |
 | Evidence | `veda-collect` also records the scanner-capacity facts, read-only. | `infra/terraform/modules/deploy` |
@@ -50,7 +50,7 @@ Media alarm signals:
 | Entry | Status | Content |
 |---|---|---|
 | `media` | DECIDED | The owner defaults of this workstream, as given: bucket, data key, no Object Lock, 30-day noncurrent window, delivery via api-staging behind Access, catalog governance. |
-| `media_scanner` | **UNDECIDED** | Option A, B or C, after the capacity evidence (§4). `mode` stays `none`, so uploads stay PENDING and nothing is served. |
+| `media_scanner` | **UNDECIDED** | Option B or C, after the capacity evidence (§4). Option A is precluded and refused (§5). `mode` stays `none`, so uploads stay PENDING and nothing is served. |
 | `media_rights` | **UNDECIDED** | `approver: [OWNER TO FILL]`. Never invented. |
 | `catalog_v3` | DECIDED: off | Every flag false; `approval_record_sha256` null. |
 
@@ -58,7 +58,8 @@ UNDECIDED blocks V3 activation only. It does not block other applies or deploys;
 
 The staging-core output `catalog_v3` refuses all of the following:
 - a scanner other than `none` or `clamd`;
-- `clamd` without option A or B and an image pinned by digest;
+- `media_scanner.option` A, whatever the mode (§5);
+- `clamd` without option B and an image pinned by digest;
 - a partial activation;
 - any flag on without all of these: `media_scanner` DECIDED with `clamd`, `media_rights` DECIDED with a named approver, and `approval_record_sha256` equal to the SHA-256 of the committed approval record.
 
@@ -104,28 +105,33 @@ Do not run a scanner to measure it. Collect facts on the running host:
    - **Minimum 3 GiB, preferred 4 GiB** of RAM for the ClamAV container.
    - "upwards of 1.2 GiB of RAM simply to load the signature definitions".
    - During a database reload clamd "will use twice the amount of RAM for a brief period". `ConcurrentDatabaseReload no` avoids this, but scans block until the reload completes.
-4. The capacity rule for **option A**:
+4. The capacity rule, applied to the host that would run clamd (under option B, the resized host):
 
    `MemTotal − (peak current service memory + projected clamd reservation + projected reload peak) ≥ the approved reserve`
 
-   The reserve is an owner decision; the proposal is 25% of memory, 512 MiB on a 2 GiB host. Also required: no OOM kill and no restart in the window.
+   The reserve is an owner decision; the proposal is 25% of memory (512 MiB on the current 2 GiB host, which the ClamAV minimum alone exceeds, so clamd on the current host is precluded, §5). Also required: no OOM kill and no restart in the window.
 5. Record the evidence object's SHA-256 in `media_scanner.capacity_evidence_sha256`, and as `scanner_capacity` in the approval record.
 
-## 5. Scanner options (the owner decides; nothing is chosen here)
+## 5. Scanner options (the owner decides between B and C; nothing is chosen here)
 
-| | A: clamd on the current host | B: resize the host, then clamd | C: asynchronous S3 scanning |
-|---|---|---|---|
-| Security posture | Synchronous scan before storing; unscanned or failed objects are never served | Same as A | Scan after upload; objects quarantined until a verdict; equivalent if the adapter quarantines |
-| Operational burden | One container, signature updates, alarms already prepared | Same as A, plus a host change | A managed or isolated service, events, adapter code |
-| Memory impact | **Precluded.** The ClamAV minimum (3 GiB) exceeds the whole 2 GiB host, so the §4 reserve rule cannot pass, whatever the measured service memory. Only a deliberate owner change to the capacity policy could reopen it | Removes the pressure: the host must give clamd its 3 to 4 GiB beyond the reserve and the current services (t4g.medium is 4 GiB in total, so the size is to be derived from the §4 evidence) | None on the host |
-| Infrastructure changes | Decide `media_scanner` (A, `clamd`, image digest) | A reviewed `compute.instance_type` change in staging-platform.json (a stop and start of the host), then as A | New service resources and an event path |
-| Application changes | None | None | A new scanner adapter. The app accepts only `none` or `clamd` today, and staging-core refuses any other mode. |
-| Monthly cost (plan evidence) | No new AWS resource (container on the existing host) | The instance-type difference shown by that plan; must fit the $25 budget (AUT-112) | The managed service's per-GB and per-object charges, from its plan |
-| Failure mode | Memory pressure can restart services; the scanner fails to FAILED (never served) | Same as A, with headroom | Delayed verdicts; PENDING until scanned |
-| Rollback | `mode: none`, redeploy: the scanner stops and uploads stay PENDING | Same as A; the size change reverts by a reviewed plan | Revert the adapter and the mode |
-| Requires | Not available under the current policy and host | A reviewed host-resize plan; owner cost approval; a validated, pinned ARM64 ClamAV image; the capacity reserve; a rollout and rollback plan | An approved application adapter; an isolated scan architecture; a security and operational review |
+**Option A (clamd on the current 2 GiB host) is not a choice.** The ClamAV minimum (3 GiB) exceeds the whole host, so
+the §4 reserve rule cannot pass whatever the measured service memory, and staging-core refuses `media_scanner.option`
+A whatever the mode (§18; `infra/config/staging-platform.json` records the same). Only a deliberate owner change to the
+capacity policy and to staging-core could reopen it.
 
-## 6. ClamAV implementation readiness (if B is chosen; A is precluded)
+| | B: resize the host, then clamd | C: asynchronous S3 scanning |
+|---|---|---|
+| Security posture | Synchronous scan before storing; unscanned or failed objects are never served | Scan after upload; objects quarantined until a verdict; equivalent if the adapter quarantines |
+| Operational burden | One container, signature updates, alarms already prepared, plus a host change | A managed or isolated service, events, adapter code |
+| Memory impact | Removes the pressure: the host must give clamd its 3 to 4 GiB beyond the reserve and the current services (t4g.medium is 4 GiB in total, so the size is to be derived from the §4 evidence) | None on the host |
+| Infrastructure changes | A reviewed `compute.instance_type` change in staging-platform.json (a stop and start of the host), then `media_scanner` decided: option B, mode `clamd`, image digest | New service resources and an event path |
+| Application changes | None | A new scanner adapter. The app accepts only `none` or `clamd` today, and staging-core refuses any other mode. |
+| Monthly cost (plan evidence) | The instance-type difference shown by that plan; must fit the $25 budget (AUT-112). The container itself adds no AWS resource | The managed service's per-GB and per-object charges, from its plan |
+| Failure mode | The scanner fails to FAILED (never served); the resize gives the headroom that the current host lacks | Delayed verdicts; PENDING until scanned |
+| Rollback | `mode: none`, redeploy: the scanner stops and uploads stay PENDING; the size change reverts by a reviewed plan | Revert the adapter and the mode |
+| Requires | A reviewed host-resize plan; owner cost approval; a validated, pinned ARM64 ClamAV image; the capacity reserve; a rollout and rollback plan | An approved application adapter; an isolated scan architecture; a security and operational review |
+
+## 6. ClamAV implementation readiness (if B is chosen)
 
 **ClamAV is not ready to run, and is not claimed to be.** The image digest is still a placeholder (`scanner-image-not-decided` in Compose, `none-selected` in SSM), and every gate refuses it: the Terraform precondition, the host media preflight and `deploy.sh`. ARM64 support, non-root behaviour, the health check and the configuration all still need validating for whichever image is selected. Before the decision is recorded:
 
@@ -334,7 +340,8 @@ The same rules run at four points:
 
 Changing the policy (any field) changes the record's SHA-256, so the plan and the build refuse the old binding.
 
-**Scanner rollback model.** The scanner states are `none` and `clamd`; an isolated asynchronous scanner is reserved and refused today. The 13 media parameters are always planned:
+**Scanner rollback model.** The scanner states are `none` and `clamd`; an isolated asynchronous scanner is reserved and refused today. The 13 media parameters are always planned (14 with
+`VEDA_CATALOG_APPROVAL_SHA256`, the approval digest of this change, `none` until bound, §18):
 - **Common:** backend, bucket, KMS ARN, the two prefixes, and the delivery, 3D, video, estimator and admin flags.
 - **Scanner-specific:** the clamd address and image. With `none` they are present and inactive (`none-selected`).
 
