@@ -53,7 +53,7 @@ def _date(value: object) -> date | None:
     if not _match(POLICY["date_pattern"], value):
         return None
     try:
-        return date.fromisoformat(value)  # type: ignore[arg-type]
+        return date.fromisoformat(str(value))  # a str: _match checked it
     except ValueError:
         return None
 
