@@ -42,25 +42,32 @@ def enabled() -> bool:
     return settings().catalog_estimator_enabled
 
 
-def _approved_for_this_environment() -> None:
-    """On protected staging, V3 serves only while the packaged V3 staging approval record is APPROVED and current:
-    a revoked, expired or past-review approval stops every public V3 request at once (fail closed). Production never
-    reaches here (the API refuses the V3 flags there); local and test have no approval record."""
+def require_staging_approval(release: CatalogRelease | None = None) -> None:
+    """On protected staging, V3 serves and media is handled only while the packaged V3 staging approval record passes
+    every rule of v3_approval_policy.json and is the record bound by VEDA_CATALOG_APPROVAL_SHA256; with `release`, it
+    must also cover that (active) release. A missing, revoked, expired, past-review or unbound record stops every public
+    V3 request and every media operation at once (fail closed). Production never reaches here (the API refuses the V3
+    flags there); local and test have no approval record."""
     if settings().env != "staging":
         return
     from . import staging_approval
 
-    found = staging_approval.problems(staging_approval.load(), today=claims.today())
+    found = staging_approval.evaluate(
+        staging_approval.read(),
+        today=staging_approval.today(),
+        bound_sha256=settings().catalog_approval_sha256,
+        release=release.release_code if release is not None else None,
+    )
     if found:
-        log.error("catalog.v3_staging_approval_refused", problems=found[:5])
+        log.error("catalog.v3_staging_approval_refused", codes=found)
         raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
 
 
 def _active(s: Session) -> CatalogRelease:
-    _approved_for_this_environment()
     release = service.active_release(s)
     if release is None or release.rate_card_id is None:
         raise ApiError(503, "ESTIMATOR_UNAVAILABLE", "Estimates are not available right now.")
+    require_staging_approval(release)
     return release
 
 

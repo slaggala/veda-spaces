@@ -1,182 +1,200 @@
-"""The V3 staging approval record (targeted media enablement, Phase 11).
+"""The V3 staging approval record (targeted media enablement, Phase 11; activation remediation).
 
 `api/veda/modules/catalog/approved/v3-staging-approval.json` is the owner's record that V3 may be activated on protected
 staging. It references by digest every piece of evidence the activation rests on. It does not itself enable anything.
-V3 needs, in addition:
-- the catalog_v3 flags in infra/config/staging-platform.json, bound to the record's SHA-256;
-- the staging build (`app/scripts/staging-build.mjs`), which repeats these checks;
-- the API's own production refusal.
 
-Statuses are DRAFT, IN_REVIEW, APPROVED and REVOKED. Only APPROVED satisfies the gate, and only while it is current:
-- `review_by` has not been reached (at most 90 days after `approved_at`);
-- `expires_at` has not been reached, or an explicit `non_expiring_decision` was recorded instead;
-- it is not revoked.
+The rules are defined once, in `v3_approval_policy.json` next to this module. Four gates apply them:
+- the Terraform plan (infra/terraform/modules/v3-approval);
+- the staging build (app/scripts/v3-approval.mjs);
+- the deployment check (deploy.sh runs this module);
+- the runtime, on every public V3 request and every media operation on staging (configure.require_staging_approval).
 
-The approver must not be the author (four-eyes review). The record is for protected staging only: the schema refuses
-any other environment. The same rules run at plan (Terraform), build (staging-build.mjs), deployment preflight
-(deploy.sh) and on every public V3 request on staging (configure._approved_for_this_environment).
+Each gate reports the failing rule codes in the policy's order. The shared conformance cases in
+api/tests/fixtures/v3_approval/cases.json prove that the three implementations decide every case identically.
 
 No record is committed until the owner approves one: the template in docs/implementation/catalog/ is DRAFT with empty
 evidence, and no owner value or date is ever filled in automatically.
 
-    python -m veda.modules.catalog.staging_approval <record.json>   # exit 0 only for a current APPROVED record
+    python -m veda.modules.catalog.staging_approval [record.json]
+    # exit 0 only for a current APPROVED record bound by VEDA_CATALOG_APPROVAL_SHA256
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from pathlib import Path
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing import Any
 
 RECORD = Path(__file__).resolve().parent / "approved" / "v3-staging-approval.json"
-SCHEMA = "veda.catalog.v3-staging-approval/2"
+POLICY_FILE = Path(__file__).resolve().parent / "v3_approval_policy.json"
+POLICY: dict[str, Any] = json.loads(POLICY_FILE.read_text())
 
-# The evidence an approval rests on, by name. Commits are git SHAs; everything else is the SHA-256 of an artifact
-# kept where its procedure says (never its content: no rates, no personal data, no media).
-GIT_EVIDENCE = ("application_commit", "pr69_merge")
-DIGEST_EVIDENCE = (
-    "application_certification", "real_card_evidence", "infrastructure_plan", "infrastructure_apply",
-    "scanner_capacity", "scanner_decision", "media_bucket", "iam", "ssm_settings", "csp", "media_smoke_test",
-    "promise_owner_approval", "media_rights_approver",
-)  # fmt: skip
+SCHEMA: str = POLICY["schema"]
+MAX_REVIEW_DAYS: int = POLICY["max_review_days"]
+GIT_EVIDENCE: tuple[str, ...] = tuple(POLICY["git_evidence"])
+DIGEST_EVIDENCE: tuple[str, ...] = tuple(POLICY["digest_evidence"])
 REQUIRED_EVIDENCE = (*GIT_EVIDENCE, *DIGEST_EVIDENCE)
-MAX_REVIEW_DAYS = 90  # an approval is reviewed at least every 90 days (owner may set an earlier date)
+CODES: tuple[str, ...] = tuple(c["code"] for c in POLICY["codes"])
+MESSAGES: dict[str, str] = {c["code"]: c["message"] for c in POLICY["codes"]}
 
-Name = Annotated[str, Field(min_length=1, max_length=120)]
-Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-GitSha = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
-Ref = Annotated[str, Field(min_length=8, max_length=300)]
-
-
-class _Model(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+_SPACE = re.compile(r"[ \t\r\n]+")
+_EDGE = re.compile(r"^[ \t\r\n]+|[ \t\r\n]+$")
 
 
-class Evidence(_Model):
-    sha256: Sha256 | None = None  # the artifact's SHA-256
-    git_sha: GitSha | None = None  # for commits
-    reference: Ref  # where it is kept (a private path, a workflow run, a PR), never the content
+def _match(pattern: str, value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(pattern, value) is not None  # no trailing-newline match
 
 
-class ApprovalScope(_Model):
-    version: Literal["v3"]
-    protected: Literal[True]  # behind Cloudflare Access (protected staging), never public
-    public_intake: Literal[False]
-    media_delivery: bool
-    three_d: Literal[False]
-    video: Literal[False]
-
-
-class V3StagingApproval(_Model):
-    schema_: Literal["veda.catalog.v3-staging-approval/2"] = Field(alias="schema")
-    status: Literal["DRAFT", "IN_REVIEW", "APPROVED", "REVOKED"]
-    environment: Literal["staging"]  # a production record cannot be written: the schema refuses it
-    release: Annotated[str, Field(pattern=r"^[A-Z0-9][A-Z0-9._-]{2,31}$")]  # the catalog release it covers
-    author: Name
-    approver: Name | None = None
-    approved_at: date | None = None
-    review_by: date | None = None  # mandatory review date of an approval (at most MAX_REVIEW_DAYS after approval)
-    expires_at: date | None = None  # null only with an explicit non-expiring owner decision
-    non_expiring_decision: Annotated[str, Field(min_length=20, max_length=300)] | None = None
-    revoked_at: date | None = None
-    revocation_reason: Annotated[str, Field(min_length=10, max_length=300)] | None = None
-    approval_scope: ApprovalScope
-    evidence: dict[str, Evidence]
-
-    @model_validator(mode="after")
-    def _gate(self):
-        unknown = set(self.evidence) - set(REQUIRED_EVIDENCE)
-        if unknown:
-            raise ValueError(f"unknown evidence: {', '.join(sorted(unknown))}")
-        if self.status in ("APPROVED", "REVOKED"):
-            missing = [k for k in REQUIRED_EVIDENCE if k not in self.evidence]
-            if missing:
-                raise ValueError(
-                    f"an approved record references every piece of evidence; missing: {', '.join(missing)}"
-                )
-            for k in GIT_EVIDENCE:
-                if not self.evidence[k].git_sha:
-                    raise ValueError(f"evidence {k} is a git commit SHA")
-            for k in DIGEST_EVIDENCE:
-                if not self.evidence[k].sha256:
-                    raise ValueError(f"evidence {k} needs the SHA-256 of its artifact")
-            if not self.approver or not self.approved_at:
-                raise ValueError("an approved record names its approver and approval date")
-            if _same(self.approver, self.author):
-                raise ValueError("the approver is not the author (four-eyes review)")
-            if "TO FILL" in self.approver.upper() or "TO FILL" in self.author.upper():
-                raise ValueError("a placeholder is not an approver or an author")
-            if not self.review_by or not (
-                self.approved_at < self.review_by <= self.approved_at + timedelta(days=MAX_REVIEW_DAYS)
-            ):
-                raise ValueError(f"an approved record has a review date within {MAX_REVIEW_DAYS} days of its approval")
-            if (self.expires_at is None) == (self.non_expiring_decision is None):
-                raise ValueError(
-                    "an approved record has an expiry date or an explicit non-expiring owner decision, exactly one"
-                )
-            if self.expires_at is not None and self.expires_at <= self.approved_at:
-                raise ValueError("an approval expires after it is given")
-        if self.status == "REVOKED" and not (self.revoked_at and self.revocation_reason):
-            raise ValueError("a REVOKED record says when and why")
-        if self.status != "REVOKED" and (self.revoked_at or self.revocation_reason):
-            raise ValueError("only a REVOKED record carries a revocation")
-        return self
-
-
-def _same(a: str, b: str) -> bool:
-    return " ".join(a.casefold().split()) == " ".join(b.casefold().split())
-
-
-def check(document: dict) -> V3StagingApproval:
-    """The record, validated; raises ValueError when it is malformed or inconsistent."""
-    if document.get("schema") != SCHEMA:
-        raise ValueError(f"not a {SCHEMA} record")
-    return V3StagingApproval.model_validate(document)
-
-
-def problems(document: dict | None, *, today: date | None = None) -> list[str]:
-    """Why a record does not authorise V3 on protected staging today (empty when it does). Checked by plan, build,
-    deployment preflight and, while the catalog runs, by every public request (so expiry is never silent)."""
-    if document is None:
-        return ["no V3 staging approval record"]
+def _date(value: object) -> date | None:
+    if not _match(POLICY["date_pattern"], value):
+        return None
     try:
-        record = check(document)
-    except ValueError as err:
-        return [str(err).splitlines()[0][:300]]
-    today = today or date.today()
-    out = []
-    if record.status != "APPROVED":
-        out.append(f"the record is {record.status}")
-    if record.review_by and record.review_by <= today:
-        out.append(f"the approval review date {record.review_by.isoformat()} has been reached")
-    if record.expires_at and record.expires_at <= today:
-        out.append(f"the approval expired on {record.expires_at.isoformat()}")
-    if record.approved_at and record.approved_at > today:
-        out.append("the approval date is in the future")
-    return out
-
-
-def approves(document: dict | None, *, today: date | None = None) -> bool:
-    """True only for a valid, current APPROVED record (what the staging gates accept)."""
-    return not problems(document, today=today)
-
-
-def load(path: Path = RECORD) -> dict | None:
-    try:
-        return json.loads(path.read_text())
-    except (OSError, ValueError):
+        return date.fromisoformat(str(value))  # a str: _match checked it
+    except ValueError:
         return None
 
 
+def _trim(value: str) -> str:
+    return _EDGE.sub("", value)
+
+
+def _norm(value: object) -> str | None:
+    return _SPACE.sub(" ", _trim(value)).lower() if isinstance(value, str) else None
+
+
+def read(path: Path = RECORD) -> bytes | None:
+    """The record file's bytes, or None when there is none to read."""
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def evaluate(raw: bytes | None, *, today: date, bound_sha256: object, release: str | None = None) -> list[str]:
+    """The failing rule codes, in policy order (empty: the record authorises V3 on protected staging today).
+
+    `raw` is the record file's bytes; `bound_sha256` is the digest the record must have; `release`, when given, is the
+    active catalog release's code (runtime routes that serve the active release)."""
+    if raw is None:
+        return ["NO_RECORD"]
+    try:
+        doc = json.loads(raw)
+    except ValueError:
+        doc = None
+    if not isinstance(doc, dict):
+        return ["MALFORMED"]
+    failing: set[str] = set()
+    get = doc.get
+
+    if get("schema") != SCHEMA:
+        failing.add("SCHEMA")
+    if get("status") != POLICY["approved_status"]:
+        failing.add("STATUS")
+    if get("environment") != POLICY["environment"]:
+        failing.add("ENVIRONMENT")
+    if not _match(POLICY["release_pattern"], get("release")):
+        failing.add("RELEASE")
+
+    scope = get("approval_scope")
+    if not (
+        isinstance(scope, dict)
+        and all(scope.get(k) is v if isinstance(v, bool) else scope.get(k) == v for k, v in POLICY["scope"].items())
+        and isinstance(scope.get("media_delivery"), bool)
+    ):
+        failing.add("SCOPE")
+
+    if (
+        get("status") == POLICY["revoked_status"]
+        or get("revoked_at") is not None
+        or get("revocation_reason") is not None
+    ):
+        failing.add("REVOKED")
+
+    names = (get("approver"), get("author"))
+    approver, author = _norm(names[0]), _norm(names[1])
+    placeholder = POLICY["placeholder"].upper()
+    if not approver or not author or approver == author or any(placeholder in str(n).upper() for n in names):
+        failing.add("APPROVER")
+
+    approved = _date(get("approved_at"))
+    if approved is None:
+        failing.add("APPROVAL_DATE")
+    elif approved > today:
+        failing.add("APPROVAL_IN_FUTURE")
+
+    review = _date(get("review_by"))
+    if review is None or (
+        approved is not None and not (approved < review <= approved + timedelta(days=MAX_REVIEW_DAYS))
+    ):
+        failing.add("REVIEW_WINDOW")
+    if review is not None and review <= today:
+        failing.add("REVIEW_REACHED")
+
+    has_expiry, has_decision = get("expires_at") is not None, get("non_expiring_decision") is not None
+    expires = _date(get("expires_at"))
+    decision = get("non_expiring_decision")
+    if (
+        has_expiry == has_decision
+        or (has_expiry and (expires is None or (approved is not None and expires <= approved)))
+        or (
+            has_decision
+            and not (isinstance(decision, str) and len(_trim(decision)) >= POLICY["non_expiring_min_length"])
+        )
+    ):
+        failing.add("EXPIRY_POLICY")
+    if expires is not None and expires <= today:
+        failing.add("EXPIRED")
+
+    if not _evidence_ok(get("evidence")):
+        failing.add("EVIDENCE")
+
+    if not (_match(POLICY["sha256_pattern"], bound_sha256) and bound_sha256 == hashlib.sha256(raw).hexdigest()):
+        failing.add("DIGEST_MISMATCH")
+
+    if release is not None and get("release") != release:
+        failing.add("RELEASE_MISMATCH")
+
+    return [c for c in CODES if c in failing]
+
+
+def _evidence_ok(evidence: object) -> bool:
+    if not isinstance(evidence, dict) or set(evidence) != set(REQUIRED_EVIDENCE):
+        return False
+    for key, value in evidence.items():
+        if not isinstance(value, dict):
+            return False
+        ref = value.get("reference")
+        if not (isinstance(ref, str) and len(_trim(ref)) >= POLICY["reference_min_length"]):
+            return False
+        field, pattern = ("git_sha", "git_sha_pattern") if key in GIT_EVIDENCE else ("sha256", "sha256_pattern")
+        if not _match(POLICY[pattern], value.get(field)):
+            return False
+    return True
+
+
+def today() -> date:
+    """The current UTC date: the same day the plan (plantimestamp) and the build (UTC) judge by."""
+    from veda.kernel import clock
+
+    return clock.now().astimezone(UTC).date()
+
+
+def messages(codes: list[str]) -> list[str]:
+    return [MESSAGES[c] for c in codes]
+
+
 def main(argv: list[str]) -> int:
+    """The deployment check: the packaged record against the digest rendered from SSM (VEDA_CATALOG_APPROVAL_SHA256)."""
+    from veda.config import settings
+
     path = Path(argv[1]) if len(argv) > 1 else RECORD
-    found = problems(load(path))
-    if found:
-        print(f"refused: {'; '.join(found)}")
+    codes = evaluate(read(path), today=today(), bound_sha256=settings().catalog_approval_sha256)
+    if codes:
+        print(f"refused: {'; '.join(f'{c}: {m}' for c, m in zip(codes, messages(codes), strict=True))}")
         return 1
     print("APPROVED and current")
     return 0

@@ -1,0 +1,84 @@
+{
+  "schema": "veda.catalog.v3-staging-approval/2",
+  "status": "APPROVED",
+  "environment": "staging",
+  "release": "V3-STAGING-1",
+  "author": "Catalog author (synthetic role)",
+  "approver": "Independent approver (synthetic role)",
+  "approved_at": "2026-10-01",
+  "review_by": "2026-12-30",
+  "expires_at": "2026-09-30",
+  "non_expiring_decision": null,
+  "revoked_at": null,
+  "revocation_reason": null,
+  "approval_scope": {
+    "version": "v3",
+    "protected": true,
+    "public_intake": false,
+    "media_delivery": false,
+    "three_d": false,
+    "video": false
+  },
+  "evidence": {
+    "application_commit": {
+      "git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reference": "git application_commit (synthetic)"
+    },
+    "pr69_merge": {
+      "git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reference": "git pr69_merge (synthetic)"
+    },
+    "application_certification": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence application_certification (synthetic)"
+    },
+    "real_card_evidence": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence real_card_evidence (synthetic)"
+    },
+    "infrastructure_plan": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence infrastructure_plan (synthetic)"
+    },
+    "infrastructure_apply": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence infrastructure_apply (synthetic)"
+    },
+    "scanner_capacity": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence scanner_capacity (synthetic)"
+    },
+    "scanner_decision": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence scanner_decision (synthetic)"
+    },
+    "media_bucket": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence media_bucket (synthetic)"
+    },
+    "iam": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence iam (synthetic)"
+    },
+    "ssm_settings": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence ssm_settings (synthetic)"
+    },
+    "csp": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence csp (synthetic)"
+    },
+    "media_smoke_test": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence media_smoke_test (synthetic)"
+    },
+    "promise_owner_approval": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence promise_owner_approval (synthetic)"
+    },
+    "media_rights_approver": {
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reference": "evidence media_rights_approver (synthetic)"
+    }
+  }
+}

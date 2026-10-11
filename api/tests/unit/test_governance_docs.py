@@ -115,6 +115,8 @@ def test_no_undecided_item_reads_as_decided():
 # must add it to KNOWN_COMMITS in the same change, where reviewers see it.
 
 KNOWN_COMMITS = {
+    "3e9cbca46a00a33f92fb5458cf54e0120cccbbe7": ("Merge pull request #58 from slaggala/feature/estimator-ux-v2-implementation", "last staging deployment before V3"),
+    "e0899035e0b00e012b8409f560d4a6287a82244e": ("Merge pull request #71 from slaggala/fix/v3-media-pre-plan-closure", "applied staging-core media infrastructure"),
     "778aa8fdd918da48340319696ada3ff673e9fb8e": ("Fix R-01 conformance exception matching for non-entity string identifiers", "certified architecture baseline"),
     "9236aa3ade38c33d03a57cf7a064ece29937b109": ("Implement Veda Spaces P0 platform", "first reviewed implementation"),
     "2f6b59a0a6a59dbc41a597dddc7e6512dcd581fe": ("Remove pip from the API runtime image", "re-reviewed implementation"),
