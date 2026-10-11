@@ -9,7 +9,10 @@ Covers:
 
 The synthetic slice only: no real media, no customer content, nothing deployed."""
 
+import base64
 import copy
+import hashlib
+import io
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -36,142 +39,221 @@ def _clock():
     clock.reset()
 
 
-# --- the V3 staging approval record (schema 2: explicit review and expiry policy) -------------------------------------
-TODAY = date(2026, 10, 10)
+# --- the V3 staging approval record: one policy, four gates, one conformance set --------------------------------------
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "v3_approval"
+CASES = json.loads((FIXTURES / "cases.json").read_text())
 
 
-def approved(**over):
-    doc = json.loads(TEMPLATE.read_text())
-    doc.update(status="APPROVED", author="Catalog lead (role, test)", approver="Owner (role, test)",
-               approved_at="2026-10-01", review_by="2026-12-01", expires_at="2027-03-01")  # fmt: skip
-    doc["evidence"] = {
-        k: {"git_sha": "a" * 40, "reference": f"git {k} (synthetic)"} for k in staging_approval.GIT_EVIDENCE
-    }
-    doc["evidence"] |= {
-        k: {"sha256": "b" * 64, "reference": f"evidence {k} (synthetic)"} for k in staging_approval.DIGEST_EVIDENCE
-    }
-    doc.update(over)
-    return doc
+def _case_inputs(case):
+    path = FIXTURES / f"{case['record']}.json"
+    raw = path.read_bytes() if path.exists() else None
+    bound = {"record": hashlib.sha256(raw).hexdigest() if raw else None, "other": CASES["other_digest"], None: None}
+    return path, raw, bound[case["bound"]], date.fromisoformat(case["today"])
+
+
+@pytest.mark.parametrize("case", CASES["cases"], ids=lambda c: c["name"])
+def test_runtime_rules_give_the_shared_conformance_codes(case):
+    _, raw, bound, today = _case_inputs(case)
+    assert staging_approval.evaluate(raw, today=today, bound_sha256=bound) == case["codes"]
+
+
+@pytest.mark.parametrize("case", CASES["cases"], ids=lambda c: c["name"])
+def test_the_deployment_check_gives_the_same_decision(case, monkeypatch, capsys):
+    path, _, bound, today = _case_inputs(case)
+
+    class Bound:
+        catalog_approval_sha256 = bound
+
+    monkeypatch.setattr(config, "settings", lambda: Bound())
+    clock.set_clock(lambda: datetime.combine(today, datetime.min.time(), UTC).replace(hour=12))
+    assert staging_approval.main(["x", str(path)]) == (0 if not case["codes"] else 1)
+    out = capsys.readouterr().out
+    assert all(c in out for c in case["codes"]), out
+
+
+def test_every_gate_reads_the_one_policy_and_the_terraform_cases_are_current():
+    from tools import v3_approval_conformance
+
+    root = Path(__file__).resolve().parents[3]
+    assert "v3_approval_policy.json" in (root / "app/scripts/v3-approval.mjs").read_text()
+    assert "v3_approval_policy.json" in (root / "infra/terraform/modules/v3-approval/main.tf").read_text()
+    assert 'source = "../../modules/v3-approval"' in (root / "infra/terraform/envs/staging-core/main.tf").read_text()
+    assert "evaluateV3Approval" in (root / "app/scripts/staging-build.mjs").read_text()
+    assert v3_approval_conformance.main(["x", "--check"]) == 0, "regenerate the Terraform conformance cases"
+    covered = {c["record"] for c in CASES["cases"]}
+    assert {p.stem for p in FIXTURES.glob("*.json")} - {"cases"} <= covered, "every fixture is a conformance case"
+    for required in ("approved", "expired", "future-review", "revoked", "wrong-environment", "self-approved",
+                     "missing-evidence", "wrong-scope-public-intake"):  # fmt: skip
+        assert required in covered, required
+    assert any(c["bound"] == "other" and c["codes"] == ["DIGEST_MISMATCH"] for c in CASES["cases"])
+
+
+def test_no_fixture_the_runtime_rejects_is_used_as_an_approved_record():
+    approved = [c for c in CASES["cases"] if not c["codes"]]
+    assert approved, "the conformance set has accepted records"
+    for case in approved:
+        _, raw, bound, today = _case_inputs(case)
+        assert staging_approval.evaluate(raw, today=today, bound_sha256=bound) == []
 
 
 def test_the_committed_template_is_a_draft_and_no_approved_record_exists():
-    doc = json.loads(TEMPLATE.read_text())
-    template = staging_approval.check(doc)
-    assert template.status == "DRAFT" and template.evidence == {} and template.approver is None
-    assert template.review_by is None and template.expires_at is None and template.approved_at is None
-    assert not staging_approval.approves(doc, today=TODAY)
+    raw = TEMPLATE.read_bytes()
+    doc = json.loads(raw)
+    assert doc["status"] == "DRAFT" and doc["evidence"] == {} and doc["approver"] is None
+    assert doc["review_by"] is None and doc["expires_at"] is None and doc["approved_at"] is None
+    assert "STATUS" in staging_approval.evaluate(raw, today=date(2026, 10, 11), bound_sha256=None)
     assert not staging_approval.RECORD.exists(), "no approval record is committed until the owner approves one"
 
 
-def test_a_complete_independent_current_record_approves():
-    assert staging_approval.approves(approved(), today=TODAY)
-    assert staging_approval.approves(approved(expires_at=None, non_expiring_decision="Owner decision: reviewed every 90 days instead"),
-                                     today=TODAY)  # fmt: skip
+def test_the_policy_names_every_piece_of_evidence():
     assert set(staging_approval.REQUIRED_EVIDENCE) == {
         "application_certification", "application_commit", "pr69_merge", "real_card_evidence", "infrastructure_plan",
         "infrastructure_apply", "scanner_capacity", "scanner_decision", "media_bucket", "iam", "ssm_settings", "csp",
         "media_smoke_test", "promise_owner_approval", "media_rights_approver"}  # fmt: skip
-
-
-@pytest.mark.parametrize("over,why", [
-    ({"status": "DRAFT"}, "is DRAFT"),
-    ({"status": "IN_REVIEW"}, "is IN_REVIEW"),
-    ({"status": "REVOKED", "revoked_at": "2026-10-05", "revocation_reason": "Evidence withdrawn (synthetic)"}, "is REVOKED"),
-    ({"expires_at": "2026-10-10"}, "expired"),
-    ({"expires_at": "2026-10-05"}, "expired"),
-    ({"review_by": "2026-10-10"}, "review date"),
-    ({"approved_at": "2026-10-20", "review_by": "2026-12-01"}, "future"),
-])  # fmt: skip
-def test_records_that_do_not_authorise_v3_today(over, why):
-    found = staging_approval.problems(approved(**over), today=TODAY)
-    assert any(why in p for p in found), found
-
-
-@pytest.mark.parametrize("over,why", [
-    ({"approver": "Catalog lead (role, test)"}, "four-eyes"),
-    ({"approver": "  catalog LEAD (role, test) "}, "four-eyes"),
-    ({"approver": "[OWNER TO FILL]"}, "placeholder"),
-    ({"approver": None}, "approver"),
-    ({"review_by": None}, "review date"),
-    ({"review_by": "2027-06-01"}, "review date"),  # more than 90 days after approval
-    ({"expires_at": None}, "non-expiring"),
-    ({"non_expiring_decision": "Owner decision: no expiry, reviewed quarterly (test)"}, "exactly one"),
-    ({"expires_at": "2026-09-01"}, "expires after"),
-    ({"status": "REVOKED"}, "when and why"),
-    ({"revoked_at": "2026-10-05"}, "only a REVOKED"),
-    ({"environment": "production"}, "environment"),
-    ({"approval_scope": {"version": "v3", "protected": True, "public_intake": True, "media_delivery": False,
-                         "three_d": False, "video": False}}, "public_intake"),
-    ({"approval_scope": {"version": "v3", "protected": False, "public_intake": False, "media_delivery": False,
-                         "three_d": False, "video": False}}, "protected"),
-    ({"schema": "veda.catalog.v3-staging-approval/1"}, "not a"),
-])  # fmt: skip
-def test_malformed_or_inconsistent_records_are_refused(over, why):
-    with pytest.raises(ValueError, match=why):
-        staging_approval.check(approved(**over))
-    assert not staging_approval.approves(approved(**over), today=TODAY)
-
-
-@pytest.mark.parametrize("missing", ["real_card_evidence", "scanner_capacity", "media_rights_approver", "pr69_merge"])
-def test_every_piece_of_evidence_is_required(missing):
-    doc = approved()
-    del doc["evidence"][missing]
-    with pytest.raises(ValueError, match=missing):
-        staging_approval.check(doc)
-
-
-def test_evidence_must_be_a_digest_not_a_placeholder():
-    doc = approved()
-    doc["evidence"]["real_card_evidence"] = {"reference": "OWNER-RUN REAL-CARD EVIDENCE PENDING"}
-    with pytest.raises(ValueError, match="real_card_evidence"):
-        staging_approval.check(doc)
+    assert staging_approval.MAX_REVIEW_DAYS == 90
 
 
 def test_a_missing_or_unreadable_record_does_not_authorise(tmp_path):
-    assert staging_approval.problems(None) == ["no V3 staging approval record"]
-    bad = tmp_path / "record.json"
-    bad.write_text("{not json")
-    assert staging_approval.load(bad) is None and not staging_approval.approves(staging_approval.load(bad))
-    assert staging_approval.main(["x", str(bad)]) == 1
+    assert staging_approval.evaluate(None, today=date(2026, 10, 11), bound_sha256=None) == ["NO_RECORD"]
+    assert staging_approval.read(tmp_path / "absent.json") is None
 
 
 def test_production_can_never_use_a_staging_approval():
-    with pytest.raises(ValueError):
-        staging_approval.check(approved(environment="production"))
+    raw = (FIXTURES / "wrong-environment.json").read_bytes()
+    codes = staging_approval.evaluate(raw, today=date(2026, 10, 11), bound_sha256=hashlib.sha256(raw).hexdigest())
+    assert codes == ["ENVIRONMENT"]
     assert config.validate_environment(config.Settings(env="production", database_url="sqlite://",
                                                        catalog_estimator_enabled=True)), "production refuses V3 anyway"  # fmt: skip
 
 
-@ON
-def test_on_staging_v3_stops_serving_when_the_approval_is_not_current(api, people, monkeypatch, tmp_path):
-    """An expired, revoked or missing approval stops V3 at once on staging: not only at plan, build or deploy."""
+# --- the runtime gate on staging: the catalog and every media route --------------------------------------------------
+NOW = datetime(2026, 10, 11, 12, tzinfo=UTC)
+
+
+def _record(**over):
+    doc = json.loads((FIXTURES / "approved.json").read_text())
+    doc.update({"release": "SLICE-1", **over})  # the release the test slice activates
+    return doc
+
+
+@pytest.fixture
+def on_staging(monkeypatch, tmp_path):
+    """Run the API as protected staging with `doc` as the packaged record, bound by its own digest unless `bound`."""
     from veda.modules.catalog import configure
 
+    real = configure.settings
+    state = {"bound": None}
+
+    class Staging:
+        def __getattr__(self, name):
+            if name == "env":
+                return "staging"
+            if name == "catalog_approval_sha256":
+                return state["bound"]
+            return getattr(real(), name)
+
+    monkeypatch.setattr(configure, "settings", lambda: Staging())
+    record = tmp_path / "v3-staging-approval.json"
+    monkeypatch.setattr(staging_approval, "RECORD", record)
+    monkeypatch.setattr(staging_approval, "read", lambda path=record: path.read_bytes() if path.exists() else None)
+    clock.set_clock(lambda: NOW)
+
+    def use(doc, *, bound="record"):
+        configure._view_cache.clear()
+        if doc is None:
+            record.unlink(missing_ok=True)
+            state["bound"] = None
+            return
+        raw = json.dumps(doc, indent=2).encode()
+        record.write_bytes(raw)
+        state["bound"] = hashlib.sha256(raw).hexdigest() if bound == "record" else bound
+
+    return use
+
+
+def _released(people):
     a, b = people
     seed_slice(a)
     approve_all(a, b)
     release(a, b)
-    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, (
-        "test environment: no approval record needed"
+    with db.unit_of_work(write=False) as s:
+        doc = service.versions(s, "media", "img.tv-laminate")[-1].document
+    return next(iter(doc["objects"]["variants"].values()))
+
+
+LAPSED = {
+    "missing": (None, "record"),
+    "revoked": (
+        _record(status="REVOKED", revoked_at="2026-10-05", revocation_reason="Synthetic: rights complaint"),
+        "record",
+    ),
+    "expired": (_record(expires_at="2026-10-10"), "record"),
+    "review reached": (_record(review_by="2026-10-11"), "record"),
+    "review window exceeded": (_record(review_by="2026-12-31"), "record"),
+    "digest mismatch": (_record(), "c" * 64),
+    "unbound": (_record(), None),
+    "another release": (_record(release="SLICE-2"), "record"),
+}
+
+
+@ON
+@pytest.mark.parametrize("why", list(LAPSED))
+def test_on_staging_approval_loss_stops_the_catalog_and_public_media_at_once(api, people, on_staging, why):
+    sha = _released(people)
+    media_route = f"/api/v1/public/catalog/media/{sha}"
+    on_staging(_record())
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, "a current approval serves the catalog"
+    assert api.get(media_route, anonymous=True).status == 200, "and its media"
+    doc, bound = LAPSED[why]
+    on_staging(doc, bound=bound)
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503, why
+    assert api.get(media_route, anonymous=True).status == 503, f"{why}: media stops with the catalog"
+
+
+@ON
+@pytest.mark.parametrize("why", [w for w in LAPSED if w != "another release"])
+def test_on_staging_approval_loss_stops_every_staff_media_operation(api, people, factory, on_staging, why):
+    sha = _released(people)
+    founder = factory.user("FOUNDER")
+    factory.grant(founder, "catalog.media.edit")
+    token = factory.login(api, founder, set_default=False)
+    upload = {"data_base64": base64.b64encode(_jpeg()).decode()}
+    on_staging(_record())
+    assert api.get("/api/v1/catalog/media", token=token).status == 200
+    assert api.get(f"/api/v1/catalog/media/{sha}", token=token).status == 200
+    doc, bound = LAPSED[why]
+    on_staging(doc, bound=bound)
+    assert api.get("/api/v1/catalog/media", token=token).status == 503, f"list: {why}"
+    assert api.get(f"/api/v1/catalog/media/{sha}", token=token).status == 503, f"preview: {why}"
+    assert api.post("/api/v1/catalog/media", upload, token=token).status == 503, f"upload: {why}"
+    assert api.post(f"/api/v1/catalog/media/{sha}/withdraw", {"note": "synthetic"}, token=token).status == 503, (
+        f"withdraw: {why}"
     )
-    real = configure.settings
 
-    class Staging:
-        def __getattr__(self, name):
-            return "staging" if name == "env" else getattr(real(), name)
 
-    monkeypatch.setattr(configure, "settings", lambda: Staging())
-    configure._view_cache.clear()
-    monkeypatch.setattr(staging_approval, "RECORD", tmp_path / "absent.json")
-    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503
-    record = tmp_path / "record.json"
-    record.write_text(json.dumps(approved(expires_at="2026-10-05", review_by="2026-10-04", approved_at="2026-10-01")))
-    monkeypatch.setattr(staging_approval, "RECORD", record)
-    monkeypatch.setattr(staging_approval, "load", lambda path=record: json.loads(record.read_text()))
-    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503, "expired approval: fail closed"
-    record.write_text(json.dumps(approved(approved_at="2026-10-01", review_by="2026-12-01", expires_at="2099-01-01")))
-    clock.set_clock(lambda: datetime(2026, 10, 10, 12, tzinfo=UTC))
-    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, "a current approval serves"
+@ON
+def test_staff_media_needs_no_matching_release_so_the_next_release_can_be_prepared(api, people, factory, on_staging):
+    sha = _released(people)
+    founder = factory.user("FOUNDER")
+    token = factory.login(api, founder, set_default=False)
+    on_staging(_record(release="SLICE-2"))
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 503, "serving needs the approved release"
+    assert api.get(f"/api/v1/catalog/media/{sha}", token=token).status == 200, "staff preview does not"
+
+
+@ON
+def test_off_staging_the_approval_gate_is_not_consulted(api, people):
+    sha = _released(people)
+    assert api.get("/api/v1/public/catalog", anonymous=True).status == 200, "test environment: no record needed"
+    assert api.get(f"/api/v1/public/catalog/media/{sha}", anonymous=True).status == 200
+
+
+def _jpeg():
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 48), (120, 90, 60)).save(buf, "JPEG")
+    return buf.getvalue()
 
 
 # --- settings fail closed --------------------------------------------------------------------------------------------

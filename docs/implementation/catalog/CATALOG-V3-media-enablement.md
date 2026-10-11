@@ -125,7 +125,7 @@ Do not run a scanner to measure it. Collect facts on the running host:
 | Rollback | `mode: none`, redeploy: the scanner stops and uploads stay PENDING | Same as A; the size change reverts by a reviewed plan | Revert the adapter and the mode |
 | Requires | Not available under the current policy and host | A reviewed host-resize plan; owner cost approval; a validated, pinned ARM64 ClamAV image; the capacity reserve; a rollout and rollback plan | An approved application adapter; an isolated scan architecture; a security and operational review |
 
-## 6. ClamAV implementation readiness (if A or B is chosen)
+## 6. ClamAV implementation readiness (if B is chosen; A is precluded)
 
 **ClamAV is not ready to run, and is not claimed to be.** The image digest is still a placeholder (`scanner-image-not-decided` in Compose, `none-selected` in SSM), and every gate refuses it: the Terraform precondition, the host media preflight and `deploy.sh`. ARM64 support, non-root behaviour, the health check and the configuration all still need validating for whichever image is selected. Before the decision is recorded:
 
@@ -365,4 +365,56 @@ The preflight prints names, never values, and refuses before anything on the hos
 An unrelated staging deployment after the merge, but before the apply, therefore fails visibly at the first step, with nothing deployed. Production has no such path.
 
 The staging-plan inspection checklist is [CATALOG-V3-staging-plan-inspection.md](CATALOG-V3-staging-plan-inspection.md).
+
+## 18. Activation remediation (follow-up to the 2026-10-11 activation-readiness review)
+
+**One rule set, four gates.** The approval rules are defined once, in
+[`api/veda/modules/catalog/v3_approval_policy.json`](../../../api/veda/modules/catalog/v3_approval_policy.json): the
+schema, the 90-day review window, the evidence lists, the scope, and an ordered list of reason codes with their
+messages. Three implementations apply that text, and every gate reports the same codes:
+
+| Gate | Implementation |
+|---|---|
+| Plan | `infra/terraform/modules/v3-approval` (no provider, no resource), called by staging-core with the plan date |
+| Build | `app/scripts/v3-approval.mjs`, called by `staging-build.mjs` |
+| Deployment check | `python -m veda.modules.catalog.staging_approval` (deploy.sh step 0b) |
+| Runtime | `configure.require_staging_approval`, the same Python function |
+
+Terraform and the static-site build cannot run the Python validator without adding a runtime to the plan and the
+Pages build, so the rules are implemented three times from one definition. That they agree is proven, not assumed:
+[`api/tests/fixtures/v3_approval/cases.json`](../../../api/tests/fixtures/v3_approval/cases.json) holds 39 cases, each
+with its expected codes written by hand from the policy. Python and the build read the cases directly. The Terraform
+runs are generated from them (`api/tools/v3_approval_conformance.py`), and a unit test fails when the generated file
+is out of date. Every gate passes every case.
+
+What changed in the rules:
+- **The 90-day review window is enforced everywhere.** Before, the plan and the build only checked that `review_by`
+  was in the future.
+- **"Today" is the UTC date at every gate.** The runtime used the India business date before.
+- **The digest binding is checked at deployment and at runtime too.** staging-core plans
+  `VEDA_CATALOG_APPROVAL_SHA256` (the bound digest, or `none`), and the API compares the packaged record's SHA-256
+  with it. This is the 14th media setting. It is created by the next staging-core apply. The media preflight does not
+  require it while V3 is off, so a deployment before that apply still passes; an activation without it is refused
+  (**APPROVAL DIGEST NOT BOUND**).
+- **The old Terraform test fixtures are gone.** Their 2099 review dates were accepted by the plan but rejected by the
+  runtime. The staging-core tests now cover only the wiring; the rules are covered by the shared cases.
+
+**Media routes.** Every media operation applies the same runtime gate as the catalog:
+
+| Route | Check |
+|---|---|
+| `GET /public/catalog/media/<sha>` (variant delivery) | Approval current and bound, **and** the record's `release` is the active release |
+| `POST /catalog/media` (upload), `POST /catalog/media/<sha>/withdraw`, `GET /catalog/media` (list), `GET /catalog/media/<sha>` (staff preview) | Approval current and bound. No release match, so media for the next release can be prepared before that release exists |
+
+A missing, revoked, expired, past-review, out-of-window, unbound or mismatched record answers 503 on every one of
+them, at once. Serve-time rights checks are unchanged and still apply after the approval gate. Maintenance jobs (the
+pending-scan retry and the retention purge) do not serve media and keep running.
+
+Withdrawal is gated too, as the review asked: while an approval is lapsed nothing is served, so a withdrawal can wait
+for a current approval. If the owner prefers withdrawal to stay available during a lapse, that is a one-line change
+to decide separately.
+
+**Scanner Option A removed.** staging-core refuses `media_scanner.option` A whatever the mode, and `clamd` now
+requires option B. Option C may be recorded, but its scanner mode stays `none` until the asynchronous adapter
+exists. No scanner was selected.
 

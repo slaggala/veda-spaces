@@ -175,34 +175,9 @@ locals {
   catalog_v3_flags   = [local.catalog_v3.catalog_estimator_enabled, local.catalog_v3.catalog_admin_enabled, local.catalog_v3.media_delivery_enabled]
   approval_record    = var.approval_record_path != "" ? var.approval_record_path : "${path.module}/../../../../api/veda/modules/catalog/approved/v3-staging-approval.json"
   activation         = anytrue(local.catalog_v3_flags)
-  # The approval record is parsed and judged by Terraform itself (pre-plan closure, gap 1), not only matched by
-  # digest: any flag on needs a current, independent, fully evidenced APPROVED record for protected staging.
-  approval          = local.activation ? try(jsondecode(file(local.approval_record)), null) : null
-  approval_now      = plantimestamp()
-  approval_date     = { for k in ["approved_at", "review_by", "expires_at", "revoked_at"] : k => try(local.approval[k], null) }
-  approval_evidence = try(local.approval.evidence, {})
-  approval_problems = !local.activation ? [] : local.approval == null ? ["no readable approval record"] : compact([
-    try(local.approval.schema, "") == "veda.catalog.v3-staging-approval/2" ? "" : "not a schema-2 V3 staging approval record",
-    try(local.approval.status, "") == "APPROVED" ? "" : "status is ${try(local.approval.status, "missing")}, not APPROVED",
-    try(local.approval.environment, "") == "staging" ? "" : "the record is not for staging",
-    try(local.approval.approval_scope.version == "v3" && local.approval.approval_scope.protected == true &&
-      local.approval.approval_scope.public_intake == false && local.approval.approval_scope.three_d == false &&
-    local.approval.approval_scope.video == false, false) ? "" : "the scope is not V3 on protected staging without public intake, 3D or video",
-    local.approval_date.revoked_at == null && try(local.approval.revocation_reason, null) == null ? "" : "the approval is revoked",
-    try(trimspace(local.approval.approver) != "" && trimspace(local.approval.author) != "" &&
-      lower(join(" ", split(" ", trimspace(local.approval.approver)))) != lower(join(" ", split(" ", trimspace(local.approval.author)))) &&
-    !strcontains(upper("${local.approval.approver} ${local.approval.author}"), "TO FILL"), false) ? "" : "the approver is missing, a placeholder or the author",
-    local.approval_date.approved_at != null ? "" : "no approval date",
-    try(timecmp("${local.approval_date.review_by}T00:00:00Z", local.approval_now) > 0, false) ? "" : "the review date is missing or has been reached",
-    (local.approval_date.expires_at == null ? try(local.approval.non_expiring_decision, null) != null :
-    try(timecmp("${local.approval_date.expires_at}T00:00:00Z", local.approval_now) > 0, false)) ? "" : "the approval has expired or has no expiry policy",
-    alltrue([for k in ["application_commit", "pr69_merge"] : can(regex("^[0-9a-f]{40}$", local.approval_evidence[k].git_sha))]) &&
-    alltrue([for k in local.approval_digest_evidence : can(regex("^[0-9a-f]{64}$", local.approval_evidence[k].sha256))]) ? "" : "evidence without a SHA or SHA-256",
-    local.catalog_v3.approval_record_sha256 == filesha256(local.approval_record) ? "" : "the record's SHA-256 is not catalog_v3.approval_record_sha256",
-  ])
-  approval_digest_evidence = ["application_certification", "real_card_evidence", "infrastructure_plan", "infrastructure_apply",
-    "scanner_capacity", "scanner_decision", "media_bucket", "iam", "ssm_settings", "csp", "media_smoke_test",
-  "promise_owner_approval", "media_rights_approver"]
+  # The approval record is judged by the shared rules (modules/v3-approval, from v3_approval_policy.json): the same
+  # rules and codes as the staging build, the deployment check and the runtime. Only any flag on needs a record.
+  approval_problems = local.activation ? [for i, c in module.v3_approval.codes : "${c}: ${module.v3_approval.messages[i]}"] : []
   media_config = merge({
     VEDA_CATALOG_MEDIA_BACKEND          = "s3"
     VEDA_CATALOG_MEDIA_BUCKET           = module.storage.bucket_names["media"]
@@ -215,6 +190,8 @@ locals {
     VEDA_CATALOG_VIDEO_ENABLED          = "false"
     VEDA_CATALOG_ESTIMATOR_ENABLED      = local.catalog_v3.catalog_estimator_enabled ? "true" : "false"
     VEDA_CATALOG_ADMIN_ENABLED          = local.catalog_v3.catalog_admin_enabled ? "true" : "false"
+    # The digest the deployment check and the runtime require of the packaged record ("none" while nothing is bound).
+    VEDA_CATALOG_APPROVAL_SHA256 = coalesce(local.catalog_v3.approval_record_sha256, "none")
     # Scanner-specific settings are always present and inactive unless VEDA_CATALOG_MEDIA_SCANNER is clamd (pre-plan
     # closure, gap 2): a scanner rollback (clamd -> none) changes one value in place and removes no parameter, so
     # it needs no destroy and no plan-guard exception. The address is the Compose service on the private network.
@@ -234,6 +211,15 @@ locals {
     VEDA_ESTIMATOR_ENABLED   = "true"
     VEDA_WARRANTY_POLICY_URL = var.warranty_policy_url
   } : {}
+}
+
+# The V3 staging approval record, judged by the shared rules (no resource; read only when a catalog_v3 flag is on).
+module "v3_approval" {
+  source = "../../modules/v3-approval"
+
+  record_path  = local.approval_record
+  bound_sha256 = local.catalog_v3.approval_record_sha256
+  today        = formatdate("YYYY-MM-DD", plantimestamp())
 }
 
 module "ssm" {

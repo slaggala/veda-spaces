@@ -192,6 +192,7 @@ class Settings:
     catalog_media_variant_prefix: str = "variant/"
     catalog_video_enabled: bool = False  # video is not supported: refused on, everywhere
     catalog_media_rights_approver: str | None = None  # the owner-assigned media-rights approver (staging, production)
+    catalog_approval_sha256: str | None = None  # the digest the V3 staging approval record is bound to (from SSM)
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -331,6 +332,7 @@ def load_settings(**overrides) -> Settings:
         catalog_media_variant_prefix=_str("VEDA_CATALOG_MEDIA_VARIANT_PREFIX", "variant/"),
         catalog_video_enabled=_bool("VEDA_CATALOG_VIDEO_ENABLED", False),
         catalog_media_rights_approver=_env("VEDA_CATALOG_MEDIA_RIGHTS_APPROVER"),
+        catalog_approval_sha256=_env("VEDA_CATALOG_APPROVAL_SHA256"),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),

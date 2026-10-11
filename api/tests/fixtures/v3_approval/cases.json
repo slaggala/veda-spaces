@@ -1,0 +1,359 @@
+{
+ "description": "Shared V3 staging approval conformance cases: every gate (Terraform plan, staging build, deployment check, runtime) must return exactly 'codes' for each. 'record' is a file in this directory without .json (relative paths allowed); 'bound' is 'record' (the record file's own SHA-256), 'other' (a different digest) or null (none bound); 'today' is the UTC date. Expected codes are written from v3_approval_policy.json by hand, not computed by any gate.",
+ "other_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+ "cases": [
+  {
+   "name": "approved",
+   "record": "approved",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": []
+  },
+  {
+   "name": "approved_non_expiring",
+   "record": "approved-non-expiring",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": []
+  },
+  {
+   "name": "future_review",
+   "record": "future-review",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": []
+  },
+  {
+   "name": "review_on_the_90th_day_is_accepted",
+   "record": "approved",
+   "today": "2026-12-29",
+   "bound": "record",
+   "codes": []
+  },
+  {
+   "name": "review_reached",
+   "record": "approved",
+   "today": "2026-12-30",
+   "bound": "record",
+   "codes": [
+    "REVIEW_REACHED"
+   ]
+  },
+  {
+   "name": "review_window_exceeded",
+   "record": "review-window-exceeded",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "REVIEW_WINDOW"
+   ]
+  },
+  {
+   "name": "review_not_after_approval",
+   "record": "review-not-after-approval",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "REVIEW_WINDOW",
+    "REVIEW_REACHED"
+   ]
+  },
+  {
+   "name": "review_missing",
+   "record": "review-missing",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "REVIEW_WINDOW"
+   ]
+  },
+  {
+   "name": "review_date_as_number",
+   "record": "review-date-as-number",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "REVIEW_WINDOW"
+   ]
+  },
+  {
+   "name": "expired",
+   "record": "expired",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EXPIRED"
+   ]
+  },
+  {
+   "name": "expired_on_its_expiry_day",
+   "record": "approved",
+   "today": "2027-03-31",
+   "bound": "record",
+   "codes": [
+    "REVIEW_REACHED",
+    "EXPIRED"
+   ]
+  },
+  {
+   "name": "expiry_before_approval",
+   "record": "expiry-before-approval",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EXPIRY_POLICY",
+    "EXPIRED"
+   ]
+  },
+  {
+   "name": "no_expiry_policy",
+   "record": "no-expiry-policy",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EXPIRY_POLICY"
+   ]
+  },
+  {
+   "name": "expiry_and_non_expiring",
+   "record": "expiry-and-non-expiring",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EXPIRY_POLICY"
+   ]
+  },
+  {
+   "name": "non_expiring_too_short",
+   "record": "non-expiring-too-short",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EXPIRY_POLICY"
+   ]
+  },
+  {
+   "name": "approval_in_future",
+   "record": "approval-in-future",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "APPROVAL_IN_FUTURE"
+   ]
+  },
+  {
+   "name": "approval_date_not_a_day",
+   "record": "approval-date-not-a-day",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "APPROVAL_DATE"
+   ]
+  },
+  {
+   "name": "revoked",
+   "record": "revoked",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "STATUS",
+    "REVOKED"
+   ]
+  },
+  {
+   "name": "revocation_on_approved",
+   "record": "revocation-on-approved",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "REVOKED"
+   ]
+  },
+  {
+   "name": "draft",
+   "record": "draft",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "STATUS"
+   ]
+  },
+  {
+   "name": "in_review",
+   "record": "in-review",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "STATUS"
+   ]
+  },
+  {
+   "name": "wrong_environment",
+   "record": "wrong-environment",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "ENVIRONMENT"
+   ]
+  },
+  {
+   "name": "schema_1",
+   "record": "schema-1",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "SCHEMA"
+   ]
+  },
+  {
+   "name": "digest_mismatch",
+   "record": "approved",
+   "today": "2026-10-11",
+   "bound": "other",
+   "codes": [
+    "DIGEST_MISMATCH"
+   ]
+  },
+  {
+   "name": "digest_unbound",
+   "record": "approved",
+   "today": "2026-10-11",
+   "bound": null,
+   "codes": [
+    "DIGEST_MISMATCH"
+   ]
+  },
+  {
+   "name": "self_approved",
+   "record": "self-approved",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "APPROVER"
+   ]
+  },
+  {
+   "name": "placeholder_approver",
+   "record": "placeholder-approver",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "APPROVER"
+   ]
+  },
+  {
+   "name": "missing_evidence",
+   "record": "missing-evidence",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EVIDENCE"
+   ]
+  },
+  {
+   "name": "unknown_evidence",
+   "record": "unknown-evidence",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EVIDENCE"
+   ]
+  },
+  {
+   "name": "evidence_sha_not_lowercase_hex",
+   "record": "evidence-sha-not-lowercase-hex",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "EVIDENCE"
+   ]
+  },
+  {
+   "name": "wrong_scope_public_intake",
+   "record": "wrong-scope-public-intake",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "SCOPE"
+   ]
+  },
+  {
+   "name": "wrong_scope_unprotected",
+   "record": "wrong-scope-unprotected",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "SCOPE"
+   ]
+  },
+  {
+   "name": "wrong_scope_3d",
+   "record": "wrong-scope-3d",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "SCOPE"
+   ]
+  },
+  {
+   "name": "wrong_scope_boolean_as_string",
+   "record": "wrong-scope-boolean-as-string",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "SCOPE"
+   ]
+  },
+  {
+   "name": "bad_release",
+   "record": "bad-release",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "RELEASE"
+   ]
+  },
+  {
+   "name": "malformed_array",
+   "record": "malformed-array",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "MALFORMED"
+   ]
+  },
+  {
+   "name": "malformed_text",
+   "record": "malformed-text",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "MALFORMED"
+   ]
+  },
+  {
+   "name": "no_record",
+   "record": "no-such-record",
+   "today": "2026-10-11",
+   "bound": "record",
+   "codes": [
+    "NO_RECORD"
+   ]
+  },
+  {
+   "name": "committed_draft_template",
+   "record": "../../../../docs/implementation/catalog/v3-staging-approval.template",
+   "today": "2026-10-11",
+   "bound": null,
+   "codes": [
+    "STATUS",
+    "APPROVER",
+    "APPROVAL_DATE",
+    "REVIEW_WINDOW",
+    "EXPIRY_POLICY",
+    "EVIDENCE",
+    "DIGEST_MISMATCH"
+   ]
+  }
+ ]
+}

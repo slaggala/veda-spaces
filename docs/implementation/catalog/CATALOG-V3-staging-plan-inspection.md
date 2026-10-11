@@ -32,7 +32,7 @@ Tick each item. **Any unexpected item: do not apply.**
 | 11 | Scanner | **No active ClamAV.** The scanner mode is `none`, and the Compose `scanner` profile is not started by any deploy. |
 | 12 | Media delivery | **Off** (`VEDA_CATALOG_MEDIA_DELIVERY_ENABLED=false`). |
 | 13 | Bucket name | `veda-stg-media-<account>`, with tags `Name` and `purpose=media`. |
-| 14 | Bucket encryption | `aws:kms` with `kms_master_key_id` = the data key ARN, and `bucket_key_enabled=true`. The policy denies a `PutObject` without SSE-KMS under the data key. |
+| 14 | Bucket encryption | `aws:kms` with `kms_master_key_id` = the data key ARN, and `bucket_key_enabled=true`. The policy denies a `PutObject` that names another KMS key or a non-KMS encryption type (`StringNotEqualsIfExists`); an upload with no encryption header is encrypted by the bucket default with the data key. |
 | 15 | Lifecycle | `abort-incomplete-uploads` after 7 days; `noncurrent-media`: noncurrent versions expire after **30** days and expired delete markers are removed. **No Object Lock.** |
 | 16 | IAM prefixes | Get, put and delete only on `arn:aws:s3:::veda-stg-media-<account>/source/*` and `.../variant/*`; `ListBucket` only with `s3:prefix` `source/*` or `variant/*`. No KMS statement added. |
 | 17 | Metric and alarm count | +8 log metric filters (15 in all), +1 host metric: **+9 custom metrics** (21 with the host). +8 application alarms and +1 host alarm: **+9 alarms**. All on the existing topic `veda-stg-alarms`. |
@@ -44,3 +44,19 @@ Tick each item. **Any unexpected item: do not apply.**
 2. After the apply, the next `12-deploy` passes the media preflight with **"V3 intentionally disabled"** and **"scanner not selected"**.
 3. Before the apply, a deploy refuses with **MEDIA INFRASTRUCTURE NOT APPLIED**, and nothing changes.
 4. The scanner decision, real-card evidence, smoke tests and approval record remain separate, later steps (runbook §15).
+
+## Status and the next plan
+
+**Applied 2026-10-11** (`11-infra-apply` run 38106639695, plan run 38106264925): 38 added, 3 changed, 0 destroyed.
+That plan also created `module.monitoring.aws_sns_topic_subscription.owner`. It recurs while the owner has not
+confirmed the alarm-topic email, because AWS drops a pending subscription. A follow-up plan
+(run 38106962562) showed no changes.
+
+**After the activation-remediation PR merges**, the next staging-core plan should be exactly:
+
+| # | Check | Expected |
+|---|---|---|
+| 1 | Creates | `module.ssm.aws_ssm_parameter.config["VEDA_CATALOG_APPROVAL_SHA256"]`, value `none`. Plus the owner email subscription only if it is still unconfirmed. |
+| 2 | Updates, replacements, destroys | None. `module.v3_approval` has no resources. |
+| 3 | Everything else | As above: no KMS, CloudFront, hostname, host-size or production change; every flag `false`; scanner `none`. |
+

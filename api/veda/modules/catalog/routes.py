@@ -474,6 +474,7 @@ def delete_configuration(req: Req, reference: str):
 @api.route("POST", "/media", permission="catalog.media.edit", body=CatalogMediaIn, status=201, max_body=MEDIA_MAX_BODY,
            requirement="CAT-004")  # fmt: skip
 def upload_media(req: Req):
+    configure.require_staging_approval()
     try:
         data = base64.b64decode(req.body.data_base64, validate=True)
     except (binascii.Error, ValueError) as err:
@@ -489,6 +490,7 @@ def upload_media(req: Req):
 @api.route("POST", "/media/<sha>/withdraw", permission="catalog.media.edit", body=CatalogNoteIn, requirement="CAT-004")
 def withdraw_media(req: Req, sha: str):
     """A deletion request or withdrawn consent for one media file (its source and every variant)."""
+    configure.require_staging_approval()
     try:
         return ok({"withdrawn": media.withdraw(req.session, sha, req.body.note or "")})
     except media.MediaError as err:
@@ -499,6 +501,7 @@ def withdraw_media(req: Req, sha: str):
 def list_media(req: Req):
     import sqlalchemy as sa
 
+    configure.require_staging_approval()
     rows = req.session.execute(
         sa.select(CatalogMediaObject).where(CatalogMediaObject.is_deleted.is_(False))
         .order_by(CatalogMediaObject.created_on.desc()).limit(500)
@@ -523,6 +526,7 @@ def staff_media(req: Req, sha: str):
     """Staff preview of a delivery variant (any scan status except INFECTED; sources are never served)."""
     import sqlalchemy as sa
 
+    configure.require_staging_approval()
     row = req.session.execute(
         sa.select(CatalogMediaObject).where(
             CatalogMediaObject.object_sha256 == sha, CatalogMediaObject.role == "VARIANT"
@@ -640,7 +644,11 @@ def public_media(req: Req, sha: str):
     _enabled()
     if not settings().catalog_media_delivery_enabled:  # F2: no public media until the storage controls exist
         raise ApiError(404, "NOT_FOUND", "Not found.")
-    row = media.deliverable(req.session, sha)
+    release = service.active_release(req.session)
+    if release is None:
+        raise ApiError(404, "NOT_FOUND", "Not found.")
+    configure.require_staging_approval(release)  # the same gate as the catalog: approval loss stops serving at once
+    row = media.deliverable(req.session, sha, release=release)
     if row is None:
         raise ApiError(404, "NOT_FOUND", "Not found.")
     return _send(row, public=True)

@@ -47,16 +47,21 @@ output "catalog_v3" {
   }
 
   precondition {
+    condition     = local.scanner.option == null || contains(["B", "C"], coalesce(local.scanner.option, "-"))
+    error_message = "media_scanner.option is B (resize the host, then the clamd sidecar) or C (asynchronous scanning), or null while undecided. Option A (clamd on the current 2 GiB host) is refused: ClamAV needs at least 3 GiB."
+  }
+
+  precondition {
     condition     = contains(["none", "clamd"], local.scanner.mode)
     error_message = "media.scanner_mode is none or clamd (the application supports no other scanner; option C needs an application adapter first)."
   }
 
   precondition {
     condition = local.scanner.mode != "clamd" || (
-      contains(["A", "B"], coalesce(local.scanner.option, "-")) &&
+      coalesce(local.scanner.option, "-") == "B" &&
       can(regex("^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$", coalesce(local.scanner.clamd_image, "-")))
     )
-    error_message = "clamd needs the owner's scanner decision (option A or B, after the capacity evidence) and an image pinned by digest; a placeholder is refused."
+    error_message = "clamd needs the owner's scanner decision option B (a resized host, after the capacity evidence) and an image pinned by digest; a placeholder is refused."
   }
 
   precondition {
