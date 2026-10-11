@@ -2,8 +2,8 @@
 # Validate a candidate ClamAV image for the catalog V3 scanner on an arm64 host (CATALOG-V3-media-enablement.md §6).
 # No credentials, no AWS, no staging: the image is pulled by digest from Docker Hub and run locally in three profiles.
 #   A  the certified Compose profile (api/deploy/docker-compose.yml, service clamd) exactly as it stands
-#   B  the proposed non-root profile: /init-unprivileged as uid 1000, no capability, read-only root, tmpfs for
-#      /tmp, /run/clamav and /var/log/clamav, this directory's clamd.conf (ConcurrentDatabaseReload no)
+#   B  the proposed non-root profile: /init-unprivileged as uid 1000, no capability, read-only root, tmpfs (mode
+#      1777) for /tmp, /run/clamav and /var/log/clamav, this directory's clamd.conf (ConcurrentDatabaseReload no)
 #   C  profile B with ConcurrentDatabaseReload yes, for the reload-peak comparison
 # Every profile records whether clamd answered, how long it took, health and the last log lines. B and C also record
 # the process user, an EICAR stream (must be FOUND), a clean stream, the StreamMaxLength limit, freshclam's write to
@@ -62,6 +62,10 @@ ready_wait() { # name limit-seconds
       return 1
     fi
     if docker exec "$name" clamdcheck.sh >/dev/null 2>&1; then rec "${name}_outcome" "ready after ${t}s"; return 0; fi
+    if docker logs "$name" 2>&1 | grep -qE "Can't initialize the internal logger|Failed to start clamd|Initialization error"; then
+      rec "${name}_outcome" "clamd failed to start (see the log lines) after ${t}s"
+      return 1
+    fi
     sleep 5; t=$((t + 5))
   done
   rec "${name}_outcome" "not ready after ${limit}s (container still running)"
@@ -134,12 +138,12 @@ docker rm -f sv-a >/dev/null
 run_profile() { # name conf
   docker volume create "sv-vol-${1#sv-}" >/dev/null
   docker run -d --name "$1" --user 1000:1000 --entrypoint /init-unprivileged --read-only --cap-drop ALL \
-    --security-opt no-new-privileges:true --tmpfs /tmp --tmpfs /run/clamav --tmpfs /var/log/clamav \
+    --security-opt no-new-privileges:true --tmpfs /tmp:mode=1777 --tmpfs /run/clamav:mode=1777 --tmpfs /var/log/clamav:mode=1777 \
     -v "sv-vol-${1#sv-}:/var/lib/clamav" -v "$2:/etc/clamav/clamd.conf:ro" \
     --memory 3g --memory-reservation 1g -e CLAMAV_NO_MILTERD=true -e CLAMD_STARTUP_TIMEOUT=1800 \
     "${HEALTH[@]}" "$IMAGE" >/dev/null
 }
-note "profile B: non-root /init-unprivileged, no capability, read-only, tmpfs /tmp /run/clamav /var/log/clamav, clamd.conf (ConcurrentDatabaseReload no)"
+note "profile B: non-root /init-unprivileged, no capability, read-only, tmpfs mode 1777 for /tmp /run/clamav /var/log/clamav, clamd.conf (ConcurrentDatabaseReload no)"
 run_profile sv-b "$HERE/clamd.conf"
 if ready_wait sv-b 900; then exercise sv-b; fi
 logs_tail sv-b
