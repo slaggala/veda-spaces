@@ -128,7 +128,7 @@ reload_peak() { # name → max memory.current sampled every second for 120 s aft
 }
 memrec() { # name key: current/peak/anon in MiB
   local m; m="$(mem "$1")"
-  rec "$2" "current=$(mib "${m#*current=}") peak=$(mib "$(sed -n 's/.*peak=\([0-9a-z/]*\).*/\1/p' <<<"$m")") anon=$(mib "${m##*anon=}")"
+  rec "$2" "$(awk -v s="$m" 'BEGIN { n = split(s, f, " "); for (i = 1; i <= n; i++) { split(f[i], kv, "="); v = kv[2]; if (v ~ /^[0-9]+$/) v = sprintf("%.0f", v / 1048576); printf "%s%s=%s", (i > 1 ? " " : ""), kv[1], v } }')"
 }
 exercise() { # name: the checks on a ready profile
   local name=$1 peak_reload t
@@ -158,12 +158,13 @@ exercise() { # name: the checks on a ready profile
 # --- profile compose: the deploy bundle's clamd service ---------------------------------------------------------------
 note "profile compose: $DEPLOY/docker-compose.yml service clamd, as deploy.sh step 4c starts it, image $IMAGE"
 if [[ ! -e /etc/veda/api.env ]]; then
-  note "no /etc/veda/api.env on this host (not the staging host): creating an empty one so Compose can load the file"
-  sudo install -d -m 0755 /etc/veda && sudo install -m 0600 /dev/null /etc/veda/api.env
+  note "no /etc/veda/api.env on this host (not the staging host): creating an empty, readable one so Compose can load the file"
+  sudo install -d -m 0755 /etc/veda && sudo install -m 0644 /dev/null /etc/veda/api.env
 fi
 export VEDA_CLAMD_IMAGE="$IMAGE"
 if [[ "$MEMORY" != "$(get compose_mem_limit_default)" ]]; then export VEDA_CLAMD_MEM_LIMIT="$MEMORY"; fi
-"${COMPOSE[@]}" config --quiet && rec compose_config "valid"
+"${COMPOSE[@]}" config --quiet
+rec compose_config "valid"
 rec compose_rendered_clamd "$("${COMPOSE[@]}" config --format json | python3 -c '
 import json, sys
 c = json.load(sys.stdin)["services"]["clamd"]
