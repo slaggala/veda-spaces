@@ -158,6 +158,9 @@ KNOWN_COMMITS = {
     "5e95cf0cf06608c58ac6a9e64adc12f16d6dafe6": ("V3 remediation A3/H3: isolation tests and real-card equivalence (local only)", "V3 remediation A3/H3"),  # pragma: allowlist secret (commit SHA)
     "5eeb149966f487debdfe563c408a647d5faac484": ("Catalog V3 phase 5: independent-review package, OpenAPI contract, public-route pin", "Catalog V3 phase 5"),  # pragma: allowlist secret (commit SHA)
     "006c2039c212ffaa14fc5299c55a0762839dda19": ("Merge pull request #68 from slaggala/fix/catalog-v3-customer-safety-closure", "main where the canonical customer-copy bypasses were reproduced"),  # pragma: allowlist secret (commit SHA)
+    "bb4cbf6405610269d9f23e58e4c6c97dbd30b5ce": ("Merge pull request #69 from slaggala/fix/catalog-v3-canonical-customer-copy", "PR #69 merge: the V3 staging approval record's `pr69_merge` evidence"),  # pragma: allowlist secret (commit SHA)
+    "246ffeeddf2b9612c6a55be9aa34ce1366c2f5a6": ("Merge pull request #73 from slaggala/docs/v3-activation-readiness-corrections", "certified main after the activation-readiness corrections; commit of the phase-0 real-card artifact"),  # pragma: allowlist secret (commit SHA)
+    "c9b1ba35db33328a7d769dba9d1bad483274d63c": ("Merge pull request #74 from slaggala/docs/v3-activation-preparation", "main deployed to staging by 12-deploy run 38163064366 (V3 off); the activation record's `application_commit` candidate"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

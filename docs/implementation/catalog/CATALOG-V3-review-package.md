@@ -10,6 +10,29 @@
 
 Nothing here activates V3, changes V1 or V2, enables public intake, or changes production behaviour.
 
+## Activation preparation status (phase 1 evidence package, PR #75, corrected 2026-10-12)
+
+This section states the position after the phase-1 evidence package
+([CATALOG-V3-activation-phase1.md](CATALOG-V3-activation-phase1.md)) and its remediation of the independent review's
+findings. It is a status statement for reviewers; it approves nothing and enables nothing.
+
+| Item | Status |
+|---|---|
+| Evidence package | **Complete and sanitized**: every commit is cited as a full, allowlisted SHA and every digest in full ([evidence-reference matrix](CATALOG-V3-activation-phase1-evidence-references.md)); the governance SHA check reports 0 failures |
+| Real-card evidence | **Valid**: PASS on SQLite and PostgreSQL on the deployed commit; artifact intact (`artifact_sha256` `0e4e1b11fac8ce4da38df31546ccc05f96dff1c454fdeb101fbe19642f04f9f7`) |
+| Capacity evidence | **Supports decision-making**: two owner-only host samples collected and digested (`scanner_capacity` `ab25630c5f0e8b2934a8181acd9b55dc5a59de21e05c778d8cefc1da05058517`); the owner reads the figures into AD-2 |
+| `t4g.medium` | **Not recommended**: passes the 25 % rule only if services plus operating system stay at or under 877 MiB, and only with `ConcurrentDatabaseReload no` |
+| `t4g.large` | **Recommended, pending a reviewed plan and owner cost approval**: its price is an estimate pending owner verification (no recorded `t4g.large` price; extrapolated from the recorded `t4g.medium` rate, phase-1 record §4.5); AD-2 and AD-3 UNDECIDED |
+| Scanner image | **Valid**: `clamav/clamav:1.4.6-debian13-slim` arm64 manifest `sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b` resolves by digest, starts on arm64, answers PING, becomes healthy, detects EICAR, refuses an oversized stream, updates signatures |
+| Current Compose scanner profile | **Not deployable**: the certified `clamd` service cannot start the image (root `chown -R` on the 0700 signature directory); the fix is a separate, independently reviewed scanner-engineering pull request (phase-1 record §5.6), not PR #75, and must not add capabilities or privileged mode |
+| Proposed 2,048 MiB clamd limit | **PROPOSED 2048 MiB LIMIT NOT YET VALIDATED**: the harness ran at 3 GiB; the scanner-engineering pull request reruns it at the configured limit |
+| Media-rights approver | **OWNER TO FILL** (AD-4); the acceptance template names nobody |
+| Activation record | **DRAFT**: the committed template is a preparation-only skeleton (`media_delivery: false`, no approver, no dates, empty evidence); no approval record exists; the digest is unbound |
+| Smoke-test sequencing (AD-7) | Requires either an independently reviewed engineering change (option a) or the owner's controlled-window decision (option b); UNDECIDED |
+| V3 | **Off** (every flag false; the API refuses V3 in production) |
+| Media delivery | **Off** |
+| Production | **Unchanged** (no production root, environment, workflow or configuration) |
+
 ## B1 final closure (follow-up to the PR #69 re-review)
 
 The re-review passed B2, B3, the 503 fix and migration 0105, and failed B1 narrowly. These forms still passed:

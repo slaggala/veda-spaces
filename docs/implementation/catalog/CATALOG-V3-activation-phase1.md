@@ -6,7 +6,12 @@ owner's decisions; the decision records themselves are in
 [CATALOG-V3-activation-owner-decisions.md](CATALOG-V3-activation-owner-decisions.md) and remain blank where a human
 decision is missing. Phase 0 is [CATALOG-V3-activation-preparation.md](CATALOG-V3-activation-preparation.md).
 
-Digests are SHA-256. Times are UTC. Nothing here was read with AWS credentials: this machine has none, and the
+Digests are SHA-256 and are always written in full (64 hex digits); commits are written as full 40-hex SHAs that
+the governance allowlist (`api/tests/unit/test_governance_docs.py`, `KNOWN_COMMITS`) names with their subjects. The
+only shorter hex strings are literal artifact names (the image tag, the evidence label and the evidence object key,
+which the deploy and evidence workflows form from the first 12 hex digits of the commit). The reference matrix is
+[CATALOG-V3-activation-phase1-evidence-references.md](CATALOG-V3-activation-phase1-evidence-references.md).
+Times are UTC. Nothing here was read with AWS credentials: this machine has none, and the
 evidence objects are readable only by the owner. Every figure below comes from GitHub workflow logs, the Docker
 registry, the ClamAV sources and documentation, and the validation run on a GitHub arm64 runner.
 
@@ -14,10 +19,10 @@ registry, the ClamAV sources and documentation, and the validation run on a GitH
 
 | Item | Value | How |
 |---|---|---|
-| main | `c9b1ba35db33328a7d769dba9d1bad483274d63c` (PR #74 merge, docs only on top of the certified PR #73 merge) | `git fetch` over HTTPS; `ls-remote` agrees |
+| main | `c9b1ba35db33328a7d769dba9d1bad483274d63c` (the merge commit of PR #74, "Merge pull request #74 from slaggala/docs/v3-activation-preparation"; docs only on top of the PR #73 merge `246ffeeddf2b9612c6a55be9aa34ce1366c2f5a6`) | `git fetch` over HTTPS; `ls-remote` agrees |
 | Approval-digest parameter | Applied: `11-infra-apply` run 38128798960 bound plan run 38127613791 ("1 to add, 0 to change, 0 to destroy"; the one create is `VEDA_CATALOG_APPROVAL_SHA256 = none`) | run logs |
 | Drift after the apply | `10-infra-plan` run 38160993150 (dispatch, main): "No changes. Your infrastructure matches the configuration." | run log |
-| Staging release | `12-deploy` run 38163064366 (main `c9b1ba3`), deploy job 18:27:59 to 18:30:08: image `veda-api:c9b1ba35db33` digest `sha256:b9a55479db3c32df3c8e677d67e1bc5d3d1d9940cc6ea265ea039787241162fe`; bundle `9c8728447dc12c573d777572982844867c20a8261c3181449823ef93d71e056d`; preflight printed `scanner not selected` and `V3 intentionally disabled`; host `i-01538ad0e744faaff` | run log |
+| Staging release | `12-deploy` run 38163064366 (main `c9b1ba35db33328a7d769dba9d1bad483274d63c`), deploy job 18:27:59 to 18:30:08: image `veda-api:c9b1ba35db33` (the literal ECR tag: the first 12 hex digits of that commit) digest `sha256:b9a55479db3c32df3c8e677d67e1bc5d3d1d9940cc6ea265ea039787241162fe`; bundle `9c8728447dc12c573d777572982844867c20a8261c3181449823ef93d71e056d`; preflight printed `scanner not selected` and `V3 intentionally disabled`; host `i-01538ad0e744faaff` | run log |
 | Previous release (rollback tag) | PR #58 merge `3e9cbca46a00` (run 37792485980) | run log |
 | Release evidence | `13-evidence` run 38164329788, label `phase0-release-c9b1ba35db33`, approved by the owner, collected 18:42:52: `s3://veda-evidence-813238078849/host/2026-10-11/i-01538ad0e744faaff/phase0-release-c9b1ba35db33-20261011T184252Z.tgz` sha256 `47977a7f647d8532e6cc59d029fac01a03c5436796fb25cec525ff94cc56580c` | run log |
 | Scanner mode, option, status | `none`, `null`, UNDECIDED | `infra/config/staging-platform.json` |
@@ -26,7 +31,7 @@ registry, the ClamAV sources and documentation, and the validation run on a GitH
 | Budget | 25 USD/month (O16) | `infra/config/staging-budget.json` |
 | Compute | `t4g.small`; the module accepts only `t4g.small` and `t4g.medium` | same; `infra/terraform/modules/compute/variables.tf` |
 | Production | No production root, environment, workflow or configuration; the API refuses every V3 flag in production | repository |
-| Staging site Pages build | still failing on every main commit since PR #62 (not required; the API is unaffected) | check runs on `c9b1ba3` |
+| Staging site Pages build | still failing on every main commit since PR #62 (not required; the API is unaffected) | check runs on the PR #74 merge commit (the `main` row) |
 
 ## 2. Scanner-capacity evidence (brief item 1): COLLECTED, FIGURES WITH THE OWNER
 
@@ -63,9 +68,9 @@ replaces the one above in AD-1.
 
 ## 3. Real-card evidence (brief item 5): DONE AGAIN ON THE DEPLOYED COMMIT
 
-The phase-0 artifact recorded the PR #73 merge (`246ffee…`). Because the deployed commit is the PR #74 merge, the
+The phase-0 artifact recorded the PR #73 merge (`246ffeeddf2b9612c6a55be9aa34ce1366c2f5a6`). Because the deployed commit is the PR #74 merge, the
 procedure ([CATALOG-V3-real-card-evidence.md](CATALOG-V3-real-card-evidence.md)) was run again on the owner's machine,
-on a clean checkout of `c9b1ba35db33…`, with the card read in place outside Git and a fresh embedded-PostgreSQL
+on a clean checkout of `c9b1ba35db33328a7d769dba9d1bad483274d63c`, with the card read in place outside Git and a fresh embedded-PostgreSQL
 directory (the harness fault of phase 0 did not recur).
 
 | Field | Value |
@@ -78,7 +83,7 @@ directory (the harness fault of phase 0 did not recur).
 | `artifact_sha256` (the record's `real_card_evidence`) | `0e4e1b11fac8ce4da38df31546ccc05f96dff1c454fdeb101fbe19642f04f9f7` |
 | `--verify` | "artifact intact" |
 
-The phase-0 artifact (`e309a868…`) stays valid for the PR #73 merge; the record should reference the artifact of the
+The phase-0 artifact (`artifact_sha256` `e309a8683c28e99bebdcd51eecabf685a62777e5fb92dfd501a99bb1b90ac91b`) stays valid for the PR #73 merge; the record should reference the artifact of the
 commit it names in `application_commit`. Note: the tool truncates the `operator` field at 80 characters; it is a
 display field, not evidence.
 
@@ -97,7 +102,7 @@ adapter. What follows gives the owner the measured scanner figures; the host-sid
 | RELOAD with `ConcurrentDatabaseReload no`: sampled maximum | 1,052 MiB (no growth) | 1,086 MiB |
 | RELOAD with `ConcurrentDatabaseReload yes`: sampled maximum / cgroup peak | 2,006 / 2,009 MiB | 2,032 / 2,036 MiB |
 | Reload duration on the runner (scans wait this long under `no`) | 7 s | similar |
-| OOM killed under a 3 GiB limit | no | no |
+| OOM killed under the harness limit of 3 GiB (profiles B and C; **not** the proposed 2,048 MiB) | no | no |
 | Signature database in the image / after the first freshclam update | 108 MiB (`main.cvd` 85, `daily.cvd` 22, `bytecode.cvd` 0.3) / 168 MiB (`daily.cld` 82) | same shape |
 
 The ClamAV documentation's figures (minimum 3 GiB, "upwards of 1.2 GiB to load", double during a concurrent reload)
@@ -126,8 +131,8 @@ limit) `t4g.medium` passes when `3,900 − S − 1,632 ≥ R`.
 |---|---|---|
 | Instance size (AD-2) | **`t4g.large`** under reserve policy (a) | Passes with more than 2 GiB to spare for any plausible S; a concurrent reload would still fit. `t4g.medium` passes only if S ≤ 877 MiB and only with `ConcurrentDatabaseReload no`; the owner decides it from the §2 figures, with the +8.18 USD saving against a reserve that one extra container or a signature-set growth erases |
 | Reserve policy (AD-2) | (a) 25 % of memory on `t4g.large`; (b) only if `t4g.medium` is chosen | as above |
-| clamd settings | `ConcurrentDatabaseReload no`, `StreamMaxLength 30M`, `MaxScanSize 100M`, `MaxFileSize 30M`, `MaxRecursion 10` (`infra/scanner-validation/clamd.conf`); Compose `mem_limit` **2048m** (3072m only with concurrent reloads), `mem_reservation` 1024m | measured peaks 1.63 GiB (first load) and no reload growth; the certified default `mem_limit` 1536m is below the measured first-load peak |
-| Monthly cost delta (AD-3) | `t4g.medium` +8.18 USD (staging about 33 USD); `t4g.large` +24.5 USD (staging about 50 USD); ap-south-1 on-demand list prices as recorded in AUT-101 (`t4g.small` 8.18, `t4g.medium` 16.36, `t4g.large` 32.68). No other new cost: the image comes from Docker Hub (not ECR), signature updates are small daily downloads, no new storage | Budget limit 25 USD must be revised before the resize; proposed 60 USD for `t4g.large`, 40 USD for `t4g.medium`, forecast alerts unchanged at 80 % and 100 % |
+| clamd settings | `ConcurrentDatabaseReload no`, `StreamMaxLength 30M`, `MaxScanSize 100M`, `MaxFileSize 30M`, `MaxRecursion 10` (`infra/scanner-validation/clamd.conf`); Compose `mem_limit` **2048m** (3072m only with concurrent reloads), `mem_reservation` 1024m. **PROPOSED 2048 MiB LIMIT NOT YET VALIDATED**: the harness ran profiles B and C with `--memory 3g`; no run has yet started clamd under a 2,048 MiB cgroup limit | measured peaks 1.63 GiB (first load) and no reload growth, both under a 3 GiB limit; the certified default `mem_limit` 1536m is below the measured first-load peak. The scanner-engineering pull request (§5.6) reruns the harness at the limit it configures before the limit is called validated |
+| Monthly cost delta (AD-3) | **Estimated cost pending owner verification** (see §4.5 for the provenance of every figure). `t4g.medium`: +8.17 USD/month compute (recorded rate). `t4g.large`: +24.52 USD/month compute (**extrapolated**, no recorded price). Estimated total staging run rate: about 33–34 USD/month on `t4g.medium`, about 49–50 USD/month on `t4g.large`. No other new cost is expected: the image comes from Docker Hub (not ECR), signature updates are small daily downloads, no new storage | The 25 USD limit must be revised before any resize. Proposed for the owner to accept or change, not approved: 60 USD for `t4g.large`, 40 USD for `t4g.medium`, forecast alerts unchanged at 80 % and 100 %. AD-3 stays UNDECIDED |
 | ARM64 ClamAV feasibility | **Feasible**: validated on arm64 for both candidates (§5). Only the `-debian` / `-debian13-slim` image variants are multi-arch; the plain tags are amd64 only | registry manifests; validation runs |
 | Rollback | Scanner: `media_scanner.mode` back to `none`; plan shows two in-place SSM updates and no removal; the next `12-deploy` stops the container (step 4c). Host: `compute.instance_type` back to `t4g.small` as an in-place update (stop and start), only after the mode is `none` and the V3 flags are off. The `clamav-db` volume and the pulled image stay on the host until pruned; nothing else is created | preparation record §7 and §11, unchanged |
 | Capacity reserve after the resize | `t4g.large`: at least 1,950 MiB free after S and the clamd limit, by construction; confirmed by a `13-evidence` `scanner-validation` collection once clamd runs on the host | §4.2 |
@@ -140,6 +145,28 @@ limit) `t4g.medium` passes when `3,900 − S − 1,632 ≥ R`.
 4. Together or after: `media_scanner` (`status DECIDED`, `option B`, `mode clamd`, `clamd_image` pinned, `capacity_evidence_sha256`, `decision`).
 5. **Prerequisite:** `staging-network.json` → `az_id` is still `null` (unpinned). A plan that re-evaluates the AZ preference for a new instance type could move the subnet, which is a replacement; the plan guard refuses the destroy, so nothing would apply, but the plan would be refused. Pin `az_id` to the current subnet's AZ ID (from the state or the console) in the same or an earlier pull request.
 6. The plan must show `aws_instance` with an in-place update of `instance_type` only, SSM updates in place, no destroy. Any replacement is a stop signal. Take a data-volume snapshot before the apply; expect a few minutes of API unavailability and one host-health alarm cycle.
+
+### 4.5 Price provenance (correction of 2026-10-12; estimated cost pending owner verification)
+
+The independent review of this record found that the `t4g.large` price was derived, not recorded in any owner
+evidence package. The first revision's figure (32.68 USD) is withdrawn: it had no recorded source. What is and is not
+recorded:
+
+| Item | Value | Provenance |
+|---|---|---|
+| Currency, region, pricing model | USD; `ap-south-1` (Mumbai); EC2 on-demand Linux, `standard` credit mode, 730 hours per month | AUT-101 review package §7; staging cost report |
+| Price date | AWS Price List API, `AmazonEC2` offer version `20260925174521`, read 2026-10-05 | [STAGING-PLATFORM-cost-report.md](../staging/STAGING-PLATFORM-cost-report.md) |
+| `t4g.small` | 0.0112 USD/h; 8.18 USD/month compute | **recorded** in AUT-101 and the cost report |
+| `t4g.medium` | 0.0224 USD/h; 16.35 USD/month compute (0.0224 × 730; AUT-101 records the delta against `t4g.small` as +8.18) | **recorded** in AUT-101 (hourly rate) |
+| `t4g.large` | **not recorded** in AUT-101, the cost report or any owner evidence package | — |
+| `t4g.large`, figure used in this record | 32.70 USD/month compute, delta +24.52 against `t4g.small` | **extrapolation**: 2 × the recorded `t4g.medium` hourly rate (the T4g family doubles per size step) = 0.0448 USD/h × 730 h. Not a price quote. **Estimated cost pending owner verification** against the Price List API or the console before AD-3 is decided |
+| Scope of every figure above | compute only (the instance's hourly rate); monthly estimate, not a billed amount; excludes tax, data transfer, EBS, IPv4, KMS, CloudWatch and every other line of the cost report | this table |
+| Estimated total staging run rate | cost report list-price total 24.5–25.5 USD/month, minus the `t4g.small` 8.18, plus the new compute figure: about 33–34 USD on `t4g.medium`; about 49–50 USD on `t4g.large` (the `t4g.large` term is the extrapolation above) | arithmetic on the cost report; the CloudWatch always-free allowance would lower it by about 5 USD |
+| Billed cost | none exists for either size; staging has never run on them | — |
+| Owner budget decision (AD-3) | **UNDECIDED**; the proposed limits (60 / 40 USD) are engineering proposals, not approved amounts | owner-decisions file |
+
+The owner records the verified `t4g.large` price (or a reviewed plan's cost estimate) with AD-3; until then every
+`t4g.large` amount in this record and in the owner-decisions file is an estimate.
 
 ## 5. ARM64 ClamAV image validation and pin (brief item 3): VALIDATED; ONE REVIEWED CHANGE REQUIRED
 
@@ -180,7 +207,7 @@ only; arm64 exists only in the `-debian` and `-debian13-slim` variants.
 | Profile | 1.4.6 LTS (run 38168217482) | 1.5.4 (run 38168231883) |
 |---|---|---|
 | **A: the certified Compose profile as it stands** (`/init` as root, `cap_drop ALL` + `CHOWN,SETUID,SETGID`, `read_only`, tmpfs `/tmp` `/run/clamav`, limit 1536m) | **exits at once, code 1: `chown: cannot read directory '/var/lib/clamav': Permission denied`** | same |
-| **B: proposed non-root profile** (`user 1000:1000`, `entrypoint /init-unprivileged`, `cap_drop ALL` and nothing added, `read_only`, tmpfs mode 1777 for `/tmp` `/run/clamav` `/var/log/clamav`, `clamd.conf` bind-mounted read-only, `ConcurrentDatabaseReload no`, limit 3g) | ready after 10 s; `healthy`; processes `clamd`, `freshclam`, `tail` all uid 1000; EICAR stream `FOUND` (exit 1); 1 MiB and 20 MiB streams `OK`; 31 MiB stream refused `INSTREAM size limit exceeded` (exit 2, an error, never CLEAN); freshclam replaced `daily.cvd` by `daily.cld` on the volume within two minutes; memory as in §4.1; still answering after the reload | same outcomes; memory as in §4.1 |
+| **B: proposed non-root profile** (`user 1000:1000`, `entrypoint /init-unprivileged`, `cap_drop ALL` and nothing added, `read_only`, tmpfs mode 1777 for `/tmp` `/run/clamav` `/var/log/clamav`, `clamd.conf` bind-mounted read-only, `ConcurrentDatabaseReload no`, **limit 3g, not the proposed 2048m**) | ready after 10 s; `healthy`; processes `clamd`, `freshclam`, `tail` all uid 1000; EICAR stream `FOUND` (exit 1); 1 MiB and 20 MiB streams `OK`; 31 MiB stream refused `INSTREAM size limit exceeded` (exit 2, an error, never CLEAN); freshclam replaced `daily.cvd` by `daily.cld` on the volume within two minutes; memory as in §4.1; still answering after the reload | same outcomes; memory as in §4.1 |
 | C: profile B with `ConcurrentDatabaseReload yes` | same outcomes; reload peak 2,006 MiB | same; 2,032 MiB |
 | Summary digests | `bf5d5a8341a77d087f7771308b860aa376a47a0f4d916291554cb774e33359a9` | `f1c7d89561e72173c1f1b7ca5b7af9c36820d0e147f0786c448f577b6fd87156` |
 
@@ -212,12 +239,64 @@ service to the validated profile:
 - `cap_drop: ["ALL"]` with **no** `cap_add`;
 - tmpfs with an explicit mode for `/tmp`, `/run/clamav` and `/var/log/clamav` (Compose long syntax, `tmpfs.mode: 01777`);
 - `./clamd.conf:/etc/clamav/clamd.conf:ro` with the file moved from `infra/scanner-validation/clamd.conf` into `api/deploy/`;
-- `mem_limit` 2048m (3072m if concurrent reloads are wanted); `mem_reservation` 1024m unchanged;
+- `mem_limit` 2048m (3072m if concurrent reloads are wanted); `mem_reservation` 1024m unchanged. **PROPOSED 2048 MiB LIMIT NOT YET VALIDATED**: every measurement in §5.3 was taken under a 3 GiB harness limit; the pull request that sets the limit reruns `infra/scanner-validation/validate.sh` with that exact limit and records the result;
 - `image`, `profiles`, `expose`, `read_only`, `security_opt`, the volume, the health check and `restart` unchanged.
 
 `deploy.sh`, `media-preflight.sh`, `render-env.sh` and the API need no change. The deploy bundle digest changes with
 the file, as for any bundle change. The validation workflow and harness stay available to re-run against the final
 profile and against any later image digest.
+
+### 5.6 Scanner-engineering scope: a separate, independently reviewed pull request (NOT this one)
+
+**Boundary.** PR #75 is an evidence and preparation package. It changes no file under `api/deploy/`, no Terraform, no
+configuration and nothing on the host; it must not be read as the scanner implementation. The finding, stated exactly:
+
+| Subject | Finding |
+|---|---|
+| The validated ARM64 image (`clamav/clamav:1.4.6-debian13-slim`, arm64 manifest `sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b`) | **VALID.** Resolves by immutable digest to `linux/arm64`; starts on an arm64 host; answers `PING`; becomes `healthy`; detects the EICAR stream (`FOUND`, exit 1); refuses a 31 MiB stream under `StreamMaxLength 30M` (`INSTREAM size limit exceeded`, exit 2, never CLEAN); freshclam updates the signature volume (`daily.cld` written within two minutes) |
+| The current (certified) Compose `clamd` profile in `api/deploy/docker-compose.yml` | **NOT DEPLOYABLE.** Cannot start the image safely: its root entrypoint `/init` attempts `chown -R` on the 0700 uid-1000 signature directory and exits at once without `CAP_DAC_OVERRIDE`/`CAP_DAC_READ_SEARCH`. It **must not** be fixed by adding those or any broad capability, by `privileged`, or by relaxing `read_only` |
+| The proposed 2,048 MiB `mem_limit` | **NOT YET VALIDATED** at that limit (§4.3, §5.3) |
+
+**Required scope of the scanner-engineering pull request** (each item independently reviewed; nothing here is done in
+PR #75):
+
+1. Image-supported non-root initialisation: `entrypoint: ["/init-unprivileged"]` (the ClamAV-documented unprivileged
+   entrypoint; no `chown`, no config rewrite).
+2. `user: "1000:1000"`, the image's `clamav` uid and gid, confirmed from the image (`/var/lib/clamav` and
+   `/var/log/clamav` are owned 1000:1000); re-confirm against any later image digest.
+3. `cap_drop: ["ALL"]` with **no `cap_add`** and **no `privileged`**; `security_opt: no-new-privileges:true` and
+   `read_only: true` kept.
+4. tmpfs with explicit `mode: 01777` for `/tmp`, `/run/clamav` and `/var/log/clamav` (the default tmpfs mode was not
+   writable by uid 1000: run 38165875991).
+5. `clamd.conf` as a read-only bind mount (`StreamMaxLength 30M`, `MaxScanSize 100M`, `MaxFileSize 30M`,
+   `MaxRecursion 10`, `ConcurrentDatabaseReload no`), moved from `infra/scanner-validation/clamd.conf` into the
+   deploy bundle; environment injection is impossible under `read_only`.
+6. Persistent signature-database volume (`clamav-db`) owned 1000:1000; the first-start ownership of a fresh volume
+   confirmed (the harness used a fresh Docker volume, which Docker initialises from the image's directory ownership;
+   the host's existing volume, if any, is inspected before the deploy).
+7. Private Compose network only: `expose` 3310 to the API container, **no published host port**, no public scanner
+   endpoint; the API reaches clamd by service name.
+8. Health and readiness: the image's `clamdcheck.sh` health check, the start period measured (10 s to PONG with
+   preloaded signatures; the image allows six minutes), `deploy.sh` step 4c's PONG wait and fail-closed refusal
+   unchanged.
+9. FreshClam behaviour documented: daemon mode, `UpdateLogFile` under the tmpfs log directory, the one-time "Clamd was
+   NOT notified" warning at start-up, `SelfCheck` 600 s pick-up, signature-age alarm threshold 48 h.
+10. Rollback to scanner `none`: `media_scanner.mode` back to `none` (two in-place SSM updates, no removal), the next
+    `12-deploy` stops the container; the volume and image stay until pruned; validated in the plan output.
+11. Validation at the actual proposed memory limit: rerun `infra/scanner-validation/validate.sh` (and workflow
+    `14-scanner-image-validation`) with the harness limit set to the configured `mem_limit` (2048m, or 3072m if
+    concurrent reloads are chosen); record readiness, EICAR, the stream limit, the reload peak and `OOMKilled` under
+    that limit. Until then: **PROPOSED 2048 MiB LIMIT NOT YET VALIDATED**.
+12. Reviewed host-resize Terraform plan (§4.4): `instance_type` as an in-place update only, SSM updates in place, no
+    destroy, no replacement; data-volume snapshot before the apply; the plan digest recorded for the record's
+    `infrastructure_plan`.
+13. Availability Zone handling if required: pin `staging-network.json` → `az_id` to the current subnet's AZ ID before
+    any instance-type change, so the network module's offering check cannot propose a subnet replacement.
+14. Deploy-time evidence: `13-evidence` with the label `scanner-validation` once clamd runs on the host, its digest
+    becoming the record's `scanner_decision` evidence (with AD-1).
+
+What is **not** in that scope: enabling any V3 flag, media delivery, public intake, the approval record, the
+media-rights approver, or any production change.
 
 ## 6. Media-rights approver assignment record (brief item 4): PREPARED, NO NAME
 
@@ -237,8 +316,8 @@ the primary name is in `infra/config/staging-platform.json` → `media_rights.ap
 | Evaluation of the template today (`staging_approval.evaluate`, unbound) | `STATUS, APPROVER, APPROVAL_DATE, REVIEW_WINDOW, EXPIRY_POLICY, EVIDENCE, DIGEST_MISMATCH`: exactly the codes a draft must fail, in policy order |
 | No record committed | `api/veda/modules/catalog/approved/` does not exist (the integration test asserts it) |
 | Note 1: CLI | `python -m veda.modules.catalog.staging_approval <record>` needs `VEDA_ENV` set (it reads the bound digest from settings); run it with `VEDA_ENV=test` to check a draft |
-| Note 2: scope | The template has `approval_scope.media_delivery: false`; AD-6 says the activation record sets it `true`. The gate accepts either boolean; the author sets it deliberately |
-| Note 3: docs nit | Enablement §10 still says schema `/1`; the policy and AD-6 say `/2`. The activation PR fixes the sentence |
+| Note 2: scope (**resolved as a labelling matter, 2026-10-12**) | The committed file is a **preparation-only DRAFT skeleton**, not the V3-STAGING-1 activation record: status `DRAFT`, `author` `[AUTHOR TO FILL]`, no approver, no dates, `evidence: {}`. It keeps `approval_scope.media_delivery: false`, the restrictive default that can enable nothing. AD-6 records the owner's direction that the activation record sets `media_delivery` to `true` for an activation that enables public delivery behind Cloudflare Access; AD-6 is **UNDECIDED**, so the skeleton does not pre-empt it: the record's author sets the field when AD-6 is recorded ([OWNER TO FILL] in AD-6). The gate accepts either boolean. `test_activation_phase1_docs.py` pins the skeleton's labels and value |
+| Note 3: schema version (**fixed in this pull request, 2026-10-12**) | Enablement §10 said schema `/1`; the certified policy (`api/veda/modules/catalog/v3_approval_policy.json`), the template, every fixture and AD-6 say `veda.catalog.v3-staging-approval/2`. The sentence now reads `/2`, and `test_activation_phase1_docs.py` fails if any activation or enablement document names a schema version other than the policy's |
 
 **Evidence already in hand for the record** (reference and digest), to be copied by the record's author:
 
@@ -264,18 +343,20 @@ item's absence stops activation as the gates are built today.
 
 | Item | Status | Evidence or location | What unblocks it | Blocks activation |
 |---|---|---|---|---|
-| Certified application on main | COMPLETE | `c9b1ba35db33…`; CI green | — | — |
-| Approval-digest parameter applied | COMPLETE | apply run 38128798960 (plan 38127613791, `9d7a13a6…`) | — | — |
+| Certified application on main | COMPLETE | `c9b1ba35db33328a7d769dba9d1bad483274d63c` (PR #74 merge); CI green | — | — |
+| Approval-digest parameter applied | COMPLETE | apply run 38128798960 (plan 38127613791, plan digest `9d7a13a65808be962d62a30b0e6ca0c526f70f998068653fb096551453a37a85`) | — | — |
 | Drift check after the apply | COMPLETE | plan run 38160993150, "No changes" | — | — |
-| Certified release deployed to staging, V3 off | COMPLETE | `12-deploy` run 38163064366; digest `b9a55479…`; preflight lines as expected | — | — |
-| Release evidence | COMPLETE | `13-evidence` run 38164329788, `47977a7f…` | — | — |
-| Real-card evidence on the deployed commit | COMPLETE | artifact `…T184922+0000.json`, `0e4e1b11…`, PASS, intact | — | — |
-| Scanner-capacity evidence collected | COMPLETE | `13-evidence` run 38164988919, `ab25630c…` | — | — |
+| Certified release deployed to staging, V3 off | COMPLETE | `12-deploy` run 38163064366; image digest `sha256:b9a55479db3c32df3c8e677d67e1bc5d3d1d9940cc6ea265ea039787241162fe`; preflight lines as expected | — | — |
+| Release evidence | COMPLETE | `13-evidence` run 38164329788, object digest `47977a7f647d8532e6cc59d029fac01a03c5436796fb25cec525ff94cc56580c` | — | — |
+| Real-card evidence on the deployed commit | COMPLETE | artifact `real-card-evidence-2026-10-11T184922+0000.json`, `artifact_sha256` `0e4e1b11fac8ce4da38df31546ccc05f96dff1c454fdeb101fbe19642f04f9f7`, PASS, intact | — | — |
+| Scanner-capacity evidence collected | COMPLETE | `13-evidence` run 38164988919, object digest `ab25630c5f0e8b2934a8181acd9b55dc5a59de21e05c778d8cefc1da05058517` | — | — |
 | Scanner-capacity figures read and recorded | PENDING (owner) | the tarball (owner-only); CloudWatch 14-day memory maximum and CPU | the owner reads them into AD-2 | yes (`scanner_capacity` needs the decision it supports) |
 | ClamAV image validated on ARM64 and pin value | COMPLETE | §5; runs 38168217482, 38168231883 | — | — |
 | Pin recorded in `media_scanner.clamd_image` | BLOCKED (owner decision AD-1) | `infra/config/staging-platform.json` | AD-1 pull request | yes |
-| Scanner Compose profile able to start the image | **BLOCKED (reviewed engineering change)** | §5.5 | the activation pull request's Compose change, independently reviewed | yes (deploy refuses when the scanner does not answer) |
-| Host size and reserve (AD-2) | BLOCKED (owner decision) | §4 | owner decision; module and network changes if `t4g.large`; `az_id` pin | yes |
+| Scanner Compose profile able to start the image | **BLOCKED (reviewed engineering change; not in PR #75)** | §5.5, §5.6 | a separate scanner-engineering pull request, independently reviewed | yes (deploy refuses when the scanner does not answer) |
+| Proposed 2,048 MiB clamd limit validated at that limit | **PENDING (PROPOSED 2048 MiB LIMIT NOT YET VALIDATED)** | §4.3, §5.3: the harness ran at 3 GiB | the scanner-engineering pull request reruns the harness at the configured limit (§5.6 item 11) | yes (the limit is the planning figure of the capacity rule) |
+| `t4g.large` price verified | **PENDING (owner)**: estimated cost pending owner verification | §4.5: extrapolated from the recorded `t4g.medium` rate; no recorded `t4g.large` price | the owner verifies the price (or a reviewed plan's cost estimate) with AD-3 | yes (AD-3 policy) |
+| Host size and reserve (AD-2) | BLOCKED (owner decision) | §4 (`t4g.medium` not recommended; `t4g.large` recommended, pending a reviewed plan and owner cost approval) | owner decision; module and network changes if `t4g.large`; `az_id` pin | yes |
 | Budget revision (AD-3) | BLOCKED (owner decision) | `infra/config/staging-budget.json` | owner decision | yes (policy) |
 | Resize plan and apply | PENDING (after AD-2, AD-3) | future `10-infra-plan`/`11-infra-apply` runs | in-place update of `instance_type` only | yes |
 | Scanner running on the host; scanner health evidence | PENDING (after the Compose change, the resize and a deploy) | `13-evidence` `scanner-validation` | the above | yes (`scanner_decision`) |
@@ -295,17 +376,19 @@ No undecided human item is marked complete.
 ## 9. Remaining owner decisions
 
 AD-1 scanner recording (option B, mode `clamd`, the §5.1 pin, the §2 digest), AD-2 host size and reserve policy (§4.3
-recommends `t4g.large` under 25 %), AD-3 budget (proposed 60 USD for `t4g.large`, 40 for `t4g.medium`), AD-4
+recommends `t4g.large` under 25 %), AD-3 budget (proposed 60 USD for `t4g.large`, 40 for `t4g.medium`; every `t4g.large` amount is an estimate pending owner verification, §4.5), AD-4
 media-rights approver and backup with the signed acceptance (§6), AD-5 withdrawal during a lapse, AD-6 record author,
 approver and dates, AD-7 smoke-test sequencing (option (b) needs no code), AD-8 promise-owner approval. Also: whether
 to fix the staging site Pages variable, and whether a second capacity sample after a week of soak is wanted (§2).
 
 ## 10. Remaining activation blockers and verdict
 
-**Engineering (one, independently reviewed):** the `clamd` Compose service cannot start the official image under the
-certified profile (§5.3 A, §5.5). The validated replacement profile is specified; nothing in the certified tree was
-changed by this phase. If `t4g.large` is chosen, the one-line compute-module validation and the `az_id` pin come with
-it (§4.4).
+**Engineering (one, independently reviewed, in a separate pull request):** the `clamd` Compose service cannot start
+the official image under the certified profile (§5.3 A, §5.5). The validated replacement profile is specified and its
+full scope is in §5.6; nothing in the certified tree was changed by this phase or by this pull request. If `t4g.large`
+is chosen, the one-line compute-module validation and the `az_id` pin come with it (§4.4). The proposed 2,048 MiB
+limit is **NOT YET VALIDATED** at that limit (§4.3); the `t4g.large` price is an **estimate pending owner
+verification** (§4.5).
 
 **Owner (eight decisions, AD-1 to AD-8), plus** the reading of the capacity figures into AD-2.
 
@@ -318,7 +401,8 @@ ARM64 image validation with a pin value, the acceptance template and the record 
 preparation cannot start because two of the record's evidence items (`scanner_decision`, `media_smoke_test`) need a
 running scanner, the scanner needs the reviewed Compose change and the owner's AD-1 to AD-3, and the record itself
 needs AD-4 to AD-8. The shortest path: the owner reads the §2 figures and records AD-1 to AD-3; engineering opens the
-reviewed pull request with the Compose profile, the module line, the `az_id` pin and the configuration changes; after
+separate, independently reviewed scanner pull request (§5.6) with the Compose profile, the harness rerun at the
+configured limit, the module line, the `az_id` pin and the configuration changes; after
 the plan, apply and deploy, `13-evidence` collects `scanner-validation`; then AD-4 to AD-8 and the record.
 
 Nothing was activated, enabled, uploaded, approved or changed in production. V3 is off, media delivery is off, the
