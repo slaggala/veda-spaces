@@ -176,8 +176,8 @@ if ready_wait "$CC" 600 compose; then
   rec compose_identity "$(docker exec "$CC" id)"
   rec compose_dir_modes "$(docker exec "$CC" stat -c '%n=%a:%u:%g' /tmp /run/clamav /var/log/clamav /var/lib/clamav | tr '\n' ' ')"
   rec compose_tmpfs_mounts "$(docker exec "$CC" sh -c 'grep " tmpfs " /proc/mounts | grep -E " /(tmp|run/clamav|var/log/clamav) " | awk "{printf \"%s(%s) \", \$2, \$4}"')"
-  rec compose_root_readonly "$(docker exec "$CC" sh -c 'touch /etc/probe 2>&1 >/dev/null && echo WRITABLE || echo "read-only root: $(touch /etc/probe 2>&1 | tr -d "\n")"')"
-  rec compose_conf_readonly "$(docker exec "$CC" sh -c 'sh -c ">>/etc/clamav/clamd.conf" 2>&1 >/dev/null && echo WRITABLE || echo read-only')"
+  rec compose_root_readonly "$(docker exec "$CC" sh -c 'if touch /etc/probe >/dev/null 2>&1; then echo WRITABLE; else echo "read-only root"; fi')"
+  rec compose_conf_readonly "$(docker exec "$CC" sh -c 'if sh -c ">>/etc/clamav/clamd.conf" >/dev/null 2>&1; then echo WRITABLE; else echo read-only; fi')"
   rec compose_effective_conf "$(docker exec "$CC" sh -c 'grep -E "^(StreamMaxLength|MaxScanSize|MaxFileSize|MaxRecursion|ConcurrentDatabaseReload|ExitOnOOM|LogRotate|LogFileMaxSize|TemporaryDirectory)" /etc/clamav/clamd.conf | tr "\n" ";"')"
   rec compose_capabilities "$(docker exec "$CC" sh -c 'grep -E "^Cap(Eff|Prm|Bnd)" /proc/1/status | tr -s "\t" "=" | tr "\n" " "')"
   rec compose_no_new_privs "$(docker exec "$CC" sh -c 'grep NoNewPrivs /proc/1/status | tr -s "\t" "="')"
@@ -196,13 +196,22 @@ if ready_wait "$CC" 600 compose; then
   if ready_wait "$CC" 300 compose_after_clamd_killed; then rec compose_after_clamd_killed_seconds "$(( $(date +%s) - t0 ))"; fi
   rec compose_after_clamd_killed_restart_count "before=$before after=$(docker inspect -f '{{.RestartCount}}' "$CC") status=$(docker inspect -f '{{.State.Status}}' "$CC")"
   rec compose_after_clamd_killed_log "$(docker logs --since 5m "$CC" 2>&1 | grep -E "veda-clamd-init: clamd exited|starting clamd" | tail -n 3 | tr '\n' '|')"
-  # Recovery: the whole container killed (SIGKILL to PID 1); restart: unless-stopped must bring it back.
-  note "compose: docker kill (SIGKILL) the container"
+  # Recovery: PID 1 killed from the host with SIGKILL (what the kernel's OOM killer or a crash of the entrypoint
+  # looks like to Docker: an unexpected exit, not an operator stop); restart: unless-stopped must bring it back.
+  note "compose: kill -KILL PID 1 from the host"
   before="$(docker inspect -f '{{.RestartCount}}' "$CC")"; t0=$(date +%s)
-  docker kill "$CC" >/dev/null
+  sudo kill -KILL "$(docker inspect -f '{{.State.Pid}}' "$CC")"
   sleep 10
-  if ready_wait "$CC" 300 compose_after_container_killed; then rec compose_after_container_killed_seconds "$(( $(date +%s) - t0 ))"; fi
-  rec compose_after_container_killed_restart_count "before=$before after=$(docker inspect -f '{{.RestartCount}}' "$CC") status=$(docker inspect -f '{{.State.Status}}' "$CC")"
+  if ready_wait "$CC" 300 compose_after_pid1_killed; then rec compose_after_pid1_killed_seconds "$(( $(date +%s) - t0 ))"; fi
+  rec compose_after_pid1_killed_restart_count "before=$before after=$(docker inspect -f '{{.RestartCount}}' "$CC") status=$(docker inspect -f '{{.State.Status}}' "$CC")"
+  # Operator kill through the Docker API: Docker records it as a manual stop, so the restart policy does not apply
+  # (the same as docker stop); the health heartbeat then reports ScannerHealthy 0 and scanner-unhealthy alarms.
+  note "compose: docker kill (SIGKILL through the Docker API; an operator action)"
+  before="$(docker inspect -f '{{.RestartCount}}' "$CC")"
+  docker kill "$CC" >/dev/null; sleep 20
+  rec compose_after_docker_kill "status=$(docker inspect -f '{{.State.Status}}' "$CC") exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$CC") restart_count before=$before after=$(docker inspect -f '{{.RestartCount}}' "$CC")"
+  "${COMPOSE[@]}" up -d --no-deps clamd >/dev/null
+  ready_wait "$CC" 300 compose_after_docker_kill_start || true
   # Rollback-shaped stop: a Compose stop (deploy.sh step 4c with scanner none runs rm -s -f) must stay stopped.
   note "compose: docker compose stop clamd (must not restart)"
   "${COMPOSE[@]}" stop clamd >/dev/null; sleep 20
