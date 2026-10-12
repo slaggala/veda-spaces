@@ -38,6 +38,7 @@ NOT_VALIDATED = "PROPOSED 2048 MiB LIMIT NOT YET VALIDATED"
 ESTIMATE = "estimated cost pending owner verification"
 SKELETON = "preparation-only DRAFT skeleton"
 GOVERNANCE = "VEDA-SPACES-ACTIVATION-GOVERNANCE-EXECUTION"
+DEPLOYMENT = "VEDA-SPACES-SCANNER-DEPLOYMENT-EXECUTION"
 # The image workflow 14 validates by default: the only pin AD-1 may record (the deploy starts nothing else).
 WORKFLOW14_PIN = re.search(
     r"'(clamav/clamav:[^']+)'", (REPO / ".github/workflows/14-scanner-image-validation.yml").read_text()
@@ -231,11 +232,16 @@ def test_the_recorded_decisions_match_the_decision_files_and_enable_nothing():
     # AD-1 (governance pass of 2026-10-12) records option B, the validated pin and the capacity digest. A record deploys
     # no scanner (mode none); no media delivery, no V3 flag, no approval binding, no approver invented.
     scanner = platform["media_scanner"]
-    assert scanner["status"] == "DECIDED" and scanner["option"] == "B" and scanner["mode"] == "none"
+    # The scanner deployment change (2026-10-12, recorded as given) then set the mode to clamd: the only value it touched.
+    assert scanner["status"] == "DECIDED" and scanner["option"] == "B" and scanner["mode"] == "clamd"
     assert scanner["clamd_image"] == WORKFLOW14_PIN
     assert scanner["capacity_evidence_sha256"] == DIGESTS["scanner capacity"]
     assert "AD-1, 2026-10-12" in scanner["decision"] and GOVERNANCE in scanner["decision"]
-    assert "Approved scanner mode clamd. mode stays none" in scanner["decision"]
+    assert "Approved scanner mode clamd. mode was none in the recording change" in scanner["decision"]
+    assert (
+        f"is clamd since the scanner deployment change of 2026-10-12 (owner direction {DEPLOYMENT}"
+        in scanner["decision"]
+    )
     v3 = platform["catalog_v3"]
     assert v3["approval_record_sha256"] is None
     assert not any(v for k, v in v3.items() if k.endswith("_enabled"))
@@ -327,7 +333,9 @@ def test_the_governance_pass_records_ad1_from_the_evidence_deploys_no_scanner_an
     # The record and the decision file carry the same pin and the same capacity digest, in full.
     assert f"| Pinned image (`clamd_image`) | `{scanner['clamd_image']}` |" in ad1
     assert f"| Capacity evidence (`capacity_evidence_sha256`) | `{scanner['capacity_evidence_sha256']}` |" in ad1
-    assert "| Approved scanner mode | `clamd`" in ad1 and "| `mode` in this change | `none`" in ad1
+    assert "| Approved scanner mode | `clamd`" in ad1
+    assert "| `mode` after the scanner deployment change | `clamd` (pull request #80, 2026-10-12" in ad1
+    assert f"owner direction {DEPLOYMENT}, recorded as given" in ad1
     assert "| Scanner path | Option B |" in ad1
     ad4 = section(decisions, "## AD-4. Media-rights approver")
     assert "| Primary media-rights approver | **[OWNER TO FILL]** |" in ad4
