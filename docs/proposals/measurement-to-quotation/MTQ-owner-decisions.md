@@ -1,6 +1,6 @@
 # MTQ owner-decision register
 
-**Status:** twelve inputs defined, **none resolved**. Decisions are recorded here only as the owner gives them, verbatim, with date and source instruction. Recommendations are the author's and carry no authority.
+**Status:** seventeen inputs defined (OI-MTQ-13…17 added 2026-10-13 from the business-reality review), **none resolved**. Decisions are recorded here only as the owner gives them, verbatim, with date and source instruction. Recommendations are the author's and carry no authority.
 **Companion:** [MTQ-BLUEPRINT.md §18](MTQ-BLUEPRINT.md#18-owner-inputs-register) · [MTQ-dependency-matrix.md](MTQ-dependency-matrix.md) · [MTQ-implementation-entry-gate.md](MTQ-implementation-entry-gate.md)
 
 | ID | Input | Needed before | Blueprint ref | Author recommendation | Owner decision | Decided on | Source |
@@ -17,6 +17,11 @@
 | OI-MTQ-10 | Whether unit rates may ever be shown to customers | B4 implementation | §1.2, §4.3 `show_unit_rates` | Default hidden; Sales Manager may expose per quotation | — | — | — |
 | OI-MTQ-11 | Customer acceptance mechanism (portal click, signed copy, or both) and its legal standing | B4 activation | §10.3, §4.3 `quotation_decision` | Portal acceptance recorded with terms version and re-typed quotation number; signed copy optional attachment | — | — | — |
 | OI-MTQ-12 | Knowledge-store thresholds and the first AI capabilities to enable | B5 | §16 B5 | ≥ 100 quotations with outcomes; rule-calibration reports first | — | — | — |
+| OI-MTQ-13 | Variation policy: how post-acceptance changes are quoted (delta variation quotations vs full re-quote), who approves, and whether `ACCEPTED` stays terminal | B4 | [MTQ-B1-SCOPE.md §2.7](MTQ-B1-SCOPE.md) | Delta variation quotations against the accepted base; Sales Manager approval; base stays ACCEPTED | — | — | — |
+| OI-MTQ-14 | Provisional sums: whether unmeasurable or undecided items may be quoted as provisional amounts, and how they are reconciled | B3 / B4 | §9.4, §10.1 | Allowed as a separate `ALLOWANCE` section with a stated reconciliation rule; never hidden in lines | — | — | — |
+| OI-MTQ-15 | Preparation-package drivers: replace the 1BHK–4BHK/CUSTOM keying with declared drivers; approve a 5 BHK amount and the independent-house factor | B3 | §9.3, [MTQ-B1-SCOPE.md §2.9.4](MTQ-B1-SCOPE.md) | Drivers `bedroom_count` + `level_count`; 5 BHK amount derived from the 4 BHK amount with the owner's uplift | — | — | — |
+| OI-MTQ-16 | Design-stage linkage: whether a quotation may be sent before design sign-off, and how design changes re-enter the lineage | B2 / B4 | §12.2 | Quotation before design allowed with assumptions disclosed; design changes create scope rev n+1 | — | — | — |
+| OI-MTQ-17 | Commercial go/no-go: whether commercial properties enter B2 or wait for a separate package | B2 | [MTQ-B1-SCOPE.md §1.2](MTQ-B1-SCOPE.md) | Wait; residential first | — | — | — |
 
 ## Recording rules
 

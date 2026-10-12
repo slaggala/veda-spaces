@@ -4,6 +4,7 @@
 **Instruction:** `VEDA-SPACES-MTQ-B1-SCOPE-FREEZE` (2026-10-13).
 **Inputs:** [MTQ-BLUEPRINT.md](MTQ-BLUEPRINT.md) (PR #83) · survey and scope templates (PR #84, branch `docs/mtq-survey-scope-templates` at e7e319d) · the architecture review verdict "READY WITH REQUIRED CHANGES" and the business-reality review, **both reported by the owner and not recorded on either PR** · the owner-decisions workshop of 2026-10-13 (recommended defaults, **none recorded in [MTQ-owner-decisions.md](MTQ-owner-decisions.md) yet**).
 **Supersedes:** blueprint §16 B1 where the two differ. Everything else in the blueprint stands.
+**Review intake:** the business-reality review's "required before B1" list (2026-10-13, session record, not posted on the PRs) is addressed item by item in §2.9 and §5; the items that bind B2–B4 are listed in §6.
 
 ---
 
@@ -60,9 +61,9 @@ All tables carry the nine audit columns (ADR-003), UUIDv7 ids (ADR-002), `versio
 | 3 | `property_space` | as §4.1; **B1+** `template_version` VARCHAR(20) NULL (code-fixture version that seeded it) | FULL |
 | 4 | `measurement_visit` | as §4.1; **B1+** `survey_level_code` CODE(10) NOT NULL (`LITE` / `FULL`), planned level for the visit | FULL |
 | 5 | `measurement_set` | as §4.1; **B1+** `survey_level_code` CODE(10) NOT NULL; `property_capture` JSON NOT NULL default `{}` (property-level items: main door, lift, staircase width, DB location, access) | FULL |
-| 6 | `space_measurement` | as §4.1; **B1+** `attributes` JSON NOT NULL default `{}`, validated per space type (staircase geometry, AC and fan counts, fridge niche) | EVENT_ONLY |
+| 6 | `space_measurement` | as §4.1; **B1+** `attributes` JSON NOT NULL default `{}`, validated per space type (staircase geometry, L-shape legs, AC and fan counts); **B1+** `captured_by` GUID FK → `app_user` NOT NULL (per-space author for two-surveyor sets) | EVENT_ONLY |
 | 7 | `space_wall` | as §4.1; `usable_for_code` vocabulary frozen (§2.6) | EVENT_ONLY |
-| 8 | `space_opening` | as §4.1; **B1+** `purpose_code` CODE(20) NULL (`FRIDGE`, `APPLIANCE`, `STORAGE`, `WASH`, `OTHER`) for `NICHE`; `is_existing` BOOL NOT NULL default true | EVENT_ONLY |
+| 8 | `space_opening` | as §4.1; **B1+** `purpose_code` CODE(20) NULL (`FRIDGE`, `APPLIANCE`, `STORAGE`, `WASH`, `OTHER`) for `NICHE`; **B1+** `depth_mm` MM NULL (niche and recess depth); `is_existing` BOOL NOT NULL default true | EVENT_ONLY |
 | 9 | **`space_electrical_point`** | **New table** (§2.5) | EVENT_ONLY |
 | 10 | `measurement_note` | as §4.1; `note_type_code` adds `RISK_ACK` (verifier acknowledgement) | FULL |
 
@@ -77,13 +78,13 @@ Lookups added: `SPACE_TYPE` (residential subset only in B1 seed: LIVING, DINING,
 | | Lite survey | Full survey |
 |---|---|---|
 | Purpose | Qualify the lead and tighten the budget band before design effort; 45–60 minutes | Quotation-ready measurement; 3–6 hours |
-| Per space | Shape, L, W, ceiling height, `confidence_code`, one overview photo, furniture walls tagged with **length only** | Everything in blueprint §4.1: every wall with height and tags, every opening, obstructions, electrical points, photos per wall |
+| Per space | Shape, L, W, ceiling height, `confidence_code`, one overview photo, furniture walls tagged with **length only** | **Trimmed Full capture:** every wall with length, height and tags; openings with offsets and swing, obstructions, electrical points and photos **REQ only on tagged furniture walls** and on walls whose door or window bounds a tagged wall; untagged walls carry length and height only; one overview photo per space; ceiling points per space |
 | Property-level | Floor, lift availability, access notes | Full `property_capture` (PR #84 02 §0) |
 | Completeness rule | Space complete when L, W, CH and one photo exist | Space complete when PR #84 00 §5 REQ and COND items hold |
 | Verification | `VERIFIED` allowed; sets `summary.survey_level = LITE` | `VERIFIED` requires the §6.2 fail-closed checks plus: every in-scope space has ≥ 1 tagged furniture wall with obstructions captured or an explicit "none" marker |
 | Downstream (B2+) | A scope may be **generated** from a LITE set for indicative purposes but **cannot be CONFIRMED**; `pricing_basis_code` can only be `TYPICAL`/`MIXED` | Scope may be CONFIRMED; `pricing_basis_code = MEASURED` |
 | Revision rule | A FULL set supersedes any LITE set for the property; a LITE set never supersedes a FULL set | — |
-| Who | Sales or surveyor | Surveyor; two surveyors (one set each) for multi-level houses |
+| Who | Sales or surveyor | Surveyor; two surveyors on **one** DRAFT set with disjoint spaces for multi-level houses (§2.9.3) |
 
 `survey_level_code` lives on both the visit (planned) and the set (actual); a set may be upgraded from LITE to FULL only by a new revision.
 
@@ -131,7 +132,7 @@ Rules: a `SHIFT` row needs both from- and to-positions; a `NEW` row needs a to-p
 `WALL_TAG` lookup (values of `space_wall.usable_for_code`), **frozen in B1 because B2 scope rules key on them**:
 `WARDROBE`, `LOFT`, `BED_HEAD`, `TV_UNIT`, `STUDY_UNIT`, `CROCKERY_UNIT`, `KITCHEN_RUN`, `KITCHEN_WALL_RUN`, `TALL_UNIT`, `VANITY`, `SHOE_RACK`, `POOJA_UNIT`, `FEATURE_WALL`, `WINDOW_SEATING`, `STORAGE_WALL`, `PARTITION_EDGE`, `NONE`.
 
-Kitchen capture for tall units: the `TALL_UNIT` tag on the wall stretch, the fridge niche as a `NICHE` opening with `purpose_code = FRIDGE` (width, depth via `sill_height_mm` reuse is **not** allowed; depth goes in `attributes.fridge_niche_depth_mm`), `floor_to_lintel_mm` captured in every kitchen, and the appliance list as a `CUSTOMER_REQUEST` note. The `KITCHEN_TALL_UNIT` product and card line are a B3 addition (PR #84 marks it NEW LINE); B1 only guarantees the measurements exist.
+Kitchen capture for tall units: the `TALL_UNIT` tag on the wall stretch, the fridge niche as a `NICHE` opening with `purpose_code = FRIDGE` and `depth_mm`, `floor_to_lintel_mm` captured in every kitchen, and the appliance list as a `CUSTOMER_REQUEST` note. The `KITCHEN_TALL_UNIT` product and card line are a B3 addition (PR #84 marks it NEW LINE); B1 only guarantees the measurements exist.
 
 ### 2.7 Variation quotation model (frozen design, implemented in B4)
 
@@ -159,6 +160,18 @@ B1 commitments: `property_space.id` never changes across measurement revisions (
 | Retention and PII | Survey photos may show people and documents; attachments on a lead's property follow the lead-retention job (OWNER-INPUT-002): deleted, not anonymised. Floor plans supplied by customers are `visibility = INTERNAL` |
 | Polymorphism | `attachment.entity_type` ∈ {`property`, `property_space`, `measurement_set`, `space_wall`, `space_opening`, `space_electrical_point`, `measurement_note`} in B1; permissions evaluated against the parent lead's visibility |
 | Cost | ~50 surveys/month × 100 MB ≈ 5 GB/month; negligible against the existing media budget |
+
+### 2.9 Capture rules added from the business-reality review
+
+**2.9.1 L-shape geometry.** `shape_code = L_SHAPE` stores two rectangular legs in `attributes.l_shape = { turn_code: LEFT | RIGHT, leg_a: { l_mm, w_mm }, leg_b: { l_mm, w_mm } }`, where leg A contains the entry (or W1) and the turn is read standing at W1 facing into the room. Derived floor area = leg A + leg B; perimeter and wall areas come from the six walls, which must be entered individually. Verification fails when the six wall lengths do not close within 50 mm of the leg dimensions.
+
+**2.9.2 W1 convention for door-less spaces.** Where a space has no door (open living/dining, foyer continuing into a passage, open kitchen), W1 is the first solid wall clockwise from the OPEN edge through which the surveyor entered, and the OPEN edge is recorded as a `space_wall` with `wall_type_code = OPEN` and `wall_index` 0. A space with several OPEN edges records all of them; the derivation engine excludes OPEN edges from wall area and includes them in perimeter.
+
+**2.9.3 Two-surveyor policy.** One DRAFT `measurement_set` per revision. Surveyors claim spaces: `space_measurement.captured_by` is set on first write and only that user (or the set's `captured_by` lead surveyor) may edit the space until submission. A write to a space claimed by someone else returns 409 `SPACE_CLAIMED`. Submission is by the lead surveyor once every in-scope space is complete. There is no merge step; the verifier sees one set with per-space authorship.
+
+**2.9.4 Driver rules.** `derived_bedroom_count` counts spaces whose type has `counts_as_bedroom = true`; `SERVANT_ROOM`, `GUEST_SUITE` and `STUDY` are **not** bedrooms for the preparation-package driver, and `MASTER_BEDROOM`, `BEDROOM`, `CHILDREN_BEDROOM`, `GUEST_BEDROOM`, `PARENTS_BEDROOM` are. `derived_level_count` counts distinct `level_index` values among in-scope spaces, so a terrace-only upper level still counts as a level. The card today keys the preparation package by 1BHK–4BHK plus CUSTOM; a 5 BHK amount and the driver choice are owner input OI-MTQ-15 (B3). B1 only guarantees the counts exist.
+
+**2.9.5 Niche depth.** `space_opening.depth_mm` is REQ for `NICHE`, optional otherwise.
 
 ---
 
@@ -213,6 +226,7 @@ Blueprint §5.2 holds space templates as Catalogue V3 records. Catalogue adminis
 | B1-05 (new) attachment limits and retention | §2.8: 15 MB/object, 400 objects and 1 GB per set, 2048 px client scaling, delete-on-lead-retention | **Proposed here** |
 | B1-06 (new) templates as fixtures | §4.4 deviation accepted for B1 | **Proposed here** |
 | OI-MTQ-03/05/06/07/09 | Workshop defaults of 2026-10-13 | **Blank** — not B1 blockers; needed for B2–B4 |
+| OI-MTQ-13…17 (new, from the business-reality review) | Variation policy, provisional sums, preparation-package drivers (incl. 5 BHK), design-stage linkage, commercial go/no-go | **Added to the register as blank rows** in this freeze; none blocks B1 |
 
 Workshop decisions do not change any B1 table. The one workshop consequence inside B1 is B1-04 (the wall-tag vocabulary).
 
@@ -222,11 +236,11 @@ Workshop decisions do not change any B1 table. The one workshop consequence insi
 
 | # | Blocker | Gate | Owner action |
 |---|---|---|---|
-| 1 | The architecture review's "required changes" are not recorded on PR #83 or #84, so they cannot be dispositioned | MTQ-G1 | Post the review findings on the PR or as a remediation matrix; the author dispositions each |
+| 1 | The architecture and business-reality review findings exist only as a session record; they are not posted on PR #83 or #84, so they cannot be formally dispositioned. The B1 items are addressed in §2.9; the B2–B4 items (PROJECT_ALLOWANCE range contradicting §9.4, card line labels in PR #84, GST on part of the value, commercial partition double count) are not | MTQ-G1 | Post the findings on the PRs; author dispositions each in a remediation matrix |
 | 2 | OI-MTQ-01 and OI-MTQ-02 blank | MTQ-G3 | Record the two values (proposed above) in the register with date and instruction |
 | 3 | B1-01…B1-06 are proposed, not recorded | MTQ-G2 | Record them with this document's commit SHA as the frozen-scope reference |
 | 4 | Migration range `0106`, `0200`–`0203` not approved | MTQ-G4 | Decision-log entry |
-| 5 | Historical replay criteria not approved (they gate B2/B3 validation, listed because G5 is an entry condition) | MTQ-G5 | Approve ±5 % quantity / ±3 % total or state other values |
+| 5 | Historical replay criteria not approved, and the E6 set is three 3 BHK quotations (two in one building), which cannot validate 2, 4 or 5 BHK or independent houses | MTQ-G5 | Approve ±5 % quantity / ±3 % total or other values, and widen the replay set to at least one 2 BHK, one 4 BHK and one independent house with recorded measurements |
 | 6 | ATT has a strategy (§2.8) but no table specification or permission matrix of its own | MTQ-G2 (B1 scope) | Accept §2.8 and the blueprint's roadmap `attachment` columns as the ATT spec, or request a separate ATT package |
 | 7 | PR #83 and PR #84 unmerged; this freeze lives on the PR #83 branch | — | Merge after review disposition |
 
