@@ -177,7 +177,8 @@ phase-1 record's statement that its own measurements were taken under 3 GiB rema
 | Guards while PROPOSED | `stack.sh apply` and `stack.sh decisions` (hence `12-deploy`) refuse; `infra/tests/run.sh` fails by design on #77; the owner records AD-2 (and AD-3) or reverts before merging |
 
 **Plan runs.** `10-infra-plan` run **38200171272** for #76 ran with the owner's approval of the `staging-plan`
-environment on the pull request's merge commit `2f930aa3b64ef0f7c9b0c72edcfcb35ff0053f25` (`refs/pull/76/merge`), passed
+environment on the pull request's GitHub merge commit (`refs/pull/76/merge`, a synthetic commit outside the branch
+history; its SHA is in the artifact's `core-plan.meta.json`), passed
 the plan guard ("no destroy, everything in ap-south-1 …") and planned **1 to add, 1 to change, 0 to destroy** (artifact
 `core-plan-38200171272`; plan SHA-256 `2ccf7620dd24e0af96ebf10982e8d97783adc98b1f9bff0a344976d510f230d3`, plan text
 SHA-256 `10ade82e510fea487be790d4055a0ad0c8c97893f61556257e26fbbd8870f409`; 199 no-op):
