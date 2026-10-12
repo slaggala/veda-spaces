@@ -16,6 +16,7 @@ No name below was chosen by engineering. `[OWNER TO FILL]` means exactly that.
 | Owner direction received | Option B preferred (resize the protected-staging host, run the already-supported clamd integration). Option A prohibited. Option C deferred (needs a new application adapter; would reopen engineering). |
 | Repository evidence that conflicts with the direction | None. The application accepts only `none` and `clamd`; startup validation requires clamd when any V3 flag is on in staging; staging-core refuses option A in any mode. |
 | What still blocks recording it | The capacity evidence (§6 of the preparation record) and the host-size decision AD-2. `media_scanner.option` may be recorded as `B` with `mode` still `none` only together with a pinned image digest or it will fail the staging-core precondition when the mode becomes `clamd`. |
+| Phase 1 update (2026-10-11, engineering, no decision) | Capacity evidence collected: `13-evidence` run 38164988919, digest `ab25630c5f0e8b2934a8181acd9b55dc5a59de21e05c778d8cefc1da05058517`. Image validated on ARM64 and pin value: `clamav/clamav:1.4.6-debian13-slim@sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b` (LTS). The certified Compose `clamd` service cannot start the official image; the validated non-root profile needs an independently reviewed change ([phase-1 record §5](CATALOG-V3-activation-phase1.md)). |
 | Where it is recorded | `infra/config/staging-platform.json` → `media_scanner` (`status`, `option`, `mode`, `clamd_image`, `capacity_evidence_sha256`, `decision`) |
 | Decision text | [OWNER TO FILL] |
 | Decided by, on | [OWNER TO FILL], [DATE TO FILL] |
@@ -30,7 +31,8 @@ No name below was chosen by engineering. `[OWNER TO FILL]` means exactly that.
 | Capacity rule (enablement §4) | `MemTotal − (peak current service memory + clamd reservation + reload peak) ≥ approved reserve`, with no OOM kill and no restart in the window. |
 | Reserve policy options | (a) 25 % of memory, as proposed in the enablement document. (b) A measured policy: the reserve is a fixed amount derived from the evidence, with `ConcurrentDatabaseReload no` so the reload peak is not doubled and scans block briefly during reloads. |
 | Preliminary arithmetic (documentation figures, not a recommendation) | ClamAV documents a 3 GiB minimum and about 1.2 GiB to load signatures. On 4 GiB, a 3 GiB reservation plus the current services cannot leave a 1 GiB reserve, so `t4g.medium` passes rule (a) only if the measured figures are used under (b). On 8 GiB the rule passes under (a) with margin. |
-| Cost (ap-south-1 list prices recorded in AUT-101) | `t4g.small` 8.18 USD/month; `t4g.medium` +8.18; `t4g.large` +24.5. Staging today runs at about 25 USD/month including the media alarms, against the 25 USD budget (AD-3). |
+| Cost (**estimated cost pending owner verification**; USD, `ap-south-1`, EC2 on-demand Linux, compute only, monthly estimate, excludes tax and data transfer) | `t4g.small` 8.18 USD/month (0.0112 USD/h **recorded** in AUT-101, Price List API read 2026-10-05); `t4g.medium` +8.17 (0.0224 USD/h **recorded** in AUT-101); `t4g.large` +24.52 (**extrapolated**: 2 × the recorded `t4g.medium` rate = 0.0448 USD/h × 730 h = 32.70; no `t4g.large` price is recorded in any owner evidence package; [phase-1 record §4.5](CATALOG-V3-activation-phase1.md)). Staging today runs at about 25 USD/month including the media alarms, against the 25 USD budget (AD-3). |
+| Phase 1 update (2026-10-11, engineering, no decision) | Measured on ARM64: clamd steady about 1.05 GiB, first-load peak 1.63 GiB, no growth on reload with `ConcurrentDatabaseReload no`, about 2.0 GiB with concurrent reloads. With a 2,048 MiB clamd limit, `t4g.medium` passes the 25 % rule only if services plus operating system stay at or under 877 MiB; `t4g.large` passes with more than 2 GiB to spare. Engineering recommends `t4g.large` under policy (a); the owner reads the host figures from the capacity evidence. **PROPOSED 2048 MiB LIMIT NOT YET VALIDATED**: the measurements were taken under a 3 GiB harness limit; the scanner-engineering pull request reruns the harness at the configured limit ([phase-1 record §5.6](CATALOG-V3-activation-phase1.md)). Prerequisite for any resize: pin `az_id` in `infra/config/staging-network.json` ([phase-1 record §4](CATALOG-V3-activation-phase1.md)). |
 | Where it is recorded | `infra/config/staging-platform.json` → `compute.instance_type` and `compute.decision`; reserve policy in `media_scanner.decision` |
 | Chosen size | [OWNER TO FILL] |
 | Reserve policy | [OWNER TO FILL] |
@@ -42,7 +44,8 @@ No name below was chosen by engineering. `[OWNER TO FILL]` means exactly that.
 |---|---|
 | Status | **UNDECIDED** |
 | Current limit | 25 USD/month, forecast alerts at 80 % and 100 % (`infra/config/staging-budget.json`). |
-| Why it is needed | Option B on any eligible size exceeds the current limit (about 33–34 USD on `t4g.medium`, about 49–50 USD on `t4g.large`). The budget resource only alerts; it does not stop spend, but the owner decided the limit and the forecast alert would fire every month. |
+| Why it is needed | Option B on any eligible size exceeds the current limit (estimated total staging run rate about 33–34 USD/month on `t4g.medium`, about 49–50 USD/month on `t4g.large`; both are **estimated cost pending owner verification**, the `t4g.large` term extrapolated, [phase-1 record §4.5](CATALOG-V3-activation-phase1.md)). The budget resource only alerts; it does not stop spend, but the owner decided the limit and the forecast alert would fire every month. |
+| Phase 1 update (2026-10-11, engineering, no decision; corrected 2026-10-12) | Proposed limits for the owner to accept or change, **not approved**: 60 USD with `t4g.large` (estimated total about 49–50 USD), 40 USD with `t4g.medium` (estimated total about 33–34 USD); forecast alerts unchanged at 80 % and 100 %. No other new cost from the scanner is expected. The `t4g.large` figure is an estimate pending owner verification; no billed cost exists for either size ([phase-1 record §4.3 and §4.5](CATALOG-V3-activation-phase1.md)). |
 | Where it is recorded | `infra/config/staging-budget.json` → `monthly_limit_usd`, `decision` |
 | New limit | [OWNER TO FILL] |
 | Review date for the limit | [OWNER TO FILL] |
@@ -59,6 +62,7 @@ No name below was chosen by engineering. `[OWNER TO FILL]` means exactly that.
 | Responsibilities | Verify ownership or licence; verify consent (and its reference) for client permission; verify attribution; verify usage scope (products, rooms, styles); verify effective, expiry and review dates; approve withdrawal; approve publication eligibility (a record's `reviewed_by`). |
 | Effect while blank | `media_rights.approver` stays `[OWNER TO FILL]`: staging-core refuses any V3 flag (output `catalog_v3`), and startup validation refuses `VEDA_CATALOG_MEDIA_RIGHTS_APPROVER` with that text. |
 | Where it is recorded | `infra/config/staging-platform.json` → `media_rights.approver`, `media_rights.status`; the backup approver in `media_rights.decision` |
+| Phase 1 update (2026-10-11, engineering, no decision) | Acceptance template prepared: [media-rights-approver-acceptance.template.md](media-rights-approver-acceptance.template.md). No name was entered. |
 | Written acceptance by the approver | [OWNER TO FILL: location of the signed note; its SHA-256 becomes the activation record's `media_rights_approver` evidence] |
 | Decided by, on | [OWNER TO FILL], [DATE TO FILL] |
 
@@ -88,7 +92,7 @@ No name below was chosen by engineering. `[OWNER TO FILL]` means exactly that.
 | `approved_at` | The UTC day the approver signs |
 | `review_by` | After `approved_at` and at most 90 days later. Proposed: 60 days. [OWNER TO FILL] |
 | `expires_at` or `non_expiring_decision` | Exactly one. Owner direction: expiry must be explicit unless an independently approved non-expiring policy is recorded. Proposed: `expires_at = review_by`. [OWNER TO FILL] |
-| `approval_scope.media_delivery` | `true` for an activation that enables public delivery behind Cloudflare Access (a JSON boolean is required; any value is accepted by the gate) |
+| `approval_scope.media_delivery` | Owner direction: `true` for an activation that enables public delivery behind Cloudflare Access (a JSON boolean is required; either value is accepted by the gate). The committed [`v3-staging-approval.template.json`](v3-staging-approval.template.json) is a **preparation-only DRAFT skeleton**, not this record: it keeps `false` (the restrictive default) and does not pre-empt this decision; the record's author sets the field when this decision is recorded. Value for the V3-STAGING-1 record: [OWNER TO FILL] |
 | Decided by, on | [OWNER TO FILL], [DATE TO FILL] |
 
 ## AD-7. First-activation smoke-test sequencing

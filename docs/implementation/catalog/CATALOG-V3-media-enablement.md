@@ -198,7 +198,7 @@ Catalog governance applies; there is no second workflow. A media record carries:
 
 ## 10. The V3 staging approval record
 
-The schema is `veda.catalog.v3-staging-approval/1` (`api/veda/modules/catalog/staging_approval.py`). The template is [`v3-staging-approval.template.json`](v3-staging-approval.template.json), status DRAFT. **No approved record exists, and none is created by this work.**
+The schema is `veda.catalog.v3-staging-approval/2` (fixed by the certified policy `api/veda/modules/catalog/v3_approval_policy.json`, read by `api/veda/modules/catalog/staging_approval.py`; the version named here is checked against the policy by `test_activation_phase1_docs.py`). The template is [`v3-staging-approval.template.json`](v3-staging-approval.template.json): a **preparation-only DRAFT skeleton**, not the V3-STAGING-1 activation record. It has status DRAFT, a `[AUTHOR TO FILL]` author, no approver, no dates, empty evidence and `approval_scope.media_delivery: false` (the restrictive default). The activation record's author sets `media_delivery` per owner decision AD-6 (owner direction: `true` for public delivery behind Cloudflare Access; UNDECIDED until recorded). **No approved record exists, and none is created by this work.**
 
 - **Statuses:** DRAFT, IN_REVIEW, APPROVED, REVOKED. A revocation states when and why.
 - **APPROVED requires:**
