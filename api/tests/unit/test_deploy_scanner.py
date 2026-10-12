@@ -70,6 +70,57 @@ def test_the_scanner_service_is_private_bounded_and_hardened():
     assert compose["volumes"]["clamav-db"] == {}, "signatures persist across restarts"
 
 
+def test_the_scanner_runs_as_the_image_user_without_any_capability():
+    """CATALOG-V3-scanner-implementation.md: the validated non-root profile. The image's /init (root, chown -R on the
+    0700 signature directory) cannot start under cap_drop ALL; the profile runs the image's clamav user with the
+    bundle's entrypoint instead, and adds no capability and no privilege to make it work."""
+    from pathlib import Path
+
+    import yaml
+
+    bundle = Path(__file__).resolve().parents[2] / "deploy"
+    clamd = yaml.safe_load((bundle / "docker-compose.yml").read_text())["services"]["clamd"]
+    assert clamd["user"] == "1000:1000" and clamd["entrypoint"] == ["/usr/local/bin/veda-clamd-init"]
+    assert "cap_add" not in clamd and "privileged" not in clamd and clamd["cap_drop"] == ["ALL"]
+    assert clamd["pids_limit"] == 256 and clamd["restart"] == "unless-stopped"
+    assert clamd["mem_limit"] == "${VEDA_CLAMD_MEM_LIMIT:-2048m}", "the validated limit is the default"
+    assert "env_file" not in clamd and set(clamd["environment"]) == {"CLAMAV_NO_MILTERD", "FRESHCLAM_CHECKS"}
+    # The three directories the daemons write are tmpfs with an explicit mode (the default mode was not writable by
+    # uid 1000), a size bound (tmpfs pages count against mem_limit) and no exec, suid or device nodes.
+    tmpfs = dict(t.split(":", 1) for t in clamd["tmpfs"])
+    assert set(tmpfs) == {"/tmp", "/run/clamav", "/var/log/clamav"}
+    for options in tmpfs.values():
+        parts = set(options.split(","))
+        assert (
+            "mode=1777" in parts
+            and {"noexec", "nosuid", "nodev"} <= parts
+            and any(p.startswith("size=") for p in parts)
+        )
+    # Read-only bind mounts from the bundle: the configuration (StreamMaxLength 30M etc.) and the entrypoint; the
+    # signature database on the named volume. Nothing else from the host.
+    assert sorted(clamd["volumes"]) == sorted([
+        "clamav-db:/var/lib/clamav",
+        "./clamd.conf:/etc/clamav/clamd.conf:ro",
+        "./clamd-entrypoint.sh:/usr/local/bin/veda-clamd-init:ro",
+    ])  # fmt: skip
+    conf = (bundle / "clamd.conf").read_text()
+    for directive in ("StreamMaxLength 30M", "MaxScanSize 100M", "MaxFileSize 30M", "MaxRecursion 10",
+                      "ConcurrentDatabaseReload no", "ExitOnOOM yes", "TCPSocket 3310"):  # fmt: skip
+        assert f"\n{directive}\n" in conf, directive
+    entrypoint = (bundle / "clamd-entrypoint.sh").read_text()
+    assert entrypoint.startswith("#!/bin/sh\n") and (bundle / "clamd-entrypoint.sh").stat().st_mode & 0o111
+    for required in ("clamd --foreground &", 'wait "$clamd_pid"', 'exit "$rc"', "freshclam --checks="):
+        assert required in entrypoint, required
+    code = "\n".join(line for line in entrypoint.splitlines() if not line.lstrip().startswith("#"))
+    assert "chown" not in code and "tail -f" not in code, "no ownership change; PID 1 exits with clamd"
+    health = clamd["healthcheck"]
+    assert (
+        health["test"] == ["CMD-SHELL", "clamdcheck.sh"]
+        and health["interval"] == "30s"
+        and health["start_period"] == "300s"
+    )
+
+
 def test_the_rendered_quoted_form_is_read(deploy, tmp_path):  # noqa: F811
     """render-env.sh writes NAME="value"; the scanner step reads that form."""
     path = tmp_path / "api.env"

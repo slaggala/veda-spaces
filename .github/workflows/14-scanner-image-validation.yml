@@ -1,10 +1,12 @@
-# Validate a candidate ClamAV image for the catalog V3 scanner on an arm64 runner (CATALOG-V3-media-enablement.md §6).
+# Validate the catalog V3 scanner on an arm64 runner (CATALOG-V3-media-enablement.md §6; CATALOG-V3-scanner-implementation.md).
 # No credentials, no environment, no AWS, no staging: the image is pulled by digest from Docker Hub and run on the
-# runner under the certified Compose hardening and under the proposed non-root profile (infra/scanner-validation).
-# The job summary and the printed summary.json are the evidence for owner decisions AD-1 and AD-2; nothing is decided
-# or deployed here. Manual, or on a push of the harness itself on an activation/* branch.
+# runner as the deploy bundle runs it (api/deploy/docker-compose.yml, service clamd, at its configured memory limit)
+# and under the comparison profiles of infra/scanner-validation/validate.sh. The job summary, the printed summary.json
+# and the uploaded artifact are the evidence for the owner decisions AD-1 and AD-2 and for the review of the scanner
+# implementation; nothing is decided or deployed here. Manual, or on a push of the harness or the bundle's scanner
+# files on an activation/* or infra/* branch.
 name: 14-scanner-image-validation
-run-name: "14-scanner-image-validation (${{ inputs.image || 'default candidate' }})"
+run-name: "14-scanner-image-validation (${{ inputs.image || 'default candidate' }}, ${{ inputs.memory_limit || '2048m' }})"
 
 on:
   workflow_dispatch:
@@ -13,11 +15,19 @@ on:
         description: "Candidate image pinned by digest, name:tag@sha256:<64 hex> (deploy.sh form)"
         required: true
         type: string
+      memory_limit:
+        description: "Memory limit for every profile (the deploy bundle's default is 2048m), e.g. 2048m or 3072m"
+        required: false
+        default: "2048m"
+        type: string
   push:
-    branches: ["activation/**"]
+    branches: ["activation/**", "infra/**"]
     paths:
       - ".github/workflows/14-scanner-image-validation.yml"
       - "infra/scanner-validation/**"
+      - "api/deploy/docker-compose.yml"
+      - "api/deploy/clamd.conf"
+      - "api/deploy/clamd-entrypoint.sh"
 
 permissions:
   contents: read
@@ -26,13 +36,23 @@ jobs:
   validate:
     name: validate (arm64 runner, no credentials)
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       # The LTS candidate (ClamAV 1.4.6, Debian 13 slim, the linux/arm64 manifest of the multi-arch index).
       IMAGE: ${{ inputs.image || 'clamav/clamav:1.4.6-debian13-slim@sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b' }}
+      SCANNER_VALIDATION_MEMORY: ${{ inputs.memory_limit || '2048m' }}
+      SCANNER_VALIDATION_OUT: /tmp/scanner-validation
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Validate the candidate image
+      - name: Validate the scanner (Compose profile at the configured limit, comparison profiles B and C)
         run: infra/scanner-validation/validate.sh "$IMAGE"
+      - name: Upload summary.json (evidence; its SHA-256 is in the job summary)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scanner-validation-${{ github.run_id }}
+          path: /tmp/scanner-validation/summary.json
+          if-no-files-found: warn
+          retention-days: 90

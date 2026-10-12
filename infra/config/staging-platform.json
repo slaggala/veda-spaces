@@ -54,7 +54,7 @@
   },
   "monitoring": {
     "status": "DECIDED",
-    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue. Implementation note 2026-10-10 (targeted media enablement, not a change of this decision): the monitoring module now plans 15 log metric filters (these 7 plus 8 catalog-media signals) and one more host metric (scanner restarts): 16 custom metrics without the host, 21 with it.",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue. Implementation note 2026-10-10 (targeted media enablement, not a change of this decision): the monitoring module now plans 15 log metric filters (these 7 plus 8 catalog-media signals) and one more host metric (scanner restarts): 16 custom metrics without the host, 21 with it. Implementation note 2026-10-12 (scanner implementation, not a change of this decision): one more host metric, the scanner health (Veda/Host ScannerHealthy, alarm scanner-unhealthy), reported only while the scanner container exists: 16 custom metrics without the host, 22 with it.",
     "log_retention_days": 30,
     "thresholds": {
       "server_errors_per_5min": 5,

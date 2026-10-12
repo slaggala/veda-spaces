@@ -42,31 +42,45 @@ services:
     volumes: ["/var/lib/veda:/var/lib/veda", "./litestream.yml:/etc/litestream.yml:ro"]
     ports: ["127.0.0.1:9090:9090"]  # replication-lag metrics for the CloudWatch agent only
     restart: unless-stopped
-  # Catalog V3 malware scanner (targeted media enablement). Started by deploy.sh only when the rendered configuration
-  # selects VEDA_CATALOG_MEDIA_SCANNER=clamd, which staging-core plans only after the owner's scanner decision (the
-  # capacity evidence passed) and with the image pinned by digest; any other image is refused. On the private
-  # Compose network only (the API reaches clamd:3310); no host port. Not running today.
+  # Catalog V3 malware scanner (targeted media enablement; docs/implementation/catalog/CATALOG-V3-scanner-implementation.md).
+  # Started by deploy.sh step 4c only when the rendered configuration selects VEDA_CATALOG_MEDIA_SCANNER=clamd, which
+  # staging-core plans only after the owner's scanner decision (option B, resized host) and with the image pinned by
+  # digest; any other image is refused. On the private Compose network only (the API reaches clamd:3310); no host port.
+  # Not running today (the configuration says none).
+  # Non-root profile, validated on arm64 at this memory limit by infra/scanner-validation (workflow 14): the image's
+  # clamav user 1000:1000; the bind-mounted entrypoint, which is the image's /init-unprivileged step for step except
+  # that PID 1 exits when clamd exits, so the restart policy applies; every capability dropped and none added; no
+  # privileged mode; read-only root; tmpfs with mode 1777 and a size bound for the three directories the daemons write
+  # (the default tmpfs mode was not writable by uid 1000); clamd.conf bind-mounted read-only (the image's /init
+  # rewrites it from the environment, impossible here); the signature database on a named volume owned 1000:1000.
   clamd:
     image: ${VEDA_CLAMD_IMAGE:-scanner-image-not-decided}
     profiles: ["scanner"]
     expose: ["3310"]
+    user: "1000:1000"
+    entrypoint: ["/usr/local/bin/veda-clamd-init"]
     environment:
       CLAMAV_NO_MILTERD: "true"
-      CLAMD_STARTUP_TIMEOUT: "1800"
+      FRESHCLAM_CHECKS: "2"  # signature checks per day; the media-signatures-outdated alarm fires at 48 h
     volumes:
       - clamav-db:/var/lib/clamav  # signature database, kept across restarts (freshclam updates it in place)
-    tmpfs: ["/tmp", "/run/clamav"]
+      - ./clamd.conf:/etc/clamav/clamd.conf:ro
+      - ./clamd-entrypoint.sh:/usr/local/bin/veda-clamd-init:ro
+    tmpfs:
+      - /tmp:mode=1777,size=256m,noexec,nosuid,nodev  # clamd socket and scan temporaries (StreamMaxLength 30M, MaxScanSize 100M)
+      - /run/clamav:mode=1777,size=8m,noexec,nosuid,nodev
+      - /var/log/clamav:mode=1777,size=64m,noexec,nosuid,nodev  # clamd.log (rotated at 5M) and freshclam.log
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
-    cap_add: ["CHOWN", "SETUID", "SETGID"]  # the image's entrypoint drops to its clamav user
+    pids_limit: 256
     mem_reservation: ${VEDA_CLAMD_MEM_RESERVATION:-1024m}
-    mem_limit: ${VEDA_CLAMD_MEM_LIMIT:-1536m}
+    mem_limit: ${VEDA_CLAMD_MEM_LIMIT:-2048m}  # measured first-load peak 1.63 GiB; no growth on reload (ConcurrentDatabaseReload no)
     healthcheck:
       test: ["CMD-SHELL", "clamdcheck.sh"]
-      interval: 60s
+      interval: 30s
       timeout: 10s
-      start_period: 600s  # the first signature load
+      start_period: 300s  # measured 10 s to PONG with the image's preloaded signatures; the image itself allows 6 minutes
       retries: 3
     restart: unless-stopped
 

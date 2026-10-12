@@ -90,8 +90,8 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = toset(keys(aws_cloudwatch_metric_alarm.host)) == toset(["host-status-check", "host-cpu", "host-memory", "host-data-disk", "host-root-disk", "scanner-restarts", "api-health"])
-    error_message = "status, CPU, memory, both disks, scanner restarts and the health heartbeat"
+    condition     = toset(keys(aws_cloudwatch_metric_alarm.host)) == toset(["host-status-check", "host-cpu", "host-memory", "host-data-disk", "host-root-disk", "scanner-restarts", "scanner-unhealthy", "api-health"])
+    error_message = "status, CPU, memory, both disks, scanner restarts, scanner health and the health heartbeat"
   }
 
   assert {
@@ -100,8 +100,13 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = output.custom_metric_count == 21
-    error_message = "with the host: plus memory, two disks, the health metric and the scanner restart count"
+    condition     = aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].treat_missing_data == "notBreaching" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].comparison_operator == "LessThanThreshold" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].statistic == "Minimum"
+    error_message = "a scanner that is not running reports nothing and is not an alarm; one that runs and fails its health check is"
+  }
+
+  assert {
+    condition     = output.custom_metric_count == 22
+    error_message = "with the host: plus memory, two disks, the health metric, the scanner restart count and the scanner health"
   }
 }
 
