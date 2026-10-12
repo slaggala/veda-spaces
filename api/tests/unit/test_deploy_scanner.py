@@ -84,7 +84,7 @@ def test_the_scanner_runs_as_the_image_user_without_any_capability():
     assert "cap_add" not in clamd and "privileged" not in clamd and clamd["cap_drop"] == ["ALL"]
     assert clamd["pids_limit"] == 256 and clamd["restart"] == "unless-stopped"
     assert clamd["mem_limit"] == "${VEDA_CLAMD_MEM_LIMIT:-2048m}", "the validated limit is the default"
-    assert "env_file" not in clamd and set(clamd["environment"]) == {"CLAMAV_NO_MILTERD", "FRESHCLAM_CHECKS"}
+    assert "env_file" not in clamd and set(clamd["environment"]) == {"FRESHCLAM_CHECKS"}
     # The three directories the daemons write are tmpfs with an explicit mode (the default mode was not writable by
     # uid 1000), a size bound (tmpfs pages count against mem_limit) and no exec, suid or device nodes.
     tmpfs = dict(t.split(":", 1) for t in clamd["tmpfs"])

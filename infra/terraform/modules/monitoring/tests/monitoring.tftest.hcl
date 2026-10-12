@@ -100,8 +100,8 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].treat_missing_data == "notBreaching" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].comparison_operator == "LessThanThreshold" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].statistic == "Minimum"
-    error_message = "a scanner that is not running reports nothing and is not an alarm; one that runs and fails its health check is"
+    condition     = aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].treat_missing_data == "notBreaching" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].comparison_operator == "LessThanThreshold" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].statistic == "Minimum" && aws_cloudwatch_metric_alarm.host["scanner-unhealthy"].evaluation_periods == 2 && aws_cloudwatch_metric_alarm.host["api-health"].evaluation_periods == 1
+    error_message = "a scanner that is not running reports nothing and is not an alarm; one that runs and fails its health check for two consecutive periods is (a start reports 0 while Docker's health is starting); other alarms keep one period"
   }
 
   assert {

@@ -33,7 +33,10 @@ mkdir -p "$OUT"
 RESULTS="$OUT/results.tsv"
 : >"$RESULTS"
 note() { echo "[$(date -u +%H:%M:%S)] $*"; }
-rec() { printf '%s\t%s\n' "$1" "$2" >>"$RESULTS"; note "$1 = $2"; }
+rec() { # key value: one line per record (newlines and tabs in a value become spaces, so the TSV and the JSON stay valid)
+  local v; v="$(printf '%s' "$2" | tr '\n\t' '  ')"
+  printf '%s\t%s\n' "$1" "$v" >>"$RESULTS"; note "$1 = $v"
+}
 get() { awk -F'\t' -v k="$1" '$1 == k { v = $2 } END { print v }' "$RESULTS"; }
 # The Compose project is named like the host's (the deploy directory), so the container is deploy-clamd-1, the name
 # infra/host/health.sh inspects. The compose file's env_file (/etc/veda/api.env, the host's rendered configuration)
@@ -83,9 +86,17 @@ rec bundle_compose_sha256 "$(sha256sum "$DEPLOY/docker-compose.yml" | cut -d' ' 
 # --- helpers --------------------------------------------------------------------------------------------------------
 HEALTH=(--health-cmd clamdcheck.sh --health-interval 30s --health-timeout 10s --health-start-period 300s --health-retries 3)
 ready_wait() { # name limit-seconds [key]: records <key>_outcome (default <name>_outcome)
-  local name=$1 limit=$2 key=${3:-$1} t=0 st
+  local name=$1 limit=$2 key=${3:-$1} t=0 st r0 r
+  # A container under a restart policy shows "restarting" between attempts; one restart is a recovery, three or
+  # more during one wait is a crash loop and fails at once instead of spinning until the limit.
+  r0="$(docker inspect -f '{{.RestartCount}}' "$name" 2>/dev/null || echo 0)"
   while (( t < limit )); do
     st="$(docker inspect -f '{{.State.Status}}' "$name" 2>/dev/null || echo missing)"
+    r="$(docker inspect -f '{{.RestartCount}}' "$name" 2>/dev/null || echo "$r0")"
+    if (( r - r0 >= 3 )); then
+      rec "${key}_outcome" "crash loop: $((r - r0)) restarts in ${t}s (status $st, exit code $(docker inspect -f '{{.State.ExitCode}}' "$name" 2>/dev/null || echo '?'))"
+      return 1
+    fi
     if [[ "$st" != running && "$st" != restarting ]]; then
       rec "${key}_outcome" "container $st, exit code $(docker inspect -f '{{.State.ExitCode}}' "$name" 2>/dev/null || echo '?') after ${t}s"
       return 1

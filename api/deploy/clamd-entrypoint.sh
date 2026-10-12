@@ -42,12 +42,14 @@ stop() {
 trap stop TERM INT
 
 rc=0
+signalled=0
 wait "$clamd_pid" || rc=$?
-# A trapped signal interrupts wait (status above 128): wait once more for clamd itself to end.
-if [ "$rc" -gt 128 ]; then rc=0; wait "$clamd_pid" || rc=$?; fi
+# A trapped signal interrupts wait (status above 128): the trap has signalled both daemons; wait once more for clamd.
+if [ "$rc" -gt 128 ]; then signalled=1; rc=0; wait "$clamd_pid" || rc=$?; fi
 echo "veda-clamd-init: clamd exited with status $rc; exiting so that Docker's restart policy applies"
 if [ -n "$freshclam_pid" ]; then
-  kill -TERM "$freshclam_pid" 2>/dev/null || true
+  # clamd ended on its own (crash, ExitOnOOM): stop freshclam too; after a trapped signal it was already told.
+  [ "$signalled" -eq 1 ] || kill -TERM "$freshclam_pid" 2>/dev/null || true
   wait "$freshclam_pid" 2>/dev/null || true
 fi
 exit "$rc"

@@ -74,7 +74,7 @@ capability, `pids_limit`, bounded tmpfs, `noexec`).
 | Signal | Source | Alarm | Threshold |
 |---|---|---|---|
 | `Veda/Host ScannerRestarts` (existing) | `health.sh` every minute, `RestartCount` of `deploy-clamd-1`, only while the container exists | `scanner-restarts` | ≥ 3 in 15 minutes |
-| `Veda/Host ScannerHealthy` (**new**) | `health.sh`: 1 when the container is `running` and Docker health is `healthy`, else 0; only while the container exists | `scanner-unhealthy` (**new**) | `Minimum < 1` over 5 minutes; missing data not breaching (a stopped scanner reports nothing) |
+| `Veda/Host ScannerHealthy` (**new**) | `health.sh`: 1 when the container is `running` and Docker health is `healthy`, else 0; only while the container exists | `scanner-unhealthy` (**new**) | `Minimum < 1` in **two consecutive** 5-minute periods (the heartbeat reports 0 while Docker's health is `starting` after any start or restart, which must not page); missing data not breaching (a stopped scanner reports nothing) |
 | `Veda/App MediaScannerUnavailable`, `MediaScanFailed`, `MediaInfected`, `MediaPendingMaxAgeSeconds`, `MediaSignatureAgeHours` (existing) | the API's structured signals | `media-*` | unchanged (enablement §7) |
 
 The monitoring module plans 22 custom metrics with the host (21 before); `staging-platform.json` → `monitoring.decision`
@@ -98,7 +98,7 @@ Run **38199283652** on `b5de1d4275d3510dc9d5f6b0096fca6fa7702d9a`; `summary.json
 |---|---|
 | Image, platform | `clamav/clamav:1.4.6-debian13-slim@sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b`; `linux/arm64`; clamd `ClamAV 1.4.6/28136/Sun Sep 27 06:26:12 2026`; daily signatures built 27 Sep 2026 06:26 +0000 |
 | Memory limit used | `2048m` (Compose default `2048m`); rendered `HostConfig.Memory` in `compose_inspect` |
-| Rendered hardening (`docker inspect`) | `user=1000:1000 entrypoint=/usr/local/bin/veda-clamd-init cap_add=[] cap_drop=[ALL] privileged=false read_only=true security_opt=[no-new-privileges:true] tmpfs=map[/run/clamav:mode=1777,size=8m,noexec,nosuid,nodev /tmp:mode=1777,size=256m,noexec,nosuid,nodev /var/log/clamav:mode=1777,size=64m,noexec,nosuid,nodev] memory=2147483648 memory_reservation=1073741824 pids_limit=256 restart=unless-stopped network_mode=deploy_default port_bindings=map[] published=map[3310/tcp:[] 7357/tcp:[]]` |
+| Rendered hardening (`docker inspect`; `7357/tcp` in `published` is the image's `EXPOSE` metadata for a milter that this profile never starts, with no binding) | `user=1000:1000 entrypoint=/usr/local/bin/veda-clamd-init cap_add=[] cap_drop=[ALL] privileged=false read_only=true security_opt=[no-new-privileges:true] tmpfs=map[/run/clamav:mode=1777,size=8m,noexec,nosuid,nodev /tmp:mode=1777,size=256m,noexec,nosuid,nodev /var/log/clamav:mode=1777,size=64m,noexec,nosuid,nodev] memory=2147483648 memory_reservation=1073741824 pids_limit=256 restart=unless-stopped network_mode=deploy_default port_bindings=map[] published=map[3310/tcp:[] 7357/tcp:[]]` |
 | Mounts | `bind:<repo>/api/deploy/clamd.conf->/etc/clamav/clamd.conf:rw=false bind:<repo>/api/deploy/clamd-entrypoint.sh->/usr/local/bin/veda-clamd-init:rw=false volume:/var/lib/docker/volumes/deploy_clamav-db/_data->/var/lib/clamav:rw=true ` |
 | Identity and directory modes | `uid=1000(clamav) gid=1000(clamav) groups=1000(clamav)`; `/tmp=1777:0:0 /run/clamav=1777:0:0 /var/log/clamav=1777:0:0 /var/lib/clamav=700:1000:1000 ` |
 | tmpfs mounts as mounted | `/tmp(rw,nosuid,nodev,noexec,relatime,size=262144k,inode64) /run/clamav(rw,nosuid,nodev,noexec,relatime,size=8192k,inode64) /var/log/clamav(rw,nosuid,nodev,noexec,relatime,size=65536k,inode64) ` |
@@ -151,6 +151,8 @@ which is the rollback behaviour `deploy.sh` relies on; `ScannerHealthy` then rep
 volume the updated signatures are still there. Profile C (concurrent reload) reaches about 2,006 MiB sampled at this
 limit, 42 MiB below it, without an OOM kill: the margin confirms that `ConcurrentDatabaseReload no` is load-bearing.
 
+RERUN_ADDENDUM_PENDING
+
 **PROPOSED 2048 MiB LIMIT: VALIDATED** at that limit for the Compose profile the bundle deploys (this section); the
 phase-1 record's statement that its own measurements were taken under 3 GiB remains true of those runs.
 
@@ -185,7 +187,7 @@ SHA-256 `10ade82e510fea487be790d4055a0ad0c8c97893f61556257e26fbbd8870f409`; 199 
 
 | Resource | Action | Why |
 |---|---|---|
-| `module.monitoring.aws_cloudwatch_metric_alarm.host["scanner-unhealthy"]` | create | `veda-stg-scanner-unhealthy`: `Veda/Host ScannerHealthy`, `Minimum`, `LessThanThreshold 1`, period 300, `treat_missing_data notBreaching`, `actions_enabled true`, dimension `InstanceId` of the host (§4) |
+| `module.monitoring.aws_cloudwatch_metric_alarm.host["scanner-unhealthy"]` | create | `veda-stg-scanner-unhealthy`: `Veda/Host ScannerHealthy`, `Minimum`, `LessThanThreshold 1`, period 300, `treat_missing_data notBreaching`, `actions_enabled true`, dimension `InstanceId` of the host (§4). That run planned the alarm with one evaluation period; the independent review (§9, finding 1) changed it to two, so the next plan shows the same create with `evaluation_periods = 2` |
 | `module.monitoring.aws_cloudwatch_dashboard.staging` | update in place | the alarm widget lists every alarm, so the new alarm's ARN joins `dashboard_body`; the forecast in the first version of this record (1 to add, 0 to change) missed this consequence |
 | everything else, including `module.network.aws_subnet.public` | no-op | the `az_id` pin names the AZ the subnet already has |
 
@@ -203,9 +205,34 @@ in the table above is a forecast, not a plan.
 6. **Owner-only steps remain**: AD-1 (record option B, the pin, the capacity digest), AD-2, AD-3, the approvals of the #76 and #77 plan runs, the `13-evidence` `scanner-validation` collection once clamd runs on the host, AD-4 to AD-8 and the approval record. None is engineering's to take.
 7. **No live run on the staging host yet**: every measurement here is from a GitHub arm64 runner (same architecture, different kernel and Docker version, recorded in `docker_version` and `host`); the first host run happens only after AD-1 to AD-3 and the owner's apply and deploy.
 
-## 9. Verdict
+## 9. Independent review of the pull request (fresh context, 2026-10-12)
 
-**SCANNER IMPLEMENTATION READY FOR INDEPENDENT REVIEW.**
+A reviewer with no prior context read the 24-file diff with the security and platform lenses (POSIX `sh` semantics,
+Compose v2 behaviour, CloudWatch alarm design, Terraform validation). Result: **no blocker, no major defect**; four minor
+findings and three nits, all addressed in this pull request before merge:
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | MINOR | `scanner-unhealthy` would page on every start or restart: the heartbeat reports 0 while Docker's health is `starting`, and one 0 in a 5-minute `Minimum` window with one evaluation period alarms | `evaluation_periods = 2` for this alarm (every host alarm now states its period count; the others keep 1); test asserts both |
+| 2 | MINOR | `ready_wait` tolerated `restarting`, so a crash-looping container would spin for the whole limit during the initial start | three or more restarts during one wait record a crash loop and fail at once |
+| 3 | MINOR | the summary JSON escaped only `\` and `"`; a future multi-line value would corrupt `summary.json` silently | `rec` folds newlines and tabs into spaces at record time, so the TSV and the JSON stay valid |
+| 4 | MINOR | `CLAMAV_NO_MILTERD` was vestigial: only the image's own init scripts read it, and the bundle's entrypoint never starts a milter | removed; the environment carries `FRESHCLAM_CHECKS` only (test updated) |
+| 5 | NIT | `User clamav` in `clamd.conf` is ignored when clamd does not start as root (log noise) | removed, with a comment saying why |
+| 6 | NIT | freshclam received SIGTERM twice on `docker stop` (trap, then cleanup) | the cleanup signals freshclam only when clamd ended on its own; after a trapped signal it only reaps |
+| 7 | NIT | the rendered-hardening row shows `7357/tcp` without saying it is `EXPOSE` metadata, not a listening milter | noted in §5 |
+
+Verified clean by that review: entrypoint signal handling and exit-code propagation, zombie reaping, the initial
+database download, tmpfs option passing, the `noexec` tmpfs versus the bind-mounted entrypoint, the health check,
+every `clamd.conf` directive for ClamAV 1.4, the heartbeat parsing, the alarm semantics, the compute regex, the
+`az_id` pin, the metric count, and that the unit tests cannot pass on a regressed profile.
+
+Findings 4, 5 and 6 change bytes in the deploy bundle (Compose service, `clamd.conf`, entrypoint), so the harness ran
+once more on the final bytes: see the addendum at the end of §5.
+
+## 10. Verdict
+
+**SCANNER IMPLEMENTATION CERTIFIED** (after the independent review of §9; the first version of this record said
+"ready for independent review").
 
 What that means and does not mean: the Compose profile, the entrypoint, the configuration, the probes, the monitoring,
 the harness and the host-plan preparation are implemented, tested offline (Terraform module and root tests, 850 script

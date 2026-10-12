@@ -60,8 +60,7 @@ services:
     user: "1000:1000"
     entrypoint: ["/usr/local/bin/veda-clamd-init"]
     environment:
-      CLAMAV_NO_MILTERD: "true"
-      FRESHCLAM_CHECKS: "2"  # signature checks per day; the media-signatures-outdated alarm fires at 48 h
+      FRESHCLAM_CHECKS: "2"  # signature checks per day; the media-signatures-outdated alarm fires at 48 h (the entrypoint reads nothing else)
     volumes:
       - clamav-db:/var/lib/clamav  # signature database, kept across restarts (freshclam updates it in place)
       - ./clamd.conf:/etc/clamav/clamd.conf:ro
