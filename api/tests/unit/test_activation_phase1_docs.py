@@ -9,7 +9,10 @@ scanner implementation that followed (CATALOG-V3-scanner-implementation.md) chan
 harness; the two assertions that pinned the PR #75 boundary now pin the implemented state. The resize pull request
 (#77) then recorded AD-2 and AD-3 as given by the owner's direction of 2026-10-12: those two records are DECIDED in
 the decision files, every other record stays UNDECIDED with its human fields blank, and the phase-1 record itself is
-unchanged (its price provenance section describes the state at its date)."""
+unchanged (its price provenance section describes the state at its date). The governance pass of 2026-10-12
+(VEDA-SPACES-ACTIVATION-GOVERNANCE-EXECUTION, pull request #78) then recorded AD-1 and AD-5 as given and resolved AD-7
+under the owner's direction, with the scanner still not deployed (mode none) and AD-4, AD-6 and AD-8 still blank: no
+name, date or document was invented."""
 
 import json
 import re
@@ -34,6 +37,11 @@ ACTIVATION_DOCS = (PHASE1, MATRIX, DECISIONS, CATALOG / "CATALOG-V3-activation-p
 NOT_VALIDATED = "PROPOSED 2048 MiB LIMIT NOT YET VALIDATED"
 ESTIMATE = "estimated cost pending owner verification"
 SKELETON = "preparation-only DRAFT skeleton"
+GOVERNANCE = "VEDA-SPACES-ACTIVATION-GOVERNANCE-EXECUTION"
+# The image workflow 14 validates by default: the only pin AD-1 may record (the deploy starts nothing else).
+WORKFLOW14_PIN = re.search(
+    r"'(clamav/clamav:[^']+)'", (REPO / ".github/workflows/14-scanner-image-validation.yml").read_text()
+).group(1)
 SCHEMA_REF = re.compile(r"veda\.catalog\.v3-staging-approval/(\d+)")
 # A hex string cut short with an ellipsis is an abbreviated reference (the review's "eight-character digest prefixes").
 ABBREVIATED = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{6,63}…")
@@ -220,9 +228,14 @@ def test_the_recorded_decisions_match_the_decision_files_and_enable_nothing():
         "AD-3, 2026-10-12" in budget["decision"]
         and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in budget["decision"]
     )
-    # The resize decides the host size and the budget only: no scanner, no media delivery, no V3 flag, no approval binding.
+    # AD-1 (governance pass of 2026-10-12) records option B, the validated pin and the capacity digest. A record deploys
+    # no scanner (mode none); no media delivery, no V3 flag, no approval binding, no approver invented.
     scanner = platform["media_scanner"]
-    assert scanner["status"] == "UNDECIDED" and scanner["mode"] == "none" and scanner["clamd_image"] is None
+    assert scanner["status"] == "DECIDED" and scanner["option"] == "B" and scanner["mode"] == "none"
+    assert scanner["clamd_image"] == WORKFLOW14_PIN
+    assert scanner["capacity_evidence_sha256"] == DIGESTS["scanner capacity"]
+    assert "AD-1, 2026-10-12" in scanner["decision"] and GOVERNANCE in scanner["decision"]
+    assert "Approved scanner mode clamd. mode stays none" in scanner["decision"]
     v3 = platform["catalog_v3"]
     assert v3["approval_record_sha256"] is None
     assert not any(v for k, v in v3.items() if k.endswith("_enabled"))
@@ -271,9 +284,9 @@ def test_the_scanner_engineering_scope_is_documented_as_a_separate_pull_request_
 # --- owner decisions, dependency matrix, acceptance template, review package ----------------------------------------
 
 
-def test_only_ad2_and_ad3_are_decided_and_every_other_human_field_is_blank():
+def test_only_the_directed_records_are_decided_and_every_other_human_field_is_blank():
     decisions = DECISIONS.read_text()
-    for n in (1, 4, 5, 6, 7, 8):
+    for n in (4, 6, 8):
         body = section(decisions, f"## AD-{n}.")
         assert "| Status | **UNDECIDED**" in body, f"AD-{n}"
         assert "[OWNER TO FILL]" in body and "[DATE TO FILL]" in body, f"AD-{n}"
@@ -285,15 +298,59 @@ def test_only_ad2_and_ad3_are_decided_and_every_other_human_field_is_blank():
             "| Decided by, on | The owner, by the direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION of 2026-10-12, recorded as given"
             in body
         ), f"AD-{n}"
+    for n in (1, 5):
+        body = section(decisions, f"## AD-{n}.")
+        assert "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body, f"AD-{n}"
+        assert (
+            f"| Decided by, on | The owner, by the direction {GOVERNANCE} of 2026-10-12, recorded as given" in body
+        ), f"AD-{n}"
+        assert "[OWNER TO FILL]" not in body and "[DATE TO FILL]" not in body, f"AD-{n}"
+    ad7 = section(decisions, "## AD-7.")
+    assert "| Status | **DECIDED** (2026-10-12, resolved under the owner's direction" in ad7
+    assert "| Owner decision | Option (b)" in ad7 and "[OWNER TO FILL]" not in ad7 and "[DATE TO FILL]" not in ad7
     assert (
-        "**Owner acceptance of AD-2 and AD-3: recorded as given (owner direction of 2026-10-12, pull request #77). "
+        "**Owner acceptance of AD-1, AD-2, AD-3 and AD-5: recorded as given (owner directions of 2026-10-12, pull "
+        "requests #77 and #78). AD-7: resolved under the owner's direction of 2026-10-12 (pull request #78). "
         "Owner acceptance of every other record above: not recorded.**"
     ) in decisions
-    assert len(re.findall(r"^\| Status \| \*\*DECIDED", decisions, re.MULTILINE)) == 2
+    assert len(re.findall(r"^\| Status \| \*\*DECIDED", decisions, re.MULTILINE)) == 5
     acceptance = ACCEPTANCE.read_text()
     assert "**Status: TEMPLATE. No approver is named; nothing is accepted.**" in acceptance
     assert acceptance.count("[TO FILL") >= 8 and "| Signed by | [TO FILL] |" in acceptance
     assert "`[TO FILL]`" in acceptance.rsplit("SHA-256 of the signed file", 1)[1]
+
+
+def test_the_governance_pass_records_ad1_from_the_evidence_deploys_no_scanner_and_invents_no_name():
+    decisions = DECISIONS.read_text()
+    scanner = json.loads((REPO / "infra/config/staging-platform.json").read_text())["media_scanner"]
+    ad1 = section(decisions, "## AD-1. Scanner path")
+    # The record and the decision file carry the same pin and the same capacity digest, in full.
+    assert f"| Pinned image (`clamd_image`) | `{scanner['clamd_image']}` |" in ad1
+    assert f"| Capacity evidence (`capacity_evidence_sha256`) | `{scanner['capacity_evidence_sha256']}` |" in ad1
+    assert "| Approved scanner mode | `clamd`" in ad1 and "| `mode` in this change | `none`" in ad1
+    assert "| Scanner path | Option B |" in ad1
+    ad4 = section(decisions, "## AD-4. Media-rights approver")
+    assert "| Primary media-rights approver | **[OWNER TO FILL]** |" in ad4
+    assert "| Backup approver | **[OWNER TO FILL]** |" in ad4 and "| Approval workflow (defined) |" in ad4
+    ad5 = section(decisions, "## AD-5. Withdrawal during an approval lapse")
+    assert "**not implemented**" in ad5 and "| Decision | Adopt the direction" in ad5
+    ad6 = section(decisions, "## AD-6. Activation record roles and dates")
+    assert "| Separation (defined) |" in ad6 and "| Author | [OWNER TO FILL] |" in ad6
+    ad8 = section(decisions, "## AD-8. Promise-owner approval of customer-facing claims")
+    assert "| Where the approval is written | [OWNER TO FILL" in ad8
+    checklist = section(decisions, "## Activation checklist (governance pass of 2026-10-12)")
+    assert "**Verdict: ACTIVATION GOVERNANCE INCOMPLETE.**" in checklist
+    rows = [
+        [c.strip() for c in line.strip("|").split("|")]
+        for line in checklist.splitlines()
+        if re.match(r"^\| \d+ \|", line)
+    ]
+    assert len(rows) == 15
+    # No step that waits on the owner is marked done, and the three blank records are the three UNDECIDED steps.
+    for _n, _step, status, who, _evidence in rows:
+        if who.startswith("owner"):
+            assert status != "DONE", who
+    assert sum(status == "UNDECIDED" for _n, _step, status, _who, _evidence in rows) == 3
 
 
 def test_the_dependency_matrix_marks_no_undecided_item_complete_and_keeps_the_verdict():
