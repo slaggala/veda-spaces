@@ -188,7 +188,9 @@ def test_the_t4g_large_price_is_an_estimate_pending_owner_verification_with_full
     # The hourly rate is verified against the public Price List; the staging total stays an estimate until billed.
     for heading in ("## AD-2. Host size and capacity reserve for clamd", "## AD-3. Budget revision (O16)"):
         body = section(decisions, heading)
-        assert ESTIMATE in body.lower() and "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body, heading
+        assert (
+            ESTIMATE in body.lower() and "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body
+        ), heading
         assert "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in body and "recorded as given" in body, heading
         assert "`20261009203134`" in body and "0.0448" in body and "32.70" in body and "+24.53" in body, heading
         assert "[DATE TO FILL]" not in body, heading
@@ -208,10 +210,16 @@ def test_the_recorded_decisions_match_the_decision_files_and_enable_nothing():
     compute = platform["compute"]
     assert compute["status"] == "DECIDED" and compute["instance_type"] == "t4g.large"
     assert network["host_instance_type"] == compute["instance_type"] and network["az_id"] == "aps1-az1"
-    assert "AD-2, 2026-10-12" in compute["decision"] and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in compute["decision"]
+    assert (
+        "AD-2, 2026-10-12" in compute["decision"]
+        and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in compute["decision"]
+    )
     assert (compute["root_volume_gb"], compute["data_volume_gb"], compute["snapshot_retain_count"]) == (12, 20, 7)
     assert budget["monthly_limit_usd"] == 60 and budget["forecast_alert_thresholds_percent"] == [80, 100]
-    assert "AD-3, 2026-10-12" in budget["decision"] and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in budget["decision"]
+    assert (
+        "AD-3, 2026-10-12" in budget["decision"]
+        and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in budget["decision"]
+    )
     # The resize decides the host size and the budget only: no scanner, no media delivery, no V3 flag, no approval binding.
     scanner = platform["media_scanner"]
     assert scanner["status"] == "UNDECIDED" and scanner["mode"] == "none" and scanner["clamd_image"] is None
@@ -273,9 +281,14 @@ def test_only_ad2_and_ad3_are_decided_and_every_other_human_field_is_blank():
         body = section(decisions, f"## AD-{n}.")
         assert "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body, f"AD-{n}"
         # No person was named by the direction, so none is named here (the file's own rule).
-        assert "| Decided by, on | The owner, by the direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION of 2026-10-12, recorded as given" in body, f"AD-{n}"
-    assert ("**Owner acceptance of AD-2 and AD-3: recorded as given (owner direction of 2026-10-12, pull request #77). "
-            "Owner acceptance of every other record above: not recorded.**") in decisions
+        assert (
+            "| Decided by, on | The owner, by the direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION of 2026-10-12, recorded as given"
+            in body
+        ), f"AD-{n}"
+    assert (
+        "**Owner acceptance of AD-2 and AD-3: recorded as given (owner direction of 2026-10-12, pull request #77). "
+        "Owner acceptance of every other record above: not recorded.**"
+    ) in decisions
     assert len(re.findall(r"^\| Status \| \*\*DECIDED", decisions, re.MULTILINE)) == 2
     acceptance = ACCEPTANCE.read_text()
     assert "**Status: TEMPLATE. No approver is named; nothing is accepted.**" in acceptance

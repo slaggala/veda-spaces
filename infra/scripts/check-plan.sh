@@ -510,7 +510,9 @@ violations="$(jq -r --arg acct "$ACCOUNT" --arg repo "$REPO" --arg subject "$SUB
            then "\($addr): budget name \($after.name // "(unknown)") is not \($prefix)-*" else empty end),
         (if $unknown.account_id != true and ($after.account_id // $acct) != $acct
            then "\($addr): budget for account \($after.account_id), not \($acct)" else empty end),
-        (if $unknown.billing_view_arn == true or ($after.billing_view_arn // null) != null
+        # null at create; the provider reads the primary view back as "" and plans "" again on an in-place update
+        # (seen on the AD-3 limit change, 10-infra-plan run 38219792510): only a named view is a billing view.
+        (if $unknown.billing_view_arn == true or ($after.billing_view_arn // "") != ""
            then "\($addr): budget on a billing view (\($after.billing_view_arn // "unknown")) is not allowed" else empty end),
         (if $unknown.limit_amount == true or ($after.limit_amount // "") == "" or ($after.limit_unit // "") != "USD"
            then "\($addr): budget without a known limit in USD (owner decision O16)" else empty end),

@@ -1441,6 +1441,11 @@ plan_json "$P.bacct" "[$(budget '.account_id = "999999999999"' '{"id":true}')]"
 check "AUT-112 a budget for another account is refused" fail "budget for account 999999999999" -- guard "$P.bacct"
 plan_json "$P.bview" "[$(budget '.billing_view_arn = "arn:aws:billing::999999999999:billingview/x"')]"
 check "AUT-112 a budget on a billing view is refused" fail "budget on a billing view" -- guard "$P.bview"
+plan_json "$P.bviewupd" "[$(budget '.billing_view_arn = "arn:aws:billing::999999999999:billingview/x" | .limit_amount = "60.00"' | jq -c '.change.actions = ["update"]')]"
+check "AUT-112 an update that moves the budget onto a billing view is refused" fail "budget on a billing view" -- guard "$P.bviewupd"
+# The provider reads the primary view back as "" and plans "" again on an in-place update (the AD-3 limit change).
+plan_json "$P.blimitupd" "[$(budget '.billing_view_arn = "" | .limit_amount = "60.00"' | jq -c '.change.actions = ["update"]')]"
+check "AUT-112 an in-place limit change with the primary billing view (planned as empty) passes" ok "plan guard: no destroy" -- guard "$P.blimitupd"
 plan_json "$P.blimit" "[$(budget '.limit_amount = null')]"
 check "AUT-112 a budget without a limit (O16 undecided) is refused" fail "budget without a known limit in USD" -- guard "$P.blimit"
 plan_json "$P.bunit" "[$(budget '.limit_unit = "EUR"')]"
@@ -1836,10 +1841,11 @@ absent "AUT-108 no planned resource refers to another workload (Aurion, swing-tr
 check "AUT-108 committed decision: DECIDED t4g.large (AD-2), 12 GB root, 20 GB data, 7 snapshots" ok '^DECIDED t4g.large 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
 check "  ... AD-2 is recorded in the compute decision text (owner direction recorded as given; a revert must be reviewed)" ok 'AD-2, 2026-10-12 .*host t4g.large' -- jq -r .compute.decision "$PLATFORM"
 # The network module's AZ offering check reads host_instance_type; the compute module reads compute.instance_type. The two must name the same type.
+# shellcheck disable=SC2016 # jq variables, expanded by jq
 check "  ... the same instance type as the network decision (AZ check)" ok '^same t4g.large$' -- jq -r --arg t "$(jq -r .compute.instance_type "$PLATFORM")" 'if .host_instance_type == $t then "same \(.host_instance_type)" else "DIFFER network \(.host_instance_type) platform \($t)" end' "$INFRA/config/staging-network.json"
 # AD-2 resizes the host and nothing else: the scanner stays off (AD-1 is a later reviewed change), every V3 flag stays off, and only the two staging roots exist.
 check "  ... the resize enables no scanner and no V3 flag (media_scanner none and UNDECIDED; catalog_v3 off, no approval binding)" ok '^none UNDECIDED null false false false null$' -- jq -r '"\(.media_scanner.mode) \(.media_scanner.status) \(.media_scanner.clamd_image) \(.catalog_v3.catalog_estimator_enabled) \(.catalog_v3.catalog_admin_enabled) \(.catalog_v3.media_delivery_enabled) \(.catalog_v3.approval_record_sha256)"' "$PLATFORM"
-check "  ... only the staging roots exist (no production environment is planned by this repository)" ok '^staging-core staging-edge$' -- bash -c 'ls "$1" | sort | tr "\n" " " | sed "s/ $//"' _ "$INFRA/terraform/envs"
+check "  ... only the staging roots exist (no production environment is planned by this repository)" ok '^staging-core, staging-edge$' -- ls -m "$INFRA/terraform/envs"
 
 echo "== AUT-111: SES (staging sender, sandbox, suppression and TLS, failure alarms, lead never rolled back)"
 SESPLAN="$HERE/fixtures/aut111-ses-plan.json"
