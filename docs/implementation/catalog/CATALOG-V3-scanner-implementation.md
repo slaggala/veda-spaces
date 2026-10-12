@@ -6,7 +6,8 @@ ClamAV image without privilege, the readiness and health probes, the scanner mon
 at the memory limit the bundle configures, and the reviewed host plan for `t4g.large`. Pull request #76
 (`infra/scanner-option-b`: implementation commit `a27a650e029561285505ebf8f05286b0269d52a0`, harness fixes up to
 `b5de1d4275d3510dc9d5f6b0096fca6fa7702d9a`, the validated commit) and the stacked plan-only proposal #77
-(`infra/host-t4g-large-proposal`, commit `2b4c0cda3027a50cf04bcd00b48aeb0fe48b62dc`).
+(`infra/host-t4g-large-proposal`; its first head was superseded when the pull request was rebuilt on `main` after
+the merge of #76, §7, so it is cited by number, not by commit).
 
 **Not in scope, not done.** No V3 flag is on, media delivery is off, no approval record exists, `media_scanner` stays
 UNDECIDED with mode `none`, the host stays `t4g.small`, the budget stays 25 USD, nothing is applied, deployed or
