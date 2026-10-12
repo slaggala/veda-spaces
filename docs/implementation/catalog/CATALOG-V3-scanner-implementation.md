@@ -157,7 +157,27 @@ every functional, memory, PID 1 kill, stop and restart result as above, **but th
 `compose_after_clamd_killed_restart_count = before=0 after=0 status=running`, outcome `not ready after 300s (container
 running)`. Cause and fix: §9 finding 8. The final run on the corrected entrypoint:
 
-RUN5_PENDING
+Run **38204772069** on `a8229f1890a6a181a3dde8446cedb3b4a653bde0` (`summary.json` SHA-256 `df4d021981df0f8d304cff658425382334ee522edfe23e2767cdad6ed5306b07`, artifact `scanner-validation-38204772069`, validated at 2026-10-12T04:49:40Z, Docker `28.0.4 compose 2.38.2`):
+
+| Check | Result |
+|---|---|
+| Bundle bytes validated | compose `e7bcf2fde6cb4b59e50ba5d42f9b0bcc32b3161f9f37bcecb0d25bd41bc4989c`, clamd.conf `78ed3a4a9ddba93159335f87cec0d75326749839bfdeea03b502a79735577017`, entrypoint `31feaddcb68249b237cef860bfb4a891830dc748413ed66c083d6b78baa746d9` |
+| Rendered environment | entrypoint `['/usr/local/bin/veda-clamd-init']`; `CLAMAV_NO_MILTERD` absent: yes |
+| Start / health / processes | ready after 10s; healthy; `packer:veda-clamd-init packer:freshclam packer:clamd ` |
+| EICAR / clean / oversized | `rc=1 /tmp/f: Eicar-Test-Signature FOUND`; `rc=0 /tmp/f: OK`; `rc=2 Failed to parse reply: "INSTREAM size limit exceeded. ERROR"` |
+| Memory loaded / reload max / after / OOM | current=1051 peak=1533 anon=963; 1051 MiB; current=1050 peak=1533 anon=961; OOM false |
+| Signature update | `bytecode.cvd=281702 daily.cld=86201856 main.cvd=89072577 ` |
+| Compose restart | ready after 10s; 11 s |
+| clamd killed inside the container (finding 8 regression test) | ready after 0s; 15 s wall clock; `before=0 after=1 status=running`; log `veda-clamd-init: starting clamd (foreground; configuration /etc/clamav/clamd.conf)\|veda-clamd-init: clamd exited with status 137; exiting so that Docker's restart policy applies\|veda-clamd-init: starting clamd (foreground; configuration /etc/clamav/clamd.conf)\|` |
+| PID 1 SIGKILLed from the host | ready after 0s; 10 s; `before=1 after=2 status=running` |
+| Operator docker kill / compose stop / start again | `status=exited exit_code=137 restart_count before=2 after=2`; `status=exited exit_code=0`; ready after 10s |
+| Final state | health healthy; OOM false; current=960 peak=963 anon=956 |
+| Profiles B / C at the same limit | B peak current=1052 peak=1643 anon=963, reload 1051 MiB, OOM false; C reload 2006 MiB, after current=1050 peak=2009 anon=961, OOM false |
+
+Every result of the main table holds on the final bytes, and the clamd-kill recovery is back: the entrypoint logs
+`clamd exited with status 137`, Docker restarts the container once and clamd answers within 15 s of the kill. The
+bytes validated by run 38204772069 are the bytes of pull request #76 at its final commit; the record's §2 and §3 tables
+describe those bytes (no `CLAMAV_NO_MILTERD`, no `User` directive, the trap-set flag).
 
 **PROPOSED 2048 MiB LIMIT: VALIDATED** at that limit for the Compose profile the bundle deploys (this section); the
 phase-1 record's statement that its own measurements were taken under 3 GiB remains true of those runs.
