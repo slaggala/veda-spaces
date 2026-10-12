@@ -221,6 +221,20 @@ The pull-request plan is review-only by design; an applicable plan is a `workflo
 merge. Run 38198329902 for #77 (the resize) still **waits for the owner's approval**; until it runs, the expected delta
 in the table above is a forecast, not a plan.
 
+**Rebuild of #77 after the merge of #76 (2026-10-12).** The independent review of #77 found it stacked on a
+pre-review snapshot of this implementation (it lacked the §9 fixes) with `compute.status` PROPOSED. It was rebuilt on
+`main` after the merge of #76, so its diff is only: the three decision files (`compute` DECIDED and `t4g.large`,
+`host_instance_type` `t4g.large`, `monthly_limit_usd` 60), AD-2 and AD-3 in the
+[owner-decision records](CATALOG-V3-activation-owner-decisions.md) as given by the owner's direction
+VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION, the committed-decision checks of `infra/tests/run.sh` (the two
+instance types must agree; the scanner stays `none` and every V3 flag off; only the staging roots exist), the
+activation-document tests, and this note. The run 38198329902 above was superseded by that push (the plan workflow
+cancels the waiting run of a pull request ref on a new push). The rebuilt head's plan runs, their result and the
+plan digest are cited in the pull request itself, not here, because this record cannot cite a run that has not
+run; the expected delta becomes `aws_instance.host` `instance_type` in place and `aws_budgets_budget` limit in place,
+0 to destroy, 0 to replace, and any other change is a stop signal. The scanner alarm create of #76 is applied or
+pending on `main` independently of #77.
+
 ## 8. Remaining risks
 
 1. **`aps1-az1` offering of `t4g.large` unverified** until the #77 plan runs (owner approval of `staging-plan`; still waiting at the time of this record); a refusal means a different host size or a subnet move, which is a redesign, not an apply.

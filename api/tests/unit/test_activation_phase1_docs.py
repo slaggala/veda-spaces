@@ -6,7 +6,10 @@ documents, one schema version everywhere, the approval template labelled as a pr
 t4g.large price marked as an estimate pending owner verification, the proposed 2,048 MiB scanner limit marked as not
 yet validated, the scanner Compose work kept out of that pull request, and every owner decision still UNDECIDED. The
 scanner implementation that followed (CATALOG-V3-scanner-implementation.md) changed the Compose service and the
-harness; the two assertions that pinned the PR #75 boundary now pin the implemented state."""
+harness; the two assertions that pinned the PR #75 boundary now pin the implemented state. The resize pull request
+(#77) then recorded AD-2 and AD-3 as given by the owner's direction of 2026-10-12: those two records are DECIDED in
+the decision files, every other record stays UNDECIDED with its human fields blank, and the phase-1 record itself is
+unchanged (its price provenance section describes the state at its date)."""
 
 import json
 import re
@@ -181,13 +184,42 @@ def test_the_t4g_large_price_is_an_estimate_pending_owner_verification_with_full
         if "32.68" in line:
             assert "withdrawn" in line, line
     decisions = DECISIONS.read_text()
+    # AD-2 and AD-3 were recorded by the resize pull request (#77) as given by the owner's direction of 2026-10-12.
+    # The hourly rate is verified against the public Price List; the staging total stays an estimate until billed.
     for heading in ("## AD-2. Host size and capacity reserve for clamd", "## AD-3. Budget revision (O16)"):
         body = section(decisions, heading)
-        assert ESTIMATE in body.lower() and "| Status | **UNDECIDED**" in body, heading
-        assert "[OWNER TO FILL]" in body
+        assert ESTIMATE in body.lower() and "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body, heading
+        assert "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in body and "recorded as given" in body, heading
+        assert "`20261009203134`" in body and "0.0448" in body and "32.70" in body and "+24.53" in body, heading
+        assert "[DATE TO FILL]" not in body, heading
+    ad2 = section(decisions, "## AD-2. Host size and capacity reserve for clamd")
+    assert "| Chosen size | `t4g.large` (8 GiB)" in ad2 and "| Reserve policy | (a) 25 % of memory" in ad2
+    assert "[OWNER TO FILL]" not in ad2
     ad3 = section(decisions, "## AD-3. Budget revision (O16)")
-    assert "| New limit | [OWNER TO FILL] |" in ad3 and "**not approved**" in ad3
+    assert "| New limit | 60 USD/month, forecast alerts at 80 % and 100 % |" in ad3 and "**not approved**" in ad3
+    assert "| Review date for the limit | [OWNER TO FILL] |" in ad3  # the direction set none
     assert "`t4g.large` +24.5." not in decisions and "32.68" not in decisions
+
+
+def test_the_recorded_decisions_match_the_decision_files_and_enable_nothing():
+    platform = json.loads((REPO / "infra/config/staging-platform.json").read_text())
+    network = json.loads((REPO / "infra/config/staging-network.json").read_text())
+    budget = json.loads((REPO / "infra/config/staging-budget.json").read_text())
+    compute = platform["compute"]
+    assert compute["status"] == "DECIDED" and compute["instance_type"] == "t4g.large"
+    assert network["host_instance_type"] == compute["instance_type"] and network["az_id"] == "aps1-az1"
+    assert "AD-2, 2026-10-12" in compute["decision"] and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in compute["decision"]
+    assert (compute["root_volume_gb"], compute["data_volume_gb"], compute["snapshot_retain_count"]) == (12, 20, 7)
+    assert budget["monthly_limit_usd"] == 60 and budget["forecast_alert_thresholds_percent"] == [80, 100]
+    assert "AD-3, 2026-10-12" in budget["decision"] and "VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION" in budget["decision"]
+    # The resize decides the host size and the budget only: no scanner, no media delivery, no V3 flag, no approval binding.
+    scanner = platform["media_scanner"]
+    assert scanner["status"] == "UNDECIDED" and scanner["mode"] == "none" and scanner["clamd_image"] is None
+    v3 = platform["catalog_v3"]
+    assert v3["approval_record_sha256"] is None
+    assert not any(v for k, v in v3.items() if k.endswith("_enabled"))
+    assert platform["media_rights"]["approver"] == "[OWNER TO FILL]"
+    assert not any(v.get("status") == "PROPOSED" for v in platform.values() if isinstance(v, dict))
 
 
 # --- scanner memory limit and engineering boundary -------------------------------------------------------------------
@@ -231,14 +263,20 @@ def test_the_scanner_engineering_scope_is_documented_as_a_separate_pull_request_
 # --- owner decisions, dependency matrix, acceptance template, review package ----------------------------------------
 
 
-def test_every_owner_decision_is_still_undecided_and_every_human_field_blank():
+def test_only_ad2_and_ad3_are_decided_and_every_other_human_field_is_blank():
     decisions = DECISIONS.read_text()
-    for n in range(1, 9):
+    for n in (1, 4, 5, 6, 7, 8):
         body = section(decisions, f"## AD-{n}.")
         assert "| Status | **UNDECIDED**" in body, f"AD-{n}"
         assert "[OWNER TO FILL]" in body and "[DATE TO FILL]" in body, f"AD-{n}"
-    assert "**Owner acceptance of any record above: not recorded.**" in decisions
-    assert not re.search(r"^\| Status \| \*\*DECIDED", decisions, re.MULTILINE)
+    for n in (2, 3):
+        body = section(decisions, f"## AD-{n}.")
+        assert "| Status | **DECIDED** (2026-10-12, owner direction recorded as given" in body, f"AD-{n}"
+        # No person was named by the direction, so none is named here (the file's own rule).
+        assert "| Decided by, on | The owner, by the direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION of 2026-10-12, recorded as given" in body, f"AD-{n}"
+    assert ("**Owner acceptance of AD-2 and AD-3: recorded as given (owner direction of 2026-10-12, pull request #77). "
+            "Owner acceptance of every other record above: not recorded.**") in decisions
+    assert len(re.findall(r"^\| Status \| \*\*DECIDED", decisions, re.MULTILINE)) == 2
     acceptance = ACCEPTANCE.read_text()
     assert "**Status: TEMPLATE. No approver is named; nothing is accepted.**" in acceptance
     assert acceptance.count("[TO FILL") >= 8 and "| Signed by | [TO FILL] |" in acceptance

@@ -1465,7 +1465,8 @@ check "AUT-112 a budget notifying the account's own topic in Mumbai passes" ok "
 BUDGET_CFG="$INFRA/config/staging-budget.json"
 check "AUT-112 committed decision: forecast alerts at 80% and 100% (O16)" ok "^\[80,100\]$" -- jq -c .forecast_alert_thresholds_percent "$BUDGET_CFG"
 check "AUT-112 committed budget is veda-*" ok "^veda-staging-monthly-cost$" -- jq -r .name "$BUDGET_CFG"
-check "AUT-112 committed decision: monthly limit 25 USD (O16)" ok "^25$" -- jq -c .monthly_limit_usd "$BUDGET_CFG"
+check "AUT-112 committed decision: monthly limit 60 USD (O16, revised by AD-3 for the t4g.large host)" ok "^60$" -- jq -c .monthly_limit_usd "$BUDGET_CFG"
+check "AUT-112 AD-3 is recorded in the budget decision text (owner direction recorded as given; a revert must be reviewed)" ok 'AD-3, 2026-10-12 .*monthly limit 60 USD' -- jq -r .decision "$BUDGET_CFG"
 absent "AUT-112 no email address is committed in the budget decision" "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" "$(cat "$BUDGET_CFG")"
 absent "AUT-112 no email address in the budget module or the staging-core root" "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[a-z]{2,}" \
   "$(cat "$INFRA"/terraform/modules/budgets/*.tf "$INFRA"/terraform/envs/staging-core/*.tf)"
@@ -1591,7 +1592,8 @@ check "AUT-101 minor 10 an instance without a subnet (default VPC) is refused" f
 check "AUT-101 minor 10 an instance in a subnet passes the network rules" ok "plan guard: no destroy" -- guard "$(netfix '.resource_changes += [{address: "module.compute.aws_instance.host", type: "aws_instance", change: {actions: ["create"], after: {instance_type: "t4g.small", network_interface: [], metadata_options: [{http_tokens: "required"}], root_block_device: [{encrypted: true}]}, after_unknown: {subnet_id: true}}}]')"
 # The committed decision and the bootstrap's one change.
 NET_CFG="$INFRA/config/staging-network.json"
-check "AUT-101 committed decision: egress model A, t4g.small, 10.60.0.0/20 (N1, N2, N4)" ok '^"A","t4g.small","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
+check "AUT-101 committed decision: egress model A, t4g.large (N2 host size superseded by AD-2), 10.60.0.0/20 (N1, N4)" ok '^"A","t4g.large","10.60.0.0/20","10.60.0.0/24"$' -- jq -r '[.egress_model, .host_instance_type, .vpc_cidr, .public_subnet_cidr] | map(tojson) | join(",")' "$NET_CFG"
+check "AUT-101 AD-2 keeps the AZ pinned (the resize can never move the subnet)" ok '^aps1-az1$' -- jq -r .az_id "$NET_CFG"
 check "AUT-101 committed decision: flow logs ALL to S3 (N6, C3)" ok '^ALL s3$' -- jq -r '"\(.flow_logs.traffic_type) \(.flow_logs.destination)"' "$NET_CFG"
 check "AUT-101 committed decision: tunnel egress to Cloudflare's two ranges only (N8)" ok '^\["198.41.192.0/24","198.41.200.0/24"\]$' -- jq -c .tunnel_egress_cidrs "$NET_CFG"
 check "AUT-101 staging-core plans the network module" ok 'source = "../../modules/network"' -- tr -s ' ' <"$INFRA/terraform/envs/staging-core/main.tf"
@@ -1831,8 +1833,13 @@ done
 check "AUT-108 the data volume is kept and snapshotted daily, seven kept" ok '^daily 7$' -- jq -r '[(.resource_changes[] | select(.address == "module.compute.aws_ebs_volume.data") | .change.after.tags["veda-backup"]), (.resource_changes[] | select(.address == "module.compute.aws_dlm_lifecycle_policy.data") | .change.after.policy_details[0].schedule[0].retain_rule[0].count | tostring)] | join(" ")' "$EC2PLAN"
 check "AUT-108 the host alarms exist with the host (status, CPU, memory, both disks, health)" ok '^6$' -- jq '[.resource_changes[] | select(.address | startswith("module.monitoring.aws_cloudwatch_metric_alarm.host"))] | length' "$MONPLAN"
 absent "AUT-108 no planned resource refers to another workload (Aurion, swing-trader-vm)" "[Aa]urion|swing-trader" "$(cat "$HERE"/fixtures/aut1*-plan.json)"
-check "AUT-108 committed decision: t4g.small, 12 GB root, 20 GB data, 7 snapshots" ok '^DECIDED t4g.small 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
-check "  ... the same instance type as the network decision (AZ check)" ok '^t4g.small$' -- jq -r .host_instance_type "$INFRA/config/staging-network.json"
+check "AUT-108 committed decision: DECIDED t4g.large (AD-2), 12 GB root, 20 GB data, 7 snapshots" ok '^DECIDED t4g.large 12 20 7$' -- jq -r '"\(.compute.status) \(.compute.instance_type) \(.compute.root_volume_gb) \(.compute.data_volume_gb) \(.compute.snapshot_retain_count)"' "$PLATFORM"
+check "  ... AD-2 is recorded in the compute decision text (owner direction recorded as given; a revert must be reviewed)" ok 'AD-2, 2026-10-12 .*host t4g.large' -- jq -r .compute.decision "$PLATFORM"
+# The network module's AZ offering check reads host_instance_type; the compute module reads compute.instance_type. The two must name the same type.
+check "  ... the same instance type as the network decision (AZ check)" ok '^same t4g.large$' -- jq -r --arg t "$(jq -r .compute.instance_type "$PLATFORM")" 'if .host_instance_type == $t then "same \(.host_instance_type)" else "DIFFER network \(.host_instance_type) platform \($t)" end' "$INFRA/config/staging-network.json"
+# AD-2 resizes the host and nothing else: the scanner stays off (AD-1 is a later reviewed change), every V3 flag stays off, and only the two staging roots exist.
+check "  ... the resize enables no scanner and no V3 flag (media_scanner none and UNDECIDED; catalog_v3 off, no approval binding)" ok '^none UNDECIDED null false false false null$' -- jq -r '"\(.media_scanner.mode) \(.media_scanner.status) \(.media_scanner.clamd_image) \(.catalog_v3.catalog_estimator_enabled) \(.catalog_v3.catalog_admin_enabled) \(.catalog_v3.media_delivery_enabled) \(.catalog_v3.approval_record_sha256)"' "$PLATFORM"
+check "  ... only the staging roots exist (no production environment is planned by this repository)" ok '^staging-core staging-edge$' -- bash -c 'ls "$1" | sort | tr "\n" " " | sed "s/ $//"' _ "$INFRA/terraform/envs"
 
 echo "== AUT-111: SES (staging sender, sandbox, suppression and TLS, failure alarms, lead never rolled back)"
 SESPLAN="$HERE/fixtures/aut111-ses-plan.json"
