@@ -70,6 +70,57 @@ def test_the_scanner_service_is_private_bounded_and_hardened():
     assert compose["volumes"]["clamav-db"] == {}, "signatures persist across restarts"
 
 
+def test_the_scanner_runs_as_the_image_user_without_any_capability():
+    """CATALOG-V3-scanner-implementation.md: the validated non-root profile. The image's /init (root, chown -R on the
+    0700 signature directory) cannot start under cap_drop ALL; the profile runs the image's clamav user with the
+    bundle's entrypoint instead, and adds no capability and no privilege to make it work."""
+    from pathlib import Path
+
+    import yaml
+
+    bundle = Path(__file__).resolve().parents[2] / "deploy"
+    clamd = yaml.safe_load((bundle / "docker-compose.yml").read_text())["services"]["clamd"]
+    assert clamd["user"] == "1000:1000" and clamd["entrypoint"] == ["/usr/local/bin/veda-clamd-init"]
+    assert "cap_add" not in clamd and "privileged" not in clamd and clamd["cap_drop"] == ["ALL"]
+    assert clamd["pids_limit"] == 256 and clamd["restart"] == "unless-stopped"
+    assert clamd["mem_limit"] == "${VEDA_CLAMD_MEM_LIMIT:-2048m}", "the validated limit is the default"
+    assert "env_file" not in clamd and set(clamd["environment"]) == {"FRESHCLAM_CHECKS"}
+    # The three directories the daemons write are tmpfs with an explicit mode (the default mode was not writable by
+    # uid 1000), a size bound (tmpfs pages count against mem_limit) and no exec, suid or device nodes.
+    tmpfs = dict(t.split(":", 1) for t in clamd["tmpfs"])
+    assert set(tmpfs) == {"/tmp", "/run/clamav", "/var/log/clamav"}
+    for options in tmpfs.values():
+        parts = set(options.split(","))
+        assert (
+            "mode=1777" in parts
+            and {"noexec", "nosuid", "nodev"} <= parts
+            and any(p.startswith("size=") for p in parts)
+        )
+    # Read-only bind mounts from the bundle: the configuration (StreamMaxLength 30M etc.) and the entrypoint; the
+    # signature database on the named volume. Nothing else from the host.
+    assert sorted(clamd["volumes"]) == sorted([
+        "clamav-db:/var/lib/clamav",
+        "./clamd.conf:/etc/clamav/clamd.conf:ro",
+        "./clamd-entrypoint.sh:/usr/local/bin/veda-clamd-init:ro",
+    ])  # fmt: skip
+    conf = (bundle / "clamd.conf").read_text()
+    for directive in ("StreamMaxLength 30M", "MaxScanSize 100M", "MaxFileSize 30M", "MaxRecursion 10",
+                      "ConcurrentDatabaseReload no", "ExitOnOOM yes", "TCPSocket 3310"):  # fmt: skip
+        assert f"\n{directive}\n" in conf, directive
+    entrypoint = (bundle / "clamd-entrypoint.sh").read_text()
+    assert entrypoint.startswith("#!/bin/sh\n") and (bundle / "clamd-entrypoint.sh").stat().st_mode & 0o111
+    for required in ("clamd --foreground &", 'wait "$clamd_pid"', 'exit "$rc"', "freshclam --checks="):
+        assert required in entrypoint, required
+    code = "\n".join(line for line in entrypoint.splitlines() if not line.lstrip().startswith("#"))
+    assert "chown" not in code and "tail -f" not in code, "no ownership change; PID 1 exits with clamd"
+    health = clamd["healthcheck"]
+    assert (
+        health["test"] == ["CMD-SHELL", "clamdcheck.sh"]
+        and health["interval"] == "30s"
+        and health["start_period"] == "300s"
+    )
+
+
 def test_the_rendered_quoted_form_is_read(deploy, tmp_path):  # noqa: F811
     """render-env.sh writes NAME="value"; the scanner step reads that form."""
     path = tmp_path / "api.env"
@@ -113,3 +164,88 @@ def test_v3_activation_with_a_current_approval_proceeds(deploy, tmp_path):  # no
     r, calls = deploy("at-floor", env_extra=extra)
     assert r.returncode == 0, r.stdout + r.stderr
     assert calls.index("staging_approval") < calls.index("up -d --no-deps api")
+
+
+# --- the entrypoint's process semantics, with stub daemons (CATALOG-V3-scanner-implementation.md §2) ----------------
+import os  # noqa: E402
+import signal  # noqa: E402
+import subprocess  # noqa: E402
+import time  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+ENTRYPOINT = Path(__file__).resolve().parents[2] / "deploy" / "clamd-entrypoint.sh"
+
+
+def _stubs(tmp_path, clamd_body="exec sleep 300"):
+    """Fake clamd and freshclam on PATH; a signature file so the download branch is skipped; the env the script reads."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "clamd").write_text(f"#!/bin/sh\necho $$ >'{tmp_path}/clamd.pid'\n{clamd_body}\n")
+    (bin_dir / "freshclam").write_text(f"#!/bin/sh\necho $$ >'{tmp_path}/freshclam.pid'\nexec sleep 300\n")
+    for f in bin_dir.iterdir():
+        f.chmod(0o755)
+    db = tmp_path / "db"
+    db.mkdir()
+    (db / "main.cvd").write_bytes(b"stub")
+    return {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CLAMAV_DB_DIR": str(db),
+            "FRESHCLAM_CONF": str(tmp_path / "freshclam.conf")}  # fmt: skip
+
+
+def _pid(path, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists() and path.read_text().strip():
+            return int(path.read_text())
+        time.sleep(0.05)
+    raise AssertionError(f"{path.name} never started")
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _wait_gone(pid, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and _alive(pid):
+        time.sleep(0.05)
+    return not _alive(pid)
+
+
+def test_entrypoint_exits_with_clamd_status_when_clamd_is_killed_and_stops_freshclam(tmp_path):
+    """The failure the entrypoint exists for: clamd dies (OOM killer, crash), PID 1 must exit non-zero so Docker restarts
+    the container, and freshclam must not keep the container alive."""
+    proc = subprocess.Popen(
+        ["sh", str(ENTRYPOINT)], env=_stubs(tmp_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    clamd, fresh = _pid(tmp_path / "clamd.pid"), _pid(tmp_path / "freshclam.pid")
+    os.kill(clamd, signal.SIGKILL)
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode == 137, out
+    assert "clamd exited with status 137" in out
+    assert _wait_gone(fresh), "freshclam must be terminated when clamd dies on its own"
+
+
+def test_entrypoint_forwards_sigterm_to_both_daemons_and_exits(tmp_path):
+    """docker stop: SIGTERM to PID 1 ends clamd and freshclam; the container exits and (unless-stopped) stays stopped."""
+    proc = subprocess.Popen(
+        ["sh", str(ENTRYPOINT)], env=_stubs(tmp_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    clamd, fresh = _pid(tmp_path / "clamd.pid"), _pid(tmp_path / "freshclam.pid")
+    time.sleep(0.2)
+    proc.send_signal(signal.SIGTERM)
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode != 0 and "stop requested" in out, out
+    assert _wait_gone(clamd) and _wait_gone(fresh)
+
+
+def test_entrypoint_propagates_a_clean_clamd_exit(tmp_path):
+    proc = subprocess.Popen(["sh", str(ENTRYPOINT)], env=_stubs(tmp_path, clamd_body="sleep 0.3; exit 0"), stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)  # fmt: skip
+    fresh = _pid(tmp_path / "freshclam.pid")
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode == 0 and "clamd exited with status 0" in out, out
+    assert _wait_gone(fresh)

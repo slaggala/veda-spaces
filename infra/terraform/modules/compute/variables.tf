@@ -23,8 +23,8 @@ variable "instance_type" {
   type        = string
 
   validation {
-    condition     = can(regex("^t4g\\.(small|medium)$", var.instance_type))
-    error_message = "The host is a Graviton t4g.small or t4g.medium (N2; 02 §12.2)."
+    condition     = can(regex("^t4g\\.(small|medium|large)$", var.instance_type))
+    error_message = "The host is a Graviton t4g.small, t4g.medium or t4g.large (N2; 02 §12.2; AD-2 of the V3 activation owner decisions for the clamd sizes)."
   }
 }
 

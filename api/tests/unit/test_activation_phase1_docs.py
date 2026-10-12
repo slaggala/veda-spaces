@@ -4,7 +4,9 @@ non-activating. These checks read the repository only; they approve nothing, dec
 They pin the corrections of the independent review of 2026-10-12: no abbreviated SHA or digest in the activation
 documents, one schema version everywhere, the approval template labelled as a preparation-only DRAFT skeleton, the
 t4g.large price marked as an estimate pending owner verification, the proposed 2,048 MiB scanner limit marked as not
-yet validated, the scanner Compose work kept out of this pull request, and every owner decision still UNDECIDED."""
+yet validated, the scanner Compose work kept out of that pull request, and every owner decision still UNDECIDED. The
+scanner implementation that followed (CATALOG-V3-scanner-implementation.md) changed the Compose service and the
+harness; the two assertions that pinned the PR #75 boundary now pin the implemented state."""
 
 import json
 import re
@@ -24,7 +26,8 @@ REVIEW = CATALOG / "CATALOG-V3-review-package.md"
 TEMPLATE = CATALOG / "v3-staging-approval.template.json"
 ACCEPTANCE = CATALOG / "media-rights-approver-acceptance.template.md"
 POLICY = json.loads((REPO / "api/veda/modules/catalog/v3_approval_policy.json").read_text())
-ACTIVATION_DOCS = (PHASE1, MATRIX, DECISIONS, CATALOG / "CATALOG-V3-activation-preparation.md", ACCEPTANCE)
+SCANNER = CATALOG / "CATALOG-V3-scanner-implementation.md"
+ACTIVATION_DOCS = (PHASE1, MATRIX, DECISIONS, CATALOG / "CATALOG-V3-activation-preparation.md", ACCEPTANCE, SCANNER)
 NOT_VALIDATED = "PROPOSED 2048 MiB LIMIT NOT YET VALIDATED"
 ESTIMATE = "estimated cost pending owner verification"
 SKELETON = "preparation-only DRAFT skeleton"
@@ -198,9 +201,12 @@ def test_the_proposed_scanner_limit_is_marked_not_yet_validated_and_matches_the_
                     "## 10. Remaining activation blockers and verdict"):  # fmt: skip
         body = section(text, heading)
         assert NOT_VALIDATED in body or "NOT YET VALIDATED" in body, heading
+    # The phase-1 record describes the harness as it ran then (3 GiB). The scanner implementation reruns it at the
+    # limit the deploy bundle configures: the harness default and the Compose default are the same value.
     harness = (REPO / "infra/scanner-validation/validate.sh").read_text()
-    # The statement "the harness ran at 3 GiB" is true of the harness as committed; change both together.
-    assert "--memory 3g" in harness and "--memory 2048m" not in harness
+    compose = (REPO / "api/deploy/docker-compose.yml").read_text()
+    assert 'MEMORY="${SCANNER_VALIDATION_MEMORY:-2048m}"' in harness and "--memory 3g" not in harness
+    assert "${VEDA_CLAMD_MEM_LIMIT:-2048m}" in compose
     assert "--memory 3g" in text and "limit 3g, not the proposed 2048m" in text
     assert NOT_VALIDATED in REVIEW.read_text() and NOT_VALIDATED in DECISIONS.read_text()
 
@@ -216,10 +222,10 @@ def test_the_scanner_engineering_scope_is_documented_as_a_separate_pull_request_
     for excluded in ("enabling any V3 flag", "media delivery", "public intake", "production"):
         assert excluded in scope.rsplit("What is **not** in that scope", 1)[1], excluded
     compose = (REPO / "api/deploy/docker-compose.yml").read_text()
-    # The boundary: the certified clamd service is untouched by the evidence package. The scanner-engineering pull
-    # request changes this file and this assertion together, under its own review.
-    assert "/init-unprivileged" not in compose and "01777" not in compose
-    assert "privileged: true" not in compose and "cap_add" in compose  # the certified profile, as reviewed
+    # The boundary held for PR #75; the scanner implementation (CATALOG-V3-scanner-implementation.md) then changed the
+    # service to the validated non-root profile, and this assertion with it: tests/unit/test_deploy_scanner.py pins it.
+    assert "privileged: true" not in compose and "cap_add" not in compose
+    assert 'user: "1000:1000"' in compose and "mode=1777" in compose
 
 
 # --- owner decisions, dependency matrix, acceptance template, review package ----------------------------------------

@@ -101,6 +101,19 @@ run "pinned_ami_wins" {
   }
 }
 
+run "t4g_large_is_an_in_place_change_of_the_type_only" {
+  command = plan
+
+  variables {
+    instance_type = "t4g.large"
+  }
+
+  assert {
+    condition     = aws_instance.host.instance_type == "t4g.large" && one(aws_instance.host.credit_specification).cpu_credits == "standard" && one(aws_instance.host.root_block_device).volume_size == 12
+    error_message = "t4g.large (AD-2 option B host) keeps every other setting of the host"
+  }
+}
+
 run "x86_or_large_instance_refused" {
   command = plan
 

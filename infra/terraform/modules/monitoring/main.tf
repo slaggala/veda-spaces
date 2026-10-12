@@ -57,13 +57,16 @@ locals {
   }
 
   host_alarms = !var.host_alarms_enabled ? {} : {
-    "host-status-check" = { deployed = false, ns = "AWS/EC2", metric = "StatusCheckFailed", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "breaching", what = "Instance or system status check failed (EC2 recovers it automatically)" }
-    "host-cpu"          = { deployed = false, ns = "AWS/EC2", metric = "CPUUtilization", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.cpu_percent, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "CPU high for 15 minutes" }
-    "host-memory"       = { deployed = true, ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }
-    "host-data-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/var/lib/veda" }, stat = "Maximum", threshold = var.thresholds.data_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Data volume (/var/lib/veda) filling up" }
-    "host-root-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/" }, stat = "Maximum", threshold = var.thresholds.root_disk_percent, cmp = "GreaterThanThreshold", period = 300, missing = "breaching", what = "Root volume filling up (images, logs)" }
-    "scanner-restarts"  = { deployed = true, ns = "Veda/Host", metric = "ScannerRestarts", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = var.thresholds.scanner_restarts, cmp = "GreaterThanOrEqualToThreshold", period = 900, missing = "notBreaching", what = "The malware scanner keeps restarting (memory or signature reload)" }
-    "api-health"        = { deployed = true, ns = "Veda/Host", metric = "HealthReady", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, missing = "breaching", what = "/health/ready failing or not reporting (uptime)" }
+    "host-status-check" = { deployed = false, ns = "AWS/EC2", metric = "StatusCheckFailed", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, periods = 1, missing = "breaching", what = "Instance or system status check failed (EC2 recovers it automatically)" }
+    "host-cpu"          = { deployed = false, ns = "AWS/EC2", metric = "CPUUtilization", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.cpu_percent, cmp = "GreaterThanThreshold", period = 900, periods = 1, missing = "notBreaching", what = "CPU high for 15 minutes" }
+    "host-memory"       = { deployed = true, ns = "CWAgent", metric = "mem_used_percent", dims = { InstanceId = var.instance_id }, stat = "Average", threshold = var.thresholds.memory_percent, cmp = "GreaterThanThreshold", period = 300, periods = 1, missing = "breaching", what = "Memory high (or the agent stopped reporting)" }
+    "host-data-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/var/lib/veda" }, stat = "Maximum", threshold = var.thresholds.data_disk_percent, cmp = "GreaterThanThreshold", period = 300, periods = 1, missing = "breaching", what = "Data volume (/var/lib/veda) filling up" }
+    "host-root-disk"    = { deployed = true, ns = "CWAgent", metric = "disk_used_percent", dims = { InstanceId = var.instance_id, path = "/" }, stat = "Maximum", threshold = var.thresholds.root_disk_percent, cmp = "GreaterThanThreshold", period = 300, periods = 1, missing = "breaching", what = "Root volume filling up (images, logs)" }
+    "scanner-restarts"  = { deployed = true, ns = "Veda/Host", metric = "ScannerRestarts", dims = { InstanceId = var.instance_id }, stat = "Maximum", threshold = var.thresholds.scanner_restarts, cmp = "GreaterThanOrEqualToThreshold", period = 900, periods = 1, missing = "notBreaching", what = "The malware scanner keeps restarting (memory or signature reload)" }
+    # Two consecutive periods: the heartbeat reports 0 while Docker's health is still "starting" after any start or
+    # restart (up to one minute), which must not page; ten minutes without a passing health check does.
+    "scanner-unhealthy" = { deployed = true, ns = "Veda/Host", metric = "ScannerHealthy", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, periods = 2, missing = "notBreaching", what = "The malware scanner runs but has not answered its health check for two consecutive periods (a stopped scanner reports nothing)" }
+    "api-health"        = { deployed = true, ns = "Veda/Host", metric = "HealthReady", dims = { InstanceId = var.instance_id }, stat = "Minimum", threshold = 1, cmp = "LessThanThreshold", period = 300, periods = 1, missing = "breaching", what = "/health/ready failing or not reporting (uptime)" }
   }
 }
 
@@ -200,7 +203,7 @@ resource "aws_cloudwatch_metric_alarm" "host" {
   threshold           = each.value.threshold
   comparison_operator = each.value.cmp
   period              = each.value.period
-  evaluation_periods  = 1
+  evaluation_periods  = each.value.periods
   treat_missing_data  = each.value.missing
   alarm_actions       = [local.topic_arn]
   ok_actions          = [local.topic_arn]

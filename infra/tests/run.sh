@@ -2103,6 +2103,7 @@ check "MEDIA preflight: flags off with the inactive digest none -> V3 intentiona
 check "MEDIA preflight: video on is refused" fail "VIDEO_ENABLED must be false" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_VIDEO_ENABLED=true)"
 absent "MEDIA preflight never prints a setting's value" "veda-stg-media-111122223333|alias/veda-stg-data" "$("$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v BUCKET "$f" >"$f.y"; cat "$f" >/dev/null; echo "$f")" 2>&1; "$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v SCANNER= "$f" >"$f.z"; echo "$f.z")" 2>&1 || true)"
 check "MEDIA the health heartbeat reports scanner restarts only when the scanner runs" ok "ScannerRestarts" -- cat "$INFRA/host/health.sh"
+check "MEDIA the health heartbeat reports scanner health (1 only when running and healthy) beside the restarts" ok "ScannerHealthy" -- cat "$INFRA/host/health.sh"
 check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"
 # shellcheck disable=SC2016 # matched literally in the script
 check "DEPLOY the data volume is formatted only when it carries no filesystem" ok 'if ! blkid "\$DEVICE"' -- cat "$INFRA/host/host-setup.sh"
