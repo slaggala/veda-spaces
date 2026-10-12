@@ -1,6 +1,6 @@
 # MTQ B1 — Measurement Foundation: final scope (proposed freeze)
 
-**Status:** PROPOSED FREEZE. Documentation only. Becomes the frozen B1 scope (gate MTQ-G2) when the owner records it; until then it binds nothing.
+**Status:** RECORDED AS FROZEN on 2026-10-13 by [MTQ-B1-blocker-closure.md](MTQ-B1-blocker-closure.md) (frozen-scope reference d4f14c3 plus the Δ values in closure §6); the §6 blocker table below is superseded by closure §8. Documentation only; binds on the owner's approval of PR #85.
 **Instruction:** `VEDA-SPACES-MTQ-B1-SCOPE-FREEZE` (2026-10-13).
 **Inputs:** [MTQ-BLUEPRINT.md](MTQ-BLUEPRINT.md) (PR #83) · survey and scope templates (PR #84, branch `docs/mtq-survey-scope-templates` at e7e319d) · the architecture review verdict "READY WITH REQUIRED CHANGES" and the business-reality review, **both reported by the owner and not recorded on either PR** · the owner-decisions workshop of 2026-10-13 (recommended defaults, **none recorded in [MTQ-owner-decisions.md](MTQ-owner-decisions.md) yet**).
 **Supersedes:** blueprint §16 B1 where the two differ. Everything else in the blueprint stands.
