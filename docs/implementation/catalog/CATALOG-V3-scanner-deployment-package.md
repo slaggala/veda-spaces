@@ -193,5 +193,37 @@ and the alarms are in place; the three blockers of §6 are governance steps (a m
 change), not engineering gaps. When steps 1 to 4 of §3 are done, the package of §3 steps 5 to 11 is the scanner
 deployment, and this file's verdict is re-stated as READY FOR SCANNER DEPLOYMENT by a reviewed update.
 
-Nothing was activated, enabled, deployed or changed in production by this package. Every V3 flag is off, media
-delivery is off, the scanner mode is `none`.
+Nothing was activated, enabled, deployed or changed in production by this package as prepared. Every V3 flag is off,
+media delivery is off; the scanner mode was `none` when it was written (§8 records what the execution changed).
+
+## 8. Execution record (2026-10-12, owner direction VEDA-SPACES-SCANNER-DEPLOYMENT-EXECUTION)
+
+The three blockers of §6 cleared the same day and the deployment ran. Every run below is an owner-approved
+environment run; the pull requests are reviewed merges.
+
+| § 3 step | Run or change | Result |
+|---|---|---|
+| 1 | Pull request #78 merged (12:04 UTC) | AD-1 on `main` |
+| 3 | Pull request #80 merged (12:50 UTC): `media_scanner.mode` `clamd`, one decision value | CI green; the review-only plan showed the mode parameter |
+| 2 and 4 (one apply) | `10-infra-plan` run 38251677019 on `main`, digest `b7fd8a72b693cda00bcf3421c5783614d162d40c2edc10c3794b2e8a58805b4b`; `11-infra-apply` run 38252118680 | **0 to add, 2 to change, 0 to destroy**: `VEDA_CATALOG_CLAMD_IMAGE` to the pin and `VEDA_CATALOG_MEDIA_SCANNER` to `clamd`, both in place; apply complete, 0 added, 2 changed, 0 destroyed |
+| 7, first attempt | `12-deploy` run 38252332555 | **Refused at step 2, the image scan**: two new HIGH findings in the base image's glibc 2.41-12+deb13u4 (CVE-2026-5435, CVE-2026-19499), unfixed in Debian trixie (no-dsa); nothing reached the host |
+| gate exception | Pull request #81 merged (13:31 UTC): two reviewed staging exceptions, each approved by the owner through the review, expiring 2026-12-31; the stale gcc-14 exception retired ([policy](../../operations/image-scan-exceptions.md)) | the API code was unchanged; the findings are not reachable from it |
+| 7 | `12-deploy` run 38256345183 (13:37 UTC) on `main` at the merge of pull request #81 | image `veda-api@sha256:5d92f4d3775ddd6cf5443b52df2c28973cb3c8dfdb441a78c4434a552123f986`; scan gate: 3 HIGH findings, all covered; bundle SHA-256 `54f34b072860c3862d180edb22216bfb9186e884de8c2d53ba83cd6b035d2453` verified on the host; media preflight `scanner: clamd (pinned image)` and `V3 intentionally disabled: every V3 and media-delivery flag is false`; `veda-deploy` ended Success, which the deploy script reports only after step 4c received `PONG` from clamd and step 5 passed `/health/ready`. The host-side step lines are truncated in the run output (the SSM plugin's output limit) |
+| drift | `10-infra-plan` run 38257133680 on `main` after the apply | **No changes**, 201 no-op |
+| post-deploy snapshot | `13-evidence` run 38257129126, label `scanner-deploy-verify` | `s3://veda-evidence-813238078849/host/2026-10-12/i-01538ad0e744faaff/scanner-deploy-verify-20261012T134234Z.tgz`, SHA-256 `270f243d000a309d660e92f7476f5636d73b80db2c6bb919a2079138eaf7e9be`; a snapshot at deploy time, not the validation evidence |
+| 8 | Soak | started 13:37 UTC on 2026-10-12; at least 24 hours |
+| 10, 11 | `scanner-validation` collection and its record | pending the soak |
+| 5 | Bundle-refresh deploy before the mode change | not taken: the owner collapsed the two deploys into one |
+
+Not yet verified from host facts, because the evidence tarball lives in the locked evidence bucket and the SSM
+output is truncated: the container's Docker health state, the pulled image digest as Docker reports it, the
+FreshClam log line, and the listeners list. They are read from the tarball by the owner (or from
+`api/deploy/scanner-check.sh` in an owner session) and from the `scanner-validation` collection after the soak. What
+the certified configuration guarantees by construction: user 1000:1000, read-only root, every capability dropped, no
+privileged mode, port 3310 on the private Compose network only, the image equal to the SSM parameter (the deploy
+script's digest check), and the 2048 MiB limit. EICAR detection, the oversized-stream refusal, restart and recovery
+and the absence of OOM kills are proven by the arm64 harness runs 38199283652 and 38204772069 on this image; no
+host-level repetition exists yet.
+
+**Re-stated verdict (2026-10-12, 13:45 UTC): the scanner is deployed; the soak and the validation evidence are
+pending.** V3 flags, media delivery and production are unchanged.
