@@ -196,9 +196,13 @@ run "media_settings_planned_with_every_flag_off" {
     error_message = "every V3, delivery, 3D and video flag is off"
   }
 
+  # AD-1 (2026-10-12) records option B and the pinned image; the mode stays none until the owner's scanner deployment,
+  # so the pin is planned as an inert parameter and the scanner Compose profile is not started by a deploy.
   assert {
-    condition     = local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] == "none" && local.app_config["VEDA_CATALOG_CLAMD_IMAGE"] == "none-selected" && local.app_config["VEDA_CATALOG_CLAMD_ADDRESS"] == "clamd:3310"
-    error_message = "no scanner until the owner decides (uploads stay PENDING); its settings are present and inactive"
+    condition = (local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] == "none" && local.scanner.status == "DECIDED" && local.scanner.option == "B" &&
+      local.app_config["VEDA_CATALOG_CLAMD_IMAGE"] == "clamav/clamav:1.4.6-debian13-slim@sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b" &&
+    local.app_config["VEDA_CATALOG_CLAMD_ADDRESS"] == "clamd:3310")
+    error_message = "scanner decided (option B, pinned image) but not deployed: mode none (uploads stay PENDING); its settings are present and inactive"
   }
 
   assert {
