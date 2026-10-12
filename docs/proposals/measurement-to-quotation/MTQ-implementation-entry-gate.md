@@ -22,3 +22,4 @@
 | Date | Gate | Change | Evidence | Recorded by |
 |---|---|---|---|---|
 | 2026-10-13 | all | Gate proposed with the blueprint publication PR | this PR | author |
+| 2026-10-13 | MTQ-G2 | B1 scope proposed for freeze in [MTQ-B1-SCOPE.md](MTQ-B1-SCOPE.md); not yet recorded by the owner | this branch | author |

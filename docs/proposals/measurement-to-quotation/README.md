@@ -10,6 +10,7 @@
 | [MTQ-dependency-matrix.md](MTQ-dependency-matrix.md) | What each block depends on: platform modules, catalogue administration, rate-card decisions, commercial decisions |
 | [MTQ-coverage-matrix.md](MTQ-coverage-matrix.md) | Reviewer traceability: property-type coverage, the BHK-as-label check, and the reuse-of-existing-mechanisms check, each with blueprint section references |
 | [MTQ-implementation-entry-gate.md](MTQ-implementation-entry-gate.md) | The gate that must pass before any code generation for MTQ begins |
+| [MTQ-B1-SCOPE.md](MTQ-B1-SCOPE.md) | B1 Measurement Foundation final scope (proposed freeze): supported configurations, included and deferred entities, Lite/Full survey, staircase, electrical and sensor capture, kitchen tall units, variation quotation model, attachment scaling, migration strategy |
 | [survey-and-scope-templates/](survey-and-scope-templates/README.md) | Survey and scope-template system (2026-10-13): conventions, fourteen space-type templates, property templates, the measurement-visit playbook with the quotation-readiness gate, and catalogue-record content; proposed content for OI-MTQ-02 and OI-MTQ-03 |
 
 Review order suggested: coverage matrix → blueprint §0–§4 → §5–§10 → §11–§15 → §16–§20 → dependency matrix → owner-decision register → entry gate.
