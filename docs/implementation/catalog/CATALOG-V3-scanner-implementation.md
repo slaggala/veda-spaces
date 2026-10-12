@@ -176,17 +176,25 @@ phase-1 record's statement that its own measurements were taken under 3 GiB rema
 | Rollback | §6: `t4g.small` again, in place, after the scanner is `none` |
 | Guards while PROPOSED | `stack.sh apply` and `stack.sh decisions` (hence `12-deploy`) refuse; `infra/tests/run.sh` fails by design on #77; the owner records AD-2 (and AD-3) or reverts before merging |
 
-**Plan runs (owner-gated).** `10-infra-plan` runs for both pull requests exist and **wait for the owner's approval of
-the `staging-plan` environment**: run 38199286193 for #76 (expected 1 to add, the `scanner-unhealthy` alarm; 0 to
-change; 0 to destroy; the AZ pin is a no-op because the subnet is already in `aps1-az1`) and run 38198329902 for #77
-(expected as in the table above). Their change counts and plan digests appear in the run summaries once approved; the
-plan text itself is published only under gate N-04-S (accepted). Neither run can be applied: a pull-request plan is
-for review by design, and #77 is PROPOSED. This record is complete without them; it is **not** a claim about what the
-plans show.
+**Plan runs.** `10-infra-plan` run **38200171272** for #76 ran with the owner's approval of the `staging-plan`
+environment on the pull request's merge commit `2f930aa3b64ef0f7c9b0c72edcfcb35ff0053f25` (`refs/pull/76/merge`), passed
+the plan guard ("no destroy, everything in ap-south-1 …") and planned **1 to add, 1 to change, 0 to destroy** (artifact
+`core-plan-38200171272`; plan SHA-256 `2ccf7620dd24e0af96ebf10982e8d97783adc98b1f9bff0a344976d510f230d3`, plan text
+SHA-256 `10ade82e510fea487be790d4055a0ad0c8c97893f61556257e26fbbd8870f409`; 199 no-op):
+
+| Resource | Action | Why |
+|---|---|---|
+| `module.monitoring.aws_cloudwatch_metric_alarm.host["scanner-unhealthy"]` | create | `veda-stg-scanner-unhealthy`: `Veda/Host ScannerHealthy`, `Minimum`, `LessThanThreshold 1`, period 300, `treat_missing_data notBreaching`, `actions_enabled true`, dimension `InstanceId` of the host (§4) |
+| `module.monitoring.aws_cloudwatch_dashboard.staging` | update in place | the alarm widget lists every alarm, so the new alarm's ARN joins `dashboard_body`; the forecast in the first version of this record (1 to add, 0 to change) missed this consequence |
+| everything else, including `module.network.aws_subnet.public` | no-op | the `az_id` pin names the AZ the subnet already has |
+
+The pull-request plan is review-only by design; an applicable plan is a `workflow_dispatch` run on `main` after the
+merge. Run 38198329902 for #77 (the resize) still **waits for the owner's approval**; until it runs, the expected delta
+in the table above is a forecast, not a plan.
 
 ## 8. Remaining risks
 
-1. **`aps1-az1` offering of `t4g.large` unverified** until the #77 plan runs (owner approval of `staging-plan`); a refusal means a different host size or a subnet move, which is a redesign, not an apply.
+1. **`aps1-az1` offering of `t4g.large` unverified** until the #77 plan runs (owner approval of `staging-plan`; still waiting at the time of this record); a refusal means a different host size or a subnet move, which is a redesign, not an apply.
 2. **Budget**: the verified `t4g.large` rate puts staging at about 49–50 USD/month against a 25 USD limit; AD-3 is the owner's; the forecast alert would fire every month until revised.
 3. **Concurrent reload headroom**: `ConcurrentDatabaseReload no` is load-bearing at 2048 MiB (phase-1 measured about 2.0 GiB with `yes`); profile C in §5 shows what happens at this limit if that setting ever changes.
 4. **Signature growth**: the first-load peak (1.63 GiB) includes the signature file cache; a materially larger signature set narrows the margin to the limit; `ScannerRestarts`/`scanner-unhealthy` would show it; the limit is one Compose variable.
