@@ -1,7 +1,7 @@
 {
   "description": "Staging cost budget (AUT-112, owner decision O16), planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request. The alert recipient is NOT stored here: it is the BUDGET_ALERT_EMAIL secret of the staging-plan environment, because the repository is public and GitHub prints plain variables in job logs. The plan refuses to run while monthly_limit_usd is null (undecided).",
   "name": "veda-staging-monthly-cost",
-  "monthly_limit_usd": 25,
+  "monthly_limit_usd": 60,
   "forecast_alert_thresholds_percent": [80, 100],
-  "decision": "O16, 2026-10-05: monthly limit 25 USD; forecast alerts at 80% and 100% of it, by email to the owner's address."
+  "decision": "O16, 2026-10-05: monthly limit 25 USD; forecast alerts at 80% and 100% of it, by email to the owner's address. AD-3, 2026-10-12 (owner direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION, recorded as given in docs/implementation/catalog/CATALOG-V3-activation-owner-decisions.md): monthly limit 60 USD, the owner's ceiling for the t4g.large host of AD-2 (compute rate verified from the public AWS Price List, offer 20261009203134: 0.0448 USD/h, 32.70 USD per 730 h, +24.53 USD per month against t4g.small; the estimated staging total of about 49 to 50 USD per month is an estimate until billed); forecast alerts unchanged at 80% and 100%; the review date for the limit is not yet set by the owner (AD-3). Effective at the merge of pull request #77; planned on main by 10-infra-plan and applied only by an approved 11-infra-apply."
 }

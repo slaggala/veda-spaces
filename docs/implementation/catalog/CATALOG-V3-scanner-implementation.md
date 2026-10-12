@@ -6,7 +6,8 @@ ClamAV image without privilege, the readiness and health probes, the scanner mon
 at the memory limit the bundle configures, and the reviewed host plan for `t4g.large`. Pull request #76
 (`infra/scanner-option-b`: implementation commit `a27a650e029561285505ebf8f05286b0269d52a0`, harness fixes up to
 `b5de1d4275d3510dc9d5f6b0096fca6fa7702d9a`, the validated commit) and the stacked plan-only proposal #77
-(`infra/host-t4g-large-proposal`, commit `2b4c0cda3027a50cf04bcd00b48aeb0fe48b62dc`).
+(`infra/host-t4g-large-proposal`; its first head was superseded when the pull request was rebuilt on `main` after
+the merge of #76, §7, so it is cited by number, not by commit).
 
 **Not in scope, not done.** No V3 flag is on, media delivery is off, no approval record exists, `media_scanner` stays
 UNDECIDED with mode `none`, the host stays `t4g.small`, the budget stays 25 USD, nothing is applied, deployed or
@@ -220,6 +221,20 @@ SHA-256 `10ade82e510fea487be790d4055a0ad0c8c97893f61556257e26fbbd8870f409`; 199 
 The pull-request plan is review-only by design; an applicable plan is a `workflow_dispatch` run on `main` after the
 merge. Run 38198329902 for #77 (the resize) still **waits for the owner's approval**; until it runs, the expected delta
 in the table above is a forecast, not a plan.
+
+**Rebuild of #77 after the merge of #76 (2026-10-12).** The independent review of #77 found it stacked on a
+pre-review snapshot of this implementation (it lacked the §9 fixes) with `compute.status` PROPOSED. It was rebuilt on
+`main` after the merge of #76, so its diff is only: the three decision files (`compute` DECIDED and `t4g.large`,
+`host_instance_type` `t4g.large`, `monthly_limit_usd` 60), AD-2 and AD-3 in the
+[owner-decision records](CATALOG-V3-activation-owner-decisions.md) as given by the owner's direction
+VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION, the committed-decision checks of `infra/tests/run.sh` (the two
+instance types must agree; the scanner stays `none` and every V3 flag off; only the staging roots exist), the
+activation-document tests, and this note. The run 38198329902 above was superseded by that push (the plan workflow
+cancels the waiting run of a pull request ref on a new push). The rebuilt head's plan runs, their result and the
+plan digest are cited in the pull request itself, not here, because this record cannot cite a run that has not
+run; the expected delta becomes `aws_instance.host` `instance_type` in place and `aws_budgets_budget` limit in place,
+0 to destroy, 0 to replace, and any other change is a stop signal. The scanner alarm create of #76 is applied or
+pending on `main` independently of #77.
 
 ## 8. Remaining risks
 

@@ -167,7 +167,8 @@ KNOWN_COMMITS = {
     "b5de1d4275d3510dc9d5f6b0096fca6fa7702d9a": ("Infra: scanner validation harness, PID 1 killed from the host beside the Docker API kill (which Docker records as a manual stop); single-line read-only records", "scanner implementation (PR #76); the commit workflow 14 run 38199283652 validated (the recorded validation)"),  # pragma: allowlist secret (commit SHA)
     "bc26a3a90c2cf9894465b036d484520ad9733fe7": ('Infra: independent-review findings on the scanner implementation (alarm needs two periods, crash-loop detection, newline-safe records, vestigial milter variable, no-op User directive, single SIGTERM to freshclam)', "scanner implementation (PR #76); the commit workflow 14 run 38203465696 validated, which caught the entrypoint regression (record §9 finding 8)"),  # pragma: allowlist secret (commit SHA)
     "a8229f1890a6a181a3dde8446cedb3b4a653bde0": ("Fix: scanner entrypoint set its stop flag from clamd's exit status, so a SIGKILLed clamd (137) was mistaken for a trapped signal and the container stayed running without clamd (validation run 38203465696)", "scanner implementation (PR #76); the corrected entrypoint, validated by workflow 14 run 38204772069"),  # pragma: allowlist secret (commit SHA)
-    "2b4c0cda3027a50cf04bcd00b48aeb0fe48b62dc": ("Infra: PROPOSED t4g.large host for the option B scanner (plan for the owner's AD-2; not mergeable while PROPOSED)", "plan-only t4g.large proposal (PR #77)"),  # pragma: allowlist secret (commit SHA)
+    # PR #77's first head (the plan-only PROPOSED proposal) was superseded when the pull request was rebuilt on main
+    # after the merge of #76; the documents cite that pull request by number, so no commit of it is listed here.
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",
