@@ -164,3 +164,88 @@ def test_v3_activation_with_a_current_approval_proceeds(deploy, tmp_path):  # no
     r, calls = deploy("at-floor", env_extra=extra)
     assert r.returncode == 0, r.stdout + r.stderr
     assert calls.index("staging_approval") < calls.index("up -d --no-deps api")
+
+
+# --- the entrypoint's process semantics, with stub daemons (CATALOG-V3-scanner-implementation.md §2) ----------------
+import os  # noqa: E402
+import signal  # noqa: E402
+import subprocess  # noqa: E402
+import time  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+ENTRYPOINT = Path(__file__).resolve().parents[2] / "deploy" / "clamd-entrypoint.sh"
+
+
+def _stubs(tmp_path, clamd_body="exec sleep 300"):
+    """Fake clamd and freshclam on PATH; a signature file so the download branch is skipped; the env the script reads."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "clamd").write_text(f"#!/bin/sh\necho $$ >'{tmp_path}/clamd.pid'\n{clamd_body}\n")
+    (bin_dir / "freshclam").write_text(f"#!/bin/sh\necho $$ >'{tmp_path}/freshclam.pid'\nexec sleep 300\n")
+    for f in bin_dir.iterdir():
+        f.chmod(0o755)
+    db = tmp_path / "db"
+    db.mkdir()
+    (db / "main.cvd").write_bytes(b"stub")
+    return {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CLAMAV_DB_DIR": str(db),
+            "FRESHCLAM_CONF": str(tmp_path / "freshclam.conf")}  # fmt: skip
+
+
+def _pid(path, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists() and path.read_text().strip():
+            return int(path.read_text())
+        time.sleep(0.05)
+    raise AssertionError(f"{path.name} never started")
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _wait_gone(pid, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and _alive(pid):
+        time.sleep(0.05)
+    return not _alive(pid)
+
+
+def test_entrypoint_exits_with_clamd_status_when_clamd_is_killed_and_stops_freshclam(tmp_path):
+    """The failure the entrypoint exists for: clamd dies (OOM killer, crash), PID 1 must exit non-zero so Docker restarts
+    the container, and freshclam must not keep the container alive."""
+    proc = subprocess.Popen(
+        ["sh", str(ENTRYPOINT)], env=_stubs(tmp_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    clamd, fresh = _pid(tmp_path / "clamd.pid"), _pid(tmp_path / "freshclam.pid")
+    os.kill(clamd, signal.SIGKILL)
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode == 137, out
+    assert "clamd exited with status 137" in out
+    assert _wait_gone(fresh), "freshclam must be terminated when clamd dies on its own"
+
+
+def test_entrypoint_forwards_sigterm_to_both_daemons_and_exits(tmp_path):
+    """docker stop: SIGTERM to PID 1 ends clamd and freshclam; the container exits and (unless-stopped) stays stopped."""
+    proc = subprocess.Popen(
+        ["sh", str(ENTRYPOINT)], env=_stubs(tmp_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    clamd, fresh = _pid(tmp_path / "clamd.pid"), _pid(tmp_path / "freshclam.pid")
+    time.sleep(0.2)
+    proc.send_signal(signal.SIGTERM)
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode != 0 and "stop requested" in out, out
+    assert _wait_gone(clamd) and _wait_gone(fresh)
+
+
+def test_entrypoint_propagates_a_clean_clamd_exit(tmp_path):
+    proc = subprocess.Popen(["sh", str(ENTRYPOINT)], env=_stubs(tmp_path, clamd_body="sleep 0.3; exit 0"), stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)  # fmt: skip
+    fresh = _pid(tmp_path / "freshclam.pid")
+    out, _ = proc.communicate(timeout=10)
+    assert proc.returncode == 0 and "clamd exited with status 0" in out, out
+    assert _wait_gone(fresh)

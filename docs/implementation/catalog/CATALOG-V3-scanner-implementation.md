@@ -151,7 +151,13 @@ which is the rollback behaviour `deploy.sh` relies on; `ScannerHealthy` then rep
 volume the updated signatures are still there. Profile C (concurrent reload) reaches about 2,006 MiB sampled at this
 limit, 42 MiB below it, without an OOM kill: the margin confirms that `ConcurrentDatabaseReload no` is load-bearing.
 
-RERUN_ADDENDUM_PENDING
+**Addendum: reruns after the independent review (§9).** Run **38203465696** on `bc26a3a90c2cf9894465b036d484520ad9733fe7`
+(bundle bytes changed by findings 4, 5 and 6; `summary.json` SHA-256 `d0f3c789252deaa970b48f3783b20e09dbe9175aa46ca839a26e65a39b41ef4d`):
+every functional, memory, PID 1 kill, stop and restart result as above, **but the clamd-kill recovery regressed**:
+`compose_after_clamd_killed_restart_count = before=0 after=0 status=running`, outcome `not ready after 300s (container
+running)`. Cause and fix: §9 finding 8. The final run on the corrected entrypoint:
+
+RUN5_PENDING
 
 **PROPOSED 2048 MiB LIMIT: VALIDATED** at that limit for the Compose profile the bundle deploys (this section); the
 phase-1 record's statement that its own measurements were taken under 3 GiB remains true of those runs.
@@ -218,7 +224,8 @@ findings and three nits, all addressed in this pull request before merge:
 | 3 | MINOR | the summary JSON escaped only `\` and `"`; a future multi-line value would corrupt `summary.json` silently | `rec` folds newlines and tabs into spaces at record time, so the TSV and the JSON stay valid |
 | 4 | MINOR | `CLAMAV_NO_MILTERD` was vestigial: only the image's own init scripts read it, and the bundle's entrypoint never starts a milter | removed; the environment carries `FRESHCLAM_CHECKS` only (test updated) |
 | 5 | NIT | `User clamav` in `clamd.conf` is ignored when clamd does not start as root (log noise) | removed, with a comment saying why |
-| 6 | NIT | freshclam received SIGTERM twice on `docker stop` (trap, then cleanup) | the cleanup signals freshclam only when clamd ended on its own; after a trapped signal it only reaps |
+| 6 | NIT | freshclam received SIGTERM twice on `docker stop` (trap, then cleanup) | the cleanup signals freshclam only when clamd ended on its own; after a trapped signal it only reaps. **The first version of this fix was wrong** (finding 8) |
+| 8 | **MAJOR** (introduced by the first fix of 6; caught by validation run 38203465696, never merged) | the "trapped signal" case was inferred from clamd's exit status being above 128; a clamd killed by SIGKILL also ends with 137, so the entrypoint skipped stopping freshclam and blocked on it: the container stayed `running` without clamd for the whole 300 s wait (`compose_after_clamd_killed_outcome = not ready after 300s`), the exact failure the entrypoint exists to prevent | the flag is set inside the trap function itself, never inferred; three unit tests with stub daemons now pin the semantics (clamd SIGKILLed → exit 137 and freshclam gone; SIGTERM to PID 1 → both daemons ended; clean clamd exit → 0), and the harness reran (§5 addendum) |
 | 7 | NIT | the rendered-hardening row shows `7357/tcp` without saying it is `EXPOSE` metadata, not a listening milter | noted in §5 |
 
 Verified clean by that review: entrypoint signal handling and exit-code propagation, zombie reaping, the initial
@@ -227,7 +234,9 @@ every `clamd.conf` directive for ClamAV 1.4, the heartbeat parsing, the alarm se
 `az_id` pin, the metric count, and that the unit tests cannot pass on a regressed profile.
 
 Findings 4, 5 and 6 change bytes in the deploy bundle (Compose service, `clamd.conf`, entrypoint), so the harness ran
-once more on the final bytes: see the addendum at the end of §5.
+again on the changed bytes; that run (38203465696) caught finding 8, and the harness ran once more on the final bytes:
+see the addendum at the end of §5. The lesson is recorded on purpose: a one-line "nit" fix in the process supervisor
+broke the recovery property, and only the rerun of the recovery measurement showed it.
 
 ## 10. Verdict
 
