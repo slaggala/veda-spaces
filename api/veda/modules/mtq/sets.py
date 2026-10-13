@@ -133,6 +133,16 @@ def lock_draft(s: Session, mset: MeasurementSet) -> None:
     require_draft(mset)
 
 
+def lock_for_write(s: Session, property_id: str, *rows) -> None:
+    """Take the property lock, then re-read each row under it. An If-Match check compares against these re-read
+    versions, never the version read before the lock: a request that read version n while another request committed
+    n+1 would otherwise pass its check and, after the refresh, overwrite that commit (PostgreSQL READ COMMITTED; SQLite
+    write units of work already start under BEGIN IMMEDIATE)."""
+    lock_property(s, property_id)
+    for row in rows:
+        s.refresh(row)
+
+
 def require_no_submitted(s: Session, property_id: str, exclude: str | None = None) -> None:
     """A revision awaiting verification is decided first (verified, or returned for correction): a second open
     candidate would make the authoritative revision ambiguous."""

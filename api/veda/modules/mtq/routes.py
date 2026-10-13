@@ -106,6 +106,7 @@ def get_property(req: Req, property_id: str):
            if_match=True, requirement="PROP-003", summary="Edit a property")  # fmt: skip
 def patch_property(req: Req, property_id: str):
     prop = P.get_visible(req.session, req.ctx, property_id)
+    sets.lock_for_write(req.session, prop.id, prop)
     req.require_version(prop.version)
     P.update(req.session, req.ctx, prop, req.body)
     req.session.flush()
@@ -134,6 +135,7 @@ def list_spaces(req: Req, property_id: str):
 def create_space(req: Req, property_id: str):
     prop = P.get_visible(req.session, req.ctx, property_id)
     scope.require_in_scope(req.session, req.ctx, prop.lead_id, "property.update")
+    P.lock_plan(req.session, prop)
     b = req.body
     sp = P.add_space(
         req.session,
@@ -159,6 +161,7 @@ def create_space(req: Req, property_id: str):
 def spaces_from_template(req: Req, property_id: str):
     prop = P.get_visible(req.session, req.ctx, property_id)
     scope.require_in_scope(req.session, req.ctx, prop.lead_id, "property.update")
+    P.lock_plan(req.session, prop)
     P.seed_from_template(req.session, prop, req.body.template_key, list(req.body.include_optional))
     req.session.flush()
     return ok(P.present(req.session, prop), status=201)
@@ -169,16 +172,25 @@ def spaces_from_template(req: Req, property_id: str):
            summary="Set the walk order: the list must name every live space exactly once (stale lists are refused)")  # fmt: skip
 def order_spaces(req: Req, property_id: str):
     prop = P.get_visible(req.session, req.ctx, property_id)
+    P.lock_plan(req.session, prop)
     rows = P.reorder(req.session, req.ctx, prop, list(req.body.space_ids))
     req.session.flush()
     return ok([P.present_space(sp) for sp in rows])
+
+
+def _lock_space(req: Req, sp, prop) -> None:
+    """Lock, re-read, then compare If-Match against the version under the lock (never the version read before it)."""
+    P.lock_plan(req.session, prop, sp)
+    req.require_version(sp.version)
+    if sp.is_deleted:  # archived by the request that held the lock first (its version moved, so this is unreachable)
+        raise ApiError(404, "NOT_FOUND", "Not found.")
 
 
 @api.route("PATCH", "/spaces/<space_id>", permission="property.update", body=S.SpacePatchIn, if_match=True,
            requirement="PROP-003", summary="Edit a space (its type and id never change)")  # fmt: skip
 def patch_space(req: Req, space_id: str):
     sp, prop = P.get_space(req.session, req.ctx, space_id)
-    req.require_version(sp.version)
+    _lock_space(req, sp, prop)
     P.update_space(req.session, req.ctx, sp, prop, req.body)
     req.session.flush()
     return ok(P.present_space(sp))
@@ -188,7 +200,7 @@ def patch_space(req: Req, space_id: str):
            requirement="PROP-003", summary="Archive a space (soft delete; its id is kept)")  # fmt: skip
 def delete_space(req: Req, space_id: str):
     sp, prop = P.get_space(req.session, req.ctx, space_id)
-    req.require_version(sp.version)
+    _lock_space(req, sp, prop)
     from veda.kernel.context import reason
 
     with reason(req.body.reason if req.body else None):
@@ -309,6 +321,7 @@ def get_set(req: Req, set_id: str):
            if_match=True, requirement="MEAS-004", summary="Property-level capture and the entry unit of a draft")  # fmt: skip
 def patch_set(req: Req, set_id: str):
     mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.capture")
+    sets.lock_for_write(req.session, prop.id, mset)
     req.require_version(mset.version)
     sets.update_set(req.session, req.ctx, mset, prop, req.body)
     req.session.flush()
@@ -349,10 +362,14 @@ def add_note(req: Req, set_id: str):
            requirement="MEAS-004", summary="Delete a note from a draft")  # fmt: skip
 def delete_note(req: Req, set_id: str, note_id: str):
     mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.capture")
-    note = req.session.get(MeasurementNote, note_id)
-    if note is None or note.is_deleted or note.measurement_set_id != mset.id:
+    # Deleted notes included: whether a request is stale is decided by its If-Match under the lock, below.
+    note = req.session.get(MeasurementNote, note_id, execution_options={"include_deleted": True})
+    if note is None or note.measurement_set_id != mset.id:
         raise ApiError(404, "NOT_FOUND", "Not found.")
-    req.require_version(note.version)
+    sets.lock_for_write(req.session, prop.id, mset, note)
+    req.require_version(note.version)  # a request that read the note before another deleted it is stale (409)
+    if note.is_deleted:
+        raise ApiError(404, "NOT_FOUND", "Not found.")
     sets.delete_note(req.session, req.ctx, mset, prop, note)
     req.session.flush()
     return no_content()
@@ -363,6 +380,7 @@ def delete_note(req: Req, set_id: str, note_id: str):
            summary="Submit the draft (lead surveyor); it becomes immutable")  # fmt: skip
 def submit_set(req: Req, set_id: str):
     mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.capture")
+    sets.lock_for_write(req.session, prop.id, mset)
     req.require_version(mset.version)
     sets.submit(req.session, req.ctx, mset, prop)
     req.session.flush()
@@ -374,6 +392,7 @@ def submit_set(req: Req, set_id: str):
            summary="Return a submitted revision for correction; a new draft revision is opened from it")  # fmt: skip
 def reject_set(req: Req, set_id: str):
     mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.verify")
+    sets.lock_for_write(req.session, prop.id, mset)
     req.require_version(mset.version)
     correction = sets.reject(req.session, req.ctx, mset, prop, req.body.reason)
     req.session.flush()
@@ -403,6 +422,7 @@ def set_checks(req: Req, set_id: str):
            summary="Verify a submitted revision: fail-closed checks, sealed snapshot, the previous verified set superseded")  # fmt: skip
 def verify_set(req: Req, set_id: str):
     mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.verify")
+    sets.lock_for_write(req.session, prop.id, mset)
     req.require_version(mset.version)
     verification.verify(req.session, req.ctx, mset, prop, list(req.body.acknowledgements) if req.body else [])
     req.session.flush()
