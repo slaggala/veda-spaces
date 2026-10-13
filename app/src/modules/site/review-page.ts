@@ -4,6 +4,7 @@ import { SessionElement } from '../../core/authz/session-element.js';
 import { navigate } from '../../core/router/next.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import { site, variantUrl, type MeasurementSet, type Property, type Readiness } from './api.js';
+import { siteTargets } from './styles.js';
 import { formatArea, formatLength } from './units.js';
 
 const label = (code: string) => code.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
@@ -30,7 +31,7 @@ export class VsReviewPage extends SessionElement {
   declare busy: boolean;
   declare disabled: boolean;
 
-  static override styles = [...shared, pageStyles, tableStyles, css`
+  static override styles = [...shared, pageStyles, tableStyles, siteTargets, css`
     .space { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     @media (max-width: 767px) { .space { grid-template-columns: 1fr; } }
     .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }

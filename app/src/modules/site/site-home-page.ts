@@ -6,6 +6,7 @@ import { navigate } from '../../core/router/next.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import { site, type Property, type Templates, type Visit } from './api.js';
 import { registerSiteWorker } from './pwa.js';
+import { siteTargets } from './styles.js';
 
 const label = (code: string) => code.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -26,10 +27,10 @@ export class VsSiteHomePage extends SessionElement {
   declare busy: boolean;
   declare form: { lead_id: string; property_type_code: string; template_key: string; include: string[]; city: string; built_up: string };
 
-  static override styles = [...shared, pageStyles, tableStyles, css`
+  static override styles = [...shared, pageStyles, tableStyles, siteTargets, css`
     .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
     .opt { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-    .opt label { display: flex; gap: 6px; align-items: center; min-height: 32px; font-size: 13px; }
+    .opt label { display: flex; gap: 6px; align-items: center; min-height: var(--vs-target); font-size: 13px; }
   `];
 
   constructor() {

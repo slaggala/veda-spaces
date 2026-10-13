@@ -10,6 +10,7 @@ import {
 } from './capture-model.js';
 import { queue, type QueuedOp } from './offline-queue.js';
 import { preparePhoto } from './photos.js';
+import { siteTargets } from './styles.js';
 import { formatArea, formatLength, parseLength, type UnitSystem } from './units.js';
 
 const WALL_TAGS = ['WARDROBE', 'LOFT', 'BED_HEAD', 'TV_UNIT', 'STUDY_UNIT', 'CROCKERY_UNIT', 'KITCHEN_RUN', 'KITCHEN_WALL_RUN', 'TALL_UNIT',
@@ -53,7 +54,7 @@ export class VsCapturePage extends SessionElement {
   /** Operations on this device that predate ownership (B1-PE-01): counted, never shown or sent. */
   declare unowned: number;
 
-  static override styles = [...shared, pageStyles, css`
+  static override styles = [...shared, pageStyles, siteTargets, css`
     :host { display: block; }
     .layout { display: grid; gap: 16px; grid-template-columns: 260px 1fr; align-items: start; }
     @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
@@ -67,7 +68,7 @@ export class VsCapturePage extends SessionElement {
     .req::after { content: ' · required'; color: var(--vs-danger); font-weight: 600; }
     .opt::after { content: ' · optional'; color: var(--vs-ink-muted); }
     .tags { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-    .tags label { display: flex; gap: 6px; align-items: center; font-size: 13px; min-height: 32px; }
+    .tags label { display: flex; gap: 6px; align-items: center; font-size: 13px; min-height: var(--vs-target); }
     .bar { position: sticky; top: 0; z-index: 2; background: var(--vs-surface); padding: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .conflict { border-left: 3px solid var(--vs-danger); padding-left: 8px; }
     ul.plain { padding-left: 18px; margin: 4px 0; }

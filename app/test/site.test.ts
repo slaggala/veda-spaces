@@ -15,6 +15,32 @@ import '../src/modules/site/index.js';
 
 /** MTQ B1-T10: the site capture client (units, payloads, offline queue, photo sizing, pages). */
 
+// The real design tokens (--vs-target is 44 px, the focus ring colour), so the pages measured and scanned are the ones
+// a surveyor gets.
+let tokens: HTMLLinkElement;
+before(async () => {
+  tokens = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: '/src/design-system/tokens.css' });
+  const loaded = new Promise((resolve) => { tokens.onload = resolve; });
+  document.head.append(tokens);
+  await loaded;
+});
+after(() => tokens.remove());
+
+/** Every rendered control smaller than 44 × 44 px (B1-PE-04); a checkbox or file input counts by the label holding it. */
+function smallTargets(root: ShadowRoot): string[] {
+  for (const d of root.querySelectorAll('details')) d.open = true;
+  const controls = new Set<Element>();
+  for (const el of root.querySelectorAll('button, a[href], input, select, textarea, summary')) {
+    const wrapped = el.matches('input[type="checkbox"], input[type="radio"], input[type="file"]') ? el.closest('label') : null;
+    controls.add(wrapped ?? el);
+  }
+  return [...controls].flatMap((el) => {
+    const r = el.getBoundingClientRect();
+    const name = `${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).replace(/ /g, '.')}` : ''} "${(el.textContent ?? '').trim().slice(0, 30)}"`;
+    return r.height >= 44 && r.width >= 44 ? [] : [`${name} ${Math.round(r.width)}×${Math.round(r.height)}`];
+  });
+}
+
 describe('site units (blueprint §6.1, AR-16)', () => {
   it('parses feet-inches and millimetres to integer millimetres', () => {
     expect(parseLength(`11' 10"`, 'FT_IN')).to.equal(3607);
@@ -459,28 +485,71 @@ describe('site pages accessibility at phone width (B1-PE-03)', () => {
     const page = await mount('vs-site-home-page', { params: {} }, '#new');
     await waitUntil(() => page.shadowRoot!.textContent!.includes('VS-V-1') && page.shadowRoot!.textContent!.includes('VS-P-1'), 'lists loaded');
     await expect(page).to.be.accessible();
+    expect(smallTargets(page.shadowRoot!), 'touch targets (B1-PE-04)').to.deep.equal([]);
   });
 
   it('property: spaces, visits and revisions', async () => {
     const page = await mount('vs-property-page', { params: { id: 'p1' } }, '#spaces');
     await waitUntil(() => page.shadowRoot!.textContent!.includes('Rev 2'), 'revisions loaded');
     await expect(page).to.be.accessible();
+    expect(smallTargets(page.shadowRoot!), 'touch targets (B1-PE-04)').to.deep.equal([]);
   });
 
   it('review: checks with an acknowledgement, the comparison and the measured spaces', async () => {
     const page = await mount('vs-review-page', { params: { id: 's3' }, search: '?compare=s2' }, '#checks');
     await waitUntil(() => page.shadowRoot!.querySelector('#diff'), 'comparison loaded');
     await expect(page).to.be.accessible();
+    expect(smallTargets(page.shadowRoot!), 'touch targets (B1-PE-04)').to.deep.equal([]);
   });
 
   it('capture: the photo buttons show the focus ring when their hidden file input has focus', async () => {
     const page = await mount('vs-capture-page', { params: { id: 's2' } }, '#room-title');
-    page.style.setProperty('--vs-focus-ring', '#A46D42'); // the design tokens (tokens.css) are not loaded in unit tests
     const input = page.shadowRoot!.querySelector<HTMLInputElement>('label.btn input[type="file"]')!;
     const label = input.closest('label')!;
     expect(getComputedStyle(label).outlineStyle).to.equal('none');
     input.focus();
     expect(getComputedStyle(label).outlineStyle).to.equal('solid');
     expect(getComputedStyle(label).outlineWidth).to.equal('2px');
+  });
+});
+
+describe('site touch targets at phone width (B1-PE-04)', () => {
+  const originalFetch = window.fetch;
+  afterEach(() => { window.fetch = originalFetch; });
+
+  async function capturePage(): Promise<HTMLElement> {
+    const set = { id: 'set1', version: 1, property_id: 'p1', revision_no: 1, status: 'DRAFT', survey_level_code: 'FULL', method_code: 'LASER',
+      unit_system_code: 'MM', captured_by: 'u1', summary: {}, property_capture: {}, notes: [], spaces: [{ id: 'm1', version: 1, space_id: 'k1',
+        shape_code: 'L_SHAPE', length_mm: 3000, width_mm: 2400, ceiling_height_mm: 2900, confidence_code: 'HIGH', is_complete: false, attributes: {},
+        walls: [{ id: 'w1', wall_index: 1, length_mm: 3000, wall_type_code: 'PARTITION', usable_for_code: ['KITCHEN_RUN'],
+          obstructions: [{ kind: 'SWITCHBOARD', offset_mm: 300, width_mm: 150 }],
+          openings: [{ client_ref: 'o1', opening_type_code: 'WINDOW', width_mm: 1200, height_mm: 1200, sill_height_mm: 900 }] }],
+        electrical_points: [{ client_ref: 'e1', point_type_code: 'SOCKET_15A', status_code: 'SHIFT', wall_index: 1, from_offset_mm: 400 }] }] };
+    const property = { id: 'p1', version: 1, property_number: 'VS-P-1', display_label: '1 BHK apartment', spaces: [
+      { id: 'k1', version: 1, label: 'Kitchen', space_type_code: 'KITCHEN', is_in_scope: true, zone_code: 'INDOOR', level_index: 0, sort_order: 10 },
+      { id: 'b1', version: 1, label: 'Bedroom', space_type_code: 'BEDROOM', is_in_scope: true, zone_code: 'INDOOR', level_index: 0, sort_order: 20 },
+    ] };
+    const templates = { template_version: '2026.10.1', property_templates: {}, space_templates: {
+      KITCHEN_DEFAULT: { space_types: ['KITCHEN'], full_required: ['FL', 'ATTR:has_gas_line'], checklist: [] } } };
+    const checks = { survey_level: 'FULL', ready_to_submit: false, ready_to_verify: false, verify_problems: [], usable_segments: {}, submit_problems: [] };
+    window.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes('/checks') ? checks : url.includes('/mtq/templates') ? templates : url.includes('/properties/') ? property : set;
+      return new Response(JSON.stringify({ data: body }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    const el = await fixture(html`<div style="width: 360px"><vs-capture-page .location=${{ params: { id: 'set1' } }}></vs-capture-page></div>`);
+    const page = el.querySelector<HTMLElement>('vs-capture-page')!;
+    await waitUntil(() => page.shadowRoot!.querySelector('#room-title'), 'room editor');
+    return page;
+  }
+
+  it('makes every control on the capture page at least 44 × 44 px', async () => {
+    const page = await capturePage();
+    const root = page.shadowRoot!;
+    await (page as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    expect(root.querySelectorAll('.tags label').length, 'wall tags rendered').to.be.greaterThan(10);
+    expect(root.querySelectorAll('label.btn input[type="file"]').length, 'room and wall photo buttons rendered').to.equal(2);
+    expect(root.querySelectorAll('.btn.small').length, 'small buttons rendered').to.be.greaterThan(5);
+    expect(smallTargets(root)).to.deep.equal([]);
   });
 });
