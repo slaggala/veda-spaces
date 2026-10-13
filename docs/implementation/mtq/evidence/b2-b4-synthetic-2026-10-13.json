@@ -1,0 +1,216 @@
+{
+ "configurations": {
+  "2BHK": {
+   "as_committed": {
+    "blockers": [
+     "GST_POLICY_REQUIRED:OI-MTQ-07",
+     "NO_FINAL_TOTAL:OI-MTQ-07",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-08",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-09",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-11",
+     "RULESET_NOT_APPROVED:OI-MTQ-03"
+    ],
+    "customer_issuable": false,
+    "derived_bedrooms": 2,
+    "derived_levels": 1,
+    "estimate_lines": 56,
+    "optional_lines": 20,
+    "quotation_lines": 56,
+    "quotation_status": "DRAFT",
+    "spaces": 8,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 54972150,
+    "total_minor": null,
+    "unpriced_lines": 4
+   },
+   "synthetic_decisions": {
+    "blockers": [],
+    "customer_issuable": true,
+    "derived_bedrooms": 2,
+    "derived_levels": 1,
+    "estimate_lines": 56,
+    "optional_lines": 20,
+    "policy_version": "SYNTHETIC-TEST-1",
+    "quotation_lines": 56,
+    "quotation_status": "ACCEPTED",
+    "spaces": 8,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 54972150,
+    "total_minor": 64867137,
+    "traced_lines": 30,
+    "unpriced_lines": 4
+   }
+  },
+  "3BHK": {
+   "as_committed": {
+    "blockers": [
+     "GST_POLICY_REQUIRED:OI-MTQ-07",
+     "NO_FINAL_TOTAL:OI-MTQ-07",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-08",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-09",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-11",
+     "RULESET_NOT_APPROVED:OI-MTQ-03"
+    ],
+    "customer_issuable": false,
+    "derived_bedrooms": 3,
+    "derived_levels": 1,
+    "estimate_lines": 67,
+    "optional_lines": 27,
+    "quotation_lines": 67,
+    "quotation_status": "DRAFT",
+    "spaces": 9,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 67177350,
+    "total_minor": null,
+    "unpriced_lines": 5
+   },
+   "synthetic_decisions": {
+    "blockers": [],
+    "customer_issuable": true,
+    "derived_bedrooms": 3,
+    "derived_levels": 1,
+    "estimate_lines": 67,
+    "optional_lines": 27,
+    "policy_version": "SYNTHETIC-TEST-1",
+    "quotation_lines": 67,
+    "quotation_status": "ACCEPTED",
+    "spaces": 9,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 67177350,
+    "total_minor": 79269273,
+    "traced_lines": 34,
+    "unpriced_lines": 5
+   }
+  },
+  "4BHK": {
+   "as_committed": {
+    "blockers": [
+     "GST_POLICY_REQUIRED:OI-MTQ-07",
+     "NO_FINAL_TOTAL:OI-MTQ-07",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-08",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-09",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-11",
+     "RULESET_NOT_APPROVED:OI-MTQ-03"
+    ],
+    "customer_issuable": false,
+    "derived_bedrooms": 4,
+    "derived_levels": 1,
+    "estimate_lines": 81,
+    "optional_lines": 35,
+    "quotation_lines": 81,
+    "quotation_status": "DRAFT",
+    "spaces": 11,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 81766600,
+    "total_minor": null,
+    "unpriced_lines": 7
+   },
+   "synthetic_decisions": {
+    "blockers": [],
+    "customer_issuable": true,
+    "derived_bedrooms": 4,
+    "derived_levels": 1,
+    "estimate_lines": 81,
+    "optional_lines": 35,
+    "policy_version": "SYNTHETIC-TEST-1",
+    "quotation_lines": 81,
+    "quotation_status": "ACCEPTED",
+    "spaces": 11,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 81766600,
+    "total_minor": 96484588,
+    "traced_lines": 40,
+    "unpriced_lines": 7
+   }
+  },
+  "5BHK": {
+   "as_committed": {
+    "blockers": [
+     "GST_POLICY_REQUIRED:OI-MTQ-07",
+     "NO_FINAL_TOTAL:OI-MTQ-07",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-08",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-09",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-11",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-15",
+     "RULESET_NOT_APPROVED:OI-MTQ-03",
+     "UNPRICED_LINES"
+    ],
+    "customer_issuable": false,
+    "derived_bedrooms": 5,
+    "derived_levels": 1,
+    "estimate_lines": 95,
+    "optional_lines": 43,
+    "quotation_lines": 95,
+    "quotation_status": "DRAFT",
+    "spaces": 13,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 85432700,
+    "total_minor": null,
+    "unpriced_lines": 15
+   },
+   "synthetic_decisions": {
+    "blockers": [],
+    "customer_issuable": true,
+    "derived_bedrooms": 5,
+    "derived_levels": 1,
+    "estimate_lines": 95,
+    "optional_lines": 43,
+    "policy_version": "SYNTHETIC-TEST-1",
+    "quotation_lines": 95,
+    "quotation_status": "ACCEPTED",
+    "spaces": 13,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 94132700,
+    "total_minor": 111076586,
+    "traced_lines": 46,
+    "unpriced_lines": 9
+   }
+  },
+  "IH": {
+   "as_committed": {
+    "blockers": [
+     "GST_POLICY_REQUIRED:OI-MTQ-07",
+     "NO_FINAL_TOTAL:OI-MTQ-07",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-08",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-09",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-11",
+     "OWNER_DECISION_REQUIRED:OI-MTQ-15",
+     "RULESET_NOT_APPROVED:OI-MTQ-03",
+     "UNPRICED_LINES"
+    ],
+    "customer_issuable": false,
+    "derived_bedrooms": 3,
+    "derived_levels": 2,
+    "estimate_lines": 75,
+    "optional_lines": 29,
+    "quotation_lines": 75,
+    "quotation_status": "DRAFT",
+    "spaces": 14,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 76134850,
+    "total_minor": null,
+    "unpriced_lines": 11
+   },
+   "synthetic_decisions": {
+    "blockers": [],
+    "customer_issuable": true,
+    "derived_bedrooms": 3,
+    "derived_levels": 2,
+    "estimate_lines": 75,
+    "optional_lines": 29,
+    "policy_version": "SYNTHETIC-TEST-1",
+    "quotation_lines": 75,
+    "quotation_status": "ACCEPTED",
+    "spaces": 14,
+    "status": "SYNTHETIC_VALIDATED",
+    "subtotal_minor": 85234850,
+    "total_minor": 100577123,
+    "traced_lines": 40,
+    "unpriced_lines": 5
+   }
+  }
+ },
+ "evidence": "MTQ B2-B4 end-to-end, five supported configurations",
+ "note": "Synthetic sites (tests/support/ten_site.py), the SYNTHETIC test rate card and, for the decided runs, the SYNTHETIC test policy. No live site, real rate or owner decision.",
+ "status": "SYNTHETIC_VALIDATED"
+}

@@ -160,6 +160,9 @@ def test_expired_quotation_cannot_be_accepted(api, factory):
     clock.advance(timedelta(days=31))
     with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
         assert quotations.expire_due(s) == 1
+    from veda.platform import maintenance
+
+    assert maintenance.mtq_quotation_expiry() == {"expired": 0}  # the maintenance job runs the same rule, idempotently
     q = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}"))
     assert q["status"] == "EXPIRED"
     r = step(c, q, "decision", c.sales, {"decision": "ACCEPTED", "method": "SIGNED_COPY"}, code=409)

@@ -97,3 +97,22 @@ def test_discounts_disabled_until_decided_then_authority_and_four_eyes(api, fact
     r = mgr.post(f"/api/v1/cost-estimates/{cur['id']}/approve", if_match=cur["version"])
     assert r.status == 409 and r.code == "FOUR_EYES_REQUIRED"
     ok(c.as_(c.second_manager).post(f"/api/v1/cost-estimates/{cur['id']}/approve", if_match=cur["version"]))
+
+
+def test_no_active_rate_card_prices_nothing(api, factory):
+    """No card in force: the BOQ cannot be generated (it needs the card's product lines) and nothing is priced."""
+    from veda.kernel import db
+    from veda.kernel.context import actor, system_context
+    from veda.modules.estimator.models import EstimatorRateCard
+
+    load_card()
+    c = Commercial(api, factory)
+    prop = c.site("2BHK")
+    c.seed(prop)
+    c.decide_all(prop)
+    scope = c.confirm(c.fill_staff_inputs(c.draft_scope(prop)))
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        for row in s.query(EstimatorRateCard).filter(EstimatorRateCard.status == "ACTIVE"):
+            row.status = "RETIRED"
+    r = c.as_(c.estimator).post(f"/api/v1/scopes/{scope['id']}/boqs")
+    assert r.status == 409 and r.code == "CATALOGUE_UNAVAILABLE"
