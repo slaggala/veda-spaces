@@ -26,8 +26,8 @@
   "label": "SYNTHETIC_VALIDATED",
   "provenance": {
     "database_engine": "postgresql",
-    "generated_at": "2026-10-13T07:55:19.813Z",
-    "generator_commit": "1fe72169548bc952cde5e30ccf73f7410f35c731-dirty",
+    "generated_at": "2026-10-13T10:23:15.982Z",
+    "generator_commit": "3a6da201e5eaa39f7a97a8f8c8b60f72b9d2efb5",
     "reference_sha256": "sha256:d65c3d198b18e978ff2854ae17986557f1db238059dc237c60923da332804f26",
     "template_version": "2026.10.1"
   },
@@ -66,7 +66,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S01",
-      "snapshot": "sha256:488129c171a98a4b12c3310d6b6675fa41ede9c3f44d0ead76d18120ee8bf727",
+      "snapshot": "sha256:c1f5f75b0d5d02baa487f65c1f655fae3c3e7f26e0456a275b9c0b9ac59694de",
       "spaces": {
         "compared": 8,
         "pass": 8
@@ -130,7 +130,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S02",
-      "snapshot": "sha256:967b530e377e62af7a5ae5ece4507b080725373e6c293affcd508568fc435762",
+      "snapshot": "sha256:e88134183a4c19d2fb90e4ef660882508c5756f4dedb81c99aa0467404480b8a",
       "spaces": {
         "compared": 8,
         "pass": 8
@@ -194,7 +194,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S03",
-      "snapshot": "sha256:8fbb7e59810a712b138500ce87690957f2c87fe8295e79dbe37614d5339875ea",
+      "snapshot": "sha256:7da96d54374f35957e15c44982069cbcdbbb913c8ce78506ea8d6f2eb067ea56",
       "spaces": {
         "compared": 9,
         "pass": 9
@@ -268,7 +268,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S04",
-      "snapshot": "sha256:d32afc6d053c0543ade7b8f547474ada906709b5a7043ddc3b4dd288c42722ad",
+      "snapshot": "sha256:773093b6deeb9c5e2d238cce157b031d42988737c85116efce58cf3de8bfe303",
       "spaces": {
         "compared": 9,
         "pass": 9
@@ -332,7 +332,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S05",
-      "snapshot": "sha256:5f89db043a3c341bf4877e9908d3bad1616fb3ed64c17513c72e048b1fc242af",
+      "snapshot": "sha256:5700b260cc7581b092c66c6c6252294296866f1138d129ee3b4b410165a888e2",
       "spaces": {
         "compared": 11,
         "pass": 11
@@ -396,7 +396,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S06",
-      "snapshot": "sha256:a7d84903c5b1ab07ca3e99d738ec7af6a9c85aff1898b3313a14da023e4560e5",
+      "snapshot": "sha256:883d3766808d181e34b1a185b0536341f87c3e9a7c2e240d581c0a38b427b073",
       "spaces": {
         "compared": 14,
         "pass": 14
@@ -470,7 +470,7 @@
       "root_cause": "Tape slipped off the skirting",
       "set_status": "VERIFIED",
       "site_id": "S07",
-      "snapshot": "sha256:4fb316fb037f0ee5efd4dc5a005e1dd22ddede960acb202e2e75e3ec43b9c580",
+      "snapshot": "sha256:4fd2d1aa83f9930a83e0e793a7edca5f2d70858943cd4ddcd3aa335d2636bbc3",
       "spaces": {
         "compared": 14,
         "pass": 13
@@ -534,7 +534,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S08",
-      "snapshot": "sha256:2f187fcfc1474ae9ff66d0dc111a004dc7bd71eab50ec9df9a5cfb9f0b4a6240",
+      "snapshot": "sha256:39e4d6997c599ad029ca3444aae634adc911acf07f8e4765045f37cef66bdc45",
       "spaces": {
         "compared": 14,
         "pass": 14
@@ -598,7 +598,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S09",
-      "snapshot": "sha256:39f528751f612636408c93535748158f507aee045ec0440fbacc94f66edfceb3",
+      "snapshot": "sha256:bb916f08e85cb18441e7a79b6078a01b858f97b352f22aa7bba9080a54484c0c",
       "spaces": {
         "compared": 14,
         "pass": 14
@@ -662,7 +662,7 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S10",
-      "snapshot": "sha256:6dff06a03da374b42c0100ad9b09b00d86f3bb349fcbdfe2c02d9d90d01891f4",
+      "snapshot": "sha256:7be5fb046e8a167f9389a1c1b43d6de6da747abf88952985d2783e9573136363",
       "spaces": {
         "compared": 17,
         "pass": 17
