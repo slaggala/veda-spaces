@@ -94,7 +94,11 @@ def me_payload(s: Session, ctx) -> dict:
         "must_change_password": bool(ctx.claims.get("pwd_change")),
         # MC-3: features the deployment has switched on; the workspace shows a feature only when it is on here AND
         # the user holds its permission (a permission alone never makes a switched-off feature discoverable).
-        "features": {"mtq_site": bool(settings().mtq_site_enabled)},
+        "features": {
+            "mtq_site": bool(settings().mtq_site_enabled),
+            "mtq_estimation": bool(settings().mtq_estimation_enabled),
+            "mtq_quotation": bool(settings().mtq_quotation_enabled),
+        },
         "version": user.version,
     }
 

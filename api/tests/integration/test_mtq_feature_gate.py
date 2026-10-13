@@ -44,7 +44,7 @@ def test_flag_off_every_role_sees_the_feature_off_and_every_method_is_404(api, f
     factory.login(api, user)
     me = api.get("/api/v1/auth/me")
     assert me.status == 200, me
-    assert me.data["features"] == {"mtq_site": False}
+    assert me.data["features"] == {"mtq_site": False, "mtq_estimation": False, "mtq_quotation": False}
     for path in GATED:
         for method in METHODS:
             r = api.call(method, path, {} if method in ("POST", "PUT", "PATCH") else None)
@@ -135,7 +135,11 @@ def test_flag_on_double_slash_routes_as_werkzeug_does(api, factory):
 @pytest.mark.settings(mtq_site_enabled=True)
 def test_flag_on_reports_the_feature_and_opens_the_routes(api, factory):
     factory.login(api, factory.user("SURVEYOR"))
-    assert api.get("/api/v1/auth/me").data["features"] == {"mtq_site": True}
+    assert api.get("/api/v1/auth/me").data["features"] == {
+        "mtq_site": True,
+        "mtq_estimation": False,
+        "mtq_quotation": False,
+    }
     assert api.get("/api/v1/mtq/templates").status == 200
     assert api.call("PATCH", "/api/v1/mtq/templates", {}).status == 405  # with the flag on, normal routing applies
 

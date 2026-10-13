@@ -195,6 +195,15 @@ register(
 register(
     AuditPolicy("measurement_note", FULL, parent=("measurement_set", "measurement_set_id"), pii=frozenset({"body"}))
 )
+# --- MTQ B2 (0201): requirements, scope and BOQ revisions. FULL, each linked to its aggregate parent. No personal data
+# beyond free-text notes and decision reasons (erased with the lead); the BOQ summary is recomputable from its lines.
+register(
+    AuditPolicy("requirement", FULL, parent=("property", "property_id"), pii=frozenset({"notes", "decision_reason"}))
+)
+register(AuditPolicy("scope", FULL, parent=("property", "property_id"), pii=frozenset({"notes"})))
+register(AuditPolicy("scope_item", FULL, parent=("scope", "scope_id"), pii=frozenset({"notes", "override_reason"})))
+register(AuditPolicy("boq", FULL, parent=("property", "property_id"), excluded=frozenset({"summary"})))
+register(AuditPolicy("boq_line", FULL, parent=("boq", "boq_id"), pii=frozenset({"override_reason"})))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

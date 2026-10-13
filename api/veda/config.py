@@ -205,6 +205,10 @@ class Settings:
     attachment_upload_ttl_seconds: int = 300  # lifetime of a pre-signed upload
     # B1-T12: the SHA-256 of the owner's APPROVED staging enablement record that staging-core bound the flag to.
     mtq_site_enablement_sha256: str | None = None
+    # MTQ B2-B4 (blueprint §16 flags). Off by default everywhere, refused in production, and needing B1 on: scope and
+    # BOQ (B2) and the internal estimate (B3) behind ESTIMATION; quotations (B4) behind QUOTATION, which needs both.
+    mtq_estimation_enabled: bool = False
+    mtq_quotation_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -354,6 +358,8 @@ def load_settings(**overrides) -> Settings:
         attachment_clamd_address=_str("VEDA_ATTACHMENT_CLAMD_ADDRESS", "127.0.0.1:3310"),
         attachment_upload_ttl_seconds=_intd("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS", 300),
         mtq_site_enablement_sha256=_env("VEDA_MTQ_SITE_ENABLEMENT_SHA256"),
+        mtq_estimation_enabled=_bool("VEDA_MTQ_ESTIMATION_ENABLED", False),
+        mtq_quotation_enabled=_bool("VEDA_MTQ_QUOTATION_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -398,6 +404,15 @@ def validate_environment(settings: Settings) -> list[str]:
     days = settings.anchor_retention_days
     if days is not None and not 1 <= days <= ANCHOR_RETENTION_MAX_DAYS:
         problems.append(f"VEDA_ANCHOR_RETENTION_DAYS must be between 1 and {ANCHOR_RETENTION_MAX_DAYS} (got {days})")
+    # MTQ B2-B4 flags build on each other in every environment (decision log 31).
+    if settings.mtq_estimation_enabled and not settings.mtq_site_enabled:
+        problems.append(
+            "VEDA_MTQ_ESTIMATION_ENABLED needs VEDA_MTQ_SITE_ENABLED (scope is built on verified measurements)"
+        )
+    if settings.mtq_quotation_enabled and not settings.mtq_estimation_enabled:
+        problems.append(
+            "VEDA_MTQ_QUOTATION_ENABLED needs VEDA_MTQ_ESTIMATION_ENABLED (a quotation is built on an estimate)"
+        )
     if not settings.is_deployed:
         return problems
     env = settings.env
@@ -555,6 +570,10 @@ def validate_environment(settings: Settings) -> list[str]:
         if settings.mtq_site_enabled:
             # MTQ B1 is staging-only until its own production decision (decision log 27).
             problems.append("VEDA_MTQ_SITE_ENABLED is not authorised in production (MTQ B1)")
+        for flag, on in (("VEDA_MTQ_ESTIMATION_ENABLED", settings.mtq_estimation_enabled),
+                         ("VEDA_MTQ_QUOTATION_ENABLED", settings.mtq_quotation_enabled)):  # fmt: skip
+            if on:  # MTQ B2-B4: no production decision exists (decision log 31)
+                problems.append(f"{flag} is not authorised in production (MTQ B2-B4)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

@@ -100,7 +100,7 @@ def test_upgrade_from_0200_grants_the_shell_rows(tmp_path, engine, app):
             before = _grants(conn)
         eng.dispose()
         assert not (before & SHELL)
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "0204_mtq_self_service")  # this revision only: later ones seed other roles
         eng = db.create_engine(url)
         with eng.begin() as conn:
             after = _grants(conn)

@@ -58,7 +58,7 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
 # Default role matrix (06 §6.3). "A" = ALL, "O" = OWN, "✓" = granted without scope.
 MATRIX: dict[str, dict[str, str]] = {
     "lead.create": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
-    "lead.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
+    "lead.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "SALES_MANAGER": "A"},
     "lead.update": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
     "lead.status.change": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
     "lead.reopen": {"FOUNDER": "A", "ADMIN": "A"},
