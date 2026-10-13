@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from veda.config import settings
 from veda.kernel.errors import ApiError
-from veda.kernel.http import Api, Req, no_content, offset_meta, ok, problem_response
+from veda.kernel.http import Api, Req, no_content, offset_meta, ok, problem_response, request_reaches
 from veda.kernel.ids import is_valid_id
 from veda.kernel.ratelimit import ip_key
 
@@ -47,11 +47,9 @@ GATED_PREFIXES = (
 @api.blueprint.before_app_request
 def _site_enabled():
     """MC-3: app-wide, before routing errors are raised, so every method on every gated path (including methods no
-    route accepts, which would otherwise be 405) answers 404 while VEDA_MTQ_SITE_ENABLED is off."""
-    from flask import request
-
-    path = request.path.rstrip("/")
-    if not settings().mtq_site_enabled and any(path == p or path.startswith(p + "/") for p in GATED_PREFIXES):
+    route accepts, which would otherwise be 405) answers 404 while VEDA_MTQ_SITE_ENABLED is off. B1-PE-09: also every
+    spelling Werkzeug would route here (``//``, encoded slashes, dot segments: 308 or 405 otherwise)."""
+    if not settings().mtq_site_enabled and request_reaches(("mtq",), GATED_PREFIXES):
         return problem_response(ApiError(404, "NOT_FOUND", "Not found."))
     return None
 
