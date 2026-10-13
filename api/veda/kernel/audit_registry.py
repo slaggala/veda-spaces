@@ -155,6 +155,46 @@ register(
         pii=frozenset({"original_filename", "caption"}),
     )
 )
+
+# --- MTQ B1 (0200): every site table is FULL (row history), each linked to its aggregate parent. B1-SCOPE §2.1 proposed
+# EVENT_ONLY for the measurement detail rows; FULL is stricter and needs no contract exception (rule 9). Personal data:
+# the site address and coordinates, the visit's customer contact and free-text notes; all erased with the lead.
+register(
+    AuditPolicy(
+        "property",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"address_line_1", "address_line_2", "locality", "pincode", "geo_lat_e6", "geo_lng_e6", "notes"}),
+    )
+)
+register(AuditPolicy("property_space", FULL, parent=("property", "property_id")))
+register(
+    AuditPolicy(
+        "measurement_visit",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"customer_contact_name", "customer_contact_phone", "access_notes", "cancel_reason"}),
+    )
+)
+register(
+    AuditPolicy(
+        "measurement_set",
+        FULL,
+        parent=("property", "property_id"),
+        pii=frozenset({"rejection_reason", "property_capture"}),
+    )
+)
+register(AuditPolicy("space_measurement", FULL, parent=("measurement_set", "measurement_set_id")))
+register(AuditPolicy("space_wall", FULL, parent=("space_measurement", "space_measurement_id")))
+register(AuditPolicy("space_opening", FULL, parent=("space_wall", "space_wall_id")))
+register(
+    AuditPolicy(
+        "space_electrical_point", FULL, parent=("space_measurement", "space_measurement_id"), pii=frozenset({"notes"})
+    )
+)
+register(
+    AuditPolicy("measurement_note", FULL, parent=("measurement_set", "measurement_set_id"), pii=frozenset({"body"}))
+)
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

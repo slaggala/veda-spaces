@@ -540,6 +540,15 @@ def erase_for_lead(s: Session, lead: Lead) -> int:
     return len(rows)
 
 
+def audit_ids_for_lead(s: Session, lead_id: str) -> list[str]:
+    """Attachment ids of a lead, for the erasure-audit rewrite (their audit parent is the lead already)."""
+    return list(
+        s.execute(
+            sa.select(Attachment.id).where(Attachment.lead_id == lead_id).execution_options(include_deleted=True)
+        ).scalars()
+    )
+
+
 def purge(s: Session) -> dict[str, int]:
     """Scheduler: quarantined (INFECTED) uploads after 30 days, abandoned uploads after 24 hours."""
     now = db.tx_time(s)

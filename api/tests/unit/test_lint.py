@@ -15,6 +15,7 @@ SEED_FILES = {
     "veda/modules/estimator/permissions.py",
     "veda/modules/catalog/permissions.py",
     "veda/modules/attachments/permissions.py",
+    "veda/modules/mtq/permissions.py",
     "veda/kernel/migration_support.py",
 }
 DATA_ATTRIBUTE_CONTEXT = ("protection_level", "PROTECTION_LEVELS", "action_class", "APPROVAL_CLASSES")
@@ -210,6 +211,7 @@ def test_PLAT_011_module_boundaries():
                             "veda.modules.estimator",
                             "veda.modules.catalog",
                             "veda.modules.attachments",
+                            "veda.modules.mtq",
                         ), "only the modules' permission registries"
 
 

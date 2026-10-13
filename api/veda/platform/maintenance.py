@@ -236,7 +236,10 @@ def run_erasure_audit() -> int:
                     .execution_options(include_deleted=True)
                 )
             ]
-            ids = [lead_id, *child_ids]
+            from veda.modules.crm.leads import erasure as lead_erasure
+
+            # Rows in other modules (attachments, MTQ site records) whose audit parent is not the lead (07 §8.2).
+            ids = [lead_id, *child_ids, *lead_erasure.descendant_ids(s, lead_id)]
             conn = s.connection()
             migration_support.drop_immutability_guards(conn, "audit_log")
             rows = s.execute(

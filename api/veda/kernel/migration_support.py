@@ -433,6 +433,40 @@ def seed_roles_and_matrix(conn, *, audit: bool) -> None:
             )
 
 
+def seed_missing_roles(conn, codes: tuple[str, ...], *, audit: bool) -> list[str]:
+    """A later module migration: insert the registry roles in ``codes`` that the database does not have yet (fresh
+    databases already have them from 0003, which reads the live registry). Grants follow with grant_new_codes."""
+    from veda.platform.rbac.registry import ROLES
+
+    now = clock.now()
+    tx = new_id()
+    present = {r.code for r in conn.execute(sa.select(ROLE.c.code).where(ROLE.c.is_deleted == sa.false()))}
+    added = []
+    for role in ROLES:
+        if role.code not in codes or role.code in present:
+            continue
+        insert_audited(
+            conn,
+            ROLE,
+            {
+                "code": role.code,
+                "name": role.name,
+                "name_normalized": role.name.strip().lower(),
+                "description": role.description,
+                "is_system": True,
+                "is_assignable": role.is_assignable,
+                "grant_path": role.grant_path,
+                "mfa_required": role.mfa_required,
+                "sort_order": role.sort_order,
+            },
+            transaction_id=tx,
+            now=now,
+            audit=audit,
+        )
+        added.append(role.code)
+    return added
+
+
 def grant_new_codes(conn, codes: tuple[str, ...], *, audit: bool) -> int:
     """A later module migration: grant the matrix rows of `codes` that are missing (fresh databases already have them
     from 0003, which reads the live registry), then bump every human's authz_version so sessions pick them up."""

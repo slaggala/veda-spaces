@@ -33,10 +33,10 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     ),
 )
 
-# Blueprint §15.2 pattern: FOUNDER/ADMIN ALL, SALES OWN. The SURVEYOR and DESIGNER roles and their grants arrive with
-# 0200_mtq_site (B1-T03); the fresh-database seed (0003) reads this live matrix, so a role must exist before it is named.
+# Blueprint §15.2 pattern: FOUNDER/ADMIN ALL, the working roles OWN. The SURVEYOR and DESIGNER roles exist from
+# 0200_mtq_site (B1-T03), which also grants their rows on databases migrated before it.
 MATRIX: dict[str, dict[str, str]] = {
-    "attachment.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
-    "attachment.create": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
-    "attachment.delete": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O"},
+    "attachment.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "attachment.create": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "attachment.delete": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
 }

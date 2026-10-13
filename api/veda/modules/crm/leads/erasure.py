@@ -13,7 +13,18 @@ from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 
-CASCADES: tuple[str, ...] = ("veda.modules.attachments.service:erase_for_lead",)
+CASCADES: tuple[str, ...] = (
+    "veda.modules.attachments.service:erase_for_lead",
+    "veda.modules.mtq.erasure:erase_for_lead",
+)
+
+
+# Ids of every row, in another module, whose audit payloads may hold the lead's personal data and whose audit parent is
+# not the lead itself; the erasure-audit job rewrites those payloads too (07 §8.2 step 6).
+DESCENDANTS: tuple[str, ...] = (
+    "veda.modules.attachments.service:audit_ids_for_lead",
+    "veda.modules.mtq.erasure:audit_ids_for_lead",
+)
 
 
 def _load(path: str) -> Callable:
@@ -24,3 +35,10 @@ def _load(path: str) -> Callable:
 def run(s: Session, lead) -> dict[str, int]:
     """Run every cascade for one lead inside the caller's transaction; returns rows touched per cascade."""
     return {path: int(_load(path)(s, lead) or 0) for path in CASCADES}
+
+
+def descendant_ids(s: Session, lead_id: str) -> list[str]:
+    ids: list[str] = []
+    for path in DESCENDANTS:
+        ids.extend(_load(path)(s, lead_id))
+    return ids

@@ -29,6 +29,17 @@ from veda.modules.estimator.models import (
     EstimatorRateItem,
     EstimatorSpecEvent,
 )
+from veda.modules.mtq.models import (
+    MeasurementNote,
+    MeasurementSet,
+    MeasurementVisit,
+    Property,
+    PropertySpace,
+    SpaceElectricalPoint,
+    SpaceMeasurement,
+    SpaceOpening,
+    SpaceWall,
+)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
     MfaChallenge,
@@ -91,5 +102,14 @@ __all__ = [
     "UserPermission",
     "UserRole",
     "UserSession",
+    "MeasurementNote",
+    "MeasurementSet",
+    "MeasurementVisit",
+    "Property",
+    "PropertySpace",
+    "SpaceElectricalPoint",
+    "SpaceMeasurement",
+    "SpaceOpening",
+    "SpaceWall",
     "metadata",
 ]

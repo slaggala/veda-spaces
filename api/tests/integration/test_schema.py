@@ -11,7 +11,7 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
-HEAD = "0106_attachment"
+HEAD = "0200_mtq_site"
 
 
 def _connect():
@@ -224,6 +224,7 @@ def test_RBAC_001_migration_order():
         "0103_catalog",
         "0104_catalog_idempotency",
         "0105_catalog_claim_control",
+        "0106_attachment",
         HEAD,
     ]
 
