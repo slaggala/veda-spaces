@@ -26,7 +26,7 @@ def test_estimation_off_every_path_and_method_is_404(api, factory, method):
     for path in PATHS:
         r = api.call(method, path, json={} if method != "GET" else None)
         assert r.status == 404, (method, path, r)
-    me = api.get(f"/api/v1/auth/me").data
+    me = api.get("/api/v1/auth/me").data
     assert me["features"]["mtq_estimation"] is False and me["features"]["mtq_quotation"] is False
 
 

@@ -244,7 +244,10 @@ def test_a_second_verified_revision_supersedes_the_first(site):
 
 
 def test_b1_creates_no_boq_pricing_or_quotation_tables(app):
-    with db.engine().connect() as conn:
-        names = set(sa.inspect(conn).get_table_names())
+    """B1's own migration creates none of the deferred tables; they arrive with their blocks (0201 B2/B3, 0202 B4)."""
+    from tests.conftest import ROOT
+
+    b1 = (ROOT / "migrations/versions/0200_mtq_site.py").read_text()
+    assert 'op.create_table(\n        "property",' in b1  # the pattern matches how tables are created
     for deferred in ("scope", "scope_item", "boq", "boq_line", "cost_estimate", "quotation", "requirement"):
-        assert deferred not in names
+        assert f'op.create_table(\n        "{deferred}",' not in b1, deferred

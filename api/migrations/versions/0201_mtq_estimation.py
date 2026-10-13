@@ -1,7 +1,10 @@
-"""0201_mtq_estimation: MTQ B2 scope and BOQ, and the commercial roles (blueprint §4.2, §16 B2; decision log 31).
+"""0201_mtq_estimation: MTQ B2 scope and BOQ, B3 estimates, and the commercial roles (blueprint §4.2, §16 B2-B3;
+decision log 31).
 
-Tables: ``requirement``, ``scope``, ``scope_item``, ``boq``, ``boq_line``. Roles ``ESTIMATOR`` and ``SALES_MANAGER``
-with the B2 permission codes, plus the read grants they need on the B1 site records and the workspace self-service
+Tables: ``requirement``, ``scope``, ``scope_item``, ``boq``, ``boq_line`` (B2); ``cost_estimate``,
+``cost_estimate_line``, ``cost_estimate_adjustment`` (B3). No rate table is added: estimates price with the
+estimator's existing versioned rate card and pin it. Roles ``ESTIMATOR`` and ``SALES_MANAGER``
+with the B2/B3 permission codes, plus the read grants they need on the B1 site records and the workspace self-service
 rows. Expand-only (02 §12.4): new tables and rows only; no existing table is altered. The tables are inert while
 VEDA_MTQ_ESTIMATION_ENABLED is off (the default everywhere; production refuses it).
 
@@ -32,6 +35,12 @@ CODES = (
     "boq.generate",
     "boq.override",
     "boq.review",
+    "cost_estimate.read",
+    "cost_estimate.rate.view",
+    "cost_estimate.create",
+    "cost_estimate.approve",
+    "cost_estimate.discount.apply",
+    "cost_estimate.discount.approve",
     # existing codes the new roles need: the B1 site records, the lead (sales manager) and the workspace shell
     "property.read",
     "measurement.visit.read",
@@ -582,7 +591,7 @@ def upgrade() -> None:
             name="ck_boq__reviewed_by_format",
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
-            "status = 'GENERATED' OR (reviewed_on IS NOT NULL AND reviewed_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
+            "status <> 'REVIEWED' OR (reviewed_on IS NOT NULL AND reviewed_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
             name="ck_boq__reviewed_sealed",
         ),
         sa.CheckConstraint("revision_no >= 1", name="ck_boq__revision_no"),
@@ -803,6 +812,561 @@ def upgrade() -> None:
         sqlite_where=sa.text("is_deleted = 0"),
         postgresql_where=sa.text("is_deleted = false"),
     )
+
+    op.create_table(
+        "cost_estimate",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("lead_id", GUID(), nullable=False),
+        sa.Column("property_id", GUID(), nullable=False),
+        sa.Column("boq_id", GUID(), nullable=False),
+        sa.Column("boq_revision_no", sa.Integer(), nullable=False),
+        sa.Column("boq_snapshot_sha256", sa.String(64), nullable=False),
+        sa.Column("scope_id", GUID(), nullable=False),
+        sa.Column("scope_revision_no", sa.Integer(), nullable=False),
+        sa.Column("measurement_set_id", GUID(), nullable=False),
+        sa.Column("measurement_revision_no", sa.Integer(), nullable=False),
+        sa.Column("revision_no", sa.Integer(), nullable=False),
+        sa.Column("supersedes_estimate_id", GUID(), nullable=True),
+        sa.Column("status", sa.String(12), nullable=False),
+        sa.Column("tier_code", sa.String(10), nullable=False),
+        sa.Column("rate_card_id", GUID(), nullable=False),
+        sa.Column("rate_card_version", sa.String(40), nullable=False),
+        sa.Column("rate_card_sha256", sa.String(64), nullable=False),
+        sa.Column("calculation_version", sa.String(20), nullable=False),
+        sa.Column("policy_version", sa.String(40), nullable=False),
+        sa.Column("policy_sha256", sa.String(64), nullable=False),
+        sa.Column("pricing_basis_code", sa.String(10), nullable=False),
+        sa.Column("currency", sa.String(3), nullable=False, server_default="INR"),
+        sa.Column("subtotal_minor", sa.BigInteger(), nullable=False),
+        sa.Column("optional_minor", sa.BigInteger(), nullable=False),
+        sa.Column("discount_minor", sa.BigInteger(), nullable=False),
+        sa.Column("taxable_minor", sa.BigInteger(), nullable=False),
+        sa.Column("tax_status", sa.String(20), nullable=False),
+        sa.Column("tax_minor", sa.BigInteger(), nullable=True),
+        sa.Column("total_minor", sa.BigInteger(), nullable=True),
+        sa.Column("unpriced_lines", sa.Integer(), nullable=False),
+        sa.Column("blockers", JSONType(), nullable=False),
+        sa.Column("approved_on", UTCDateTime(), nullable=True),
+        sa.Column("approved_by", GUID(), nullable=True),
+        sa.Column("snapshot_sha256", sa.String(64), nullable=True),
+        sa.Column("notes", sa.Text(), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_cost_estimate"),
+        sa.ForeignKeyConstraint(
+            ["approved_by"], ["app_user.id"], name="fk_cost_estimate__approved_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["boq_id"], ["boq.id"], name="fk_cost_estimate__boq_id", ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_cost_estimate__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_cost_estimate__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["lead_id"], ["lead.id"], name="fk_cost_estimate__lead_id", ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["measurement_set_id"],
+            ["measurement_set.id"],
+            name="fk_cost_estimate__measurement_set_id",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["property_id"], ["property.id"], name="fk_cost_estimate__property_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["rate_card_id"], ["estimator_rate_card.id"], name="fk_cost_estimate__rate_card_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["scope_id"], ["scope.id"], name="fk_cost_estimate__scope_id", ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["supersedes_estimate_id"],
+            ["cost_estimate.id"],
+            name="fk_cost_estimate__supersedes_estimate_id",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_cost_estimate__updated_by", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "subtotal_minor >= 0 AND optional_minor >= 0 AND discount_minor >= 0 AND discount_minor <= subtotal_minor AND taxable_minor = subtotal_minor - discount_minor",
+            name="ck_cost_estimate__amounts",
+        ),
+        sa.CheckConstraint(
+            "approved_by IS NULL OR (length(approved_by) = 32 AND approved_by NOT GLOB '*[^0-9a-f]*' AND substr(approved_by, 13, 1) = '7' AND substr(approved_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate__approved_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "status <> 'APPROVED' OR (approved_on IS NOT NULL AND approved_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
+            name="ck_cost_estimate__approved_sealed",
+        ),
+        sa.CheckConstraint("blockers IS NULL OR json_valid(blockers)", name="ck_cost_estimate__blockers_json").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(boq_id) = 32 AND boq_id NOT GLOB '*[^0-9a-f]*' AND substr(boq_id, 13, 1) = '7' AND substr(boq_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__boq_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(boq_snapshot_sha256) <= 64", name="ck_cost_estimate__boq_snapshot_sha256_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(calculation_version) <= 20", name="ck_cost_estimate__calculation_version_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(currency) <= 3", name="ck_cost_estimate__currency_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_cost_estimate__is_deleted_bool").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(lead_id) = 32 AND lead_id NOT GLOB '*[^0-9a-f]*' AND substr(lead_id, 13, 1) = '7' AND substr(lead_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__lead_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(measurement_set_id) = 32 AND measurement_set_id NOT GLOB '*[^0-9a-f]*' AND substr(measurement_set_id, 13, 1) = '7' AND substr(measurement_set_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__measurement_set_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "supersedes_estimate_id IS NULL OR supersedes_estimate_id <> id", name="ck_cost_estimate__not_self"
+        ),
+        sa.CheckConstraint("length(policy_sha256) <= 64", name="ck_cost_estimate__policy_sha256_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(policy_version) <= 40", name="ck_cost_estimate__policy_version_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("pricing_basis_code IN ('MEASURED', 'MIXED')", name="ck_cost_estimate__pricing_basis_code"),
+        sa.CheckConstraint("length(pricing_basis_code) <= 10", name="ck_cost_estimate__pricing_basis_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(property_id) = 32 AND property_id NOT GLOB '*[^0-9a-f]*' AND substr(property_id, 13, 1) = '7' AND substr(property_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__property_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(rate_card_id) = 32 AND rate_card_id NOT GLOB '*[^0-9a-f]*' AND substr(rate_card_id, 13, 1) = '7' AND substr(rate_card_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__rate_card_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(rate_card_sha256) <= 64", name="ck_cost_estimate__rate_card_sha256_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(rate_card_version) <= 40", name="ck_cost_estimate__rate_card_version_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("revision_no >= 1", name="ck_cost_estimate__revision_no"),
+        sa.CheckConstraint(
+            "length(scope_id) = 32 AND scope_id NOT GLOB '*[^0-9a-f]*' AND substr(scope_id, 13, 1) = '7' AND substr(scope_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__scope_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "snapshot_sha256 IS NULL OR length(snapshot_sha256) = 64", name="ck_cost_estimate__snapshot_sha256_len"
+        ),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_cost_estimate__soft_delete_consistent",
+        ),
+        sa.CheckConstraint("status IN ('DRAFT', 'APPROVED', 'SUPERSEDED')", name="ck_cost_estimate__status"),
+        sa.CheckConstraint("length(status) <= 12", name="ck_cost_estimate__status_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "supersedes_estimate_id IS NULL OR (length(supersedes_estimate_id) = 32 AND supersedes_estimate_id NOT GLOB '*[^0-9a-f]*' AND substr(supersedes_estimate_id, 13, 1) = '7' AND substr(supersedes_estimate_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate__supersedes_estimate_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(tax_status = 'APPLIED' AND tax_minor IS NOT NULL AND total_minor = taxable_minor + tax_minor) OR (tax_status = 'GST_POLICY_REQUIRED' AND tax_minor IS NULL AND total_minor IS NULL)",
+            name="ck_cost_estimate__tax",
+        ),
+        sa.CheckConstraint("tax_status IN ('GST_POLICY_REQUIRED', 'APPLIED')", name="ck_cost_estimate__tax_status"),
+        sa.CheckConstraint("length(tax_status) <= 20", name="ck_cost_estimate__tax_status_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("tier_code IN ('ESSENTIAL', 'PREMIUM', 'LUXURY')", name="ck_cost_estimate__tier_code"),
+        sa.CheckConstraint("length(tier_code) <= 10", name="ck_cost_estimate__tier_code_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_cost_estimate__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_cost_estimate__version_positive"),
+    )
+    op.create_index("ix_cost_estimate__boq_id", "cost_estimate", ["boq_id"])
+    op.create_index("ix_cost_estimate__lead_id", "cost_estimate", ["lead_id"])
+    op.create_index("ix_cost_estimate__measurement_set_id", "cost_estimate", ["measurement_set_id"])
+    op.create_index("ix_cost_estimate__rate_card_id", "cost_estimate", ["rate_card_id"])
+    op.create_index("ix_cost_estimate__scope_id", "cost_estimate", ["scope_id"])
+    op.create_index("ix_cost_estimate__supersedes_estimate_id", "cost_estimate", ["supersedes_estimate_id"])
+    op.create_index(
+        "ux_cost_estimate__one_approved",
+        "cost_estimate",
+        ["property_id"],
+        unique=True,
+        sqlite_where=sa.text("status = 'APPROVED' AND is_deleted = 0"),
+        postgresql_where=sa.text("status = 'APPROVED' AND is_deleted = false"),
+    )
+    op.create_index(
+        "ux_cost_estimate__one_draft",
+        "cost_estimate",
+        ["property_id"],
+        unique=True,
+        sqlite_where=sa.text("status = 'DRAFT' AND is_deleted = 0"),
+        postgresql_where=sa.text("status = 'DRAFT' AND is_deleted = false"),
+    )
+    op.create_index(
+        "ux_cost_estimate__property_revision",
+        "cost_estimate",
+        ["property_id", "revision_no"],
+        unique=True,
+        sqlite_where=sa.text("is_deleted = 0"),
+        postgresql_where=sa.text("is_deleted = false"),
+    )
+
+    op.create_table(
+        "cost_estimate_line",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("estimate_id", GUID(), nullable=False),
+        sa.Column("boq_line_id", GUID(), nullable=True),
+        sa.Column("scope_item_id", GUID(), nullable=True),
+        sa.Column("requirement_id", GUID(), nullable=True),
+        sa.Column("space_id", GUID(), nullable=True),
+        sa.Column("position", sa.Integer(), nullable=False),
+        sa.Column("component_code", sa.String(20), nullable=False),
+        sa.Column("category_code", sa.String(20), nullable=False),
+        sa.Column("card_product_code", sa.String(40), nullable=True),
+        sa.Column("card_line_code", sa.String(40), nullable=True),
+        sa.Column("prep_component_code", sa.String(40), nullable=True),
+        sa.Column("item_type_code", sa.String(40), nullable=True),
+        sa.Column("label", sa.String(300), nullable=False),
+        sa.Column("uom_code", sa.String(4), nullable=True),
+        sa.Column("quantity_centi", sa.BigInteger(), nullable=True),
+        sa.Column("tier_code", sa.String(10), nullable=False),
+        sa.Column("finish_code", sa.String(20), nullable=True),
+        sa.Column("rate_minor", sa.BigInteger(), nullable=True),
+        sa.Column("rate_status", sa.String(30), nullable=False),
+        sa.Column("rate_note", sa.String(500), nullable=True),
+        sa.Column("amount_minor", sa.BigInteger(), nullable=True),
+        sa.Column("discount_minor", sa.BigInteger(), nullable=False),
+        sa.Column("taxable_minor", sa.BigInteger(), nullable=True),
+        sa.Column("tax_rate_bp", sa.Integer(), nullable=True),
+        sa.Column("tax_minor", sa.BigInteger(), nullable=True),
+        sa.Column("is_optional", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("dimension_source_code", sa.String(10), nullable=False),
+        sa.Column("provenance", JSONType(), nullable=False),
+        sa.PrimaryKeyConstraint("id", name="pk_cost_estimate_line"),
+        sa.ForeignKeyConstraint(
+            ["boq_line_id"], ["boq_line.id"], name="fk_cost_estimate_line__boq_line_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_cost_estimate_line__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_cost_estimate_line__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["estimate_id"], ["cost_estimate.id"], name="fk_cost_estimate_line__estimate_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["requirement_id"], ["requirement.id"], name="fk_cost_estimate_line__requirement_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["scope_item_id"], ["scope_item.id"], name="fk_cost_estimate_line__scope_item_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["space_id"], ["property_space.id"], name="fk_cost_estimate_line__space_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_cost_estimate_line__updated_by", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "coalesce(rate_minor, 0) >= 0 AND coalesce(amount_minor, 0) >= 0 AND discount_minor >= 0 AND discount_minor <= coalesce(amount_minor, 0)",
+            name="ck_cost_estimate_line__amounts",
+        ),
+        sa.CheckConstraint(
+            "boq_line_id IS NULL OR (length(boq_line_id) = 32 AND boq_line_id NOT GLOB '*[^0-9a-f]*' AND substr(boq_line_id, 13, 1) = '7' AND substr(boq_line_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_line__boq_line_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(card_line_code) <= 40", name="ck_cost_estimate_line__card_line_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(card_product_code) <= 40", name="ck_cost_estimate_line__card_product_code_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(category_code) <= 20", name="ck_cost_estimate_line__category_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "component_code IN ('PRODUCT', 'LABOUR', 'INSTALLATION', 'TRANSPORT', 'SITE_PROTECTION', 'ELECTRICAL_SHIFTING', 'OTHER_SERVICE')",
+            name="ck_cost_estimate_line__component_code",
+        ),
+        sa.CheckConstraint("length(component_code) <= 20", name="ck_cost_estimate_line__component_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_line__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_line__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "dimension_source_code IN ('MEASURED', 'DERIVED', 'ASSUMED', 'STAFF')",
+            name="ck_cost_estimate_line__dimension_source_code",
+        ),
+        sa.CheckConstraint(
+            "length(dimension_source_code) <= 10", name="ck_cost_estimate_line__dimension_source_code_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(estimate_id) = 32 AND estimate_id NOT GLOB '*[^0-9a-f]*' AND substr(estimate_id, 13, 1) = '7' AND substr(estimate_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_line__estimate_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "finish_code IS NULL OR finish_code IN ('LAMINATE', 'ACRYLIC', 'VENEER', 'PU', 'GLASS', 'MEMBRANE', 'CUSTOM')",
+            name="ck_cost_estimate_line__finish_code",
+        ),
+        sa.CheckConstraint("length(finish_code) <= 20", name="ck_cost_estimate_line__finish_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_line__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_cost_estimate_line__is_deleted_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("is_optional IN (0, 1)", name="ck_cost_estimate_line__is_optional_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(item_type_code) <= 40", name="ck_cost_estimate_line__item_type_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("length(label) <= 300", name="ck_cost_estimate_line__label_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(prep_component_code) <= 40", name="ck_cost_estimate_line__prep_component_code_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(rate_status = 'PRICED' AND rate_minor IS NOT NULL AND amount_minor IS NOT NULL) OR (rate_status <> 'PRICED' AND amount_minor IS NULL)",
+            name="ck_cost_estimate_line__priced",
+        ),
+        sa.CheckConstraint(
+            "provenance IS NULL OR json_valid(provenance)", name="ck_cost_estimate_line__provenance_json"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(rate_note) <= 500", name="ck_cost_estimate_line__rate_note_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "rate_status IN ('PRICED', 'RATE_CARD_NOT_APPROVED', 'FINISH_RATE_NOT_APPROVED', 'CATALOGUE_MAPPING_MISSING', 'OWNER_DECISION_REQUIRED', 'RATE_MISSING', 'QUANTITY_MISSING', 'QUANTITY_BASIS_CHANGED')",
+            name="ck_cost_estimate_line__rate_status",
+        ),
+        sa.CheckConstraint("length(rate_status) <= 30", name="ck_cost_estimate_line__rate_status_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "requirement_id IS NULL OR (length(requirement_id) = 32 AND requirement_id NOT GLOB '*[^0-9a-f]*' AND substr(requirement_id, 13, 1) = '7' AND substr(requirement_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_line__requirement_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "scope_item_id IS NULL OR (length(scope_item_id) = 32 AND scope_item_id NOT GLOB '*[^0-9a-f]*' AND substr(scope_item_id, 13, 1) = '7' AND substr(scope_item_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_line__scope_item_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_cost_estimate_line__soft_delete_consistent",
+        ),
+        sa.CheckConstraint(
+            "space_id IS NULL OR (length(space_id) = 32 AND space_id NOT GLOB '*[^0-9a-f]*' AND substr(space_id, 13, 1) = '7' AND substr(space_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_line__space_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("tier_code IN ('ESSENTIAL', 'PREMIUM', 'LUXURY')", name="ck_cost_estimate_line__tier_code"),
+        sa.CheckConstraint("length(tier_code) <= 10", name="ck_cost_estimate_line__tier_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "uom_code IS NULL OR uom_code IN ('SFT', 'RFT', 'NOS', 'LUMP')", name="ck_cost_estimate_line__uom_code"
+        ),
+        sa.CheckConstraint("length(uom_code) <= 4", name="ck_cost_estimate_line__uom_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_cost_estimate_line__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_line__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("version >= 1", name="ck_cost_estimate_line__version_positive"),
+    )
+    op.create_index("ix_cost_estimate_line__boq_line_id", "cost_estimate_line", ["boq_line_id"])
+    op.create_index("ix_cost_estimate_line__requirement_id", "cost_estimate_line", ["requirement_id"])
+    op.create_index("ix_cost_estimate_line__scope_item_id", "cost_estimate_line", ["scope_item_id"])
+    op.create_index("ix_cost_estimate_line__space_id", "cost_estimate_line", ["space_id"])
+    op.create_index(
+        "ux_cost_estimate_line__position",
+        "cost_estimate_line",
+        ["estimate_id", "position"],
+        unique=True,
+        sqlite_where=sa.text("is_deleted = 0"),
+        postgresql_where=sa.text("is_deleted = false"),
+    )
+
+    op.create_table(
+        "cost_estimate_adjustment",
+        sa.Column("id", GUID(), nullable=False),
+        sa.Column("created_on", UTCDateTime(), nullable=False),
+        sa.Column("updated_on", UTCDateTime(), nullable=False),
+        sa.Column("created_by", GUID(), nullable=False),
+        sa.Column("updated_by", GUID(), nullable=False),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_on", UTCDateTime(), nullable=True),
+        sa.Column("deleted_by", GUID(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column("estimate_id", GUID(), nullable=False),
+        sa.Column("scope_code", sa.String(10), nullable=False),
+        sa.Column("target_line_id", GUID(), nullable=True),
+        sa.Column("target_category", sa.String(20), nullable=True),
+        sa.Column("kind_code", sa.String(10), nullable=False),
+        sa.Column("value_bp", sa.Integer(), nullable=True),
+        sa.Column("amount_minor", sa.BigInteger(), nullable=True),
+        sa.Column("base_minor", sa.BigInteger(), nullable=False),
+        sa.Column("discount_minor", sa.BigInteger(), nullable=False),
+        sa.Column("post_minor", sa.BigInteger(), nullable=False),
+        sa.Column("reason", sa.String(500), nullable=False),
+        sa.Column("status", sa.String(10), nullable=False),
+        sa.Column("authority_code", sa.String(15), nullable=True),
+        sa.Column("policy_version", sa.String(40), nullable=False),
+        sa.Column("decided_by", GUID(), nullable=True),
+        sa.Column("decided_on", UTCDateTime(), nullable=True),
+        sa.Column("decision_note", sa.String(500), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_cost_estimate_adjustment"),
+        sa.ForeignKeyConstraint(
+            ["created_by"], ["app_user.id"], name="fk_cost_estimate_adjustment__created_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["decided_by"], ["app_user.id"], name="fk_cost_estimate_adjustment__decided_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["deleted_by"], ["app_user.id"], name="fk_cost_estimate_adjustment__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["estimate_id"], ["cost_estimate.id"], name="fk_cost_estimate_adjustment__estimate_id", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["target_line_id"],
+            ["cost_estimate_line.id"],
+            name="fk_cost_estimate_adjustment__target_line_id",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["updated_by"], ["app_user.id"], name="fk_cost_estimate_adjustment__updated_by", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint(
+            "discount_minor >= 0 AND discount_minor <= base_minor AND post_minor = base_minor - discount_minor",
+            name="ck_cost_estimate_adjustment__amounts",
+        ),
+        sa.CheckConstraint(
+            "authority_code IS NULL OR authority_code IN ('WITHIN_LIMIT', 'APPROVER')",
+            name="ck_cost_estimate_adjustment__authority_code",
+        ),
+        sa.CheckConstraint(
+            "length(authority_code) <= 15", name="ck_cost_estimate_adjustment__authority_code_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_adjustment__created_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "status = 'PROPOSED' OR (decided_by IS NOT NULL AND decided_on IS NOT NULL)",
+            name="ck_cost_estimate_adjustment__decided",
+        ),
+        sa.CheckConstraint(
+            "decided_by IS NULL OR (length(decided_by) = 32 AND decided_by NOT GLOB '*[^0-9a-f]*' AND substr(decided_by, 13, 1) = '7' AND substr(decided_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_adjustment__decided_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(decision_note) <= 500", name="ck_cost_estimate_adjustment__decision_note_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "deleted_by IS NULL OR (length(deleted_by) = 32 AND deleted_by NOT GLOB '*[^0-9a-f]*' AND substr(deleted_by, 13, 1) = '7' AND substr(deleted_by, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_adjustment__deleted_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(estimate_id) = 32 AND estimate_id NOT GLOB '*[^0-9a-f]*' AND substr(estimate_id, 13, 1) = '7' AND substr(estimate_id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_adjustment__estimate_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(id) = 32 AND id NOT GLOB '*[^0-9a-f]*' AND substr(id, 13, 1) = '7' AND substr(id, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_adjustment__id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_cost_estimate_adjustment__is_deleted_bool").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint("kind_code IN ('PERCENT', 'AMOUNT')", name="ck_cost_estimate_adjustment__kind_code"),
+        sa.CheckConstraint("length(kind_code) <= 10", name="ck_cost_estimate_adjustment__kind_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "length(policy_version) <= 40", name="ck_cost_estimate_adjustment__policy_version_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(reason) <= 500", name="ck_cost_estimate_adjustment__reason_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "scope_code IN ('LINE', 'CATEGORY', 'PROJECT')", name="ck_cost_estimate_adjustment__scope_code"
+        ),
+        sa.CheckConstraint("length(scope_code) <= 10", name="ck_cost_estimate_adjustment__scope_code_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
+            name="ck_cost_estimate_adjustment__soft_delete_consistent",
+        ),
+        sa.CheckConstraint(
+            "status IN ('PROPOSED', 'APPROVED', 'REJECTED', 'WITHDRAWN')", name="ck_cost_estimate_adjustment__status"
+        ),
+        sa.CheckConstraint("length(status) <= 10", name="ck_cost_estimate_adjustment__status_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "(scope_code = 'LINE') = (target_line_id IS NOT NULL) AND (scope_code = 'CATEGORY') = (target_category IS NOT NULL)",
+            name="ck_cost_estimate_adjustment__target",
+        ),
+        sa.CheckConstraint(
+            "length(target_category) <= 20", name="ck_cost_estimate_adjustment__target_category_len"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "target_line_id IS NULL OR (length(target_line_id) = 32 AND target_line_id NOT GLOB '*[^0-9a-f]*' AND substr(target_line_id, 13, 1) = '7' AND substr(target_line_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_cost_estimate_adjustment__target_line_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("updated_on >= created_on", name="ck_cost_estimate_adjustment__updated_after_created"),
+        sa.CheckConstraint(
+            "length(updated_by) = 32 AND updated_by NOT GLOB '*[^0-9a-f]*' AND substr(updated_by, 13, 1) = '7' AND substr(updated_by, 17, 1) IN ('8', '9', 'a', 'b')",
+            name="ck_cost_estimate_adjustment__updated_by_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "(kind_code = 'PERCENT' AND value_bp BETWEEN 1 AND 10000 AND amount_minor IS NULL) OR (kind_code = 'AMOUNT' AND amount_minor > 0 AND value_bp IS NULL)",
+            name="ck_cost_estimate_adjustment__value",
+        ),
+        sa.CheckConstraint("version >= 1", name="ck_cost_estimate_adjustment__version_positive"),
+    )
+    op.create_index("ix_cost_estimate_adjustment__estimate_id", "cost_estimate_adjustment", ["estimate_id"])
+    op.create_index("ix_cost_estimate_adjustment__target_line_id", "cost_estimate_adjustment", ["target_line_id"])
     # --- end generated DDL ---
     bind = op.get_bind()
     ms.sync_permissions(bind, audit=True)

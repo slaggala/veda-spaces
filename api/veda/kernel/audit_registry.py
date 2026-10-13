@@ -204,6 +204,17 @@ register(AuditPolicy("scope", FULL, parent=("property", "property_id"), pii=froz
 register(AuditPolicy("scope_item", FULL, parent=("scope", "scope_id"), pii=frozenset({"notes", "override_reason"})))
 register(AuditPolicy("boq", FULL, parent=("property", "property_id"), excluded=frozenset({"summary"})))
 register(AuditPolicy("boq_line", FULL, parent=("boq", "boq_id"), pii=frozenset({"override_reason"})))
+# --- MTQ B3 (0201): estimates, their priced lines and discounts (reasons and notes are free text, erased with the lead).
+register(AuditPolicy("cost_estimate", FULL, parent=("property", "property_id"), pii=frozenset({"notes"})))
+register(AuditPolicy("cost_estimate_line", FULL, parent=("cost_estimate", "estimate_id")))
+register(
+    AuditPolicy(
+        "cost_estimate_adjustment",
+        FULL,
+        parent=("cost_estimate", "estimate_id"),
+        pii=frozenset({"reason", "decision_note"}),
+    )
+)
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

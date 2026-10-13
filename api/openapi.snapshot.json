@@ -361,6 +361,122 @@
         "title": "ActivityPatch",
         "type": "object"
       },
+      "AdjustmentDecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "AdjustmentDecisionIn",
+        "type": "object"
+      },
+      "AdjustmentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "maximum": 10000000000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Minor"
+          },
+          "kind_code": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "title": "Kind Code",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope_code": {
+            "enum": [
+              "LINE",
+              "CATEGORY",
+              "PROJECT"
+            ],
+            "title": "Scope Code",
+            "type": "string"
+          },
+          "target_category": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z][A-Z0-9_]{1,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Category"
+          },
+          "target_line_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Line Id"
+          },
+          "value_bp": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Bp"
+          }
+        },
+        "required": [
+          "scope_code",
+          "kind_code",
+          "reason"
+        ],
+        "title": "AdjustmentIn",
+        "type": "object"
+      },
       "AssignIn": {
         "additionalProperties": false,
         "properties": {
@@ -1451,6 +1567,35 @@
           "reason"
         ],
         "title": "ErasureIn",
+        "type": "object"
+      },
+      "EstimateCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "tier_code": {
+            "default": "ESSENTIAL",
+            "enum": [
+              "ESSENTIAL",
+              "PREMIUM",
+              "LUXURY"
+            ],
+            "title": "Tier Code",
+            "type": "string"
+          }
+        },
+        "title": "EstimateCreateIn",
         "type": "object"
       },
       "EstimateRevisionIn": {
@@ -8547,6 +8692,58 @@
         "x-requirement": "BOQ-001"
       }
     },
+    "/api/v1/boqs/{boq_id}/cost-estimates": {
+      "post": {
+        "operationId": "mtq_estimation_create_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "boq_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Price a reviewed BOQ with the active rate card (supersedes the open draft)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-003"
+      }
+    },
     "/api/v1/boqs/{boq_id}/diff/{other_id}": {
       "get": {
         "operationId": "mtq_estimation_diff_boqs",
@@ -10258,6 +10455,353 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}": {
+      "get": {
+        "operationId": "mtq_estimation_get_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One estimate: room-wise, category-wise and project views; rates only with rate.view",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/adjustments": {
+      "post": {
+        "operationId": "mtq_estimation_propose_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Propose a line, category or project discount (refused while OI-MTQ-06 is undecided)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.apply"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-005"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/approve": {
+      "post": {
+        "operationId": "mtq_estimation_approve_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a draft estimate: lineage current, no data issue, no pending discount; seals it",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-004"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/compare/{other_id}": {
+      "get": {
+        "operationId": "mtq_estimation_compare_estimates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "other_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Differences between two estimate revisions (quantity, rate, discount)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/reproduce": {
+      "get": {
+        "operationId": "mtq_estimation_reproduce_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recompute the estimate from its pinned rate card and compare",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.rate.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-002"
+      }
+    },
+    "/api/v1/estimate-adjustments/{adjustment_id}/decision": {
+      "post": {
+        "operationId": "mtq_estimation_decide_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "adjustment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve or reject a proposed discount (never one's own)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-006"
+      }
+    },
+    "/api/v1/estimate-adjustments/{adjustment_id}/withdraw": {
+      "post": {
+        "operationId": "mtq_estimation_withdraw_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "adjustment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a live discount from a draft estimate",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.apply"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-005"
       }
     },
     "/api/v1/estimates/{estimate_id}": {
@@ -13791,6 +14335,37 @@
         "x-requirement": "MEAS-003"
       }
     },
+    "/api/v1/mtq/commercial-policy": {
+      "get": {
+        "operationId": "mtq_estimation_get_policy",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Which owner commercial decisions are recorded (OI-MTQ-03\u202615); undecided ones block or disable",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
     "/api/v1/mtq/scope-rules": {
       "get": {
         "operationId": "mtq_estimation_get_rules",
@@ -14606,6 +15181,48 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "SCOPE-001"
+      }
+    },
+    "/api/v1/properties/{property_id}/cost-estimates": {
+      "get": {
+        "operationId": "mtq_estimation_list_estimates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every estimate revision of a property, with staleness and blockers",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
       }
     },
     "/api/v1/properties/{property_id}/measurement-sets": {

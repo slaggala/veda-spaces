@@ -60,3 +60,39 @@ UOMS = ("SFT", "RFT", "NOS", "LUMP")  # the rate card's units (estimator UOMS); 
 # count when the item has no card line yet (UNMAPPED lines are kept and reported, never dropped).
 FORMULA_KINDS = ("CARD_AREA", "CARD_DIRECT", "CARD_COUNT", "CARD_LUMP", "MEASURED_COUNT", "UNMAPPED")
 LINE_STATUSES = ("OK", "ISSUE")
+
+# --- B3 estimate -------------------------------------------------------------------------------------------------------
+ESTIMATE_STATUSES = ("DRAFT", "APPROVED", "SUPERSEDED")
+PRICING_BASES = ("MEASURED", "MIXED")
+# Approved cost/charge categories (instruction B3.5). The rate card's line rates are all-inclusive supply-and-install
+# rates (ADR-012), so PRODUCT carries them; LABOUR and INSTALLATION exist for when a card prices them separately.
+COMPONENTS = (
+    "PRODUCT",
+    "LABOUR",
+    "INSTALLATION",
+    "TRANSPORT",
+    "SITE_PROTECTION",
+    "ELECTRICAL_SHIFTING",
+    "OTHER_SERVICE",
+)
+RATE_STATUSES = (
+    "PRICED",
+    "RATE_CARD_NOT_APPROVED",  # the tier has no approved staff rates (OI-MTQ-05)
+    "FINISH_RATE_NOT_APPROVED",  # a finish variant without an approved rate (OI-MTQ-05)
+    "CATALOGUE_MAPPING_MISSING",  # the item has no rate-card line (NEW LINE, OI-MTQ-05)
+    "OWNER_DECISION_REQUIRED",  # e.g. the preparation package driver for 5 BHK or an independent house (OI-MTQ-15)
+    "RATE_MISSING",  # the card in force has no such product, line or tier rate
+    "QUANTITY_MISSING",
+    "QUANTITY_BASIS_CHANGED",  # the pricing card measures this line differently from the BOQ's card
+)
+OWNER_DECISION_RATE_STATUSES = (
+    "RATE_CARD_NOT_APPROVED",
+    "FINISH_RATE_NOT_APPROVED",
+    "CATALOGUE_MAPPING_MISSING",
+    "OWNER_DECISION_REQUIRED",
+)
+TAX_STATUSES = ("GST_POLICY_REQUIRED", "APPLIED")
+ADJUSTMENT_SCOPES = ("LINE", "CATEGORY", "PROJECT")
+ADJUSTMENT_KINDS = ("PERCENT", "AMOUNT")
+ADJUSTMENT_STATUSES = ("PROPOSED", "APPROVED", "REJECTED", "WITHDRAWN")
+AUTHORITIES = ("WITHIN_LIMIT", "APPROVER")

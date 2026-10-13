@@ -197,7 +197,7 @@ class Boq(AuditedBase):
         CheckConstraint("revision_no >= 1", name="ck_boq__revision_no"),
         _sha("boq"),
         CheckConstraint(
-            "status = 'GENERATED' OR (reviewed_on IS NOT NULL AND reviewed_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
+            "status <> 'REVIEWED' OR (reviewed_on IS NOT NULL AND reviewed_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
             name="ck_boq__reviewed_sealed",
         ),
         CheckConstraint("supersedes_boq_id IS NULL OR supersedes_boq_id <> id", name="ck_boq__not_self"),
@@ -269,3 +269,194 @@ class BoqLine(AuditedBase):
 
 
 B2_TABLES = ("requirement", "scope", "scope_item", "boq", "boq_line")
+
+
+# --- B3: internal estimate ---------------------------------------------------------------------------------------------
+class CostEstimate(AuditedBase):
+    """One estimate revision: a reviewed BOQ priced with the rate card in force, every rate pinned (reproducible)."""
+
+    __tablename__ = "cost_estimate"
+
+    lead_id: Mapped[str] = mapped_column(GUID(), _fk("lead.id"), nullable=False)
+    property_id: Mapped[str] = mapped_column(GUID(), _fk("property.id"), nullable=False)
+    boq_id: Mapped[str] = mapped_column(GUID(), _fk("boq.id"), nullable=False)
+    boq_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    boq_snapshot_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    scope_id: Mapped[str] = mapped_column(GUID(), _fk("scope.id"), nullable=False)
+    scope_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    measurement_set_id: Mapped[str] = mapped_column(GUID(), _fk("measurement_set.id"), nullable=False)
+    measurement_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    supersedes_estimate_id: Mapped[str | None] = mapped_column(GUID(), _fk("cost_estimate.id"))
+    status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="DRAFT")
+    tier_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    # Pricing provenance: the rate card row, its version and document digest, and the engine rules version.
+    rate_card_id: Mapped[str] = mapped_column(GUID(), _fk("estimator_rate_card.id"), nullable=False)
+    rate_card_version: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    rate_card_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    calculation_version: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    policy_version: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    policy_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    pricing_basis_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    currency: Mapped[str] = mapped_column(sa.String(3), nullable=False, default="INR", server_default="INR")
+    subtotal_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)  # priced included lines
+    optional_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    discount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    taxable_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    tax_status: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    unpriced_lines: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    blockers: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)
+    approved_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    approved_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    snapshot_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    notes: Mapped[str | None] = mapped_column(sa.Text)
+
+    __table_args__ = (
+        in_check("cost_estimate", "status", V.ESTIMATE_STATUSES),
+        in_check("cost_estimate", "tier_code", V.TIERS),
+        in_check("cost_estimate", "pricing_basis_code", V.PRICING_BASES),
+        in_check("cost_estimate", "tax_status", V.TAX_STATUSES),
+        CheckConstraint("revision_no >= 1", name="ck_cost_estimate__revision_no"),
+        _sha("cost_estimate"),
+        CheckConstraint(
+            "subtotal_minor >= 0 AND optional_minor >= 0 AND discount_minor >= 0 AND discount_minor <= subtotal_minor "
+            "AND taxable_minor = subtotal_minor - discount_minor",
+            name="ck_cost_estimate__amounts",
+        ),
+        CheckConstraint(
+            "(tax_status = 'APPLIED' AND tax_minor IS NOT NULL AND total_minor = taxable_minor + tax_minor) "
+            "OR (tax_status = 'GST_POLICY_REQUIRED' AND tax_minor IS NULL AND total_minor IS NULL)",
+            name="ck_cost_estimate__tax",
+        ),
+        CheckConstraint(
+            "status <> 'APPROVED' OR (approved_on IS NOT NULL AND approved_by IS NOT NULL AND snapshot_sha256 IS NOT NULL)",
+            name="ck_cost_estimate__approved_sealed",
+        ),
+        CheckConstraint(
+            "supersedes_estimate_id IS NULL OR supersedes_estimate_id <> id", name="ck_cost_estimate__not_self"
+        ),
+        Index("ux_cost_estimate__property_revision", "property_id", "revision_no", unique=True, **live_where()),
+        Index("ux_cost_estimate__one_draft", "property_id", unique=True, **_one("cost_estimate", "DRAFT")),
+        Index("ux_cost_estimate__one_approved", "property_id", unique=True, **_one("cost_estimate", "APPROVED")),
+        Index("ix_cost_estimate__boq_id", "boq_id"),
+        Index("ix_cost_estimate__scope_id", "scope_id"),
+        Index("ix_cost_estimate__lead_id", "lead_id"),
+        Index("ix_cost_estimate__measurement_set_id", "measurement_set_id"),
+        Index("ix_cost_estimate__rate_card_id", "rate_card_id"),
+        Index("ix_cost_estimate__supersedes_estimate_id", "supersedes_estimate_id"),
+    )
+
+
+class CostEstimateLine(AuditedBase):
+    """One priced (or explicitly unpriced) line: BOQ line → card product line → rate → amount, with discount and tax."""
+
+    __tablename__ = "cost_estimate_line"
+
+    estimate_id: Mapped[str] = mapped_column(GUID(), _fk("cost_estimate.id"), nullable=False)
+    boq_line_id: Mapped[str | None] = mapped_column(GUID(), _fk("boq_line.id"))  # NULL: a project charge
+    scope_item_id: Mapped[str | None] = mapped_column(GUID(), _fk("scope_item.id"))
+    requirement_id: Mapped[str | None] = mapped_column(GUID(), _fk("requirement.id"))
+    space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
+    position: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    component_code: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    category_code: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    card_product_code: Mapped[str | None] = mapped_column(sa.String(40))
+    card_line_code: Mapped[str | None] = mapped_column(sa.String(40))
+    prep_component_code: Mapped[str | None] = mapped_column(sa.String(40))
+    item_type_code: Mapped[str | None] = mapped_column(sa.String(40))
+    label: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    uom_code: Mapped[str | None] = mapped_column(sa.String(4))
+    quantity_centi: Mapped[int | None] = mapped_column(sa.BigInteger)
+    tier_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    finish_code: Mapped[str | None] = mapped_column(sa.String(20))
+    rate_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    rate_status: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    rate_note: Mapped[str | None] = mapped_column(sa.String(500))
+    amount_minor: Mapped[int | None] = mapped_column(sa.BigInteger)  # before discount
+    discount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)  # allocated
+    taxable_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    tax_rate_bp: Mapped[int | None] = mapped_column(sa.Integer)
+    tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    is_optional: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    dimension_source_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    provenance: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)
+
+    __table_args__ = (
+        in_check("cost_estimate_line", "component_code", V.COMPONENTS),
+        in_check("cost_estimate_line", "rate_status", V.RATE_STATUSES),
+        in_check("cost_estimate_line", "tier_code", V.TIERS),
+        in_check("cost_estimate_line", "finish_code", V.FINISHES, nullable=True),
+        in_check("cost_estimate_line", "uom_code", V.UOMS, nullable=True),
+        in_check("cost_estimate_line", "dimension_source_code", V.DIMENSION_SOURCES),
+        CheckConstraint(
+            "(rate_status = 'PRICED' AND rate_minor IS NOT NULL AND amount_minor IS NOT NULL) "
+            "OR (rate_status <> 'PRICED' AND amount_minor IS NULL)",
+            name="ck_cost_estimate_line__priced",
+        ),
+        CheckConstraint(
+            "coalesce(rate_minor, 0) >= 0 AND coalesce(amount_minor, 0) >= 0 AND discount_minor >= 0 "
+            "AND discount_minor <= coalesce(amount_minor, 0)",
+            name="ck_cost_estimate_line__amounts",
+        ),
+        Index("ux_cost_estimate_line__position", "estimate_id", "position", unique=True, **live_where()),
+        Index("ix_cost_estimate_line__boq_line_id", "boq_line_id"),
+        Index("ix_cost_estimate_line__scope_item_id", "scope_item_id"),
+        Index("ix_cost_estimate_line__requirement_id", "requirement_id"),
+        Index("ix_cost_estimate_line__space_id", "space_id"),
+    )
+
+
+class CostEstimateAdjustment(AuditedBase):
+    """A discount (line, category or project) with its pre/post values, reason, authority and approval. It never
+    changes a rate: the line keeps its card rate and amount; the discount is allocated beside them."""
+
+    __tablename__ = "cost_estimate_adjustment"
+
+    estimate_id: Mapped[str] = mapped_column(GUID(), _fk("cost_estimate.id"), nullable=False)
+    scope_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    target_line_id: Mapped[str | None] = mapped_column(GUID(), _fk("cost_estimate_line.id"))
+    target_category: Mapped[str | None] = mapped_column(sa.String(20))
+    kind_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    value_bp: Mapped[int | None] = mapped_column(sa.Integer)
+    amount_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    base_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)  # pre-discount value of the target
+    discount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    post_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    reason: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="PROPOSED")
+    authority_code: Mapped[str | None] = mapped_column(sa.String(15))
+    policy_version: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    decided_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    decided_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    decision_note: Mapped[str | None] = mapped_column(sa.String(500))
+
+    __table_args__ = (
+        in_check("cost_estimate_adjustment", "scope_code", V.ADJUSTMENT_SCOPES),
+        in_check("cost_estimate_adjustment", "kind_code", V.ADJUSTMENT_KINDS),
+        in_check("cost_estimate_adjustment", "status", V.ADJUSTMENT_STATUSES),
+        in_check("cost_estimate_adjustment", "authority_code", V.AUTHORITIES, nullable=True),
+        CheckConstraint(
+            "(kind_code = 'PERCENT' AND value_bp BETWEEN 1 AND 10000 AND amount_minor IS NULL) "
+            "OR (kind_code = 'AMOUNT' AND amount_minor > 0 AND value_bp IS NULL)",
+            name="ck_cost_estimate_adjustment__value",
+        ),
+        CheckConstraint(
+            "discount_minor >= 0 AND discount_minor <= base_minor AND post_minor = base_minor - discount_minor",
+            name="ck_cost_estimate_adjustment__amounts",
+        ),
+        CheckConstraint(
+            "(scope_code = 'LINE') = (target_line_id IS NOT NULL) AND (scope_code = 'CATEGORY') = (target_category IS NOT NULL)",
+            name="ck_cost_estimate_adjustment__target",
+        ),
+        CheckConstraint(
+            "status = 'PROPOSED' OR (decided_by IS NOT NULL AND decided_on IS NOT NULL)",
+            name="ck_cost_estimate_adjustment__decided",
+        ),
+        Index("ix_cost_estimate_adjustment__estimate_id", "estimate_id"),
+        Index("ix_cost_estimate_adjustment__target_line_id", "target_line_id"),
+    )
+
+
+B3_TABLES = ("cost_estimate", "cost_estimate_line", "cost_estimate_adjustment")

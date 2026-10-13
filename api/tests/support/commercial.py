@@ -148,3 +148,62 @@ class Commercial:
         boq = self.boq(scope)
         reviewed = ok(self.review(boq))
         return prop, scope, reviewed
+
+
+# A complete commercial policy for exercising the decided paths. SYNTHETIC: every value is invented for tests, the
+# loader refuses this status outside the test environment, and nothing here is a Veda Spaces decision.
+SYNTHETIC_POLICY: dict[str, Any] = {
+    "schema": "veda.mtq.commercial-policy/1",
+    "version": "SYNTHETIC-TEST-1",
+    "status": "SYNTHETIC_TEST_ONLY",
+    "note": "SYNTHETIC test policy. Not an owner decision.",
+    "decisions": {
+        "OI-MTQ-03": None,
+        "OI-MTQ-04": None,
+        "OI-MTQ-05": {
+            "staff_tiers": ["PREMIUM"],
+            "finish_rates": {"ACRYLIC": {"WARDROBE.BODY": {"ESSENTIAL": 150000}}},
+        },
+        "OI-MTQ-06": {"self_limit_bp": 200, "max_bp": 1000, "four_eyes": True},
+        "OI-MTQ-07": {"mode": "SINGLE_RATE", "rate_bp": 1800, "discount_allocation": "PRO_RATA"},
+        "OI-MTQ-08": {"validity_days": 30},
+        "OI-MTQ-09": {
+            "terms_version": "SYN-T1",
+            "payment_milestones": [
+                {"label": "Booking", "share_bp": 1000, "trigger": "On acceptance (synthetic)"},
+                {"label": "Production", "share_bp": 5000, "trigger": "Before production (synthetic)"},
+                {"label": "Handover", "share_bp": 4000, "trigger": "On handover (synthetic)"},
+            ],
+            "warranty": ["Synthetic warranty text for tests."],
+            "assumptions": ["Synthetic assumption for tests."],
+            "exclusions": ["Synthetic exclusion for tests."],
+            "change_order_terms": "Synthetic change-order terms for tests.",
+            "cancellation_terms": "Synthetic cancellation terms for tests.",
+        },
+        "OI-MTQ-10": {"show_unit_rates": False},
+        "OI-MTQ-11": {"methods": ["STAFF_RECORDED", "SIGNED_COPY"]},
+        "OI-MTQ-13": {"allowed": True, "rate_changes_allowed": False},
+        "OI-MTQ-14": None,
+        "OI-MTQ-15": {"home_size_by_bedrooms": {}, "independent_house_factor_bp": None},
+    },
+}
+
+
+def install_policy(**decisions) -> dict:
+    """Install SYNTHETIC_POLICY with ``decisions`` replaced (OI codes with '-' as '_': OI_MTQ_07=None)."""
+    from veda.modules.mtq_commercial import policy
+
+    doc = copy.deepcopy(SYNTHETIC_POLICY)
+    for k, v in decisions.items():
+        doc["decisions"][k.replace("_", "-")] = v
+    policy.install_for_tests(doc)
+    return doc
+
+
+@pytest.fixture
+def synthetic_policy(app):
+    install_policy()
+    yield
+    from veda.modules.mtq_commercial import policy
+
+    policy.install_for_tests(None)

@@ -9,7 +9,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from veda.kernel.dto import Closed, Id, optional_text, text
 
@@ -82,3 +82,36 @@ class ScopeItemCreateIn(RequirementCreateIn):
 class BoqOverrideIn(Closed):
     quantity_centi: Annotated[int, Field(ge=0, le=10_000_000_00)]
     reason: Reason
+
+
+# --- B3 ----------------------------------------------------------------------------------------------------------------
+class EstimateCreateIn(Closed):
+    tier_code: Tier = "ESSENTIAL"
+    notes: Notes = None
+
+
+class AdjustmentIn(Closed):
+    scope_code: Literal["LINE", "CATEGORY", "PROJECT"]
+    target_line_id: Id | None = None
+    target_category: Code | None = None
+    kind_code: Literal["PERCENT", "AMOUNT"]
+    value_bp: Annotated[int | None, Field(ge=1, le=10_000)] = None
+    amount_minor: Annotated[int | None, Field(ge=1, le=10_000_000_000)] = None
+    reason: Reason
+
+    @model_validator(mode="after")
+    def _shape(self):
+        if (self.scope_code == "LINE") != (self.target_line_id is not None):
+            raise ValueError("target_line_id goes with scope_code LINE (and only with it)")
+        if (self.scope_code == "CATEGORY") != (self.target_category is not None):
+            raise ValueError("target_category goes with scope_code CATEGORY (and only with it)")
+        if (self.kind_code == "PERCENT") != (self.value_bp is not None) or (self.kind_code == "AMOUNT") != (
+            self.amount_minor is not None
+        ):
+            raise ValueError("PERCENT takes value_bp, AMOUNT takes amount_minor")
+        return self
+
+
+class AdjustmentDecisionIn(Closed):
+    decision: Literal["APPROVE", "REJECT"]
+    note: OptionalReason = None

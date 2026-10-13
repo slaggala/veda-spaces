@@ -31,6 +31,28 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     _p("boq.generate", "Generate BOQ", "Generate a BOQ revision from a confirmed scope", "BOQ-002"),
     _p("boq.override", "Override BOQ quantities", "Override a calculated quantity with a stated reason", "BOQ-003"),
     _p("boq.review", "Review BOQ", "Review a BOQ revision and seal it for pricing", "BOQ-004"),
+    # B3 internal estimate
+    _p(
+        "cost_estimate.read",
+        "View estimates",
+        "View internal estimates (amounts, totals, blockers), within scope",
+        "CEST-001",
+    ),  # fmt: skip
+    _p("cost_estimate.rate.view", "View unit rates", "See unit rates and pricing provenance on estimates", "CEST-002"),
+    _p("cost_estimate.create", "Price estimates", "Price a reviewed BOQ with the active rate card", "CEST-003"),
+    _p("cost_estimate.approve", "Approve estimates", "Approve an estimate revision and seal it", "CEST-004"),
+    _p(
+        "cost_estimate.discount.apply",
+        "Propose discounts",
+        "Propose line, category or project discounts on a draft",
+        "CEST-005",
+    ),  # fmt: skip
+    _p(
+        "cost_estimate.discount.approve",
+        "Approve discounts",
+        "Approve or reject a discount above the proposer's limit (never one's own)",
+        "CEST-006",
+    ),  # fmt: skip
 )
 
 _ALL_COMMERCIAL = {"FOUNDER": "A", "ADMIN": "A", "SALES_MANAGER": "A"}
@@ -43,4 +65,10 @@ MATRIX: dict[str, dict[str, str]] = {
     "boq.generate": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "DESIGNER": "O"},
     "boq.override": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
     "boq.review": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
+    "cost_estimate.read": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "SALES": "O"},
+    "cost_estimate.rate.view": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
+    "cost_estimate.create": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
+    "cost_estimate.approve": dict(_ALL_COMMERCIAL),
+    "cost_estimate.discount.apply": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
+    "cost_estimate.discount.approve": dict(_ALL_COMMERCIAL),
 }
