@@ -190,6 +190,7 @@ def test_no_existing_table_is_altered():
         ROOT_MIGRATION,
         "migrations/versions/0204_mtq_self_service.py",
         "migrations/versions/0201_mtq_estimation.py",
+        "migrations/versions/0202_mtq_commercial.py",
     ):
         text = (ROOT / path).read_text()
         for forbidden in ("op.alter_column", "op.add_column", "op.drop_", "batch_alter_table", "op.execute("):

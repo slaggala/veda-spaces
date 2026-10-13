@@ -96,3 +96,43 @@ ADJUSTMENT_SCOPES = ("LINE", "CATEGORY", "PROJECT")
 ADJUSTMENT_KINDS = ("PERCENT", "AMOUNT")
 ADJUSTMENT_STATUSES = ("PROPOSED", "APPROVED", "REJECTED", "WITHDRAWN")
 AUTHORITIES = ("WITHIN_LIMIT", "APPROVER")
+
+# --- B4 quotation ------------------------------------------------------------------------------------------------------
+# The instruction's lifecycle (B4.3); the blueprint's SENT is ISSUED here, and WITHDRAWN is not offered (no decision).
+QUOTATION_STATUSES = (
+    "DRAFT",
+    "INTERNAL_REVIEW",
+    "APPROVED",
+    "ISSUED",
+    "ACCEPTED",
+    "REJECTED",
+    "EXPIRED",
+    "SUPERSEDED",
+)
+OPEN_QUOTATION_STATUSES = ("DRAFT", "INTERNAL_REVIEW", "APPROVED")  # still editable or about to be issued
+QUOTATION_KINDS = ("BASE", "VARIATION")
+SECTION_CODES = ("SPACE", "PROJECT", "OPTIONAL", "VARIATION")
+CHANGE_CODES = (
+    "NONE",
+    "ADD",
+    "OMIT",
+    "CHANGE_QUANTITY",
+    "CHANGE_MATERIAL",
+    "CHANGE_FINISH",
+    "CHANGE_RATE",
+)
+DECISION_METHODS = ("STAFF_RECORDED", "SIGNED_COPY")
+QUOTATION_EVENTS = (
+    "CREATED",
+    "VERSION_CREATED",
+    "VARIATION_CREATED",
+    "EDITED",
+    "SUBMITTED_FOR_REVIEW",
+    "RETURNED_TO_DRAFT",
+    "APPROVED",
+    "ISSUED",
+    "ACCEPTED",
+    "REJECTED",
+    "EXPIRED",
+    "SUPERSEDED",
+)

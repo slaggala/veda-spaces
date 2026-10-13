@@ -46,6 +46,10 @@ from veda.modules.mtq_commercial.models import (
     CostEstimate,
     CostEstimateAdjustment,
     CostEstimateLine,
+    Quotation,
+    QuotationEvent,
+    QuotationLine,
+    QuotationSection,
     Requirement,
     Scope,
     ScopeItem,
@@ -69,6 +73,10 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "QuotationSection",
+    "QuotationLine",
+    "QuotationEvent",
+    "Quotation",
     "CostEstimateLine",
     "CostEstimateAdjustment",
     "CostEstimate",

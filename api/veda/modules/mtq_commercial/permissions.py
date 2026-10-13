@@ -53,6 +53,38 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
         "Approve or reject a discount above the proposer's limit (never one's own)",
         "CEST-006",
     ),  # fmt: skip
+    # B4 quotation
+    _p("quotation.read", "View quotations", "View quotations, their documents and lifecycle, within scope", "QUOT-001"),
+    _p(
+        "quotation.create",
+        "Prepare quotations",
+        "Create, edit, revise and submit draft quotations, within scope",
+        "QUOT-002",
+    ),  # fmt: skip
+    _p(
+        "quotation.approve",
+        "Approve quotations",
+        "Approve a quotation for issue (never a discounted one you prepared)",
+        "QUOT-003",
+    ),  # fmt: skip
+    _p(
+        "quotation.issue",
+        "Issue quotations",
+        "Issue an approved, customer-issuable quotation, within scope",
+        "QUOT-004",
+    ),
+    _p(
+        "quotation.decision.record",
+        "Record customer decisions",
+        "Record a customer's acceptance or rejection, within scope",
+        "QUOT-005",
+    ),  # fmt: skip
+    _p(
+        "quotation.variation.create",
+        "Raise variations",
+        "Raise a variation (change order) to an accepted quotation",
+        "QUOT-006",
+    ),  # fmt: skip
 )
 
 _ALL_COMMERCIAL = {"FOUNDER": "A", "ADMIN": "A", "SALES_MANAGER": "A"}
@@ -71,4 +103,10 @@ MATRIX: dict[str, dict[str, str]] = {
     "cost_estimate.approve": dict(_ALL_COMMERCIAL),
     "cost_estimate.discount.apply": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
     "cost_estimate.discount.approve": dict(_ALL_COMMERCIAL),
+    "quotation.read": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "SALES": "O"},
+    "quotation.create": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "SALES": "O"},
+    "quotation.approve": dict(_ALL_COMMERCIAL),
+    "quotation.issue": {**_ALL_COMMERCIAL, "SALES": "O"},
+    "quotation.decision.record": {**_ALL_COMMERCIAL, "SALES": "O"},
+    "quotation.variation.create": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "SALES": "O"},
 }

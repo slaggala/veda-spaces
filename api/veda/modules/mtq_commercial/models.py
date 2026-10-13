@@ -8,7 +8,7 @@ never edited: a change upstream makes a new revision downstream.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from sqlalchemy import CheckConstraint, ForeignKey, Index
@@ -460,3 +460,195 @@ class CostEstimateAdjustment(AuditedBase):
 
 
 B3_TABLES = ("cost_estimate", "cost_estimate_line", "cost_estimate_adjustment")
+
+
+# --- B4: quotation -----------------------------------------------------------------------------------------------------
+_OPEN = "status IN ('DRAFT', 'INTERNAL_REVIEW', 'APPROVED')"
+
+
+class Quotation(AuditedBase):
+    """One version of a customer quotation (or of a variation to an accepted one), frozen from ISSUED on."""
+
+    __tablename__ = "quotation"
+
+    quotation_number: Mapped[str] = mapped_column(sa.String(24), nullable=False)  # stable across versions
+    version_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    quotation_kind: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="BASE")
+    variation_no: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)  # 0 = the base quotation
+    variation_of_quotation_id: Mapped[str | None] = mapped_column(GUID(), _fk("quotation.id"))
+    baseline_quotation_id: Mapped[str | None] = mapped_column(GUID(), _fk("quotation.id"))  # accepted baseline
+    supersedes_quotation_id: Mapped[str | None] = mapped_column(GUID(), _fk("quotation.id"))
+    lead_id: Mapped[str] = mapped_column(GUID(), _fk("lead.id"), nullable=False)
+    property_id: Mapped[str] = mapped_column(GUID(), _fk("property.id"), nullable=False)
+    measurement_set_id: Mapped[str] = mapped_column(GUID(), _fk("measurement_set.id"), nullable=False)
+    measurement_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    scope_id: Mapped[str] = mapped_column(GUID(), _fk("scope.id"), nullable=False)
+    scope_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    boq_id: Mapped[str] = mapped_column(GUID(), _fk("boq.id"), nullable=False)
+    boq_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    cost_estimate_id: Mapped[str] = mapped_column(GUID(), _fk("cost_estimate.id"), nullable=False)
+    estimate_revision_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    estimate_snapshot_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="DRAFT")
+    title: Mapped[str] = mapped_column(sa.String(160), nullable=False)
+    cover_note: Mapped[str | None] = mapped_column(sa.Text)  # customer-facing
+    tier_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    policy_version: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    policy_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    terms: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)  # terms snapshot (policy + scope)
+    currency: Mapped[str] = mapped_column(sa.String(3), nullable=False, default="INR", server_default="INR")
+    base_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)  # included, pre-discount
+    optional_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    discount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    taxable_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    tax_status: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    blockers: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)  # customer-issuance blockers
+    submitted_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    approved_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    approved_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    issued_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    issued_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    valid_until: Mapped[date | None] = mapped_column(sa.Date)
+    snapshot: Mapped[dict | None] = mapped_column(JSONType())  # the customer document, set on ISSUED
+    snapshot_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    decision_method: Mapped[str | None] = mapped_column(sa.String(16))
+    decided_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    decision_recorded_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    selected_optional_line_ids: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)
+    accepted_total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    decision_note: Mapped[str | None] = mapped_column(sa.String(1000))
+
+    __table_args__ = (
+        in_check("quotation", "status", V.QUOTATION_STATUSES),
+        in_check("quotation", "quotation_kind", V.QUOTATION_KINDS),
+        in_check("quotation", "tier_code", V.TIERS),
+        in_check("quotation", "tax_status", V.TAX_STATUSES),
+        in_check("quotation", "decision_method", V.DECISION_METHODS, nullable=True),
+        CheckConstraint("version_no >= 1 AND variation_no >= 0", name="ck_quotation__numbers"),
+        CheckConstraint(
+            "(quotation_kind = 'BASE') = (variation_no = 0) AND (quotation_kind = 'BASE') = (variation_of_quotation_id IS NULL)",
+            name="ck_quotation__kind",
+        ),
+        _sha("quotation"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'INTERNAL_REVIEW', 'APPROVED') OR status = 'SUPERSEDED' "
+            "OR (issued_on IS NOT NULL AND snapshot_sha256 IS NOT NULL AND total_minor IS NOT NULL)",
+            name="ck_quotation__issued_frozen",
+        ),
+        CheckConstraint(
+            "status NOT IN ('ACCEPTED', 'REJECTED') OR (decided_on IS NOT NULL AND decision_recorded_by IS NOT NULL "
+            "AND decision_method IS NOT NULL)",
+            name="ck_quotation__decided",
+        ),
+        CheckConstraint("status <> 'ACCEPTED' OR accepted_total_minor IS NOT NULL", name="ck_quotation__accepted"),
+        CheckConstraint(
+            "optional_minor >= 0 AND discount_minor >= 0 AND taxable_minor = base_total_minor - discount_minor "
+            "AND (quotation_kind = 'VARIATION' OR base_total_minor >= 0)",  # a variation's net change may be negative
+            name="ck_quotation__amounts",
+        ),
+        Index(
+            "ux_quotation__number_variation_version",
+            "quotation_number",
+            "variation_no",
+            "version_no",
+            unique=True,
+            **live_where(),
+        ),  # fmt: skip
+        Index(
+            "ux_quotation__one_open",
+            "quotation_number",
+            "variation_no",
+            unique=True,
+            **where(f"{_OPEN} AND is_deleted = 0", f"{_OPEN} AND is_deleted = false"),
+        ),
+        Index("ix_quotation__property_id", "property_id"),
+        Index("ix_quotation__lead_id", "lead_id"),
+        Index("ix_quotation__cost_estimate_id", "cost_estimate_id"),
+        Index("ix_quotation__scope_id", "scope_id"),
+        Index("ix_quotation__boq_id", "boq_id"),
+        Index("ix_quotation__measurement_set_id", "measurement_set_id"),
+        Index("ix_quotation__variation_of", "variation_of_quotation_id"),
+        Index("ix_quotation__baseline", "baseline_quotation_id"),
+        Index("ix_quotation__supersedes", "supersedes_quotation_id"),
+        Index("ix_quotation__status_valid_until", "status", "valid_until"),
+    )
+
+
+class QuotationSection(AuditedBase):
+    __tablename__ = "quotation_section"
+
+    quotation_id: Mapped[str] = mapped_column(GUID(), _fk("quotation.id"), nullable=False)
+    position: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    section_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
+    title: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    subtotal_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    optional_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+
+    __table_args__ = (
+        in_check("quotation_section", "section_code", V.SECTION_CODES),
+        Index("ux_quotation_section__position", "quotation_id", "position", unique=True, **live_where()),
+        Index("ix_quotation_section__space_id", "space_id"),
+    )
+
+
+class QuotationLine(AuditedBase):
+    """A customer-facing line. The unit rate is stored for reconciliation and shown only if OI-MTQ-10 allows."""
+
+    __tablename__ = "quotation_line"
+
+    quotation_id: Mapped[str] = mapped_column(GUID(), _fk("quotation.id"), nullable=False)
+    section_id: Mapped[str] = mapped_column(GUID(), _fk("quotation_section.id"), nullable=False)
+    cost_estimate_line_id: Mapped[str | None] = mapped_column(GUID(), _fk("cost_estimate_line.id"))
+    requirement_id: Mapped[str | None] = mapped_column(GUID(), _fk("requirement.id"))
+    space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
+    position: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    line_key: Mapped[str] = mapped_column(sa.String(200), nullable=False)  # stable across versions and variations
+    description: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    detail: Mapped[str | None] = mapped_column(sa.String(300))
+    uom_code: Mapped[str | None] = mapped_column(sa.String(4))
+    quantity_centi: Mapped[int | None] = mapped_column(sa.BigInteger)
+    finish_code: Mapped[str | None] = mapped_column(sa.String(20))
+    rate_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    amount_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    discount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    is_priced: Mapped[bool] = mapped_column(Bool(), nullable=False, default=True, server_default=sa.true())
+    is_optional: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    is_mandatory: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    change_code: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="NONE")
+    baseline_amount_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    delta_amount_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+
+    __table_args__ = (
+        in_check("quotation_line", "change_code", V.CHANGE_CODES),
+        in_check("quotation_line", "uom_code", V.UOMS, nullable=True),
+        CheckConstraint("is_priced OR amount_minor IS NULL", name="ck_quotation_line__unpriced"),
+        Index("ux_quotation_line__position", "quotation_id", "position", unique=True, **live_where()),
+        Index("ix_quotation_line__section_id", "section_id"),
+        Index("ix_quotation_line__cost_estimate_line_id", "cost_estimate_line_id"),
+        Index("ix_quotation_line__requirement_id", "requirement_id"),
+        Index("ix_quotation_line__space_id", "space_id"),
+    )
+
+
+class QuotationEvent(AuditedBase):
+    """The quotation's lifecycle, append-only by service rule (each row is also FULL-audited)."""
+
+    __tablename__ = "quotation_event"
+
+    quotation_id: Mapped[str] = mapped_column(GUID(), _fk("quotation.id"), nullable=False)
+    event_code: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(sa.String(16))
+    to_status: Mapped[str | None] = mapped_column(sa.String(16))
+    detail: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)
+
+    __table_args__ = (
+        in_check("quotation_event", "event_code", V.QUOTATION_EVENTS),
+        Index("ix_quotation_event__quotation", "quotation_id", "created_on"),
+    )
+
+
+B4_TABLES = ("quotation", "quotation_section", "quotation_line", "quotation_event")

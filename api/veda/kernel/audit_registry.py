@@ -215,6 +215,20 @@ register(
         pii=frozenset({"reason", "decision_note"}),
     )
 )
+# --- MTQ B4 (0202): quotations. The frozen customer document is reproducible from its digest and holds no personal
+# data (the customer's name is added when rendered), so it is not snapshotted; cover and decision notes are free text.
+register(
+    AuditPolicy(
+        "quotation",
+        FULL,
+        parent=("property", "property_id"),
+        excluded=frozenset({"snapshot"}),
+        pii=frozenset({"cover_note", "decision_note"}),
+    )
+)
+register(AuditPolicy("quotation_section", FULL, parent=("quotation", "quotation_id")))
+register(AuditPolicy("quotation_line", FULL, parent=("quotation", "quotation_id")))
+register(AuditPolicy("quotation_event", FULL, parent=("quotation", "quotation_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

@@ -8,7 +8,20 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from .models import Boq, BoqLine, CostEstimate, CostEstimateAdjustment, CostEstimateLine, Requirement, Scope, ScopeItem
+from .models import (
+    Boq,
+    BoqLine,
+    CostEstimate,
+    CostEstimateAdjustment,
+    CostEstimateLine,
+    Quotation,
+    QuotationEvent,
+    QuotationLine,
+    QuotationSection,
+    Requirement,
+    Scope,
+    ScopeItem,
+)
 
 ERASED = "[erased]"
 # (model, lead column or None, parent (model, fk) when the row has no lead column, free-text fields)
@@ -21,6 +34,10 @@ TEXT_FIELDS: list[tuple] = [
     (CostEstimate, "lead_id", None, ("notes",)),
     (CostEstimateLine, None, (CostEstimate, "estimate_id"), ()),
     (CostEstimateAdjustment, None, (CostEstimate, "estimate_id"), ("reason", "decision_note")),
+    (Quotation, "lead_id", None, ("cover_note", "decision_note")),
+    (QuotationSection, None, (Quotation, "quotation_id"), ()),
+    (QuotationLine, None, (Quotation, "quotation_id"), ()),
+    (QuotationEvent, None, (Quotation, "quotation_id"), ()),
 ]
 
 
