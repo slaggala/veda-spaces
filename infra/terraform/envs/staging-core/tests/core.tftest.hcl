@@ -381,7 +381,7 @@ run "scanner_none_with_v3_flags_on_refused" {
 }
 
 # MTQ B1-T11: attachment storage planned and inert (closure §6.4).
-run "attachment_storage_planned_with_the_site_flag_off" {
+run "attachment_storage_planned_with_the_site_flag_on_and_bound" {
   command = plan
 
   assert {
@@ -402,8 +402,9 @@ run "attachment_storage_planned_with_the_site_flag_off" {
   }
 
   assert {
-    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "false" && output.mtq_attachments.site_enabled == "false" && local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == "none"
-    error_message = "the site measurement flag stays false and no enablement record is bound: the settings are inert"
+    condition = (local.app_config["VEDA_MTQ_SITE_ENABLED"] == "true" && output.mtq_attachments.site_enabled == "true" &&
+    local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == filesha256("../../../config/mtq-site-enablement-record.json"))
+    error_message = "owner approval of 2026-10-13 (decision log 30): the site flag is on in staging and bound to the committed record's SHA-256"
   }
 
   assert {
@@ -434,13 +435,22 @@ run "a_pre_signed_upload_longer_than_the_api_accepts_refused" {
 }
 
 # MTQ B1-T12: the site flag turns on only with an owner-APPROVED enablement record bound by its SHA-256.
-run "the_committed_enablement_record_is_a_draft_and_enables_nothing" {
+run "the_committed_enablement_record_is_approved_and_meets_every_gate" {
   command = plan
 
   assert {
-    condition     = jsondecode(file("../../../config/mtq-site-enablement-record.json")).status == "DRAFT" && contains(local.mtq_record_problems, "the record is not APPROVED")
-    error_message = "the committed record is the owner's template, not an approval"
+    condition     = jsondecode(file("../../../config/mtq-site-enablement-record.json")).status == "APPROVED" && local.mtq_record_problems == [] && local.app_config["VEDA_ENV"] == "staging"
+    error_message = "the committed record is the owner's approval (decision log 30): APPROVED, every evidence field filled, bound, staging only"
   }
+}
+
+run "the_flag_with_a_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-draft.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-draft.json"
+  }
+  expect_failures = [output.mtq_attachments]
 }
 
 run "an_approved_bound_record_turns_the_flag_on_in_staging" {
@@ -461,7 +471,7 @@ run "an_approved_bound_record_turns_the_flag_on_in_staging" {
   }
 }
 
-run "the_flag_with_the_committed_draft_refused" {
+run "the_flag_bound_to_another_record_refused" {
   command = plan
   variables {
     platform_config_path = "tests/fixtures/platform-mtq-on.json"
