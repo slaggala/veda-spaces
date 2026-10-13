@@ -55,19 +55,33 @@ Each step uses the existing workflows and their environment approvals. The expec
 
 ## 4. Live ten-site validation
 
-**Sites:** five apartments covering 2, 3 and 4 BHK, and five independent houses. At least one 5 BHK is required in the dataset; the synthetic run covers it (S10). A live 5 BHK is included only if a real one is available, and its absence is recorded, never filled in.
+**Sites:** exactly ten. Five apartments covering at least one 2, one 3 and one 4 BHK; five independent houses, at least two of them with two or more levels (closure §2.2). A 5 BHK is not required by closure §2.2: the evidence reports `coverage.informational.has_5_bhk`, and when no live 5 BHK is available its absence is recorded there (`ABSENT`), never filled in. The synthetic run covers a 5 BHK (S10).
 
-**Each site:** the app survey by one surveyor, and an independent reference measurement by a second surveyor with a different instrument (tape against laser). At least one site uses Lite and at least one Full. At least one site has a second surveyor conflict, and at least one an offline retry, both observed and recorded.
+**Each site:** the app survey by one surveyor, and an independent reference measurement by a second surveyor with a different instrument (tape against laser). At least one site uses Lite and at least one Full. At least one site has a second surveyor conflict, and at least one an offline retry, both observed and recorded. The on-site surveyor minutes are recorded per site (`survey_minutes`).
 
 **Evaluation:**
 
 ```
-.venv/bin/python tools/mtq_ten_site.py --reference ref.json --measured measured.json --events events.json --out evidence.json
+.venv/bin/python tools/mtq_ten_site.py --reference ref.json --measured measured.json --events events.json \
+    --database-engine postgresql --out evidence.json
 ```
 
-`ref.json` holds anonymous site ids S01 to S10 and the reference readings; it is owner data and stays private. `measured.json` holds each site's verified set and property, exported from staging by a staff user. The tool writes only dimensions and verdicts. It exits 0 only for LIVE_VALIDATED.
+`ref.json` holds anonymous site ids (S01 to S10, none twice), each site's property type, bedroom count, levels (required for a house), survey level, reference method, surveyor minutes, and the reference readings per space: wall lengths by wall index, ceiling height, length and width, every opening (wall, type, width, height, offset from the wall's start corner, sill), and the staircase run, width, riser and tread. It is owner data and stays private. `measured.json` holds each site's verified set and property, exported from staging by a staff user. The tool writes only dimensions and verdicts. It refuses (exit 2) more than ten sites, a repeated site id, a measured set for a site the reference does not list, and a LIVE dataset with a synthetic reference method. It exits 0 only for LIVE_VALIDATED (or SYNTHETIC_VALIDATED on a synthetic dataset; the two labels never mix).
 
-**Rules** (closure §2.2, as code in `veda/modules/mtq/tolerance.py`): per site, at least 95 % of walls PASS, no wall FAIL, every space area within tolerance, property total within 1 %. Gate: at least nine of ten sites PASS, and no two failures share a root cause. Fewer than ten referenced sites is UNVALIDATED_NO_REFERENCE, never a pass.
+**What the evaluator checks** (closure §2.1 tolerances and §2.2 rules, as code in `veda/modules/mtq/ten_site.py` and `tolerance.py`):
+
+| Level | Check |
+|---|---|
+| Wall | Each reference wall against the recorded wall with the same index: ±25 mm (≤ 6 000 mm) or ±50 mm. PASS within tolerance; EXPLAINED within twice the tolerance when a cause is recorded; otherwise FAIL. A wall not recorded is FAIL |
+| Opening | Paired per wall by position along it: both sides ordered by offset from the wall's start corner (openings without an offset last; reference in listed order, recorded by `client_ref`). Width and height ±20 mm, offset and sill ±25 mm (when the reference gives them), type must agree. An opening on one side only is FAIL |
+| Staircase | Run, width, riser and tread ±10 mm against `attributes.staircase` |
+| Space | PASS only when every opening, every staircase value and the floor area (±1 % or 0.1 m²) are within tolerance, the ceiling (±25 mm) is not FAIL, and no wall is FAIL. EXPLAINED is a wall allowance: an explained opening is recorded but does not pass its space |
+| Site | PASS when ≥ 95 % of compared walls PASS, no wall FAIL, every space PASS and the property total is within ±1 %. INCOMPLETE (never PASS) when the measured set is not VERIFIED, when no wall was compared, or when there is no property total. FAIL when the measured property's type, bedroom count or level count differs from the reference |
+| Surveyor time | Minutes reported per site against the 03 §13 baseline row (WITHIN, ABOVE, BELOW, NOT_RECORDED). Recorded, never a verdict input; absence is listed in `survey_time_not_recorded` |
+| Gate | Exactly ten referenced sites. PASS when ≥ 9 PASS and no FAIL shares a root cause with another (a FAIL without a root cause fails the gate). A reference site without a measured set, or an INCOMPLETE site, keeps the gate INCOMPLETE |
+| Label | Fewer than ten referenced sites: UNVALIDATED_NO_REFERENCE. Ten: LIVE_VALIDATED (or SYNTHETIC_VALIDATED) only when the gate is PASS, every site has a measured set, every reference profile agrees with its measured property, and the site mix and B1-T12 coverage (Lite and Full, a conflict, an offline retry) are met; otherwise VALIDATION_FAILED |
+
+**Evidence binding:** every document records `provenance.generator_commit` (`VEDA_GIT_SHA` or `GITHUB_SHA`, else the checkout's HEAD, suffixed `-dirty` when tracked files differ), `database_engine`, `generated_at`, `reference_sha256` (of the reference file) and `template_version`. The committed synthetic evidence was generated by this tool from the inputs the harness writes when `VEDA_MTQ_EVIDENCE_OUT` names a directory; SQLite and PostgreSQL give identical evidence apart from provenance and snapshot digests.
 
 ## 5. Rollback
 

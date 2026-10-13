@@ -2,7 +2,9 @@
 
 Everything here is SYNTHETIC (tests/fixtures/mtq_ten_site/synthetic-2026.10.json). Reference dimensions come from a
 fixed table plus a deterministic variation per site and space; the "app" reading is the reference plus a deterministic
-error of at most 5 mm, except the deviations a site plants on purpose. No real site, customer or measurement is used.
+error of at most 5 mm, except the deviations a site plants on purpose. Every reading the evaluator compares is
+exercised: walls, ceilings, areas, openings (a door on W1 of every enclosed space, a window with its sill on W3 of every
+bedroom), and the staircase run, width, riser and tread. No real site, customer or measurement is used.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from tests.support.mtq import FULL_CAPTURE, photo
 from veda.kernel import clock
 from veda.modules.mtq import templates
 from veda.modules.mtq.capture import FURNITURE_TAGS
-from veda.modules.mtq.ten_site import Reference, SiteRef, SpaceRef
+from veda.modules.mtq.ten_site import OpeningRef, Reference, SiteRef, SpaceRef, StaircaseRef
 
 DATASET = Path(__file__).resolve().parents[1] / "fixtures" / "mtq_ten_site" / "synthetic-2026.10.json"
 
@@ -37,6 +39,10 @@ ATTRIBUTE_VALUES = {"ac_type": "SPLIT", "ac_point_count": 1, "fan_point_count": 
                     "exposure_code": "OPEN"}  # fmt: skip
 CEILING = {"APARTMENT": 2900, "INDEPENDENT_HOUSE": 3050}
 PARAPET_MM = 1000
+DOOR = {"opening_type_code": "DOOR", "width_mm": 900, "height_mm": 2100, "offset_from_wall_start_mm": 100}
+WINDOW = {"opening_type_code": "WINDOW", "width_mm": 1200, "height_mm": 1200, "offset_from_wall_start_mm": 600,
+          "sill_height_mm": 900}  # fmt: skip
+RISER_MM, TREAD_MM = 170, 250
 
 
 def load() -> dict[str, Any]:
@@ -52,16 +58,29 @@ def err(site_id: str, label: str, quantity: str) -> int:
     return _h(site_id, label, quantity) % 11 - 5
 
 
+def reference_openings(sp: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
+    """(wall_index, opening) for a space: a door on W1 of every enclosed space, a window on W3 of every bedroom."""
+    if sp["zone_code"] == "OUTDOOR":
+        return []
+    out = [(1, DOOR)]
+    if sp["space_type_code"].endswith("BEDROOM"):
+        out.append((3, WINDOW))
+    return out
+
+
 def reference_space(site_id: str, sp: dict[str, Any], property_type: str) -> SpaceRef:
     t, label = sp["space_type_code"], sp["label"]
     base_l, base_w = DIMS.get(t, (3000, 2500))
     length = base_l + (_h(site_id, label, "L") % 21) * 10
     width = base_w + (_h(site_id, label, "W") % 11) * 10
     walls = [width, length, width, length]
-    if t == "STAIRCASE":  # compared by its walls; its area comes from the flight geometry, not length x width
-        return SpaceRef(label=label, walls=walls)
+    openings = [OpeningRef(wall=w, **o) for w, o in reference_openings(sp)]
+    if t == "STAIRCASE":  # its area comes from the flight geometry, not length x width; compared by walls and flight
+        flight = StaircaseRef(run_length_mm=length, width_mm=width, riser_height_mm=RISER_MM, tread_depth_mm=TREAD_MM)
+        return SpaceRef(label=label, walls=walls, openings=openings, staircase=flight)
     ceiling = None if sp["zone_code"] == "OUTDOOR" else CEILING[property_type]
-    return SpaceRef(label=label, length_mm=length, width_mm=width, ceiling_height_mm=ceiling, walls=walls)
+    return SpaceRef(label=label, length_mm=length, width_mm=width, ceiling_height_mm=ceiling, walls=walls,
+                    openings=openings)  # fmt: skip
 
 
 def payload(site_id: str, sp: dict[str, Any], ref: SpaceRef, level: str, deviations: list[dict], n: int,
@@ -75,9 +94,12 @@ def payload(site_id: str, sp: dict[str, Any], ref: SpaceRef, level: str, deviati
     for i, length in enumerate(ref.walls, start=1):
         planted = sum(d["delta_mm"] for d in deviations if d["space"] == label and d["wall"] == i)
         walls.append({"wall_index": i, "length_mm": length + err(site_id, label, f"W{i}") + planted})
-    if not outdoor:
-        walls[0]["openings"] = [{"client_ref": f"op{n}-door", "opening_type_code": "DOOR", "width_mm": 900,
-                                 "height_mm": 2100, "offset_from_wall_start_mm": 100, "swing_code": "IN"}]  # fmt: skip
+    for k, (wall, o) in enumerate(reference_openings(sp)):
+        q = f"W{wall}/O{k}"
+        recorded = {f: v + err(site_id, label, f"{q}/{f}") for f, v in o.items() if f != "opening_type_code"}
+        swing = "IN" if o["opening_type_code"] == "DOOR" else "SLIDING"
+        walls[wall - 1].setdefault("openings", []).append({"client_ref": f"op{n}-{k}", "swing_code": swing,
+                                                           "opening_type_code": o["opening_type_code"], **recorded})  # fmt: skip
     walls[0]["usable_for_code"] = ["NONE"]
     tags = [c[4:] for c in required if c.startswith("TAG:")]
     for tag, w in zip(tags, walls[1:], strict=False):
@@ -119,7 +141,8 @@ def payload(site_id: str, sp: dict[str, Any], ref: SpaceRef, level: str, deviati
     if stair:
         attrs["staircase"] = {"from_level": 0, "to_level": 1, "turn_type_code": "STRAIGHT", "flight_count": 1,
                               "run_length_mm": body["length_mm"], "width_mm": body["width_mm"], "riser_count": 18,
-                              "riser_height_mm": 170, "tread_depth_mm": 250, "headroom_mm": 2200,
+                              "riser_height_mm": RISER_MM + err(site_id, label, "R") // 2,
+                              "tread_depth_mm": TREAD_MM + err(site_id, label, "T"), "headroom_mm": 2200,
                               "largest_panel_mm": 1200}  # fmt: skip
     if attrs:
         body["attributes"] = attrs
@@ -218,15 +241,18 @@ class TenSite:
             "set": self._ok(founder.get(f"/api/v1/measurement-sets/{mset['id']}")),
             "property": self._ok(founder.get(f"/api/v1/properties/{prop['id']}")),
         }
+        # The reference profile comes from the fixture, never from what the app derived: the evaluator cross-checks it.
         ref = SiteRef(
             site_id=site_id,
             property_type_code=ptype,
-            bedrooms=measured["property"]["derived_bedroom_count"],
+            bedrooms=spec["bedrooms"],
+            levels=spec.get("levels"),
             survey_level_code=level,
             reference_method="SYNTHETIC_GENERATED",
             spaces=[refs[sp["id"]] for sp in spaces],
             causes={f"{d['space']}/W{d['wall']}": d["cause"] for d in deviations},
             root_cause=spec.get("root_cause"),
+            survey_minutes=spec.get("survey_minutes"),
         )
         return ref, measured, events
 

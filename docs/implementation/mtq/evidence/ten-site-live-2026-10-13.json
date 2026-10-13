@@ -1,31 +1,48 @@
 {
   "coverage": {
     "apartments_cover_2_3_4_bhk": false,
-    "at_least_one_5_bhk": false,
     "complete": false,
     "five_apartments": false,
     "five_independent_houses": false,
+    "informational": {
+      "five_bhk_note": "ABSENT: no 5 BHK site in this dataset (not required by closure section 2.2; recorded, never filled in)",
+      "five_bhk_sites": [],
+      "has_5_bhk": false
+    },
     "lite_and_full": false,
     "missing": [
       "apartments_cover_2_3_4_bhk",
-      "at_least_one_5_bhk",
       "five_apartments",
       "five_independent_houses",
       "lite_and_full",
       "offline_retry",
-      "second_surveyor_conflict"
+      "second_surveyor_conflict",
+      "two_houses_with_two_or_more_levels"
     ],
     "offline_retry": false,
-    "second_surveyor_conflict": false
+    "profile_mismatch_sites": [],
+    "profiles_agree": true,
+    "second_surveyor_conflict": false,
+    "two_houses_with_two_or_more_levels": false
   },
   "dataset_id": "LIVE-STAGING-B1",
   "dataset_kind": "LIVE",
   "evidence": "MTQ-B1-TEN-SITE-VALIDATION",
   "gate_verdict": "INCOMPLETE",
   "label": "UNVALIDATED_NO_REFERENCE",
+  "provenance": {
+    "database_engine": "unknown",
+    "generated_at": "2026-10-13T07:53:04.336Z",
+    "generator_commit": "1fe72169548bc952cde5e30ccf73f7410f35c731-dirty",
+    "reference_sha256": "none: no reference file",
+    "template_version": "2026.10.1"
+  },
   "sites": [],
   "sites_evaluated": 0,
+  "sites_incomplete": [],
+  "sites_referenced": 0,
   "sites_without_a_measured_set": [],
+  "survey_time_not_recorded": [],
   "template_version": "2026.10.1",
   "tolerance_policy": "OI-MTQ-01 (MTQ-B1-blocker-closure.md section 2)"
 }
