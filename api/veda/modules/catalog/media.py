@@ -32,31 +32,48 @@
 
 from __future__ import annotations
 
-import hashlib
-import io
 import json
-import socket
+import socket  # noqa: F401 - kept: tests patch media.socket.create_connection for the signature probe
 import struct
-import warnings
 from dataclasses import dataclass
 from datetime import timedelta
-from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from veda.config import settings
-from veda.kernel import clock, db, metrics
+from veda.kernel import clock, db, metrics  # noqa: F401 - metrics: tests patch media.metrics.emit
+from veda.kernel.media import (  # the shared kernel media library (MTQ B1-T01); re-exported under the old names
+    IMAGE_FORMATS,
+    IMAGE_WIDTHS,
+    MAX_IMAGE_BYTES,
+    LocalStorage,
+    MediaError,
+    ObjectStore,
+    S3Storage,
+    clamd_scan,
+    clamd_signature_age_hours,
+    image_variants,
+    scan_outcome,
+    sha256_hex,
+    sniff,
+)
+from veda.kernel.media import (
+    MAX_IMAGE_PIXELS as MAX_IMAGE_PIXELS,
+)
+from veda.kernel.media import (
+    MAX_IMAGE_SIDE as MAX_IMAGE_SIDE,
+)
+from veda.kernel.media import (
+    MIN_IMAGE_SIDE as MIN_IMAGE_SIDE,
+)
+from veda.kernel.media import (
+    check_image_size as check_image_size,
+)
+from veda.kernel.media import storage_errors as _storage_errors  # noqa: F401 - re-exported for tests
 
 from .models import CatalogEvent, CatalogMediaObject, CatalogRecord, CatalogRelease
-
-MAX_IMAGE_BYTES = 15 * 1024 * 1024
-MAX_IMAGE_PIXELS = 24_000_000  # the documented hard limit (24 MP); see the module docstring
-MAX_IMAGE_SIDE = 8_000
-MIN_IMAGE_SIDE = 320
-IMAGE_WIDTHS = {"thumb": 320, "mobile": 768, "desktop": 1600}
-IMAGE_FORMATS = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
 
 MAX_MODEL_BYTES = 25 * 1024 * 1024
 GLB_MIME = "model/gltf-binary"
@@ -71,97 +88,6 @@ GLB_EXTENSIONS = frozenset({"KHR_materials_unlit", "KHR_texture_transform", "KHR
 _JSON, _BIN = 0x4E4F534A, 0x004E4942
 
 
-class MediaError(ValueError):
-    """An upload was refused; the message never echoes file contents or names."""
-
-
-# --- storage ---------------------------------------------------------------------------------------------------------
-class ObjectStore(Protocol):
-    def put(self, key: str, data: bytes, content_type: str) -> None: ...
-    def get(self, key: str) -> bytes: ...
-    def delete(self, key: str) -> None: ...
-
-
-def _check_key(key: str) -> str:
-    if not key.startswith(("source/", "variant/")) or ".." in key or len(key.split("/")[-1]) != 64:
-        raise MediaError("invalid storage key")
-    return key
-
-
-class LocalStorage:
-    """Development and test object store."""
-
-    def __init__(self, root: str | Path):
-        self.root = Path(root)
-
-    def put(self, key: str, data: bytes, content_type: str) -> None:
-        path = self.root / _check_key(key)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            tmp = path.with_suffix(".tmp")
-            tmp.write_bytes(data)
-            tmp.replace(path)
-
-    def get(self, key: str) -> bytes:
-        return (self.root / _check_key(key)).read_bytes()
-
-    def delete(self, key: str) -> None:
-        (self.root / _check_key(key)).unlink(missing_ok=True)
-
-
-class S3Storage:
-    """The prepared staging and production store (F2; not active until the owner approves the bucket):
-    - a private, versioned bucket with every public-access block on and no ACLs;
-    - each object encrypted with KMS;
-    - keys are content hashes.
-
-    Delivery goes through the API (or the approved CDN in front of it), never to the bucket directly."""
-
-    def __init__(self, bucket: str, kms_key_arn: str | None):
-        import boto3
-
-        self.bucket, self.kms_key_arn = bucket, kms_key_arn
-        self.client = boto3.client("s3")
-
-    def put(self, key: str, data: bytes, content_type: str) -> None:
-        extra = {"SSEKMSKeyId": self.kms_key_arn} if self.kms_key_arn else {}
-        with _storage_errors("put"):
-            self.client.put_object(Bucket=self.bucket, Key=_check_key(key), Body=data, ContentType=content_type,
-                                   ServerSideEncryption="aws:kms", **extra)  # fmt: skip
-
-    def get(self, key: str) -> bytes:
-        with _storage_errors("get"):
-            body = self.client.get_object(Bucket=self.bucket, Key=_check_key(key))["Body"].read()
-        return bytes(body)
-
-    def delete(self, key: str) -> None:
-        with _storage_errors("delete"):
-            self.client.delete_object(Bucket=self.bucket, Key=_check_key(key))
-
-
-class _storage_errors:  # noqa: N801 - a context manager used as `with _storage_errors(op)`
-    """Count S3 and KMS access denials (MediaStorageAccessDenied, MediaKmsAccessDenied) and re-raise. The signal names
-    the operation and the error code only: never the key, the bucket, a filename or the content."""
-
-    def __init__(self, op: str):
-        self.op = op
-
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, kind, err, tb) -> Literal[False]:
-        code = str(getattr(err, "response", {}).get("Error", {}).get("Code", "")) if err is not None else ""
-        if code.startswith("KMS") or code in (
-            "KMS.AccessDeniedException",
-            "AccessDeniedException",
-            "KMS.DisabledException",
-        ):
-            metrics.emit("MediaKmsAccessDenied", 1, dimensions={"Operation": self.op})
-        elif code in ("AccessDenied", "AllAccessDisabled", "InvalidObjectState"):
-            metrics.emit("MediaStorageAccessDenied", 1, dimensions={"Operation": self.op})
-        return False
-
-
 def storage() -> ObjectStore:
     cfg = settings()
     if cfg.catalog_media_backend == "s3":
@@ -169,70 +95,9 @@ def storage() -> ObjectStore:
     return LocalStorage(cfg.catalog_media_dir)
 
 
-# --- sniffing --------------------------------------------------------------------------------------------------------
-def sniff(data: bytes) -> str:
-    if data[:3] == b"\xff\xd8\xff":
-        return "JPEG"
-    if data[:8] == b"\x89PNG\r\n\x1a\n":
-        return "PNG"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "WEBP"
-    if data[:4] == b"glTF":
-        return "GLB"
-    if data[:4] == b"PK\x03\x04":
-        return "USDZ"
-    if data[4:8] == b"ftyp":
-        return "VIDEO"
-    if data.lstrip()[:1] == b"{":
-        return "GLTF"
-    raise MediaError("unsupported file type (JPEG, PNG, WebP or GLB)")
-
-
-# --- images (F1) -----------------------------------------------------------------------------------------------------
-def check_image_size(width: int, height: int) -> None:
-    """The hard complexity limit, applied to the header's dimensions before any pixel is decoded."""
-    if width > MAX_IMAGE_SIDE or height > MAX_IMAGE_SIDE:
-        raise MediaError(f"images are at most {MAX_IMAGE_SIDE} pixels on each side")
-    if width * height > MAX_IMAGE_PIXELS:
-        raise MediaError(f"images are at most {MAX_IMAGE_PIXELS:,} pixels")
-    if min(width, height) < MIN_IMAGE_SIDE:
-        raise MediaError(f"images need at least {MIN_IMAGE_SIDE} pixels on each side")
-
-
 def _image_variants(data: bytes) -> tuple[list[tuple[str, bytes, int, int]], int, int]:
-    from PIL import Image, ImageOps
-
-    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS  # Pillow's own guard, at the same limit (second line of defence)
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as header:  # reads the header only
-                if header.format not in IMAGE_FORMATS:
-                    raise MediaError("unsupported image format")
-                check_image_size(*header.size)  # before verify() or load() touch the pixels
-                header.verify()
-            with Image.open(io.BytesIO(data)) as img:
-                check_image_size(*img.size)
-                img.load()
-                upright = ImageOps.exif_transpose(img)
-                width, height = upright.size
-                check_image_size(width, height)
-                base = upright.convert("RGBA" if "A" in upright.getbands() else "RGB")
-    except MediaError:
-        raise
-    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as err:  # Pillow's guard, same limit
-        raise MediaError(f"images are at most {MAX_IMAGE_PIXELS:,} pixels") from err
-    except Exception as err:  # noqa: BLE001 — any decoder failure (truncated, malformed) refuses the upload
-        raise MediaError("the image could not be decoded safely") from err
-    out = []
-    for name, target in IMAGE_WIDTHS.items():
-        w = min(target, width)
-        h = max(1, round(height * w / width))
-        variant = base.resize((w, h), Image.Resampling.LANCZOS) if w != width else base.copy()
-        buf = io.BytesIO()
-        variant.save(buf, "WEBP", quality=82, method=4)  # no exif/icc/xmp passed: the variant carries no metadata
-        out.append((name, buf.getvalue(), w, h))
-    return out, width, height
+    """The catalogue's delivery variants (thumb 320, mobile 768, desktop 1600; WebP, no metadata)."""
+    return image_variants(data, IMAGE_WIDTHS)
 
 
 # --- 3D (G2) ---------------------------------------------------------------------------------------------------------
@@ -359,64 +224,15 @@ def three_d_uploads_ready() -> bool:
 
 
 # --- scanning --------------------------------------------------------------------------------------------------------
-def clamd_scan(data: bytes, address: str) -> bool:
-    """True when clamd reports the stream clean, False when it finds something; an error raises."""
-    host, _, port = address.rpartition(":")
-    with socket.create_connection((host, int(port)), timeout=30) as sock:
-        sock.sendall(b"zINSTREAM\0")
-        for i in range(0, len(data), 64 * 1024):
-            chunk = data[i : i + 64 * 1024]
-            sock.sendall(struct.pack(">I", len(chunk)) + chunk)
-        sock.sendall(struct.pack(">I", 0))
-        reply = sock.recv(4096).decode(errors="replace").strip("\0\n ")
-    if reply.endswith("OK"):
-        return True
-    if "FOUND" in reply:
-        return False
-    raise MediaError("the malware scanner did not answer")
-
-
 def scan_status(data: bytes) -> str:
     """CLEAN, INFECTED or FAILED with a scanner; without one, CLEAN only in local and test, otherwise PENDING.
     Every outcome is counted for the alarms (no filename, key or content in the signal); a scanner that cannot be
     reached or does not answer leaves the object FAILED, which is never served and is retried."""
     cfg = settings()
-    if cfg.catalog_media_scanner == "clamd":
-        try:
-            clean = clamd_scan(data, cfg.catalog_clamd_address)
-        except OSError:
-            metrics.emit("MediaScannerUnavailable", 1)
-            return "FAILED"
-        except (MediaError, ValueError):
-            metrics.emit("MediaScanFailed", 1)
-            return "FAILED"
-        if not clean:
-            metrics.emit("MediaInfected", 1)
-        return "CLEAN" if clean else "INFECTED"
-    return "CLEAN" if cfg.env in ("local", "test") else "PENDING"
-
-
-def clamd_signature_age_hours(address: str, *, now=None) -> float | None:
-    """Hours since the scanner's signature database was built (clamd VERSION: "ClamAV 1.4.1/27400/<date>"), or None
-    when the scanner does not answer (counted as unavailable)."""
-    from email.utils import parsedate_to_datetime
-
-    host, _, port = address.rpartition(":")
-    try:
-        with socket.create_connection((host, int(port)), timeout=10) as sock:
-            sock.sendall(b"zVERSION\0")
-            reply = sock.recv(512).decode(errors="replace").strip("\0\n ")
-    except OSError:
-        metrics.emit("MediaScannerUnavailable", 1)
-        return None
-    parts = reply.split("/")
-    try:
-        built = parsedate_to_datetime(parts[2].strip() + " +0000") if len(parts) >= 3 else None
-    except (TypeError, ValueError):
-        built = None
-    if built is None:
-        return None
-    return max(0.0, ((now or clock.now()) - built).total_seconds() / 3600)
+    mode = cfg.catalog_media_scanner
+    # The address is read only when a scanner is configured, as before; the lambda resolves clamd_scan at call time.
+    address = cfg.catalog_clamd_address if mode == "clamd" else ""
+    return scan_outcome(data, mode=mode, address=address, env=cfg.env, scan=lambda blob, a: clamd_scan(blob, a))
 
 
 # --- upload ----------------------------------------------------------------------------------------------------------
@@ -430,7 +246,7 @@ class Uploaded:
 
 
 def _sha(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+    return sha256_hex(data)
 
 
 def _store(s: Session, data: bytes, *, role: str, kind: str, variant: str, mime: str, width: int | None,

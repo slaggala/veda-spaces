@@ -12,6 +12,8 @@
 | [MTQ-implementation-entry-gate.md](MTQ-implementation-entry-gate.md) | The gate that must pass before any code generation for MTQ begins |
 | [MTQ-B1-SCOPE.md](MTQ-B1-SCOPE.md) | B1 Measurement Foundation final scope (proposed freeze): supported configurations, included and deferred entities, Lite/Full survey, staircase, electrical and sensor capture, kitchen tall units, variation quotation model, attachment scaling, migration strategy |
 | [MTQ-B1-blocker-closure.md](MTQ-B1-blocker-closure.md) | B1 blocker closure (2026-10-13): review-finding resolution matrix, tolerance policy, template-package acceptance, migration approval, replay criteria, attachment policy, remaining blockers and verdict |
+| [reviews/MTQ-independent-review-2026-10-13.md](reviews/MTQ-independent-review-2026-10-13.md) | The independent review of record (verbatim), gate MTQ-G1 |
+| [replay/replay-reference-manifest.json](replay/replay-reference-manifest.json) | Sanitised historical replay references, gate MTQ-G5 |
 | [survey-and-scope-templates/](survey-and-scope-templates/README.md) | Survey and scope-template system (2026-10-13): conventions, fourteen space-type templates, property templates, the measurement-visit playbook with the quotation-readiness gate, and catalogue-record content; proposed content for OI-MTQ-02 and OI-MTQ-03 |
 
 Review order suggested: coverage matrix → blueprint §0–§4 → §5–§10 → §11–§15 → §16–§20 → dependency matrix → owner-decision register → entry gate.

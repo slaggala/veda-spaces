@@ -254,3 +254,75 @@ A change to any frozen value (B1-01…06, OI-MTQ-01, OI-MTQ-02, the migration ra
 Gates after this record: **MTQ-G2 RECORDED**, **MTQ-G3 RECORDED**, **MTQ-G4 RECORDED** (each passes on the owner's PR approval); **MTQ-G1 OPEN** (blocker 1); **MTQ-G5 PARTIAL** (criteria recorded, blocker 2).
 
 **Verdict: B1 STILL BLOCKED.** Every design and policy decision B1 needs is now written down; what remains is one review artefact and one data list that only the owner holds, plus the merge. No engineering decision is outstanding.
+
+---
+
+## 9. Entry-gate closure under `VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION` (2026-10-13, appended)
+
+Sections 1–8 above are unchanged. This section records what was found when the owner directed implementation after PR #86 merged.
+
+### 9.1 MTQ-G1: review of record located
+
+§1.3 said the architecture review could not be found. A search of every session transcript on the owner's machine found one independent review only: the business-reality review, with an explicit architecture-soundness lens, whose instruction states the reviewer did not author PR #83 or #84. Its full text, verdict **READY WITH REQUIRED CHANGES** and provenance (session id, message id, transcript SHA-256) are now committed verbatim as [reviews/MTQ-independent-review-2026-10-13.md](reviews/MTQ-independent-review-2026-10-13.md). The committed file is the immutable reference. No separate architecture review exists anywhere, and none is invented here.
+
+§1.1 (BR-01…BR-19) dispositioned the review's B1 items. §1.4 below dispositions every remaining finding of that text, so each section of the review now has a row.
+
+### 1.4 Remaining findings of the review of record (AR rows)
+
+| # | Review § | Finding (quoted or condensed from the review text) | Disposition | Action | Owner | Status |
+|---|---|---|---|---|---|---|
+| AR-01 | §1 | "Rule evaluation model is too small for the rules proposed … needs a property-level pass and a specified grammar before any rule is keyed" | Accepted | Binds B2 entry: rule grammar and property-level pass specified before any `scope_rule` record | Architecture Owner | OPEN-B2 |
+| AR-02 | §1, §10.6 | "Three small schema additions … niche depth, partition `is_proposed`, wall turn direction … in the 0200 migration" | Accepted for niche depth and `is_proposed`; turn direction kept as frozen | `space_opening.depth_mm` (BR-07); **`space_wall.is_proposed` BOOL NOT NULL default false added to 0200**; L-shape turn stays in `space_measurement.attributes.l_shape` per B1-SCOPE §2.9.1, validated by a closed schema (unknown keys and out-of-range values refused) so it is not a free-form escape hatch | Architecture Owner | DECIDED |
+| AR-03 | §1 | "Rate-card driver change is not additive … it is a new card major version" | Accepted | Recorded against OI-MTQ-15: the driver change is a card major version with re-approval | Product Owner | OPEN-B3 |
+| AR-04 | §1, §10.7 | "B1 depends on catalogue authoring it says it does not need" | Accepted | Templates ship as code fixtures (BR-16, B1-06) | Architecture Owner | CLOSED |
+| AR-05 | §1 | "No design stage … no design artefact linked to a scope revision" | Accepted | OI-MTQ-16 | Product Owner | OPEN-B2/B4 |
+| AR-06 | §2 | Photo minimums produce 120–700 photos through a scanner still in soak | Accepted | Lite/Full trim (BR-10); attachment limits (closure §6); scanner soak evidence is a T12 staging precondition | Operations Owner | CLOSED (capture) · OPEN-T12 (soak) |
+| AR-07 | §2 | Offset and swing REQ on every opening | Accepted | Trimmed Full capture (B1-SCOPE §2.3) | Architecture Owner | CLOSED |
+| AR-08 | §2 | Toilet template has nine REQ items | Accepted | Toilet walls follow the trimmed rule: detail is REQ only on a wall tagged `VANITY` | Architecture Owner | CLOSED |
+| AR-09 | §2 | Sixteen submit checks and fifteen property-level REQ items block submission | Accepted | The server submit gate is the completeness rule of B1-SCOPE §2.3 only; property-level items are verify-time checks for FULL sets; the playbook §8 self-check stays procedural | Architecture Owner | DECIDED |
+| AR-10 | §2, §10.1 | Visit time roughly three times today's visit | Accepted | T12 records capture duration per site against the 03 §13 baseline | Operations Owner | OPEN-T12 |
+| AR-11 | §2 | Door architrave intrusion from the adjacent wall is missing | Accepted | Obstruction kind `ARCHITRAVE` on the wall, with offset and width; no new column | Architecture Owner | DECIDED |
+| AR-12 | §2, §10.2 | Floor-to-lintel should be REQ in bedrooms and kitchens | Accepted | `floor_to_lintel_mm` REQ for FULL sets in KITCHEN and every bedroom type | Architecture Owner | DECIDED |
+| AR-13 | §2 | Ceiling positions of existing lights, fans and AC drain missing | Accepted | Ceiling electrical points with x/y (B1-SCOPE §2.5); obstruction kind `AC_DRAIN` | Architecture Owner | DECIDED |
+| AR-14 | §2 | W1 ambiguous for door-less and two-door rooms | Accepted | Door-less per B1-SCOPE §2.9.2; with several doors, W1 is the wall containing the door the surveyor entered through | Architecture Owner | DECIDED |
+| AR-15 | §2 | `derived_level_count` and servant-room rule ambiguous | Accepted | BR-15 | Architecture Owner | CLOSED |
+| AR-16 | §2 | Unit system fixed per set while surveyors mix laser mm and tape feet-inches | Accepted | Storage is always mm and the client converts every entry; `unit_system_code` is the set's default entry unit only | Architecture Owner | DECIDED |
+| AR-17 | §3 | Mandatory and optional scope items, mislabelled card lines, `TRANSPORT` double count, natural-light attributes | Accepted | Scope and card content deferred (closure §3.2, BR-03, BR-04). B1 does not capture natural-light attributes | Product Owner | OPEN-B2/B3 · CLOSED (B1 capture) |
+| AR-18 | §4 | Allowance range, preparation basis, GST, payment schedule, material naming, variations, unit-rate visibility | Accepted | BR-04, BR-01, BR-05, BR-06; OI-MTQ-10 for unit rates | Product Owner | OPEN-B3/B4 |
+| AR-19 | §5 | Stair walls are stepped or sloped, so `length × CH` is wrong | Accepted | Stair walls are per-segment `space_wall` rows; `height_mm` is REQ on every STAIRCASE wall (mean height for a sloped segment) and the ceiling-height default never applies there | Architecture Owner | DECIDED |
+| AR-20 | §5 | Exterior painting, deck flooring, pergolas; two multi-level pricing mechanisms; double-height scaffolding | Accepted | OI-MTQ-05 and OI-MTQ-15; site factor in B3 | Product Owner | OPEN-B3 |
+| AR-21 | §5, §10.3 | Villa second-surveyor merge | Accepted | BR-13 claim policy | Architecture Owner | CLOSED |
+| AR-22 | §6 | Commercial is structurally covered and commercially absent; shared partition identity; GSTIN | Accepted | OI-MTQ-17; commercial out of B1 | Product Owner | OPEN-B2+ |
+| AR-23 | §7 | Stable scope-item identity across regeneration; material and hardware records | Accepted | B2 and B3 design items | Architecture Owner | OPEN-B2/B3 |
+| AR-24 | §7, §10.8 | Attachment anonymisation cascade with the lead purge | Accepted | Closure §6.4 deletion cascade | Privacy Owner | DECIDED |
+| AR-25 | §8 risk 6 | Catalogue V3 administration is off in production; every block after B1 depends on it | Accepted | B2 entry dependency; B1 is independent of it (AR-04) | Product Owner | OPEN-B2 |
+
+**Required changes before B1 (review §10) mapped:** 1 BR-10, AR-10 · 2 BR-08, BR-12, AR-12, AR-14 · 3 BR-13 · 4 BR-14, AR-19 · 5 BR-15 · 6 BR-07, AR-02 · 7 BR-16 · 8 BR-17, AR-24 · 9 BR-03, BR-04 (deferred sections, not B1) · 10 BR-18 and §9.2 below. Every condition has a disposition.
+
+**MTQ-G1: PASSED** on 2026-10-13. Evidence: the committed review of record, §1.1, §1.4, and the owner's merge of PR #86 that carried §1.1. The gate's "CERTIFIED WITH CONDITIONS, every condition dispositioned" reads onto the review's verdict and the table above.
+
+### 9.2 MTQ-G5: replay references inventoried
+
+The owner's private evidence was inventoried on 2026-10-13: the E6 calibration input and thirteen quotation or estimation workbooks. Every workbook is a 3 BHK apartment or not a quotation. No historical source exists for a 2 BHK, 4 BHK, 5 BHK apartment or an independent house. The sanitised manifest is [replay/replay-reference-manifest.json](replay/replay-reference-manifest.json): anonymous ids, fingerprints of the owner-held source, coverage summaries and categories only, no names, rates or amounts.
+
+| Configuration | Status | Confidence (§5.2) |
+|---|---|---|
+| 2 BHK apartment | UNVALIDATED_NO_HISTORICAL_REFERENCE | NONE |
+| 3 BHK apartment | References R-3BHK-A (base, HIGH) and R-3BHK-B (base, MEDIUM: older card); R-3BHK-C is replayed only as the B → C variation case | MEDIUM |
+| 4 BHK apartment | UNVALIDATED_NO_HISTORICAL_REFERENCE | NONE |
+| 5 BHK apartment | UNVALIDATED_NO_HISTORICAL_REFERENCE (§5.3 first-live-quotation rule applies) | NONE |
+| Independent house | UNVALIDATED_NO_HISTORICAL_REFERENCE | NONE |
+
+The owner's instruction of this date rules that missing historical references are a validation limitation carried into the B2 and B3 exits, not a blocker for the generic B1 capture model. §5.2 already treats an empty configuration as UNVALIDATED, never FAIL, so no criterion changes. **MTQ-G5: PASSED WITH LIMITATIONS** on 2026-10-13.
+
+### 9.3 Gate state
+
+| Gate | State | Evidence |
+|---|---|---|
+| MTQ-G1 | PASSED | §9.1, review of record |
+| MTQ-G2 | PASSED | Owner merge of PR #86 (frozen scope d4f14c3 plus §6 Δ values) |
+| MTQ-G3 | PASSED | Owner merge of PR #86 (OI-MTQ-01, OI-MTQ-02 in the register) |
+| MTQ-G4 | PASSED | Owner merge of PR #86; `0106` and `0200` still unoccupied on main |
+| MTQ-G5 | PASSED WITH LIMITATIONS | §9.2, manifest |
+
+**Verdict of §8 superseded: the entry gate is open for B1.** Commercial, duplex, villa and everything in B1-SCOPE §1.2 stay deferred.
