@@ -124,6 +124,10 @@ try {
 
   await step('site measurement is off by default (MTQ B1 production isolation)', async () => {
     const before = consoleErrors.length;
+    await page.goto(`${BASE}/`);
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leads' }).first().waitFor();
+    // MC-3: the Founder holds every site permission, yet nothing of the switched-off feature is discoverable.
+    if (await page.getByRole('link', { name: 'Site visits' }).count()) throw new Error('Site visits is in the menu with the flag off');
     await page.goto(`${BASE}/site`);
     await page.getByText(/not enabled/).first().waitFor({ timeout: 10000 });
     const status = await page.evaluate(async () => (await fetch('/api/v1/properties', { credentials: 'include' })).status);

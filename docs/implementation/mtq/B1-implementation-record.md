@@ -142,3 +142,31 @@ Full record: [B1-T12-staging-enablement.md](B1-T12-staging-enablement.md). Statu
 | Evidence privacy | Anonymous site ids (S01–S20 enforced), dimensions and verdicts only; digests `sha256:`-prefixed | No customer data or pricing in evidence |
 
 Pre-existing flaky test observed (not caused by this branch): `tests/unit/test_deploy_scanner.py::test_entrypoint_propagates_a_clean_clamd_exit` waits 5 s for a stub process and fails intermittently under load; it failed 3 of 6 runs on the main checkout as well.
+
+## PR #87 review closure (merge conditions MC-1, MC-2, MC-3)
+
+The independent review of head 7e640df returned **B1 CERTIFIED WITH MERGE CONDITIONS**. Each condition is fixed in its own commit after B1-T12. Nothing was applied to staging, the site flag stays false, and production is unchanged.
+
+| Condition | Root cause | Correction | Regression tests |
+|---|---|---|---|
+| MC-1 verification order and supersession (commit B1-MC1) | `verify` superseded whichever revision was VERIFIED without comparing survey level or revision; a draft could be opened while a revision was SUBMITTED; `supersedes_set_id` was fixed at draft creation | Every revision transition takes the property lock and re-reads the set under it. Verification refuses `LITE_AFTER_FULL`, `REVISION_OUT_OF_ORDER` and `HIGHER_REVISION_PENDING`; drafts and second submissions are refused while a revision awaits verification (`SUBMITTED_REVISION_PENDING`); `supersedes_set_id` and the predecessor's SUPERSEDED state are set at verification in one transaction | `api/tests/integration/test_mtq_revision_order.py` (six tests, SQLite and PostgreSQL) |
+| MC-2 attachment upload after withdrawal or erasure (commit B1-MC2) | `complete` checked only `upload_status`, so late bytes for a withdrawn or erased attachment were scanned CLEAN and given variants; purge looked only at AWAITING_UPLOAD and rescan only at ACTIVE rows | `require_uploadable` gates instructions, local receipt and completion; a refused completion deletes bytes that already arrived and is refused the same way on retry; withdrawal and erasure invalidate a pending upload; scan and variant code never act on a non-active attachment; purge sweeps withdrawn and erased attachments for 24 hours; a rescan that finds an object missing emits `AttachmentObjectMissing` | `api/tests/integration/test_attachment_lifecycle.py` (six tests, local and S3 stand-in, SQLite and PostgreSQL) |
+| MC-3 navigation while the flag is off (commit B1-MC3) | The nav item depended on permissions only; the route gate was a blueprint `before_request`, which Flask skips when routing fails, so unsupported methods answered 405 | `/auth/me` reports `features.mtq_site`; the menu and the command palette show an item behind a feature only when the feature is on AND the permission is held; the gate is app-wide `before_app_request` on the exact MTQ and attachment path prefixes, so every method answers 404 | `api/tests/integration/test_mtq_feature_gate.py`; `app/test/feature-nav.test.ts`; the browser E2E checks the Founder's menu |
+
+**About the MC-1 lock.** The concurrency test passes with and without the property lock, and no request returns a server error either way. The ordering rules, the one-verified-per-property index and the row version column already make concurrent attempts refuse safely. The lock makes each decision on committed state; it is defence in depth, not what the test proves.
+
+### Pre-enablement findings (not merge conditions)
+
+Carried from the review, unchanged by these commits:
+
+- Shared-device offline queue.
+- Accessibility coverage expansion.
+- 44 px touch targets.
+- S3 missing-object 403/404 behaviour.
+- PostgreSQL submit race. MC-1 now takes the property lock on submit as well; the finding stays open for its own re-check.
+- Live validation evaluator defects.
+- Missing live-site references.
+
+Found while fixing MC-3:
+
+- The SURVEYOR and DESIGNER roles do not hold `profile.read`, so a user with only those roles cannot load `/auth/me` or the workspace. Staff accounts need SALES as well until the role matrix is reviewed.

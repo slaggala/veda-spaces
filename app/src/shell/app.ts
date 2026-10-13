@@ -169,7 +169,7 @@ export class VsApp extends LitElement {
     const meta = metaForPath(this.pathname);
     const me = session.me;
     const chrome = Boolean(meta?.chrome) && session.isAuthenticated && !session.isRecovery;
-    const items = filterNav(NAV_ITEMS, me?.permissions);
+    const items = filterNav(NAV_ITEMS, me?.permissions, me?.features);
     const main = items.filter((i) => i.group === 'main');
     const adminItems = items.filter((i) => i.group === 'admin');
     const account = items.filter((i) => i.group === 'account');
@@ -203,7 +203,7 @@ export class VsApp extends LitElement {
         ? html`<nav class="tabs" aria-label="Primary">
             ${items.filter((i) => i.mobile).map((i) => html`<a href=${i.path} aria-current=${this.isActive(i) ? 'page' : 'false'}>${icon(i.icon)}${i.label}</a>`)}
           </nav>
-          <vs-command-palette .perms=${me?.permissions ?? {}}></vs-command-palette>`
+          <vs-command-palette .perms=${me?.permissions ?? {}} .features=${me?.features ?? {}}></vs-command-palette>`
         : nothing}
       <vs-step-up-dialog></vs-step-up-dialog>
       <span class="sr-only" aria-live="polite">${session.state.status === 'loading' ? t('app.name') : this.announced}</span>

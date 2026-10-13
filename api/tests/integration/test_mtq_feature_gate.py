@@ -1,0 +1,91 @@
+"""MC-3 (PR #87 review): while VEDA_MTQ_SITE_ENABLED is off, nothing of site measurement is discoverable.
+
+Every method on every site-measurement and attachment path answers 404 (never 405), whoever asks; /auth/me reports
+the feature as off for every role, so the workspace hides it even from users who hold its permissions. With the flag
+on, the workspace may show it to users with the permission (the menu rule is tested in app/test/site.test.ts).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from veda.config import validate_environment
+
+# SURVEYOR and DESIGNER do not hold profile.read on their own (a pre-enablement finding recorded in the PR): the staff
+# accounts below hold SALES as well, so /auth/me loads; the route gate is also checked for the bare roles.
+ROLES = [
+    ((), True),
+    (("ADMIN",), False),
+    (("SALES",), False),
+    (("SURVEYOR", "SALES"), False),
+    (("DESIGNER", "SALES"), False),
+]
+GATED = [
+    "/api/v1/properties",
+    "/api/v1/properties/01a133f83e0b75f28dbab1b4e22da549",
+    "/api/v1/properties/01a133f83e0b75f28dbab1b4e22da549/spaces",
+    "/api/v1/spaces/01a133f83e0b75f28dbab1b4e22da549",
+    "/api/v1/measurement-visits",
+    "/api/v1/measurement-sets/01a133f83e0b75f28dbab1b4e22da549",
+    "/api/v1/measurement-sets/01a133f83e0b75f28dbab1b4e22da549/sync",
+    "/api/v1/mtq/templates",
+    "/api/v1/attachments",
+    "/api/v1/attachments/01a133f83e0b75f28dbab1b4e22da549/complete",
+]
+METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+
+def _user(factory, roles, founder):
+    return factory.user(founder=True) if founder else factory.user(*roles)
+
+
+@pytest.mark.parametrize(("role", "founder"), ROLES, ids=["FOUNDER", "ADMIN", "SALES", "SURVEYOR", "DESIGNER"])
+def test_flag_off_every_role_sees_the_feature_off_and_every_method_is_404(api, factory, role, founder):
+    user = _user(factory, role, founder)
+    factory.login(api, user)
+    me = api.get("/api/v1/auth/me")
+    assert me.status == 200, me
+    assert me.data["features"] == {"mtq_site": False}
+    for path in GATED:
+        for method in METHODS:
+            r = api.call(method, path, {} if method in ("POST", "PUT", "PATCH") else None)
+            assert r.status == 404, (role, method, path, r.status)
+            assert r.json["code"] == "NOT_FOUND"
+
+
+@pytest.mark.parametrize("role", ["SURVEYOR", "DESIGNER"])
+def test_flag_off_bare_site_roles_get_404_on_every_method(api, factory, role):
+    factory.login(api, factory.user(role))
+    for path in GATED:
+        for method in METHODS:
+            assert api.call(method, path, {} if method in ("POST", "PUT", "PATCH") else None).status == 404, (
+                method,
+                path,
+            )
+
+
+def test_flag_off_unauthenticated_requests_are_404_too(api):
+    for path in GATED:
+        for method in METHODS:
+            assert api.call(method, path, None, anonymous=True).status == 404, (method, path)
+
+
+def test_flag_off_leaves_v1_routes_untouched(api, factory):
+    factory.login(api, factory.user(founder=True))
+    assert api.get("/api/v1/leads").status == 200
+    assert api.call("PATCH", "/api/v1/leads", {}).status == 405  # V1 keeps its own method answers
+
+
+@pytest.mark.settings(mtq_site_enabled=True)
+def test_flag_on_reports_the_feature_and_opens_the_routes(api, factory):
+    factory.login(api, factory.user("SURVEYOR", "SALES"))
+    assert api.get("/api/v1/auth/me").data["features"] == {"mtq_site": True}
+    assert api.get("/api/v1/mtq/templates").status == 200
+    assert api.call("PATCH", "/api/v1/mtq/templates", {}).status == 405  # with the flag on, normal routing applies
+
+
+def test_production_refuses_the_flag(monkeypatch):
+    from tests.unit.test_config_environments import deployed_env
+
+    on = deployed_env(monkeypatch, "production", VEDA_MTQ_SITE_ENABLED="true")
+    assert "VEDA_MTQ_SITE_ENABLED is not authorised in production (MTQ B1)" in validate_environment(on)

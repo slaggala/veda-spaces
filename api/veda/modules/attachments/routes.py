@@ -23,9 +23,17 @@ CONTENT_MAX_BODY = 21 * 1024 * 1024  # 15 MiB base64-encoded, local backend only
 UPLOAD_LIMITS = [("600 per minute", ip_key)]
 
 
-@api.blueprint.before_request
+GATED_PREFIXES = ("/api/v1/attachments",)
+
+
+@api.blueprint.before_app_request
 def _site_enabled():
-    if not settings().mtq_site_enabled:
+    """MC-3: app-wide, before routing errors are raised, so every method on every gated path (including methods no
+    route accepts, which would otherwise be 405) answers 404 while VEDA_MTQ_SITE_ENABLED is off."""
+    from flask import request
+
+    path = request.path.rstrip("/")
+    if not settings().mtq_site_enabled and any(path == p or path.startswith(p + "/") for p in GATED_PREFIXES):
         return problem_response(ApiError(404, "NOT_FOUND", "Not found."))
     return None
 

@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { api } from '../core/api/client.js';
 import type { Lead, PermissionMap } from '../core/api/types.js';
-import { filterNav, has, NAV_ITEMS } from '../core/authz/permissions.js';
+import { filterNav, has, NAV_ITEMS, type FeatureMap } from '../core/authz/permissions.js';
 import { navigate } from '../core/router/next.js';
 import { shared } from '../design-system/styles.js';
 
@@ -9,12 +9,13 @@ interface Item { label: string; hint?: string; path: string }
 
 /** ⌘K / Ctrl-K: jump to a lead by number, name or phone, or to a page. Permission-filtered (09 §3.2). */
 export class VsCommandPalette extends LitElement {
-  static override properties = { open: { state: true }, results: { state: true }, active: { state: true }, perms: { attribute: false } };
+  static override properties = { open: { state: true }, results: { state: true }, active: { state: true }, perms: { attribute: false }, features: { attribute: false } };
   declare open: boolean;
   declare results: Item[];
   /** Index of the highlighted option (aria-activedescendant); -1 when there are no results. */
   declare active: number;
   declare perms: PermissionMap;
+  declare features: FeatureMap;
   private seq = 0;
   private onKey = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -37,6 +38,7 @@ export class VsCommandPalette extends LitElement {
     this.results = [];
     this.active = -1;
     this.perms = {};
+    this.features = {};
   }
   override connectedCallback() {
     super.connectedCallback();
@@ -52,7 +54,7 @@ export class VsCommandPalette extends LitElement {
     this.updateComplete.then(() => (this.renderRoot.querySelector('input') as HTMLInputElement | null)?.focus());
   }
   private pages(q: string): Item[] {
-    const items: Item[] = filterNav(NAV_ITEMS, this.perms).map((n) => ({ label: n.label, hint: 'Page', path: n.path }));
+    const items: Item[] = filterNav(NAV_ITEMS, this.perms, this.features).map((n) => ({ label: n.label, hint: 'Page', path: n.path }));
     if (has(this.perms, 'lead.create')) items.push({ label: 'New lead', hint: 'Action', path: '/leads?new=1' });
     return items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()));
   }
