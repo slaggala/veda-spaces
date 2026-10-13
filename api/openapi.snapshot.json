@@ -16443,6 +16443,48 @@
         "x-requirement": "QUOT-003"
       }
     },
+    "/api/v1/quotations/{quotation_id}/chain": {
+      "get": {
+        "operationId": "mtq_quotation_get_chain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every version and variation under this quotation number",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
     "/api/v1/quotations/{quotation_id}/decision": {
       "post": {
         "operationId": "mtq_quotation_decide",
@@ -16704,6 +16746,58 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/variations": {
+      "post": {
+        "operationId": "mtq_quotation_create_variation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Raise a variation (change order) to an accepted quotation from a newly approved estimate",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.variation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-006"
       }
     },
     "/api/v1/quotations/{quotation_id}/versions": {

@@ -12,7 +12,7 @@ from veda.config import settings
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 
-from . import access, journey, quotations, rendering
+from . import access, journey, quotations, rendering, variations
 from . import schemas as S
 from .models import CostEstimate, Quotation, QuotationLine
 
@@ -78,6 +78,15 @@ def get_quotation(req: Req, quotation_id: str):
            summary="The customer document (frozen snapshot once issued; a marked draft before) and its HTML")  # fmt: skip
 def get_document(req: Req, quotation_id: str):
     return ok(rendering.rendered(req.session, _quotation(req, quotation_id)))
+
+
+@api.route("GET", "/quotations/<quotation_id>/chain", permission="quotation.read", write=False,
+           requirement="QUOT-001", summary="Every version and variation under this quotation number")  # fmt: skip
+def get_chain(req: Req, quotation_id: str):
+    q = _quotation(req, quotation_id)
+    return ok({"quotation_number": q.quotation_number, "accepted_value_minor":
+               variations.accepted_value(req.session, q.quotation_number),
+               "versions": variations.chain(req.session, q.quotation_number)})  # fmt: skip
 
 
 @api.route("GET", "/quotation-lines/<line_id>/trace", permission="quotation.read", write=False,
@@ -160,6 +169,18 @@ def decide(req: Req, quotation_id: str):
     _for_write(req, q, "quotation.decision.record")
     quotations.decide(req.session, req.ctx, q, req.body)
     return _out(req, q)
+
+
+@api.route("POST", "/quotations/<quotation_id>/variations", permission="quotation.variation.create",
+           body=S.QuotationVersionIn, status=201, idempotent_create=True, requirement="QUOT-006",
+           summary="Raise a variation (change order) to an accepted quotation from a newly approved estimate")  # fmt: skip
+def create_variation(req: Req, quotation_id: str):
+    base = _quotation(req, quotation_id)
+    access.for_write(req.session, req.ctx, base.lead_id, base.property_id, "quotation.variation.create", base)
+    est = _estimate(req, req.body.cost_estimate_id)
+    prop = access.property_visible(req.session, req.ctx, base.property_id, "quotation.read")
+    q = variations.create(req.session, req.ctx, base, est, prop, req.body)
+    return _out(req, q, 201)
 
 
 def _journey_quotations(s, ctx, prop):
