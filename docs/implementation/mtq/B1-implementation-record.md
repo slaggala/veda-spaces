@@ -204,3 +204,17 @@ Audit of the remaining If-Match paths: visit PATCH and visit status, attachment 
 Every new test was run against the code before the fix: 30 of the 51 new cases failed there (the rest are the draft-permitted cases and SQLite cases BEGIN IMMEDIATE already serialised) (PostgreSQL PATCH: both requests 200, the second request's value silently replaced the first), and all pass after it on SQLite and PostgreSQL.
 
 The synthetic ten-site evidence was regenerated from the remediation commit on a clean checkout (generator commit without `-dirty`); it remains SYNTHETIC_VALIDATED and is never a live result. The live document remains UNVALIDATED_NO_REFERENCE.
+
+### Stated-area freeze (owner decision, decision log entry 29, 2026-10-13)
+
+Verification reads two property values: the stated `built_up_area_sqft_centi`, falling back to `carpet_area_sqft_centi`, for the ±25 % `BUILT_UP_DEVIATION` check. Before this change, `PATCH /properties/{id}` could change them while a revision was SUBMITTED, which could clear or create that check's result without an acknowledgement. `properties.update` now refuses a change to either value with 409 `PROPERTY_REFERENCE_FROZEN` (listing the `fields` and the pending `measurement_set_id`) while a revision is SUBMITTED. It uses the same lock and SUBMITTED check as the plan freeze (`require_plan_open`). Other property fields and an unchanged value are still accepted, and the freeze ends at verification or reject.
+
+Tests: `api/tests/integration/test_mtq_property_reference_freeze.py`, run on SQLite and PostgreSQL. They cover:
+
+- both fields refused while SUBMITTED;
+- other fields still editable;
+- a later PATCH can neither clear nor create a `BUILT_UP_DEVIATION`;
+- the freeze ends after verify and after reject;
+- a forced interleaving with submit.
+
+9 of the 14 cases fail on the previous code.
