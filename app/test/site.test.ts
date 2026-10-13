@@ -1,3 +1,4 @@
+import { ContextProvider } from '@lit/context';
 import { expect, fixture, html, waitUntil } from '@open-wc/testing';
 import '../src/design-system/components.js';
 import { emptyRoom, fromMeasurement, toPayload } from '../src/modules/site/capture-model.js';
@@ -5,6 +6,7 @@ import type { SpaceMeasurement } from '../src/modules/site/api.js';
 import { ApiClient } from '../src/core/api/client.js';
 import type { Me } from '../src/core/api/types.js';
 import { session, SessionController } from '../src/core/auth/session.js';
+import { sessionContext } from '../src/core/authz/context.js';
 import { MemoryStore, OfflineQueue, queue, sendBytes, SITE_DB } from '../src/modules/site/offline-queue.js';
 import { siteDatabaseExists, siteSignOutGuard } from '../src/modules/site/sign-out.js';
 import { fitWithin } from '../src/modules/site/photos.js';
@@ -393,5 +395,92 @@ describe('site pages', () => {
     expect(root.textContent).to.contain('1 items before submission');
     expect(root.textContent).to.not.contain('₹');
     await expect(page).to.be.accessible();
+  });
+});
+
+describe('site pages accessibility at phone width (B1-PE-03)', () => {
+  const originalFetch = window.fetch;
+  afterEach(() => { window.fetch = originalFetch; });
+
+  const PERMS = ['measurement.visit.read', 'measurement.visit.create', 'measurement.read', 'measurement.verify', 'measurement.capture',
+    'property.read', 'property.create', 'property.update'];
+  const spaces = [
+    { id: 'l1', version: 1, property_id: 'p1', parent_space_id: null, label: 'Living', space_type_code: 'LIVING', is_in_scope: true, zone_code: 'INDOOR', level_index: 0, sort_order: 10 },
+    { id: 'b1', version: 1, property_id: 'p1', parent_space_id: null, label: 'Bedroom 1', space_type_code: 'BEDROOM', is_in_scope: true, zone_code: 'INDOOR', level_index: 0, sort_order: 20 },
+    { id: 't1', version: 1, property_id: 'p1', parent_space_id: 'b1', label: 'Toilet 1', space_type_code: 'TOILET', is_in_scope: false, zone_code: 'INDOOR', level_index: 0, sort_order: 30 },
+  ];
+  const property = { id: 'p1', version: 1, property_number: 'VS-P-1', display_label: '1 BHK apartment', configuration_label: '1 BHK', city: 'Pune',
+    derived_bedroom_count: 1, derived_toilet_count: 1, derived_level_count: 1, derived_measured_floor_area_sqft_centi: 45000,
+    latest_verified_set: { id: 's1', revision_no: 1 }, spaces };
+  const visit = { id: 'v1', version: 1, visit_number: 'VS-V-1', property_id: 'p1', status: 'SCHEDULED', survey_level_code: 'FULL',
+    scheduled_start_on: '2026-10-14T05:30:00Z', assigned_to: { id: 'u1', display_name: 'Surveyor One' }, allowed_transitions: ['IN_PROGRESS', 'CANCELLED'] };
+  const wall = { wall_index: 1, length_mm: 3600, wall_type_code: 'MASONRY', usable_for_code: ['WARDROBE'], obstructions: [], openings: [] };
+  const measured = { id: 'm1', version: 1, space_id: 'b1', shape_code: 'RECTANGULAR', length_mm: 3600, width_mm: 3000, ceiling_height_mm: 2900,
+    derived_floor_area_sqft_centi: 11625, derived_wall_area_net_sqft_centi: 30000, derived_perimeter_mm: 13200, walls: [wall], electrical_points: [] };
+  const set = (id: string, revision: number, status: string) => ({ id, version: 1, property_id: 'p1', revision_no: revision, status, survey_level_code: 'FULL',
+    method_code: 'LASER', unit_system_code: 'FT_IN', captured_by: 'u2', rejection_reason: null, snapshot_sha256: null,
+    summary: { total_floor_area_sqft_centi: 11625 }, spaces: [measured], notes: [] });
+  const templates = { template_version: '2026.10.1', space_templates: {}, property_templates: {
+    APARTMENT_3BHK: { property_type_code: 'APARTMENT', configuration_label: '3 BHK', spaces: [{ ref: 'living', label: 'Living' }, { ref: 'study', label: 'Study', optional: true }] } } };
+  const checks = { survey_level: 'FULL', ready_to_submit: true, ready_to_verify: true, usable_segments: {}, submit_problems: [],
+    verify_problems: [{ pointer: '/spaces/b1', code: 'CEILING_UNUSUAL', message: 'The ceiling is unusually high.', acknowledgeable: true }] };
+
+  function serve() {
+    window.fetch = async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), location.href).pathname;
+      const body = path.endsWith('/mtq/templates') ? templates
+        : path.endsWith('/measurement-visits') ? [visit]
+        : path.endsWith('/measurement-sets') ? [set('s1', 1, 'VERIFIED'), set('s2', 2, 'DRAFT')]
+        : path.endsWith('/checks') ? checks
+        : path.includes('/diff/') ? { spaces: [{ space_id: 'b1', change: 'CHANGED', fields: { length_mm: { from: 3500, to: 3600 } }, walls: { 1: { from: 3500, to: 3600 } } }] }
+        : path.includes('/attachments') ? []
+        : path === '/api/v1/measurement-sets/s2' ? set('s2', 2, 'DRAFT')
+        : path.startsWith('/api/v1/measurement-sets/') ? set('s3', 3, 'SUBMITTED')
+        : path === '/api/v1/properties' ? [property]
+        : property;
+      return new Response(JSON.stringify({ data: body }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+  }
+
+  /** Mounts a page at 360 px under a session that holds every site permission (the pages read it through context). */
+  async function mount(tag: string, location: { params: Record<string, string>; search?: string }, ready: string): Promise<HTMLElement> {
+    serve();
+    const host = await fixture<HTMLDivElement>(html`<div style="width: 360px"></div>`);
+    new ContextProvider(host, { context: sessionContext, initialValue: { status: 'authenticated',
+      me: { id: 'u1', permissions: Object.fromEntries(PERMS.map((p) => [p, 'ALL'])) } as unknown as Me } });
+    const page = document.createElement(tag) as HTMLElement & { location: unknown };
+    page.location = location;
+    host.append(page);
+    await waitUntil(() => page.shadowRoot?.querySelector(ready), `${tag} rendered`);
+    return page;
+  }
+
+  it('site home: visits, properties and the new-property form', async () => {
+    const page = await mount('vs-site-home-page', { params: {} }, '#new');
+    await waitUntil(() => page.shadowRoot!.textContent!.includes('VS-V-1') && page.shadowRoot!.textContent!.includes('VS-P-1'), 'lists loaded');
+    await expect(page).to.be.accessible();
+  });
+
+  it('property: spaces, visits and revisions', async () => {
+    const page = await mount('vs-property-page', { params: { id: 'p1' } }, '#spaces');
+    await waitUntil(() => page.shadowRoot!.textContent!.includes('Rev 2'), 'revisions loaded');
+    await expect(page).to.be.accessible();
+  });
+
+  it('review: checks with an acknowledgement, the comparison and the measured spaces', async () => {
+    const page = await mount('vs-review-page', { params: { id: 's3' }, search: '?compare=s2' }, '#checks');
+    await waitUntil(() => page.shadowRoot!.querySelector('#diff'), 'comparison loaded');
+    await expect(page).to.be.accessible();
+  });
+
+  it('capture: the photo buttons show the focus ring when their hidden file input has focus', async () => {
+    const page = await mount('vs-capture-page', { params: { id: 's2' } }, '#room-title');
+    page.style.setProperty('--vs-focus-ring', '#A46D42'); // the design tokens (tokens.css) are not loaded in unit tests
+    const input = page.shadowRoot!.querySelector<HTMLInputElement>('label.btn input[type="file"]')!;
+    const label = input.closest('label')!;
+    expect(getComputedStyle(label).outlineStyle).to.equal('none');
+    input.focus();
+    expect(getComputedStyle(label).outlineStyle).to.equal('solid');
+    expect(getComputedStyle(label).outlineWidth).to.equal('2px');
   });
 });

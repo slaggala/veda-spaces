@@ -72,6 +72,8 @@ export class VsCapturePage extends SessionElement {
     .conflict { border-left: 3px solid var(--vs-danger); padding-left: 8px; }
     ul.plain { padding-left: 18px; margin: 4px 0; }
     input.len { font-family: var(--vs-font-mono); }
+    /* Photo buttons are labels around a visually hidden file input: the ring shows on the label the input sits in. */
+    label.btn:focus-within { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
   `];
 
   constructor() {

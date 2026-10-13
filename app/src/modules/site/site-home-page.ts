@@ -101,7 +101,7 @@ export class VsSiteHomePage extends SessionElement {
       ${this.problem ? html`<div role="alert" class="danger-text">${this.problem.detail ?? this.problem.title}</div>` : nothing}
       ${this.can('measurement.visit.read') ? html`<section class="card stack" aria-labelledby="mine">
         <h2 id="mine" class="title">My visits</h2>
-        ${this.visits.length ? html`<table><thead><tr><th>Visit</th><th>When</th><th>Survey</th><th>Status</th><th></th></tr></thead><tbody>
+        ${this.visits.length ? html`<table><thead><tr><th>Visit</th><th>When</th><th>Survey</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
           ${this.visits.map((v) => html`<tr><td>${v.visit_number}</td><td>${formatFull(v.scheduled_start_on)}</td><td>${label(v.survey_level_code)}</td>
             <td>${label(v.status)}</td><td><button class="btn small primary" @click=${() => this.start(v)}>${v.status === 'IN_PROGRESS' ? 'Continue' : 'Start'}</button>
             <a class="btn small ghost" href="/site/properties/${v.property_id}">Property</a></td></tr>`)}
