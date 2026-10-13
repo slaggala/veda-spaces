@@ -186,6 +186,30 @@ export function estimatorFlags(env) {
   return { enabled: env.STAGING_ESTIMATOR === 'on', packages, homeSizes, propertyTypes, ux, version };
 }
 
+/**
+ * MTQ B1-T11: site photos upload straight to the private attachments bucket through a pre-signed POST (the API never
+ * relays bytes; blocker closure §6). The bucket has no CORS (the plan guard refuses it), so the browser sends the POST
+ * without reading the answer and the API's completion step verifies the object (length, SHA-256, type). connect-src
+ * names exactly the staging bucket's regional origin from the reviewed account manifest: no wildcard, no other bucket.
+ */
+export const ACCOUNT_MANIFEST = fileURLToPath(new URL('../../infra/config/staging-account.json', import.meta.url));
+export function attachmentOrigin(manifestFile = ACCOUNT_MANIFEST) {
+  const m = JSON.parse(readFileSync(manifestFile, 'utf8'));
+  if (!/^[0-9]{12}$/.test(m.account_id ?? '') || m.region !== 'ap-south-1') {
+    throw new Error('staging-account.json: expected a 12-digit account_id and region ap-south-1 for the attachments bucket');
+  }
+  return `https://veda-stg-attachments-${m.account_id}.s3.${m.region}.amazonaws.com`;
+}
+
+export function attachmentConnectCsp(headersText, origin) {
+  if (!/^https:\/\/veda-stg-attachments-[0-9]{12}\.s3\.ap-south-1\.amazonaws\.com$/.test(origin)) {
+    throw new Error(`not the staging attachments bucket origin: ${origin}`);
+  }
+  const want = `connect-src 'self' ${STAGING_API}`;
+  if ((headersText.match(/connect-src [^;]*/g) || []).join() !== want) throw new Error(`_headers: expected "${want}" in the workspace CSP`);
+  return headersText.replace(want, `${want} ${origin}`);
+}
+
 export function buildApp(key) {
   siteKey(key);
   if (process.env.VITE_API_BASE && process.env.VITE_API_BASE !== STAGING_API) {
@@ -194,7 +218,7 @@ export function buildApp(key) {
   const env = { ...process.env, VITE_API_BASE: STAGING_API, VITE_TURNSTILE_SITE_KEY: key };
   execFileSync('npm', ['run', 'build'], { cwd: APP, env, stdio: 'inherit' });
   const out = join(APP, 'dist');
-  writeFileSync(join(out, '_headers'), stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')));
+  writeFileSync(join(out, '_headers'), attachmentConnectCsp(stagingHeaders(readFileSync(join(out, '_headers'), 'utf8')), attachmentOrigin()));
   checkStaging(out);
 }
 

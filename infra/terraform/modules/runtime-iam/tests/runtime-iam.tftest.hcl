@@ -16,6 +16,8 @@ variables {
     evidence   = "arn:aws:s3:::veda-evidence-111122223333"
     logs       = "arn:aws:s3:::veda-stg-logs-111122223333"
     media      = "arn:aws:s3:::veda-stg-media-111122223333"
+
+    attachments = "arn:aws:s3:::veda-stg-attachments-111122223333"
   }
   repository_name  = "veda-api"
   log_group_prefix = "/veda/staging"
@@ -80,9 +82,10 @@ run "locked_buckets_never_deleted_by_the_host" {
   assert {
     condition = alltrue([for s in jsondecode(aws_iam_policy.runtime.policy).Statement :
       s.Effect == "Deny" || !contains(flatten([s.Action]), "s3:DeleteObject") || s.Resource == "${var.bucket_arns.litestream}/*" ||
-      toset(flatten([s.Resource])) == toset(["${var.bucket_arns.media}/source/*", "${var.bucket_arns.media}/variant/*"])
+      toset(flatten([s.Resource])) == toset(["${var.bucket_arns.media}/source/*", "${var.bucket_arns.media}/variant/*"]) ||
+      toset(flatten([s.Resource])) == toset(["${var.bucket_arns.attachments}/upload/*", "${var.bucket_arns.attachments}/att/*"])
     ])
-    error_message = "the host deletes only Litestream objects (WAL retention) and withdrawn media under source/ and variant/, never snapshots, anchors or evidence"
+    error_message = "the host deletes only Litestream objects (WAL retention), withdrawn media under source/ and variant/ and attachments under upload/ and att/, never snapshots, anchors or evidence"
   }
 }
 
@@ -174,6 +177,58 @@ run "a_production_media_bucket_refused" {
       evidence   = "arn:aws:s3:::veda-evidence-111122223333"
       logs       = "arn:aws:s3:::veda-stg-logs-111122223333"
       media      = "arn:aws:s3:::veda-prod-media-111122223333"
+
+      attachments = "arn:aws:s3:::veda-stg-attachments-111122223333"
+    }
+  }
+
+  expect_failures = [var.bucket_arns]
+}
+
+# MTQ B1-T11: the host reaches the attachments bucket only under upload/ and att/; a pre-signed POST it signs can do no more.
+run "attachment_access_only_under_the_approved_prefixes" {
+  command = plan
+
+  assert {
+    condition = toset(flatten([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : flatten([s.Resource])
+      if s.Effect == "Allow" && strcontains(jsonencode(s.Resource), "veda-stg-attachments")])) == toset([
+      "arn:aws:s3:::veda-stg-attachments-111122223333/upload/*", "arn:aws:s3:::veda-stg-attachments-111122223333/att/*",
+      "arn:aws:s3:::veda-stg-attachments-111122223333",
+    ])
+    error_message = "the attachments bucket is reachable only under upload/ and att/ (and listed only there)"
+  }
+
+  assert {
+    condition = toset(one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Action if s.Sid == "SiteAttachmentObjects"])) == toset([
+    "s3:GetObject", "s3:PutObject", "s3:DeleteObject"])
+    error_message = "get (and head), put and delete only: no version delete, tagging, ACL or policy action"
+  }
+
+  assert {
+    condition     = one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "SiteAttachmentListPrefixes"]) == ["upload/*", "att/*"]
+    error_message = "listing only under the approved prefixes"
+  }
+
+  assert {
+    condition = length([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s
+    if s.Effect == "Allow" && anytrue([for a in flatten([s.Action]) : startswith(a, "kms:")]) && s.Sid != "DataKey" && s.Sid != "AuditKeyThroughS3Only"]) == 0
+    error_message = "no new KMS permission: attachments use the existing data-key grant by alias"
+  }
+}
+
+run "a_production_attachments_bucket_refused" {
+  command = plan
+
+  variables {
+    bucket_arns = {
+      litestream  = "arn:aws:s3:::veda-stg-litestream-111122223333"
+      snapshots   = "arn:aws:s3:::veda-stg-snapshots-111122223333"
+      anchor      = "arn:aws:s3:::veda-stg-anchor-111122223333"
+      artifacts   = "arn:aws:s3:::veda-stg-artifacts-111122223333"
+      evidence    = "arn:aws:s3:::veda-evidence-111122223333"
+      logs        = "arn:aws:s3:::veda-stg-logs-111122223333"
+      media       = "arn:aws:s3:::veda-stg-media-111122223333"
+      attachments = "arn:aws:s3:::veda-prod-attachments-111122223333"
     }
   }
 

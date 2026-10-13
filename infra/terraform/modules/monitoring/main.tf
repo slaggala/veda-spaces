@@ -34,6 +34,10 @@ locals {
     MediaNonCleanRequested    = { pattern = "{ $.MediaNonCleanRequested >= 1 }", value = "1" }
     MediaStorageAccessDenied  = { pattern = "{ $.MediaStorageAccessDenied >= 1 }", value = "1" }
     MediaKmsAccessDenied      = { pattern = "{ $.MediaKmsAccessDenied >= 1 }", value = "1" }
+    # MTQ B1 site attachments (closure §6). The scanner, S3 and KMS signals above are shared with media (the kernel
+    # media module emits them for both); these two are attachment-only. Counts only, no key, filename or customer.
+    AttachmentInfected      = { pattern = "{ $.AttachmentInfected >= 1 }", value = "1" }
+    AttachmentObjectMissing = { pattern = "{ $.AttachmentObjectMissing >= 1 }", value = "1" }
   }
 
   # name => metric, statistic, threshold, comparison, period, missing-data treatment, description
@@ -51,8 +55,10 @@ locals {
     "media-pending-age"         = { deployed = true, ns = "Veda/App", metric = "MediaPendingMaxAgeSeconds", stat = "Maximum", threshold = var.thresholds.media_pending_seconds, cmp = "GreaterThanThreshold", period = 900, missing = "notBreaching", what = "Media waiting for a scan for too long" }
     "media-signatures-outdated" = { deployed = true, ns = "Veda/App", metric = "MediaSignatureAgeHours", stat = "Maximum", threshold = var.thresholds.scanner_signature_hours, cmp = "GreaterThanThreshold", period = 3600, missing = "notBreaching", what = "The scanner's signatures are older than allowed (freshclam not updating)" }
     "media-non-clean-requested" = { deployed = true, ns = "Veda/App", metric = "MediaNonCleanRequested", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Delivery was asked for a released object that is not CLEAN (refused)" }
-    "media-s3-access-denied"    = { deployed = true, ns = "Veda/App", metric = "MediaStorageAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "S3 refused the host on the media bucket" }
-    "media-kms-access-denied"   = { deployed = true, ns = "Veda/App", metric = "MediaKmsAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "KMS refused the host for media" }
+    "media-s3-access-denied"    = { deployed = true, ns = "Veda/App", metric = "MediaStorageAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "S3 refused the host on the media or attachments bucket" }
+    "media-kms-access-denied"   = { deployed = true, ns = "Veda/App", metric = "MediaKmsAccessDenied", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "KMS refused the host for media or attachments" }
+    "attachment-infected"       = { deployed = true, ns = "Veda/App", metric = "AttachmentInfected", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A site photo was detected as malware (quarantined, never served)" }
+    "attachment-object-missing" = { deployed = true, ns = "Veda/App", metric = "AttachmentObjectMissing", stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "A recorded site photo's object is missing from the attachments bucket" }
     "audit-tampering"           = { deployed = false, ns = var.tampering_metric.namespace, metric = var.tampering_metric.name, stat = "Sum", threshold = 1, cmp = "GreaterThanOrEqualToThreshold", period = 300, missing = "notBreaching", what = "Trail, key or bucket protection changed (AUT-104)" }
   }
 

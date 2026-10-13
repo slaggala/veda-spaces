@@ -1805,7 +1805,7 @@ check "MEDIA the guard refuses removing a common media SSM parameter" fail "dele
 check "MEDIA the guard refuses an unrelated SSM parameter removal" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_LOG_LEVEL"]' aws_ssm_parameter '["delete"]')"
 check "MEDIA the guard refuses deleting the media bucket" fail "delete|destroy" -- guard "$(deladd 'module.storage.aws_s3_bucket.this["media"]' aws_s3_bucket '["delete"]')"
 check "MEDIA the guard refuses replacing the data key" fail "delete|destroy" -- guard "$(deladd 'module.kms.aws_kms_key.this["data"]' aws_kms_key '["delete","create"]')"
-check "  ... the recorded AUT-110 plan has seven log metric filters, all in Veda/App (historical fixture; the module now plans fifteen)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
+check "  ... the recorded AUT-110 plan has seven log metric filters, all in Veda/App (historical fixture; the module now plans seventeen)" ok '^7 Veda/App$' -- jq -r '[.resource_changes[] | select(.type == "aws_cloudwatch_log_metric_filter") | .change.after.metric_transformation[0].namespace] | "\(length) \(unique | join(","))"' "$MONPLAN"
 check "  ... every alarm is veda-stg-* and notifies only the alarm topic (known at plan time)" ok '^true$' -- jq '[.resource_changes[] | select(.type == "aws_cloudwatch_metric_alarm") | .change.after | (.alarm_name | startswith("veda-stg-")) and .alarm_actions == ["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"] and .ok_actions == .alarm_actions] | all' "$MONPLAN"
 check "AUT-110 an unencrypted topic is refused" fail "SNS topic without KMS encryption" -- guard "$(monmod aws_sns_topic.alarms '.after.kms_master_key_id = null | .after_unknown.kms_master_key_id = false')"
 check "AUT-110 an HTTPS subscription is refused (data could leave)" fail "subscription protocol https" -- guard "$(monmod aws_sns_topic_subscription.owner '.after.protocol = "https" | .after.endpoint = "https://example.com/hook"')"
@@ -2126,6 +2126,31 @@ check "MEDIA preflight: activation with the inactive digest none is refused" fai
 check "MEDIA preflight: flags off with the inactive digest none -> V3 intentionally disabled" ok "V3 intentionally disabled" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_APPROVAL_SHA256=none)"
 check "MEDIA preflight: video on is refused" fail "VIDEO_ENABLED must be false" -- "$INFRA/host/media-preflight.sh" "$(mpf_env VEDA_CATALOG_VIDEO_ENABLED=true)"
 absent "MEDIA preflight never prints a setting's value" "veda-stg-media-111122223333|alias/veda-stg-data" "$("$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v BUCKET "$f" >"$f.y"; cat "$f" >/dev/null; echo "$f")" 2>&1; "$INFRA/host/media-preflight.sh" "$(f="$(mpf_env)"; grep -v SCANNER= "$f" >"$f.z"; echo "$f.z")" 2>&1 || true)"
+# MTQ B1-T11: the site measurement preflight on rendered files (names only, never values).
+APF="$TMP/apf"; mkdir -p "$APF"
+apf_env() {
+  local f="$APF/env.$RANDOM$RANDOM" kv
+  printf '%s\n' 'VEDA_MTQ_SITE_ENABLED="true"' 'VEDA_ATTACHMENT_BACKEND="s3"' 'VEDA_ATTACHMENT_BUCKET="veda-stg-attachments-111122223333"' \
+    'VEDA_ATTACHMENT_KMS_KEY_ARN="arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data"' 'VEDA_ATTACHMENT_SCANNER="clamd"' \
+    'VEDA_ATTACHMENT_CLAMD_ADDRESS="clamd:3310"' 'VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS="300"' >"$f"
+  for kv in "$@"; do
+    grep -v "^${kv%%=*}=" "$f" >"$f.t" || true
+    printf '%s="%s"\n' "${kv%%=*}" "${kv#*=}" >>"$f.t"
+    mv "$f.t" "$f"
+  done
+  echo "$f"
+}
+check "MTQ render-env runs the site measurement preflight before replacing api.env" ok "attachment-preflight.sh\" \"[$]TMP\"" -- cat "$INFRA/host/render-env.sh"
+check "MTQ preflight: flag absent -> intentionally disabled, no attachment setting required" ok "intentionally disabled" -- "$INFRA/host/attachment-preflight.sh" "$(printf 'VEDA_ENV="staging"\n' >"$APF/empty"; echo "$APF/empty")"
+check "MTQ preflight: flag false -> intentionally disabled" ok "intentionally disabled .VEDA_MTQ_SITE_ENABLED is false" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_MTQ_SITE_ENABLED=false VEDA_ATTACHMENT_SCANNER=none)"
+check "MTQ preflight: flag on without the attachment storage -> NOT APPLIED, names only" fail "ATTACHMENT STORAGE NOT APPLIED: 1 setting.*VEDA_ATTACHMENT_BUCKET" -- "$INFRA/host/attachment-preflight.sh" "$(f="$(apf_env)"; grep -v BUCKET "$f" >"$f.x"; echo "$f.x")"
+check "MTQ preflight: flag on with the local backend is refused" fail "ATTACHMENT BACKEND UNSAFE" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_ATTACHMENT_BACKEND=local)"
+check "MTQ preflight: flag on without clamd is refused (fail closed)" fail "WITHOUT A SCANNER" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_ATTACHMENT_SCANNER=none)"
+check "MTQ preflight: a flag that is neither true nor false is refused" fail "SITE FLAG INVALID" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_MTQ_SITE_ENABLED=yes)"
+check "MTQ preflight: flag on, bucket and clamd -> enabled" ok "ENABLED with the private attachment bucket" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env)"
+absent "MTQ preflight never prints a setting's value" "veda-stg-attachments-111122223333|alias/veda-stg-data" "$("$INFRA/host/attachment-preflight.sh" "$(f="$(apf_env)"; grep -v TTL "$f" >"$f.y"; echo "$f.y")" 2>&1; "$INFRA/host/attachment-preflight.sh" "$(apf_env)" 2>&1 || true)"
+check "MTQ the guard refuses deleting the attachments bucket" fail "delete|destroy" -- guard "$(deladd 'module.storage.aws_s3_bucket.this["attachments"]' aws_s3_bucket '["delete"]')"
+check "MTQ the guard refuses removing an attachment SSM parameter" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_ATTACHMENT_BUCKET"]' aws_ssm_parameter '["delete"]')"
 check "MEDIA the health heartbeat reports scanner restarts only when the scanner runs" ok "ScannerRestarts" -- cat "$INFRA/host/health.sh"
 check "MEDIA the health heartbeat reports scanner health (1 only when running and healthy) beside the restarts" ok "ScannerHealthy" -- cat "$INFRA/host/health.sh"
 check "DEPLOY the Compose plugin is pinned by SHA-256" ok 'COMPOSE_SHA256="[0-9a-f]{64}"' -- cat "$INFRA/host/host-setup.sh"

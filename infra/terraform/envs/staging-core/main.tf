@@ -77,7 +77,12 @@ module "storage" {
   retention = merge({
     for k in ["litestream_noncurrent_days", "snapshots_expire_days", "artifacts_expire_days", "artifacts_noncurrent_days",
     "logs_cloudtrail_expire_days", "logs_flow_expire_days", "evidence_lock_mode", "evidence_lock_days"] : k => local.platform.storage[k]
-  }, { media_noncurrent_days = local.media.noncurrent_days })
+    }, {
+    media_noncurrent_days          = local.media.noncurrent_days
+    attachments_noncurrent_days    = local.attachments.noncurrent_days
+    attachments_upload_expire_days = local.attachments.upload_expire_days
+    attachments_tiering_days       = local.attachments.tiering_days
+  })
 }
 
 # AUT-104: CloudTrail (management events; data events by the owner session).
@@ -157,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config
+    }, local.estimator_config, local.media_config, local.attachment_config
   )
 }
 
@@ -200,6 +205,23 @@ locals {
     }, local.rights.status == "DECIDED" ? {
     VEDA_CATALOG_MEDIA_RIGHTS_APPROVER = local.rights.approver
   } : {})
+}
+
+# MTQ B1 site attachments (B1-T11; closure §6, infra/config/staging-platform.json "attachments"). The attachment
+# storage settings are planned now and stay inert: VEDA_MTQ_SITE_ENABLED is false, so every site-measurement and
+# attachment route answers 404 and nothing is uploaded. Turning the flag on is a separate, reviewed change (B1-T12).
+# The scanner is the media scanner already running on the host (same Compose service, same pinned image).
+locals {
+  attachments = local.platform.attachments
+  attachment_config = {
+    VEDA_MTQ_SITE_ENABLED              = "false"
+    VEDA_ATTACHMENT_BACKEND            = "s3"
+    VEDA_ATTACHMENT_BUCKET             = module.storage.bucket_names["attachments"]
+    VEDA_ATTACHMENT_KMS_KEY_ARN        = local.data_key_alias_arn
+    VEDA_ATTACHMENT_SCANNER            = local.scanner.mode
+    VEDA_ATTACHMENT_CLAMD_ADDRESS      = "clamd:3310"
+    VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS = tostring(local.attachments.upload_ttl_seconds)
+  }
 }
 
 locals {

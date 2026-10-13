@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { APPROVAL, buildSite, canonicalSha256, checkStaging, checkV3Approval, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API, v3ImageCsp } from './staging-build.mjs';
+import { APPROVAL, attachmentConnectCsp, attachmentOrigin, buildSite, canonicalSha256, checkStaging, checkV3Approval, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API, v3ImageCsp } from './staging-build.mjs';
 import { createHash } from 'node:crypto';
 
 const SRC = fileURLToPath(new URL('../e2e/site-release', import.meta.url));
@@ -260,4 +260,24 @@ test('V3 with its approved, bound record: the page ships with the V3-only image 
   const refused = v3Files(join(V3_FIXTURES, 'approved.json'), 'other');
   assert.throws(() => buildSite(SRC, mkdtempSync(join(tmpdir(), 'veda-v3-off-')), KEY, { ...estimatorFlags({ STAGING_ESTIMATOR: 'on', STAGING_ESTIMATOR_VERSION: 'v3' }), v3ApprovalFile: refused.approvalFile, platformFile: refused.platformFile, today: V3_TODAY }), /DIGEST_MISMATCH/);
   rmSync(refused.dir, { recursive: true, force: true });
+});
+
+test('MTQ B1-T11: the workspace CSP reaches exactly the staging attachments bucket', () => {
+  const dir = tmp();
+  const manifest = join(dir, 'account.json');
+  writeFileSync(manifest, JSON.stringify({ account_id: '111122223333', region: 'ap-south-1' }));
+  const origin = attachmentOrigin(manifest);
+  assert.equal(origin, 'https://veda-stg-attachments-111122223333.s3.ap-south-1.amazonaws.com');
+  const committed = readFileSync(fileURLToPath(new URL('../public/_headers', import.meta.url)), 'utf8');
+  const staged = committed.replaceAll(PRODUCTION_API, STAGING_API);
+  const out = attachmentConnectCsp(staged, origin);
+  assert.ok(out.includes(`connect-src 'self' ${STAGING_API} ${origin};`));
+  assert.ok(!out.includes('*.amazonaws.com') && !out.includes('s3.amazonaws.com;'));
+  assert.ok(!committed.includes('amazonaws.com'), 'the production workspace CSP names no bucket');
+  assert.throws(() => attachmentConnectCsp(staged, 'https://*.s3.ap-south-1.amazonaws.com'), /not the staging attachments bucket/);
+  assert.throws(() => attachmentConnectCsp(staged, 'https://veda-prod-attachments-111122223333.s3.ap-south-1.amazonaws.com'), /not the staging attachments bucket/);
+  assert.throws(() => attachmentConnectCsp(committed, origin), /expected "connect-src/);
+  writeFileSync(manifest, JSON.stringify({ account_id: '', region: 'ap-south-1' }));
+  assert.throws(() => attachmentOrigin(manifest), /12-digit account_id/);
+  rmSync(dir, { recursive: true, force: true });
 });

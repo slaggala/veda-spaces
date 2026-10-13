@@ -60,6 +60,10 @@ variable "retention" {
     evidence_lock_mode          = string
     evidence_lock_days          = number
     media_noncurrent_days       = number
+    # MTQ B1 attachments (closure §6): old versions after a withdrawal or erasure, and abandoned uploads.
+    attachments_noncurrent_days    = number
+    attachments_upload_expire_days = number
+    attachments_tiering_days       = number
   })
 
   validation {
@@ -70,6 +74,21 @@ variable "retention" {
   validation {
     condition     = var.retention.media_noncurrent_days >= 1 && var.retention.media_noncurrent_days <= 90
     error_message = "Withdrawn media bytes may survive in old versions for 1 to 90 days only (staging decision media.noncurrent_days)."
+  }
+
+  validation {
+    condition     = var.retention.attachments_noncurrent_days >= 1 && var.retention.attachments_noncurrent_days <= 90
+    error_message = "Withdrawn or erased attachment bytes may survive in old versions for 1 to 90 days only (attachments.noncurrent_days)."
+  }
+
+  validation {
+    condition     = var.retention.attachments_tiering_days >= 30
+    error_message = "Attachments move to Intelligent-Tiering after 30 days at the earliest (closure §6.4 decides 90)."
+  }
+
+  validation {
+    condition     = var.retention.attachments_upload_expire_days >= 1 && var.retention.attachments_upload_expire_days <= 7
+    error_message = "An abandoned upload expires after 1 to 7 days (a pre-signed POST lives at most 15 minutes)."
   }
 
   validation {

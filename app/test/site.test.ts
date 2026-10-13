@@ -1,7 +1,7 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing';
 import { emptyRoom, fromMeasurement, toPayload } from '../src/modules/site/capture-model.js';
 import type { SpaceMeasurement } from '../src/modules/site/api.js';
-import { MemoryStore, OfflineQueue } from '../src/modules/site/offline-queue.js';
+import { MemoryStore, OfflineQueue, sendBytes } from '../src/modules/site/offline-queue.js';
 import { fitWithin } from '../src/modules/site/photos.js';
 import { formatArea, formatLength, parseLength } from '../src/modules/site/units.js';
 import '../src/modules/site/index.js';
@@ -98,6 +98,61 @@ describe('offline queue (B1-T09/T10)', () => {
     await q.flush('set2');
     expect((await q.pending('set2')).map((o) => o.state)).to.deep.equal(['PENDING']);
     expect(q.online).to.equal(false);
+  });
+});
+
+describe('photo upload to the private bucket (B1-T11)', () => {
+  it('sends the pre-signed fields first and the file last, without credentials or CORS', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fake = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init! });
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    const url = 'https://veda-stg-attachments-111122223333.s3.ap-south-1.amazonaws.com/';
+    await sendBytes('a1', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }),
+      { required: true, method: 'POST', url, fields: { key: 'upload/abc', policy: 'p', 'Content-Type': 'image/jpeg' } }, undefined, fake);
+    expect(calls.length).to.equal(1);
+    expect(calls[0].url).to.equal(url);
+    expect(calls[0].init.mode).to.equal('no-cors');
+    expect(calls[0].init.credentials).to.equal('omit');
+    const keys = [...(calls[0].init.body as FormData).keys()];
+    expect(keys).to.deep.equal(['key', 'policy', 'Content-Type', 'file']);
+  });
+
+  it('keeps a photo queued until the server confirms it arrived, and retries with fresh instructions', async () => {
+    const originalFetch = window.fetch;
+    const store = new MemoryStore();
+    const q = new OfflineQueue(store);
+    const op = await q.queuePhoto('set3', { client_ref: 'ph-1' }, new Blob([new Uint8Array([9])], { type: 'image/jpeg' }));
+    const seen: string[] = [];
+    let arrived = false;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const u = String(input);
+      seen.push(`${init?.method ?? 'GET'} ${u.replace(/^https?:\/\/[^/]+/, '')}`);
+      if (u.includes('/sync')) {
+        return new Response(JSON.stringify({ data: { results: [{ op_id: op.op_id, status: 'APPLIED', entity_id: 'att1', upload: { required: true, method: 'PUT', url: '/api/v1/attachments/att1/content' } }] } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (u.endsWith('/complete')) {
+        return arrived ? new Response(JSON.stringify({ data: { upload_status: 'RECEIVED' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+          : new Response(JSON.stringify({ status: 409, code: 'UPLOAD_NOT_RECEIVED', title: 'Conflict' }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } });
+      }
+      if (u.endsWith('/attachments/att1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ data: { upload: { required: true, method: 'PUT', url: '/api/v1/attachments/att1/content' } } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ data: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+      await q.flush('set3');
+      expect((await q.pending('set3')).map((o) => o.state)).to.deep.equal(['UPLOADING'], 'not confirmed: kept');
+      arrived = true;
+      seen.length = 0;
+      await q.resumeUploads('set3');
+      expect(seen[0]).to.equal('GET /api/v1/attachments/att1', 'fresh instructions first');
+      expect(seen).to.include('POST /api/v1/attachments/att1/complete');
+      expect(await q.pending('set3')).to.deep.equal([]);
+    } finally {
+      window.fetch = originalFetch;
+    }
   });
 });
 

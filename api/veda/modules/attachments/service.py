@@ -59,7 +59,9 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 def storage() -> km.ObjectStore:
     cfg = settings()
     if cfg.attachment_backend == "s3":
-        return km.S3Storage(cfg.attachment_bucket or "", cfg.attachment_kms_key_arn, prefixes=PREFIXES)
+        return km.S3Storage(
+            cfg.attachment_bucket or "", cfg.attachment_kms_key_arn, prefixes=PREFIXES, region=cfg.aws_region
+        )
     return km.LocalStorage(cfg.attachment_dir, prefixes=PREFIXES)
 
 

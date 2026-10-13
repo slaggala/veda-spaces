@@ -115,4 +115,17 @@ No deviation. Characterisation snapshot identical before and after.
 | No pricing in the capture UI | The capture and review pages show no rate, amount or currency; a unit test asserts no rupee sign renders | B1 scope excludes pricing |
 | Production isolation | The browser E2E opens `/site` with the flag unset and requires the "not enabled" message and a 404 from `/api/v1/properties` | The flag-off default is checked end to end |
 
+## B1-T11 — attachment storage on staging
+
+Full record: [B1-T11-attachment-storage.md](B1-T11-attachment-storage.md). Status: planned, awaiting controlled apply.
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| Bucket `${name_prefix}-attachments-${account_id}`, data key, no Object Lock, versioning with 30-day noncurrent expiry, Intelligent-Tiering after 90 days, TLS only, bucket-owner-enforced, no public access (closure §6.4) | As frozen, from the storage module; the KMS-only upload statements of the media bucket | Reuse, no new key |
+| "The API never proxies bytes in staging or production (pre-signed POST)" (closure §6) vs the plan guard's refusal of bucket CORS (AUT-103) | The browser sends the pre-signed POST as a `no-cors` simple request and the server's completion step is the proof of arrival; retries fetch fresh instructions | Keeps both rules: no relay, no CORS, no guard exception |
+| — | Uploads never completed expire under `upload/` after 2 days | Not in the freeze; prevents abandoned browser uploads from accumulating |
+| Pre-signed uploads | The attachment store uses a regional, virtual-hosted SigV4 S3 client; the staging workspace CSP names exactly that bucket origin | botocore's default global URL would not match an exact CSP origin |
+| Scanning (closure §6.3) | The attachment scanner setting follows the media scanner mode on the host (clamd, same Compose service) | One scanner, already certified |
+| Flag default false | Planned `VEDA_MTQ_SITE_ENABLED=false`; staging-core refuses another value in this change; the host preflight refuses a flag-on render without the bucket and clamd | Enablement is B1-T12 and needs owner approval |
+
 Pre-existing flaky test observed (not caused by this branch): `tests/unit/test_deploy_scanner.py::test_entrypoint_propagates_a_clean_clamd_exit` waits 5 s for a stub process and fails intermittently under load; it failed 3 of 6 runs on the main checkout as well.

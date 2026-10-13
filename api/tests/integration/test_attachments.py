@@ -6,6 +6,7 @@ scope, frozen limits, idempotency, verified completion, scanning, fail-closed de
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import io
 
@@ -13,6 +14,7 @@ import pytest
 import sqlalchemy as sa
 from PIL import Image
 
+from veda.config import settings
 from veda.kernel import db
 from veda.kernel import media as km
 from veda.kernel.context import actor, system_context
@@ -431,6 +433,40 @@ def test_presigned_post_binds_key_type_length_and_kms(monkeypatch):
     assert out["fields"]["key"] == key and out["expires_in"] == 300
     with pytest.raises(km.MediaError):
         store.presign_post("source/" + "e" * 64, "image/jpeg", 1, 300)  # another module's prefix is refused
+
+
+def test_presigned_post_url_is_the_regional_bucket_origin_the_staging_csp_names(monkeypatch):
+    """B1-T11: the browser uploads to https://<bucket>.s3.<region>.amazonaws.com, signed with SigV4 (botocore, offline)."""
+    for name, value in {
+        "AWS_ACCESS_KEY_ID": "AKIDEXAMPLEFORTESTS0",
+        "AWS_SECRET_ACCESS_KEY": "test-only-not-a-key",  # pragma: allowlist secret
+        "AWS_EC2_METADATA_DISABLED": "true",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    store = km.S3Storage("veda-stg-attachments-111122223333", "arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data",
+                         prefixes=service.PREFIXES, region="ap-south-1")  # fmt: skip
+    out = store.presign_post(km.content_key("upload/", "e" * 64), "image/jpeg", 12345, 300)
+    assert out["url"] == "https://veda-stg-attachments-111122223333.s3.ap-south-1.amazonaws.com/"
+    assert out["fields"]["x-amz-algorithm"] == "AWS4-HMAC-SHA256"
+    assert out["fields"]["x-amz-server-side-encryption"] == "aws:kms"
+
+
+def test_the_s3_backend_builds_a_regional_store(monkeypatch):
+    seen = {}
+
+    class Store:
+        def __init__(self, bucket, kms, prefixes, region=None):
+            seen.update(bucket=bucket, kms=kms, prefixes=prefixes, region=region)
+
+    monkeypatch.setattr(km, "S3Storage", Store)
+    cfg = dataclasses.replace(settings(), attachment_backend="s3", attachment_bucket="veda-stg-attachments-111122223333",
+                              attachment_kms_key_arn="arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data",
+                              aws_region="ap-south-1")  # fmt: skip
+    monkeypatch.setattr(service, "settings", lambda: cfg)
+    service.storage()
+    assert seen == {"bucket": "veda-stg-attachments-111122223333", "kms": "arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data",
+                    "prefixes": service.PREFIXES, "region": "ap-south-1"}  # fmt: skip
 
 
 def test_attachment_category_lookup_is_seeded_and_matches_the_check(app):

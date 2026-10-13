@@ -17,6 +17,10 @@ locals {
     # Catalog V3 media (targeted media enablement): private sources and delivery variants under content-hash keys
     # (source/, variant/). No Object Lock: a media or consent withdrawal removes the current version at once; prior versions expire by lifecycle.
     media = { name = "${var.name_prefix}-media-${var.account_id}", key = var.data_key_arn, lock = false }
+    # MTQ B1 site attachments (measurement photos; closure §6): browser uploads land under upload/<sha256> through a
+    # pre-signed POST, the API re-encodes them into att/<sha256> and deletes the upload. No Object Lock: a withdrawal
+    # or an erasure removes the current version at once; prior versions expire by lifecycle.
+    attachments = { name = "${var.name_prefix}-attachments-${var.account_id}", key = var.data_key_arn, lock = false }
   }
 
   arn       = { for k, b in local.buckets : k => "arn:aws:s3:::${b.name}" }
@@ -33,6 +37,14 @@ locals {
     # A withdrawal or retention purge deletes the current version (the application decides what is served); the old
     # versions expire after the decided window, and the delete markers left behind are removed.
     media = [{ id = "noncurrent-media", prefix = "", expire_days = null, noncurrent_days = var.retention.media_noncurrent_days, delete_markers = true }]
+    # Attachments: old versions expire after the decided window; an upload that was never completed (the API deletes
+    # completed ones) expires after upload_expire_days, so abandoned browser uploads do not accumulate.
+    attachments = [
+      # Closure §6.4: current objects move to Intelligent-Tiering after 90 days (objects under 128 KB stay in the
+      # frequent tier and are not charged monitoring).
+      { id = "noncurrent-attachments", prefix = "", expire_days = null, noncurrent_days = var.retention.attachments_noncurrent_days, delete_markers = true, tiering_days = var.retention.attachments_tiering_days },
+      { id = "expire-abandoned-uploads", prefix = "upload/", expire_days = var.retention.attachments_upload_expire_days, noncurrent_days = 1 },
+    ]
     logs = [
       { id = "expire-cloudtrail", prefix = "cloudtrail/", expire_days = var.retention.logs_cloudtrail_expire_days, noncurrent_days = 1 },
       { id = "expire-vpc-flow", prefix = "vpc-flow/", expire_days = var.retention.logs_flow_expire_days, noncurrent_days = 1 },
@@ -103,6 +115,22 @@ locals {
       Resource  = "${local.arn["media"]}/*"
       Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
     },
+  ]
+
+  # The attachments bucket: the same KMS rules as media (the pre-signed POST carries both headers as signed
+  # conditions). The host role may write only under upload/ and att/ (runtime-iam), so a pre-signed POST, which acts
+  # with the host role's permissions, can only ever land under upload/<sha256> with the length and type it was signed for.
+  attachment_statements = [
+    for st in [
+      {
+        Sid       = "DenyUploadsWithoutTheDataKey"
+        Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption-aws-kms-key-id" = [var.data_key_arn, var.data_key_alias_arn] } }
+      },
+      {
+        Sid       = "DenyUploadsWithoutKms"
+        Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
+      },
+    ] : merge(st, { Effect = "Deny", Principal = "*", Action = "s3:PutObject", Resource = "${local.arn["attachments"]}/*" })
   ]
 
   # The logs bucket: CloudTrail (the Veda trail) and VPC flow-log delivery write their own prefixes.
@@ -241,6 +269,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
         }
       }
 
+      dynamic "transition" {
+        for_each = try(rule.value.tiering_days, null) == null ? [] : [rule.value.tiering_days]
+        content {
+          days          = transition.value
+          storage_class = "INTELLIGENT_TIERING"
+        }
+      }
+
       dynamic "expiration" {
         for_each = try(rule.value.delete_markers, false) ? [true] : []
         content {
@@ -268,6 +304,7 @@ resource "aws_s3_bucket_policy" "this" {
       [for s in local.lock_statements : merge(s, { Resource = "${local.arn[each.key]}/*" }) if contains(["snapshots", "anchor"], each.key)],
       [for s in local.delivery_statements : s if each.key == "logs"],
       [for s in local.media_statements : s if each.key == "media"],
+      [for s in local.attachment_statements : s if each.key == "attachments"],
     )
   })
 

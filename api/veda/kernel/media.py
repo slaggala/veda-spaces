@@ -98,11 +98,26 @@ class S3Storage:
     """A private, versioned bucket with every public-access block on and no ACLs; each object encrypted with KMS;
     keys are content hashes. Delivery goes through the API, never to the bucket directly."""
 
-    def __init__(self, bucket: str, kms_key_arn: str | None, prefixes: tuple[str, ...] = CONTENT_KEY_PREFIXES):
+    def __init__(
+        self,
+        bucket: str,
+        kms_key_arn: str | None,
+        prefixes: tuple[str, ...] = CONTENT_KEY_PREFIXES,
+        region: str | None = None,
+    ):
         import boto3
 
         self.bucket, self.kms_key_arn, self.prefixes = bucket, kms_key_arn, prefixes
-        self.client = boto3.client("s3")
+        if region is None:
+            self.client = boto3.client("s3")
+        else:
+            # Pre-signed browser uploads (MTQ B1-T11): a regional, virtual-hosted URL
+            # (https://<bucket>.s3.<region>.amazonaws.com), the one origin the staging CSP names, signed with SigV4.
+            from botocore.config import Config
+
+            self.client = boto3.client(
+                "s3", region_name=region, config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"})
+            )
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         extra = {"SSEKMSKeyId": self.kms_key_arn} if self.kms_key_arn else {}

@@ -19,6 +19,10 @@ variables {
     evidence_lock_mode          = "COMPLIANCE"
     evidence_lock_days          = 30
     media_noncurrent_days       = 30
+
+    attachments_noncurrent_days    = 30
+    attachments_upload_expire_days = 2
+    attachments_tiering_days       = 90
   }
 }
 
@@ -29,13 +33,13 @@ run "the_bootstrap_names_and_the_media_bucket" {
     condition = toset([for b in aws_s3_bucket.this : b.bucket]) == toset([
       "veda-stg-litestream-111122223333", "veda-stg-snapshots-111122223333", "veda-stg-anchor-111122223333",
       "veda-stg-artifacts-111122223333", "veda-evidence-111122223333", "veda-stg-logs-111122223333",
-      "veda-stg-media-111122223333",
+      "veda-stg-media-111122223333", "veda-stg-attachments-111122223333",
     ])
     error_message = "the bucket names the bootstrap roles and data-read denies are scoped to"
   }
 
   assert {
-    condition     = [for k in ["snapshots", "anchor", "evidence"] : aws_s3_bucket.this[k].object_lock_enabled] == [true, true, true] && !aws_s3_bucket.this["litestream"].object_lock_enabled && !aws_s3_bucket.this["media"].object_lock_enabled
+    condition     = [for k in ["snapshots", "anchor", "evidence"] : aws_s3_bucket.this[k].object_lock_enabled] == [true, true, true] && !aws_s3_bucket.this["litestream"].object_lock_enabled && !aws_s3_bucket.this["media"].object_lock_enabled && !aws_s3_bucket.this["attachments"].object_lock_enabled
     error_message = "Object Lock on snapshots, anchors and evidence only"
   }
 }
@@ -116,15 +120,18 @@ run "governance_lock_refused" {
 
   variables {
     retention = {
-      litestream_noncurrent_days  = 7
-      snapshots_expire_days       = 42
-      artifacts_expire_days       = 90
-      artifacts_noncurrent_days   = 30
-      logs_cloudtrail_expire_days = 90
-      logs_flow_expire_days       = 30
-      evidence_lock_mode          = "GOVERNANCE"
-      evidence_lock_days          = 30
-      media_noncurrent_days       = 30
+      litestream_noncurrent_days     = 7
+      snapshots_expire_days          = 42
+      artifacts_expire_days          = 90
+      artifacts_noncurrent_days      = 30
+      logs_cloudtrail_expire_days    = 90
+      logs_flow_expire_days          = 30
+      evidence_lock_mode             = "GOVERNANCE"
+      evidence_lock_days             = 30
+      media_noncurrent_days          = 30
+      attachments_noncurrent_days    = 30
+      attachments_upload_expire_days = 2
+      attachments_tiering_days       = 90
     }
   }
 
@@ -136,15 +143,18 @@ run "snapshots_expiring_inside_their_lock_refused" {
 
   variables {
     retention = {
-      litestream_noncurrent_days  = 7
-      snapshots_expire_days       = 30
-      artifacts_expire_days       = 90
-      artifacts_noncurrent_days   = 30
-      logs_cloudtrail_expire_days = 90
-      logs_flow_expire_days       = 30
-      evidence_lock_mode          = "COMPLIANCE"
-      evidence_lock_days          = 30
-      media_noncurrent_days       = 30
+      litestream_noncurrent_days     = 7
+      snapshots_expire_days          = 30
+      artifacts_expire_days          = 90
+      artifacts_noncurrent_days      = 30
+      logs_cloudtrail_expire_days    = 90
+      logs_flow_expire_days          = 30
+      evidence_lock_mode             = "COMPLIANCE"
+      evidence_lock_days             = 30
+      media_noncurrent_days          = 30
+      attachments_noncurrent_days    = 30
+      attachments_upload_expire_days = 2
+      attachments_tiering_days       = 90
     }
   }
 
@@ -205,15 +215,18 @@ run "media_noncurrent_window_out_of_range_refused" {
 
   variables {
     retention = {
-      litestream_noncurrent_days  = 7
-      snapshots_expire_days       = 42
-      artifacts_expire_days       = 90
-      artifacts_noncurrent_days   = 30
-      logs_cloudtrail_expire_days = 90
-      logs_flow_expire_days       = 30
-      evidence_lock_mode          = "COMPLIANCE"
-      evidence_lock_days          = 30
-      media_noncurrent_days       = 365
+      litestream_noncurrent_days     = 7
+      snapshots_expire_days          = 42
+      artifacts_expire_days          = 90
+      artifacts_noncurrent_days      = 30
+      logs_cloudtrail_expire_days    = 90
+      logs_flow_expire_days          = 30
+      evidence_lock_mode             = "COMPLIANCE"
+      evidence_lock_days             = 30
+      media_noncurrent_days          = 365
+      attachments_noncurrent_days    = 30
+      attachments_upload_expire_days = 2
+      attachments_tiering_days       = 90
     }
   }
 
@@ -228,4 +241,59 @@ run "a_media_key_other_than_the_data_key_alias_refused" {
   }
 
   expect_failures = [var.data_key_alias_arn]
+}
+
+# MTQ B1-T11: the attachments bucket (closure §6): private, data key, KMS-only uploads, old versions and abandoned
+# uploads expire, no Object Lock (a withdrawal or an erasure removes the bytes).
+run "attachments_bucket_private_kms_only_and_expiring" {
+  command = plan
+
+  assert {
+    condition     = one(one(aws_s3_bucket_server_side_encryption_configuration.this["attachments"].rule).apply_server_side_encryption_by_default).kms_master_key_id == var.data_key_arn
+    error_message = "attachments are encrypted with the data key"
+  }
+
+  assert {
+    condition = toset([for s in jsondecode(aws_s3_bucket_policy.this["attachments"].policy).Statement : s.Sid]) == toset([
+    "DenyInsecureTransport", "DenyOtherAccounts", "DenyUploadsWithoutTheDataKey", "DenyUploadsWithoutKms"])
+    error_message = "TLS only, this account only, and every upload under the data key"
+  }
+
+  assert {
+    condition     = alltrue([for s in jsondecode(aws_s3_bucket_policy.this["attachments"].policy).Statement : s.Effect == "Deny"])
+    error_message = "the bucket policy grants nothing: access comes from the host role only"
+  }
+
+  assert {
+    condition = length([for r in aws_s3_bucket_lifecycle_configuration.this["attachments"].rule : r
+      if r.id == "noncurrent-attachments" && one(r.noncurrent_version_expiration).noncurrent_days == 30]) == 1 && length([
+      for r in aws_s3_bucket_lifecycle_configuration.this["attachments"].rule : r
+      if r.id == "expire-abandoned-uploads" && one(r.filter).prefix == "upload/" && one(r.expiration).days == 2]) == 1 && length([
+      for r in aws_s3_bucket_lifecycle_configuration.this["attachments"].rule : r
+    if r.id == "noncurrent-attachments" && one(r.transition).days == 90 && one(r.transition).storage_class == "INTELLIGENT_TIERING"]) == 1
+    error_message = "old versions expire after 30 days, current objects tier after 90 (closure §6.4); abandoned uploads under upload/ expire after 2"
+  }
+}
+
+run "attachment_retention_bounded" {
+  command = plan
+
+  variables {
+    retention = {
+      litestream_noncurrent_days     = 7
+      snapshots_expire_days          = 42
+      artifacts_expire_days          = 90
+      artifacts_noncurrent_days      = 30
+      logs_cloudtrail_expire_days    = 90
+      logs_flow_expire_days          = 30
+      evidence_lock_mode             = "COMPLIANCE"
+      evidence_lock_days             = 30
+      media_noncurrent_days          = 30
+      attachments_noncurrent_days    = 365
+      attachments_upload_expire_days = 2
+      attachments_tiering_days       = 90
+    }
+  }
+
+  expect_failures = [var.retention]
 }

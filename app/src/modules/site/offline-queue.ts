@@ -200,12 +200,19 @@ export class OfflineQueue extends EventTarget {
     return out;
   }
 
-  /** Upload a queued photo's bytes, then ask the server to verify, scan and re-encode them. */
-  private async upload(op: QueuedOp, res: SyncResult): Promise<void> {
+  /**
+   * Upload a queued photo's bytes, then ask the server to verify, scan and re-encode them. The completion step is the
+   * proof of arrival (length, SHA-256 and type checked by the server); until it succeeds the photo stays UPLOADING.
+   */
+  private async upload(op: QueuedOp, res: SyncResult, retry = false): Promise<void> {
     const blob = await this.store.getBlob(op.op_id);
-    if (!blob || !res.entity_id || !res.upload) return;
+    if (!blob || !res.entity_id) return;
     try {
-      await sendBytes(res.entity_id, blob, res.upload);
+      // A retry asks for fresh instructions: a pre-signed POST lives five minutes, and the server may already have it.
+      const upload = retry
+        ? (await api.request<{ upload?: SyncResult['upload'] }>(`/api/v1/attachments/${res.entity_id}`)).data.upload
+        : res.upload;
+      if (upload?.required) await sendBytes(res.entity_id, blob, upload);
       await api.request(`/api/v1/attachments/${res.entity_id}/complete`, { method: 'POST' });
       await this.store.remove(op.op_id);
       await this.store.removeBlob(op.op_id);
@@ -217,28 +224,27 @@ export class OfflineQueue extends EventTarget {
   /** Retry photo uploads interrupted by a lost connection (their metadata is already on the server). */
   async resumeUploads(setId: string): Promise<void> {
     for (const op of (await this.pending(setId)).filter((o) => o.state === 'UPLOADING')) {
-      await this.upload(op, op.result as unknown as SyncResult);
+      await this.upload(op, op.result as unknown as SyncResult, true);
     }
     this.changed();
   }
 }
 
-/** Send bytes the way the server asked: a pre-signed POST (S3, exact length and type) or the local-only PUT. */
+/**
+ * Send bytes the way the server asked. S3 (staging): a pre-signed POST straight to the private bucket. The bucket has
+ * no CORS (refused by the infrastructure plan guard), so the multipart POST is sent as a simple request whose answer
+ * the browser does not expose (`no-cors`); the server's completion step, not this answer, decides whether it arrived.
+ * Local development: the local-only PUT through the API.
+ */
 export async function sendBytes(attachmentId: string, blob: Blob, upload: NonNullable<SyncResult['upload']>,
-  onProgress?: (fraction: number) => void): Promise<void> {
+  onProgress?: (fraction: number) => void, fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<void> {
   if (!upload.required) return;
   if (upload.method === 'POST' && upload.url) {
     const form = new FormData();
     for (const [k, v] of Object.entries(upload.fields ?? {})) form.append(k, v);
-    form.append('file', blob);
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', upload.url!);
-      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload ${xhr.status}`)));
-      xhr.onerror = () => reject(new Error('upload failed'));
-      xhr.send(form);
-    });
+    form.append('file', blob); // S3 requires the file to be the last field
+    await fetchImpl(upload.url, { method: 'POST', body: form, mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    onProgress?.(1);
     return;
   }
   const base64 = await blobToBase64(blob);

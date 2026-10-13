@@ -82,3 +82,32 @@ output "catalog_v3" {
     error_message = "A catalog_v3 flag is on but the V3 staging approval record is refused: ${join("; ", local.approval_problems)}."
   }
 }
+
+# MTQ B1 site attachments (B1-T11): what is planned, and the gates that refuse the rest.
+output "mtq_attachments" {
+  description = "MTQ B1 attachment storage on staging: the bucket and settings (inert while VEDA_MTQ_SITE_ENABLED is false)."
+  value = {
+    bucket             = module.storage.bucket_names["attachments"]
+    site_enabled       = local.attachment_config.VEDA_MTQ_SITE_ENABLED
+    scanner_mode       = local.attachment_config.VEDA_ATTACHMENT_SCANNER
+    noncurrent_days    = local.attachments.noncurrent_days
+    tiering_days       = local.attachments.tiering_days
+    upload_expire_days = local.attachments.upload_expire_days
+    upload_ttl_seconds = local.attachments.upload_ttl_seconds
+  }
+
+  precondition {
+    condition     = local.attachments.status == "DECIDED"
+    error_message = "attachments must be DECIDED (closure §6.4) before its bucket and settings are planned."
+  }
+
+  precondition {
+    condition     = local.attachments.upload_ttl_seconds >= 60 && local.attachments.upload_ttl_seconds <= 900
+    error_message = "A pre-signed upload lives 60 to 900 seconds (the API refuses anything else)."
+  }
+
+  precondition {
+    condition     = local.attachment_config.VEDA_MTQ_SITE_ENABLED == "false"
+    error_message = "B1-T11 plans attachment storage only: the site measurement flag stays false until a reviewed enablement change."
+  }
+}
