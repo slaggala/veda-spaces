@@ -28,3 +28,7 @@
 | 2026-10-13 | MTQ-G3 | OI-MTQ-01 and OI-MTQ-02 recorded | closure §2, §3; register | same |
 | 2026-10-13 | MTQ-G4 | Migration range approved: `0106_attachment`, `0200_mtq_site`; `0201`–`0203` reserved | closure §4; decision log entry 26 | same |
 | 2026-10-13 | MTQ-G5 | Replay criteria, tolerances and set composition recorded; quotation reference list pending owner | closure §5 | same |
+| 2026-10-13 | MTQ-G1 | **PASSED.** Review of record located and committed verbatim; remaining findings dispositioned AR-01…AR-25 | [reviews/MTQ-independent-review-2026-10-13.md](reviews/MTQ-independent-review-2026-10-13.md); [closure §9.1](MTQ-B1-blocker-closure.md) | session under `VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION` |
+| 2026-10-13 | MTQ-G2, G3, G4 | **PASSED** on the owner's merge of PR #86 | PR #86 | same |
+| 2026-10-13 | MTQ-G5 | **PASSED WITH LIMITATIONS.** Sanitised manifest; only 3 BHK has references; 2/4/5 BHK and independent house UNVALIDATED_NO_HISTORICAL_REFERENCE as a validation limitation, per the owner instruction | [replay/replay-reference-manifest.json](replay/replay-reference-manifest.json); [closure §9.2](MTQ-B1-blocker-closure.md) | same |
+| 2026-10-13 | all | **Gate open for B1.** Implementation branch `feature/mtq-b1-end-to-end` created from main | closure §9.3 | same |

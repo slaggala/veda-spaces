@@ -14,6 +14,8 @@ SEED_FILES = {
     "veda/modules/crm/leads/permissions.py",
     "veda/modules/estimator/permissions.py",
     "veda/modules/catalog/permissions.py",
+    "veda/modules/attachments/permissions.py",
+    "veda/modules/mtq/permissions.py",
     "veda/kernel/migration_support.py",
 }
 DATA_ATTRIBUTE_CONTEXT = ("protection_level", "PROTECTION_LEVELS", "action_class", "APPROVAL_CLASSES")
@@ -204,9 +206,13 @@ def test_PLAT_011_module_boundaries():
                 if name.startswith("veda.modules"):
                     assert r in allowed_platform, f"{r} imports {name}"
                     if r == "veda/platform/rbac/registry.py":
-                        assert name in ("veda.modules.crm.leads", "veda.modules.estimator", "veda.modules.catalog"), (
-                            "only the modules' permission registries"
-                        )
+                        assert name in (
+                            "veda.modules.crm.leads",
+                            "veda.modules.estimator",
+                            "veda.modules.catalog",
+                            "veda.modules.attachments",
+                            "veda.modules.mtq",
+                        ), "only the modules' permission registries"
 
 
 def test_no_raw_sql_or_bulk_mutation_in_services():

@@ -61,6 +61,18 @@ REVISIONS: dict[str, list[str]] = {
         "catalog_analytics_daily",
     ],
     "0105_catalog_claim_control": ["catalog_claim_control"],
+    "0106_attachment": ["attachment"],
+    "0200_mtq_site": [
+        "property",
+        "property_space",
+        "measurement_visit",
+        "measurement_set",
+        "space_measurement",
+        "space_wall",
+        "space_opening",
+        "space_electrical_point",
+        "measurement_note",
+    ],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

@@ -981,6 +981,9 @@ def anonymize(s: Session, lead: Lead, *, legal_basis: str, request_ref: str | No
             if previous.get("withdrawal_note"):
                 scrubbed["withdrawal_note"] = ANONYMIZED
             act.metadata_ = {**meta, "previous": scrubbed}
+    from .erasure import run as run_erasure_cascades
+
+    run_erasure_cascades(s, lead)  # attachments (and later MTQ site records) on this lead (07 §8.2; MTQ closure §6.4)
     write_explicit_audit(
         s,
         entity_type="lead",

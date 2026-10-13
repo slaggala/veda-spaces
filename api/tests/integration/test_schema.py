@@ -11,7 +11,7 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
-HEAD = "0105_catalog_claim_control"
+HEAD = "0200_mtq_site"
 
 
 def _connect():
@@ -32,7 +32,7 @@ def test_PLAT_013_no_user_table_and_expected_inventory(app):
 
 
 def test_FKLESS_allow_list_is_exact():
-    assert len(audit_registry.FKLESS_IDENTIFIERS) == 10
+    assert len(audit_registry.FKLESS_IDENTIFIERS) == 11
     assert {f.key for f in audit_registry.FKLESS_IDENTIFIERS} == {
         "audit_log.session_id",
         "security_event_log.session_id",
@@ -44,6 +44,7 @@ def test_FKLESS_allow_list_is_exact():
         "outbox_event.aggregate_id",
         "notification.entity_id",
         "user_mfa_recovery_code.batch_id",
+        "attachment.entity_id",
     }
     assert set(audit_registry.NON_ENTITY_STRING_IDENTIFIERS) == {
         "audit_log.request_id",
@@ -222,6 +223,8 @@ def test_RBAC_001_migration_order():
         "0102_estimator_spec",
         "0103_catalog",
         "0104_catalog_idempotency",
+        "0105_catalog_claim_control",
+        "0106_attachment",
         HEAD,
     ]
 
@@ -234,8 +237,8 @@ def test_seed_data(app):
         assert system[0] == "SYSTEM" and str(system[1]).replace("-", "") == "00000000000070008000000000000001"
         humans = conn.execute(sa.text("SELECT count(*) FROM app_user WHERE user_type = 'HUMAN'")).scalar()
         assert humans == 0, "no human users in any migration (AUTH-014)"
-        cats = conn.execute(sa.text("SELECT count(*) FROM lookup_category")).scalar()
-        assert cats == 6
+        cats = conn.execute(sa.text("SELECT count(*) FROM lookup_category WHERE module = 'crm'")).scalar()
+        assert cats == 6  # the 0006 reference seed; module migrations add their own (ATT, MTQ), tested there
         seeded_audit = conn.execute(
             sa.text("SELECT count(*) FROM audit_log WHERE performed_via = 'MIGRATION'")
         ).scalar()
@@ -369,7 +372,7 @@ def test_TD_H4_undocumented_registry_entry_fails(engine, tmp_path):
     with db.create_engine(f"sqlite:///{tmp_path / 'h4.db'}").connect() as conn:
         models.metadata.create_all(conn)
         report = conformance.check(
-            conn, fkless=(*audit_registry.FKLESS_IDENTIFIERS[:8], entry, audit_registry.FKLESS_IDENTIFIERS[9])
+            conn, fkless=(*audit_registry.FKLESS_IDENTIFIERS[:8], entry, *audit_registry.FKLESS_IDENTIFIERS[9:])
         )
     assert not report.ok and any("documentation" in p for p in report.problems)
 

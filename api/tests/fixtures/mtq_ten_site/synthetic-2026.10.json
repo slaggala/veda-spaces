@@ -1,0 +1,94 @@
+{
+  "dataset_id": "SYN-TEN-SITE-2026-10",
+  "dataset_kind": "SYNTHETIC",
+  "note": "SYNTHETIC. No real site, customer, address or measurement. Reference dimensions are generated deterministically from each site id and space label (tests/support/ten_site.py); the 'app' measurements are the reference plus a deterministic error of at most 5 mm, except the deviations listed per site. It proves the capture pipeline and the validation rules end to end; it says nothing about field accuracy.",
+  "sites": [
+    {
+      "site_id": "S01",
+      "template_key": "APARTMENT_2BHK",
+      "survey_level_code": "LITE"
+    },
+    {
+      "site_id": "S02",
+      "template_key": "APARTMENT_2BHK",
+      "survey_level_code": "FULL"
+    },
+    {
+      "site_id": "S03",
+      "template_key": "APARTMENT_3BHK",
+      "survey_level_code": "LITE",
+      "offline_retry": true
+    },
+    {
+      "site_id": "S04",
+      "template_key": "APARTMENT_3BHK",
+      "survey_level_code": "LITE",
+      "deviations": [
+        {
+          "space": "Living",
+          "wall": 2,
+          "delta_mm": 40,
+          "cause": "Plaster bulge at mid-wall; laser read at the bulge"
+        }
+      ]
+    },
+    {
+      "site_id": "S05",
+      "template_key": "APARTMENT_4BHK",
+      "survey_level_code": "LITE",
+      "conflict_space": "Master bedroom"
+    },
+    {
+      "site_id": "S06",
+      "template_key": "INDEPENDENT_HOUSE",
+      "survey_level_code": "LITE"
+    },
+    {
+      "site_id": "S07",
+      "template_key": "INDEPENDENT_HOUSE",
+      "survey_level_code": "LITE",
+      "deviations": [
+        {
+          "space": "Dining",
+          "wall": 2,
+          "delta_mm": 130,
+          "cause": "Tape slipped off the skirting"
+        }
+      ],
+      "root_cause": "Tape slipped off the skirting"
+    },
+    {
+      "site_id": "S08",
+      "template_key": "INDEPENDENT_HOUSE",
+      "survey_level_code": "FULL"
+    },
+    {
+      "site_id": "S09",
+      "template_key": "INDEPENDENT_HOUSE",
+      "survey_level_code": "LITE",
+      "offline_retry": true
+    },
+    {
+      "site_id": "S10",
+      "template_key": "INDEPENDENT_HOUSE",
+      "survey_level_code": "LITE",
+      "extra_spaces": [
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 4",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 4 toilet",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 5",
+          "level_index": 1
+        }
+      ]
+    }
+  ]
+}

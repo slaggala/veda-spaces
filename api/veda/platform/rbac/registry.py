@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from veda.modules.attachments import permissions as attachment_permissions
 from veda.modules.catalog import permissions as catalog_permissions
 from veda.modules.crm.leads import permissions as lead_permissions
 from veda.modules.estimator import permissions as estimate_permissions
+from veda.modules.mtq import permissions as mtq_permissions
 
 from .registry_types import PermissionDef, RoleDef
 
@@ -188,6 +190,9 @@ ROLES: tuple[RoleDef, ...] = (
     ),
     RoleDef("ADMIN", "Admin", "Operations administrator", mfa_required=True, sort_order=20),
     RoleDef("SALES", "Sales", "Sales & design consultants", mfa_required=False, sort_order=30),
+    # MTQ B1 (0200_mtq_site): site measurement roles. Neither sees a price anywhere (blueprint §15.1).
+    RoleDef("DESIGNER", "Designer", "Spaces, verification of measurement sets", mfa_required=False, sort_order=40),
+    RoleDef("SURVEYOR", "Surveyor", "Measurement capture on assigned visits", mfa_required=False, sort_order=50),
 )
 
 
@@ -210,6 +215,8 @@ def _entries() -> tuple[RegistryEntry, ...]:
         ("crm", lead_permissions.PERMISSIONS),
         ("estimator", estimate_permissions.PERMISSIONS),
         ("catalog", catalog_permissions.PERMISSIONS),
+        ("attachments", attachment_permissions.PERMISSIONS),
+        ("mtq", mtq_permissions.PERMISSIONS),
     ):
         for d in defs:
             resource, _, action = d.code.partition(".")
@@ -224,6 +231,8 @@ MATRIX: dict[str, dict[str, str]] = {
     **lead_permissions.MATRIX,
     **estimate_permissions.MATRIX,
     **catalog_permissions.MATRIX,
+    **attachment_permissions.MATRIX,
+    **mtq_permissions.MATRIX,
 }
 
 SENSITIVE_CODES = frozenset(e.code for e in REGISTRY if e.definition.is_sensitive)

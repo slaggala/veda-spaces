@@ -28,8 +28,8 @@ run "a_fixed_set_of_metric_filters_not_emf" {
   command = plan
 
   assert {
-    condition     = length(aws_cloudwatch_log_metric_filter.app) == 15 && alltrue([for f in aws_cloudwatch_log_metric_filter.app : one(f.metric_transformation).namespace == "Veda/App"])
-    error_message = "seven application metrics and eight catalog-media metrics, one namespace: the custom-metric count is bounded (cost)"
+    condition     = length(aws_cloudwatch_log_metric_filter.app) == 17 && alltrue([for f in aws_cloudwatch_log_metric_filter.app : one(f.metric_transformation).namespace == "Veda/App"])
+    error_message = "seven application metrics, eight catalog-media metrics and two attachment metrics, one namespace: the custom-metric count is bounded (cost)"
   }
 
   assert {
@@ -38,8 +38,8 @@ run "a_fixed_set_of_metric_filters_not_emf" {
   }
 
   assert {
-    condition     = output.custom_metric_count == 16
-    error_message = "before the host exists: 15 filters and the tampering metric"
+    condition     = output.custom_metric_count == 18
+    error_message = "before the host exists: 17 filters and the tampering metric"
   }
 }
 
@@ -105,7 +105,7 @@ run "host_alarms_with_the_instance" {
   }
 
   assert {
-    condition     = output.custom_metric_count == 22
+    condition     = output.custom_metric_count == 24
     error_message = "with the host: plus memory, two disks, the health metric, the scanner restart count and the scanner health"
   }
 }
@@ -183,5 +183,25 @@ run "media_alarms_reuse_the_topic_and_carry_no_data" {
   assert {
     condition     = aws_cloudwatch_metric_alarm.app["media-pending-age"].threshold == 3600 && aws_cloudwatch_metric_alarm.app["media-signatures-outdated"].threshold == 48
     error_message = "pending for more than an hour, signatures older than 48 hours"
+  }
+}
+
+# MTQ B1-T11: the attachment alarms reuse the alarm topic, carry no data and are silent without data.
+run "attachment_alarms_reuse_the_topic_and_carry_no_data" {
+  command = plan
+
+  variables {
+    deployment_alarms_enabled = true
+  }
+
+  assert {
+    condition     = alltrue([for k in ["attachment-infected", "attachment-object-missing"] : contains(keys(aws_cloudwatch_metric_alarm.app), k)])
+    error_message = "every attachment signal has its alarm"
+  }
+
+  assert {
+    condition = alltrue([for k, a in aws_cloudwatch_metric_alarm.app : a.alarm_actions == toset(["arn:aws:sns:ap-south-1:111122223333:veda-stg-alarms"]) && a.treat_missing_data == "notBreaching"
+    if startswith(k, "attachment-")])
+    error_message = "attachment alarms notify the existing alarm topic only, and no data is not an alarm"
   }
 }

@@ -36,6 +36,9 @@ if ((${#missing[@]})); then
 fi
 # Catalog V3 media preflight: names the state in plain words and refuses before anything on the host changes.
 "$(dirname "$0")/media-preflight.sh" "$TMP" || { echo "refusing: catalog media preflight failed (see above)" >&2; exit 1; }
+# MTQ B1 site measurement preflight: the attachment settings are inert while the flag is off; with it on, refuses
+# an incomplete or unsafe attachment configuration before anything on the host changes.
+"$(dirname "$0")/attachment-preflight.sh" "$TMP" || { echo "refusing: site measurement preflight failed (see above)" >&2; exit 1; }
 # Keep a declared schema-ahead acceptance across renders (deploy.sh rollback, runbook §2).
 if [[ -f "$OUT" ]] && grep -q '^VEDA_SCHEMA_AHEAD_ACCEPTED=' "$OUT"; then grep '^VEDA_SCHEMA_AHEAD_ACCEPTED=' "$OUT" >>"$TMP"; fi
 chmod 0600 "$TMP"

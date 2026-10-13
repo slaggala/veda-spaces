@@ -236,7 +236,10 @@ def run_erasure_audit() -> int:
                     .execution_options(include_deleted=True)
                 )
             ]
-            ids = [lead_id, *child_ids]
+            from veda.modules.crm.leads import erasure as lead_erasure
+
+            # Rows in other modules (attachments, MTQ site records) whose audit parent is not the lead (07 §8.2).
+            ids = [lead_id, *child_ids, *lead_erasure.descendant_ids(s, lead_id)]
             conn = s.connection()
             migration_support.drop_immutability_guards(conn, "audit_log")
             rows = s.execute(
@@ -839,6 +842,24 @@ def catalog_media_scan() -> dict:
         return {"skipped": "the catalog is not enabled here"}
     with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
         return {"scanned": media.rescan_pending(s)}
+
+
+def attachment_scan() -> dict:
+    """Scan received attachments still PENDING or FAILED (MTQ closure §6.3). Runs whether or not MTQ is enabled: an
+    attachment uploaded before the flag was turned off is still never served until it is CLEAN."""
+    from veda.modules.attachments import service as attachments
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return {"scanned": attachments.rescan_pending(s)}
+
+
+def attachment_retention() -> dict:
+    """Delete quarantined (INFECTED) uploads after 30 days and abandoned uploads after 24 hours (MTQ closure §6.4).
+    Runs whether or not MTQ is enabled, so turning the flag off never leaves bytes behind."""
+    from veda.modules.attachments import service as attachments
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return attachments.purge(s)
 
 
 def catalog_media_retention() -> dict:

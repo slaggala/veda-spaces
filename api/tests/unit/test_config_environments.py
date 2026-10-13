@@ -277,3 +277,46 @@ def test_a_deployed_catalog_needs_the_private_bucket_and_a_scanner(monkeypatch):
 def test_catalog_four_eyes_cannot_be_switched_off_when_deployed(monkeypatch):
     problems = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_CATALOG_FOUR_EYES="false"))
     assert any("VEDA_CATALOG_FOUR_EYES" in p for p in problems), problems
+
+
+# --- MTQ B1 (B1-T02): the site flag and its attachment store -----------------------------------------------------------
+def test_MTQ_site_flag_defaults_off_and_production_refuses_it(monkeypatch):
+    assert config.Settings().mtq_site_enabled is False
+    assert deployed_env(monkeypatch, "production").mtq_site_enabled is False
+    on = deployed_env(
+        monkeypatch,
+        "production",
+        VEDA_MTQ_SITE_ENABLED="true",
+        VEDA_ATTACHMENT_BACKEND="s3",
+        VEDA_ATTACHMENT_BUCKET="veda-attachments",
+        VEDA_ATTACHMENT_KMS_KEY_ARN="arn:aws:kms:ap-south-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        VEDA_ATTACHMENT_SCANNER="clamd",
+    )
+    assert "VEDA_MTQ_SITE_ENABLED is not authorised in production (MTQ B1)" in config.validate_environment(on)
+
+
+def test_MTQ_staging_needs_the_private_bucket_key_and_scanner(monkeypatch):
+    bare = deployed_env(monkeypatch, "staging", VEDA_MTQ_SITE_ENABLED="true")
+    problems = " ".join(config.validate_environment(bare))
+    for fragment in ("VEDA_ATTACHMENT_BACKEND=s3", "VEDA_ATTACHMENT_KMS_KEY_ARN", "VEDA_ATTACHMENT_SCANNER=clamd",
+                     "VEDA_MTQ_SITE_ENABLEMENT_SHA256"):  # fmt: skip
+        assert fragment in problems
+    storage = {
+        "VEDA_MTQ_SITE_ENABLED": "true",
+        "VEDA_ATTACHMENT_BACKEND": "s3",
+        "VEDA_ATTACHMENT_BUCKET": "veda-staging-attachments-123456789012",
+        "VEDA_ATTACHMENT_KMS_KEY_ARN": "arn:aws:kms:ap-south-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        "VEDA_ATTACHMENT_SCANNER": "clamd",
+    }
+    unbound = config.validate_environment(deployed_env(monkeypatch, "staging", **storage))
+    assert unbound == ["MTQ needs VEDA_MTQ_SITE_ENABLEMENT_SHA256 (the approved enablement record) in staging"]
+    none = deployed_env(monkeypatch, "staging", **storage, VEDA_MTQ_SITE_ENABLEMENT_SHA256="none")
+    assert config.validate_environment(none) == unbound  # the inactive value staging-core plans while off
+    ready = deployed_env(monkeypatch, "staging", **storage, VEDA_MTQ_SITE_ENABLEMENT_SHA256="e" * 64)
+    assert config.validate_environment(ready) == []
+    for name, value, fragment in (
+        ("VEDA_ATTACHMENT_BACKEND", "ftp", "VEDA_ATTACHMENT_BACKEND must be local or s3"),
+        ("VEDA_ATTACHMENT_SCANNER", "other", "VEDA_ATTACHMENT_SCANNER must be none or clamd"),
+        ("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS", "3600", "VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS"),
+    ):
+        assert fragment in " ".join(config.validate_environment(deployed_env(monkeypatch, "staging", **{name: value})))

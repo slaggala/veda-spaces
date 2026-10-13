@@ -84,6 +84,23 @@ resource "aws_iam_policy" "runtime" {
         Resource  = local.b.media
         Condition = { StringLike = { "s3:prefix" = ["source/*", "variant/*"] } }
       },
+      {
+        # MTQ B1 site attachments (closure §6): the API signs pre-signed POSTs for upload/<sha256> (the signature acts
+        # with these permissions, so a browser can write nothing else), reads the upload back to verify, scan and
+        # re-encode it into att/<sha256>, and deletes uploads and withdrawn objects. No version deletes, no tagging,
+        # no ACL, nothing else in the bucket.
+        Sid      = "SiteAttachmentObjects"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = ["${local.b.attachments}/upload/*", "${local.b.attachments}/att/*"]
+      },
+      {
+        Sid       = "SiteAttachmentListPrefixes"
+        Effect    = "Allow"
+        Action    = "s3:ListBucket"
+        Resource  = local.b.attachments
+        Condition = { StringLike = { "s3:prefix" = ["upload/*", "att/*"] } }
+      },
       { Sid = "DeployBundles", Effect = "Allow", Action = "s3:GetObject", Resource = "${local.b.artifacts}/*" },
       { Sid = "FileEvidence", Effect = "Allow", Action = "s3:PutObject", Resource = "${local.b.evidence}/*" },
       {

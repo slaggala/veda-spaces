@@ -82,3 +82,38 @@ output "catalog_v3" {
     error_message = "A catalog_v3 flag is on but the V3 staging approval record is refused: ${join("; ", local.approval_problems)}."
   }
 }
+
+# MTQ B1 site attachments (B1-T11): what is planned, and the gates that refuse the rest.
+output "mtq_attachments" {
+  description = "MTQ B1 on staging: the attachment bucket and settings, and the site flag (false until an owner-approved, digest-bound enablement record)."
+  value = {
+    bucket             = module.storage.bucket_names["attachments"]
+    site_enabled       = local.attachment_config.VEDA_MTQ_SITE_ENABLED
+    enablement_record  = local.mtq_site.enablement_record_sha256
+    scanner_mode       = local.attachment_config.VEDA_ATTACHMENT_SCANNER
+    noncurrent_days    = local.attachments.noncurrent_days
+    tiering_days       = local.attachments.tiering_days
+    upload_expire_days = local.attachments.upload_expire_days
+    upload_ttl_seconds = local.attachments.upload_ttl_seconds
+  }
+
+  precondition {
+    condition     = local.attachments.status == "DECIDED"
+    error_message = "attachments must be DECIDED (closure §6.4) before its bucket and settings are planned."
+  }
+
+  precondition {
+    condition     = local.attachments.upload_ttl_seconds >= 60 && local.attachments.upload_ttl_seconds <= 900
+    error_message = "A pre-signed upload lives 60 to 900 seconds (the API refuses anything else)."
+  }
+
+  precondition {
+    condition     = local.mtq_site.status == "DECIDED" && (local.mtq_site.site_enabled || local.mtq_site.enablement_record_sha256 == null)
+    error_message = "mtq_site must be DECIDED, and a digest is bound only together with site_enabled (rollback clears both)."
+  }
+
+  precondition {
+    condition     = !local.mtq_site.site_enabled || (local.scanner.mode == "clamd" && length(local.mtq_record_problems) == 0)
+    error_message = "VEDA_MTQ_SITE_ENABLED turns on only with the clamd scanner and an owner-APPROVED infra/config/mtq-site-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.mtq_record_problems)}."
+  }
+}

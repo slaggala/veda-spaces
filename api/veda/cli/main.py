@@ -210,6 +210,8 @@ JOBS = {
     "catalog-activation": "catalog_activation",
     "catalog-media-scan": "catalog_media_scan",
     "catalog-media-retention": "catalog_media_retention",
+    "attachment-scan": "attachment_scan",
+    "attachment-retention": "attachment_retention",
     "verify-chain": "verify_chain",
     "anchor-chain": "anchor_chain",
     "invariants": "check_invariants",
@@ -446,7 +448,7 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
 
     _settings()
     frequent = ["expire-approvals", "break-glass-due", "follow-up-reminders", "erasure-audit", "disk-usage",
-                "catalog-activation", "catalog-media-scan"]  # fmt: skip
+                "catalog-activation", "catalog-media-scan", "attachment-scan"]  # fmt: skip
     daily = {
         "01:30": "snapshot",
         "02:00": "invariants",
@@ -456,6 +458,7 @@ def cmd_scheduler(args) -> int:  # pragma: no cover - process loop
         "04:00": "lead-retention",
         "04:15": "estimate-retention",
         "04:30": "catalog-media-retention",
+        "04:45": "attachment-retention",
         "05:00": "restore-verify",
         "09:00": "spam-review",
     }

@@ -193,6 +193,18 @@ class Settings:
     catalog_video_enabled: bool = False  # video is not supported: refused on, everywhere
     catalog_media_rights_approver: str | None = None  # the owner-assigned media-rights approver (staging, production)
     catalog_approval_sha256: str | None = None  # the digest the V3 staging approval record is bound to (from SSM)
+    # Measurement-to-Quotation B1 (site measurement) and its attachments (ATT). Off by default: every MTQ and attachment
+    # route answers 404 while the flag is off; production refuses it.
+    mtq_site_enabled: bool = False
+    attachment_backend: str = "local"  # local (development and tests) | s3 (the private attachment bucket)
+    attachment_dir: str = "var/attachments"
+    attachment_bucket: str | None = None
+    attachment_kms_key_arn: str | None = None
+    attachment_scanner: str = "none"  # none | clamd; with none, uploads stay PENDING outside local and test
+    attachment_clamd_address: str = "127.0.0.1:3310"
+    attachment_upload_ttl_seconds: int = 300  # lifetime of a pre-signed upload
+    # B1-T12: the SHA-256 of the owner's APPROVED staging enablement record that staging-core bound the flag to.
+    mtq_site_enablement_sha256: str | None = None
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -333,6 +345,15 @@ def load_settings(**overrides) -> Settings:
         catalog_video_enabled=_bool("VEDA_CATALOG_VIDEO_ENABLED", False),
         catalog_media_rights_approver=_env("VEDA_CATALOG_MEDIA_RIGHTS_APPROVER"),
         catalog_approval_sha256=_env("VEDA_CATALOG_APPROVAL_SHA256"),
+        mtq_site_enabled=_bool("VEDA_MTQ_SITE_ENABLED", False),
+        attachment_backend=_str("VEDA_ATTACHMENT_BACKEND", "local"),
+        attachment_dir=_str("VEDA_ATTACHMENT_DIR", "var/attachments"),
+        attachment_bucket=_env("VEDA_ATTACHMENT_BUCKET"),
+        attachment_kms_key_arn=_env("VEDA_ATTACHMENT_KMS_KEY_ARN"),
+        attachment_scanner=_str("VEDA_ATTACHMENT_SCANNER", "none"),
+        attachment_clamd_address=_str("VEDA_ATTACHMENT_CLAMD_ADDRESS", "127.0.0.1:3310"),
+        attachment_upload_ttl_seconds=_intd("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS", 300),
+        mtq_site_enablement_sha256=_env("VEDA_MTQ_SITE_ENABLEMENT_SHA256"),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -503,6 +524,23 @@ def validate_environment(settings: Settings) -> list[str]:
         approver = (settings.catalog_media_rights_approver or "").strip()
         if not approver or "OWNER TO FILL" in approver.upper() or approver.upper() == "UNASSIGNED":
             problems.append(f"the catalog needs an owner-assigned VEDA_CATALOG_MEDIA_RIGHTS_APPROVER in {env}")
+    if settings.attachment_backend not in ("local", "s3"):
+        problems.append("VEDA_ATTACHMENT_BACKEND must be local or s3")
+    if settings.attachment_scanner not in ("none", "clamd"):
+        problems.append("VEDA_ATTACHMENT_SCANNER must be none or clamd")
+    if not 60 <= settings.attachment_upload_ttl_seconds <= 900:
+        problems.append("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS must be between 60 and 900")
+    if env in ("staging", "production") and settings.mtq_site_enabled:
+        # MTQ closure §6: deployed attachments need the private bucket, the data key and the malware scanner.
+        if settings.attachment_backend != "s3" or not settings.attachment_bucket:
+            problems.append(f"MTQ needs VEDA_ATTACHMENT_BACKEND=s3 and VEDA_ATTACHMENT_BUCKET in {env}")
+        if not settings.attachment_kms_key_arn:
+            problems.append(f"MTQ needs VEDA_ATTACHMENT_KMS_KEY_ARN (the data key) in {env}")
+        if settings.attachment_scanner != "clamd":
+            problems.append(f"MTQ needs VEDA_ATTACHMENT_SCANNER=clamd in {env}")
+        # B1-T12: on only with the owner's approved enablement record, bound by its digest (infra staging-core).
+        if not re.fullmatch(r"[0-9a-f]{64}", settings.mtq_site_enablement_sha256 or ""):
+            problems.append(f"MTQ needs VEDA_MTQ_SITE_ENABLEMENT_SHA256 (the approved enablement record) in {env}")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:
@@ -514,6 +552,9 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append("VEDA_CATALOG_ESTIMATOR_ENABLED is not authorised in production (ADR-013)")
         if settings.catalog_analytics_enabled:
             problems.append("VEDA_CATALOG_ANALYTICS_ENABLED is not authorised in production (ADR-013)")
+        if settings.mtq_site_enabled:
+            # MTQ B1 is staging-only until its own production decision (decision log 27).
+            problems.append("VEDA_MTQ_SITE_ENABLED is not authorised in production (MTQ B1)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

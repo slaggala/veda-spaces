@@ -31,6 +31,8 @@ APPROVED_METRICS = frozenset(
         # Catalog V3 media (targeted media enablement): scanner, pending age, delivery refusals, storage denials.
         "MediaScanFailed", "MediaScannerUnavailable", "MediaInfected", "MediaPendingMaxAgeSeconds",
         "MediaSignatureAgeHours", "MediaNonCleanRequested", "MediaStorageAccessDenied", "MediaKmsAccessDenied",
+        # MTQ B1 attachments (ATT): uploads registered, rejected, infected, withdrawn, and bytes missing at delivery.
+        "AttachmentCreated", "AttachmentRejected", "AttachmentInfected", "AttachmentWithdrawn", "AttachmentObjectMissing",
     }
 )  # fmt: skip
 

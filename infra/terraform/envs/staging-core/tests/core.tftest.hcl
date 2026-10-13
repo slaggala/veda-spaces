@@ -379,3 +379,137 @@ run "scanner_none_with_v3_flags_on_refused" {
   }
   expect_failures = [output.catalog_v3]
 }
+
+# MTQ B1-T11: attachment storage planned and inert (closure §6.4).
+run "attachment_storage_planned_with_the_site_flag_off" {
+  command = plan
+
+  assert {
+    condition     = module.storage.bucket_names["attachments"] == "veda-stg-attachments-${local.account_id}"
+    error_message = "the attachments bucket follows the plan-guard naming convention"
+  }
+
+  assert {
+    condition = (local.app_config["VEDA_ATTACHMENT_BACKEND"] == "s3" && local.app_config["VEDA_ATTACHMENT_BUCKET"] == "veda-stg-attachments-${local.account_id}" &&
+      local.app_config["VEDA_ATTACHMENT_KMS_KEY_ARN"] == "arn:aws:kms:ap-south-1:${local.account_id}:alias/veda-stg-data" &&
+    local.app_config["VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS"] == "300")
+    error_message = "S3 backend, the attachments bucket, the existing data key by alias, five-minute pre-signed uploads"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_ATTACHMENT_SCANNER"] == local.app_config["VEDA_CATALOG_MEDIA_SCANNER"] && local.app_config["VEDA_ATTACHMENT_CLAMD_ADDRESS"] == local.app_config["VEDA_CATALOG_CLAMD_ADDRESS"]
+    error_message = "attachments are scanned by the media scanner already on the host (same mode, same private address)"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "false" && output.mtq_attachments.site_enabled == "false" && local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == "none"
+    error_message = "the site measurement flag stays false and no enablement record is bound: the settings are inert"
+  }
+
+  assert {
+    condition     = output.mtq_attachments.noncurrent_days == 30 && output.mtq_attachments.tiering_days == 90 && output.mtq_attachments.upload_expire_days == 2
+    error_message = "the closure §6.4 windows reach the bucket"
+  }
+
+  assert {
+    condition     = length(local.attachment_config) == 8
+    error_message = "the flag, its record digest and six attachment parameters"
+  }
+}
+
+run "attachments_not_decided_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-attachments-undecided.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "a_pre_signed_upload_longer_than_the_api_accepts_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-attachments-long-upload.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+# MTQ B1-T12: the site flag turns on only with an owner-APPROVED enablement record bound by its SHA-256.
+run "the_committed_enablement_record_is_a_draft_and_enables_nothing" {
+  command = plan
+
+  assert {
+    condition     = jsondecode(file("../../../config/mtq-site-enablement-record.json")).status == "DRAFT" && contains(local.mtq_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is the owner's template, not an approval"
+  }
+}
+
+run "an_approved_bound_record_turns_the_flag_on_in_staging" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "true" && local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == filesha256("tests/fixtures/mtq-record-approved.json")
+    error_message = "the flag and the bound digest reach SSM together"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_ENV"] == "staging" && local.mtq_record_problems == []
+    error_message = "staging only, every gate met"
+  }
+}
+
+run "the_flag_with_the_committed_draft_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-mtq-on.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_with_unfilled_evidence_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-placeholder.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-placeholder-evidence.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_approved_by_its_author_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-self.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-self-approved.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_with_another_records_digest_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-placeholder-evidence.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_without_the_clamd_scanner_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-no-scanner.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "a_bound_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-digest-without-flag.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}

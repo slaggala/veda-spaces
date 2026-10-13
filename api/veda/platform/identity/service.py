@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from veda.config import settings
 from veda.kernel import clock
 from veda.kernel.dto import mask_email, parse_phone
 from veda.kernel.errors import ApiError, field_error
@@ -91,6 +92,9 @@ def me_payload(s: Session, ctx) -> dict:
         "mfa": {"required": mfa["required"], "required_by": mfa["required_by"], "enrolled": mfa["factor"] is not None},
         "email_change": pending_email_change(s, user),
         "must_change_password": bool(ctx.claims.get("pwd_change")),
+        # MC-3: features the deployment has switched on; the workspace shows a feature only when it is on here AND
+        # the user holds its permission (a permission alone never makes a switched-off feature discoverable).
+        "features": {"mtq_site": bool(settings().mtq_site_enabled)},
         "version": user.version,
     }
 

@@ -1,0 +1,109 @@
+{
+  "manifest": "MTQ replay reference manifest",
+  "version": 1,
+  "recorded_on": "2026-10-13",
+  "instruction": "VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION",
+  "rules": "Sanitised: anonymous ids, fingerprints of owner-held sources, coverage summaries and categories only. No customer names, addresses, project names, rates or amounts. Criteria: MTQ-B1-blocker-closure.md section 5.",
+  "inventory": {
+    "sources_inspected": 14,
+    "e6_calibration_input": 1,
+    "quotation_or_estimation_workbooks": 13,
+    "finding": "every workbook is a 3 BHK apartment quotation or not a quotation; none covers 2 BHK, 4 BHK, 5 BHK or an independent house"
+  },
+  "references": [
+    {
+      "scenario_id": "R-3BHK-A",
+      "property_type": "APARTMENT",
+      "bhk_count": 3,
+      "source_fingerprint": {
+        "file": "owner-private E6 calibration input",
+        "entry": "A",
+        "digest": "sha256:d480dfcefd640789b1a582cb7e460444132f60e8a4aa2ab2c49074b838ef9b2e"
+      },
+      "measurement_coverage": {
+        "rooms": 8,
+        "bedrooms": 3,
+        "selections": 25,
+        "selections_with_measurements": 20,
+        "granularity": "product runs per room, not wall by wall"
+      },
+      "expected_replay_category": "BASE",
+      "confidence": "HIGH",
+      "evidence_location": "owner-private ~/veda-private/estimator-2026-10/calibration (E6 entry A)"
+    },
+    {
+      "scenario_id": "R-3BHK-B",
+      "property_type": "APARTMENT",
+      "bhk_count": 3,
+      "source_fingerprint": {
+        "file": "owner-private E6 calibration input",
+        "entry": "B",
+        "digest": "sha256:d480dfcefd640789b1a582cb7e460444132f60e8a4aa2ab2c49074b838ef9b2e"
+      },
+      "measurement_coverage": {
+        "rooms": 8,
+        "bedrooms": 3,
+        "selections": 16,
+        "selections_with_measurements": 16,
+        "granularity": "product runs per room, not wall by wall"
+      },
+      "expected_replay_category": "BASE",
+      "confidence": "MEDIUM",
+      "confidence_reason": "the card in force at its date cannot be reconstructed; compared rate-normalised",
+      "evidence_location": "owner-private ~/veda-private/estimator-2026-10/calibration (E6 entry B)"
+    },
+    {
+      "scenario_id": "R-3BHK-C",
+      "property_type": "APARTMENT",
+      "bhk_count": 3,
+      "source_fingerprint": {
+        "file": "owner-private E6 calibration input",
+        "entry": "C",
+        "digest": "sha256:d480dfcefd640789b1a582cb7e460444132f60e8a4aa2ab2c49074b838ef9b2e"
+      },
+      "measurement_coverage": {
+        "rooms": 8,
+        "bedrooms": 3,
+        "selections": 24,
+        "selections_with_measurements": 18,
+        "granularity": "product runs per room, not wall by wall"
+      },
+      "expected_replay_category": "VARIATION_CASE",
+      "variation_of": "R-3BHK-B",
+      "confidence": "MEDIUM",
+      "confidence_reason": "execution-stage revision in the same building as B; never a base",
+      "evidence_location": "owner-private ~/veda-private/estimator-2026-10/calibration (E6 entry C)"
+    }
+  ],
+  "configurations": {
+    "APARTMENT_2BHK": {
+      "status": "UNVALIDATED_NO_HISTORICAL_REFERENCE",
+      "confidence": "NONE"
+    },
+    "APARTMENT_3BHK": {
+      "status": "REFERENCED",
+      "references": [
+        "R-3BHK-A",
+        "R-3BHK-B"
+      ],
+      "variation_cases": [
+        "R-3BHK-C"
+      ],
+      "confidence": "MEDIUM"
+    },
+    "APARTMENT_4BHK": {
+      "status": "UNVALIDATED_NO_HISTORICAL_REFERENCE",
+      "confidence": "NONE"
+    },
+    "APARTMENT_5BHK": {
+      "status": "UNVALIDATED_NO_HISTORICAL_REFERENCE",
+      "confidence": "NONE",
+      "note": "first live quotation compared before sending (closure 5.3)"
+    },
+    "INDEPENDENT_HOUSE": {
+      "status": "UNVALIDATED_NO_HISTORICAL_REFERENCE",
+      "confidence": "NONE"
+    }
+  },
+  "limitation": "Missing references are a validation limitation carried into the B2 and B3 exits (owner instruction 2026-10-13); they do not block the generic B1 capture model."
+}

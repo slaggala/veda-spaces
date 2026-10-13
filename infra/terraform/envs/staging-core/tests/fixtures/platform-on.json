@@ -111,5 +111,19 @@
     "status": "DECIDED",
     "decision": "Not decided: the owner names the accountable media-rights approver (a person or role they choose; never invented). Until then media activation is blocked (output catalog_v3, release validation).",
     "approver": "Brand lead (role, test)"
+  },
+  "attachments": {
+    "status": "DECIDED",
+    "decision": "MTQ B1 attachment policy, frozen in docs/proposals/measurement-to-quotation/MTQ-B1-blocker-closure.md section 6.4 (merged by the owner with pull request #86): one private bucket veda-stg-attachments-<account> from the existing storage module, the existing data key by alias, no Object Lock, versioning with noncurrent versions expiring after noncurrent_days (30), current objects to Intelligent-Tiering after tiering_days (90), TLS only, bucket-owner-enforced, no public access. Implementation detail of B1-T11 (docs/implementation/mtq/B1-implementation-record.md): uploads that are never completed expire under upload/ after upload_expire_days (2); a pre-signed POST lives upload_ttl_seconds (300). The scanner is the media scanner (media_scanner.mode). The site measurement flag VEDA_MTQ_SITE_ENABLED stays false: these settings are inert until a reviewed enablement change.",
+    "noncurrent_days": 30,
+    "tiering_days": 90,
+    "upload_expire_days": 2,
+    "upload_ttl_seconds": 300
+  },
+  "mtq_site": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION (2026-10-13), recorded as given: VEDA_MTQ_SITE_ENABLED stays false on staging until explicit owner approval, and it is never enabled in production (the API refuses it there). It may turn on only by a reviewed change that sets site_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/mtq-site-enablement-record.json once that record is APPROVED by the owner with every evidence field filled (independent review, CI, the attachment-storage apply, a clean drift run, migration and rollback verification). staging-core refuses anything else. Rollback: site_enabled false and enablement_record_sha256 null.",
+    "site_enabled": false,
+    "enablement_record_sha256": null
   }
 }

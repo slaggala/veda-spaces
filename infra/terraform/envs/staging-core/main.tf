@@ -77,7 +77,12 @@ module "storage" {
   retention = merge({
     for k in ["litestream_noncurrent_days", "snapshots_expire_days", "artifacts_expire_days", "artifacts_noncurrent_days",
     "logs_cloudtrail_expire_days", "logs_flow_expire_days", "evidence_lock_mode", "evidence_lock_days"] : k => local.platform.storage[k]
-  }, { media_noncurrent_days = local.media.noncurrent_days })
+    }, {
+    media_noncurrent_days          = local.media.noncurrent_days
+    attachments_noncurrent_days    = local.attachments.noncurrent_days
+    attachments_upload_expire_days = local.attachments.upload_expire_days
+    attachments_tiering_days       = local.attachments.tiering_days
+  })
 }
 
 # AUT-104: CloudTrail (management events; data events by the owner session).
@@ -157,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config
+    }, local.estimator_config, local.media_config, local.attachment_config
   )
 }
 
@@ -200,6 +205,43 @@ locals {
     }, local.rights.status == "DECIDED" ? {
     VEDA_CATALOG_MEDIA_RIGHTS_APPROVER = local.rights.approver
   } : {})
+}
+
+# MTQ B1 site attachments (B1-T11; closure §6, infra/config/staging-platform.json "attachments") and the site flag
+# (B1-T12, "mtq_site"). The attachment storage settings are always planned. The flag stays false until the owner
+# approves enablement: it turns on only with site_enabled true AND enablement_record_sha256 equal to the SHA-256 of an
+# APPROVED infra/config/mtq-site-enablement-record.json with every evidence field filled (output "mtq_attachments"
+# refuses anything else). The scanner is the media scanner already running on the host (same Compose service).
+locals {
+  attachments     = local.platform.attachments
+  mtq_site        = local.platform.mtq_site
+  mtq_record_path = var.mtq_enablement_record_path != "" ? var.mtq_enablement_record_path : "${path.module}/../../../config/mtq-site-enablement-record.json"
+  mtq_record      = try(jsondecode(file(local.mtq_record_path)), {})
+  mtq_evidence    = try(local.mtq_record.evidence, {})
+  # Every reason the record cannot enable the flag; empty means it can (read only when site_enabled is true).
+  mtq_record_problems = concat(
+    fileexists(local.mtq_record_path) ? [] : ["the record file is missing"],
+    try(local.mtq_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.mtq_record.environment, "") == "staging" && try(local.mtq_record.production, true) == false ? [] : ["the record is not staging-only"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.mtq_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.mtq_record.approved_by, "")) != "" && !strcontains(upper(try(local.mtq_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.mtq_record.approved_by, "") != try(local.mtq_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k in ["independent_review", "ci_run_id", "infra_apply_run_id", "drift_run_id", "migration_verification_run_id", "rollback_verification_run_id"] :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.mtq_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.mtq_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in ["ci_run_id", "infra_apply_run_id", "drift_run_id", "migration_verification_run_id", "rollback_verification_run_id"] :
+    "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.mtq_evidence[k], ""))))],
+    fileexists(local.mtq_record_path) && try(local.mtq_site.enablement_record_sha256, null) == (fileexists(local.mtq_record_path) ? filesha256(local.mtq_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  attachment_config = {
+    VEDA_MTQ_SITE_ENABLED              = local.mtq_site.site_enabled ? "true" : "false"
+    VEDA_MTQ_SITE_ENABLEMENT_SHA256    = coalesce(local.mtq_site.enablement_record_sha256, "none")
+    VEDA_ATTACHMENT_BACKEND            = "s3"
+    VEDA_ATTACHMENT_BUCKET             = module.storage.bucket_names["attachments"]
+    VEDA_ATTACHMENT_KMS_KEY_ARN        = local.data_key_alias_arn
+    VEDA_ATTACHMENT_SCANNER            = local.scanner.mode
+    VEDA_ATTACHMENT_CLAMD_ADDRESS      = "clamd:3310"
+    VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS = tostring(local.attachments.upload_ttl_seconds)
+  }
 }
 
 locals {

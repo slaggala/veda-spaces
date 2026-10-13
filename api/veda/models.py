@@ -5,6 +5,7 @@ imports ``veda.models``.
 """
 
 from veda.kernel.base import Base, finalize_metadata
+from veda.modules.attachments.models import Attachment
 from veda.modules.catalog.models import (
     CatalogAnalyticsDaily,
     CatalogClaimControl,
@@ -28,6 +29,17 @@ from veda.modules.estimator.models import (
     EstimatorRateItem,
     EstimatorSpecEvent,
 )
+from veda.modules.mtq.models import (
+    MeasurementNote,
+    MeasurementSet,
+    MeasurementVisit,
+    Property,
+    PropertySpace,
+    SpaceElectricalPoint,
+    SpaceMeasurement,
+    SpaceOpening,
+    SpaceWall,
+)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
     MfaChallenge,
@@ -48,6 +60,7 @@ finalize_metadata(metadata)
 
 __all__ = [
     "AdminApprovalRequest",
+    "Attachment",
     "AuditLog",
     "BudgetEstimate",
     "BudgetEstimateAssumption",
@@ -89,5 +102,14 @@ __all__ = [
     "UserPermission",
     "UserRole",
     "UserSession",
+    "MeasurementNote",
+    "MeasurementSet",
+    "MeasurementVisit",
+    "Property",
+    "PropertySpace",
+    "SpaceElectricalPoint",
+    "SpaceMeasurement",
+    "SpaceOpening",
+    "SpaceWall",
     "metadata",
 ]

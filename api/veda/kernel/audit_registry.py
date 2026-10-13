@@ -144,6 +144,57 @@ register(AuditPolicy("catalog_record", FULL, excluded=frozenset({"document"})))
 register(AuditPolicy("catalog_release", FULL, excluded=frozenset({"compiled", "validation"})))
 register(AuditPolicy("catalog_event", FULL))
 register(AuditPolicy("catalog_media_object", FULL))
+
+# --- MTQ B1 (ATT, 0106): attachments are evidence of a site visit; the row and its hashes outlive the bytes. The
+# display filename and caption are personal text, removed on lead erasure (closure §6.4).
+register(
+    AuditPolicy(
+        "attachment",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"original_filename", "caption"}),
+    )
+)
+
+# --- MTQ B1 (0200): every site table is FULL (row history), each linked to its aggregate parent. B1-SCOPE §2.1 proposed
+# EVENT_ONLY for the measurement detail rows; FULL is stricter and needs no contract exception (rule 9). Personal data:
+# the site address and coordinates, the visit's customer contact and free-text notes; all erased with the lead.
+register(
+    AuditPolicy(
+        "property",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"address_line_1", "address_line_2", "locality", "pincode", "geo_lat_e6", "geo_lng_e6", "notes"}),
+    )
+)
+register(AuditPolicy("property_space", FULL, parent=("property", "property_id")))
+register(
+    AuditPolicy(
+        "measurement_visit",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"customer_contact_name", "customer_contact_phone", "access_notes", "cancel_reason"}),
+    )
+)
+register(
+    AuditPolicy(
+        "measurement_set",
+        FULL,
+        parent=("property", "property_id"),
+        pii=frozenset({"rejection_reason", "property_capture"}),
+    )
+)
+register(AuditPolicy("space_measurement", FULL, parent=("measurement_set", "measurement_set_id")))
+register(AuditPolicy("space_wall", FULL, parent=("space_measurement", "space_measurement_id")))
+register(AuditPolicy("space_opening", FULL, parent=("space_wall", "space_wall_id")))
+register(
+    AuditPolicy(
+        "space_electrical_point", FULL, parent=("space_measurement", "space_measurement_id"), pii=frozenset({"notes"})
+    )
+)
+register(
+    AuditPolicy("measurement_note", FULL, parent=("measurement_set", "measurement_set_id"), pii=frozenset({"body"}))
+)
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))
@@ -342,6 +393,19 @@ FKLESS_IDENTIFIERS: tuple[FklessIdentifier, ...] = (
         "With the codes",
         "MFA-005",
         "03 §5.6, 05 §11.5",
+    ),
+    FklessIdentifier(
+        "attachment",
+        "entity_id",
+        "EXC-011",
+        "The site record a photo, sketch or floor-plan image belongs to (MTQ B1-SCOPE §2.8)",
+        "Polymorphic: one of seven site record types; 0106 precedes the MTQ tables",
+        "entity_type",
+        "Format CHECK + entity_type CHECK; the owning module's binding resolves the id before any write",
+        "ix_attachment__entity",
+        "With the attachment row (bytes deleted on withdrawal, erasure or purge; the row stays)",
+        "ATT-002, MTQ B1",
+        "MTQ-B1-SCOPE §2.8, blocker closure §6",
     ),
 )
 

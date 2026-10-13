@@ -50,13 +50,19 @@ export interface NavItem {
   group: 'main' | 'admin' | 'account';
   /** The item renders when the user holds ANY of these permission codes (09 §3.1). */
   anyOf: readonly string[];
+  /** MC-3: a feature the deployment must have switched on (``/auth/me`` ``features``) besides the permission. */
+  feature?: FeatureCode;
   mobile?: boolean;
 }
+
+export type FeatureCode = 'mtq_site';
+export type FeatureMap = Partial<Record<FeatureCode, boolean>>;
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/', label: 'Dashboard', icon: 'home', group: 'main', anyOf: ['lead.read'], mobile: true },
   { path: '/leads', label: 'Leads', icon: 'users', group: 'main', anyOf: ['lead.read'], mobile: true },
   { path: '/follow-ups', label: 'Follow-ups', icon: 'calendar', group: 'main', anyOf: ['lead_activity.read'], mobile: true },
+  { path: '/site', label: 'Site visits', icon: 'calendar', group: 'main', anyOf: ['measurement.visit.read', 'property.read'], feature: 'mtq_site', mobile: true },
   { path: '/approvals', label: 'Approvals', icon: 'check', group: 'admin', anyOf: ['user.mfa.reset', 'user.email.change', 'user.founder.manage'] },
   { path: '/admin/users', label: 'Users', icon: 'user', group: 'admin', anyOf: ['user.read'] },
   { path: '/admin/roles', label: 'Roles', icon: 'shield', group: 'admin', anyOf: ['role.read'] },
@@ -67,7 +73,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/profile', label: 'Profile', icon: 'settings', group: 'account', anyOf: ['profile.read'], mobile: true },
 ];
 
-/** Permission-driven navigation: only items whose permission the user holds (09 §3.1, 02 §2.2). */
-export function filterNav(items: readonly NavItem[], perms: PermissionMap | null | undefined): NavItem[] {
-  return items.filter((item) => hasAny(perms, item.anyOf));
+/**
+ * Permission-driven navigation: only items whose permission the user holds (09 §3.1, 02 §2.2), and, for an item
+ * behind a feature, only while the deployment has that feature on (MC-3: a permission alone never makes a
+ * switched-off feature discoverable; a missing or unknown feature map counts as off).
+ */
+export function filterNav(items: readonly NavItem[], perms: PermissionMap | null | undefined, features?: FeatureMap | null): NavItem[] {
+  return items.filter((item) => hasAny(perms, item.anyOf) && (!item.feature || features?.[item.feature] === true));
 }

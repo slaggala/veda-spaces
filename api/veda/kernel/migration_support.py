@@ -433,6 +433,40 @@ def seed_roles_and_matrix(conn, *, audit: bool) -> None:
             )
 
 
+def seed_missing_roles(conn, codes: tuple[str, ...], *, audit: bool) -> list[str]:
+    """A later module migration: insert the registry roles in ``codes`` that the database does not have yet (fresh
+    databases already have them from 0003, which reads the live registry). Grants follow with grant_new_codes."""
+    from veda.platform.rbac.registry import ROLES
+
+    now = clock.now()
+    tx = new_id()
+    present = {r.code for r in conn.execute(sa.select(ROLE.c.code).where(ROLE.c.is_deleted == sa.false()))}
+    added = []
+    for role in ROLES:
+        if role.code not in codes or role.code in present:
+            continue
+        insert_audited(
+            conn,
+            ROLE,
+            {
+                "code": role.code,
+                "name": role.name,
+                "name_normalized": role.name.strip().lower(),
+                "description": role.description,
+                "is_system": True,
+                "is_assignable": role.is_assignable,
+                "grant_path": role.grant_path,
+                "mfa_required": role.mfa_required,
+                "sort_order": role.sort_order,
+            },
+            transaction_id=tx,
+            now=now,
+            audit=audit,
+        )
+        added.append(role.code)
+    return added
+
+
 def grant_new_codes(conn, codes: tuple[str, ...], *, audit: bool) -> int:
     """A later module migration: grant the matrix rows of `codes` that are missing (fresh databases already have them
     from 0003, which reads the live registry), then bump every human's authz_version so sessions pick them up."""
@@ -713,6 +747,88 @@ def seed_reference_data(conn) -> None:
         transaction_id=tx,
         now=now,
     )
+
+
+def seed_lookups(
+    conn,
+    lookups: tuple[tuple[str, str, str, tuple[tuple[str, str, dict | None], ...]], ...],
+    *,
+    module: str,
+) -> int:
+    """A later module migration: insert lookup categories and values that are missing. Idempotent; an existing value
+    is never edited (values are only added, MTQ B1-SCOPE §4.1). Returns the number of rows inserted."""
+    now = clock.now()
+    tx = new_id()
+    inserted = 0
+    for code, name, description, values in lookups:
+        category_id = conn.execute(
+            sa.select(LOOKUP_CATEGORY.c.id).where(
+                LOOKUP_CATEGORY.c.code == code, LOOKUP_CATEGORY.c.is_deleted == sa.false()
+            )
+        ).scalar()
+        if category_id is None:
+            category_id = insert_audited(
+                conn,
+                LOOKUP_CATEGORY,
+                {"code": code, "name": name, "description": description, "module": module, "is_system": True},
+                transaction_id=tx,
+                now=now,
+            )
+            inserted += 1
+        existing = {
+            r[0]
+            for r in conn.execute(
+                sa.select(LOOKUP_VALUE.c.code).where(
+                    LOOKUP_VALUE.c.category_id == category_id, LOOKUP_VALUE.c.is_deleted == sa.false()
+                )
+            )
+        }
+        for order, (vcode, label, attrs) in enumerate(values, start=1):
+            if vcode in existing:
+                continue
+            insert_audited(
+                conn,
+                LOOKUP_VALUE,
+                {
+                    "category_id": category_id,
+                    "code": vcode,
+                    "label": label,
+                    "description": None,
+                    "sort_order": order * 10,
+                    "is_active": True,
+                    "attributes": attrs,
+                },
+                transaction_id=tx,
+                now=now,
+            )
+            inserted += 1
+    return inserted
+
+
+def seed_sequence(conn, key: str, prefix: str, *, padding: int = 6, reset_period: str = "YEAR") -> bool:
+    """Insert a number sequence if it is missing (idempotent)."""
+    found = conn.execute(
+        sa.select(NUMBER_SEQUENCE.c.id).where(
+            NUMBER_SEQUENCE.c.sequence_key == key, NUMBER_SEQUENCE.c.is_deleted == sa.false()
+        )
+    ).scalar()
+    if found is not None:
+        return False
+    insert_audited(
+        conn,
+        NUMBER_SEQUENCE,
+        {
+            "sequence_key": key,
+            "prefix": prefix,
+            "reset_period": reset_period,
+            "current_period": None,
+            "next_value": 1,
+            "padding": padding,
+        },
+        transaction_id=new_id(),
+        now=clock.now(),
+    )
+    return True
 
 
 # ---------------------------------------------------------------------------
