@@ -14,12 +14,19 @@
     "pricing": false
   },
   "evidence": {
-    "independent_review": "[OWNER TO FILL]",
-    "ci_run_id": "[OWNER TO FILL]",
-    "infra_apply_run_id": "[OWNER TO FILL]",
-    "drift_run_id": "[OWNER TO FILL]",
-    "migration_verification_run_id": "[OWNER TO FILL]",
+    "independent_review": "PR #87 CERTIFIED FOR MERGE at 740bb82 (focused MC-1/MC-2/MC-3 re-review, 2026-10-13); PR #88 CERTIFIED FOR MERGE at d331078 (focused locking/If-Match re-review, 2026-10-13); PR #89 CERTIFIED FOR MERGE at 5bfd8e8 (2026-10-13), merge commit [TO FILL ON MERGE]",
+    "ci_run_id": "38390130038",
+    "infra_apply_run_id": "38390957228",
+    "drift_run_id": "38391317226",
+    "migration_verification_run_id": "38391673177",
     "rollback_verification_run_id": "[OWNER TO FILL]"
   },
-  "rollback": "A reviewed change sets mtq_site.site_enabled false and mtq_site.enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the two parameters in place; the next 12-deploy renders them. Every site and attachment route then answers 404; data stays, unreadable through the API."
+  "rollback": "A reviewed change sets mtq_site.site_enabled false and mtq_site.enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the two parameters in place; the next 12-deploy renders them. Every site and attachment route then answers 404; data stays, unreadable through the API.",
+  "evidence_notes": {
+    "ci_run_id": "ci on main fc269f7 (merge of PR #88), all jobs green. Replace with the ci run of main after PR #89 merges.",
+    "infra_apply_run_id": "11-infra-apply bound to workflow_dispatch plan run 38390415767 (plan sha256 fc70db827361d028c8b82fa660073bdb3559264067932681b9fba7653fbd5084, 20 to add / 4 to change / 0 to destroy) at fc269f7; Apply complete 20 added, 4 changed, 0 destroyed. Includes B1-PE-05: the runtime IAM policy update (attachments ListBucket without a prefix condition) is one of the in-place changes.",
+    "drift_run_id": "10-infra-plan (core) at fc269f7 after the apply: No changes. Your infrastructure matches the configuration.",
+    "migration_verification_run_id": "12-deploy at fc269f7, image veda-api@sha256:17eb1fedf343e962e064046392aa89f87fdcf00f573eafd5efdbeef6917e3d5f: deploy.sh runs the migrations (0106_attachment, 0200_mtq_site, 0204_mtq_self_service) and passes only when /health/ready reports migrations: head; preflight printed 'site measurement: intentionally disabled'. The host transcript is truncated in the run log (SSM output limit).",
+    "rollback_verification_run_id": "[OWNER TO FILL] Expected: the 13-evidence run collected right after deploy.sh --rollback ebb8a44cfb2f passed readiness; record the Session Manager session id here."
+  }
 }
