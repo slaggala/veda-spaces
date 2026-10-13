@@ -122,8 +122,8 @@
   },
   "mtq_site": {
     "status": "DECIDED",
-    "decision": "Owner instruction VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION (2026-10-13), recorded as given: VEDA_MTQ_SITE_ENABLED stays false on staging until explicit owner approval, and it is never enabled in production (the API refuses it there). It may turn on only by a reviewed change that sets site_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/mtq-site-enablement-record.json once that record is APPROVED by the owner with every evidence field filled (independent review, CI, the attachment-storage apply, a clean drift run, migration and rollback verification). staging-core refuses anything else. Rollback: site_enabled false and enablement_record_sha256 null.",
-    "site_enabled": false,
-    "enablement_record_sha256": null
+    "decision": "Owner instruction VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION (2026-10-13), recorded as given: VEDA_MTQ_SITE_ENABLED stays false on staging until explicit owner approval, and it is never enabled in production (the API refuses it there). It may turn on only by a reviewed change that sets site_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/mtq-site-enablement-record.json once that record is APPROVED by the owner with every evidence field filled (independent review, CI, the attachment-storage apply, a clean drift run, migration and rollback verification). staging-core refuses anything else. Rollback: site_enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-13 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 30).",
+    "site_enabled": true,
+    "enablement_record_sha256": "017f44d1869f8ba9c0d4956513e9751d4b33e1d3ce7b9df1dccdbfc9ac407cdc"
   }
 }
