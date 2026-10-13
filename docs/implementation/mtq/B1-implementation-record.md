@@ -43,3 +43,13 @@ No deviation. Characterisation snapshot identical before and after.
 | Machine-checkable FULL requirements per template | Each template lists the subset the verifier can enforce (tags, floor-to-lintel, service attributes, obstruction kinds, wall heights, staircase geometry); the rest of 01 stays as checklist text for the human verifier | Free-text items (sketches, customer preferences) cannot be checked by code; four-eyes verification covers them |
 | `If-Match` on every mutation (blueprint §11) | Space edit and archive use the space's version; adding spaces, seeding and ordering do not take the property's version | The property version does not move when spaces change, so it would be a false check; ordering is refused unless it names every live space exactly once |
 | Outbox events `property.created` and others (blueprint §11.3) | Not emitted in B1 | No subscriber exists; an unhandled event type dead-letters. The audit log and lead activities are the B1 event record |
+
+## B1-T05 — measurement-visit state machine
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| States REQUESTED → SCHEDULED → IN_PROGRESS → COMPLETED / CANCELLED / NO_SHOW (blueprint §4.1) | Exactly these; reschedule is SCHEDULED → SCHEDULED; cancel allowed from REQUESTED, SCHEDULED and IN_PROGRESS with a reason; NO_SHOW from SCHEDULED | No pause state exists in the frozen model, so none is added |
+| `lead_activity_id` → the SITE_VISIT activity created on schedule (blueprint §4.1); "a system activity per visit" (B1-SCOPE §1.1) | A system-generated activity (type SYSTEM) per schedule, reschedule, completion, cancellation and no-show, with `measurement_visit_id` in its metadata (blueprint §4.5); `lead_activity_id` is the scheduling one | A completed SITE_VISIT contact activity at scheduling time would record a visit that has not happened |
+| Lead moves to SITE_VISIT on schedule, forward only (blueprint §12.3) | The lead module's `change_status`, called as SYSTEM with authority limited to `lead.status.change`; never backward, never on WON or LOST (scheduling on a closed lead is refused) | No direct lead mutation; the existing lead state rules apply unchanged |
+| Start and complete | `measurement.capture` by the assignee (or ALL scope); completion needs a SUBMITTED, VERIFIED or SUPERSEDED set from the visit | Fail closed: a visit cannot be marked done with nothing captured |
+| Assignee | Must be an active human holding `measurement.capture` | A visit assigned to someone who cannot capture would be unworkable |

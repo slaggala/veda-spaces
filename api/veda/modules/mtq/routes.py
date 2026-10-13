@@ -11,15 +11,17 @@ import sqlalchemy as sa
 from veda.config import settings
 from veda.kernel.errors import ApiError
 from veda.kernel.http import Api, Req, no_content, offset_meta, ok, problem_response
+from veda.kernel.ids import is_valid_id
 
 from . import (
     bindings,  # noqa: F401  (registers the attachment bindings)
     scope,
     templates,
+    visits,
 )
 from . import properties as P
 from . import schemas as S
-from .models import Property
+from .models import MeasurementVisit, Property
 
 api = Api("mtq", "/api/v1", tags=("mtq",))
 
@@ -172,3 +174,73 @@ def delete_space(req: Req, space_id: str):
         P.archive_space(req.session, req.ctx, sp, prop)
         req.session.flush()
     return no_content()
+
+
+# --- measurement visits (B1-T05) ---------------------------------------------------------------------------------------
+@api.route("GET", "/measurement-visits", permission="measurement.visit.read", query=S.VisitListQuery, write=False,
+           requirement="MEAS-001", summary="List measurement visits within scope")  # fmt: skip
+def list_visits(req: Req):
+    q = req.query
+    stmt = sa.select(MeasurementVisit).where(
+        scope.condition(req.ctx, "measurement.visit.read", MeasurementVisit.lead_id)
+    )
+    if q.property_id:
+        stmt = stmt.where(MeasurementVisit.property_id == q.property_id)
+    if q.lead_id:
+        stmt = stmt.where(MeasurementVisit.lead_id == q.lead_id)
+    if q.status:
+        stmt = stmt.where(MeasurementVisit.status.in_([x for x in q.status.split(",") if x]))
+    if q.assigned_to:
+        target = req.ctx.user.id if q.assigned_to == "me" else q.assigned_to
+        if target != req.ctx.user.id and not is_valid_id(target):
+            raise ApiError(422, "INVALID_ID", "assigned_to must be me or a user id.")
+        stmt = stmt.where(MeasurementVisit.assigned_to == target)
+    total = req.session.execute(sa.select(sa.func.count()).select_from(stmt.subquery())).scalar()
+    rows = (
+        req.session.execute(
+            stmt.order_by(MeasurementVisit.scheduled_start_on.desc(), MeasurementVisit.id)
+            .offset((q.page - 1) * q.page_size)
+            .limit(q.page_size)
+        )
+        .scalars()
+        .all()
+    )
+    meta, links = offset_meta(q.page, q.page_size, int(total or 0), "/api/v1/measurement-visits",
+                              q.model_dump(exclude_none=True))  # fmt: skip
+    return ok([visits.present(req.session, req.ctx, v) for v in rows], meta=meta, links=links)
+
+
+@api.route("POST", "/measurement-visits", permission="measurement.visit.create", body=S.VisitCreateIn, status=201,
+           idempotent_create=True, requirement="MEAS-002",
+           summary="Request a visit; with a start and a surveyor it is scheduled at once")  # fmt: skip
+def create_visit(req: Req):
+    visit = visits.create(req.session, req.ctx, req.body)
+    req.session.flush()
+    return ok(visits.present(req.session, req.ctx, visit), status=201)
+
+
+@api.route("GET", "/measurement-visits/<visit_id>", permission="measurement.visit.read", write=False,
+           requirement="MEAS-001", summary="One measurement visit")  # fmt: skip
+def get_visit(req: Req, visit_id: str):
+    return ok(visits.present(req.session, req.ctx, visits.get_visible(req.session, req.ctx, visit_id)))
+
+
+@api.route("PATCH", "/measurement-visits/<visit_id>", permission="measurement.visit.schedule", body=S.VisitPatchIn,
+           if_match=True, requirement="MEAS-003", summary="Edit a visit's contact and access details")  # fmt: skip
+def patch_visit(req: Req, visit_id: str):
+    visit = visits.get_visible(req.session, req.ctx, visit_id)
+    req.require_version(visit.version)
+    visits.update(req.session, req.ctx, visit, req.body)
+    req.session.flush()
+    return ok(visits.present(req.session, req.ctx, visit))
+
+
+@api.route("POST", "/measurement-visits/<visit_id>/status", any_of=("measurement.visit.schedule", "measurement.capture"),
+           body=S.VisitStatusIn, if_match=True, idempotent_create=True, requirement="MEAS-003",
+           summary="Move a visit through its state machine (schedule, reschedule, start, complete, cancel, no-show)")  # fmt: skip
+def visit_status(req: Req, visit_id: str):
+    visit = visits.get_visible(req.session, req.ctx, visit_id)
+    req.require_version(visit.version)
+    visits.transition(req.session, req.ctx, visit, req.body)
+    req.session.flush()
+    return ok(visits.present(req.session, req.ctx, visit))

@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from veda.kernel.dto import CalendarDate, Closed, Id, Query, optional_text, text
+from veda.kernel.dto import CalendarDate, Closed, Id, Instant, Phone, Query, optional_text, text
 
 MM = Annotated[int, Field(ge=1, le=100_000)]  # a length on site: 1 mm .. 100 m
 HEIGHT = Annotated[int, Field(ge=1, le=20_000)]
@@ -165,3 +165,45 @@ class SpacesFromTemplateIn(Closed):
 
 class SpaceDeleteIn(Closed):
     reason: Annotated[str | None, optional_text(500)] = None
+
+
+# --- measurement visits (B1-T05) ---------------------------------------------------------------------------------------
+VisitType = Literal["INITIAL", "RE_MEASURE", "VERIFICATION", "DESIGN_CHECK"]
+VisitStatus = Literal["REQUESTED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"]
+SurveyLevel = Literal["LITE", "FULL"]
+
+
+class VisitCreateIn(Closed):
+    property_id: Id
+    visit_type_code: VisitType = "INITIAL"
+    survey_level_code: SurveyLevel = "FULL"
+    scheduled_start_on: Instant | None = None
+    scheduled_end_on: Instant | None = None
+    assigned_to: Id | None = None
+    customer_contact_name: Annotated[str | None, optional_text(150)] = None
+    customer_contact_phone: Phone | None = None
+    access_notes: Annotated[str | None, optional_text(2000)] = None
+
+
+class VisitStatusIn(Closed):
+    to_status: VisitStatus
+    reason: Annotated[str | None, optional_text(500)] = None
+    scheduled_start_on: Instant | None = None
+    scheduled_end_on: Instant | None = None
+    assigned_to: Id | None = None
+
+
+class VisitPatchIn(Closed):
+    survey_level_code: SurveyLevel | None = None
+    customer_contact_name: Annotated[str | None, optional_text(150)] = None
+    customer_contact_phone: Phone | None = None
+    access_notes: Annotated[str | None, optional_text(2000)] = None
+
+
+class VisitListQuery(Query):
+    property_id: Id | None = None
+    lead_id: Id | None = None
+    status: Annotated[str | None, Field(max_length=120, pattern=r"^[A-Z_,]+$")] = None
+    assigned_to: Annotated[str | None, Field(max_length=40)] = None  # "me" or a user id
+    page: Annotated[int, Field(ge=1, le=10_000)] = 1
+    page_size: Annotated[int, Field(ge=1, le=100)] = 25
