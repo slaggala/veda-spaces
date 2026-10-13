@@ -1,0 +1,174 @@
+"""MTQ B1 endpoints (blueprint §11.1, the B1 subset). Staff only, bearer-authenticated, scoped by lead.
+
+Every route answers 404, before authentication, unless VEDA_MTQ_SITE_ENABLED is on (off by default; production
+refuses it). There is no public route and nothing here returns a price.
+"""
+
+from __future__ import annotations
+
+import sqlalchemy as sa
+
+from veda.config import settings
+from veda.kernel.errors import ApiError
+from veda.kernel.http import Api, Req, no_content, offset_meta, ok, problem_response
+
+from . import (
+    bindings,  # noqa: F401  (registers the attachment bindings)
+    scope,
+    templates,
+)
+from . import properties as P
+from . import schemas as S
+from .models import Property
+
+api = Api("mtq", "/api/v1", tags=("mtq",))
+
+
+@api.blueprint.before_request
+def _site_enabled():
+    if not settings().mtq_site_enabled:
+        return problem_response(ApiError(404, "NOT_FOUND", "Not found."))
+    return None
+
+
+# --- templates ---------------------------------------------------------------------------------------------------------
+@api.route("GET", "/mtq/templates", permission="property.read", write=False, requirement="PROP-004",
+           summary="The B1 property and space templates (version 2026.10.1)")  # fmt: skip
+def get_templates(req: Req):
+    return ok(templates.public_view())
+
+
+# --- properties --------------------------------------------------------------------------------------------------------
+@api.route("GET", "/properties", permission="property.read", query=S.PropertyListQuery, write=False,
+           requirement="PROP-001", summary="List properties within scope")  # fmt: skip
+def list_properties(req: Req):
+    q = req.query
+    stmt = sa.select(Property).where(scope.condition(req.ctx, "property.read", Property.lead_id))
+    if q.lead_id:
+        stmt = stmt.where(Property.lead_id == q.lead_id)
+    if q.city:
+        stmt = stmt.where(sa.func.lower(Property.city) == q.city.lower())
+    if q.property_type_code:
+        stmt = stmt.where(Property.property_type_code == q.property_type_code)
+    total = req.session.execute(sa.select(sa.func.count()).select_from(stmt.subquery())).scalar()
+    rows = (
+        req.session.execute(
+            stmt.order_by(Property.created_on.desc(), Property.id).offset((q.page - 1) * q.page_size).limit(q.page_size)
+        )
+        .scalars()
+        .all()
+    )
+    meta, links = offset_meta(
+        q.page, q.page_size, int(total or 0), "/api/v1/properties", q.model_dump(exclude_none=True)
+    )
+    return ok([P.present(req.session, p, with_spaces=False) for p in rows], meta=meta, links=links)
+
+
+@api.route("POST", "/properties", permission="property.create", body=S.PropertyCreateIn, status=201,
+           idempotent_create=True, requirement="PROP-002",
+           summary="Create a property for a lead, optionally seeding its space tree from a template")  # fmt: skip
+def create_property(req: Req):
+    prop = P.create(req.session, req.ctx, req.body)
+    req.session.flush()
+    return ok(P.present(req.session, prop), status=201)
+
+
+@api.route("GET", "/properties/<property_id>", permission="property.read", write=False, requirement="PROP-001",
+           summary="One property with its space tree and derived counts")  # fmt: skip
+def get_property(req: Req, property_id: str):
+    return ok(P.present(req.session, P.get_visible(req.session, req.ctx, property_id)))
+
+
+@api.route("PATCH", "/properties/<property_id>", permission="property.update", body=S.PropertyPatchIn,
+           if_match=True, requirement="PROP-003", summary="Edit a property")  # fmt: skip
+def patch_property(req: Req, property_id: str):
+    prop = P.get_visible(req.session, req.ctx, property_id)
+    req.require_version(prop.version)
+    P.update(req.session, req.ctx, prop, req.body)
+    req.session.flush()
+    return ok(P.present(req.session, prop))
+
+
+@api.route("GET", "/properties/<property_id>/summary", permission="property.read", write=False,
+           requirement="PROP-001", summary="Derived counts and the latest verified measurement set")  # fmt: skip
+def property_summary(req: Req, property_id: str):
+    data = P.present(req.session, P.get_visible(req.session, req.ctx, property_id), with_spaces=False)
+    keys = ("id", "property_number", "display_label", "derived_bedroom_count", "derived_toilet_count",
+            "derived_level_count", "derived_measured_floor_area_sqft_centi", "latest_verified_set", "version")  # fmt: skip
+    return ok({k: data[k] for k in keys})
+
+
+# --- spaces ------------------------------------------------------------------------------------------------------------
+@api.route("GET", "/properties/<property_id>/spaces", permission="property.read", write=False,
+           requirement="PROP-001", summary="The live space tree in walk order")  # fmt: skip
+def list_spaces(req: Req, property_id: str):
+    prop = P.get_visible(req.session, req.ctx, property_id)
+    return ok([P.present_space(sp) for sp in P.live_spaces(req.session, prop.id)])
+
+
+@api.route("POST", "/properties/<property_id>/spaces", permission="property.update", body=S.SpaceCreateIn,
+           status=201, requirement="PROP-003", summary="Add a space to a property's tree")  # fmt: skip
+def create_space(req: Req, property_id: str):
+    prop = P.get_visible(req.session, req.ctx, property_id)
+    scope.require_in_scope(req.session, req.ctx, prop.lead_id, "property.update")
+    b = req.body
+    sp = P.add_space(
+        req.session,
+        prop,
+        space_type_code=b.space_type_code,
+        label=b.label,
+        custom_type_label=b.custom_type_label,
+        parent_space_id=b.parent_space_id,
+        level_index=b.level_index,
+        zone_code=b.zone_code,
+        sort_order=b.sort_order,
+        is_in_scope=b.is_in_scope,
+        attributes=b.attributes.model_dump(exclude_none=True),
+    )
+    P.derive(req.session, prop)
+    req.session.flush()
+    return ok(P.present_space(sp), status=201)
+
+
+@api.route("POST", "/properties/<property_id>/spaces/from-template", permission="property.update",
+           body=S.SpacesFromTemplateIn, status=201, requirement="PROP-004",
+           summary="Seed an empty property's space tree from a template")  # fmt: skip
+def spaces_from_template(req: Req, property_id: str):
+    prop = P.get_visible(req.session, req.ctx, property_id)
+    scope.require_in_scope(req.session, req.ctx, prop.lead_id, "property.update")
+    P.seed_from_template(req.session, prop, req.body.template_key, list(req.body.include_optional))
+    req.session.flush()
+    return ok(P.present(req.session, prop), status=201)
+
+
+@api.route("PUT", "/properties/<property_id>/spaces/order", permission="property.update", body=S.SpaceOrderIn,
+           requirement="PROP-003",
+           summary="Set the walk order: the list must name every live space exactly once (stale lists are refused)")  # fmt: skip
+def order_spaces(req: Req, property_id: str):
+    prop = P.get_visible(req.session, req.ctx, property_id)
+    rows = P.reorder(req.session, req.ctx, prop, list(req.body.space_ids))
+    req.session.flush()
+    return ok([P.present_space(sp) for sp in rows])
+
+
+@api.route("PATCH", "/spaces/<space_id>", permission="property.update", body=S.SpacePatchIn, if_match=True,
+           requirement="PROP-003", summary="Edit a space (its type and id never change)")  # fmt: skip
+def patch_space(req: Req, space_id: str):
+    sp, prop = P.get_space(req.session, req.ctx, space_id)
+    req.require_version(sp.version)
+    P.update_space(req.session, req.ctx, sp, prop, req.body)
+    req.session.flush()
+    return ok(P.present_space(sp))
+
+
+@api.route("DELETE", "/spaces/<space_id>", permission="property.update", body=S.SpaceDeleteIn, if_match=True,
+           requirement="PROP-003", summary="Archive a space (soft delete; its id is kept)")  # fmt: skip
+def delete_space(req: Req, space_id: str):
+    sp, prop = P.get_space(req.session, req.ctx, space_id)
+    req.require_version(sp.version)
+    from veda.kernel.context import reason
+
+    with reason(req.body.reason if req.body else None):
+        P.archive_space(req.session, req.ctx, sp, prop)
+        req.session.flush()
+    return no_content()

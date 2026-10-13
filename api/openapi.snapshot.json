@@ -2036,6 +2036,533 @@
         "title": "ProfilePatch",
         "type": "object"
       },
+      "PropertyCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "address_line_1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address Line 1"
+          },
+          "address_line_2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address Line 2"
+          },
+          "built_up_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Built Up Area Sqft Centi"
+          },
+          "carpet_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Carpet Area Sqft Centi"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "City"
+          },
+          "configuration_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Configuration Label"
+          },
+          "floor_count": {
+            "anyOf": [
+              {
+                "maximum": 10,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Floor Count"
+          },
+          "geo_lat_e6": {
+            "anyOf": [
+              {
+                "maximum": 90000000,
+                "minimum": -90000000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Geo Lat E6"
+          },
+          "geo_lng_e6": {
+            "anyOf": [
+              {
+                "maximum": 180000000,
+                "minimum": -180000000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Geo Lng E6"
+          },
+          "include_optional": {
+            "default": [],
+            "items": {
+              "maxLength": 40,
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Include Optional",
+            "type": "array"
+          },
+          "lead_id": {
+            "title": "Lead Id",
+            "type": "string"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Locality"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "pattern": "^[1-9][0-9]{5}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pincode"
+          },
+          "plot_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plot Area Sqft Centi"
+          },
+          "possession_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Possession On"
+          },
+          "possession_status_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "UNDER_CONSTRUCTION",
+                  "READY",
+                  "OCCUPIED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Possession Status Code"
+          },
+          "project_kind_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "NEW",
+                  "RENOVATION",
+                  "PARTIAL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Project Kind Code"
+          },
+          "property_type_code": {
+            "enum": [
+              "APARTMENT",
+              "INDEPENDENT_HOUSE"
+            ],
+            "title": "Property Type Code",
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "State"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "enum": [
+                  "APARTMENT_2BHK",
+                  "APARTMENT_3BHK",
+                  "APARTMENT_4BHK",
+                  "APARTMENT_5BHK",
+                  "INDEPENDENT_HOUSE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Template Key"
+          }
+        },
+        "required": [
+          "lead_id",
+          "property_type_code"
+        ],
+        "title": "PropertyCreateIn",
+        "type": "object"
+      },
+      "PropertyPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "address_line_1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address Line 1"
+          },
+          "address_line_2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Address Line 2"
+          },
+          "built_up_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Built Up Area Sqft Centi"
+          },
+          "carpet_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Carpet Area Sqft Centi"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "City"
+          },
+          "configuration_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Configuration Label"
+          },
+          "floor_count": {
+            "anyOf": [
+              {
+                "maximum": 10,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Floor Count"
+          },
+          "floor_plan_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Floor Plan Attachment Id"
+          },
+          "geo_lat_e6": {
+            "anyOf": [
+              {
+                "maximum": 90000000,
+                "minimum": -90000000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Geo Lat E6"
+          },
+          "geo_lng_e6": {
+            "anyOf": [
+              {
+                "maximum": 180000000,
+                "minimum": -180000000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Geo Lng E6"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Locality"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "pattern": "^[1-9][0-9]{5}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pincode"
+          },
+          "plot_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plot Area Sqft Centi"
+          },
+          "possession_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Possession On"
+          },
+          "possession_status_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "UNDER_CONSTRUCTION",
+                  "READY",
+                  "OCCUPIED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Possession Status Code"
+          },
+          "project_kind_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "NEW",
+                  "RENOVATION",
+                  "PARTIAL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Project Kind Code"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "State"
+          }
+        },
+        "title": "PropertyPatchIn",
+        "type": "object"
+      },
       "PublicAttribution": {
         "additionalProperties": false,
         "properties": {
@@ -2510,6 +3037,331 @@
           "reason"
         ],
         "title": "RolesIn",
+        "type": "object"
+      },
+      "SpaceAttributes": {
+        "additionalProperties": false,
+        "description": "property_space.attributes: static facts about a space (blueprint \u00a74.1). Survey readings go on the\nmeasurement (space_measurement.attributes).",
+        "properties": {
+          "has_false_ceiling_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has False Ceiling Existing"
+          },
+          "wet_area": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wet Area"
+          }
+        },
+        "title": "SpaceAttributes",
+        "type": "object"
+      },
+      "SpaceCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "$ref": "#/components/schemas/SpaceAttributes",
+            "default": {
+              "has_false_ceiling_existing": null,
+              "wet_area": null
+            }
+          },
+          "custom_type_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Custom Type Label"
+          },
+          "is_in_scope": {
+            "default": true,
+            "title": "Is In Scope",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level_index": {
+            "default": 0,
+            "maximum": 10,
+            "minimum": -3,
+            "title": "Level Index",
+            "type": "integer"
+          },
+          "parent_space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Space Id"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sort Order"
+          },
+          "space_type_code": {
+            "enum": [
+              "LIVING",
+              "DINING",
+              "LIVING_DINING",
+              "FAMILY_LOUNGE",
+              "FOYER",
+              "PASSAGE",
+              "STAIRCASE",
+              "POOJA",
+              "MASTER_BEDROOM",
+              "BEDROOM",
+              "CHILDREN_BEDROOM",
+              "GUEST_BEDROOM",
+              "PARENTS_BEDROOM",
+              "SERVANT_ROOM",
+              "DRESSING",
+              "WALK_IN_CLOSET",
+              "TOILET",
+              "POWDER_ROOM",
+              "STUDY",
+              "HOME_OFFICE",
+              "MEDIA_ROOM",
+              "KITCHEN",
+              "UTILITY",
+              "STORE",
+              "LAUNDRY",
+              "BALCONY",
+              "TERRACE",
+              "SIT_OUT",
+              "PORCH",
+              "PARKING",
+              "GARDEN",
+              "CUSTOM"
+            ],
+            "title": "Space Type Code",
+            "type": "string"
+          },
+          "zone_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "INDOOR",
+                  "SEMI_OPEN",
+                  "OUTDOOR"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Zone Code"
+          }
+        },
+        "required": [
+          "space_type_code",
+          "label"
+        ],
+        "title": "SpaceCreateIn",
+        "type": "object"
+      },
+      "SpaceDeleteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "title": "SpaceDeleteIn",
+        "type": "object"
+      },
+      "SpaceOrderIn": {
+        "additionalProperties": false,
+        "properties": {
+          "space_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Space Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "space_ids"
+        ],
+        "title": "SpaceOrderIn",
+        "type": "object"
+      },
+      "SpacePatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpaceAttributes"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "custom_type_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Custom Type Label"
+          },
+          "is_in_scope": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is In Scope"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "level_index": {
+            "anyOf": [
+              {
+                "maximum": 10,
+                "minimum": -3,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Level Index"
+          },
+          "parent_space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Space Id"
+          },
+          "zone_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "INDOOR",
+                  "SEMI_OPEN",
+                  "OUTDOOR"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Zone Code"
+          }
+        },
+        "title": "SpacePatchIn",
+        "type": "object"
+      },
+      "SpacesFromTemplateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "include_optional": {
+            "default": [],
+            "items": {
+              "maxLength": 40,
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Include Optional",
+            "type": "array"
+          },
+          "template_key": {
+            "enum": [
+              "APARTMENT_2BHK",
+              "APARTMENT_3BHK",
+              "APARTMENT_4BHK",
+              "APARTMENT_5BHK",
+              "INDEPENDENT_HOUSE"
+            ],
+            "title": "Template Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template_key"
+        ],
+        "title": "SpacesFromTemplateIn",
         "type": "object"
       },
       "SpamResolutionIn": {
@@ -8892,6 +9744,37 @@
         "x-requirement": "PLAT-009"
       }
     },
+    "/api/v1/mtq/templates": {
+      "get": {
+        "operationId": "mtq_get_templates",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The B1 property and space templates (version 2026.10.1)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-004"
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "operationId": "notifications_list_notifications",
@@ -9309,6 +10192,496 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-016"
+      }
+    },
+    "/api/v1/properties": {
+      "get": {
+        "operationId": "mtq_list_properties",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lead_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lead Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "city",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "City"
+            }
+          },
+          {
+            "in": "query",
+            "name": "property_type_code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "APARTMENT",
+                    "INDEPENDENT_HOUSE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Property Type Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List properties within scope",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-001"
+      },
+      "post": {
+        "operationId": "mtq_create_property",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a property for a lead, optionally seeding its space tree from a template",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-002"
+      }
+    },
+    "/api/v1/properties/{property_id}": {
+      "get": {
+        "operationId": "mtq_get_property",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One property with its space tree and derived counts",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-001"
+      },
+      "patch": {
+        "operationId": "mtq_patch_property",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a property",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-003"
+      }
+    },
+    "/api/v1/properties/{property_id}/spaces": {
+      "get": {
+        "operationId": "mtq_list_spaces",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The live space tree in walk order",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-001"
+      },
+      "post": {
+        "operationId": "mtq_create_space",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a space to a property's tree",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-003"
+      }
+    },
+    "/api/v1/properties/{property_id}/spaces/from-template": {
+      "post": {
+        "operationId": "mtq_spaces_from_template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpacesFromTemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Seed an empty property's space tree from a template",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-004"
+      }
+    },
+    "/api/v1/properties/{property_id}/spaces/order": {
+      "put": {
+        "operationId": "mtq_order_spaces",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the walk order: the list must name every live space exactly once (stale lists are refused)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-003"
+      }
+    },
+    "/api/v1/properties/{property_id}/summary": {
+      "get": {
+        "operationId": "mtq_property_summary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Derived counts and the latest verified measurement set",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-001"
       }
     },
     "/api/v1/public/catalog": {
@@ -10158,6 +11531,124 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "SEVT-005"
+      }
+    },
+    "/api/v1/spaces/{space_id}": {
+      "delete": {
+        "operationId": "mtq_delete_space",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceDeleteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive a space (soft delete; its id is kept)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-003"
+      },
+      "patch": {
+        "operationId": "mtq_patch_space",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpacePatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a space (its type and id never change)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "property.update"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PROP-003"
       }
     },
     "/api/v1/users": {

@@ -1,0 +1,1348 @@
+{
+  "template_version": "2026.10.1",
+  "status": "B1 code fixture (B1-06); content accepted as OI-MTQ-02 (blocker closure §3.1)",
+  "space_templates": {
+    "LIVING_DEFAULT": {
+      "space_types": [
+        "LIVING",
+        "LIVING_DINING"
+      ],
+      "default_label": "Living",
+      "full_required": [
+        "TAG:TV_UNIT",
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "TV wall tagged; switchboard, AC indoor unit, window grill and DB box on it captured.",
+        "Feature wall tagged only when panelling, wallpaper or texture is wanted."
+      ],
+      "source": "01 §1"
+    },
+    "FAMILY_LOUNGE_DEFAULT": {
+      "space_types": [
+        "FAMILY_LOUNGE"
+      ],
+      "default_label": "Family lounge",
+      "full_required": [
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "TV unit is recommended, not mandatory, in a family lounge."
+      ],
+      "source": "01 §1, 02 §5 row 10"
+    },
+    "FOYER_DEFAULT": {
+      "space_types": [
+        "FOYER",
+        "PASSAGE"
+      ],
+      "default_label": "Foyer",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Shoe rack stretch of W1 tagged SHOE_RACK when wanted."
+      ],
+      "source": "01 CORE, 02 §1 row 1"
+    },
+    "DINING_DEFAULT": {
+      "space_types": [
+        "DINING"
+      ],
+      "default_label": "Dining",
+      "full_required": [
+        "TAG:CROCKERY_UNIT",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Crockery wall tagged; kitchen door or pass-through captured."
+      ],
+      "source": "01 §2"
+    },
+    "KITCHEN_DEFAULT": {
+      "space_types": [
+        "KITCHEN"
+      ],
+      "default_label": "Kitchen",
+      "full_required": [
+        "TAG:KITCHEN_RUN",
+        "FL",
+        "ATTR:has_gas_line",
+        "ATTR:has_water_inlet",
+        "ATTR:has_drain",
+        "ATTR:counter_existing",
+        "OBS_KIND:PIPE"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Every cabinet wall tagged KITCHEN_RUN; tall-unit stretch tagged TALL_UNIT.",
+        "Sink (pipe) and hob (gas line) positions with offsets; chimney duct outlet as a DUCT or AC_SLEEVE opening.",
+        "Fridge niche as a NICHE opening with purpose FRIDGE and its depth.",
+        "Appliance list as a customer-request note."
+      ],
+      "source": "01 §3, B1-SCOPE §2.6"
+    },
+    "UTILITY_DEFAULT": {
+      "space_types": [
+        "UTILITY",
+        "LAUNDRY"
+      ],
+      "default_label": "Utility",
+      "full_required": [
+        "TAG:KITCHEN_RUN",
+        "ATTR:has_water_inlet",
+        "ATTR:has_drain",
+        "OBS_KIND:PIPE"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Washing-machine position with tap and drain offsets.",
+        "Zone set (indoor or semi-open)."
+      ],
+      "source": "01 §4"
+    },
+    "MASTER_BEDROOM_DEFAULT": {
+      "space_types": [
+        "MASTER_BEDROOM"
+      ],
+      "default_label": "Master bedroom",
+      "full_required": [
+        "TAG:WARDROBE",
+        "TAG:BED_HEAD",
+        "FL",
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Wardrobe and bed-head walls tagged; switchboard, AC unit and pipe on the wardrobe wall.",
+        "Door to the attached toilet or dressing captured with its swing."
+      ],
+      "source": "01 §5"
+    },
+    "BEDROOM_DEFAULT": {
+      "space_types": [
+        "BEDROOM",
+        "PARENTS_BEDROOM"
+      ],
+      "default_label": "Bedroom",
+      "full_required": [
+        "TAG:WARDROBE",
+        "FL",
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Bed-head wall tagged when a bed is wanted."
+      ],
+      "source": "01 §6, AR-12"
+    },
+    "CHILDREN_BEDROOM_DEFAULT": {
+      "space_types": [
+        "CHILDREN_BEDROOM"
+      ],
+      "default_label": "Children's bedroom",
+      "full_required": [
+        "TAG:WARDROBE",
+        "FL",
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Study-unit wall tagged when a study unit is wanted."
+      ],
+      "source": "01 §6, AR-12"
+    },
+    "GUEST_BEDROOM_DEFAULT": {
+      "space_types": [
+        "GUEST_BEDROOM"
+      ],
+      "default_label": "Guest bedroom",
+      "full_required": [
+        "FL",
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Guest rooms are wardrobe-light: tag only what the customer wants."
+      ],
+      "source": "01 §7, AR-12"
+    },
+    "SERVANT_ROOM_DEFAULT": {
+      "space_types": [
+        "SERVANT_ROOM"
+      ],
+      "default_label": "Servant room",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Not a bedroom for counts and drivers."
+      ],
+      "source": "02 §6 row 11, B1-SCOPE §2.9.4"
+    },
+    "DRESSING_DEFAULT": {
+      "space_types": [
+        "DRESSING",
+        "WALK_IN_CLOSET"
+      ],
+      "default_label": "Dressing",
+      "full_required": [
+        "TAG:WARDROBE"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Every unit wall tagged WARDROBE; internal corners counted."
+      ],
+      "source": "01 §5.9"
+    },
+    "STUDY_DEFAULT": {
+      "space_types": [
+        "STUDY",
+        "HOME_OFFICE"
+      ],
+      "default_label": "Study",
+      "full_required": [
+        "TAG:STUDY_UNIT",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Data and power points on the desk wall (required for a home office)."
+      ],
+      "source": "01 §8"
+    },
+    "POOJA_DEFAULT": {
+      "space_types": [
+        "POOJA"
+      ],
+      "default_label": "Pooja",
+      "full_required": [
+        "TAG:POOJA_UNIT",
+        "FL",
+        "OBS_KIND:SWITCHBOARD"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Niche as a NICHE opening with depth when the altar is a niche.",
+        "Ventilation captured; a risk note when there is none."
+      ],
+      "source": "01 §9"
+    },
+    "MEDIA_ROOM_DEFAULT": {
+      "space_types": [
+        "MEDIA_ROOM"
+      ],
+      "default_label": "Media room",
+      "full_required": [
+        "ATTR:ac_type",
+        "ATTR:ac_point_count",
+        "ATTR:fan_point_count"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "TV and feature walls tagged; acoustic and AV notes."
+      ],
+      "source": "02 §4, §6 row 21"
+    },
+    "STORE_DEFAULT": {
+      "space_types": [
+        "STORE"
+      ],
+      "default_label": "Store",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Tall storage walls tagged STORAGE_WALL when wanted."
+      ],
+      "source": "02 §6 row 12"
+    },
+    "TOILET_DEFAULT": {
+      "space_types": [
+        "TOILET",
+        "POWDER_ROOM"
+      ],
+      "default_label": "Toilet",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Wash-basin wall tagged VANITY when a vanity is wanted; then basin, inlet and drain offsets on it.",
+        "Wet and dry split sketched; dado height noted."
+      ],
+      "source": "01 §12, AR-08"
+    },
+    "BALCONY_DEFAULT": {
+      "space_types": [
+        "BALCONY",
+        "SIT_OUT"
+      ],
+      "default_label": "Balcony",
+      "full_required": [
+        "ATTR:has_drain",
+        "ATTR:has_water_inlet",
+        "ATTR:railing_height_mm",
+        "ATTR:exposure_code"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Door from the adjoining room with its swing."
+      ],
+      "source": "01 §10"
+    },
+    "TERRACE_DEFAULT": {
+      "space_types": [
+        "TERRACE"
+      ],
+      "default_label": "Terrace",
+      "full_required": [
+        "ATTR:has_drain",
+        "ATTR:has_water_inlet",
+        "WALL_HEIGHTS"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Parapet walls with their heights; covered part as a semi-open child space."
+      ],
+      "source": "01 §11"
+    },
+    "OUTDOOR_DEFAULT": {
+      "space_types": [
+        "PORCH",
+        "PARKING",
+        "GARDEN"
+      ],
+      "default_label": "Outdoor",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Outline only; vehicle access noted."
+      ],
+      "source": "02 §6 rows 1-2"
+    },
+    "STAIRCASE_DEFAULT": {
+      "space_types": [
+        "STAIRCASE"
+      ],
+      "default_label": "Staircase",
+      "full_required": [
+        "STAIRCASE",
+        "WALL_HEIGHTS"
+      ],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Every stairwell wall segment as its own wall with its own height (mean height when sloped).",
+        "Largest panel that can go up; headroom; landing for L, U and spiral turns."
+      ],
+      "source": "B1-SCOPE §2.4, AR-19"
+    },
+    "CUSTOM_DEFAULT": {
+      "space_types": [
+        "CUSTOM"
+      ],
+      "default_label": "Custom space",
+      "full_required": [],
+      "checklist": [
+        "Stand at the entry door; label W1 and continue clockwise; photograph each label (door-less: W1 is the first solid wall clockwise from the open edge you entered through; several doors: the wall of the door you entered through).",
+        "Shape, principal dimensions, ceiling height, beam bottom if any.",
+        "Each wall: length, type, tags; on tagged walls also obstructions with offsets (or mark none).",
+        "Each opening: type, width, height; on tagged walls and walls whose door or window bounds a tagged wall also sill, offset and swing.",
+        "Flooring, condition, confidence.",
+        "Photos: one overview photo; on tagged walls one photo each with the label visible.",
+        "Notes: risks, customer requests heard in this room.",
+        "Mark complete only when the completeness check is green.",
+        "Label the intended use; tag furniture walls with the nearest standard tag."
+      ],
+      "source": "01 §14"
+    }
+  },
+  "property_templates": {
+    "APARTMENT_2BHK": {
+      "property_type_code": "APARTMENT",
+      "configuration_label": "2 BHK",
+      "expected_bedrooms": 2,
+      "levels": 1,
+      "source": "02 §1",
+      "spaces": [
+        {
+          "space_type_code": "FOYER",
+          "label": "Foyer",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FOYER_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "LIVING",
+          "label": "Living",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "LIVING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "DINING",
+          "label": "Dining",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DINING_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "KITCHEN",
+          "label": "Kitchen",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "KITCHEN_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "UTILITY",
+          "label": "Utility",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "UTILITY_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POOJA",
+          "label": "Pooja",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "POOJA_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Common toilet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "MASTER_BEDROOM",
+          "label": "Master bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MASTER_BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Master toilet",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 2",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "BALCONY",
+          "label": "Balcony",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "BALCONY_DEFAULT",
+          "level_index": 0
+        }
+      ]
+    },
+    "APARTMENT_3BHK": {
+      "property_type_code": "APARTMENT",
+      "configuration_label": "3 BHK",
+      "expected_bedrooms": 3,
+      "levels": 1,
+      "source": "02 §2",
+      "spaces": [
+        {
+          "space_type_code": "FOYER",
+          "label": "Foyer",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FOYER_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "LIVING",
+          "label": "Living",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "LIVING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "DINING",
+          "label": "Dining",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DINING_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "KITCHEN",
+          "label": "Kitchen",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "KITCHEN_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "UTILITY",
+          "label": "Utility",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "UTILITY_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POOJA",
+          "label": "Pooja",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "POOJA_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Common toilet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "MASTER_BEDROOM",
+          "label": "Master bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MASTER_BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Master toilet",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 2",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 3",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 3 toilet",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#2",
+          "optional": true
+        },
+        {
+          "space_type_code": "STUDY",
+          "label": "Study",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STUDY_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "BALCONY",
+          "label": "Balcony",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "BALCONY_DEFAULT",
+          "level_index": 0
+        }
+      ]
+    },
+    "APARTMENT_4BHK": {
+      "property_type_code": "APARTMENT",
+      "configuration_label": "4 BHK",
+      "expected_bedrooms": 4,
+      "levels": 1,
+      "source": "02 §3",
+      "spaces": [
+        {
+          "space_type_code": "FOYER",
+          "label": "Foyer",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FOYER_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "LIVING",
+          "label": "Living",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "LIVING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "DINING",
+          "label": "Dining",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DINING_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "KITCHEN",
+          "label": "Kitchen",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "KITCHEN_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "UTILITY",
+          "label": "Utility",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "UTILITY_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POOJA",
+          "label": "Pooja",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "POOJA_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Common toilet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "MASTER_BEDROOM",
+          "label": "Master bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MASTER_BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Master toilet",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 2",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 3",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 3 toilet",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#2",
+          "optional": true
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 4",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 4 toilet",
+          "instance_no": 4,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#3"
+        },
+        {
+          "space_type_code": "STUDY",
+          "label": "Study",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STUDY_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "DRESSING",
+          "label": "Dressing",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DRESSING_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1",
+          "optional": true
+        },
+        {
+          "space_type_code": "FAMILY_LOUNGE",
+          "label": "Family lounge",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FAMILY_LOUNGE_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "SERVANT_ROOM",
+          "label": "Servant room",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "SERVANT_ROOM_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "BALCONY",
+          "label": "Balcony",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "BALCONY_DEFAULT",
+          "level_index": 0
+        }
+      ]
+    },
+    "APARTMENT_5BHK": {
+      "property_type_code": "APARTMENT",
+      "configuration_label": "5 BHK",
+      "expected_bedrooms": 5,
+      "levels": 1,
+      "source": "02 §4",
+      "spaces": [
+        {
+          "space_type_code": "FOYER",
+          "label": "Foyer",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FOYER_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "LIVING",
+          "label": "Living",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "LIVING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "DINING",
+          "label": "Dining",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DINING_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "KITCHEN",
+          "label": "Kitchen",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "KITCHEN_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "UTILITY",
+          "label": "Utility",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "UTILITY_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POOJA",
+          "label": "Pooja",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "POOJA_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Common toilet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "MASTER_BEDROOM",
+          "label": "Master bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MASTER_BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Master toilet",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 2",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 3",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 3 toilet",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#2",
+          "optional": true
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 4",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 4 toilet",
+          "instance_no": 4,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#3"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 5",
+          "instance_no": 4,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 5 toilet",
+          "instance_no": 5,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "parent": "BEDROOM#4"
+        },
+        {
+          "space_type_code": "STUDY",
+          "label": "Study",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STUDY_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "DRESSING",
+          "label": "Dressing",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DRESSING_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1",
+          "optional": true
+        },
+        {
+          "space_type_code": "FAMILY_LOUNGE",
+          "label": "Family lounge",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FAMILY_LOUNGE_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "SERVANT_ROOM",
+          "label": "Servant room",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "SERVANT_ROOM_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "WALK_IN_CLOSET",
+          "label": "Walk-in closet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DRESSING_DEFAULT",
+          "level_index": 0,
+          "parent": "MASTER_BEDROOM#1",
+          "optional": true
+        },
+        {
+          "space_type_code": "MEDIA_ROOM",
+          "label": "Media room",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MEDIA_ROOM_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "STORE",
+          "label": "Store",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STORE_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "BALCONY",
+          "label": "Balcony",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "BALCONY_DEFAULT",
+          "level_index": 0
+        }
+      ]
+    },
+    "INDEPENDENT_HOUSE": {
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "configuration_label": null,
+      "expected_bedrooms": null,
+      "levels": null,
+      "default_project_kind": "RENOVATION",
+      "source": "02 §7 (villa space list 02 §6 as the base), B1-SCOPE §2.2",
+      "spaces": [
+        {
+          "space_type_code": "PORCH",
+          "label": "Porch",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "OUTDOOR_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "PARKING",
+          "label": "Parking",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "OUTDOOR_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "GARDEN",
+          "label": "Garden",
+          "instance_no": 1,
+          "zone_code": "OUTDOOR",
+          "template": "OUTDOOR_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "FOYER",
+          "label": "Foyer",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FOYER_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "LIVING",
+          "label": "Living",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "LIVING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "DINING",
+          "label": "Dining",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "DINING_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "KITCHEN",
+          "label": "Kitchen",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "KITCHEN_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "UTILITY",
+          "label": "Utility",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "UTILITY_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POOJA",
+          "label": "Pooja",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "POOJA_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "POWDER_ROOM",
+          "label": "Powder room",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Common toilet",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "GUEST_BEDROOM",
+          "label": "Guest bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "GUEST_BEDROOM_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "SERVANT_ROOM",
+          "label": "Servant room",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "SERVANT_ROOM_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "STORE",
+          "label": "Store",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STORE_DEFAULT",
+          "level_index": 0,
+          "optional": true
+        },
+        {
+          "space_type_code": "STAIRCASE",
+          "label": "Staircase (ground to first)",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "STAIRCASE_DEFAULT",
+          "level_index": 0
+        },
+        {
+          "space_type_code": "FAMILY_LOUNGE",
+          "label": "Family lounge",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "FAMILY_LOUNGE_DEFAULT",
+          "level_index": 1,
+          "optional": true
+        },
+        {
+          "space_type_code": "MASTER_BEDROOM",
+          "label": "Master bedroom",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "MASTER_BEDROOM_DEFAULT",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Master toilet",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 1,
+          "parent": "MASTER_BEDROOM#1"
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 2",
+          "instance_no": 1,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "TOILET",
+          "label": "Bedroom 2 toilet",
+          "instance_no": 3,
+          "zone_code": "INDOOR",
+          "template": "TOILET_DEFAULT",
+          "level_index": 1,
+          "parent": "BEDROOM#1",
+          "optional": true
+        },
+        {
+          "space_type_code": "BEDROOM",
+          "label": "Bedroom 3",
+          "instance_no": 2,
+          "zone_code": "INDOOR",
+          "template": "BEDROOM_DEFAULT",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "BALCONY",
+          "label": "Balcony",
+          "instance_no": 1,
+          "zone_code": "SEMI_OPEN",
+          "template": "BALCONY_DEFAULT",
+          "level_index": 1
+        },
+        {
+          "space_type_code": "TERRACE",
+          "label": "Terrace",
+          "instance_no": 1,
+          "zone_code": "OUTDOOR",
+          "template": "TERRACE_DEFAULT",
+          "level_index": 2,
+          "optional": true
+        }
+      ],
+      "notes": [
+        "Add one STAIRCASE per further level transition; add bedrooms as the house has them (BHK is derived, never stored)."
+      ]
+    }
+  }
+}

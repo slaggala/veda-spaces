@@ -31,3 +31,15 @@ No deviation. Characterisation snapshot identical before and after.
 | AR-02 partition flag | `space_wall.is_proposed` with CHECK that only a PARTITION may be proposed | Review of record §10.6 |
 | 00 §4 obstruction kinds, FLOORING, EXISTING_CONDITION (closure §3.1 "§4 values not in §2.6 deferred") | Adopted as the B1 capture vocabulary, plus ARCHITRAVE (AR-11), AC_DRAIN (AR-13) and the NONE marker (B1-SCOPE §2.3); natural-light attributes excluded (AR-17) | The parenthesis in closure §3.1 concerns wall-tag values; the capture contract needs these lists to validate input |
 | One active draft per property (T06 rule) | Partial unique index `ux_measurement_set__one_draft` | Enforced by the database, not only the service |
+
+## B1-T04 — property and space services
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| Templates as versioned JSON fixtures (B1-06) | `veda/modules/mtq/fixtures/templates-2026.10.1.json`, validated strictly at load: every B1 space type has exactly one space template, every seed space a known type and template, parents earlier in the walk, bedroom counts consistent | A malformed fixture stops the process instead of seeding a wrong tree |
+| 02 §3 (4 BHK) says the servant room counts as a bedroom; 02 §4 (5 BHK) says one set per surveyor | Servant room never counts; one set with per-space claims | B1-SCOPE §2.9.4 and §2.9.3 supersede the template text (closure §3.1) |
+| 02 §4 and §6 name `HOME_THEATRE`, `LIBRARY`, `GUEST_SUITE`, `WASH_AREA` | Not seeded; `MEDIA_ROOM` or `CUSTOM` used | Not in the B1 `SPACE_TYPE` subset (B1-SCOPE §2.1; closure §3.2) |
+| Independent house template "as Villa" (02 §7) | The villa space list (02 §6) adapted as the house seed: porch, parking, garden, ground floor, staircase, upper bedrooms, optional terrace; RENOVATION default | 02 §7 is accepted; §6 is deferred as a property type, so its list is used only as §7's base |
+| Machine-checkable FULL requirements per template | Each template lists the subset the verifier can enforce (tags, floor-to-lintel, service attributes, obstruction kinds, wall heights, staircase geometry); the rest of 01 stays as checklist text for the human verifier | Free-text items (sketches, customer preferences) cannot be checked by code; four-eyes verification covers them |
+| `If-Match` on every mutation (blueprint §11) | Space edit and archive use the space's version; adding spaces, seeding and ordering do not take the property's version | The property version does not move when spaces change, so it would be a false check; ordering is refused unless it names every live space exactly once |
+| Outbox events `property.created` and others (blueprint §11.3) | Not emitted in B1 | No subscriber exists; an unhandled event type dead-letters. The audit log and lead activities are the B1 event record |
