@@ -18,6 +18,7 @@ const leads = () => import('../../modules/leads/index.js');
 const admin = () => import('../../modules/admin/index.js');
 const audit = () => import('../../modules/audit/index.js');
 const catalog = () => import('../../modules/catalog/index.js');
+const siteModule = () => import('../../modules/site/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -52,6 +53,11 @@ export const ROUTES: Def[] = [
   },
   { path: '/admin/founder-actions', title: 'Founder actions', component: 'vs-founder-actions-page', access: 'auth', chrome: true, anyOf: ['user.founder.manage'], load: admin },
   { path: '/catalog', title: 'Estimator catalog', component: 'vs-catalog-page', access: 'auth', chrome: true, anyOf: ['catalog.view'], load: catalog },
+  // MTQ B1 site measurement (staff only; every API call answers 404 while VEDA_MTQ_SITE_ENABLED is off).
+  { path: '/site', title: 'Site measurement', component: 'vs-site-home-page', access: 'auth', chrome: true, anyOf: ['measurement.visit.read', 'property.read'], load: siteModule },
+  { path: '/site/properties/:id', title: 'Property', component: 'vs-property-page', access: 'auth', chrome: true, anyOf: ['property.read'], load: siteModule },
+  { path: '/site/sets/:id/capture', title: 'Capture', component: 'vs-capture-page', access: 'auth', chrome: true, anyOf: ['measurement.capture'], load: siteModule },
+  { path: '/site/sets/:id/review', title: 'Measurement review', component: 'vs-review-page', access: 'auth', chrome: true, anyOf: ['measurement.read'], load: siteModule },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 

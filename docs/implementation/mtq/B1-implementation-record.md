@@ -103,4 +103,16 @@ No deviation. Characterisation snapshot identical before and after.
 | Revision awareness | Writes into a revision that is no longer a draft are FROZEN with `current_draft_id` when a correction draft exists | The client rebases instead of writing into a sealed revision |
 | Version bookkeeping | After a rolled-back operation the unit of work's "already versioned" record is restored, so a later write to the same row still advances its version | Otherwise a rolled-back attempt could suppress the version bump that protects other clients |
 
+## B1-T10 — staff capture UI and PWA
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| Staff capture UI (blueprint §13.1–§13.2; B1-SCOPE §2.8) | Four pages under `/site`: visits and properties, the property with its space tree and revisions, room-by-room capture, and verification review; one nav item shown only to roles holding `measurement.visit.read` or `property.read` | Lite and Full share one capture page; the template's required markers come from the server |
+| "Offline capture" (blueprint §6.1 (4)) | Every capture action is queued on the device (IndexedDB, memory fallback) before it is sent through the T09 sync endpoint; conflicts, claims, frozen revisions and refusals stay in the queue with the server's answer until the surveyor resolves them; a conflict resolved as "mine" is resent on the server's version | No last-write-wins on the device either |
+| PWA | A service worker scoped to `/site/` caches only the app shell and hashed assets; it never caches an API response; it is registered only after the site API has answered, so with the flag off no worker is installed | Capture data must live in the queue, not a cache; other workspace pages are never controlled by it |
+| Photos (closure §6.2) | Long edge scaled to 2048 px, re-encoded as JPEG 0.8 on the device (drops EXIF and GPS), SHA-256 computed on the device; metadata is queued first, bytes upload after acceptance; review shows variants as `data:` URLs | Fits the existing CSP `img-src 'self' data:`; S3 presigned uploads need the bucket origin in `connect-src`, which is a T11/T12 staging change |
+| Units (blueprint §6.1, AR-16) | Feet-inches and millimetres parsed to integer millimetres; anything unreadable is refused with the field named, never guessed | Integer millimetres are the stored unit |
+| No pricing in the capture UI | The capture and review pages show no rate, amount or currency; a unit test asserts no rupee sign renders | B1 scope excludes pricing |
+| Production isolation | The browser E2E opens `/site` with the flag unset and requires the "not enabled" message and a 404 from `/api/v1/properties` | The flag-off default is checked end to end |
+
 Pre-existing flaky test observed (not caused by this branch): `tests/unit/test_deploy_scanner.py::test_entrypoint_propagates_a_clean_clamd_exit` waits 5 s for a stub process and fails intermittently under load; it failed 3 of 6 runs on the main checkout as well.

@@ -57,6 +57,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/', label: 'Dashboard', icon: 'home', group: 'main', anyOf: ['lead.read'], mobile: true },
   { path: '/leads', label: 'Leads', icon: 'users', group: 'main', anyOf: ['lead.read'], mobile: true },
   { path: '/follow-ups', label: 'Follow-ups', icon: 'calendar', group: 'main', anyOf: ['lead_activity.read'], mobile: true },
+  { path: '/site', label: 'Site visits', icon: 'calendar', group: 'main', anyOf: ['measurement.visit.read', 'property.read'], mobile: true },
   { path: '/approvals', label: 'Approvals', icon: 'check', group: 'admin', anyOf: ['user.mfa.reset', 'user.email.change', 'user.founder.manage'] },
   { path: '/admin/users', label: 'Users', icon: 'user', group: 'admin', anyOf: ['user.read'] },
   { path: '/admin/roles', label: 'Roles', icon: 'shield', group: 'admin', anyOf: ['role.read'] },

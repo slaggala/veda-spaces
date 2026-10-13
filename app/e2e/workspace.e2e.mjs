@@ -122,6 +122,17 @@ try {
     await page.locator('td', { hasText: /^UPDATE$/ }).first().waitFor();
   });
 
+  await step('site measurement is off by default (MTQ B1 production isolation)', async () => {
+    const before = consoleErrors.length;
+    await page.goto(`${BASE}/site`);
+    await page.getByText(/not enabled/).first().waitFor({ timeout: 10000 });
+    const status = await page.evaluate(async () => (await fetch('/api/v1/properties', { credentials: 'include' })).status);
+    if (status !== 404) throw new Error(`/api/v1/properties answered ${status} with VEDA_MTQ_SITE_ENABLED unset`);
+    // The 404s this step provokes are the expected disabled answer; any other console error still counts.
+    const provoked = consoleErrors.splice(before).filter((e) => !/status of 404/.test(e));
+    consoleErrors.push(...provoked);
+  });
+
   await step('sign out and sign back in with TOTP', async () => {
     await page.getByRole('button', { name: 'Account menu' }).click();
     await page.getByRole('button', { name: /Sign out/ }).click();
