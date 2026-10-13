@@ -8,8 +8,8 @@
                                └──no_show─► NO_SHOW
 
 Scheduling, rescheduling, cancelling and no-shows need ``measurement.visit.schedule``; starting and completing are
-capture (``measurement.capture``) by the assigned surveyor. Completion needs a submitted measurement set from the
-visit (fail closed). There is no pause state in the frozen model. Terminal states never change.
+capture (``measurement.capture``) by the assigned surveyor. Completion needs a measurement set of the property
+submitted since the visit started (fail closed). There is no pause state in the frozen model. Terminal states never change.
 
 Lead synchronisation goes through the lead module's own status service, acting as SYSTEM: the first schedule moves
 the lead forward to SITE_VISIT when it is earlier in the pipeline, never backward, and never touches a won or lost
@@ -224,10 +224,13 @@ def transition(s: Session, ctx, visit: MeasurementVisit, body) -> MeasurementVis
     if action == "start":
         visit.started_on = now
     elif action == "complete":
+        # A set of this property submitted since the visit started: the visit's own set, or the shared draft a
+        # second surveyor worked on (one DRAFT per property, B1-SCOPE §2.9.3).
         submitted = s.execute(
             sa.select(MeasurementSet.id).where(
-                MeasurementSet.measurement_visit_id == visit.id,
-                MeasurementSet.status.in_(("SUBMITTED", "VERIFIED", "SUPERSEDED")),
+                MeasurementSet.property_id == visit.property_id,
+                MeasurementSet.status.in_(("SUBMITTED", "VERIFIED", "SUPERSEDED", "REJECTED")),
+                MeasurementSet.submitted_on >= visit.started_on,
             )
         ).first()
         if submitted is None:

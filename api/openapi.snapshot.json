@@ -931,6 +931,53 @@
         "title": "DeleteIn",
         "type": "object"
       },
+      "DeviceInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "app_version": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^[0-9A-Za-z._+-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "App Version"
+          },
+          "offline_capable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offline Capable"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^[0-9A-Za-z ._/-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Platform"
+          }
+        },
+        "title": "DeviceInfo",
+        "type": "object"
+      },
       "DuplicateResolutionIn": {
         "additionalProperties": false,
         "properties": {
@@ -1793,6 +1840,262 @@
         "title": "LoginIn",
         "type": "object"
       },
+      "MeasurementAttributes": {
+        "additionalProperties": false,
+        "description": "space_measurement.attributes: survey readings per space (closed; B1-T08 adds staircase and L-shape).",
+        "properties": {
+          "ac_point_count": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ac Point Count"
+          },
+          "ac_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SPLIT",
+                  "WINDOW",
+                  "CASSETTE",
+                  "DUCTED",
+                  "NONE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ac Type"
+          },
+          "ceiling_slab_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FLAT",
+                  "SLOPED",
+                  "BEAM_GRID"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ceiling Slab Type"
+          },
+          "counter_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Counter Existing"
+          },
+          "dado_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dado Height Mm"
+          },
+          "exposure_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "OPEN",
+                  "COVERED",
+                  "ENCLOSED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exposure Code"
+          },
+          "fan_point_count": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fan Point Count"
+          },
+          "has_drain": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Drain"
+          },
+          "has_false_ceiling_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has False Ceiling Existing"
+          },
+          "has_gas_line": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Gas Line"
+          },
+          "has_loft_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Loft Existing"
+          },
+          "has_water_inlet": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Has Water Inlet"
+          },
+          "railing_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Railing Height Mm"
+          }
+        },
+        "title": "MeasurementAttributes",
+        "type": "object"
+      },
+      "MeasurementNoteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attachment Id"
+          },
+          "body": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "client_ref": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Ref"
+          },
+          "note_type_code": {
+            "enum": [
+              "OBSERVATION",
+              "RISK",
+              "CUSTOMER_REQUEST",
+              "VOICE_TRANSCRIPT",
+              "RISK_ACK"
+            ],
+            "title": "Note Type Code",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "note_type_code",
+          "body"
+        ],
+        "title": "MeasurementNoteIn",
+        "type": "object"
+      },
       "MfaRecoveryIn": {
         "additionalProperties": false,
         "properties": {
@@ -1938,6 +2241,229 @@
         "title": "NotePatch",
         "type": "object"
       },
+      "Obstruction": {
+        "additionalProperties": false,
+        "properties": {
+          "height_from_floor_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Height From Floor Mm"
+          },
+          "height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Height Mm"
+          },
+          "kind": {
+            "enum": [
+              "SWITCHBOARD",
+              "AC_INDOOR",
+              "AC_PIPE",
+              "AC_DRAIN",
+              "COLUMN",
+              "BEAM_DROP",
+              "PIPE",
+              "GAS_LINE",
+              "WINDOW_GRILL",
+              "DB_BOX",
+              "GEYSER",
+              "ARCHITRAVE",
+              "OTHER",
+              "NONE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "offset_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset Mm"
+          },
+          "width_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Width Mm"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "Obstruction",
+        "type": "object"
+      },
+      "OpeningIn": {
+        "additionalProperties": false,
+        "properties": {
+          "client_ref": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Client Ref",
+            "type": "string"
+          },
+          "deducts_from_wall_area": {
+            "default": true,
+            "title": "Deducts From Wall Area",
+            "type": "boolean"
+          },
+          "depth_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depth Mm"
+          },
+          "height_mm": {
+            "maximum": 20000,
+            "minimum": 1,
+            "title": "Height Mm",
+            "type": "integer"
+          },
+          "is_existing": {
+            "default": true,
+            "title": "Is Existing",
+            "type": "boolean"
+          },
+          "offset_from_wall_start_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset From Wall Start Mm"
+          },
+          "opening_type_code": {
+            "enum": [
+              "DOOR",
+              "WINDOW",
+              "FRENCH_WINDOW",
+              "ARCH",
+              "NICHE",
+              "VENTILATOR",
+              "AC_SLEEVE",
+              "SHAFT",
+              "DUCT",
+              "CUSTOM"
+            ],
+            "title": "Opening Type Code",
+            "type": "string"
+          },
+          "purpose_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FRIDGE",
+                  "APPLIANCE",
+                  "STORAGE",
+                  "WASH",
+                  "OTHER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purpose Code"
+          },
+          "sill_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sill Height Mm"
+          },
+          "swing_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "IN",
+                  "OUT",
+                  "SLIDING",
+                  "NONE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Swing Code"
+          },
+          "width_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Width Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "client_ref",
+          "opening_type_code",
+          "width_mm",
+          "height_mm"
+        ],
+        "title": "OpeningIn",
+        "type": "object"
+      },
       "PermissionPatch": {
         "additionalProperties": false,
         "properties": {
@@ -1967,6 +2493,57 @@
           }
         },
         "title": "PermissionPatch",
+        "type": "object"
+      },
+      "PlanSetCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "copy_from_set_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Copy From Set Id"
+          },
+          "device_info": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "method_code": {
+            "const": "PLAN_DRAWING",
+            "default": "PLAN_DRAWING",
+            "title": "Method Code",
+            "type": "string"
+          },
+          "survey_level_code": {
+            "const": "LITE",
+            "default": "LITE",
+            "title": "Survey Level Code",
+            "type": "string"
+          },
+          "unit_system_code": {
+            "default": "FT_IN",
+            "enum": [
+              "FT_IN",
+              "MM"
+            ],
+            "title": "Unit System Code",
+            "type": "string"
+          }
+        },
+        "title": "PlanSetCreateIn",
         "type": "object"
       },
       "ProfilePatch": {
@@ -2034,6 +2611,205 @@
           }
         },
         "title": "ProfilePatch",
+        "type": "object"
+      },
+      "PropertyCaptureIn": {
+        "additionalProperties": false,
+        "description": "measurement_set.property_capture (PR #84 02 \u00a70; Lite subset per B1-SCOPE \u00a72.3). Free-text keys are erased\nwith the lead (mtq/erasure.py CAPTURE_TEXT_KEYS).",
+        "properties": {
+          "access_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Notes"
+          },
+          "db_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Db Location"
+          },
+          "electrical_phase": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SINGLE",
+                  "THREE",
+                  "UNKNOWN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Electrical Phase"
+          },
+          "floor_number": {
+            "anyOf": [
+              {
+                "maximum": 150,
+                "minimum": -3,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Floor Number"
+          },
+          "lift_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lift Available"
+          },
+          "lift_depth_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lift Depth Mm"
+          },
+          "lift_door_width_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lift Door Width Mm"
+          },
+          "main_door_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Main Door Height Mm"
+          },
+          "main_door_width_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Main Door Width Mm"
+          },
+          "narrowest_passage_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Narrowest Passage Mm"
+          },
+          "occupancy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "VACANT",
+                  "OCCUPIED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Occupancy"
+          },
+          "parking_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parking Notes"
+          },
+          "staircase_width_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Staircase Width Mm"
+          },
+          "working_hours_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Working Hours Notes"
+          }
+        },
+        "title": "PropertyCaptureIn",
         "type": "object"
       },
       "PropertyCreateIn": {
@@ -2819,6 +3595,22 @@
         "title": "ReauthIn",
         "type": "object"
       },
+      "RejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RejectIn",
+        "type": "object"
+      },
       "ResetIn": {
         "additionalProperties": false,
         "properties": {
@@ -3039,6 +3831,106 @@
         "title": "RolesIn",
         "type": "object"
       },
+      "SetCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "copy_from_set_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Copy From Set Id"
+          },
+          "device_info": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "method_code": {
+            "default": "LASER",
+            "enum": [
+              "TAPE",
+              "LASER",
+              "PLAN_DRAWING",
+              "LIDAR_SCAN"
+            ],
+            "title": "Method Code",
+            "type": "string"
+          },
+          "survey_level_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "LITE",
+                  "FULL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Survey Level Code"
+          },
+          "unit_system_code": {
+            "default": "FT_IN",
+            "enum": [
+              "FT_IN",
+              "MM"
+            ],
+            "title": "Unit System Code",
+            "type": "string"
+          }
+        },
+        "title": "SetCreateIn",
+        "type": "object"
+      },
+      "SetPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "property_capture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyCaptureIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "unit_system_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FT_IN",
+                  "MM"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit System Code"
+          }
+        },
+        "title": "SetPatchIn",
+        "type": "object"
+      },
       "SpaceAttributes": {
         "additionalProperties": false,
         "description": "property_space.attributes: static facts about a space (blueprint \u00a74.1). Survey readings go on the\nmeasurement (space_measurement.attributes).",
@@ -3069,6 +3961,255 @@
           }
         },
         "title": "SpaceAttributes",
+        "type": "object"
+      },
+      "SpaceCaptureIn": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "$ref": "#/components/schemas/MeasurementAttributes",
+            "default": {
+              "ac_point_count": null,
+              "ac_type": null,
+              "ceiling_slab_type": null,
+              "counter_existing": null,
+              "dado_height_mm": null,
+              "exposure_code": null,
+              "fan_point_count": null,
+              "has_drain": null,
+              "has_false_ceiling_existing": null,
+              "has_gas_line": null,
+              "has_loft_existing": null,
+              "has_water_inlet": null,
+              "railing_height_mm": null
+            }
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Base Version"
+          },
+          "beam_bottom_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Beam Bottom Height Mm"
+          },
+          "ceiling_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ceiling Height Mm"
+          },
+          "client_ref": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Ref"
+          },
+          "confidence_code": {
+            "default": "HIGH",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "title": "Confidence Code",
+            "type": "string"
+          },
+          "existing_condition_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "BARE_SHELL",
+                  "FINISHED_NEW",
+                  "OCCUPIED_GOOD",
+                  "OCCUPIED_WORN",
+                  "DAMP",
+                  "CRACKED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Existing Condition Code"
+          },
+          "floor_to_lintel_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Floor To Lintel Mm"
+          },
+          "flooring_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "VITRIFIED",
+                  "MARBLE",
+                  "GRANITE",
+                  "WOOD",
+                  "CEMENT",
+                  "TILE_CERAMIC",
+                  "NONE_BARE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Flooring Code"
+          },
+          "is_complete": {
+            "default": false,
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "length_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Length Mm"
+          },
+          "polygon": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "maximum": 100000,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "maximum": 100000,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "maxItems": 64,
+                "minItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Polygon"
+          },
+          "shape_code": {
+            "default": "RECTANGULAR",
+            "enum": [
+              "RECTANGULAR",
+              "L_SHAPE",
+              "POLYGON",
+              "FREEFORM"
+            ],
+            "title": "Shape Code",
+            "type": "string"
+          },
+          "stated_floor_area_sqft_centi": {
+            "anyOf": [
+              {
+                "maximum": 10000000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Stated Floor Area Sqft Centi"
+          },
+          "take_over": {
+            "default": false,
+            "title": "Take Over",
+            "type": "boolean"
+          },
+          "walls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WallIn"
+            },
+            "maxItems": 64,
+            "title": "Walls",
+            "type": "array"
+          },
+          "width_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Width Mm"
+          }
+        },
+        "title": "SpaceCaptureIn",
         "type": "object"
       },
       "SpaceCreateIn": {
@@ -3920,6 +5061,138 @@
           "to_status"
         ],
         "title": "VisitStatusIn",
+        "type": "object"
+      },
+      "WallIn": {
+        "additionalProperties": false,
+        "properties": {
+          "client_ref": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Ref"
+          },
+          "height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Height Mm"
+          },
+          "is_external": {
+            "default": false,
+            "title": "Is External",
+            "type": "boolean"
+          },
+          "is_proposed": {
+            "default": false,
+            "title": "Is Proposed",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "length_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Length Mm",
+            "type": "integer"
+          },
+          "obstructions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Obstruction"
+            },
+            "maxItems": 20,
+            "title": "Obstructions",
+            "type": "array"
+          },
+          "openings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OpeningIn"
+            },
+            "maxItems": 12,
+            "title": "Openings",
+            "type": "array"
+          },
+          "usable_for_code": {
+            "default": [],
+            "items": {
+              "enum": [
+                "WARDROBE",
+                "LOFT",
+                "BED_HEAD",
+                "TV_UNIT",
+                "STUDY_UNIT",
+                "CROCKERY_UNIT",
+                "KITCHEN_RUN",
+                "KITCHEN_WALL_RUN",
+                "TALL_UNIT",
+                "VANITY",
+                "SHOE_RACK",
+                "POOJA_UNIT",
+                "FEATURE_WALL",
+                "WINDOW_SEATING",
+                "STORAGE_WALL",
+                "PARTITION_EDGE",
+                "NONE"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Usable For Code",
+            "type": "array"
+          },
+          "wall_index": {
+            "maximum": 64,
+            "minimum": 0,
+            "title": "Wall Index",
+            "type": "integer"
+          },
+          "wall_type_code": {
+            "default": "MASONRY",
+            "enum": [
+              "MASONRY",
+              "RCC",
+              "PARTITION",
+              "GLASS",
+              "OPEN"
+            ],
+            "title": "Wall Type Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "wall_index",
+          "length_mm"
+        ],
+        "title": "WallIn",
         "type": "object"
       }
     },
@@ -9983,6 +11256,490 @@
         "x-requirement": "PLAT-009"
       }
     },
+    "/api/v1/measurement-sets/{set_id}": {
+      "get": {
+        "operationId": "mtq_get_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One revision with its full tree (spaces, walls, openings, notes)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-005"
+      },
+      "patch": {
+        "operationId": "mtq_patch_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Property-level capture and the entry unit of a draft",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/diff/{other_id}": {
+      "get": {
+        "operationId": "mtq_diff_sets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "other_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Per-space differences between two revisions of a property",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-005"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/notes": {
+      "post": {
+        "operationId": "mtq_add_note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeasurementNoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a note (idempotent per client_ref)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/notes/{note_id}": {
+      "delete": {
+        "operationId": "mtq_delete_note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a note from a draft",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/reject": {
+      "post": {
+        "operationId": "mtq_reject_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a submitted revision for correction; a new draft revision is opened from it",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.verify"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-006"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/spaces/{space_id}": {
+      "put": {
+        "operationId": "mtq_put_space",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceCaptureIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write one space: measurement, walls, openings (base_version required once it exists)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/spaces/{space_id}/release": {
+      "post": {
+        "operationId": "mtq_release_space",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Release your claim on a space so another surveyor can take it over",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/submit": {
+      "post": {
+        "operationId": "mtq_submit_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit the draft (lead surveyor); it becomes immutable",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
     "/api/v1/measurement-visits": {
       "get": {
         "operationId": "mtq_list_visits",
@@ -10248,6 +12005,58 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "MEAS-003"
+      }
+    },
+    "/api/v1/measurement-visits/{visit_id}/measurement-sets": {
+      "post": {
+        "operationId": "mtq_create_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "visit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the draft revision for a visit in progress (optionally copied from an earlier revision)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
       }
     },
     "/api/v1/measurement-visits/{visit_id}/status": {
@@ -11011,6 +12820,98 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "PROP-003"
+      }
+    },
+    "/api/v1/properties/{property_id}/measurement-sets": {
+      "get": {
+        "operationId": "mtq_list_sets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every revision of a property's measurements",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-005"
+      },
+      "post": {
+        "operationId": "mtq_create_plan_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanSetCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Key in a plan-drawing pre-measure (Lite, no visit)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
       }
     },
     "/api/v1/properties/{property_id}/spaces": {

@@ -53,3 +53,16 @@ No deviation. Characterisation snapshot identical before and after.
 | Lead moves to SITE_VISIT on schedule, forward only (blueprint §12.3) | The lead module's `change_status`, called as SYSTEM with authority limited to `lead.status.change`; never backward, never on WON or LOST (scheduling on a closed lead is refused) | No direct lead mutation; the existing lead state rules apply unchanged |
 | Start and complete | `measurement.capture` by the assignee (or ALL scope); completion needs a SUBMITTED, VERIFIED or SUPERSEDED set from the visit | Fail closed: a visit cannot be marked done with nothing captured |
 | Assignee | Must be an active human holding `measurement.capture` | A visit assigned to someone who cannot capture would be unworkable |
+
+## B1-T06 — measurement sets and revisions
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| Per-space claim: "only that user (or the set's lead surveyor) may edit the space until submission" (B1-SCOPE §2.9.3) | As written, plus claim expiry (4 hours after the holder's last write), explicit release, and explicit takeover (`take_over: true`) of an expired or released claim | The instruction asks for claim expiry and release; without them a surveyor who leaves blocks a space until submission |
+| "last write wins within one surveyor's set" (blueprint §13.2) | Never: every write to an existing space carries `base_version`; a stale write gets 409 `VERSION_CONFLICT` with the server state and the conflicting fields, and is resolved by resending on the new base | Superseded by B1-SCOPE §2.9.3 and the instruction's no-silent-merge rule; stricter than field-level merging |
+| A second surveyor on one DRAFT set | A second surveyor reaches the lead through their own visit on the property; visit completion needs a set of the property submitted since that visit started (T05 rule widened from "the visit's own set") | One DRAFT per property means the second surveyor's visit has no set of its own |
+| Correction creates a new revision (blueprint §6.2) | `reject` moves SUBMITTED → REJECTED and opens DRAFT n+1 copied from it for the same lead surveyor; a re-measure copies with `copy_from_set_id`; copies are new rows, the source never changes | Revisions are immutable; `property_space.id` is the join key |
+| Walls keep identity while edited | Within a draft, walls are matched by `wall_index` and openings by `client_ref`, so photo attachments stay with the wall they show; removed walls are soft-deleted | Attachments reference `space_wall.id` |
+| `RISK_ACK` notes (B1-SCOPE §2.1) | Refused at capture; written by the verifier at verification (B1-T07) | A risk acknowledgement is the verifier's act |
+| Plan-drawing pre-measure (B1-SCOPE §4.2) | `POST /properties/{id}/measurement-sets`: PLAN_DRAWING, LITE, no visit | Staff key in a paper survey |
+| Submission completeness | B1-T06 checks every in-scope space is measured and marked complete; B1-T07 adds the Lite and Full rules | Layered by task |
