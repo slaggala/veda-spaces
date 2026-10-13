@@ -16503,6 +16503,48 @@
         "x-requirement": "QUOT-005"
       }
     },
+    "/api/v1/quotations/{quotation_id}/document": {
+      "get": {
+        "operationId": "mtq_quotation_get_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer document (frozen snapshot once issued; a marked draft before) and its HTML",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
     "/api/v1/quotations/{quotation_id}/issue": {
       "post": {
         "operationId": "mtq_quotation_issue",

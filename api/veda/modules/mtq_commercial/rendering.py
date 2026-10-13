@@ -14,11 +14,14 @@ customer's name is not stored in the snapshot (no personal data in the frozen do
 
 from __future__ import annotations
 
+import html as _html
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from veda.kernel import clock
+from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq.models import Property
 
 from . import quotations
@@ -129,3 +132,110 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
                         "customer_issuable": not (q.blockers or []),
                         "blockers": [b.get("message", b["code"]) for b in (q.blockers or [])]}  # fmt: skip
     return doc
+
+
+def rendered(s: Session, q: quotations.Quotation) -> dict[str, Any]:
+    """The frozen snapshot for an issued version (verified against its digest), else the live draft model; the
+    customer's name is added here, never stored."""
+    if q.snapshot is not None:
+        doc = dict(q.snapshot)
+        doc["snapshot_verified"] = quotations.snapshot_verified(q)
+    else:
+        quotations.refresh_blockers(s, q)
+        doc = document_model(s, q)
+    lead = s.get(Lead, q.lead_id)
+    doc["customer"] = {"name": lead.name if lead else None}
+    return {"document": doc, "html": html(doc), "generated_on": clock.to_rfc3339(clock.now())}
+
+
+def _e(value: Any) -> str:
+    return _html.escape("" if value is None else str(value))
+
+
+CSS = """
+:root{--ink:#1f1b16;--muted:#6b6259;--line:#e6dfd6;--accent:#8a5a2b;--bg:#fffdf9}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--bg);margin:0;padding:32px;line-height:1.45}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--accent);padding-bottom:12px}
+.brand{font-size:28px;letter-spacing:.04em;color:var(--accent)}.brand small{display:block;font-size:12px;color:var(--muted)}
+h1{font-size:20px;margin:0}.meta{text-align:right;font-size:13px;color:var(--muted)}
+h2{font-size:16px;margin:28px 0 8px;color:var(--accent)}table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+td.num,th.num{text-align:right;white-space:nowrap}.sub td{font-weight:bold}.muted{color:var(--muted)}
+.tag{font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:8px}
+.summary td{font-size:14px}.total td{font-size:16px;font-weight:bold;border-top:2px solid var(--ink)}
+.draft{border:2px dashed #b3261e;color:#b3261e;padding:8px 12px;margin:16px 0;font-family:sans-serif}
+ul{margin:4px 0 0 18px;padding:0;font-size:13px}@media print{body{padding:0}.draft{display:block}}
+"""
+
+
+def html(doc: dict[str, Any]) -> str:
+    """A self-contained HTML rendering of the document model (every value escaped)."""
+    rate_col = any("unit_rate" in x for sec in doc["sections"] for x in sec["lines"])
+    var = doc.get("variation_no", 0) > 0
+    p: list[str] = ["<!doctype html><html lang='en'><head><meta charset='utf-8'>",
+                    f"<title>{_e(doc['title'])} {_e(doc['reference'])}</title><style>{CSS}</style></head><body>"]  # fmt: skip
+    p.append(f"<header><div class='brand'>{_e(doc['brand']['name'])}<small>{_e(doc['brand']['tagline'])}</small></div>"
+             f"<div class='meta'><h1>{_e(doc['title'])}</h1>{_e(doc['reference'])}<br>Date {_e(doc['date'])}"
+             + (f"<br>Valid until {_e(doc['valid_until'])}" if doc.get("valid_until") else "")
+             + "</div></header>")  # fmt: skip
+    if doc.get("draft"):
+        d = doc["draft"]
+        items = "".join(f"<li>{_e(b)}</li>" for b in d["blockers"])
+        p.append(f"<div class='draft' role='note'><strong>{_e(d['watermark'])}</strong>"
+                 + (f"<ul>{items}</ul>" if items else "") + "</div>")  # fmt: skip
+    cust = (doc.get("customer") or {}).get("name")
+    prop = doc["property"]
+    p.append(f"<p>{_e('For ' + cust) if cust else ''}<br><span class='muted'>Property {_e(prop['reference'])} · "
+             f"{_e(prop['configuration'])}{(' · ' + _e(prop['city'])) if prop.get('city') else ''}</span></p>")  # fmt: skip
+    p.append(f"<p><strong>{_e(doc['subject'])}</strong></p>")
+    if doc.get("cover_note"):
+        p.append(f"<p>{_e(doc['cover_note'])}</p>")
+
+    def table(lines: list[dict], subtotal: str | None) -> str:
+        head = "<tr><th>Item</th><th>Quantity</th>" + ("<th class='num'>Rate</th>" if rate_col else "")
+        head += (
+            "<th>Change</th><th class='num'>Change value</th>" if var else ""
+        ) + "<th class='num'>Amount (INR)</th></tr>"
+        body = []
+        for x in lines:
+            detail = f"<br><span class='muted'>{_e(x['detail'])}</span>" if x.get("detail") else ""
+            amount = _e(x["amount"]) if x["priced"] else "<span class='muted'>to be confirmed</span>"
+            body.append(f"<tr><td>{_e(x['description'])}{detail} <span class='tag'>{_e(x['status'])}</span></td>"
+                        f"<td>{_e(x['quantity'] or '—')}</td>"
+                        + (f"<td class='num'>{_e(x.get('unit_rate', ''))}</td>" if rate_col else "")
+                        + (f"<td>{_e(x.get('change'))}</td><td class='num'>{_e(x.get('delta'))}</td>" if var else "")
+                        + f"<td class='num'>{amount}</td></tr>")  # fmt: skip
+        if subtotal is not None:
+            span = 2 + int(rate_col) + 2 * int(var)
+            body.append(f"<tr class='sub'><td colspan='{span}'>Subtotal</td><td class='num'>{_e(subtotal)}</td></tr>")
+        return f"<table><thead>{head}</thead><tbody>{''.join(body)}</tbody></table>"
+
+    for sec in doc["sections"]:
+        p.append(f"<h2>{_e(sec['title'])}</h2>" + table(sec["lines"], sec.get("subtotal")))
+    if doc["optional_items"]:
+        p.append("<h2>Optional items</h2><p class='muted'>Not included in the total unless you choose them.</p>"
+                 + table(doc["optional_items"], None))  # fmt: skip
+    s = doc["summary"]
+    rows = [("Total before discount" if s.get("discount") else "Total of works", s["base_total"])]
+    if s.get("discount"):
+        rows += [("Discount", f"− {s['discount']}"), ("Amount after discount", s["taxable"])]
+    rows.append(("GST", s["gst"]["amount"] if s["gst"]["amount"] else s["gst"]["status"]))
+    p.append("<h2>Summary</h2><table class='summary'>" + "".join(
+        f"<tr><td>{_e(k)}</td><td class='num'>{_e(v)}</td></tr>" for k, v in rows)
+             + f"<tr class='total'><td>Total</td><td class='num'>{_e(s['total'] or 'to be confirmed')}</td></tr>"
+             + (f"<tr><td class='muted'>Optional items (if chosen)</td><td class='num muted'>{_e(s['optional_total'])}</td></tr>"
+                if s.get("optional_total") else "") + "</table>")  # fmt: skip
+    for title, key in (("Payment schedule", "payment_schedule"), ("Warranty", "warranty"),
+                       ("Assumptions", "assumptions"), ("Exclusions", "exclusions"), ("Terms", "terms")):  # fmt: skip
+        entries: list[Any] = doc.get(key) or []
+        if not entries:
+            continue
+        if key == "payment_schedule":
+            lis = "".join(f"<li>{_e(m['label'])} — {_e(m['share'])}: {_e(m['trigger'])}</li>" for m in entries)
+        else:
+            lis = "".join(f"<li>{_e(t)}</li>" for t in entries)
+        p.append(f"<h2>{_e(title)}</h2><ul>{lis}</ul>")
+    if doc.get("terms_version"):
+        p.append(f"<p class='muted'>Terms version {_e(doc['terms_version'])}</p>")
+    p.append("</body></html>")
+    return "".join(p)

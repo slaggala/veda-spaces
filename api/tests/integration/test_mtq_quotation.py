@@ -5,6 +5,7 @@ SYNTHETIC test policy (refused outside tests). Results are SYNTHETIC_VALIDATED o
 
 from __future__ import annotations
 
+import re
 import threading
 from datetime import timedelta
 
@@ -23,6 +24,8 @@ from veda.kernel import clock, db, sequences
 from veda.kernel.context import actor, system_context
 
 pytestmark = ALL_ON
+INTERNAL_MARKERS = ("SYNTHETIC-2", "rate_card", "rate_minor", "derivation", "provenance", "card basis", "OI-MTQ",
+                    "approved_by", "self_limit", "margin_bp", "cost_minor", "WARDROBE.BODY")  # fmt: skip
 
 
 def _create(c: Commercial, est: dict, user=None):
@@ -53,6 +56,14 @@ def test_drafted_but_never_issued_while_owner_decisions_are_missing(api, factory
     step(c, q, "approve", c.manager)
     r = step(c, q, "issue", c.manager, code=409)
     assert r.code == "NOT_CUSTOMER_ISSUABLE"
+    doc = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
+    assert doc["document"]["draft"]["watermark"].startswith("DRAFT") and "GST" in doc["html"]
+    assert (
+        doc["document"]["summary"]["gst"]["status"] == "To be confirmed" and doc["document"]["summary"]["total"] is None
+    )
+    customer_part = re.sub(r"<div class='draft'.*?</div>", "", doc["html"], flags=re.S)  # the staff-only draft note
+    for marker in INTERNAL_MARKERS:
+        assert marker not in customer_part, marker
 
 
 def test_issue_freeze_accept_with_optional_items(api, factory):
@@ -76,6 +87,12 @@ def test_issue_freeze_accept_with_optional_items(api, factory):
     # frozen: no edit, the document is the stored snapshot
     r = c.as_(c.estimator).patch(f"/api/v1/quotations/{q['id']}", {"title": "Changed"}, if_match=q["version"])
     assert r.status == 409 and r.code == "QUOTATION_FROZEN"
+    doc = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))["document"]
+    assert doc["snapshot_verified"] is True and "draft" not in doc and doc["payment_schedule"]
+    assert doc["summary"]["gst"]["status"] == "Included"
+    html = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))["html"]
+    for marker in INTERNAL_MARKERS:
+        assert marker not in html and marker not in str(doc), marker
     optional = [x for sec in q["sections"] for x in sec["lines"] if x["is_optional"] and x["is_priced"]]
     assert optional
     base_total = q["total_minor"]

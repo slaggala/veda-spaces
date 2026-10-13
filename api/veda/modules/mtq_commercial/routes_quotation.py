@@ -12,7 +12,7 @@ from veda.config import settings
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 
-from . import access, journey, quotations
+from . import access, journey, quotations, rendering
 from . import schemas as S
 from .models import CostEstimate, Quotation, QuotationLine
 
@@ -71,6 +71,13 @@ def list_quotations(req: Req, property_id: str):
            summary="One quotation version: sections, lines, lineage, blockers, lifecycle events")  # fmt: skip
 def get_quotation(req: Req, quotation_id: str):
     return ok(quotations.present(req.session, _quotation(req, quotation_id), req.ctx))
+
+
+@api.route("GET", "/quotations/<quotation_id>/document", permission="quotation.read", write=False,
+           requirement="QUOT-001",
+           summary="The customer document (frozen snapshot once issued; a marked draft before) and its HTML")  # fmt: skip
+def get_document(req: Req, quotation_id: str):
+    return ok(rendering.rendered(req.session, _quotation(req, quotation_id)))
 
 
 @api.route("GET", "/quotation-lines/<line_id>/trace", permission="quotation.read", write=False,
