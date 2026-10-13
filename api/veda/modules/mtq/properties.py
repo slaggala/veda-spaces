@@ -290,9 +290,23 @@ PATCHABLE = (
 )
 
 
+# Property values verification reads (the stated area behind BUILT_UP_DEVIATION, verification.py). Owner decision of
+# 2026-10-13: they stay as they were at submission while a revision is SUBMITTED, so a later PATCH never changes whether
+# that revision trips the check; other property fields stay editable.
+REFERENCE_FIELDS = ("built_up_area_sqft_centi", "carpet_area_sqft_centi")
+
+
 def update(s: Session, ctx, prop: Property, body) -> Property:
     scope.require_in_scope(s, ctx, prop.lead_id, "property.update")
     provided = body.provided()
+    changed = [n for n in REFERENCE_FIELDS if n in provided and getattr(body, n) != getattr(prop, n)]
+    if changed:
+        try:
+            require_plan_open(s, prop)
+        except ApiError as err:
+            raise ApiError(409, "PROPERTY_REFERENCE_FROZEN",
+                           "A revision is awaiting verification; the stated areas it is checked against cannot change until it is verified or returned for correction.",
+                           extra={**(err.extra or {}), "fields": changed}) from err  # fmt: skip
     if "floor_plan_attachment_id" in provided and body.floor_plan_attachment_id is not None:
         from veda.modules.attachments.models import Attachment
 
