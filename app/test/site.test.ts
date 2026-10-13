@@ -73,7 +73,7 @@ describe('offline queue (B1-T09/T10)', () => {
   }
 
   it('keeps conflicts and refusals, drops what landed, and replaces an unsent write to the same room', async () => {
-    const q = new OfflineQueue(new MemoryStore());
+    const q = new OfflineQueue(new MemoryStore(), () => 'u1');
     const first = await q.enqueue('set1', 'space', { length_mm: 1 }, { spaceId: 'room1', label: 'Kitchen' });
     const second = await q.enqueue('set1', 'space', { length_mm: 2 }, { spaceId: 'room1', label: 'Kitchen' });
     const note = await q.enqueue('set1', 'note', { body: 'x', note_type_code: 'OBSERVATION' });
@@ -92,12 +92,81 @@ describe('offline queue (B1-T09/T10)', () => {
   });
 
   it('keeps everything when the network fails', async () => {
-    const q = new OfflineQueue(new MemoryStore());
+    const q = new OfflineQueue(new MemoryStore(), () => 'u1');
     await q.enqueue('set2', 'note', { body: 'x', note_type_code: 'OBSERVATION' });
     window.fetch = async () => { throw new TypeError('offline'); };
     await q.flush('set2');
     expect((await q.pending('set2')).map((o) => o.state)).to.deep.equal(['PENDING']);
     expect(q.online).to.equal(false);
+  });
+});
+
+describe('offline queue bound to the signed-in user (B1-PE-01)', () => {
+  const originalFetch = window.fetch;
+  afterEach(() => { window.fetch = originalFetch; });
+
+  function recordSync(): Array<Array<{ op_id: string }>> {
+    const sent: Array<Array<{ op_id: string }>> = [];
+    window.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const ops = (JSON.parse(String(init?.body)) as { operations: Array<{ op_id: string }> }).operations;
+      sent.push(ops);
+      return new Response(JSON.stringify({ data: { results: ops.map((o) => ({ op_id: o.op_id, status: 'APPLIED' })) } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    return sent;
+  }
+
+  it('lists, counts and sends only the signed-in user\'s operations', async () => {
+    const store = new MemoryStore();
+    let user: string | null = 'alice';
+    const q = new OfflineQueue(store, () => user);
+    const hers = await q.enqueue('set1', 'note', { body: 'a' });
+    await q.queuePhoto('set1', { client_ref: 'ph-a' }, new Blob([new Uint8Array([1])]));
+    user = 'bob';
+    expect(await q.pending('set1')).to.deep.equal([], 'Bob never sees Alice\'s operations');
+    const his = await q.enqueue('set1', 'note', { body: 'b' });
+    expect(his.user_id).to.equal('bob');
+    await q.discard(hers.op_id);
+    expect((await store.all()).some((o) => o.op_id === hers.op_id)).to.equal(true, 'Bob cannot discard Alice\'s operation');
+    const sent = recordSync();
+    await q.flush('set1');
+    expect(sent.flat().map((o) => o.op_id)).to.deep.equal([his.op_id], 'only Bob\'s operation goes out under Bob\'s session');
+    user = 'alice';
+    expect((await q.pending('set1')).map((o) => o.user_id)).to.deep.equal(['alice', 'alice'], 'Alice\'s queue is intact');
+    user = null;
+    expect(await q.mine()).to.deep.equal([]);
+    let refused = false;
+    try { await q.enqueue('set1', 'note', { body: 'x' }); } catch { refused = true; }
+    expect(refused).to.equal(true, 'nothing is queued without a signed-in user');
+  });
+
+  it('never sends operations queued before ownership was recorded, and discards them only on request', async () => {
+    const store = new MemoryStore();
+    await store.put({ op_id: 'op-legacy', set_id: 'set1', seq: 1, type: 'note', space_id: null, data: { body: 'old' }, state: 'PENDING', label: 'note' });
+    await store.putBlob('op-legacy', new Blob([new Uint8Array([7])]));
+    const q = new OfflineQueue(store, () => 'carol');
+    const sent = recordSync();
+    await q.flush('set1');
+    expect(sent).to.deep.equal([], 'an unowned operation is not sent under whoever is signed in');
+    expect(await q.pending('set1')).to.deep.equal([]);
+    expect((await q.unowned()).map((o) => o.op_id)).to.deep.equal(['op-legacy'], 'kept and counted, never silently lost');
+    await q.discardUnowned();
+    expect(await q.unowned()).to.deep.equal([]);
+    expect(await store.getBlob('op-legacy')).to.equal(undefined);
+  });
+
+  it('uploads photo bytes only for their owner', async () => {
+    const store = new MemoryStore();
+    let user = 'dave';
+    const q = new OfflineQueue(store, () => user);
+    const op = await q.queuePhoto('set4', { client_ref: 'ph-d' }, new Blob([new Uint8Array([3])]));
+    expect(await store.getBlob(op.op_id)).to.have.property('user_id', 'dave');
+    await store.put({ ...op, state: 'UPLOADING', result: { op_id: op.op_id, status: 'APPLIED', entity_id: 'att9' } });
+    user = 'erin';
+    const calls: string[] = [];
+    window.fetch = async (input: RequestInfo | URL) => { calls.push(String(input)); return new Response('{}', { status: 200 }); };
+    await q.resumeUploads('set4');
+    expect(calls).to.deep.equal([], 'Erin\'s session never uploads Dave\'s photo');
   });
 });
 
@@ -122,7 +191,7 @@ describe('photo upload to the private bucket (B1-T11)', () => {
   it('keeps a photo queued until the server confirms it arrived, and retries with fresh instructions', async () => {
     const originalFetch = window.fetch;
     const store = new MemoryStore();
-    const q = new OfflineQueue(store);
+    const q = new OfflineQueue(store, () => 'u1');
     const op = await q.queuePhoto('set3', { client_ref: 'ph-1' }, new Blob([new Uint8Array([9])], { type: 'image/jpeg' }));
     const seen: string[] = [];
     let arrived = false;

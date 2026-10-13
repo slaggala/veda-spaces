@@ -1,4 +1,5 @@
 import { api } from '../../core/api/client.js';
+import { session } from '../../core/auth/session.js';
 
 /**
  * The surveyor's offline queue (MTQ B1-T09/T10; blueprint §6.1 (4), §13.2).
@@ -14,6 +15,10 @@ import { api } from '../../core/api/client.js';
  * - network failure: kept untouched and retried later (no partial state on the device).
  *
  * Photos queue with their bytes; their metadata goes first in the batch, the bytes upload after it is accepted.
+ *
+ * The queue belongs to the signed-in user (B1-PE-01): every operation and photo records who captured it, and only that
+ * user's operations are listed, counted or sent. Operations stored before ownership was recorded have no owner; they
+ * are never sent under whoever is signed in now, only counted with an explicit discard (`unowned`, `discardUnowned`).
  */
 export type OpType = 'space' | 'note' | 'release' | 'property_capture' | 'attachment';
 export type OpState = 'PENDING' | 'CONFLICT' | 'CLAIMED' | 'FROZEN' | 'REJECTED' | 'UPLOADING';
@@ -28,7 +33,12 @@ export interface QueuedOp {
   state: OpState;
   result?: Record<string, unknown>;
   label: string;
+  /** Who captured it; absent on operations queued before B1-PE-01 (unowned: never sent). */
+  user_id?: string;
 }
+
+/** A queued photo's bytes with their owner; a bare Blob is a photo queued before B1-PE-01 (unowned). */
+export type StoredBlob = Blob | { user_id: string; blob: Blob };
 
 export interface SyncResult {
   op_id: string; status: string; code?: string; message?: string; version?: number; entity_id?: string;
@@ -44,25 +54,27 @@ interface Store {
   all(): Promise<QueuedOp[]>;
   put(op: QueuedOp): Promise<void>;
   remove(opId: string): Promise<void>;
-  putBlob(key: string, blob: Blob): Promise<void>;
-  getBlob(key: string): Promise<Blob | undefined>;
+  putBlob(key: string, blob: StoredBlob): Promise<void>;
+  getBlob(key: string): Promise<StoredBlob | undefined>;
   removeBlob(key: string): Promise<void>;
 }
 
 export class MemoryStore implements Store {
   private ops = new Map<string, QueuedOp>();
-  private blobs = new Map<string, Blob>();
+  private blobs = new Map<string, StoredBlob>();
   async all() { return [...this.ops.values()]; }
   async put(op: QueuedOp) { this.ops.set(op.op_id, op); }
   async remove(id: string) { this.ops.delete(id); }
-  async putBlob(k: string, b: Blob) { this.blobs.set(k, b); }
+  async putBlob(k: string, b: StoredBlob) { this.blobs.set(k, b); }
   async getBlob(k: string) { return this.blobs.get(k); }
   async removeBlob(k: string) { this.blobs.delete(k); }
 }
 
 class IdbStore implements Store {
-  private db: Promise<IDBDatabase>;
-  constructor() {
+  private db: Promise<IDBDatabase> | null = null;
+  /** Opened on first use: importing this module never creates the database. */
+  private open(): Promise<IDBDatabase> {
+    if (this.db) return this.db;
     this.db = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB, 1);
       req.onupgradeneeded = () => {
@@ -70,11 +82,12 @@ class IdbStore implements Store {
         req.result.createObjectStore('blobs');
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => { this.db = null; reject(req.error); };
     });
+    return this.db;
   }
   private async tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const db = await this.db;
+    const db = await this.open();
     return new Promise((resolve, reject) => {
       const req = fn(db.transaction(store, mode).objectStore(store));
       req.onsuccess = () => resolve(req.result);
@@ -84,8 +97,8 @@ class IdbStore implements Store {
   all() { return this.tx<QueuedOp[]>('ops', 'readonly', (s) => s.getAll() as IDBRequest<QueuedOp[]>); }
   async put(op: QueuedOp) { await this.tx('ops', 'readwrite', (s) => s.put(op)); }
   async remove(id: string) { await this.tx('ops', 'readwrite', (s) => s.delete(id)); }
-  async putBlob(k: string, b: Blob) { await this.tx('blobs', 'readwrite', (s) => s.put(b, k)); }
-  getBlob(k: string) { return this.tx<Blob | undefined>('blobs', 'readonly', (s) => s.get(k) as IDBRequest<Blob | undefined>); }
+  async putBlob(k: string, b: StoredBlob) { await this.tx('blobs', 'readwrite', (s) => s.put(b, k)); }
+  getBlob(k: string) { return this.tx<StoredBlob | undefined>('blobs', 'readonly', (s) => s.get(k) as IDBRequest<StoredBlob | undefined>); }
   async removeBlob(k: string) { await this.tx('blobs', 'readwrite', (s) => s.delete(k)); }
 }
 
@@ -102,13 +115,15 @@ export function newRef(prefix: string): string {
 
 export class OfflineQueue extends EventTarget {
   private store: Store;
+  private readonly currentUser: () => string | null;
   private seq = Date.now();
   private flushing: Promise<SyncResult[]> | null = null;
   online = typeof navigator === 'undefined' ? true : navigator.onLine;
 
-  constructor(store?: Store) {
+  constructor(store?: Store, currentUser: () => string | null = () => session.me?.id ?? null) {
     super();
     this.store = store ?? openStore();
+    this.currentUser = currentUser;
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => { this.online = true; this.changed(); });
       window.addEventListener('offline', () => { this.online = false; this.changed(); });
@@ -117,12 +132,35 @@ export class OfflineQueue extends EventTarget {
 
   private changed() { this.dispatchEvent(new Event('change')); }
 
+  /** The signed-in user's operations, in capture order; nobody else's are ever listed. */
+  async mine(): Promise<QueuedOp[]> {
+    const user = this.currentUser();
+    if (!user) return [];
+    return (await this.store.all()).filter((o) => o.user_id === user).sort((a, b) => a.seq - b.seq);
+  }
+
   async pending(setId: string): Promise<QueuedOp[]> {
-    return (await this.store.all()).filter((o) => o.set_id === setId).sort((a, b) => a.seq - b.seq);
+    return (await this.mine()).filter((o) => o.set_id === setId);
+  }
+
+  /** Operations queued before ownership was recorded: nobody can say who captured them, so they are never sent. */
+  async unowned(): Promise<QueuedOp[]> {
+    return (await this.store.all()).filter((o) => !o.user_id);
+  }
+
+  /** The surveyor's explicit choice to drop the unowned operations (and their photos) from this device. */
+  async discardUnowned(): Promise<void> {
+    for (const o of await this.unowned()) {
+      await this.store.remove(o.op_id);
+      await this.store.removeBlob(o.op_id);
+    }
+    this.changed();
   }
 
   /** Queue one operation; a later write to the same space replaces an earlier one that has not been sent. */
   async enqueue(setId: string, type: OpType, data: Record<string, unknown>, opts: { spaceId?: string | null; label?: string } = {}): Promise<QueuedOp> {
+    const user = this.currentUser();
+    if (!user) throw new Error('Sign in again to keep capturing.');
     if (type === 'space' && opts.spaceId) {
       for (const o of await this.pending(setId)) {
         if (o.type === 'space' && o.space_id === opts.spaceId && o.state === 'PENDING') await this.store.remove(o.op_id);
@@ -130,7 +168,7 @@ export class OfflineQueue extends EventTarget {
     }
     const op: QueuedOp = {
       op_id: newRef('op'), set_id: setId, seq: this.seq++, type, space_id: opts.spaceId ?? null, data,
-      state: 'PENDING', label: opts.label ?? type,
+      state: 'PENDING', label: opts.label ?? type, user_id: user,
     };
     await this.store.put(op);
     this.changed();
@@ -139,11 +177,12 @@ export class OfflineQueue extends EventTarget {
 
   async queuePhoto(setId: string, meta: Record<string, unknown>, blob: Blob, label = 'photo'): Promise<QueuedOp> {
     const op = await this.enqueue(setId, 'attachment', meta, { label });
-    await this.store.putBlob(op.op_id, blob);
+    await this.store.putBlob(op.op_id, { user_id: op.user_id!, blob });
     return op;
   }
 
   async discard(opId: string): Promise<void> {
+    if (!(await this.mine()).some((o) => o.op_id === opId)) return;
     await this.store.remove(opId);
     await this.store.removeBlob(opId);
     this.changed();
@@ -167,8 +206,10 @@ export class OfflineQueue extends EventTarget {
 
   private async doFlush(setId: string): Promise<SyncResult[]> {
     const out: SyncResult[] = [];
+    const owner = this.currentUser();
     const queue = (await this.pending(setId)).filter((o) => o.state === 'PENDING');
     for (let i = 0; i < queue.length; i += BATCH) {
+      if (this.currentUser() !== owner) return out; // signed out or switched user meanwhile: send nothing more
       const chunk = queue.slice(i, i + BATCH);
       let results: SyncResult[];
       try {
@@ -205,7 +246,9 @@ export class OfflineQueue extends EventTarget {
    * proof of arrival (length, SHA-256 and type checked by the server); until it succeeds the photo stays UPLOADING.
    */
   private async upload(op: QueuedOp, res: SyncResult, retry = false): Promise<void> {
-    const blob = await this.store.getBlob(op.op_id);
+    const stored = await this.store.getBlob(op.op_id);
+    // Only bytes recorded with this operation's owner, who must be the one signed in, are ever uploaded.
+    const blob = stored && !(stored instanceof Blob) && stored.user_id === op.user_id && op.user_id === this.currentUser() ? stored.blob : null;
     if (!blob || !res.entity_id) return;
     try {
       // A retry asks for fresh instructions: a pre-signed POST lives five minutes, and the server may already have it.

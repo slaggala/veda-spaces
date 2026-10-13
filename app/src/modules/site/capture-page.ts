@@ -33,7 +33,7 @@ export class VsCapturePage extends SessionElement {
     location: { attribute: false }, set: { state: true }, property: { state: true }, templates: { state: true },
     checks: { state: true }, roomId: { state: true }, draft: { state: true }, unit: { state: true }, ops: { state: true },
     problem: { state: true }, errors: { state: true }, busy: { state: true }, disabled: { state: true }, note: { state: true },
-    online: { state: true },
+    online: { state: true }, unowned: { state: true },
   };
   declare location: { params: Record<string, string> } | undefined;
   declare set: MeasurementSet | null;
@@ -50,6 +50,8 @@ export class VsCapturePage extends SessionElement {
   declare disabled: boolean;
   declare note: { type: string; body: string };
   declare online: boolean;
+  /** Operations on this device that predate ownership (B1-PE-01): counted, never shown or sent. */
+  declare unowned: number;
 
   static override styles = [...shared, pageStyles, css`
     :host { display: block; }
@@ -76,7 +78,7 @@ export class VsCapturePage extends SessionElement {
     super();
     this.set = null; this.property = null; this.templates = null; this.checks = null; this.roomId = null; this.draft = null;
     this.unit = 'FT_IN'; this.ops = []; this.problem = null; this.errors = []; this.busy = false; this.disabled = false;
-    this.note = { type: 'OBSERVATION', body: '' }; this.online = queue.online;
+    this.note = { type: 'OBSERVATION', body: '' }; this.online = queue.online; this.unowned = 0;
   }
 
   private readonly onQueue = () => { void this.refreshQueue(); };
@@ -118,7 +120,13 @@ export class VsCapturePage extends SessionElement {
 
   private async refreshQueue() {
     this.ops = await queue.pending(this.setId);
+    this.unowned = (await queue.unowned()).length;
     this.online = queue.online;
+  }
+
+  private async discardUnowned() {
+    if (!confirm(`Discard ${this.unowned} unsent change${this.unowned === 1 ? '' : 's'} of unknown origin from this device? They cannot be recovered.`)) return;
+    await queue.discardUnowned();
   }
 
   private get spaces(): Space[] { return (this.property?.spaces ?? []).filter((s) => s.is_in_scope); }
@@ -394,6 +402,10 @@ export class VsCapturePage extends SessionElement {
         <label class="small">Units <select @change=${(e: Event) => { this.unit = (e.target as HTMLSelectElement).value as UnitSystem; if (this.roomId) this.openRoom(this.roomId); }}>
           <option value="FT_IN" ?selected=${this.unit === 'FT_IN'}>ft-in</option><option value="MM" ?selected=${this.unit === 'MM'}>mm</option></select></label>
       </div>
+      ${this.unowned ? html`<div class="card conflict stack">
+        <div class="small">${this.unowned} unsent change${this.unowned === 1 ? '' : 's'} on this device ${this.unowned === 1 ? 'was' : 'were'} saved before
+          captures recorded who made them. ${this.unowned === 1 ? 'It' : 'They'} will not be sent under your name.</div>
+        <div class="row"><button class="btn small ghost" @click=${() => this.discardUnowned()}>Discard</button></div></div>` : nothing}
       ${open.map((o) => html`<div class="card conflict stack" role="alert">
         <div class="strong">${o.label}: ${o.state === 'CONFLICT' ? 'changed on the server meanwhile' : o.state === 'CLAIMED' ? 'another surveyor holds this room'
           : o.state === 'FROZEN' ? 'this revision is no longer a draft' : 'refused'}</div>
