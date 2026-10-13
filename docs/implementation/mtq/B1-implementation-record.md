@@ -66,3 +66,18 @@ No deviation. Characterisation snapshot identical before and after.
 | `RISK_ACK` notes (B1-SCOPE §2.1) | Refused at capture; written by the verifier at verification (B1-T07) | A risk acknowledgement is the verifier's act |
 | Plan-drawing pre-measure (B1-SCOPE §4.2) | `POST /properties/{id}/measurement-sets`: PLAN_DRAWING, LITE, no visit | Staff key in a paper survey |
 | Submission completeness | B1-T06 checks every in-scope space is measured and marked complete; B1-T07 adds the Lite and Full rules | Layered by task |
+
+## B1-T07 — derivation and verification engine
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| "Every RECTANGULAR/L_SHAPE/POLYGON space has ceiling height" (blueprint §6.2) | Required for INDOOR and SEMI_OPEN spaces; OUTDOOR spaces (terrace, garden, porch, parking) are exempt; a STAIRCASE uses its staircase geometry instead (B1-T08) | A terrace has no ceiling (01 §11 makes CH conditional on a covered part) |
+| Full survey: "every in-scope space has ≥ 1 tagged furniture wall with obstructions captured or an explicit none marker" (B1-SCOPE §2.3) | Every in-scope space has at least one tagged wall, where the `NONE` tag is the explicit "no furniture here" marker; every furniture-tagged wall has its obstructions or the `NONE` obstruction marker | A passage or a toilet without a vanity has no furniture wall; the marker records that it was looked at |
+| "Walls whose door or window bounds a tagged wall" (B1-SCOPE §2.3) | The cyclic neighbours of a furniture wall that carry a door or window | The closest machine reading of "bounds" |
+| Template requirements | Enforced machine codes per space template (B1-T04 fixture); the rest is checklist text for the verifier | As recorded for B1-T04 |
+| Property-level capture (02 §0) at verify for FULL (AR-09) | floor number, lift, main door width and height, narrowest passage, DB location, occupancy; LITE: floor number and lift | The REQ items of 02 §0 that the closed capture schema carries |
+| "Fail closed on invalid units" | Plausibility bounds at verification: ceiling 1.8–9 m, room dimensions 0.6–30 m, walls 0.1–30 m | Catches feet keyed as millimetres; values are stored as entered otherwise |
+| "Unresolved conflicts" block verification | No conflict can persist server-side: a stale write is refused (B1-T06), so there is no unresolved state to check | Recorded so the reviewer can confirm |
+| Four-eyes: verifier ≠ `captured_by` (blueprint §4.1) | The verifier must not have captured the set or any of its spaces | Stricter with two surveyors |
+| Tolerance policy (OI-MTQ-01) | `tolerance.py`: agreement tolerances and the site and gate verdicts for the B1-T12 validation harness; runtime thresholds (50 mm closure, ±25 % built-up with a verifier `RISK_ACK`) in verification | Closure §2 separates the two |
+| Verify sets `snapshot_sha256` | RFC 8785 canonical JSON of the revision without versions or claims, reproducible from the stored rows | Tamper evidence (blueprint §14) |

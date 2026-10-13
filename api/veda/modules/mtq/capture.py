@@ -261,3 +261,12 @@ class SetPatchIn(Closed):
 
 class RejectIn(Closed):
     reason: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+class Acknowledgement(Closed):
+    code: Literal["BUILT_UP_DEVIATION"]
+    note: Annotated[str, Field(min_length=5, max_length=1000)]
+
+
+class VerifyIn(Closed):
+    acknowledgements: Annotated[list[Acknowledgement], Field(max_length=5)] = []

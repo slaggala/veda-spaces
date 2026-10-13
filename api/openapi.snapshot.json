@@ -36,6 +36,28 @@
         "title": "AcceptInviteIn",
         "type": "object"
       },
+      "Acknowledgement": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "const": "BUILT_UP_DEVIATION",
+            "title": "Code",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "note"
+        ],
+        "title": "Acknowledgement",
+        "type": "object"
+      },
       "ActivityCancel": {
         "additionalProperties": false,
         "properties": {
@@ -4822,6 +4844,22 @@
           }
         },
         "title": "ValuePatch",
+        "type": "object"
+      },
+      "VerifyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "acknowledgements": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Acknowledgement"
+            },
+            "maxItems": 5,
+            "title": "Acknowledgements",
+            "type": "array"
+          }
+        },
+        "title": "VerifyIn",
         "type": "object"
       },
       "VisitCreateIn": {
@@ -11356,6 +11394,48 @@
         "x-requirement": "MEAS-004"
       }
     },
+    "/api/v1/measurement-sets/{set_id}/checks": {
+      "get": {
+        "operationId": "mtq_set_checks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dry run: what still blocks submission and verification, and the usable wall segments",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-006"
+      }
+    },
     "/api/v1/measurement-sets/{set_id}/diff/{other_id}": {
       "get": {
         "operationId": "mtq_diff_sets",
@@ -11738,6 +11818,66 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/verify": {
+      "post": {
+        "operationId": "mtq_verify_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify a submitted revision: fail-closed checks, sealed snapshot, the previous verified set superseded",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.verify"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-006"
       }
     },
     "/api/v1/measurement-visits": {

@@ -19,6 +19,7 @@ from . import (
     scope,
     sets,
     templates,
+    verification,
     visits,
 )
 from . import capture as C
@@ -370,3 +371,23 @@ def diff_sets(req: Req, set_id: str, other_id: str):
     a, _ = sets.get_visible(req.session, req.ctx, set_id)
     b, _ = sets.get_visible(req.session, req.ctx, other_id)
     return ok(sets.diff(req.session, a, b))
+
+
+# --- verification (B1-T07) ---------------------------------------------------------------------------------------------
+@api.route("GET", "/measurement-sets/<set_id>/checks", permission="measurement.read", write=False,
+           requirement="MEAS-006",
+           summary="Dry run: what still blocks submission and verification, and the usable wall segments")  # fmt: skip
+def set_checks(req: Req, set_id: str):
+    mset, _ = sets.get_visible(req.session, req.ctx, set_id)
+    return ok(verification.readiness(req.session, mset, req.ctx.user.id))
+
+
+@api.route("POST", "/measurement-sets/<set_id>/verify", permission="measurement.verify", body=C.VerifyIn,
+           if_match=True, idempotent_create=True, requirement="MEAS-006",
+           summary="Verify a submitted revision: fail-closed checks, sealed snapshot, the previous verified set superseded")  # fmt: skip
+def verify_set(req: Req, set_id: str):
+    mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.verify")
+    req.require_version(mset.version)
+    verification.verify(req.session, req.ctx, mset, prop, list(req.body.acknowledgements) if req.body else [])
+    req.session.flush()
+    return ok(sets.present(req.session, mset, full=False))

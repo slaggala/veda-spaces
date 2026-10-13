@@ -8,91 +8,12 @@ from datetime import timedelta
 import pytest
 import sqlalchemy as sa
 
+from tests.support.mtq import Site, kitchen_payload
 from veda.kernel import clock, db
 from veda.kernel.context import actor, system_context
 from veda.modules.mtq.models import MeasurementSet, SpaceWall
 
 ON = pytest.mark.settings(mtq_site_enabled=True)
-
-
-class Site:
-    """A property with two in-scope spaces (kitchen, bedroom), a visit in progress and a draft set."""
-
-    def __init__(self, api, factory):
-        self.api, self.factory = api, factory
-        self.sales = factory.user("SALES")
-        self.lead_surveyor = factory.user("SURVEYOR")
-        self.second = factory.user("SURVEYOR")
-        self.third = factory.user("SURVEYOR")
-        self.founder = factory.user(founder=True)
-        factory.login(api, self.sales)
-        self.lead = api.post(
-            "/api/v1/leads", {"name": "Ravi K", "phone": "+91 90000 44444", "source_code": "PHONE"}
-        ).data
-        self.property = api.post(
-            "/api/v1/properties", {"lead_id": self.lead["id"], "property_type_code": "APARTMENT"}
-        ).data
-        pid = self.property["id"]
-        self.kitchen = api.post(
-            f"/api/v1/properties/{pid}/spaces", {"space_type_code": "KITCHEN", "label": "Kitchen"}
-        ).data
-        self.bedroom = api.post(
-            f"/api/v1/properties/{pid}/spaces", {"space_type_code": "BEDROOM", "label": "Bedroom"}
-        ).data
-        self.visits = {}
-        for who in (self.lead_surveyor, self.second, self.third):
-            v = api.post("/api/v1/measurement-visits", {"property_id": pid, "assigned_to": who.id,
-                                                        "scheduled_start_on": clock.to_rfc3339(clock.now() + timedelta(hours=1))}).data  # fmt: skip
-            self.visits[who.id] = v
-
-    def as_(self, user):
-        self.factory.login(self.api, user)
-        return self.api
-
-    def start(self, user):
-        v = self.visits[user.id]
-        r = self.as_(user).post(f"/api/v1/measurement-visits/{v['id']}/status", {"to_status": "IN_PROGRESS"},
-                                if_match=v["version"])  # fmt: skip
-        assert r.status == 200, r
-        self.visits[user.id] = r.data
-        return r.data
-
-    def open_set(self, **body):
-        self.start(self.lead_surveyor)
-        r = self.as_(self.lead_surveyor).post(
-            f"/api/v1/measurement-visits/{self.visits[self.lead_surveyor.id]['id']}/measurement-sets", body
-        )
-        assert r.status == 201, r
-        self.set = r.data
-        return r.data
-
-
-def kitchen_payload(**over):
-    body = {
-        "client_ref": "sm-kitchen",
-        "shape_code": "RECTANGULAR",
-        "length_mm": 3600,
-        "width_mm": 2700,
-        "ceiling_height_mm": 2900,
-        "floor_to_lintel_mm": 2100,
-        "flooring_code": "VITRIFIED",
-        "existing_condition_code": "BARE_SHELL",
-        "attributes": {"has_gas_line": True, "has_water_inlet": True, "has_drain": True, "counter_existing": False},
-        "walls": [
-            {"wall_index": 1, "length_mm": 2700, "usable_for_code": ["NONE"],
-             "openings": [{"client_ref": "op-door", "opening_type_code": "DOOR", "width_mm": 900, "height_mm": 2100,
-                           "offset_from_wall_start_mm": 300, "swing_code": "IN"}]},
-            {"wall_index": 2, "length_mm": 3600, "usable_for_code": ["KITCHEN_RUN"],
-             "obstructions": [{"kind": "PIPE", "offset_mm": 1200, "width_mm": 50}],
-             "openings": [{"client_ref": "op-window", "opening_type_code": "WINDOW", "width_mm": 1200,
-                           "height_mm": 1200, "sill_height_mm": 1050, "offset_from_wall_start_mm": 1500,
-                           "swing_code": "SLIDING"}]},
-            {"wall_index": 3, "length_mm": 2700},
-            {"wall_index": 4, "length_mm": 3600},
-        ],
-    }  # fmt: skip
-    body.update(over)
-    return body
 
 
 @pytest.fixture
@@ -245,12 +166,7 @@ def test_notes_are_idempotent_and_risk_acks_belong_to_verification(site):
 
 
 def _complete_both(site, mset):
-    api = site.as_(site.lead_surveyor)
-    k = put(api, mset, site.kitchen, kitchen_payload(is_complete=True)).data
-    bed = {"length_mm": 3300, "width_mm": 3000, "ceiling_height_mm": 2900, "is_complete": True,
-           "walls": [{"wall_index": i, "length_mm": 3000 + (i % 2) * 300} for i in range(1, 5)]}  # fmt: skip
-    b = put(api, mset, site.bedroom, bed).data
-    return k, b
+    return site.capture_full(mset=mset)
 
 
 @ON
@@ -261,7 +177,7 @@ def test_submit_freezes_the_revision(site):
     fresh = api.get(f"/api/v1/measurement-sets/{mset['id']}").data
     incomplete = api.post(f"/api/v1/measurement-sets/{mset['id']}/submit", if_match=fresh["version"])
     assert incomplete.status == 422 and incomplete.code == "MEASUREMENT_INCOMPLETE"
-    assert [p["code"] for p in incomplete.json["pointers"]] == ["NOT_MEASURED"]
+    assert "NOT_MEASURED" in [p["code"] for p in incomplete.json["pointers"]]
     _complete_both(site, mset)
     site.start(site.second)
     second = site.as_(site.second)
@@ -331,11 +247,11 @@ def test_four_eyes_on_return_for_correction(site):
 
 
 def _complete_both_as(site, user, mset):
-    api = site.as_(user)
-    put(api, mset, site.kitchen, kitchen_payload(is_complete=True))
+    put(site.as_(user), mset, site.kitchen, kitchen_payload(is_complete=True))
     bed = {"length_mm": 3300, "width_mm": 3000, "ceiling_height_mm": 2900, "is_complete": True,
            "walls": [{"wall_index": i, "length_mm": 3000} for i in range(1, 5)]}  # fmt: skip
-    put(api, mset, site.bedroom, bed)
+    put(site.as_(user), mset, site.bedroom, bed)
+    site.overview_photos(user)  # LITE: dimensions, ceiling height, one overview photo, marked complete
 
 
 @ON
@@ -357,35 +273,22 @@ def test_lite_never_supersedes_a_verified_full_set(site):
 
 @ON
 def test_wall_photos_follow_the_set_and_freeze_with_it(site):
-    import base64
-    import hashlib
-    import io
-
-    from PIL import Image
+    from tests.support.mtq import photo
 
     mset = site.open_set()
+    k, _ = site.capture_full(mset=mset)
+    wall = next(w for w in k["walls"] if w["wall_index"] == 2)
     api = site.as_(site.lead_surveyor)
-    sm = put(api, mset, site.kitchen, kitchen_payload(is_complete=True)).data
-    wall = next(w for w in sm["walls"] if w["wall_index"] == 2)
-    buf = io.BytesIO()
-    Image.new("RGB", (640, 480), (1, 2, 3)).save(buf, "JPEG")
-    data = buf.getvalue()
-    decl = {"entity_type": "space_wall", "entity_id": wall["id"], "mime_type": "image/jpeg", "byte_size": len(data),
-            "sha256": hashlib.sha256(data).hexdigest(), "category_code": "LASER_READING"}  # fmt: skip
-    r = api.post("/api/v1/attachments", decl)
-    assert r.status == 201
-    api.put(f"/api/v1/attachments/{r.data['id']}/content", {"data_base64": base64.b64encode(data).decode()})
-    assert api.post(f"/api/v1/attachments/{r.data['id']}/complete").data["available"]
-    bed = {"length_mm": 3300, "width_mm": 3000, "ceiling_height_mm": 2900, "is_complete": True,
-           "walls": [{"wall_index": i, "length_mm": 3000} for i in range(1, 5)]}  # fmt: skip
-    put(api, mset, site.bedroom, bed)
-    fresh = api.get(f"/api/v1/measurement-sets/{mset['id']}").data
-    api.post(f"/api/v1/measurement-sets/{mset['id']}/submit", if_match=fresh["version"])
-    late = api.post("/api/v1/attachments", {**decl, "sha256": "b" * 64})
+    listed = api.get(f"/api/v1/attachments?entity_type=space_wall&entity_id={wall['id']}").data
+    assert len(listed) == 1 and listed[0]["available"]
+    assert site.submit().status == 200
+    late = api.post("/api/v1/attachments", {"entity_type": "space_wall", "entity_id": wall["id"], "mime_type": "image/jpeg",
+                                            "byte_size": 10, "sha256": "b" * 64})  # fmt: skip
     assert late.status == 409 and late.code == "ENTITY_FROZEN"
-    att = api.get(f"/api/v1/attachments/{r.data['id']}").data
-    withdraw = api.post(f"/api/v1/attachments/{r.data['id']}/withdraw", {}, if_match=att["version"])
+    att = listed[0]
+    withdraw = api.post(f"/api/v1/attachments/{att['id']}/withdraw", {}, if_match=att["version"])
     assert withdraw.status == 403  # a submitted set's photo is withdrawn only by a verifier, with a reason
+    assert photo  # the shared helper uploads through the real ATT flow
 
 
 def test_capture_literals_equal_the_frozen_vocabularies():

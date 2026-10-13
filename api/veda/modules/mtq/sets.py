@@ -435,6 +435,9 @@ def submit(s: Session, ctx, mset: MeasurementSet, prop: Property) -> Measurement
     _require_capture(s, ctx, prop)
     if ctx.user.id != mset.captured_by and ctx.scope("measurement.capture") != "ALL":
         raise ApiError(403, "PERMISSION_DENIED", "The lead surveyor submits the set.")
+    for sm in verification.measurements(s, mset).values():
+        verification.derive_measurement(s, sm)
+    s.flush()
     problems = verification.completeness(s, mset)
     if problems:
         raise ApiError(422, "MEASUREMENT_INCOMPLETE", "Some in-scope spaces are not complete yet.",
