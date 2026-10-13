@@ -36,6 +36,9 @@ class EntityBinding:
     resolve: Callable[[Session, str], EntityContext | None]
     # Counts (objects, bytes) of live attachments in a container, across every entity type in it.
     container_usage: Callable[[Session, str], tuple[int, int]] | None = None
+    # Serialises a new attachment against the container's freeze (MTQ: the property lock submit takes) and refreshes
+    # the container, so ``resolve`` re-read after it decides ``writable`` and the limits on the committed state.
+    container_lock: Callable[[Session, str], None] | None = None
 
 
 _BINDINGS: dict[str, EntityBinding] = {}

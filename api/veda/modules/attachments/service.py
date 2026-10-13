@@ -156,6 +156,16 @@ def _resolve(s: Session, entity_type: str, entity_id: str) -> registry.EntityCon
     return found
 
 
+def _locked(s: Session, entity_type: str, entity_id: str, target: registry.EntityContext) -> registry.EntityContext:
+    """B1-PE-06: take the container's lock (MTQ: the property lock a set's submit takes) and re-resolve, so whether the
+    record still accepts uploads, who may withdraw and the container limits are decided on the committed state."""
+    binding = registry.binding_for(entity_type)
+    if target.container_id and binding is not None and binding.container_lock is not None:
+        binding.container_lock(s, target.container_id)
+        return _resolve(s, entity_type, entity_id)
+    return target
+
+
 def _live(stmt):
     return stmt.where(
         Attachment.retention_state.in_(LIVE_STATES),
@@ -315,6 +325,7 @@ def create(s: Session, ctx, body) -> tuple[Attachment, bool, list[dict]]:
             ):
                 raise ApiError(409, "CLIENT_REF_REUSED", "This client_ref was used for a different attachment.")
             return existing, False, []
+    target = _locked(s, body.entity_type, body.entity_id, target)
     if not target.writable:
         raise ApiError(409, "ENTITY_FROZEN", "This record no longer accepts attachments.")
     warnings_ = _check_limits(s, body.entity_type, target, body.byte_size)
@@ -545,6 +556,7 @@ def withdraw(s: Session, ctx, att: Attachment, reason: str | None) -> Attachment
     if att.retention_state != "ACTIVE":
         raise ApiError(409, "INVALID_STATE", "This attachment was already withdrawn or erased.")
     target = _resolve(s, att.entity_type, att.entity_id)
+    target = _locked(s, att.entity_type, att.entity_id, target)
     scope = ctx.scope("attachment.delete")
     if target.withdraw_rule == "VERIFIER_WITH_REASON":
         if not ctx.has(target.extra.get("verify_permission", "measurement.verify")):

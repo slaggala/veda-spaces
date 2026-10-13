@@ -128,6 +128,10 @@ def _current_draft(s: Session, property_id: str) -> str | None:
 
 
 def run(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> dict[str, Any]:
+    # B1-PE-06: the whole batch holds the property lock submit/reject/verify take, so its duplicate and conflict reads
+    # and its writes see one state of the revision; each write re-checks DRAFT under it (sets.lock_draft).
+    sets.lock_property(s, prop.id)
+    s.refresh(mset)
     results = []
     for op in body.operations:
         handler = HANDLERS[op.type]

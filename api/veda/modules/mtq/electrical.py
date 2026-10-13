@@ -190,7 +190,12 @@ def _register() -> None:
         EXTRA_SPACE_CHECKS.append(_checks)
         bindings.EXTRA_SET_ENTITIES = _extra_entities
         registry.bind(
-            registry.EntityBinding("space_electrical_point", _point_binding, container_usage=bindings.set_usage)
+            registry.EntityBinding(
+                "space_electrical_point",
+                _point_binding,
+                container_usage=bindings.set_usage,
+                container_lock=bindings.lock_set,
+            )
         )
 
 

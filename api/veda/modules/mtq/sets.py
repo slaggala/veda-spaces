@@ -123,6 +123,16 @@ def lock_property(s: Session, property_id: str) -> None:
     s.execute(sa.select(Property.id).where(Property.id == property_id).with_for_update()).first()
 
 
+def lock_draft(s: Session, mset: MeasurementSet) -> None:
+    """B1-PE-06: every write into a draft's content takes the property lock that submit, reject and verify take, then
+    re-reads the set's status under it. A write that read DRAFT before a concurrent submit committed would otherwise
+    land in a SUBMITTED revision after its completeness check (PostgreSQL READ COMMITTED; SQLite is already serialised
+    by BEGIN IMMEDIATE). Re-locking in the same transaction is a no-op."""
+    lock_property(s, mset.property_id)
+    s.refresh(mset)
+    require_draft(mset)
+
+
 def require_no_submitted(s: Session, property_id: str, exclude: str | None = None) -> None:
     """A revision awaiting verification is decided first (verified, or returned for correction): a second open
     candidate would make the authoritative revision ambiguous."""
@@ -296,6 +306,7 @@ def upsert_space(
     ensure_hooks()
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_draft(s, mset)
     space = _space_of(s, mset, space_id)
     for check in PRE_WRITE:
         check(s, space, payload)
@@ -416,6 +427,7 @@ def _require_same_lead_attachment(s: Session, prop: Property, attachment_id: str
 def release_claim(s: Session, ctx, mset: MeasurementSet, prop: Property, space_id: str) -> SpaceMeasurement:
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_draft(s, mset)
     sm = _measurement(s, mset, space_id)
     if sm is None:
         raise not_found()
@@ -428,6 +440,7 @@ def release_claim(s: Session, ctx, mset: MeasurementSet, prop: Property, space_i
 def update_set(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> MeasurementSet:
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_draft(s, mset)
     provided = body.provided()
     if "property_capture" in provided and body.property_capture is not None:
         mset.property_capture = body.property_capture.model_dump(exclude_none=True)
@@ -440,6 +453,7 @@ def update_set(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> M
 def add_note(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> tuple[MeasurementNote, bool]:
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_draft(s, mset)
     if body.client_ref:
         existing = s.execute(
             sa.select(MeasurementNote).where(
@@ -470,6 +484,7 @@ def add_note(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> tup
 def delete_note(s: Session, ctx, mset: MeasurementSet, prop: Property, note: MeasurementNote) -> None:
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_draft(s, mset)
     if note.created_by != ctx.user.id and ctx.user.id != mset.captured_by and ctx.scope("measurement.capture") != "ALL":
         raise ApiError(403, "PERMISSION_DENIED", "Only the note's author or the lead surveyor deletes a note.")
     note.is_deleted = True
@@ -481,9 +496,7 @@ def submit(s: Session, ctx, mset: MeasurementSet, prop: Property) -> Measurement
 
     require_draft(mset)
     _require_capture(s, ctx, prop)
-    lock_property(s, prop.id)
-    s.refresh(mset)
-    require_draft(mset)
+    lock_draft(s, mset)
     require_no_submitted(s, prop.id, exclude=mset.id)
     if ctx.user.id != mset.captured_by and ctx.scope("measurement.capture") != "ALL":
         raise ApiError(403, "PERMISSION_DENIED", "The lead surveyor submits the set.")
