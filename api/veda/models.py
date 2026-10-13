@@ -5,6 +5,7 @@ imports ``veda.models``.
 """
 
 from veda.kernel.base import Base, finalize_metadata
+from veda.modules.attachments.models import Attachment
 from veda.modules.catalog.models import (
     CatalogAnalyticsDaily,
     CatalogClaimControl,
@@ -48,6 +49,7 @@ finalize_metadata(metadata)
 
 __all__ = [
     "AdminApprovalRequest",
+    "Attachment",
     "AuditLog",
     "BudgetEstimate",
     "BudgetEstimateAssumption",

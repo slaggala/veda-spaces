@@ -372,6 +372,152 @@
         "title": "AssignIn",
         "type": "object"
       },
+      "AttachmentContentIn": {
+        "additionalProperties": false,
+        "description": "Local backend only (development and tests): the bytes, base64-encoded.",
+        "properties": {
+          "data_base64": {
+            "maxLength": 20971528,
+            "minLength": 4,
+            "title": "Data Base64",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_base64"
+        ],
+        "title": "AttachmentContentIn",
+        "type": "object"
+      },
+      "AttachmentCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_size": {
+            "maximum": 15728640,
+            "minimum": 1,
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Caption"
+          },
+          "category_code": {
+            "default": "SITE_PHOTO",
+            "enum": [
+              "SITE_PHOTO",
+              "LASER_READING",
+              "SKETCH",
+              "FLOOR_PLAN",
+              "OTHER"
+            ],
+            "title": "Category Code",
+            "type": "string"
+          },
+          "client_ref": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Ref"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "property",
+              "property_space",
+              "measurement_set",
+              "space_wall",
+              "space_opening",
+              "space_electrical_point",
+              "measurement_note"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Filename"
+          },
+          "mime_type": {
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "visibility_code": {
+            "default": "STANDARD",
+            "enum": [
+              "STANDARD",
+              "INTERNAL"
+            ],
+            "title": "Visibility Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "mime_type",
+          "byte_size",
+          "sha256"
+        ],
+        "title": "AttachmentCreateIn",
+        "type": "object"
+      },
+      "AttachmentWithdrawIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "title": "AttachmentWithdrawIn",
+        "type": "object"
+      },
       "CancelLinkIn": {
         "additionalProperties": false,
         "properties": {
@@ -3151,6 +3297,367 @@
         ],
         "x-rbac-exception": null,
         "x-requirement": "RBAC-021"
+      }
+    },
+    "/api/v1/attachments": {
+      "get": {
+        "operationId": "attachments_list_attachments",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entity_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "property",
+                "property_space",
+                "measurement_set",
+                "space_wall",
+                "space_opening",
+                "space_electrical_point",
+                "measurement_note"
+              ],
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_withdrawn",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Withdrawn",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the attachments of one record",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-001"
+      },
+      "post": {
+        "operationId": "attachments_create_attachment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register an attachment and get its upload instructions",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-002"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}": {
+      "get": {
+        "operationId": "attachments_get_attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One attachment's record and state",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-001"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}/complete": {
+      "post": {
+        "operationId": "attachments_complete_attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify, scan and re-encode an uploaded attachment (idempotent)",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-002"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}/content": {
+      "get": {
+        "operationId": "attachments_get_content",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "default": "mobile",
+              "enum": [
+                "thumb",
+                "mobile",
+                "desktop",
+                "full"
+              ],
+              "title": "Variant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Download a re-encoded variant (CLEAN and ACTIVE only; fail closed)",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-001"
+      },
+      "put": {
+        "operationId": "attachments_put_content",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentContentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Local backend only: send the bytes (base64); staging and production use the pre-signed upload",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-002"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}/withdraw": {
+      "post": {
+        "operationId": "attachments_withdraw_attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentWithdrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw an attachment: delete its bytes, keep its record and hashes",
+        "tags": [
+          "attachments"
+        ],
+        "x-permission": [
+          "attachment.delete"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "ATT-003"
       }
     },
     "/api/v1/audit-logs": {

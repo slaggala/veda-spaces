@@ -841,6 +841,24 @@ def catalog_media_scan() -> dict:
         return {"scanned": media.rescan_pending(s)}
 
 
+def attachment_scan() -> dict:
+    """Scan received attachments still PENDING or FAILED (MTQ closure §6.3). Runs whether or not MTQ is enabled: an
+    attachment uploaded before the flag was turned off is still never served until it is CLEAN."""
+    from veda.modules.attachments import service as attachments
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return {"scanned": attachments.rescan_pending(s)}
+
+
+def attachment_retention() -> dict:
+    """Delete quarantined (INFECTED) uploads after 30 days and abandoned uploads after 24 hours (MTQ closure §6.4).
+    Runs whether or not MTQ is enabled, so turning the flag off never leaves bytes behind."""
+    from veda.modules.attachments import service as attachments
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return attachments.purge(s)
+
+
 def catalog_media_retention() -> dict:
     """Delete the stored bytes of catalog media no live record names, after the retention period (remediation G3)."""
     from veda.modules.catalog import media

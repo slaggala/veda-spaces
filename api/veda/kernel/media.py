@@ -119,6 +119,25 @@ class S3Storage:
         with storage_errors("delete"):
             self.client.delete_object(Bucket=self.bucket, Key=check_key(key, self.prefixes))
 
+    def presign_post(self, key: str, content_type: str, size: int, expires: int) -> dict:
+        """A pre-signed POST for exactly one object (MTQ B1-T02): the key, the content type, the exact length and
+        KMS encryption are conditions of the signature, so the client can upload only what the server agreed to.
+        The server still reads the object back and checks its length and SHA-256 before using it."""
+        fields = {"Content-Type": content_type, "x-amz-server-side-encryption": "aws:kms"}
+        conditions: list = [
+            {"Content-Type": content_type},
+            {"x-amz-server-side-encryption": "aws:kms"},
+            ["content-length-range", size, size],
+        ]
+        if self.kms_key_arn:
+            fields["x-amz-server-side-encryption-aws-kms-key-id"] = self.kms_key_arn
+            conditions.append({"x-amz-server-side-encryption-aws-kms-key-id": self.kms_key_arn})
+        with storage_errors("presign"):
+            post = self.client.generate_presigned_post(
+                self.bucket, check_key(key, self.prefixes), Fields=fields, Conditions=conditions, ExpiresIn=expires
+            )
+        return {"url": post["url"], "fields": post["fields"], "expires_in": expires}
+
 
 class storage_errors:  # noqa: N801 - a context manager used as `with storage_errors(op)`
     """Count S3 and KMS access denials (MediaStorageAccessDenied, MediaKmsAccessDenied) and re-raise. The signal names

@@ -23,6 +23,7 @@ log = logging.getLogger("veda.app")
 
 
 def _register_modules(app: Flask) -> None:
+    from veda.modules.attachments.routes import api as attachments_api
     from veda.modules.catalog.routes import api as catalog_api
     from veda.modules.catalog.routes import public_api as catalog_public_api
     from veda.modules.crm.leads import events as _lead_events  # noqa: F401  (registers handlers/resolvers)
@@ -52,6 +53,7 @@ def _register_modules(app: Flask) -> None:
         estimator_api,
         catalog_public_api,
         catalog_api,
+        attachments_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)

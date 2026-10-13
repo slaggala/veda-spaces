@@ -123,7 +123,7 @@ A CI job migrates an empty database on **both** SQLite and PostgreSQL, introspec
    - it lacks its required index;
    - its registry entry is missing any documentation field.
 
-   The allow-list is the 10 columns in §2.11, no more (N-02). This rule is **not** relaxed globally.
+   The allow-list is the 11 columns in §2.11, no more (N-02). This rule is **not** relaxed globally.
 
    The only columns that match the name pattern but are **not** treated as ID-like are the three non-entity string identifiers listed in §2.11.1 (R-01). Each must have exactly its documented non-GUID string type. Any other string column whose name matches the pattern fails;
 4. has a column ending in `_id`, or an actor column, whose type is not the GUID type (checked for every FK, DATA-012);
@@ -176,13 +176,13 @@ Every behavioral exception to the contract is listed here. The conformance check
 | EXC-008 | `app_user` rows SYSTEM, WEB_INTAKE, ANONYMOUS | Cannot be soft-deleted, disabled or given credentials | Required actors for FK integrity | Service guard plus seed migration check |
 | EXC-009 | `audit_log.session_id`, `security_event_log.session_id`, `refresh_token.replaced_by_id` | GUID-typed correlation references **without** a database FK (F-07) | Evidence rows must outlive purged sessions, and token chains must be purgeable in any order | The service writes only ids it has just read. Together with EXC-011, these form the exact allow-list of §2.11 for conformance rule 3. |
 | EXC-010 | `lead` rows | PII fields overwritten in place by the erasure and retention anonymization procedures (07 §8.2), which is not a soft delete | DPDP erasure and retention (LEAD-028, LEAD-029) | Audited ANONYMIZE action. `anonymized_on` set. |
-| EXC-011 | `audit_log.entity_id`, `audit_log.parent_entity_id`, `audit_log.transaction_id`, `security_event_log.target_entity_id`, `outbox_event.aggregate_id`, `notification.entity_id`, `user_mfa_recovery_code.batch_id` | GUID identifier columns **without** a database FK: polymorphic references and group identifiers (N-02) | A polymorphic target has no single parent table, and group ids have no parent row. Evidence must outlive its targets. | Fully specified per column in §2.11. Exact allow-list. Format and discriminator CHECKs. Conformance tests (12 §4.1). |
+| EXC-011 | `audit_log.entity_id`, `audit_log.parent_entity_id`, `audit_log.transaction_id`, `security_event_log.target_entity_id`, `outbox_event.aggregate_id`, `notification.entity_id`, `user_mfa_recovery_code.batch_id`, `attachment.entity_id` | GUID identifier columns **without** a database FK: polymorphic references and group identifiers (N-02) | A polymorphic target has no single parent table, and group ids have no parent row. Evidence must outlive its targets. | Fully specified per column in §2.11. Exact allow-list. Format and discriminator CHECKs. Conformance tests (12 §4.1). |
 
 ### 2.11 Registered FK-less identifier columns (DATA-011, DATA-014, N-02)
 
-These **ten** columns are the complete allow-list for rule 3 of §2.7: three correlation columns (EXC-009) and seven polymorphic or group identifiers (EXC-011). Every other ID-like column must have a DB-enforced FK.
+These **eleven** columns are the complete allow-list for rule 3 of §2.7: three correlation columns (EXC-009) and eight polymorphic or group identifiers (EXC-011). Every other ID-like column must have a DB-enforced FK.
 
-**Common rules for all ten:**
+**Common rules for all eleven:**
 
 | Rule | Detail |
 |---|---|
@@ -205,8 +205,9 @@ These **ten** columns are the complete allow-list for rule 3 of §2.7: three cor
 | 8 | `outbox_event.aggregate_id` (EXC-011) | Entity that raised the event | Polymorphic, and events must outlive entity changes | `aggregate_type` NOT NULL, validated against registered tables | Format CHECK + discriminator | `ix_outbox_event__aggregate` | Purged per §2.10 step 6 | NOTIF-003, DATA-017 | 03 §8.1, 02 §10.1 |
 | 9 | `notification.entity_id` (EXC-011) | Deep-link target | Polymorphic, optional | `entity_type`. Pair CHECK `(entity_type IS NULL) = (entity_id IS NULL)`. The type must be a registered table. | Format CHECK + pair CHECK | `ix_notification__entity` (`entity_type`, `entity_id`), used by erasure purge (07 §8.2) | Purged per §2.10 step 5 | NOTIF-001, LEAD-029 | 03 §8.2 |
 | 10 | `user_mfa_recovery_code.batch_id` (EXC-011) | Groups codes issued together | Group id: there is no batch table | — (group id) | Format CHECK. UUIDv7 generated per issuance. | `ix_user_mfa_recovery_code__batch` (`user_id`, `batch_id`) | With the codes | MFA-005 | 03 §5.6, 05 §11.5 |
+| 11 | `attachment.entity_id` (EXC-011) | The site record a photo, sketch or floor-plan image belongs to | Polymorphic over seven MTQ site record types; `0106_attachment` precedes the MTQ tables | `entity_type` NOT NULL, CHECK against the seven values; the owning module's binding resolves the id before any write | Format CHECK + discriminator CHECK | `ix_attachment__entity` (`entity_type`, `entity_id`) | With the `attachment` row; bytes deleted on withdrawal, erasure or purge | ATT-002, MTQ B1 | MTQ-B1-SCOPE §2.8 (architecture amendment, decision log 26 and 27) |
 
-The conformance check reads this table as its allow-list. Adding an eleventh FK-less identifier requires a new row with every column filled, and an ADR or architecture amendment.
+The conformance check reads this table as its allow-list. Row 11 was added by the MTQ B1 frozen scope (architecture amendment, decision log 26 and 27). Adding a twelfth FK-less identifier requires a new row with every column filled, and an ADR or architecture amendment.
 
 #### 2.11.1 Non-entity string identifiers (R-01)
 

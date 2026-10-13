@@ -144,6 +144,17 @@ register(AuditPolicy("catalog_record", FULL, excluded=frozenset({"document"})))
 register(AuditPolicy("catalog_release", FULL, excluded=frozenset({"compiled", "validation"})))
 register(AuditPolicy("catalog_event", FULL))
 register(AuditPolicy("catalog_media_object", FULL))
+
+# --- MTQ B1 (ATT, 0106): attachments are evidence of a site visit; the row and its hashes outlive the bytes. The
+# display filename and caption are personal text, removed on lead erasure (closure §6.4).
+register(
+    AuditPolicy(
+        "attachment",
+        FULL,
+        parent=("lead", "lead_id"),
+        pii=frozenset({"original_filename", "caption"}),
+    )
+)
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))
@@ -342,6 +353,19 @@ FKLESS_IDENTIFIERS: tuple[FklessIdentifier, ...] = (
         "With the codes",
         "MFA-005",
         "03 §5.6, 05 §11.5",
+    ),
+    FklessIdentifier(
+        "attachment",
+        "entity_id",
+        "EXC-011",
+        "The site record a photo, sketch or floor-plan image belongs to (MTQ B1-SCOPE §2.8)",
+        "Polymorphic: one of seven site record types; 0106 precedes the MTQ tables",
+        "entity_type",
+        "Format CHECK + entity_type CHECK; the owning module's binding resolves the id before any write",
+        "ix_attachment__entity",
+        "With the attachment row (bytes deleted on withdrawal, erasure or purge; the row stays)",
+        "ATT-002, MTQ B1",
+        "MTQ-B1-SCOPE §2.8, blocker closure §6",
     ),
 )
 

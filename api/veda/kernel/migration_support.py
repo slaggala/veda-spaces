@@ -715,6 +715,88 @@ def seed_reference_data(conn) -> None:
     )
 
 
+def seed_lookups(
+    conn,
+    lookups: tuple[tuple[str, str, str, tuple[tuple[str, str, dict | None], ...]], ...],
+    *,
+    module: str,
+) -> int:
+    """A later module migration: insert lookup categories and values that are missing. Idempotent; an existing value
+    is never edited (values are only added, MTQ B1-SCOPE §4.1). Returns the number of rows inserted."""
+    now = clock.now()
+    tx = new_id()
+    inserted = 0
+    for code, name, description, values in lookups:
+        category_id = conn.execute(
+            sa.select(LOOKUP_CATEGORY.c.id).where(
+                LOOKUP_CATEGORY.c.code == code, LOOKUP_CATEGORY.c.is_deleted == sa.false()
+            )
+        ).scalar()
+        if category_id is None:
+            category_id = insert_audited(
+                conn,
+                LOOKUP_CATEGORY,
+                {"code": code, "name": name, "description": description, "module": module, "is_system": True},
+                transaction_id=tx,
+                now=now,
+            )
+            inserted += 1
+        existing = {
+            r[0]
+            for r in conn.execute(
+                sa.select(LOOKUP_VALUE.c.code).where(
+                    LOOKUP_VALUE.c.category_id == category_id, LOOKUP_VALUE.c.is_deleted == sa.false()
+                )
+            )
+        }
+        for order, (vcode, label, attrs) in enumerate(values, start=1):
+            if vcode in existing:
+                continue
+            insert_audited(
+                conn,
+                LOOKUP_VALUE,
+                {
+                    "category_id": category_id,
+                    "code": vcode,
+                    "label": label,
+                    "description": None,
+                    "sort_order": order * 10,
+                    "is_active": True,
+                    "attributes": attrs,
+                },
+                transaction_id=tx,
+                now=now,
+            )
+            inserted += 1
+    return inserted
+
+
+def seed_sequence(conn, key: str, prefix: str, *, padding: int = 6, reset_period: str = "YEAR") -> bool:
+    """Insert a number sequence if it is missing (idempotent)."""
+    found = conn.execute(
+        sa.select(NUMBER_SEQUENCE.c.id).where(
+            NUMBER_SEQUENCE.c.sequence_key == key, NUMBER_SEQUENCE.c.is_deleted == sa.false()
+        )
+    ).scalar()
+    if found is not None:
+        return False
+    insert_audited(
+        conn,
+        NUMBER_SEQUENCE,
+        {
+            "sequence_key": key,
+            "prefix": prefix,
+            "reset_period": reset_period,
+            "current_period": None,
+            "next_value": 1,
+            "padding": padding,
+        },
+        transaction_id=new_id(),
+        now=clock.now(),
+    )
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Immutability guards (07 §6.2)
 # ---------------------------------------------------------------------------
