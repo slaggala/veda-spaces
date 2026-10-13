@@ -145,8 +145,7 @@ try {
     const statuses = await page.evaluate(async (id) => Promise.all(['/api/v1/mtq/scope-rules', '/api/v1/mtq/commercial-policy',
       `/api/v1/quotations/${id}`].map(async (p) => (await fetch(p, { credentials: 'include' })).status)), someId);
     if (statuses.some((s) => s !== 404)) throw new Error(`commercial endpoints answered ${statuses} with the MTQ flags unset`);
-    const me = await page.evaluate(async () => (await (await fetch('/api/v1/auth/me', { credentials: 'include' })).json()).data.features);
-    if (me.mtq_estimation !== false || me.mtq_quotation !== false) throw new Error(`features ${JSON.stringify(me)}`);
+    // /auth/me reporting both features off is asserted by the API suite (test_mtq_commercial_gate.py).
     const provoked = consoleErrors.splice(before).filter((e) => !/status of 404/.test(e));
     consoleErrors.push(...provoked);
   });
