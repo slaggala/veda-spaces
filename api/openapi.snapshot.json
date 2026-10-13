@@ -5108,6 +5108,81 @@
         "title": "StatusIn",
         "type": "object"
       },
+      "SyncBatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/SyncOperation"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "operations"
+        ],
+        "title": "SyncBatchIn",
+        "type": "object"
+      },
+      "SyncOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "default": {},
+            "maxProperties": 40,
+            "title": "Data",
+            "type": "object"
+          },
+          "op_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Op Id",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          },
+          "type": {
+            "enum": [
+              "space",
+              "note",
+              "release",
+              "property_capture",
+              "attachment"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op_id",
+          "type"
+        ],
+        "title": "SyncOperation",
+        "type": "object"
+      },
       "TokenIn": {
         "additionalProperties": false,
         "properties": {
@@ -12316,6 +12391,100 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/sync": {
+      "post": {
+        "operationId": "mtq_sync_set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply a batch of offline operations in order; each answers on its own (no last-write-wins)",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.capture"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/measurement-sets/{set_id}/sync-state": {
+      "get": {
+        "operationId": "mtq_sync_state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Per-space versions and claims for a reconnecting client",
+        "tags": [
+          "mtq"
+        ],
+        "x-permission": [
+          "measurement.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "MEAS-005"
       }
     },
     "/api/v1/measurement-sets/{set_id}/verify": {

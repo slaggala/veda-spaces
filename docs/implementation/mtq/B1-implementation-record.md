@@ -92,3 +92,15 @@ No deviation. Characterisation snapshot identical before and after.
 | Electrical points (B1-SCOPE §2.5) | Written with their space, matched by `client_ref` (ids and photos survive edits), re-linked to the copied walls in a new revision; a wall point lying past its wall's end is refused; Full surveys need a matching point (same wall, offset within 50 mm) for every switchboard or DB box on a furniture wall | "The capture UI creates both" made enforceable |
 | Door-less spaces (B1-SCOPE §2.9.2) | `wall_index` 0 is allowed only for an OPEN edge; further open edges use ordinary indices with type OPEN | Several open edges cannot all be index 0 (unique per space) |
 | Attachment ids named by a note or an electrical point | Must belong to the same lead | Prevents linking another lead's photo |
+
+## B1-T09 — offline sync
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| `POST /measurement-sets/{id}/sync`: "array of space payloads + notes; returns client_ref → id map; idempotent per (set, client_ref)" (blueprint §11.1) | A batch of up to 50 typed operations (space, note, release, property_capture, attachment), applied in order, each in its own savepoint with its own result (APPLIED, DUPLICATE, CONFLICT, CLAIMED, FROZEN, REJECTED), plus per-space versions; `GET .../sync-state` for reconnection | Partial failure must not undo the rest; attachments and claims travel through the same queue |
+| Idempotency per (set, client_ref) | A retried space write whose content already equals the server state is DUPLICATE (no second write, no version bump); notes and attachments by `client_ref`; a whole batch with the same `Idempotency-Key` replays the first response | No new table: the content comparison makes retries safe without a request log |
+| Conflicts | A stale or base-less write with different content is CONFLICT with the server state and the conflicting fields; nothing is merged | No last-write-wins (instruction; B1-SCOPE §2.9.3) |
+| Revision awareness | Writes into a revision that is no longer a draft are FROZEN with `current_draft_id` when a correction draft exists | The client rebases instead of writing into a sealed revision |
+| Version bookkeeping | After a rolled-back operation the unit of work's "already versioned" record is restored, so a later write to the same row still advances its version | Otherwise a rolled-back attempt could suppress the version bump that protects other clients |
+
+Pre-existing flaky test observed (not caused by this branch): `tests/unit/test_deploy_scanner.py::test_entrypoint_propagates_a_clean_clamd_exit` waits 5 s for a stub process and fails intermittently under load; it failed 3 of 6 runs on the main checkout as well.

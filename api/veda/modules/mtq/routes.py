@@ -20,6 +20,7 @@ from . import (
     geometry,  # noqa: F401  (L-shape and staircase checks)
     scope,
     sets,
+    sync,
     templates,
     verification,
     visits,
@@ -27,6 +28,7 @@ from . import (
 from . import capture as C
 from . import properties as P
 from . import schemas as S
+from . import sync_schemas as SY
 from .models import MeasurementNote, MeasurementSet, MeasurementVisit, Property
 
 api = Api("mtq", "/api/v1", tags=("mtq",))
@@ -393,3 +395,21 @@ def verify_set(req: Req, set_id: str):
     verification.verify(req.session, req.ctx, mset, prop, list(req.body.acknowledgements) if req.body else [])
     req.session.flush()
     return ok(sets.present(req.session, mset, full=False))
+
+
+# --- offline sync (B1-T09) ---------------------------------------------------------------------------------------------
+@api.route("POST", "/measurement-sets/<set_id>/sync", permission="measurement.capture", body=SY.SyncBatchIn,
+           max_body=2 * 1024 * 1024, idempotent_create=True, limits=CAPTURE_LIMITS, requirement="MEAS-004",
+           summary="Apply a batch of offline operations in order; each answers on its own (no last-write-wins)")  # fmt: skip
+def sync_set(req: Req, set_id: str):
+    mset, prop = sets.get_visible(req.session, req.ctx, set_id, "measurement.capture")
+    result = sync.run(req.session, req.ctx, mset, prop, req.body)
+    req.session.flush()
+    return ok(result)
+
+
+@api.route("GET", "/measurement-sets/<set_id>/sync-state", permission="measurement.read", write=False,
+           requirement="MEAS-005", summary="Per-space versions and claims for a reconnecting client")  # fmt: skip
+def sync_state(req: Req, set_id: str):
+    mset, _ = sets.get_visible(req.session, req.ctx, set_id)
+    return ok(sync.state(req.session, mset))
