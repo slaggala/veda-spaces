@@ -95,11 +95,14 @@ resource "aws_iam_policy" "runtime" {
         Resource = ["${local.b.attachments}/upload/*", "${local.b.attachments}/att/*"]
       },
       {
-        Sid       = "SiteAttachmentListPrefixes"
-        Effect    = "Allow"
-        Action    = "s3:ListBucket"
-        Resource  = local.b.attachments
-        Condition = { StringLike = { "s3:prefix" = ["upload/*", "att/*"] } }
+        # List without a prefix condition (B1-PE-05): S3 answers a GET of a missing key with 404 only when the caller
+        # may list the bucket, and a GetObject request carries no s3:prefix, so a prefix-conditioned grant turns
+        # "not uploaded yet" into 403 AccessDenied (a 500 at completion and a false access-denied alarm). The bucket
+        # holds only upload/ and att/ content-hash keys, so listing it reveals nothing else.
+        Sid      = "SiteAttachmentList"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = local.b.attachments
       },
       { Sid = "DeployBundles", Effect = "Allow", Action = "s3:GetObject", Resource = "${local.b.artifacts}/*" },
       { Sid = "FileEvidence", Effect = "Allow", Action = "s3:PutObject", Resource = "${local.b.evidence}/*" },

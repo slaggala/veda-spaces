@@ -195,7 +195,7 @@ run "attachment_access_only_under_the_approved_prefixes" {
       "arn:aws:s3:::veda-stg-attachments-111122223333/upload/*", "arn:aws:s3:::veda-stg-attachments-111122223333/att/*",
       "arn:aws:s3:::veda-stg-attachments-111122223333",
     ])
-    error_message = "the attachments bucket is reachable only under upload/ and att/ (and listed only there)"
+    error_message = "the attachments bucket is reachable only under upload/ and att/ (objects) and listable as a whole (it holds nothing else)"
   }
 
   assert {
@@ -205,8 +205,10 @@ run "attachment_access_only_under_the_approved_prefixes" {
   }
 
   assert {
-    condition     = one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "SiteAttachmentListPrefixes"]) == ["upload/*", "att/*"]
-    error_message = "listing only under the approved prefixes"
+    condition = one([for s in jsondecode(aws_iam_policy.runtime.policy).Statement : {
+      action = s.Action, resource = s.Resource, conditioned = can(s.Condition)
+    } if s.Sid == "SiteAttachmentList"]) == { action = "s3:ListBucket", resource = "arn:aws:s3:::veda-stg-attachments-111122223333", conditioned = false }
+    error_message = "the attachments bucket is listable without a prefix condition (a missing key must read as 404, not 403; B1-PE-05)"
   }
 
   assert {
