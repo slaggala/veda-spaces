@@ -1,12 +1,12 @@
 {
   "record": "MTQ-B1-STAGING-ENABLEMENT",
-  "status": "DRAFT",
+  "status": "APPROVED",
   "environment": "staging",
   "production": false,
   "flag": "VEDA_MTQ_SITE_ENABLED",
   "author": "MTQ B1 implementation session (pull request #87)",
-  "approved_by": "[OWNER TO FILL]",
-  "approved_on": "[OWNER TO FILL]",
+  "approved_by": "Srinivasulu Laggala",
+  "approved_on": "2026-10-13",
   "scope": {
     "staff_only": true,
     "public_routes": false,
