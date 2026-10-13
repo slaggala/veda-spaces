@@ -16,6 +16,8 @@ from veda.kernel.ratelimit import ip_key
 
 from . import (
     bindings,  # noqa: F401  (registers the attachment bindings)
+    electrical,  # noqa: F401  (electrical points: hooks, checks, binding)
+    geometry,  # noqa: F401  (L-shape and staircase checks)
     scope,
     sets,
     templates,

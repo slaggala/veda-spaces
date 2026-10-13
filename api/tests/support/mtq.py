@@ -85,6 +85,14 @@ def bedroom_payload(**over) -> dict:
             {"wall_index": 3, "length_mm": 3000},
             {"wall_index": 4, "length_mm": 3300},
         ],
+        "electrical_points": [
+            {"client_ref": "ep-switchboard", "point_type_code": "SWITCHBOARD", "wall_index": 2, "from_offset_mm": 200,
+             "from_height_mm": 1200},
+            {"client_ref": "ep-light", "point_type_code": "LIGHT_POINT", "location_code": "CEILING",
+             "from_offset_mm": 1650, "from_height_mm": 1500},
+            {"client_ref": "ep-fan", "point_type_code": "FAN_POINT", "location_code": "CEILING",
+             "from_offset_mm": 1650, "from_height_mm": 1500},
+        ],
     }  # fmt: skip
     body.update(over)
     return body

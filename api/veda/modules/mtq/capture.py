@@ -144,9 +144,58 @@ class WallIn(Closed):
             raise ValueError("only a partition can be proposed")
         if self.wall_type_code == "OPEN" and (self.openings or self.obstructions or self.usable_for_code):
             raise ValueError("an open edge has no openings, obstructions or tags")
+        if self.wall_index == 0 and self.wall_type_code != "OPEN":
+            raise ValueError("wall_index 0 is the OPEN entry edge of a door-less space (B1-SCOPE §2.9.2)")
         refs = [o.client_ref for o in self.openings]
         if len(set(refs)) != len(refs):
             raise ValueError("opening client_ref values repeat")
+        return self
+
+
+class LegIn(Closed):
+    l_mm: MM
+    w_mm: MM
+
+
+class LShapeIn(Closed):
+    """B1-SCOPE §2.9.1: leg A contains the entry (or W1); the turn is read standing at W1 facing into the room."""
+
+    turn_code: Literal["LEFT", "RIGHT"]
+    leg_a: LegIn
+    leg_b: LegIn
+
+
+class VoidIn(Closed):
+    l_mm: MM
+    w_mm: MM
+    h_mm: HEIGHT
+
+
+class StaircaseIn(Closed):
+    """B1-SCOPE §2.4 staircase geometry (space_measurement.attributes.staircase)."""
+
+    from_level: Annotated[int, Field(ge=-3, le=10)]
+    to_level: Annotated[int, Field(ge=-3, le=10)]
+    turn_type_code: Literal["STRAIGHT", "L", "U", "SPIRAL", "CUSTOM"]
+    flight_count: Annotated[int, Field(ge=1, le=6)]
+    run_length_mm: MM
+    width_mm: Annotated[int, Field(ge=300, le=5000)]
+    riser_count: Annotated[int, Field(ge=2, le=60)]
+    riser_height_mm: Annotated[int, Field(ge=80, le=300)]
+    tread_depth_mm: Annotated[int, Field(ge=150, le=500)]
+    headroom_mm: HEIGHT
+    landing_l_mm: MM | None = None
+    landing_w_mm: MM | None = None
+    under_stair_void: VoidIn | None = None
+    largest_panel_mm: MM
+    handrail_wall_index: Annotated[int, Field(ge=0, le=64)] | None = None
+
+    @model_validator(mode="after")
+    def _rules(self):
+        if self.to_level == self.from_level:
+            raise ValueError("a staircase joins two different levels")
+        if self.turn_type_code != "STRAIGHT" and (self.landing_l_mm is None or self.landing_w_mm is None):
+            raise ValueError("an L, U, spiral or custom staircase needs its landing size")
         return self
 
 
@@ -166,6 +215,68 @@ class MeasurementAttributes(Closed):
     dado_height_mm: HEIGHT | None = None
     railing_height_mm: HEIGHT | None = None
     exposure_code: Literal["OPEN", "COVERED", "ENCLOSED"] | None = None
+    l_shape: LShapeIn | None = None  # B1-T08
+    staircase: StaircaseIn | None = None  # B1-T08
+
+
+ElectricalType = Literal[
+    "LIGHT_POINT",
+    "SENSOR_LIGHT",
+    "FAN_POINT",
+    "SWITCHBOARD",
+    "SOCKET_5A",
+    "SOCKET_15A",
+    "AC_POINT",
+    "DB_BOX",
+    "TV_POINT",
+    "DATA_POINT",
+    "GEYSER_POINT",
+    "EXHAUST_POINT",
+    "CHIMNEY_POINT",
+    "APPLIANCE_POINT",
+    "PROFILE_LIGHT_FEED",
+    "CUSTOM",
+]  # fmt: skip  (equal to vocab.ELECTRICAL_POINT_TYPES; tested)
+
+
+class ElectricalPointIn(Closed):
+    """B1-SCOPE §2.5. A wall point names its wall by ``wall_index``; a ceiling point has none and gives x/y from the
+    entry corner in ``from_offset_mm`` / ``from_height_mm``."""
+
+    client_ref: ClientRef
+    point_type_code: ElectricalType
+    status_code: Literal["EXISTING", "SHIFT", "NEW", "REMOVE"] = "EXISTING"
+    wall_index: Annotated[int, Field(ge=0, le=64)] | None = None
+    from_offset_mm: OFFSET | None = None
+    from_height_mm: Annotated[int, Field(ge=0, le=100_000)] | None = None
+    to_wall_index: Annotated[int, Field(ge=0, le=64)] | None = None
+    to_offset_mm: OFFSET | None = None
+    to_height_mm: Annotated[int, Field(ge=0, le=100_000)] | None = None
+    sensor_type_code: Literal["PIR", "MICROWAVE", "NONE"] | None = None
+    switching_code: Literal["SENSOR", "MANUAL", "BOTH"] | None = None
+    location_code: (
+        Literal["CEILING", "WALL", "IN_WARDROBE", "UNDER_CABINET", "FOYER_ENTRY", "TOILET", "STAIRCASE"] | None
+    ) = None
+    quantity: Annotated[int, Field(ge=1, le=99)] = 1
+    reason_code: Literal["FURNITURE_CLASH", "CEILING_DESIGN", "CUSTOMER_REQUEST", "SAFETY"] | None = None
+    notes: Annotated[str | None, optional_text(500)] = None
+    attachment_id: Id | None = None
+
+    @model_validator(mode="after")
+    def _rules(self):
+        if self.point_type_code == "SENSOR_LIGHT" and self.sensor_type_code is None:
+            raise ValueError("a sensor light needs its sensor type")
+        if self.status_code == "SHIFT" and (self.from_offset_mm is None or self.to_offset_mm is None):
+            raise ValueError("a shifted point needs its current and its new position")
+        if self.status_code == "SHIFT" and self.to_wall_index is None and self.wall_index is not None:
+            raise ValueError("a shifted wall point names the wall it moves to (to_wall_index, possibly the same wall)")
+        if self.status_code == "NEW" and self.to_offset_mm is None:
+            raise ValueError("a new point needs its position (to_offset_mm)")
+        if self.location_code == "CEILING" and self.wall_index is not None:
+            raise ValueError("a ceiling point has no wall")
+        if self.wall_index is None and self.location_code not in (None, "CEILING"):
+            raise ValueError("a point not on a wall is a ceiling point")
+        return self
 
 
 class SpaceCaptureIn(Closed):
@@ -186,10 +297,23 @@ class SpaceCaptureIn(Closed):
     is_complete: bool = False
     attributes: MeasurementAttributes = MeasurementAttributes()
     walls: Annotated[list[WallIn], Field(max_length=64)] = []
+    electrical_points: Annotated[list[ElectricalPointIn], Field(max_length=80)] = []  # B1-T08
 
     @model_validator(mode="after")
     def _rules(self):
         idx = [w.wall_index for w in self.walls]
+        known = set(idx)
+        refs = [p.client_ref for p in self.electrical_points]
+        if len(set(refs)) != len(refs):
+            raise ValueError("electrical point client_ref values repeat")
+        for p in self.electrical_points:
+            for w in (p.wall_index, p.to_wall_index):
+                if w is not None and w not in known:
+                    raise ValueError(f"electrical point {p.client_ref} names wall {w}, which is not in this space")
+        if self.shape_code == "L_SHAPE" and self.attributes.l_shape is None and self.is_complete:
+            raise ValueError("an L-shaped space needs its two legs and turn (attributes.l_shape)")
+        if self.attributes.l_shape is not None and self.shape_code != "L_SHAPE":
+            raise ValueError("leg geometry belongs to L-shaped spaces only")
         if len(set(idx)) != len(idx):
             raise ValueError("wall_index values repeat")
         refs = [o.client_ref for w in self.walls for o in w.openings]

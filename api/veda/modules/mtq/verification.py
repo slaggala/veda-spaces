@@ -217,10 +217,22 @@ def _tree(s: Session, mset: MeasurementSet):
     photos = _attachments(s, "property_space", [sp.id for sp in spaces])
     wall_ids = [w["id"] for d in data.values() for w in d["walls"]]
     wall_photos = _attachments(s, "space_wall", wall_ids)
+    risks = dict(
+        s.execute(
+            sa.select(MeasurementNote.space_id, sa.func.count(MeasurementNote.id))
+            .where(MeasurementNote.measurement_set_id == mset.id, MeasurementNote.note_type_code == "RISK")
+            .group_by(MeasurementNote.space_id)
+        ).all()
+    )
+    for sid, m in data.items():
+        m["_risk_notes"] = int(risks.get(sid, 0))
     return spaces, data, photos, wall_photos
 
 
 def completeness(s: Session, mset: MeasurementSet) -> list[dict[str, Any]]:
+    from .sets import ensure_hooks
+
+    ensure_hooks()
     spaces, data, photos, wall_photos = _tree(s, mset)
     out: list[dict] = []
     for sp in spaces:

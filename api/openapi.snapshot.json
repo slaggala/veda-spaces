@@ -1030,6 +1030,246 @@
         "title": "DuplicateResolutionIn",
         "type": "object"
       },
+      "ElectricalPointIn": {
+        "additionalProperties": false,
+        "description": "B1-SCOPE \u00a72.5. A wall point names its wall by ``wall_index``; a ceiling point has none and gives x/y from the\nentry corner in ``from_offset_mm`` / ``from_height_mm``.",
+        "properties": {
+          "attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Attachment Id"
+          },
+          "client_ref": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Client Ref",
+            "type": "string"
+          },
+          "from_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "From Height Mm"
+          },
+          "from_offset_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "From Offset Mm"
+          },
+          "location_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "CEILING",
+                  "WALL",
+                  "IN_WARDROBE",
+                  "UNDER_CABINET",
+                  "FOYER_ENTRY",
+                  "TOILET",
+                  "STAIRCASE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location Code"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "point_type_code": {
+            "enum": [
+              "LIGHT_POINT",
+              "SENSOR_LIGHT",
+              "FAN_POINT",
+              "SWITCHBOARD",
+              "SOCKET_5A",
+              "SOCKET_15A",
+              "AC_POINT",
+              "DB_BOX",
+              "TV_POINT",
+              "DATA_POINT",
+              "GEYSER_POINT",
+              "EXHAUST_POINT",
+              "CHIMNEY_POINT",
+              "APPLIANCE_POINT",
+              "PROFILE_LIGHT_FEED",
+              "CUSTOM"
+            ],
+            "title": "Point Type Code",
+            "type": "string"
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 99,
+            "minimum": 1,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FURNITURE_CLASH",
+                  "CEILING_DESIGN",
+                  "CUSTOMER_REQUEST",
+                  "SAFETY"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason Code"
+          },
+          "sensor_type_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "PIR",
+                  "MICROWAVE",
+                  "NONE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sensor Type Code"
+          },
+          "status_code": {
+            "default": "EXISTING",
+            "enum": [
+              "EXISTING",
+              "SHIFT",
+              "NEW",
+              "REMOVE"
+            ],
+            "title": "Status Code",
+            "type": "string"
+          },
+          "switching_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SENSOR",
+                  "MANUAL",
+                  "BOTH"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Switching Code"
+          },
+          "to_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "To Height Mm"
+          },
+          "to_offset_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "To Offset Mm"
+          },
+          "to_wall_index": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "To Wall Index"
+          },
+          "wall_index": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wall Index"
+          }
+        },
+        "required": [
+          "client_ref",
+          "point_type_code"
+        ],
+        "title": "ElectricalPointIn",
+        "type": "object"
+      },
       "EmailChangeAdminIn": {
         "additionalProperties": false,
         "properties": {
@@ -1470,6 +1710,33 @@
         "title": "InviteIn",
         "type": "object"
       },
+      "LShapeIn": {
+        "additionalProperties": false,
+        "description": "B1-SCOPE \u00a72.9.1: leg A contains the entry (or W1); the turn is read standing at W1 facing into the room.",
+        "properties": {
+          "leg_a": {
+            "$ref": "#/components/schemas/LegIn"
+          },
+          "leg_b": {
+            "$ref": "#/components/schemas/LegIn"
+          },
+          "turn_code": {
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ],
+            "title": "Turn Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_code",
+          "leg_a",
+          "leg_b"
+        ],
+        "title": "LShapeIn",
+        "type": "object"
+      },
       "LeadCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -1828,6 +2095,29 @@
         "title": "LeadPatchIn",
         "type": "object"
       },
+      "LegIn": {
+        "additionalProperties": false,
+        "properties": {
+          "l_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "L Mm",
+            "type": "integer"
+          },
+          "w_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "W Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "l_mm",
+          "w_mm"
+        ],
+        "title": "LegIn",
+        "type": "object"
+      },
       "LoginIn": {
         "additionalProperties": false,
         "properties": {
@@ -2033,6 +2323,17 @@
             "default": null,
             "title": "Has Water Inlet"
           },
+          "l_shape": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LShapeIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "railing_height_mm": {
             "anyOf": [
               {
@@ -2046,6 +2347,17 @@
             ],
             "default": null,
             "title": "Railing Height Mm"
+          },
+          "staircase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaircaseIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "MeasurementAttributes",
@@ -4003,7 +4315,9 @@
               "has_gas_line": null,
               "has_loft_existing": null,
               "has_water_inlet": null,
-              "railing_height_mm": null
+              "l_shape": null,
+              "railing_height_mm": null,
+              "staircase": null
             }
           },
           "base_version": {
@@ -4071,6 +4385,15 @@
             ],
             "title": "Confidence Code",
             "type": "string"
+          },
+          "electrical_points": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ElectricalPointIn"
+            },
+            "maxItems": 80,
+            "title": "Electrical Points",
+            "type": "array"
           },
           "existing_condition_code": {
             "anyOf": [
@@ -4543,6 +4866,151 @@
           "resolution"
         ],
         "title": "SpamResolutionIn",
+        "type": "object"
+      },
+      "StaircaseIn": {
+        "additionalProperties": false,
+        "description": "B1-SCOPE \u00a72.4 staircase geometry (space_measurement.attributes.staircase).",
+        "properties": {
+          "flight_count": {
+            "maximum": 6,
+            "minimum": 1,
+            "title": "Flight Count",
+            "type": "integer"
+          },
+          "from_level": {
+            "maximum": 10,
+            "minimum": -3,
+            "title": "From Level",
+            "type": "integer"
+          },
+          "handrail_wall_index": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Handrail Wall Index"
+          },
+          "headroom_mm": {
+            "maximum": 20000,
+            "minimum": 1,
+            "title": "Headroom Mm",
+            "type": "integer"
+          },
+          "landing_l_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Landing L Mm"
+          },
+          "landing_w_mm": {
+            "anyOf": [
+              {
+                "maximum": 100000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Landing W Mm"
+          },
+          "largest_panel_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Largest Panel Mm",
+            "type": "integer"
+          },
+          "riser_count": {
+            "maximum": 60,
+            "minimum": 2,
+            "title": "Riser Count",
+            "type": "integer"
+          },
+          "riser_height_mm": {
+            "maximum": 300,
+            "minimum": 80,
+            "title": "Riser Height Mm",
+            "type": "integer"
+          },
+          "run_length_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "Run Length Mm",
+            "type": "integer"
+          },
+          "to_level": {
+            "maximum": 10,
+            "minimum": -3,
+            "title": "To Level",
+            "type": "integer"
+          },
+          "tread_depth_mm": {
+            "maximum": 500,
+            "minimum": 150,
+            "title": "Tread Depth Mm",
+            "type": "integer"
+          },
+          "turn_type_code": {
+            "enum": [
+              "STRAIGHT",
+              "L",
+              "U",
+              "SPIRAL",
+              "CUSTOM"
+            ],
+            "title": "Turn Type Code",
+            "type": "string"
+          },
+          "under_stair_void": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoidIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "width_mm": {
+            "maximum": 5000,
+            "minimum": 300,
+            "title": "Width Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_level",
+          "to_level",
+          "turn_type_code",
+          "flight_count",
+          "run_length_mm",
+          "width_mm",
+          "riser_count",
+          "riser_height_mm",
+          "tread_depth_mm",
+          "headroom_mm",
+          "largest_panel_mm"
+        ],
+        "title": "StaircaseIn",
         "type": "object"
       },
       "StatusChangeIn": {
@@ -5099,6 +5567,36 @@
           "to_status"
         ],
         "title": "VisitStatusIn",
+        "type": "object"
+      },
+      "VoidIn": {
+        "additionalProperties": false,
+        "properties": {
+          "h_mm": {
+            "maximum": 20000,
+            "minimum": 1,
+            "title": "H Mm",
+            "type": "integer"
+          },
+          "l_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "L Mm",
+            "type": "integer"
+          },
+          "w_mm": {
+            "maximum": 100000,
+            "minimum": 1,
+            "title": "W Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "l_mm",
+          "w_mm",
+          "h_mm"
+        ],
+        "title": "VoidIn",
         "type": "object"
       },
       "WallIn": {

@@ -81,3 +81,14 @@ No deviation. Characterisation snapshot identical before and after.
 | Four-eyes: verifier ≠ `captured_by` (blueprint §4.1) | The verifier must not have captured the set or any of its spaces | Stricter with two surveyors |
 | Tolerance policy (OI-MTQ-01) | `tolerance.py`: agreement tolerances and the site and gate verdicts for the B1-T12 validation harness; runtime thresholds (50 mm closure, ±25 % built-up with a verifier `RISK_ACK`) in verification | Closure §2 separates the two |
 | Verify sets `snapshot_sha256` | RFC 8785 canonical JSON of the revision without versions or claims, reproducible from the stored rows | Tamper evidence (blueprint §14) |
+
+## B1-T08 — electrical, staircase and L-shape geometry
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| L-shape: two legs, turn read standing at W1 (B1-SCOPE §2.9.1) | Leg A holds W1 (width `w_a`) and runs `l_a` in; leg B continues sideways from leg A's far end by `l_b` over a depth `w_b`; the six walls clockwise from W1 are fixed by the turn; verification compares each wall to its expected length within 50 mm | The freeze names the legs and the closure rule; this fixes the one reading that makes "close within 50 mm of the leg dimensions" checkable |
+| "Do not introduce JSON escape hatches for approved schema attributes" (instruction) vs `space_measurement.attributes` JSON (B1-SCOPE §2.1, §2.4, §2.9.1) | The frozen JSON column stays; every key is a closed, typed model (staircase geometry, L-shape legs, survey readings), unknown keys are refused, and staircase geometry is refused on any non-staircase space | Changing the frozen column layout would be a redesign; a closed schema is not an escape hatch |
+| Staircase headroom under 2 m, largest panel under 900 mm → RISK (B1-SCOPE §2.4) | Verification requires a RISK note on the staircase when either holds | "RISK" read as a recorded risk the verifier sees |
+| Electrical points (B1-SCOPE §2.5) | Written with their space, matched by `client_ref` (ids and photos survive edits), re-linked to the copied walls in a new revision; a wall point lying past its wall's end is refused; Full surveys need a matching point (same wall, offset within 50 mm) for every switchboard or DB box on a furniture wall | "The capture UI creates both" made enforceable |
+| Door-less spaces (B1-SCOPE §2.9.2) | `wall_index` 0 is allowed only for an OPEN edge; further open edges use ordinary indices with type OPEN | Several open edges cannot all be index 0 (unique per space) |
+| Attachment ids named by a note or an electrical point | Must belong to the same lead | Prevents linking another lead's photo |

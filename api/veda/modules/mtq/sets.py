@@ -75,7 +75,13 @@ OPENING_FIELDS = (
 )
 # Hooks run after a space's walls are written (B1-T08 adds electrical points) and when a revision is copied.
 AFTER_SPACE_WRITE: list = []
+PRE_WRITE: list = []  # (session, space, payload) -> None; raises to refuse (B1-T08 space-type rules)
 COPY_HOOKS: list = []
+
+
+def ensure_hooks() -> None:
+    """Load every module that registers capture hooks and checks, whatever the entry point (API, CLI, tests)."""
+    from . import electrical, geometry, verification  # noqa: F401
 
 
 # --- access ------------------------------------------------------------------------------------------------------------
@@ -177,6 +183,7 @@ def create_from_plan(s: Session, ctx, prop: Property, body) -> MeasurementSet:
 def copy_revision(s: Session, source: MeasurementSet, target: MeasurementSet, actor_id: str) -> int:
     """Copy every live space measurement of ``source`` into the DRAFT ``target`` (new rows; the source is untouched).
     The copier holds every claim of the copy; property_capture travels too."""
+    ensure_hooks()
     target.property_capture = dict(source.property_capture or {})
     n = 0
     for sm in s.execute(sa.select(SpaceMeasurement).where(SpaceMeasurement.measurement_set_id == source.id)).scalars():
@@ -261,9 +268,14 @@ def upsert_space(
     s: Session, ctx, mset: MeasurementSet, prop: Property, space_id: str, payload
 ) -> tuple[SpaceMeasurement, bool]:
     """Write one space's measurement, walls and openings. Returns (measurement, created)."""
+    ensure_hooks()
     require_draft(mset)
     _require_capture(s, ctx, prop)
-    _space_of(s, mset, space_id)
+    space = _space_of(s, mset, space_id)
+    for check in PRE_WRITE:
+        check(s, space, payload)
+    for ref in [p.attachment_id for p in getattr(payload, "electrical_points", []) if p.attachment_id]:
+        _require_same_lead_attachment(s, prop, ref)
     now = db.tx_time(s)
     sm = _measurement(s, mset, space_id)
     actor = ctx.user.id
@@ -367,6 +379,15 @@ def _write_openings(s: Session, wall: SpaceWall, openings_in) -> None:
             row.is_deleted = True
 
 
+def _require_same_lead_attachment(s: Session, prop: Property, attachment_id: str) -> None:
+    from veda.modules.attachments.models import Attachment
+
+    att = s.get(Attachment, attachment_id)
+    if att is None or att.is_deleted or att.lead_id != prop.lead_id:
+        raise ApiError(422, "VALIDATION_FAILED", "The attachment must belong to this property's lead.",
+                       errors=[field_error("attachment_id", "INVALID", "Not an attachment of this lead.")])  # fmt: skip
+
+
 def release_claim(s: Session, ctx, mset: MeasurementSet, prop: Property, space_id: str) -> SpaceMeasurement:
     require_draft(mset)
     _require_capture(s, ctx, prop)
@@ -410,6 +431,8 @@ def add_note(s: Session, ctx, mset: MeasurementSet, prop: Property, body) -> tup
             return existing, False
     if body.space_id is not None:
         _space_of(s, mset, body.space_id)
+    if body.attachment_id is not None:
+        _require_same_lead_attachment(s, prop, body.attachment_id)
     if body.note_type_code == "RISK_ACK":
         raise ApiError(422, "VALIDATION_FAILED", "Risk acknowledgements are written by the verifier at verification.")
     note = MeasurementNote(measurement_set_id=mset.id, space_id=body.space_id, note_type_code=body.note_type_code,
@@ -487,6 +510,7 @@ def reject(s: Session, ctx, mset: MeasurementSet, prop: Property, reason: str) -
 
 # --- read --------------------------------------------------------------------------------------------------------------
 def present_measurement(s: Session, sm: SpaceMeasurement) -> dict[str, Any]:
+    ensure_hooks()
     walls = []
     for w in s.execute(
         sa.select(SpaceWall).where(SpaceWall.space_measurement_id == sm.id).order_by(SpaceWall.wall_index)
