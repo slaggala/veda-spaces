@@ -31,7 +31,7 @@ Each step uses the existing workflows and their environment approvals. The expec
 
 1. **Review and merge pull request #87.** An independent reviewer certifies it. CI is green on the merged commit.
 2. **Plan attachment storage.** `10-infra-plan` by `workflow_dispatch` on `main`; approve `staging-plan`. Expect 20 to add, 4 to change, 0 to destroy, as the pull-request plan 38352456157 showed: the attachment storage, eight parameters, the dashboard update, and the owner's alarm subscription that is missing from AWS ([B1-T11 §3.1](B1-T11-attachment-storage.md)). Any other difference stops the sequence.
-3. **Apply.** `11-infra-apply` with that plan run and its SHA-256; approve `staging-infra`. Then a drift run with no changes.
+3. **Apply.** `11-infra-apply` with that plan run and its SHA-256; approve `staging-infra`. Only a `workflow_dispatch` plan run is accepted (`verify-run.sh`); the plan a push to `main` starts is for review only. Then a drift run with no changes. After the pre-enablement pull request merges (B1-PE-05), one more plan, apply and drift: exactly one in-place change, the host policy (0 / 1 / 0).
 4. **Deploy with the flag off.** `12-deploy` on `main`; approve `staging`. `deploy.sh` takes the snapshot, runs the expand-only migrations 0106 and 0200, and passes readiness. The preflight prints `site measurement: intentionally disabled`.
 5. **Production-isolation check.** `GET https://api-staging.vedaspaces.com/api/v1/properties` answers 404 through Cloudflare Access. The workspace page `/site` shows "Site measurement is not enabled here."
 6. **Migration verification.** The deploy log shows the migration to `0200_mtq_site` and `/health/ready` reports the expected migrations state. The run id goes into `evidence.migration_verification_run_id`.
@@ -105,5 +105,7 @@ Each step uses the existing workflows and their environment approvals. The expec
 | S08 | Independent house, 3 BHK | Full | staircase geometry, terrace wall heights | PASS |
 | S09 | Independent house, 3 BHK | Lite | offline retry | PASS |
 | S10 | Independent house, 5 BHK | Lite | two bedrooms added to the template | PASS |
+
+Every enclosed space also carries a door and every bedroom a window with a sill, the five houses have two levels, and every set is verified by a second user, so the run exercises the opening, staircase, house-levels and VERIFIED checks of §4 (B1-PE-07). S06 deliberately records no surveyor minutes.
 
 Gate: nine of ten PASS, one isolated failure. Label: SYNTHETIC_VALIDATED.

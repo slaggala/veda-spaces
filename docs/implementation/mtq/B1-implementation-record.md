@@ -170,3 +170,22 @@ Carried from the review, unchanged by these commits:
 Found while fixing MC-3:
 
 - The SURVEYOR and DESIGNER roles do not hold `profile.read`, so a user with only those roles cannot load `/auth/me` or the workspace. Staff accounts need SALES as well until the role matrix is reviewed.
+
+### Pre-enablement closure (B1-PE-01 … B1-PE-09, 2026-10-13)
+
+Branch `fix/mtq-b1-pre-enablement`, one commit per item. Every item was classified **must fix before enablement**, because each one either loses or misattributes field data, blocks a surveyor-only user, or makes the live gate unreliable. None was deferred.
+
+| Item | Finding | Fix |
+|---|---|---|
+| PE-01 | Offline queue not tied to a user | Every queued op and photo records its user; only the signed-in user's ops are sent; ops from before the change are never sent and can only be discarded |
+| PE-02 | Queue survived sign-out | Sign-out asks to sync or discard unsent ops, then deletes that user's data from the device; other users' ops are untouched |
+| PE-03 | Axe coverage on capture only | Axe on home, property and review at 360 px; empty table headers fixed; visible focus on photo buttons; e2e axe block runs when a stack has the flag on |
+| PE-04 | Touch targets 32–36 px | Every site control ≥ 44 × 44 px, measured by a test; design-system tokens unchanged |
+| PE-05 | Missing upload read as 403 | Host may list the attachments bucket (no prefix condition), so a missing key is 404 and completion answers 409 `UPLOAD_NOT_RECEIVED`; to be confirmed in the smoke check |
+| PE-06 | Submit race on PostgreSQL | Every write into a set's content, and attachment create/withdraw on set entities, takes the property lock submit takes and re-checks DRAFT; forced-interleaving tests on both engines |
+| PE-07 | Ten-site evaluator defects | Exactly ten sites; duplicate and missing sites refused; VERIFIED required; profile cross-check; openings and staircase compared; house-levels mix; 5 BHK informational; surveyor minutes; evidence provenance |
+| PE-08 | SURVEYOR/DESIGNER lacked `profile.read` | `0204_mtq_self_service` grants `profile.read`, `lookup.read` and `notification.read` (own) only; number taken under closure §4's corrective-migration rule (decision log entry 28) |
+| PE-09 | `//` spellings bypassed the 404 gate | The gate matches the normalised path and every route Werkzeug would reach (redirects and other methods), so 308/405 never reveal a gated route |
+
+Infrastructure sequencing (owner decision, 2026-10-13): the merged-main plan 38365213642 (20 / 4 / 0) is applied first with MTQ off. PE-05 then follows as a separate plan that changes only `module.runtime_iam.aws_iam_policy.runtime` in place (0 / 1 / 0).
+
