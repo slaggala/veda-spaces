@@ -240,7 +240,7 @@ export class VsChangePasswordPage extends LitElement {
         <label class="field"><span class="label">Confirm</span><input name="confirm" type="password" autocomplete="new-password" aria-required="true" /></label>
         <p class="danger-text" role="alert" aria-live="assertive">${this.error || nothing}</p>
         <button class="btn primary block" ?disabled=${this.busy}>Update password →</button>
-        ${session.mustChangePassword ? html`<button type="button" class="btn ghost" @click=${async () => { await session.logout(); navigate('/login'); }}>Sign out</button>` : html`<a href="/profile">Cancel</a>`}
+        ${session.mustChangePassword ? html`<button type="button" class="btn ghost" @click=${async () => { if (await session.logout()) navigate('/login'); }}>Sign out</button>` : html`<a href="/profile">Cancel</a>`}
       </form>
     </vs-auth-layout>`;
   }

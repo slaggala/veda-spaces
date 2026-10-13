@@ -192,7 +192,7 @@ export class VsApp extends LitElement {
                 <span class="spacer"></span>
                 <vs-notifications-tray></vs-notifications-tray>
                 <vs-account-menu name=${me?.full_name ?? ''} initials=${initials(me?.display_name || me?.full_name)}
-                  @sign-out=${async () => { await session.logout(); navigate('/login'); }}></vs-account-menu>
+                  @sign-out=${async () => { if (await session.logout()) navigate('/login'); }}></vs-account-menu>
               </header>
               ${this.renderBanners()}`
             : nothing}

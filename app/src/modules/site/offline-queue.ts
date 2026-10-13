@@ -47,7 +47,7 @@ export interface SyncResult {
   errors?: Array<{ field: string; message: string }>;
 }
 
-const DB = 'veda-site';
+export const SITE_DB = 'veda-site';
 const BATCH = 50;
 
 interface Store {
@@ -57,6 +57,7 @@ interface Store {
   putBlob(key: string, blob: StoredBlob): Promise<void>;
   getBlob(key: string): Promise<StoredBlob | undefined>;
   removeBlob(key: string): Promise<void>;
+  blobKeys(): Promise<string[]>;
 }
 
 export class MemoryStore implements Store {
@@ -68,6 +69,7 @@ export class MemoryStore implements Store {
   async putBlob(k: string, b: StoredBlob) { this.blobs.set(k, b); }
   async getBlob(k: string) { return this.blobs.get(k); }
   async removeBlob(k: string) { this.blobs.delete(k); }
+  async blobKeys() { return [...this.blobs.keys()]; }
 }
 
 class IdbStore implements Store {
@@ -76,12 +78,16 @@ class IdbStore implements Store {
   private open(): Promise<IDBDatabase> {
     if (this.db) return this.db;
     this.db = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB, 1);
+      const req = indexedDB.open(SITE_DB, 1);
       req.onupgradeneeded = () => {
         req.result.createObjectStore('ops', { keyPath: 'op_id' });
         req.result.createObjectStore('blobs');
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        // Step aside when another tab or the sign-out cleanup deletes or upgrades the database; reopened on next use.
+        req.result.onversionchange = () => { req.result.close(); this.db = null; };
+        resolve(req.result);
+      };
       req.onerror = () => { this.db = null; reject(req.error); };
     });
     return this.db;
@@ -100,6 +106,7 @@ class IdbStore implements Store {
   async putBlob(k: string, b: StoredBlob) { await this.tx('blobs', 'readwrite', (s) => s.put(b, k)); }
   getBlob(k: string) { return this.tx<StoredBlob | undefined>('blobs', 'readonly', (s) => s.get(k) as IDBRequest<StoredBlob | undefined>); }
   async removeBlob(k: string) { await this.tx('blobs', 'readwrite', (s) => s.delete(k)); }
+  async blobKeys() { return (await this.tx<IDBValidKey[]>('blobs', 'readonly', (s) => s.getAllKeys())).map(String); }
 }
 
 function openStore(): Store {
@@ -155,6 +162,30 @@ export class OfflineQueue extends EventTarget {
       await this.store.removeBlob(o.op_id);
     }
     this.changed();
+  }
+
+  /**
+   * Remove everything one user left on this device: operations in any state and their photos (B1-PE-02, at sign-out).
+   * Other users' operations and the unowned ones are left untouched.
+   */
+  async forget(userId: string): Promise<void> {
+    for (const o of (await this.store.all()).filter((x) => x.user_id === userId)) {
+      await this.store.remove(o.op_id);
+      await this.store.removeBlob(o.op_id);
+    }
+    for (const k of await this.store.blobKeys()) {
+      const b = await this.store.getBlob(k);
+      if (b && !(b instanceof Blob) && b.user_id === userId) await this.store.removeBlob(k);
+    }
+    this.changed();
+  }
+
+  /** Send the signed-in user's pending operations and interrupted uploads for every set (the sign-out "Sync now"). */
+  async flushAll(): Promise<void> {
+    for (const setId of new Set((await this.mine()).map((o) => o.set_id))) {
+      await this.flush(setId);
+      await this.resumeUploads(setId);
+    }
   }
 
   /** Queue one operation; a later write to the same space replaces an earlier one that has not been sent. */
@@ -232,6 +263,7 @@ export class OfflineQueue extends EventTarget {
             await this.upload(op, res);
           } else {
             await this.store.remove(op.op_id);
+            await this.store.removeBlob(op.op_id); // a photo the server already holds: drop its local copy too
           }
         } else {
           await this.store.put({ ...op, state: res.status as OpState, result: res as unknown as Record<string, unknown> });

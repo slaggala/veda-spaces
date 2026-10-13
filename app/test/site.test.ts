@@ -1,7 +1,12 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing';
+import '../src/design-system/components.js';
 import { emptyRoom, fromMeasurement, toPayload } from '../src/modules/site/capture-model.js';
 import type { SpaceMeasurement } from '../src/modules/site/api.js';
-import { MemoryStore, OfflineQueue, sendBytes } from '../src/modules/site/offline-queue.js';
+import { ApiClient } from '../src/core/api/client.js';
+import type { Me } from '../src/core/api/types.js';
+import { session, SessionController } from '../src/core/auth/session.js';
+import { MemoryStore, OfflineQueue, queue, sendBytes, SITE_DB } from '../src/modules/site/offline-queue.js';
+import { siteDatabaseExists, siteSignOutGuard } from '../src/modules/site/sign-out.js';
 import { fitWithin } from '../src/modules/site/photos.js';
 import { formatArea, formatLength, parseLength } from '../src/modules/site/units.js';
 import '../src/modules/site/index.js';
@@ -167,6 +172,123 @@ describe('offline queue bound to the signed-in user (B1-PE-01)', () => {
     window.fetch = async (input: RequestInfo | URL) => { calls.push(String(input)); return new Response('{}', { status: 200 }); };
     await q.resumeUploads('set4');
     expect(calls).to.deep.equal([], 'Erin\'s session never uploads Dave\'s photo');
+  });
+});
+
+describe('sign-out with site captures on the device (B1-PE-02)', () => {
+  const originalFetch = window.fetch;
+  const as = (id: string | null) => {
+    session.state = id ? { status: 'authenticated', me: { id } as Me } : { status: 'anonymous', me: null };
+  };
+  const dropDb = () => new Promise<void>((resolve) => {
+    const req = indexedDB.deleteDatabase(SITE_DB);
+    req.onsuccess = req.onerror = req.onblocked = () => resolve();
+  });
+  const listed = async () => (await indexedDB.databases()).some((d) => d.name === SITE_DB);
+  const dialog = () => document.querySelector('vs-site-sign-out-dialog');
+  const button = (name: RegExp) => [...dialog()!.shadowRoot!.querySelectorAll('button')].find((b) => name.test(b.textContent ?? ''))!;
+  async function seed() {
+    as('bob');
+    await queue.enqueue('setB', 'note', { body: 'his' });
+    as('alice');
+    await queue.enqueue('setA', 'note', { body: 'hers' });
+    await queue.queuePhoto('setA', { client_ref: 'ph-a' }, new Blob([new Uint8Array([1])]));
+  }
+  async function everyone(): Promise<string[]> {
+    const out: string[] = [];
+    for (const u of ['alice', 'bob']) { as(u); out.push(...(await queue.mine()).map(() => u)); }
+    return out;
+  }
+
+  beforeEach(async () => { await dropDb(); });
+  afterEach(async () => { window.fetch = originalFetch; as(null); dialog()?.remove(); await dropDb(); });
+
+  it('does nothing, asks nothing and creates nothing when the site module was never used', async () => {
+    expect(await listed()).to.equal(false);
+    expect(await siteSignOutGuard('alice')).to.equal(true);
+    expect(dialog()).to.equal(null);
+    expect(await listed()).to.equal(false, 'the check never creates the database');
+    const databases = indexedDB.databases;
+    Object.defineProperty(indexedDB, 'databases', { value: undefined, configurable: true });
+    try {
+      expect(await siteDatabaseExists()).to.equal(false, 'fallback probe for browsers without databases()');
+    } finally {
+      delete (indexedDB as unknown as Record<string, unknown>).databases;
+    }
+    expect(indexedDB.databases).to.equal(databases);
+    expect(await listed()).to.equal(false, 'the fallback probe aborts its upgrade, creating nothing');
+  });
+
+  it('signs out without asking when nothing is unsent, deleting only that user\'s site data', async () => {
+    as('bob');
+    await queue.enqueue('setB', 'note', { body: 'his' });
+    as('alice');
+    await queue.mine(); // the database exists, Alice has nothing queued
+    expect(await siteSignOutGuard('alice')).to.equal(true);
+    expect(dialog()).to.equal(null);
+    expect(await everyone()).to.deep.equal(['bob'], 'Bob\'s pending operation survives Alice\'s sign-out');
+  });
+
+  it('asks accessibly, and "Stay signed in" keeps everything', async () => {
+    await seed();
+    const answer = siteSignOutGuard('alice');
+    await waitUntil(() => dialog()?.shadowRoot?.querySelector('vs-dialog')?.open, 'confirmation shown');
+    expect(dialog()!.shadowRoot!.textContent).to.contain('2 changes');
+    await expect(dialog()).to.be.accessible();
+    button(/Stay signed in/).click();
+    expect(await answer).to.equal(false);
+    expect(await everyone()).to.deep.equal(['alice', 'alice', 'bob']);
+  });
+
+  it('"Discard and sign out" deletes that user\'s operations and photos only', async () => {
+    await seed();
+    const answer = siteSignOutGuard('alice');
+    await waitUntil(() => dialog()?.shadowRoot?.querySelector('vs-dialog')?.open, 'confirmation shown');
+    button(/Discard and sign out/).click();
+    expect(await answer).to.equal(true);
+    expect(await everyone()).to.deep.equal(['bob']);
+  });
+
+  it('"Sync now" sends, then signs out once nothing is left, or says what remains', async () => {
+    await seed();
+    let online = false;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!online) throw new TypeError('offline');
+      const u = String(input);
+      if (u.includes('/sync')) {
+        const ops = (JSON.parse(String(init?.body)) as { operations: Array<{ op_id: string; type: string }> }).operations;
+        return new Response(JSON.stringify({ data: { results: ops.map((o) => ({ op_id: o.op_id, status: 'APPLIED',
+          ...(o.type === 'attachment' ? { entity_id: 'att1', upload: { required: false } } : {}) })) } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ data: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    const answer = siteSignOutGuard('alice');
+    await waitUntil(() => dialog()?.shadowRoot?.querySelector('vs-dialog')?.open, 'confirmation shown');
+    button(/Sync now/).click();
+    await waitUntil(() => dialog()!.shadowRoot!.textContent!.includes('could still not be sent'), 'offline: still two left');
+    online = true;
+    button(/Sync now/).click();
+    expect(await answer).to.equal(true);
+    expect(await everyone()).to.deep.equal(['bob'], 'only Alice\'s operations were sent');
+  });
+
+  it('keeps the session when a guard says stay, and signs out when a guard fails', async () => {
+    const calls: string[] = [];
+    const client = new ApiClient('', (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({ data: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch);
+    const s = new SessionController(client);
+    s.state = { status: 'authenticated', me: { id: 'u1' } as Me };
+    s.addLogoutGuard(async () => false);
+    expect(await s.logout()).to.equal(false);
+    expect(calls).to.deep.equal([], 'no logout request');
+    expect(s.isAuthenticated).to.equal(true);
+    const t = new SessionController(client);
+    t.state = { status: 'authenticated', me: { id: 'u1' } as Me };
+    t.addLogoutGuard(async () => { throw new Error('IndexedDB unavailable'); });
+    expect(await t.logout()).to.equal(true);
+    expect(t.isAuthenticated).to.equal(false);
   });
 });
 

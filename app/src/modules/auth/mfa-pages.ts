@@ -158,7 +158,7 @@ export class VsRecoveryModePage extends LitElement {
       <vs-banner kind="warning">${t('recovery.banner')}</vs-banner>
       <div class="row">
         <a class="btn primary" href="/mfa/enroll?mode=recovery">Set up new authenticator →</a>
-        <button class="btn" @click=${async () => { await session.logout(); navigate('/login'); }}>Sign out</button>
+        <button class="btn" @click=${async () => { if (await session.logout()) navigate('/login'); }}>Sign out</button>
       </div>
     </div>`;
   }
