@@ -32,6 +32,7 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.estimator.routes import api as estimator_api
     from veda.modules.estimator.routes import public_api as estimator_public_api
     from veda.modules.mtq.routes import api as mtq_api
+    from veda.modules.mtq_commercial.routes_estimation import api as mtq_estimation_api
     from veda.platform.audit.routes import api as audit_api
     from veda.platform.auth.routes import api as auth_api
     from veda.platform.health import api as health_api
@@ -56,6 +57,7 @@ def _register_modules(app: Flask) -> None:
         catalog_api,
         attachments_api,
         mtq_api,
+        mtq_estimation_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
