@@ -351,11 +351,17 @@ def snapshot_sha256(s: Session, mset: MeasurementSet) -> str:
 def verify(s: Session, ctx, mset: MeasurementSet, prop: Property, acknowledgements: list) -> MeasurementSet:
     from veda.kernel.errors import ApiError
 
-    from . import scope
+    from . import scope, sets
 
-    if mset.status != "SUBMITTED":
-        raise ApiError(409, "INVALID_STATE", "Only a submitted revision can be verified.")
     scope.require_in_scope(s, ctx, prop.lead_id, "measurement.verify")
+    # MC-1: one transition at a time per property, decided on the state under the lock (not the state read before it).
+    sets.lock_property(s, prop.id)
+    s.refresh(mset)
+    if mset.status != "SUBMITTED":
+        raise ApiError(
+            409, "INVALID_STATE", "Only a submitted revision can be verified.", extra={"status": mset.status}
+        )
+    previous = authoritative_predecessor(s, mset)
     for sm in measurements(s, mset).values():
         derive_measurement(s, sm)
     s.flush()
@@ -369,16 +375,10 @@ def verify(s: Session, ctx, mset: MeasurementSet, prop: Property, acknowledgemen
         if a.code in acked:
             s.add(MeasurementNote(measurement_set_id=mset.id, space_id=None, note_type_code="RISK_ACK",
                                   body=f"{a.code}: {a.note}"))  # fmt: skip
-    previous = s.execute(
-        sa.select(MeasurementSet).where(
-            MeasurementSet.property_id == mset.property_id,
-            MeasurementSet.status == "VERIFIED",
-            MeasurementSet.id != mset.id,
-        )
-    ).scalar_one_or_none()
     if previous is not None:
         previous.status = "SUPERSEDED"
         s.flush()  # one VERIFIED per property (partial unique index): the old one steps aside first
+    mset.supersedes_set_id = previous.id if previous is not None else None  # decided now, not at draft creation
     s.flush()
     mset.summary = summary(s, mset)
     mset.snapshot_sha256 = snapshot_sha256(s, mset)
@@ -388,6 +388,47 @@ def verify(s: Session, ctx, mset: MeasurementSet, prop: Property, acknowledgemen
         sm.derived_floor_area_sqft_centi or 0 for sid, sm in measurements(s, mset).items() if sid in spaces
     )
     return mset
+
+
+def authoritative_predecessor(s: Session, mset: MeasurementSet) -> MeasurementSet | None:
+    """MC-1 precedence: FULL outranks LITE, and a higher revision outranks a lower one. Returns the verified revision
+    ``mset`` replaces, or refuses when ``mset`` would replace a revision that outranks it, or when another revision
+    awaiting verification outranks it (it must be decided first)."""
+    from veda.kernel.errors import ApiError
+
+    from .sets import LEVEL_RANK
+
+    others = (
+        s.execute(
+            sa.select(MeasurementSet).where(
+                MeasurementSet.property_id == mset.property_id,
+                MeasurementSet.id != mset.id,
+                MeasurementSet.status.in_(("VERIFIED", "SUBMITTED")),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    rank = LEVEL_RANK[mset.survey_level_code]
+    previous = next((o for o in others if o.status == "VERIFIED"), None)
+    if previous is not None:
+        if previous.revision_no > mset.revision_no:
+            raise ApiError(409, "REVISION_OUT_OF_ORDER",
+                           f"Revision {previous.revision_no} is already verified; an older revision never replaces it.",
+                           extra={"verified_set_id": previous.id})  # fmt: skip
+        if LEVEL_RANK[previous.survey_level_code] > rank:
+            raise ApiError(422, "LITE_AFTER_FULL", "A Lite survey never supersedes a verified Full survey.",
+                           extra={"verified_set_id": previous.id})  # fmt: skip
+    for o in others:
+        if o.status != "SUBMITTED":
+            continue
+        if LEVEL_RANK[o.survey_level_code] > rank or (
+            LEVEL_RANK[o.survey_level_code] == rank and o.revision_no > mset.revision_no
+        ):
+            raise ApiError(409, "HIGHER_REVISION_PENDING",
+                           f"Revision {o.revision_no} ({o.survey_level_code.lower()}) outranks this one and awaits "
+                           "verification; decide it first.", extra={"measurement_set_id": o.id})  # fmt: skip
+    return previous
 
 
 def summary(s: Session, mset: MeasurementSet) -> dict[str, Any]:

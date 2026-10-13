@@ -113,6 +113,29 @@ def _require_capture(s: Session, ctx, prop: Property) -> None:
     scope.require_in_scope(s, ctx, prop.lead_id, "measurement.capture")
 
 
+# --- revision order (MC-1) ---------------------------------------------------------------------------------------------
+LEVEL_RANK = {"LITE": 1, "FULL": 2}  # FULL outranks LITE (blueprint §6.2; never replaced by a Lite survey)
+
+
+def lock_property(s: Session, property_id: str) -> None:
+    """Serialise every revision transition of one property: PostgreSQL row lock on the property (SQLite write units
+    of work already hold the database write lock from BEGIN IMMEDIATE, where FOR UPDATE renders to nothing)."""
+    s.execute(sa.select(Property.id).where(Property.id == property_id).with_for_update()).first()
+
+
+def require_no_submitted(s: Session, property_id: str, exclude: str | None = None) -> None:
+    """A revision awaiting verification is decided first (verified, or returned for correction): a second open
+    candidate would make the authoritative revision ambiguous."""
+    q = sa.select(MeasurementSet).where(MeasurementSet.property_id == property_id, MeasurementSet.status == "SUBMITTED")
+    if exclude:
+        q = q.where(MeasurementSet.id != exclude)
+    pending = s.execute(q.order_by(MeasurementSet.revision_no).limit(1)).scalar_one_or_none()
+    if pending is not None:
+        raise ApiError(409, "SUBMITTED_REVISION_PENDING",
+                       f"Revision {pending.revision_no} is awaiting verification; verify it or return it for correction first.",
+                       extra={"measurement_set_id": pending.id})  # fmt: skip
+
+
 # --- create ------------------------------------------------------------------------------------------------------------
 def _latest(s: Session, property_id: str, *statuses: str) -> MeasurementSet | None:
     return s.execute(
@@ -124,6 +147,7 @@ def _latest(s: Session, property_id: str, *statuses: str) -> MeasurementSet | No
 
 
 def _new_set(s: Session, ctx, prop: Property, *, visit: MeasurementVisit | None, body, level: str) -> MeasurementSet:
+    lock_property(s, prop.id)
     draft = _latest(s, prop.id, "DRAFT")
     if draft is not None:
         raise ApiError(409, "DRAFT_EXISTS", "This property already has a draft revision; continue that one.",
@@ -131,6 +155,7 @@ def _new_set(s: Session, ctx, prop: Property, *, visit: MeasurementVisit | None,
     verified = _latest(s, prop.id, "VERIFIED")
     if verified is not None and verified.survey_level_code == "FULL" and level == "LITE":
         raise ApiError(422, "LITE_AFTER_FULL", "A Lite survey never supersedes a verified Full survey.")
+    require_no_submitted(s, prop.id)
     top = s.execute(
         sa.select(sa.func.max(MeasurementSet.revision_no))
         .where(MeasurementSet.property_id == prop.id)
@@ -456,6 +481,10 @@ def submit(s: Session, ctx, mset: MeasurementSet, prop: Property) -> Measurement
 
     require_draft(mset)
     _require_capture(s, ctx, prop)
+    lock_property(s, prop.id)
+    s.refresh(mset)
+    require_draft(mset)
+    require_no_submitted(s, prop.id, exclude=mset.id)
     if ctx.user.id != mset.captured_by and ctx.scope("measurement.capture") != "ALL":
         raise ApiError(403, "PERMISSION_DENIED", "The lead surveyor submits the set.")
     for sm in verification.measurements(s, mset).values():
@@ -476,6 +505,8 @@ def submit(s: Session, ctx, mset: MeasurementSet, prop: Property) -> Measurement
 def reject(s: Session, ctx, mset: MeasurementSet, prop: Property, reason: str) -> MeasurementSet:
     """SUBMITTED → REJECTED with the verifier's reason; the correction is a new DRAFT revision copied from it and
     handed back to the same lead surveyor (blueprint §6.2)."""
+    lock_property(s, prop.id)
+    s.refresh(mset)
     if mset.status != "SUBMITTED":
         raise ApiError(409, "INVALID_STATE", "Only a submitted revision can be returned for correction.")
     scope.require_in_scope(s, ctx, prop.lead_id, "measurement.verify")
