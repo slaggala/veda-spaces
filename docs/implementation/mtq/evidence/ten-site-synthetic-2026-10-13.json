@@ -1,0 +1,384 @@
+{
+  "coverage": {
+    "apartments_cover_2_3_4_bhk": true,
+    "at_least_one_5_bhk": true,
+    "complete": true,
+    "five_apartments": true,
+    "five_independent_houses": true,
+    "lite_and_full": true,
+    "missing": [],
+    "offline_retry": true,
+    "second_surveyor_conflict": true
+  },
+  "dataset_id": "SYN-TEN-SITE-2026-10",
+  "dataset_kind": "SYNTHETIC",
+  "evidence": "MTQ-B1-TEN-SITE-VALIDATION",
+  "gate_verdict": "PASS",
+  "label": "SYNTHETIC_VALIDATED",
+  "sites": [
+    {
+      "bedrooms": 2,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 82588,
+        "reference": 82567,
+        "tolerance": 826,
+        "verdict": "PASS"
+      },
+      "property_type_code": "APARTMENT",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S01",
+      "snapshot": "sha256:b378b7270f0c7f71f77469d7a2ff5cabaf14eb3526508724192945e406a4c390",
+      "spaces": {
+        "compared": 8,
+        "pass": 8
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 32,
+        "explained": 0,
+        "fail": 0,
+        "pass": 32
+      }
+    },
+    {
+      "bedrooms": 2,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 81903,
+        "reference": 81866,
+        "tolerance": 819,
+        "verdict": "PASS"
+      },
+      "property_type_code": "APARTMENT",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S02",
+      "snapshot": "sha256:910f2d3de8b4714c0c9f53e0752ddb8b593d97888d2a5c2fa9a06b51e862cd39",
+      "spaces": {
+        "compared": 8,
+        "pass": 8
+      },
+      "survey_level_code": "FULL",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 32,
+        "explained": 0,
+        "fail": 0,
+        "pass": 32
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": true,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 95475,
+        "reference": 95397,
+        "tolerance": 954,
+        "verdict": "PASS"
+      },
+      "property_type_code": "APARTMENT",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S03",
+      "snapshot": "sha256:0e7afe501e65fbdfea4b34c84a00fd09967fbc99afd791ceb1fe187cc308ca9f",
+      "spaces": {
+        "compared": 9,
+        "pass": 9
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 36,
+        "explained": 0,
+        "fail": 0,
+        "pass": 36
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [
+        {
+          "cause": "Plaster bulge at mid-wall; laser read at the bulge",
+          "measured": 5421,
+          "quantity": "W2",
+          "reference": 5380,
+          "space": "Living",
+          "tolerance": 25,
+          "verdict": "EXPLAINED"
+        }
+      ],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 95732,
+        "reference": 95732,
+        "tolerance": 958,
+        "verdict": "PASS"
+      },
+      "property_type_code": "APARTMENT",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S04",
+      "snapshot": "sha256:b92dabc97dabcc751bf070c3949271f406808ca194231ae860ce5201f4bee27f",
+      "spaces": {
+        "compared": 9,
+        "pass": 9
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 36,
+        "explained": 1,
+        "fail": 0,
+        "pass": 35
+      }
+    },
+    {
+      "bedrooms": 4,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": true
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 113324,
+        "reference": 113368,
+        "tolerance": 1134,
+        "verdict": "PASS"
+      },
+      "property_type_code": "APARTMENT",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S05",
+      "snapshot": "sha256:91ba93992a854aacccd13bec7fc254a5379cda4d1534d222c0ce84723a0d982e",
+      "spaces": {
+        "compared": 11,
+        "pass": 11
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 44,
+        "explained": 0,
+        "fail": 0,
+        "pass": 44
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 122869,
+        "reference": 122854,
+        "tolerance": 1229,
+        "verdict": "PASS"
+      },
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S06",
+      "snapshot": "sha256:3b9caf53a6e99cbdff379f53dfd7f6a96d336df03ac959177c144e256e4e294c",
+      "spaces": {
+        "compared": 14,
+        "pass": 14
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 56,
+        "explained": 0,
+        "fail": 0,
+        "pass": 56
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [
+        {
+          "cause": "Tape slipped off the skirting",
+          "measured": 3735,
+          "quantity": "W2",
+          "reference": 3600,
+          "space": "Dining",
+          "tolerance": 25,
+          "verdict": "FAIL"
+        }
+      ],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 121669,
+        "reference": 121657,
+        "tolerance": 1217,
+        "verdict": "PASS"
+      },
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": "Tape slipped off the skirting",
+      "set_status": "VERIFIED",
+      "site_id": "S07",
+      "snapshot": "sha256:9980ef0a4b621c8a6bcdee4c4d42964d77eec403c80a61874c96ac225e753eb5",
+      "spaces": {
+        "compared": 14,
+        "pass": 14
+      },
+      "survey_level_code": "LITE",
+      "verdict": "FAIL",
+      "walls": {
+        "compared": 56,
+        "explained": 0,
+        "fail": 1,
+        "pass": 55
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 123282,
+        "reference": 123244,
+        "tolerance": 1233,
+        "verdict": "PASS"
+      },
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S08",
+      "snapshot": "sha256:2473ab04e7caf3e4fe63c424f25d192d70f14adf94b5bfb67eb304e23c533ed9",
+      "spaces": {
+        "compared": 14,
+        "pass": 14
+      },
+      "survey_level_code": "FULL",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 56,
+        "explained": 0,
+        "fail": 0,
+        "pass": 56
+      }
+    },
+    {
+      "bedrooms": 3,
+      "events": {
+        "offline_retry": true,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 121431,
+        "reference": 121476,
+        "tolerance": 1215,
+        "verdict": "PASS"
+      },
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S09",
+      "snapshot": "sha256:88329dd73d876b2735d9fa1da2be48c632a5617a7ab4e53fc93ba5c105496c38",
+      "spaces": {
+        "compared": 14,
+        "pass": 14
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 56,
+        "explained": 0,
+        "fail": 0,
+        "pass": 56
+      }
+    },
+    {
+      "bedrooms": 5,
+      "events": {
+        "offline_retry": false,
+        "second_surveyor_conflict": false
+      },
+      "exceptions": [],
+      "method_code": "LASER",
+      "property_area": {
+        "measured": 151791,
+        "reference": 151773,
+        "tolerance": 1518,
+        "verdict": "PASS"
+      },
+      "property_type_code": "INDEPENDENT_HOUSE",
+      "reference_method": "SYNTHETIC_GENERATED",
+      "revision_no": 1,
+      "root_cause": null,
+      "set_status": "VERIFIED",
+      "site_id": "S10",
+      "snapshot": "sha256:58d8d055bc3b0f2b79991103ce75dec92c46ec30e91e0eaba7077a16d18d9224",
+      "spaces": {
+        "compared": 17,
+        "pass": 17
+      },
+      "survey_level_code": "LITE",
+      "verdict": "PASS",
+      "walls": {
+        "compared": 68,
+        "explained": 0,
+        "fail": 0,
+        "pass": 68
+      }
+    }
+  ],
+  "sites_evaluated": 10,
+  "sites_without_a_measured_set": [],
+  "template_version": "2026.10.1",
+  "tolerance_policy": "OI-MTQ-01 (MTQ-B1-blocker-closure.md section 2)"
+}

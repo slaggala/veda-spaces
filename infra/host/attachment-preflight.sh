@@ -6,8 +6,9 @@
 #
 # - VEDA_MTQ_SITE_ENABLED absent or "false": site measurement intentionally disabled (every route answers 404); the
 #   attachment settings are inert and not required, so a host may render before the attachment storage is applied.
-# - "true": every attachment setting must be planned, the backend must be the private bucket (s3) and the scanner
-#   clamd. The API refuses the same at start; this refuses before api.env is replaced.
+# - "true": every attachment setting must be planned, the backend must be the private bucket (s3), the scanner clamd
+#   and the enablement record digest bound (B1-T12). The API refuses the same at start; this refuses before api.env
+#   is replaced.
 # - anything else: refused (a flag is "true" or "false", never a guess).
 set -euo pipefail
 FILE="${1:?usage: attachment-preflight.sh <rendered env file>}"
@@ -45,4 +46,8 @@ if [[ "$(value VEDA_ATTACHMENT_SCANNER)" != clamd ]]; then
   echo "SITE MEASUREMENT WITHOUT A SCANNER: VEDA_ATTACHMENT_SCANNER must be clamd when site measurement is on (fail closed)" >&2
   exit 1
 fi
-echo "site measurement: ENABLED with the private attachment bucket and the clamd scanner"
+if [[ ! "$(value VEDA_MTQ_SITE_ENABLEMENT_SHA256)" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "ENABLEMENT RECORD NOT BOUND: site measurement is on without VEDA_MTQ_SITE_ENABLEMENT_SHA256 (the owner-approved record staging-core binds)" >&2
+  exit 1
+fi
+echo "site measurement: ENABLED with the private attachment bucket, the clamd scanner and a bound enablement record"

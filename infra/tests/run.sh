@@ -2132,7 +2132,8 @@ apf_env() {
   local f="$APF/env.$RANDOM$RANDOM" kv
   printf '%s\n' 'VEDA_MTQ_SITE_ENABLED="true"' 'VEDA_ATTACHMENT_BACKEND="s3"' 'VEDA_ATTACHMENT_BUCKET="veda-stg-attachments-111122223333"' \
     'VEDA_ATTACHMENT_KMS_KEY_ARN="arn:aws:kms:ap-south-1:111122223333:alias/veda-stg-data"' 'VEDA_ATTACHMENT_SCANNER="clamd"' \
-    'VEDA_ATTACHMENT_CLAMD_ADDRESS="clamd:3310"' 'VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS="300"' >"$f"
+    'VEDA_ATTACHMENT_CLAMD_ADDRESS="clamd:3310"' 'VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS="300"' \
+    "VEDA_MTQ_SITE_ENABLEMENT_SHA256=\"$(printf 'e%.0s' $(seq 64))\"" >"$f"
   for kv in "$@"; do
     grep -v "^${kv%%=*}=" "$f" >"$f.t" || true
     printf '%s="%s"\n' "${kv%%=*}" "${kv#*=}" >>"$f.t"
@@ -2147,7 +2148,8 @@ check "MTQ preflight: flag on without the attachment storage -> NOT APPLIED, nam
 check "MTQ preflight: flag on with the local backend is refused" fail "ATTACHMENT BACKEND UNSAFE" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_ATTACHMENT_BACKEND=local)"
 check "MTQ preflight: flag on without clamd is refused (fail closed)" fail "WITHOUT A SCANNER" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_ATTACHMENT_SCANNER=none)"
 check "MTQ preflight: a flag that is neither true nor false is refused" fail "SITE FLAG INVALID" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_MTQ_SITE_ENABLED=yes)"
-check "MTQ preflight: flag on, bucket and clamd -> enabled" ok "ENABLED with the private attachment bucket" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env)"
+check "MTQ preflight: flag on without a bound enablement record is refused" fail "ENABLEMENT RECORD NOT BOUND" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env VEDA_MTQ_SITE_ENABLEMENT_SHA256=none)"
+check "MTQ preflight: flag on, bucket, clamd and a bound record -> enabled" ok "ENABLED with the private attachment bucket" -- "$INFRA/host/attachment-preflight.sh" "$(apf_env)"
 absent "MTQ preflight never prints a setting's value" "veda-stg-attachments-111122223333|alias/veda-stg-data" "$("$INFRA/host/attachment-preflight.sh" "$(f="$(apf_env)"; grep -v TTL "$f" >"$f.y"; echo "$f.y")" 2>&1; "$INFRA/host/attachment-preflight.sh" "$(apf_env)" 2>&1 || true)"
 check "MTQ the guard refuses deleting the attachments bucket" fail "delete|destroy" -- guard "$(deladd 'module.storage.aws_s3_bucket.this["attachments"]' aws_s3_bucket '["delete"]')"
 check "MTQ the guard refuses removing an attachment SSM parameter" fail "delete|destroy" -- guard "$(deladd 'module.ssm.aws_ssm_parameter.config["VEDA_ATTACHMENT_BUCKET"]' aws_ssm_parameter '["delete"]')"

@@ -203,6 +203,8 @@ class Settings:
     attachment_scanner: str = "none"  # none | clamd; with none, uploads stay PENDING outside local and test
     attachment_clamd_address: str = "127.0.0.1:3310"
     attachment_upload_ttl_seconds: int = 300  # lifetime of a pre-signed upload
+    # B1-T12: the SHA-256 of the owner's APPROVED staging enablement record that staging-core bound the flag to.
+    mtq_site_enablement_sha256: str | None = None
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -351,6 +353,7 @@ def load_settings(**overrides) -> Settings:
         attachment_scanner=_str("VEDA_ATTACHMENT_SCANNER", "none"),
         attachment_clamd_address=_str("VEDA_ATTACHMENT_CLAMD_ADDRESS", "127.0.0.1:3310"),
         attachment_upload_ttl_seconds=_intd("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS", 300),
+        mtq_site_enablement_sha256=_env("VEDA_MTQ_SITE_ENABLEMENT_SHA256"),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -535,6 +538,9 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append(f"MTQ needs VEDA_ATTACHMENT_KMS_KEY_ARN (the data key) in {env}")
         if settings.attachment_scanner != "clamd":
             problems.append(f"MTQ needs VEDA_ATTACHMENT_SCANNER=clamd in {env}")
+        # B1-T12: on only with the owner's approved enablement record, bound by its digest (infra staging-core).
+        if not re.fullmatch(r"[0-9a-f]{64}", settings.mtq_site_enablement_sha256 or ""):
+            problems.append(f"MTQ needs VEDA_MTQ_SITE_ENABLEMENT_SHA256 (the approved enablement record) in {env}")
     if not 1 <= settings.estimate_retention_days <= 3650:
         problems.append("VEDA_ESTIMATE_RETENTION_DAYS must be between 1 and 3650")
     if settings.is_production:

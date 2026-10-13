@@ -68,3 +68,9 @@ variable "approval_record_path" {
   type        = string
   default     = ""
 }
+
+variable "mtq_enablement_record_path" {
+  description = "The MTQ B1 staging enablement record (tests only; empty means infra/config/mtq-site-enablement-record.json)."
+  type        = string
+  default     = ""
+}

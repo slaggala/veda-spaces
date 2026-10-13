@@ -1,0 +1,25 @@
+{
+  "record": "MTQ-B1-STAGING-ENABLEMENT",
+  "status": "APPROVED",
+  "environment": "staging",
+  "production": false,
+  "flag": "VEDA_MTQ_SITE_ENABLED",
+  "author": "MTQ B1 implementation session (pull request #87)",
+  "approved_by": "TEST FIXTURE APPROVER (not a person)",
+  "approved_on": "2026-10-20",
+  "scope": {
+    "staff_only": true,
+    "public_routes": false,
+    "sites": "The ten validation sites of docs/implementation/mtq/B1-T12-staging-enablement.md section 4 only",
+    "pricing": false
+  },
+  "evidence": {
+    "independent_review": "TEST FIXTURE: review record",
+    "ci_run_id": "100000001",
+    "infra_apply_run_id": "100000002",
+    "drift_run_id": "100000003",
+    "migration_verification_run_id": "100000004",
+    "rollback_verification_run_id": "100000005"
+  },
+  "rollback": "A reviewed change sets mtq_site.site_enabled false and mtq_site.enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the two parameters in place; the next 12-deploy renders them. Every site and attachment route then answers 404; data stays, unreadable through the API."
+}

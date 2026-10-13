@@ -128,4 +128,17 @@ Full record: [B1-T11-attachment-storage.md](B1-T11-attachment-storage.md). Statu
 | Scanning (closure §6.3) | The attachment scanner setting follows the media scanner mode on the host (clamd, same Compose service) | One scanner, already certified |
 | Flag default false | Planned `VEDA_MTQ_SITE_ENABLED=false`; staging-core refuses another value in this change; the host preflight refuses a flag-on render without the bucket and clamd | Enablement is B1-T12 and needs owner approval |
 
+## B1-T12 — protected-staging enablement and ten-site validation support
+
+Full record: [B1-T12-staging-enablement.md](B1-T12-staging-enablement.md). Status: prepared; the flag stays off.
+
+| Frozen text | Implementation | Reason |
+|---|---|---|
+| "VEDA_MTQ_SITE_ENABLED=false until explicit owner approval" (instruction) | staging-core plans the flag from `mtq_site` and refuses it on unless an APPROVED, staging-only, non-self-approved record with every evidence field is bound by its SHA-256; the host preflight and the API refuse a flag-on start without the bound digest | Three independent layers, as for the catalog V3 flags |
+| Decision record | `infra/config/mtq-site-enablement-record.json`, committed as a DRAFT template with `[OWNER TO FILL]` fields | The owner fills and approves it; never filled on the owner's behalf |
+| Ten-site validation (closure §2.1, §2.2) | `veda/modules/mtq/ten_site.py` evaluates any dataset with the recorded tolerance; `tools/mtq_ten_site.py` runs it on files for the live track; `tests/integration/test_mtq_ten_site.py` runs ten synthetic sites through the API | One evaluator for synthetic and live data |
+| Labels LIVE_VALIDATED / SYNTHETIC_VALIDATED / UNVALIDATED_NO_REFERENCE | As named, plus VALIDATION_FAILED for ten referenced sites that fail the gate or miss coverage | A failure is not "unvalidated" |
+| 5 BHK in replay or fixture validation | The synthetic S10 is a 5 BHK independent house; live 5 BHK only if a real one is available | No historical 5 BHK exists (replay manifest) |
+| Evidence privacy | Anonymous site ids (S01–S20 enforced), dimensions and verdicts only; digests `sha256:`-prefixed | No customer data or pricing in evidence |
+
 Pre-existing flaky test observed (not caused by this branch): `tests/unit/test_deploy_scanner.py::test_entrypoint_propagates_a_clean_clamd_exit` waits 5 s for a stub process and fails intermittently under load; it failed 3 of 6 runs on the main checkout as well.

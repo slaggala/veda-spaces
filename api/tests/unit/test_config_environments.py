@@ -298,17 +298,21 @@ def test_MTQ_site_flag_defaults_off_and_production_refuses_it(monkeypatch):
 def test_MTQ_staging_needs_the_private_bucket_key_and_scanner(monkeypatch):
     bare = deployed_env(monkeypatch, "staging", VEDA_MTQ_SITE_ENABLED="true")
     problems = " ".join(config.validate_environment(bare))
-    for fragment in ("VEDA_ATTACHMENT_BACKEND=s3", "VEDA_ATTACHMENT_KMS_KEY_ARN", "VEDA_ATTACHMENT_SCANNER=clamd"):
+    for fragment in ("VEDA_ATTACHMENT_BACKEND=s3", "VEDA_ATTACHMENT_KMS_KEY_ARN", "VEDA_ATTACHMENT_SCANNER=clamd",
+                     "VEDA_MTQ_SITE_ENABLEMENT_SHA256"):  # fmt: skip
         assert fragment in problems
-    ready = deployed_env(
-        monkeypatch,
-        "staging",
-        VEDA_MTQ_SITE_ENABLED="true",
-        VEDA_ATTACHMENT_BACKEND="s3",
-        VEDA_ATTACHMENT_BUCKET="veda-staging-attachments-123456789012",
-        VEDA_ATTACHMENT_KMS_KEY_ARN="arn:aws:kms:ap-south-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
-        VEDA_ATTACHMENT_SCANNER="clamd",
-    )
+    storage = {
+        "VEDA_MTQ_SITE_ENABLED": "true",
+        "VEDA_ATTACHMENT_BACKEND": "s3",
+        "VEDA_ATTACHMENT_BUCKET": "veda-staging-attachments-123456789012",
+        "VEDA_ATTACHMENT_KMS_KEY_ARN": "arn:aws:kms:ap-south-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        "VEDA_ATTACHMENT_SCANNER": "clamd",
+    }
+    unbound = config.validate_environment(deployed_env(monkeypatch, "staging", **storage))
+    assert unbound == ["MTQ needs VEDA_MTQ_SITE_ENABLEMENT_SHA256 (the approved enablement record) in staging"]
+    none = deployed_env(monkeypatch, "staging", **storage, VEDA_MTQ_SITE_ENABLEMENT_SHA256="none")
+    assert config.validate_environment(none) == unbound  # the inactive value staging-core plans while off
+    ready = deployed_env(monkeypatch, "staging", **storage, VEDA_MTQ_SITE_ENABLEMENT_SHA256="e" * 64)
     assert config.validate_environment(ready) == []
     for name, value, fragment in (
         ("VEDA_ATTACHMENT_BACKEND", "ftp", "VEDA_ATTACHMENT_BACKEND must be local or s3"),

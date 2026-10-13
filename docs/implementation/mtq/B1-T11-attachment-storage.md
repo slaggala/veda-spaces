@@ -41,7 +41,21 @@ Pull-request plans of `10-infra-plan` run in the `staging-plan` environment and 
 | runtime-iam: the host policy | 0 | 1 | 0 |
 | **Total** | **18** | **3** | **0** |
 
-Anything else in the plan is unexpected and blocks the apply. The real counts and the plan SHA-256 come from the plan run's summary.
+B1-T12 adds one more parameter, `VEDA_MTQ_SITE_ENABLEMENT_SHA256` (value `none`), so the merged pull request plans 19 to add. Anything else in the plan is unexpected and blocks the apply. The real counts and the plan SHA-256 come from the plan run's summary.
+
+### 3.1 Pull-request plans (review only)
+
+| Run | Head | Result | Plan digest |
+|---|---|---|---|
+| 38349670906 | B1-T11 | 19 to add, 4 to change, 0 to destroy; plan guard passed | `sha256:3338a3ae7eb13a209a803ae3b4739e90508bb3528d373e535f38bdd2541eee78` |
+| 38352456157 | B1-T12 | 20 to add, 4 to change, 0 to destroy; plan guard passed | `sha256:4081bcf057289e36bbcdb3e9af61620f3cbfc45a270bc7a56e1549f56f3c9138` |
+
+Against §3 (with B1-T12's parameter, 19 / 3 / 0) the B1-T12 plan has two more items:
+
+- **`module.monitoring.aws_cloudwatch_dashboard.staging` updated in place.** Caused by this change: the dashboard lists every alarm, so the two attachment alarms join it. The estimate in §3 missed it. Expected.
+- **`module.monitoring.aws_sns_topic_subscription.owner` created.** Not caused by this change: the subscription code is unchanged, and the plan of `main` on 2026-10-12 (run 38257133680) showed no changes. The owner's email subscription to `veda-stg-alarms` has gone from AWS since then. Applying recreates it and AWS sends a confirmation email the owner must accept. **Owner decision:** accept it in this apply, or restore it separately first.
+
+Nothing else differs. Pull-request plans are for review; the apply needs a `workflow_dispatch` plan on `main` and its own digest.
 
 ## 4. Cost
 

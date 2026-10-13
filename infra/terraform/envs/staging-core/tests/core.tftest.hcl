@@ -402,8 +402,8 @@ run "attachment_storage_planned_with_the_site_flag_off" {
   }
 
   assert {
-    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "false" && output.mtq_attachments.site_enabled == "false"
-    error_message = "the site measurement flag stays false: the settings are inert"
+    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "false" && output.mtq_attachments.site_enabled == "false" && local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == "none"
+    error_message = "the site measurement flag stays false and no enablement record is bound: the settings are inert"
   }
 
   assert {
@@ -412,8 +412,8 @@ run "attachment_storage_planned_with_the_site_flag_off" {
   }
 
   assert {
-    condition     = length(local.attachment_config) == 7
-    error_message = "seven attachment parameters"
+    condition     = length(local.attachment_config) == 8
+    error_message = "the flag, its record digest and six attachment parameters"
   }
 }
 
@@ -429,6 +429,87 @@ run "a_pre_signed_upload_longer_than_the_api_accepts_refused" {
   command = plan
   variables {
     platform_config_path = "tests/fixtures/platform-attachments-long-upload.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+# MTQ B1-T12: the site flag turns on only with an owner-APPROVED enablement record bound by its SHA-256.
+run "the_committed_enablement_record_is_a_draft_and_enables_nothing" {
+  command = plan
+
+  assert {
+    condition     = jsondecode(file("../../../config/mtq-site-enablement-record.json")).status == "DRAFT" && contains(local.mtq_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is the owner's template, not an approval"
+  }
+}
+
+run "an_approved_bound_record_turns_the_flag_on_in_staging" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_MTQ_SITE_ENABLED"] == "true" && local.app_config["VEDA_MTQ_SITE_ENABLEMENT_SHA256"] == filesha256("tests/fixtures/mtq-record-approved.json")
+    error_message = "the flag and the bound digest reach SSM together"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_ENV"] == "staging" && local.mtq_record_problems == []
+    error_message = "staging only, every gate met"
+  }
+}
+
+run "the_flag_with_the_committed_draft_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-mtq-on.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_with_unfilled_evidence_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-placeholder.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-placeholder-evidence.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_approved_by_its_author_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-self.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-self-approved.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_with_another_records_digest_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-placeholder-evidence.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "the_flag_without_the_clamd_scanner_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-on-no-scanner.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
+  }
+  expect_failures = [output.mtq_attachments]
+}
+
+run "a_bound_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-mtq-digest-without-flag.json"
+    mtq_enablement_record_path = "tests/fixtures/mtq-record-approved.json"
   }
   expect_failures = [output.mtq_attachments]
 }
