@@ -199,7 +199,8 @@ def public_view() -> dict[str, Any]:
     return {
         "ruleset_version": rs.ruleset_version,
         "ruleset_sha256": sha256(),
-        "status": rs.status,
+        "status": effective_status(),
+        "fixture_status": rs.status,
         "status_note": rs.status_note,
         "item_types": {
             k: {
@@ -214,3 +215,15 @@ def public_view() -> dict[str, Any]:
         },
         "rules": [r.model_dump(exclude_none=True) for r in rs.rules],
     }
+
+
+def effective_status() -> str:
+    """APPROVED only when the owner has recorded OI-MTQ-03 (rules) and OI-MTQ-04 (derivations) for exactly this ruleset
+    version and digest in the commercial policy; otherwise the fixture's own status (PROPOSED)."""
+    from . import policy
+
+    for code in ("OI-MTQ-03", "OI-MTQ-04"):
+        d = policy.decision(code)
+        if d is None or d.ruleset_version != RULESET_VERSION or d.ruleset_sha256 != sha256():
+            return load().status
+    return APPROVED_STATUS

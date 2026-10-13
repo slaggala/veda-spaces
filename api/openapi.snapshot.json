@@ -1065,13 +1065,46 @@
       "DecisionIn": {
         "additionalProperties": false,
         "properties": {
-          "reason": {
-            "title": "Reason",
+          "decision": {
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ],
+            "title": "Decision",
             "type": "string"
+          },
+          "method": {
+            "enum": [
+              "STAFF_RECORDED",
+              "SIGNED_COPY"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "selected_optional_line_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Selected Optional Line Ids",
+            "type": "array"
           }
         },
         "required": [
-          "reason"
+          "decision",
+          "method"
         ],
         "title": "DecisionIn",
         "type": "object"
@@ -4140,6 +4173,106 @@
         "title": "PublicLeadIn",
         "type": "object"
       },
+      "QuotationCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "title": "QuotationCreateIn",
+        "type": "object"
+      },
+      "QuotationPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "title": "QuotationPatchIn",
+        "type": "object"
+      },
+      "QuotationVersionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_estimate_id": {
+            "title": "Cost Estimate Id",
+            "type": "string"
+          },
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "cost_estimate_id"
+        ],
+        "title": "QuotationVersionIn",
+        "type": "object"
+      },
       "ReauthIn": {
         "additionalProperties": false,
         "properties": {
@@ -4418,6 +4551,20 @@
           "new_password"
         ],
         "title": "ResetIn",
+        "type": "object"
+      },
+      "ReturnIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReturnIn",
         "type": "object"
       },
       "RevokeIn": {
@@ -10652,6 +10799,58 @@
         "x-requirement": "CEST-001"
       }
     },
+    "/api/v1/cost-estimates/{estimate_id}/quotations": {
+      "post": {
+        "operationId": "mtq_quotation_create_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create quotation version 1 from an approved, current estimate (number from the QUOTATION sequence)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
     "/api/v1/cost-estimates/{estimate_id}/reproduce": {
       "get": {
         "operationId": "mtq_estimation_reproduce_estimate",
@@ -15317,6 +15516,48 @@
         "x-requirement": "MEAS-004"
       }
     },
+    "/api/v1/properties/{property_id}/quotations": {
+      "get": {
+        "operationId": "mtq_quotation_list_quotations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every quotation version and variation of a property",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
     "/api/v1/properties/{property_id}/requirements": {
       "get": {
         "operationId": "mtq_estimation_list_requirements",
@@ -16008,6 +16249,479 @@
         "x-permission-any-of": null,
         "x-rbac-exception": "RBX-005",
         "x-requirement": "LEAD-001"
+      }
+    },
+    "/api/v1/quotation-lines/{line_id}/trace": {
+      "get": {
+        "operationId": "mtq_quotation_trace_line",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A quotation line walked back: estimate line, BOQ line, scope item, requirement, measurement",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}": {
+      "get": {
+        "operationId": "mtq_quotation_get_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One quotation version: sections, lines, lineage, blockers, lifecycle events",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      },
+      "patch": {
+        "operationId": "mtq_quotation_patch_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a draft's title and customer cover note",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/approve": {
+      "post": {
+        "operationId": "mtq_quotation_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a version in review (four-eyes when discounted); issuance blockers stay visible",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-003"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/decision": {
+      "post": {
+        "operationId": "mtq_quotation_decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the customer's acceptance (with chosen optional items) or rejection",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.decision.record"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-005"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/issue": {
+      "post": {
+        "operationId": "mtq_quotation_issue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue an approved, customer-issuable version: freezes the document, sets validity, syncs the lead",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-004"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/return": {
+      "post": {
+        "operationId": "mtq_quotation_return_to_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a version in review (or approved, not issued) to draft, with a reason",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "quotation.create",
+          "quotation.approve"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/submit": {
+      "post": {
+        "operationId": "mtq_quotation_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit a draft for internal review",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/versions": {
+      "post": {
+        "operationId": "mtq_quotation_new_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create the next version from an approved estimate (never edits an issued version)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
       }
     },
     "/api/v1/requirements/{requirement_id}": {

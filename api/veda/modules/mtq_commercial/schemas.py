@@ -115,3 +115,31 @@ class AdjustmentIn(Closed):
 class AdjustmentDecisionIn(Closed):
     decision: Literal["APPROVE", "REJECT"]
     note: OptionalReason = None
+
+
+# --- B4 ----------------------------------------------------------------------------------------------------------------
+class QuotationCreateIn(Closed):
+    title: Annotated[str | None, optional_text(160)] = None
+    cover_note: Annotated[str | None, optional_text(4000)] = None
+
+
+class QuotationPatchIn(Closed):
+    title: Annotated[str | None, optional_text(160)] = None
+    cover_note: Annotated[str | None, optional_text(4000)] = None
+
+
+class QuotationVersionIn(Closed):
+    cost_estimate_id: Id
+    title: Annotated[str | None, optional_text(160)] = None
+    cover_note: Annotated[str | None, optional_text(4000)] = None
+
+
+class ReturnIn(Closed):
+    reason: Reason
+
+
+class DecisionIn(Closed):
+    decision: Literal["ACCEPTED", "REJECTED"]
+    method: Literal["STAFF_RECORDED", "SIGNED_COPY"]
+    selected_optional_line_ids: list[Id] = Field(default_factory=list, max_length=200)
+    note: Annotated[str | None, optional_text(1000)] = None

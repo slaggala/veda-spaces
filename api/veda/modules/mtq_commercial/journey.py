@@ -48,7 +48,7 @@ def view(s: Session, ctx, prop: Property) -> dict[str, Any]:
             {"id": m.id, "revision_no": m.revision_no, "status": m.status, "survey_level_code": m.survey_level_code}
             for m in sets
         ],  # fmt: skip
-        "ruleset": {"version": rules.RULESET_VERSION, "status": rules.load().status, "sha256": rules.sha256()},
+        "ruleset": {"version": rules.RULESET_VERSION, "status": rules.effective_status(), "sha256": rules.sha256()},
         "requirements": dict(Counter(r.status for r in reqs)),
         "scopes": [
             scopes.present(s, sc, full=False, state=lineage.scope_state(s, sc))

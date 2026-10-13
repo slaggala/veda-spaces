@@ -132,7 +132,7 @@ def seed(s: Session, ctx, prop: Property) -> dict[str, Any]:
                 "fact": c["fact"],
                 "ruleset_version": rules.RULESET_VERSION,
                 "ruleset_sha256": rules.sha256(),
-                "ruleset_status": rules.load().status,
+                "ruleset_status": rules.effective_status(),
                 "measurement_set_id": mset.id,
                 "measurement_revision_no": mset.revision_no,
                 "template_key": sp.space_template_key if sp else None,
@@ -148,7 +148,7 @@ def seed(s: Session, ctx, prop: Property) -> dict[str, Any]:
     s.flush()
     return {"created": len(created), "unchanged": skipped, "measurement_set_id": mset.id,
             "measurement_revision_no": mset.revision_no, "ruleset_version": rules.RULESET_VERSION,
-            "ruleset_status": rules.load().status}  # fmt: skip
+            "ruleset_status": rules.effective_status()}  # fmt: skip
 
 
 def _space_of(s: Session, prop: Property, space_id: str | None) -> PropertySpace | None:

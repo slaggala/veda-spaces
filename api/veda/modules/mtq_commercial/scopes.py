@@ -176,7 +176,7 @@ def create(s: Session, ctx, prop: Property, body) -> Scope:
         tier_code=body.tier_code,
         ruleset_version=rs.ruleset_version,
         ruleset_sha256=rules.sha256(),
-        ruleset_status=rs.status,
+        ruleset_status=rules.effective_status(),
         notes=body.notes,
     )
     s.add(scope)

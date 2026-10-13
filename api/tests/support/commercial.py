@@ -207,3 +207,27 @@ def synthetic_policy(app):
     from veda.modules.mtq_commercial import policy
 
     policy.install_for_tests(None)
+
+
+def install_full_policy(**decisions) -> dict:
+    """SYNTHETIC_POLICY plus OI-MTQ-03/04 recorded for the current ruleset (so scopes are APPROVED-ruleset)."""
+    from veda.modules.mtq_commercial import rules
+
+    approved = {"ruleset_version": rules.RULESET_VERSION, "ruleset_sha256": rules.sha256()}
+    return install_policy(OI_MTQ_03=approved, OI_MTQ_04=approved, **decisions)
+
+
+def approved_estimate(c: Commercial, key: str, *, optional: str = "ACCEPTED") -> tuple[dict, dict]:
+    """A synthetic site through scope, BOQ and an approved Essential estimate: (property, estimate)."""
+    prop, _, boq = c.reviewed_boq(key, optional=optional)
+    est = ok(c.as_(c.estimator).post(f"/api/v1/boqs/{boq['id']}/cost-estimates", {"tier_code": "ESSENTIAL"}), 201)
+    est = ok(c.as_(c.manager).post(f"/api/v1/cost-estimates/{est['id']}/approve", if_match=est["version"]))
+    return prop, est
+
+
+def step(c: Commercial, q: dict, action: str, user, body=None, code: int = 200):
+    api = c.as_(user)
+    cur = ok(api.get(f"/api/v1/quotations/{q['id']}"))
+    r = api.post(f"/api/v1/quotations/{q['id']}/{action}", body, if_match=cur["version"])
+    assert r.status == code, r
+    return r
