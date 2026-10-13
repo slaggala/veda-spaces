@@ -132,6 +132,35 @@ ok.push(await scan(page, 'command palette with results'));
 await page.keyboard.press('Enter');
 await page.waitForURL(/\/leads\/[0-9a-f]{32}$/);
 check('palette: Enter opens the active lead', true);
+// MTQ B1 site measurement pages at phone width (B1-PE-03). They exist only with VEDA_MTQ_SITE_ENABLED on, which this
+// stack keeps off (run-all.sh does not set it; workspace.e2e.mjs asserts the 404). Any answer but 404 means the routes
+// exist (the probe carries no bearer token, so an enabled stack answers 401): then the pages are scanned with whatever
+// data the stack holds; otherwise the step is skipped and says so.
+const mtqOn = await page.evaluate(async () => (await fetch('/api/v1/mtq/templates', { credentials: 'include' })).status !== 404);
+if (mtqOn) {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto(`${BASE}/site`);
+  await page.getByRole('heading', { name: 'Site measurement' }).waitFor();
+  await page.waitForTimeout(500);
+  ok.push(await scan(page, 'site measurement home (360 px)'));
+  const propertyLink = page.locator('a[href^="/site/properties/"]').first();
+  if (await propertyLink.count()) {
+    await propertyLink.click();
+    await page.getByRole('heading', { name: /Spaces/ }).waitFor();
+    await page.waitForTimeout(500);
+    ok.push(await scan(page, 'site property (360 px)'));
+    const review = page.getByRole('button', { name: 'Review', exact: true }).first();
+    if (await review.count()) {
+      await review.click();
+      await page.getByRole('heading', { name: /Review/ }).waitFor();
+      await page.waitForTimeout(500);
+      ok.push(await scan(page, 'site measurement review (360 px)'));
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+} else {
+  console.log('SKIP site measurement pages: VEDA_MTQ_SITE_ENABLED is off on this stack (unit tests cover them at 360 px)');
+}
 // The marketing site fades sections in on scroll; reduced motion renders everything at full opacity (AX-10).
 // bypassCSP lets the axe script run; the production CSP itself is exercised by site.e2e.mjs.
 const siteCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });

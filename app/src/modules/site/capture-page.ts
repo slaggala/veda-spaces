@@ -10,6 +10,7 @@ import {
 } from './capture-model.js';
 import { queue, type QueuedOp } from './offline-queue.js';
 import { preparePhoto } from './photos.js';
+import { siteTargets } from './styles.js';
 import { formatArea, formatLength, parseLength, type UnitSystem } from './units.js';
 
 const WALL_TAGS = ['WARDROBE', 'LOFT', 'BED_HEAD', 'TV_UNIT', 'STUDY_UNIT', 'CROCKERY_UNIT', 'KITCHEN_RUN', 'KITCHEN_WALL_RUN', 'TALL_UNIT',
@@ -33,7 +34,7 @@ export class VsCapturePage extends SessionElement {
     location: { attribute: false }, set: { state: true }, property: { state: true }, templates: { state: true },
     checks: { state: true }, roomId: { state: true }, draft: { state: true }, unit: { state: true }, ops: { state: true },
     problem: { state: true }, errors: { state: true }, busy: { state: true }, disabled: { state: true }, note: { state: true },
-    online: { state: true },
+    online: { state: true }, unowned: { state: true },
   };
   declare location: { params: Record<string, string> } | undefined;
   declare set: MeasurementSet | null;
@@ -50,8 +51,10 @@ export class VsCapturePage extends SessionElement {
   declare disabled: boolean;
   declare note: { type: string; body: string };
   declare online: boolean;
+  /** Operations on this device that predate ownership (B1-PE-01): counted, never shown or sent. */
+  declare unowned: number;
 
-  static override styles = [...shared, pageStyles, css`
+  static override styles = [...shared, pageStyles, siteTargets, css`
     :host { display: block; }
     .layout { display: grid; gap: 16px; grid-template-columns: 260px 1fr; align-items: start; }
     @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
@@ -65,18 +68,20 @@ export class VsCapturePage extends SessionElement {
     .req::after { content: ' · required'; color: var(--vs-danger); font-weight: 600; }
     .opt::after { content: ' · optional'; color: var(--vs-ink-muted); }
     .tags { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-    .tags label { display: flex; gap: 6px; align-items: center; font-size: 13px; min-height: 32px; }
+    .tags label { display: flex; gap: 6px; align-items: center; font-size: 13px; min-height: var(--vs-target); }
     .bar { position: sticky; top: 0; z-index: 2; background: var(--vs-surface); padding: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .conflict { border-left: 3px solid var(--vs-danger); padding-left: 8px; }
     ul.plain { padding-left: 18px; margin: 4px 0; }
     input.len { font-family: var(--vs-font-mono); }
+    /* Photo buttons are labels around a visually hidden file input: the ring shows on the label the input sits in. */
+    label.btn:focus-within { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
   `];
 
   constructor() {
     super();
     this.set = null; this.property = null; this.templates = null; this.checks = null; this.roomId = null; this.draft = null;
     this.unit = 'FT_IN'; this.ops = []; this.problem = null; this.errors = []; this.busy = false; this.disabled = false;
-    this.note = { type: 'OBSERVATION', body: '' }; this.online = queue.online;
+    this.note = { type: 'OBSERVATION', body: '' }; this.online = queue.online; this.unowned = 0;
   }
 
   private readonly onQueue = () => { void this.refreshQueue(); };
@@ -118,7 +123,13 @@ export class VsCapturePage extends SessionElement {
 
   private async refreshQueue() {
     this.ops = await queue.pending(this.setId);
+    this.unowned = (await queue.unowned()).length;
     this.online = queue.online;
+  }
+
+  private async discardUnowned() {
+    if (!confirm(`Discard ${this.unowned} unsent change${this.unowned === 1 ? '' : 's'} of unknown origin from this device? They cannot be recovered.`)) return;
+    await queue.discardUnowned();
   }
 
   private get spaces(): Space[] { return (this.property?.spaces ?? []).filter((s) => s.is_in_scope); }
@@ -394,6 +405,10 @@ export class VsCapturePage extends SessionElement {
         <label class="small">Units <select @change=${(e: Event) => { this.unit = (e.target as HTMLSelectElement).value as UnitSystem; if (this.roomId) this.openRoom(this.roomId); }}>
           <option value="FT_IN" ?selected=${this.unit === 'FT_IN'}>ft-in</option><option value="MM" ?selected=${this.unit === 'MM'}>mm</option></select></label>
       </div>
+      ${this.unowned ? html`<div class="card conflict stack">
+        <div class="small">${this.unowned} unsent change${this.unowned === 1 ? '' : 's'} on this device ${this.unowned === 1 ? 'was' : 'were'} saved before
+          captures recorded who made them. ${this.unowned === 1 ? 'It' : 'They'} will not be sent under your name.</div>
+        <div class="row"><button class="btn small ghost" @click=${() => this.discardUnowned()}>Discard</button></div></div>` : nothing}
       ${open.map((o) => html`<div class="card conflict stack" role="alert">
         <div class="strong">${o.label}: ${o.state === 'CONFLICT' ? 'changed on the server meanwhile' : o.state === 'CLAIMED' ? 'another surveyor holds this room'
           : o.state === 'FROZEN' ? 'this revision is no longer a draft' : 'refused'}</div>

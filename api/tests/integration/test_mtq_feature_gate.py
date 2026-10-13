@@ -11,14 +11,13 @@ import pytest
 
 from veda.config import validate_environment
 
-# SURVEYOR and DESIGNER do not hold profile.read on their own (a pre-enablement finding recorded in the PR): the staff
-# accounts below hold SALES as well, so /auth/me loads; the route gate is also checked for the bare roles.
+# The site roles load /auth/me on their own since 0204_mtq_self_service (B1-PE-08): no SALES workaround.
 ROLES = [
     ((), True),
     (("ADMIN",), False),
     (("SALES",), False),
-    (("SURVEYOR", "SALES"), False),
-    (("DESIGNER", "SALES"), False),
+    (("SURVEYOR",), False),
+    (("DESIGNER",), False),
 ]
 GATED = [
     "/api/v1/properties",
@@ -76,9 +75,66 @@ def test_flag_off_leaves_v1_routes_untouched(api, factory):
     assert api.call("PATCH", "/api/v1/leads", {}).status == 405  # V1 keeps its own method answers
 
 
+# B1-PE-09: every spelling Werkzeug would route to a gated rule (merged slashes answer 308, other methods 405).
+X = GATED[1].rsplit("/", 1)[1]  # the id the GATED paths use
+VARIANTS = [
+    "/api/v1//properties",
+    "/api/v1///properties",
+    "/api//v1/properties",
+    "/api/v1/properties//",
+    "/api/v1/%2Fproperties",
+    "/api/v1/%2fproperties",
+    "/api/v1/./properties",
+    "/api/v1/x/../properties",
+    f"/api/v1//properties/{X}/spaces",
+    f"/api/v1//spaces/{X}",
+    "/api/v1//measurement-visits",
+    f"/api/v1//measurement-sets/{X}/sync",
+    f"/api/v1/measurement-sets//{X}//sync",
+    "/api/v1///mtq/templates",
+    "/api/v1//attachments",
+    f"/api/v1//attachments/{X}/complete",
+]
+RAW_PATHS = ["//api/v1/properties", f"//api/v1//measurement-sets/{X}/sync"]  # the test client reads // as a host
+
+
+def _raw(api, method, path, token=None):
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return api.client.open("/", method=method, headers=headers, environ_overrides={"PATH_INFO": path})
+
+
+@pytest.mark.parametrize("anonymous", [False, True], ids=["authenticated", "anonymous"])
+def test_flag_off_double_slash_and_encoded_variants_are_404(api, factory, anonymous):
+    token = None if anonymous else factory.login(api, factory.user(founder=True))
+    for path in VARIANTS:
+        for method in METHODS:
+            r = api.call(method, path, {} if method in ("POST", "PUT", "PATCH") else None, anonymous=anonymous)
+            assert r.status == 404 and r.json["code"] == "NOT_FOUND", (method, path, r.status)
+            assert "Location" not in r.headers, (method, path)
+    for path in RAW_PATHS:
+        for method in METHODS:
+            r = _raw(api, method, path, token)
+            assert r.status_code == 404 and "Location" not in r.headers, (method, path, r.status_code)
+
+
+def test_flag_off_v1_double_slash_behaviour_is_unchanged(api, factory):
+    factory.login(api, factory.user(founder=True))
+    r = api.get("/api/v1//leads")
+    assert r.status == 308 and r.headers["Location"].endswith("/api/v1/leads")  # Werkzeug merge_slashes, as before
+    assert api.call("PUT", "/api/v1//leads", {}).status == 405
+    assert api.get("/api/v1//nothing").status == 404
+
+
+@pytest.mark.settings(mtq_site_enabled=True)
+def test_flag_on_double_slash_routes_as_werkzeug_does(api, factory):
+    factory.login(api, factory.user("SURVEYOR"))
+    r = api.get("/api/v1//mtq/templates")
+    assert r.status == 308 and r.headers["Location"].endswith("/api/v1/mtq/templates")
+
+
 @pytest.mark.settings(mtq_site_enabled=True)
 def test_flag_on_reports_the_feature_and_opens_the_routes(api, factory):
-    factory.login(api, factory.user("SURVEYOR", "SALES"))
+    factory.login(api, factory.user("SURVEYOR"))
     assert api.get("/api/v1/auth/me").data["features"] == {"mtq_site": True}
     assert api.get("/api/v1/mtq/templates").status == 200
     assert api.call("PATCH", "/api/v1/mtq/templates", {}).status == 405  # with the flag on, normal routing applies

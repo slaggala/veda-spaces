@@ -7,6 +7,12 @@ import { setUserTimeZone } from '../format/format.js';
 type Message = { type: 'login' } | { type: 'logout' } | { type: 'me-changed' };
 
 /**
+ * Asked before an explicit sign-out with the signed-in user's id; answering false keeps the session (the user chose to
+ * stay, e.g. with site captures not yet sent). A guard that throws never blocks sign-out.
+ */
+export type LogoutGuard = (userId: string) => Promise<boolean>;
+
+/**
  * Session controller (02 §2.2 core/auth): silent refresh on boot, memory-only access token, /auth/me as
  * the source of profile + effective permissions, BroadcastChannel sync so login/logout in one tab is
  * reflected in every tab.
@@ -22,6 +28,7 @@ export class SessionController extends EventTarget {
   private channel: BroadcastChannel | null = null;
   private readyPromise: Promise<void> | null = null;
   private readonly client: ApiClient;
+  private readonly logoutGuards: LogoutGuard[] = [];
 
   constructor(client: ApiClient = api) {
     super();
@@ -123,7 +130,24 @@ export class SessionController extends EventTarget {
     this.broadcast({ type: 'login' });
   }
 
-  async logout(all = false): Promise<void> {
+  addLogoutGuard(guard: LogoutGuard): void {
+    if (!this.logoutGuards.includes(guard)) this.logoutGuards.push(guard);
+  }
+
+  /** Explicit sign-out. Resolves false, with the session untouched, when a logout guard kept it. */
+  async logout(all = false): Promise<boolean> {
+    const userId = this.state.me?.id;
+    if (userId) {
+      for (const guard of this.logoutGuards) {
+        let proceed = true;
+        try {
+          proceed = await guard(userId);
+        } catch {
+          /* local cleanup failed (e.g. storage refused): sign-out still proceeds */
+        }
+        if (!proceed) return false;
+      }
+    }
     try {
       await this.client.post(all ? '/api/v1/auth/logout-all' : '/api/v1/auth/logout');
     } catch {
@@ -131,6 +155,7 @@ export class SessionController extends EventTarget {
     }
     this.clearLocal();
     this.broadcast({ type: 'logout' });
+    return true;
   }
 
   clearLocal(): void {

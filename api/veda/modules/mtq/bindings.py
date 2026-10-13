@@ -63,6 +63,16 @@ def _set_context(s: Session, mset_id: str, **extra) -> registry.EntityContext | 
     )
 
 
+def lock_set(s: Session, mset_id: str) -> None:
+    """ATT container lock: the property lock submit takes, then the set re-read (B1-PE-06)."""
+    from . import sets
+
+    mset = s.get(MeasurementSet, mset_id)
+    if mset is not None:
+        sets.lock_property(s, mset.property_id)
+        s.refresh(mset)
+
+
 def _measurement_set(s: Session, entity_id: str) -> registry.EntityContext | None:
     return _set_context(s, entity_id)
 
@@ -131,4 +141,4 @@ def set_usage(s: Session, mset_id: str) -> tuple[int, int]:
 
 for _type, _resolve in (("measurement_set", _measurement_set), ("space_wall", _wall), ("space_opening", _opening),
                         ("measurement_note", _note)):  # fmt: skip
-    registry.bind(registry.EntityBinding(_type, _resolve, container_usage=set_usage))
+    registry.bind(registry.EntityBinding(_type, _resolve, container_usage=set_usage, container_lock=lock_set))

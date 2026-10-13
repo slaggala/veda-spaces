@@ -177,10 +177,15 @@ def test_vocabulary_checks_refuse_values_outside_b1(app, table, column, bad):
 
 
 def test_no_existing_table_is_altered():
-    """0106 and 0200 create tables only: no ALTER of an existing table, no data change outside seeds."""
+    """0106 and 0200 create tables only, 0204 grants rows only: no ALTER of an existing table, no data change outside
+    seeds."""
     from tests.conftest import ROOT
 
-    for path in ("migrations/versions/0106_attachment.py", ROOT_MIGRATION):
+    for path in (
+        "migrations/versions/0106_attachment.py",
+        ROOT_MIGRATION,
+        "migrations/versions/0204_mtq_self_service.py",
+    ):
         text = (ROOT / path).read_text()
         for forbidden in ("op.alter_column", "op.add_column", "op.drop_", "batch_alter_table", "op.execute("):
             assert forbidden not in text, (path, forbidden)

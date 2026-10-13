@@ -43,10 +43,13 @@ ALLOWED = {
     "FOUNDER": {c for _, _, c in ENDPOINTS},
     "ADMIN": {c for _, _, c in ENDPOINTS},
     "SALES": {"lead.read", "lookup.read", "notification.read", "session.read"},
+    # B1-PE-08: the MTQ site roles load the shell (lookups, own notifications) and nothing else here.
+    "DESIGNER": {"lookup.read", "notification.read"},
+    "SURVEYOR": {"lookup.read", "notification.read"},
 }
 
 
-@pytest.mark.parametrize("role", ["FOUNDER", "ADMIN", "SALES"])
+@pytest.mark.parametrize("role", ["FOUNDER", "ADMIN", "SALES", "DESIGNER", "SURVEYOR"])
 def test_RBAC_008_role_matrix_over_endpoints(api, factory, role):
     user = factory.user(role)
     factory.login(api, user)

@@ -170,3 +170,37 @@ Carried from the review, unchanged by these commits:
 Found while fixing MC-3:
 
 - The SURVEYOR and DESIGNER roles do not hold `profile.read`, so a user with only those roles cannot load `/auth/me` or the workspace. Staff accounts need SALES as well until the role matrix is reviewed.
+
+### Pre-enablement closure (B1-PE-01 … B1-PE-09, 2026-10-13)
+
+Branch `fix/mtq-b1-pre-enablement`, one commit per item. Every item was classified **must fix before enablement**, because each one either loses or misattributes field data, blocks a surveyor-only user, or makes the live gate unreliable. None was deferred.
+
+| Item | Finding | Fix |
+|---|---|---|
+| PE-01 | Offline queue not tied to a user | Every queued op and photo records its user; only the signed-in user's ops are sent; ops from before the change are never sent and can only be discarded |
+| PE-02 | Queue survived sign-out | Sign-out asks to sync or discard unsent ops, then deletes that user's data from the device; other users' ops are untouched |
+| PE-03 | Axe coverage on capture only | Axe on home, property and review at 360 px; empty table headers fixed; visible focus on photo buttons; e2e axe block runs when a stack has the flag on |
+| PE-04 | Touch targets 32–36 px | Every site control ≥ 44 × 44 px, measured by a test; design-system tokens unchanged |
+| PE-05 | Missing upload read as 403 | Host may list the attachments bucket (no prefix condition), so a missing key is 404 and completion answers 409 `UPLOAD_NOT_RECEIVED`; to be confirmed in the smoke check |
+| PE-06 | Submit race on PostgreSQL | Every write into a set's content, and attachment create/withdraw on set entities, takes the property lock submit takes and re-checks DRAFT; forced-interleaving tests on both engines |
+| PE-07 | Ten-site evaluator defects | Exactly ten sites; duplicate and missing sites refused; VERIFIED required; profile cross-check; openings and staircase compared; house-levels mix; 5 BHK informational; surveyor minutes; evidence provenance |
+| PE-08 | SURVEYOR/DESIGNER lacked `profile.read` | `0204_mtq_self_service` grants `profile.read`, `lookup.read` and `notification.read` (own) only; number taken under closure §4's corrective-migration rule (decision log entry 28) |
+| PE-09 | `//` spellings bypassed the 404 gate | The gate matches the normalised path and every route Werkzeug would reach (redirects and other methods), so 308/405 never reveal a gated route |
+
+Infrastructure sequencing (owner decision, 2026-10-13): the merged-main plan 38365213642 (20 / 4 / 0) is applied first with MTQ off. PE-05 then follows as a separate plan that changes only `module.runtime_iam.aws_iam_policy.runtime` in place (0 / 1 / 0).
+
+
+### PR #88 review remediation (2026-10-13)
+
+The independent review of 129b4a5 returned PR88 NOT CERTIFIED on two findings; everything else passed and is unchanged.
+
+| Finding | Root cause | Correction | Tests |
+|---|---|---|---|
+| R1 Property-plan writes unlocked after submit | The plan routes (add space, edit space including `is_in_scope`, archive space, reorder, seed from template) predate MC-1 and PE-06: they took no property lock and never looked at the revisions. Verification and the derived counts read the live plan, so while a revision was SUBMITTED a space could be added, archived or taken out of scope and the submitted basis moved under the verifier | `properties.lock_plan` takes the canonical `sets.lock_property` (through `sets.lock_for_write`), re-reads the property and the space under it, and `require_plan_open` refuses with 409 `PROPERTY_PLAN_FROZEN` (and the pending `measurement_set_id`) while any revision of the property is SUBMITTED. The service functions call `require_plan_open` as well, so seeding inside property creation and any later caller are covered. A DRAFT's plan stays editable; returning the revision for correction reopens it; a VERIFIED revision's snapshot is sealed, so later plan edits shape the next revision only | `tests/integration/test_mtq_plan_freeze.py`: A–F each mutation refused while SUBMITTED with the plan and derived counts unchanged; C the measured kitchen stays in verification; G every mutation succeeds on a draft and after reject; H a plan writer paused before its lock while submit commits (PostgreSQL: refused; SQLite: serialised first, submit sees it) and a free race of writers and submit; no plan row is ever changed after `submitted_on`; no 500 |
+| R2 If-Match compared before the lock | The routes compared If-Match with the version loaded before the lock; the services then locked and refreshed the row. On PostgreSQL a request that read version n while another committed n+1 passed its check, and the refresh made its flush match n+1: a lost update (two PATCHes of one set with the same If-Match both answered 200). SQLite write units of work start under BEGIN IMMEDIATE, so it was never exposed there. Pre-existing on main (the PR #87 merge) | Every If-Match path in the MTQ routes now runs lock → re-read under the lock → If-Match → mutate: PATCH and DELETE of a space, PATCH of a property, PATCH of a set, note delete (the note is loaded including deleted ones, so a stale request is 409 rather than 404), submit, verify and reject. `sets.lock_for_write` is the one helper; services keep their own re-lock (a no-op) | `tests/integration/test_mtq_if_match_lock.py`: two requests with the same If-Match, B paused just before the lock while A commits, for PATCH set, submit, note delete, verify, reject and PATCH space: exactly one succeeds, the other gets 409 `VERSION_CONFLICT` with `current_version`, the final row shows exactly one accepted mutation; plus a free four-way race for PATCH and submit |
+
+Audit of the remaining If-Match paths: visit PATCH and visit status, attachment withdraw and the V1 routes never refresh the row before writing, so a stale request fails at flush on the row version (409 `VERSION_CONFLICT`); none of them can lose an update. They are unchanged.
+
+Every new test was run against the code before the fix: 30 of the 51 new cases failed there (the rest are the draft-permitted cases and SQLite cases BEGIN IMMEDIATE already serialised) (PostgreSQL PATCH: both requests 200, the second request's value silently replaced the first), and all pass after it on SQLite and PostgreSQL.
+
+The synthetic ten-site evidence was regenerated from the remediation commit on a clean checkout (generator commit without `-dirty`); it remains SYNTHETIC_VALIDATED and is never a live result. The live document remains UNVALIDATED_NO_REFERENCE.

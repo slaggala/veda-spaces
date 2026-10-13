@@ -1,28 +1,36 @@
 {
   "dataset_id": "SYN-TEN-SITE-2026-10",
   "dataset_kind": "SYNTHETIC",
-  "note": "SYNTHETIC. No real site, customer, address or measurement. Reference dimensions are generated deterministically from each site id and space label (tests/support/ten_site.py); the 'app' measurements are the reference plus a deterministic error of at most 5 mm, except the deviations listed per site. It proves the capture pipeline and the validation rules end to end; it says nothing about field accuracy.",
+  "note": "SYNTHETIC. No real site, customer, address or measurement. Reference dimensions are generated deterministically from each site id and space label (tests/support/ten_site.py); the 'app' measurements are the reference plus a deterministic error of at most 5 mm, except the deviations listed per site. It proves the capture pipeline and the validation rules end to end; it says nothing about field accuracy. Every enclosed space carries a door on W1 and every bedroom a window with its sill on W3; the staircase carries its flight geometry. Bedrooms and levels are stated here and cross-checked against what the app derives. Surveyor minutes are SYNTHETIC values, not observations (S06 deliberately has none, to show absence is reported).",
   "sites": [
     {
       "site_id": "S01",
       "template_key": "APARTMENT_2BHK",
-      "survey_level_code": "LITE"
+      "bedrooms": 2,
+      "survey_level_code": "LITE",
+      "survey_minutes": 135
     },
     {
       "site_id": "S02",
       "template_key": "APARTMENT_2BHK",
-      "survey_level_code": "FULL"
+      "bedrooms": 2,
+      "survey_level_code": "FULL",
+      "survey_minutes": 160
     },
     {
       "site_id": "S03",
       "template_key": "APARTMENT_3BHK",
+      "bedrooms": 3,
       "survey_level_code": "LITE",
+      "survey_minutes": 190,
       "offline_retry": true
     },
     {
       "site_id": "S04",
       "template_key": "APARTMENT_3BHK",
+      "bedrooms": 3,
       "survey_level_code": "LITE",
+      "survey_minutes": 175,
       "deviations": [
         {
           "space": "Living",
@@ -35,18 +43,25 @@
     {
       "site_id": "S05",
       "template_key": "APARTMENT_4BHK",
+      "bedrooms": 4,
       "survey_level_code": "LITE",
+      "survey_minutes": 250,
       "conflict_space": "Master bedroom"
     },
     {
       "site_id": "S06",
       "template_key": "INDEPENDENT_HOUSE",
+      "bedrooms": 3,
+      "levels": 2,
       "survey_level_code": "LITE"
     },
     {
       "site_id": "S07",
       "template_key": "INDEPENDENT_HOUSE",
+      "bedrooms": 3,
+      "levels": 2,
       "survey_level_code": "LITE",
+      "survey_minutes": 480,
       "deviations": [
         {
           "space": "Dining",
@@ -60,18 +75,27 @@
     {
       "site_id": "S08",
       "template_key": "INDEPENDENT_HOUSE",
-      "survey_level_code": "FULL"
+      "bedrooms": 3,
+      "levels": 2,
+      "survey_level_code": "FULL",
+      "survey_minutes": 620
     },
     {
       "site_id": "S09",
       "template_key": "INDEPENDENT_HOUSE",
+      "bedrooms": 3,
+      "levels": 2,
       "survey_level_code": "LITE",
+      "survey_minutes": 455,
       "offline_retry": true
     },
     {
       "site_id": "S10",
       "template_key": "INDEPENDENT_HOUSE",
+      "bedrooms": 5,
+      "levels": 2,
       "survey_level_code": "LITE",
+      "survey_minutes": 570,
       "extra_spaces": [
         {
           "space_type_code": "BEDROOM",

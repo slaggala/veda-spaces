@@ -5,6 +5,7 @@ import { formatFull } from '../../core/format/format.js';
 import { navigate } from '../../core/router/next.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import { site, type MeasurementSet, type Property, type Space, type Visit } from './api.js';
+import { siteTargets } from './styles.js';
 import { formatArea } from './units.js';
 
 const SPACE_TYPES = ['LIVING', 'DINING', 'LIVING_DINING', 'FAMILY_LOUNGE', 'FOYER', 'PASSAGE', 'STAIRCASE', 'POOJA', 'MASTER_BEDROOM', 'BEDROOM',
@@ -31,7 +32,7 @@ export class VsPropertyPage extends SessionElement {
   declare addForm: { type: string; label: string; custom: string; parent: string; level: string };
   declare visitForm: { when: string; surveyor: string; level: string; contact: string; phone: string };
 
-  static override styles = [...shared, pageStyles, tableStyles, css`
+  static override styles = [...shared, pageStyles, tableStyles, siteTargets, css`
     .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
     td.indent-1 { padding-left: 28px; } td.indent-2 { padding-left: 52px; }
     .stats { display: flex; gap: 24px; flex-wrap: wrap; }
@@ -131,10 +132,10 @@ export class VsPropertyPage extends SessionElement {
         ${p.configuration_label ? html`<p class="small muted">Customer's description: ${p.configuration_label}</p>` : nothing}</header>
       ${this.problem ? html`<div role="alert" class="danger-text">${this.problem.detail ?? this.problem.title}</div>` : nothing}
       <section class="card stack" aria-labelledby="spaces"><h2 id="spaces" class="title">Spaces (walk order)</h2>
-        <table><thead><tr><th>Space</th><th>Type</th><th>Level</th><th>In scope</th>${editable ? html`<th></th>` : nothing}</tr></thead><tbody>
+        <table><thead><tr><th>Space</th><th>Type</th><th>Level</th><th>In scope</th>${editable ? html`<th><span class="sr-only">Actions</span></th>` : nothing}</tr></thead><tbody>
           ${spaces.map((s, i) => html`<tr><td class="indent-${this.depth(s)}">${s.label}</td><td>${label(s.space_type_code)}${s.custom_type_label ? ` (${s.custom_type_label})` : ''}</td>
-            <td>${s.level_index}</td><td>${editable ? html`<input type="checkbox" aria-label="In scope: ${s.label}" .checked=${s.is_in_scope}
-              @change=${(e: Event) => this.act(() => site.patchSpace(s, { is_in_scope: (e.target as HTMLInputElement).checked }))} />` : s.is_in_scope ? 'Yes' : 'No'}</td>
+            <td>${s.level_index}</td><td>${editable ? html`<label class="hit"><input type="checkbox" aria-label="In scope: ${s.label}" .checked=${s.is_in_scope}
+              @change=${(e: Event) => this.act(() => site.patchSpace(s, { is_in_scope: (e.target as HTMLInputElement).checked }))} /></label>` : s.is_in_scope ? 'Yes' : 'No'}</td>
             ${editable ? html`<td class="row">
               <button class="btn small ghost" aria-label="Move ${s.label} up" ?disabled=${i === 0} @click=${() => this.move(s, -1)}>↑</button>
               <button class="btn small ghost" aria-label="Move ${s.label} down" ?disabled=${i === spaces.length - 1} @click=${() => this.move(s, 1)}>↓</button>
@@ -154,7 +155,7 @@ export class VsPropertyPage extends SessionElement {
         </div><button class="btn" ?disabled=${this.busy} @click=${() => this.addSpace()}>Add space</button></fieldset>` : nothing}
       </section>
       ${this.can('measurement.visit.read') ? html`<section class="card stack" aria-labelledby="visits"><h2 id="visits" class="title">Visits</h2>
-        <table><thead><tr><th>Visit</th><th>When</th><th>Surveyor</th><th>Survey</th><th>Status</th><th></th></tr></thead><tbody>
+        <table><thead><tr><th>Visit</th><th>When</th><th>Surveyor</th><th>Survey</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
           ${this.visits.map((v) => html`<tr><td>${v.visit_number}</td><td>${formatFull(v.scheduled_start_on)}</td><td>${v.assigned_to?.display_name ?? '—'}</td>
             <td>${label(v.survey_level_code)}</td><td>${label(v.status)}</td><td class="row">
             ${v.allowed_transitions.filter((t) => t !== 'SCHEDULED').map((t) => html`<button class="btn small" @click=${() => this.transition(v, t)}>${label(t)}</button>`)}</td></tr>`)}
@@ -169,7 +170,7 @@ export class VsPropertyPage extends SessionElement {
         </div><button class="btn" ?disabled=${this.busy} @click=${() => this.schedule()}>${this.visitForm.when ? 'Schedule' : 'Request'} visit</button></fieldset>` : nothing}
       </section>` : nothing}
       ${this.can('measurement.read') ? html`<section class="card stack" aria-labelledby="revs"><h2 id="revs" class="title">Measurement revisions</h2>
-        <table><thead><tr><th>Revision</th><th>Survey</th><th>Status</th><th>Area</th><th></th></tr></thead><tbody>
+        <table><thead><tr><th>Revision</th><th>Survey</th><th>Status</th><th>Area</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
           ${this.sets.map((m, i) => html`<tr><td>Rev ${m.revision_no}</td><td>${label(m.survey_level_code)}</td><td>${label(m.status)}</td>
             <td>${formatArea(m.summary?.total_floor_area_sqft_centi as number)}</td><td class="row">
             ${m.status === 'DRAFT' ? html`<button class="btn small primary" @click=${() => navigate(`/site/sets/${m.id}/capture`)}>Capture</button>`

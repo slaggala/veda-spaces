@@ -6,6 +6,7 @@ import { navigate } from '../../core/router/next.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import { site, type Property, type Templates, type Visit } from './api.js';
 import { registerSiteWorker } from './pwa.js';
+import { siteTargets } from './styles.js';
 
 const label = (code: string) => code.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -26,10 +27,10 @@ export class VsSiteHomePage extends SessionElement {
   declare busy: boolean;
   declare form: { lead_id: string; property_type_code: string; template_key: string; include: string[]; city: string; built_up: string };
 
-  static override styles = [...shared, pageStyles, tableStyles, css`
+  static override styles = [...shared, pageStyles, tableStyles, siteTargets, css`
     .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
     .opt { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-    .opt label { display: flex; gap: 6px; align-items: center; min-height: 32px; font-size: 13px; }
+    .opt label { display: flex; gap: 6px; align-items: center; min-height: var(--vs-target); font-size: 13px; }
   `];
 
   constructor() {
@@ -101,7 +102,7 @@ export class VsSiteHomePage extends SessionElement {
       ${this.problem ? html`<div role="alert" class="danger-text">${this.problem.detail ?? this.problem.title}</div>` : nothing}
       ${this.can('measurement.visit.read') ? html`<section class="card stack" aria-labelledby="mine">
         <h2 id="mine" class="title">My visits</h2>
-        ${this.visits.length ? html`<table><thead><tr><th>Visit</th><th>When</th><th>Survey</th><th>Status</th><th></th></tr></thead><tbody>
+        ${this.visits.length ? html`<table><thead><tr><th>Visit</th><th>When</th><th>Survey</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
           ${this.visits.map((v) => html`<tr><td>${v.visit_number}</td><td>${formatFull(v.scheduled_start_on)}</td><td>${label(v.survey_level_code)}</td>
             <td>${label(v.status)}</td><td><button class="btn small primary" @click=${() => this.start(v)}>${v.status === 'IN_PROGRESS' ? 'Continue' : 'Start'}</button>
             <a class="btn small ghost" href="/site/properties/${v.property_id}">Property</a></td></tr>`)}

@@ -80,6 +80,35 @@ def get_space(s: Session, ctx, space_id: str, permission: str = "property.read")
     return row[0], row[1]
 
 
+def lock_plan(s: Session, prop: Property, *rows) -> None:
+    """Take the property lock, re-read the property and the rows a request changes under it (an If-Match check then
+    compares against those versions), and refuse while a revision is SUBMITTED (``require_plan_open``)."""
+    from . import sets
+
+    sets.lock_for_write(s, prop.id, prop, *rows)
+    require_plan_open(s, prop)
+
+
+def require_plan_open(s: Session, prop: Property) -> None:
+    """Every change to a property's plan (its spaces, their scope, order and nesting) holds the property lock submit,
+    reject and verify take, and is refused while a revision is SUBMITTED: verification and the derived counts read the
+    live plan, so a change after submission would move the basis the surveyor submitted (a space added, archived or
+    taken out of scope). Re-locking in the same transaction is a no-op."""
+    from . import sets
+
+    sets.lock_property(s, prop.id)
+    pending = s.execute(
+        sa.select(MeasurementSet.id, MeasurementSet.revision_no)
+        .where(MeasurementSet.property_id == prop.id, MeasurementSet.status == "SUBMITTED")
+        .order_by(MeasurementSet.revision_no)
+        .limit(1)
+    ).first()
+    if pending is not None:
+        raise ApiError(409, "PROPERTY_PLAN_FROZEN",
+                       f"Revision {pending.revision_no} is awaiting verification; the spaces cannot change until it is verified or returned for correction.",
+                       extra={"measurement_set_id": pending.id})  # fmt: skip
+
+
 def _next_instance(s: Session, property_id: str, space_type_code: str) -> int:
     current = s.execute(
         sa.select(sa.func.max(PropertySpace.instance_no))
@@ -142,6 +171,7 @@ def add_space(
     template_key: str | None = None,
     instance_no: int | None = None,
 ) -> PropertySpace:
+    require_plan_open(s, prop)
     _custom_label(space_type_code, custom_type_label)
     count = s.execute(sa.select(sa.func.count(PropertySpace.id)).where(PropertySpace.property_id == prop.id)).scalar()
     if int(count or 0) >= SPACE_LIMIT:
@@ -177,6 +207,7 @@ def seed_from_template(s: Session, prop: Property, key: str, include_optional: l
     if unknown:
         raise ApiError(422, "VALIDATION_FAILED", "Unknown optional spaces.",
                        errors=[field_error("include_optional", "UNKNOWN", ", ".join(unknown))])  # fmt: skip
+    require_plan_open(s, prop)
     if live_spaces(s, prop.id):
         raise ApiError(409, "INVALID_STATE", "This property already has spaces; add them one by one.")
     created: dict[str, PropertySpace] = {}
@@ -279,6 +310,7 @@ def update(s: Session, ctx, prop: Property, body) -> Property:
 
 def update_space(s: Session, ctx, sp: PropertySpace, prop: Property, body) -> PropertySpace:
     scope.require_in_scope(s, ctx, prop.lead_id, "property.update")
+    require_plan_open(s, prop)
     provided = body.provided()
     if "parent_space_id" in provided:
         _check_parent(s, prop, body.parent_space_id, sp)
@@ -303,6 +335,7 @@ def update_space(s: Session, ctx, sp: PropertySpace, prop: Property, body) -> Pr
 def archive_space(s: Session, ctx, sp: PropertySpace, prop: Property) -> None:
     """Soft delete: the id is kept for revision diffs and history (B1-SCOPE §2.7)."""
     scope.require_in_scope(s, ctx, prop.lead_id, "property.update")
+    require_plan_open(s, prop)
     children = s.execute(sa.select(PropertySpace.id).where(PropertySpace.parent_space_id == sp.id)).first()
     if children is not None:
         raise ApiError(409, "INVALID_STATE", "Archive or move the spaces inside this one first.")
@@ -313,6 +346,7 @@ def archive_space(s: Session, ctx, sp: PropertySpace, prop: Property) -> None:
 
 def reorder(s: Session, ctx, prop: Property, space_ids: list[str]) -> list[PropertySpace]:
     scope.require_in_scope(s, ctx, prop.lead_id, "property.update")
+    require_plan_open(s, prop)
     spaces = {sp.id: sp for sp in live_spaces(s, prop.id)}
     if len(set(space_ids)) != len(space_ids) or set(space_ids) != set(spaces):
         raise ApiError(422, "VALIDATION_FAILED", "List every live space of the property exactly once.",

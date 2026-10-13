@@ -148,13 +148,16 @@ PLATFORM_PERMISSIONS: tuple[PermissionDef, ...] = (
     PermissionDef("lookup.manage", "Manage lookups", "Manage lookup values", False, None, "PLAT-009"),
 )
 
+# B1-PE-08 (migration 0204_mtq_self_service): the MTQ site roles hold exactly what the workspace shell needs to load —
+# their own profile (/auth/me, /auth/mfa), the reference lists the shell fetches after every sign-in, and their own
+# notifications (the tray polls them). Profile edits and session management stay with the V1 roles until decided.
 PLATFORM_MATRIX: dict[str, dict[str, str]] = {
-    "profile.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
+    "profile.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓", "DESIGNER": "✓", "SURVEYOR": "✓"},
     "profile.update": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
     "session.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
     "session.revoke": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
-    "notification.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
-    "lookup.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
+    "notification.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "lookup.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓", "DESIGNER": "✓", "SURVEYOR": "✓"},
     "user.read": {"FOUNDER": "✓", "ADMIN": "✓"},
     "user.create": {"FOUNDER": "✓", "ADMIN": "✓"},
     "user.profile.update": {"FOUNDER": "✓", "ADMIN": "✓"},

@@ -15,9 +15,11 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import posixpath
 import re
 import threading
 import time
+import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -333,6 +335,67 @@ def problem_response(err: ApiError) -> Response:
     for k, v in err.headers.items():
         resp.headers[k] = v
     return resp
+
+
+# --- feature gates (MC-3, B1-PE-09) ------------------------------------------------------------------------------------
+_REPEATED_SLASHES = re.compile(r"/{2,}")
+_ROUTED_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
+
+
+def normalised_path(path: str) -> str:
+    """``path`` as routing could end up seeing it: percent-decoded once more (encoded slashes and dots), repeated
+    slashes merged (Werkzeug ``merge_slashes`` redirects to that), dot segments resolved, no trailing slash."""
+    merged = _REPEATED_SLASHES.sub("/", urllib.parse.unquote(path))
+    return posixpath.normpath(merged) if merged.startswith("/") else "/" + posixpath.normpath(merged)
+
+
+def _routed_endpoint(adapter, path: str, method: str) -> str | None:
+    """The endpoint Werkzeug reaches for ``method path``, following its own routing redirects (merged slashes, a
+    missing trailing slash) a few hops; None when nothing matches."""
+    from urllib.parse import urlsplit
+
+    from werkzeug.exceptions import HTTPException
+    from werkzeug.routing import RequestRedirect
+
+    for _ in range(3):
+        try:
+            rule, _args = adapter.match(path, method=method, return_rule=True)
+            return str(rule.endpoint)
+        except RequestRedirect as redirect:
+            path = urlsplit(redirect.new_url).path
+            root = request.script_root
+            if root and path.startswith(root):
+                path = path[len(root) :]
+        except HTTPException:
+            return None
+    return None
+
+
+def request_reaches(blueprints: tuple[str, ...], prefixes: tuple[str, ...]) -> bool:
+    """Whether the current request is aimed at a feature: its normalised path lies under one of ``prefixes``, or it
+    would reach a route of one of ``blueprints`` by any way Werkzeug routes — matched directly, after a routing
+    redirect (``//``, a trailing slash; answered 308 otherwise), or under another method (answered 405 otherwise).
+
+    Call from ``before_app_request``: Flask has matched the URL by then (``url_rule`` or ``routing_exception``) but
+    raises routing errors only at dispatch, so a gate answering 404 here hides every variant of a gated route."""
+    from flask import current_app
+
+    path = normalised_path(request.path)
+    if any(path == p or path.startswith(p + "/") for p in prefixes):
+        return True
+    if request.url_rule is not None:
+        return str(request.url_rule.endpoint).partition(".")[0] in blueprints
+    if request.routing_exception is None:
+        return False
+    adapter = current_app.create_url_adapter(request)
+    if adapter is None:
+        return False
+    for candidate in dict.fromkeys((request.path, path)):
+        for method in _ROUTED_METHODS:
+            endpoint = _routed_endpoint(adapter, candidate, method)
+            if endpoint is not None and endpoint.partition(".")[0] in blueprints:
+                return True
+    return False
 
 
 def build_response(result: Result | Response | None, spec: RouteSpec) -> Response:

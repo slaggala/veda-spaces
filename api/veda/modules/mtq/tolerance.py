@@ -74,25 +74,48 @@ def compare(kind: Kind, reference: int, measured: int, *, cause: str | None = No
     return Comparison(kind, reference, measured, tol, verdict, cause)
 
 
-def site_verdict(walls: list[Comparison], spaces: list[bool], property_area: Comparison) -> Literal["PASS", "FAIL"]:
-    """Closure §2.2 site rule: ≥ 95 % of compared walls PASS, no wall FAIL, every space PASS, property total within 1 %."""
+SiteVerdict = Literal["PASS", "FAIL", "INCOMPLETE"]
+GATE_SITES = 10
+
+
+def site_verdict(walls: list[Comparison], spaces: list[bool], property_area: Comparison | None) -> SiteVerdict:
+    """Closure §2.2 site rule: ≥ 95 % of compared walls PASS, no wall FAIL, every space PASS, property total within 1 %.
+
+    The 95 % rule applies whenever walls are compared. A site with no compared wall, or with no property total to
+    compare, has not shown the rule and is INCOMPLETE, never PASS. A failure already shown is FAIL.
+    """
     if any(w.verdict == "FAIL" for w in walls):
         return "FAIL"
     passed = sum(1 for w in walls if w.verdict == "PASS")
     if walls and passed * 100 < 95 * len(walls):
         return "FAIL"
-    if not all(spaces) or property_area.verdict != "PASS":
+    if not all(spaces) or (property_area is not None and property_area.verdict != "PASS"):
         return "FAIL"
+    if not walls or property_area is None:
+        return "INCOMPLETE"
     return "PASS"
 
 
 def gate_verdict(sites: list[tuple[str, str, str | None]]) -> Literal["PASS", "FAIL", "INCOMPLETE"]:
     """Closure §2.2 gate: ≥ 9 of 10 sites PASS and no FAIL shares a root cause with another; ``sites`` holds
-    (site_id, verdict, root_cause). Fewer than ten sites is INCOMPLETE, never PASS."""
-    if len(sites) < 10:
+    (site_id, verdict, root_cause).
+
+    The gate is defined over exactly ten sites. Fewer is INCOMPLETE, never PASS; more is not this gate and is refused
+    (ValueError), so a larger dataset can never pass on a count of nine. A FAIL without a recorded root cause cannot be
+    shown to be isolated and fails the gate. A site that is INCOMPLETE (unverified set, nothing compared) keeps the gate
+    INCOMPLETE unless the sites already fail it.
+    """
+    if len(sites) > GATE_SITES:
+        raise ValueError(f"the gate is defined over exactly {GATE_SITES} sites, {len(sites)} given")
+    if len({s[0] for s in sites}) != len(sites):
+        raise ValueError("a site appears twice")
+    if len(sites) < GATE_SITES:
         return "INCOMPLETE"
-    passed = [s for s in sites if s[1] == "PASS"]
+    passed = sum(1 for s in sites if s[1] == "PASS")
+    incomplete = sum(1 for s in sites if s[1] == "INCOMPLETE")
     causes = [s[2] for s in sites if s[1] == "FAIL"]
-    if len(passed) < 9 or len(causes) != len(set(causes)) or None in causes:
+    if passed + incomplete < GATE_SITES - 1 or len(causes) != len(set(causes)) or None in causes:
         return "FAIL"
+    if incomplete or any(s[1] not in ("PASS", "FAIL") for s in sites):
+        return "INCOMPLETE"
     return "PASS"

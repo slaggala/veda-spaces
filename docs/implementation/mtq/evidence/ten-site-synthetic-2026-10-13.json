@@ -1,20 +1,36 @@
 {
   "coverage": {
     "apartments_cover_2_3_4_bhk": true,
-    "at_least_one_5_bhk": true,
     "complete": true,
     "five_apartments": true,
     "five_independent_houses": true,
+    "informational": {
+      "five_bhk_note": "present",
+      "five_bhk_sites": [
+        "S10"
+      ],
+      "has_5_bhk": true
+    },
     "lite_and_full": true,
     "missing": [],
     "offline_retry": true,
-    "second_surveyor_conflict": true
+    "profile_mismatch_sites": [],
+    "profiles_agree": true,
+    "second_surveyor_conflict": true,
+    "two_houses_with_two_or_more_levels": true
   },
   "dataset_id": "SYN-TEN-SITE-2026-10",
   "dataset_kind": "SYNTHETIC",
   "evidence": "MTQ-B1-TEN-SITE-VALIDATION",
   "gate_verdict": "PASS",
   "label": "SYNTHETIC_VALIDATED",
+  "provenance": {
+    "database_engine": "postgresql",
+    "generated_at": "2026-10-13T10:23:15.982Z",
+    "generator_commit": "3a6da201e5eaa39f7a97a8f8c8b60f72b9d2efb5",
+    "reference_sha256": "sha256:d65c3d198b18e978ff2854ae17986557f1db238059dc237c60923da332804f26",
+    "template_version": "2026.10.1"
+  },
   "sites": [
     {
       "bedrooms": 2,
@@ -23,7 +39,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 1,
+      "measured_profile": {
+        "bedrooms": 2,
+        "levels": 1,
+        "property_type_code": "APARTMENT"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 32,
+        "explained": 0,
+        "fail": 0,
+        "pass": 32
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 82588,
         "reference": 82567,
@@ -36,12 +66,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S01",
-      "snapshot": "sha256:b378b7270f0c7f71f77469d7a2ff5cabaf14eb3526508724192945e406a4c390",
+      "snapshot": "sha256:c1f5f75b0d5d02baa487f65c1f655fae3c3e7f26e0456a275b9c0b9ac59694de",
       "spaces": {
         "compared": 8,
         "pass": 8
       },
+      "staircase": {
+        "compared": 0,
+        "explained": 0,
+        "fail": 0,
+        "pass": 0
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 150,
+          "low": 120
+        },
+        "baseline_row": "2 BHK",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 135
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 32,
@@ -57,7 +103,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 1,
+      "measured_profile": {
+        "bedrooms": 2,
+        "levels": 1,
+        "property_type_code": "APARTMENT"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 32,
+        "explained": 0,
+        "fail": 0,
+        "pass": 32
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 81903,
         "reference": 81866,
@@ -70,12 +130,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S02",
-      "snapshot": "sha256:910f2d3de8b4714c0c9f53e0752ddb8b593d97888d2a5c2fa9a06b51e862cd39",
+      "snapshot": "sha256:e88134183a4c19d2fb90e4ef660882508c5756f4dedb81c99aa0467404480b8a",
       "spaces": {
         "compared": 8,
         "pass": 8
       },
+      "staircase": {
+        "compared": 0,
+        "explained": 0,
+        "fail": 0,
+        "pass": 0
+      },
       "survey_level_code": "FULL",
+      "survey_time": {
+        "against_baseline": "ABOVE",
+        "baseline_minutes": {
+          "high": 150,
+          "low": 120
+        },
+        "baseline_row": "2 BHK",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 160
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 32,
@@ -91,7 +167,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 1,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 1,
+        "property_type_code": "APARTMENT"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 39,
+        "explained": 0,
+        "fail": 0,
+        "pass": 39
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 95475,
         "reference": 95397,
@@ -104,12 +194,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S03",
-      "snapshot": "sha256:0e7afe501e65fbdfea4b34c84a00fd09967fbc99afd791ceb1fe187cc308ca9f",
+      "snapshot": "sha256:7da96d54374f35957e15c44982069cbcdbbb913c8ce78506ea8d6f2eb067ea56",
       "spaces": {
         "compared": 9,
         "pass": 9
       },
+      "staircase": {
+        "compared": 0,
+        "explained": 0,
+        "fail": 0,
+        "pass": 0
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 210,
+          "low": 150
+        },
+        "baseline_row": "3 BHK",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 190
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 36,
@@ -135,7 +241,21 @@
           "verdict": "EXPLAINED"
         }
       ],
+      "incomplete_reasons": [],
+      "levels": 1,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 1,
+        "property_type_code": "APARTMENT"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 39,
+        "explained": 0,
+        "fail": 0,
+        "pass": 39
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 95732,
         "reference": 95732,
@@ -148,12 +268,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S04",
-      "snapshot": "sha256:b92dabc97dabcc751bf070c3949271f406808ca194231ae860ce5201f4bee27f",
+      "snapshot": "sha256:773093b6deeb9c5e2d238cce157b031d42988737c85116efce58cf3de8bfe303",
       "spaces": {
         "compared": 9,
         "pass": 9
       },
+      "staircase": {
+        "compared": 0,
+        "explained": 0,
+        "fail": 0,
+        "pass": 0
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 210,
+          "low": 150
+        },
+        "baseline_row": "3 BHK",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 175
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 36,
@@ -169,7 +305,21 @@
         "second_surveyor_conflict": true
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 1,
+      "measured_profile": {
+        "bedrooms": 4,
+        "levels": 1,
+        "property_type_code": "APARTMENT"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 49,
+        "explained": 0,
+        "fail": 0,
+        "pass": 49
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 113324,
         "reference": 113368,
@@ -182,12 +332,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S05",
-      "snapshot": "sha256:91ba93992a854aacccd13bec7fc254a5379cda4d1534d222c0ce84723a0d982e",
+      "snapshot": "sha256:5700b260cc7581b092c66c6c6252294296866f1138d129ee3b4b410165a888e2",
       "spaces": {
         "compared": 11,
         "pass": 11
       },
+      "staircase": {
+        "compared": 0,
+        "explained": 0,
+        "fail": 0,
+        "pass": 0
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 270,
+          "low": 210
+        },
+        "baseline_row": "4 BHK",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 250
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 44,
@@ -203,7 +369,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 2,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 2,
+        "property_type_code": "INDEPENDENT_HOUSE"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 54,
+        "explained": 0,
+        "fail": 0,
+        "pass": 54
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 122869,
         "reference": 122854,
@@ -216,12 +396,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S06",
-      "snapshot": "sha256:3b9caf53a6e99cbdff379f53dfd7f6a96d336df03ac959177c144e256e4e294c",
+      "snapshot": "sha256:883d3766808d181e34b1a185b0536341f87c3e9a7c2e240d581c0a38b427b073",
       "spaces": {
         "compared": 14,
         "pass": 14
       },
+      "staircase": {
+        "compared": 4,
+        "explained": 0,
+        "fail": 0,
+        "pass": 4
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "NOT_RECORDED",
+        "baseline_minutes": {
+          "high": 600,
+          "low": 360
+        },
+        "baseline_row": "Villa / independent house",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": null
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 56,
@@ -247,7 +443,21 @@
           "verdict": "FAIL"
         }
       ],
+      "incomplete_reasons": [],
+      "levels": 2,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 2,
+        "property_type_code": "INDEPENDENT_HOUSE"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 54,
+        "explained": 0,
+        "fail": 0,
+        "pass": 54
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 121669,
         "reference": 121657,
@@ -260,12 +470,28 @@
       "root_cause": "Tape slipped off the skirting",
       "set_status": "VERIFIED",
       "site_id": "S07",
-      "snapshot": "sha256:9980ef0a4b621c8a6bcdee4c4d42964d77eec403c80a61874c96ac225e753eb5",
+      "snapshot": "sha256:4fd2d1aa83f9930a83e0e793a7edca5f2d70858943cd4ddcd3aa335d2636bbc3",
       "spaces": {
         "compared": 14,
-        "pass": 14
+        "pass": 13
+      },
+      "staircase": {
+        "compared": 4,
+        "explained": 0,
+        "fail": 0,
+        "pass": 4
       },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 600,
+          "low": 360
+        },
+        "baseline_row": "Villa / independent house",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 480
+      },
       "verdict": "FAIL",
       "walls": {
         "compared": 56,
@@ -281,7 +507,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 2,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 2,
+        "property_type_code": "INDEPENDENT_HOUSE"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 54,
+        "explained": 0,
+        "fail": 0,
+        "pass": 54
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 123282,
         "reference": 123244,
@@ -294,12 +534,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S08",
-      "snapshot": "sha256:2473ab04e7caf3e4fe63c424f25d192d70f14adf94b5bfb67eb304e23c533ed9",
+      "snapshot": "sha256:39e4d6997c599ad029ca3444aae634adc911acf07f8e4765045f37cef66bdc45",
       "spaces": {
         "compared": 14,
         "pass": 14
       },
+      "staircase": {
+        "compared": 4,
+        "explained": 0,
+        "fail": 0,
+        "pass": 4
+      },
       "survey_level_code": "FULL",
+      "survey_time": {
+        "against_baseline": "ABOVE",
+        "baseline_minutes": {
+          "high": 600,
+          "low": 360
+        },
+        "baseline_row": "Villa / independent house",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 620
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 56,
@@ -315,7 +571,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 2,
+      "measured_profile": {
+        "bedrooms": 3,
+        "levels": 2,
+        "property_type_code": "INDEPENDENT_HOUSE"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 54,
+        "explained": 0,
+        "fail": 0,
+        "pass": 54
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 121431,
         "reference": 121476,
@@ -328,12 +598,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S09",
-      "snapshot": "sha256:88329dd73d876b2735d9fa1da2be48c632a5617a7ab4e53fc93ba5c105496c38",
+      "snapshot": "sha256:bb916f08e85cb18441e7a79b6078a01b858f97b352f22aa7bba9080a54484c0c",
       "spaces": {
         "compared": 14,
         "pass": 14
       },
+      "staircase": {
+        "compared": 4,
+        "explained": 0,
+        "fail": 0,
+        "pass": 4
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 600,
+          "low": 360
+        },
+        "baseline_row": "Villa / independent house",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 455
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 56,
@@ -349,7 +635,21 @@
         "second_surveyor_conflict": false
       },
       "exceptions": [],
+      "incomplete_reasons": [],
+      "levels": 2,
+      "measured_profile": {
+        "bedrooms": 5,
+        "levels": 2,
+        "property_type_code": "INDEPENDENT_HOUSE"
+      },
       "method_code": "LASER",
+      "openings": {
+        "compared": 71,
+        "explained": 0,
+        "fail": 0,
+        "pass": 71
+      },
+      "profile_mismatches": [],
       "property_area": {
         "measured": 151791,
         "reference": 151773,
@@ -362,12 +662,28 @@
       "root_cause": null,
       "set_status": "VERIFIED",
       "site_id": "S10",
-      "snapshot": "sha256:58d8d055bc3b0f2b79991103ce75dec92c46ec30e91e0eaba7077a16d18d9224",
+      "snapshot": "sha256:7be5fb046e8a167f9389a1c1b43d6de6da747abf88952985d2783e9573136363",
       "spaces": {
         "compared": 17,
         "pass": 17
       },
+      "staircase": {
+        "compared": 4,
+        "explained": 0,
+        "fail": 0,
+        "pass": 4
+      },
       "survey_level_code": "LITE",
+      "survey_time": {
+        "against_baseline": "WITHIN",
+        "baseline_minutes": {
+          "high": 600,
+          "low": 360
+        },
+        "baseline_row": "Villa / independent house",
+        "baseline_source": "03-measurement-visit-playbook.md section 13",
+        "minutes": 570
+      },
       "verdict": "PASS",
       "walls": {
         "compared": 68,
@@ -378,7 +694,12 @@
     }
   ],
   "sites_evaluated": 10,
+  "sites_incomplete": [],
+  "sites_referenced": 10,
   "sites_without_a_measured_set": [],
+  "survey_time_not_recorded": [
+    "S06"
+  ],
   "template_version": "2026.10.1",
   "tolerance_policy": "OI-MTQ-01 (MTQ-B1-blocker-closure.md section 2)"
 }
