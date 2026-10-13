@@ -387,7 +387,7 @@ def test_purge_quarantine_and_abandoned_uploads(api, sales, binding):
     pending = declare(api, eid, jpeg()).data
     clock.advance(timedelta(hours=25))
     with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
-        assert service.purge(s) == {"infected_purged": 0, "abandoned": 1}
+        assert service.purge(s) == {"infected_purged": 0, "abandoned": 1, "invalidated_swept": 0}
     with db.unit_of_work(write=False) as s:  # the access token has expired with the clock: read the row
         row = s.get(Attachment, pending["id"])
         assert row.upload_status == "REJECTED" and row.rejection_reason == "ABANDONED" and row.bytes_deleted_on

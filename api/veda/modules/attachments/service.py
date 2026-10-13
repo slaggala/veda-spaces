@@ -50,6 +50,10 @@ SPACE_SOFT_LIMIT = 40
 SET_OBJECT_LIMIT, SET_BYTE_LIMIT = 800, 1024 * 1024 * 1024
 QUARANTINE_DAYS = 30
 ABANDONED_UPLOAD_HOURS = 24
+# MC-2: after a withdrawal or an erasure, a pre-signed POST issued before it may still land (at most the upload TTL,
+# 900 s). The purge sweep deletes such late objects for this long after the invalidation; the bucket lifecycle
+# expires anything left under upload/ after 2 days as the last resort.
+INVALIDATED_SWEEP_HOURS = 24
 LIVE_STATES = ("ACTIVE",)
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -198,9 +202,42 @@ def _check_limits(s: Session, entity_type: str, target: registry.EntityContext, 
     return warnings_
 
 
+# --- uploadability (MC-2) ----------------------------------------------------------------------------------------------
+def require_uploadable(s: Session, att: Attachment) -> None:
+    """Bytes are accepted (instructions, local receipt, completion) only while every one of these still holds; each
+    is checked again at completion, so a change after the instructions were issued refuses the completion."""
+    if att.is_deleted:
+        raise not_found()
+    if att.retention_state != "ACTIVE":
+        raise ApiError(409, "ATTACHMENT_NOT_ACTIVE", "This attachment was withdrawn or erased; it takes no bytes.",
+                       extra={"retention_state": att.retention_state})  # fmt: skip
+    lead = s.execute(
+        sa.select(Lead).where(Lead.id == att.lead_id).execution_options(include_deleted=True)
+    ).scalar_one_or_none()
+    if lead is None or lead.is_deleted or lead.anonymized_on is not None:
+        raise ApiError(409, "LEAD_ERASED", "The lead this attachment belongs to was erased.")
+    binding = registry.binding_for(att.entity_type)
+    if binding is None or binding.resolve(s, att.entity_id) is None:
+        raise ApiError(409, "ATTACHMENT_OWNER_GONE", "The record this attachment belongs to no longer exists.")
+    if att.storage_backend != settings().attachment_backend:
+        raise ApiError(409, "STORAGE_CHANGED", "This upload was issued for another storage backend; upload again.")
+    if att.upload_status != "AWAITING_UPLOAD":
+        raise ApiError(409, "UPLOAD_STATE_STALE", "This attachment is no longer awaiting its bytes.",
+                       extra={"upload_status": att.upload_status})  # fmt: skip
+    if att.created_on < db.tx_time(s) - timedelta(hours=ABANDONED_UPLOAD_HOURS):
+        raise ApiError(409, "UPLOAD_EXPIRED", "This upload was abandoned; declare the photo again.")
+
+
+def _discard_upload(s: Session, att: Attachment) -> None:
+    """Storage only: delete bytes that arrived for an attachment that may no longer take them, unless a live
+    attachment still waits for or holds the same content-hash key. Survives the refusal's rollback."""
+    if not _awaiting_same_bytes(s, att) and not _shared(s, att):
+        _delete(att.upload_key)
+
+
 def upload_instructions(att: Attachment) -> dict[str, Any]:
     cfg = settings()
-    if att.upload_status != "AWAITING_UPLOAD":
+    if att.upload_status != "AWAITING_UPLOAD" or att.retention_state != "ACTIVE" or att.is_deleted:
         return {"required": False}
     if att.storage_backend == "s3":
         store = storage()
@@ -310,6 +347,7 @@ def receive_local(s: Session, att: Attachment, data_b64: str) -> None:
         raise ApiError(409, "DIRECT_UPLOAD_REQUIRED", "Upload to the pre-signed URL; the API does not take bytes here.")
     if att.upload_status != "AWAITING_UPLOAD":
         raise ApiError(409, "INVALID_STATE", "This attachment already has its bytes.")
+    require_uploadable(s, att)
     try:
         data = base64.b64decode(data_b64, validate=True)
     except (binascii.Error, ValueError) as err:
@@ -345,6 +383,8 @@ def _shared(s: Session, att: Attachment, *, other_leads_only: bool = False) -> b
 
 
 def _store_variants(att: Attachment, data: bytes) -> None:
+    if att.retention_state != "ACTIVE":
+        raise km.MediaError("variants are made only for an active attachment")
     variants, width, height = km.image_variants(data, VARIANT_WIDTHS)
     store = storage()
     made = {}
@@ -358,8 +398,15 @@ def _store_variants(att: Attachment, data: bytes) -> None:
 
 
 def complete(s: Session, att: Attachment) -> Attachment:
-    if att.upload_status != "AWAITING_UPLOAD":
-        return att  # idempotent: a repeated completion returns the current state
+    if att.retention_state == "ACTIVE" and att.upload_status != "AWAITING_UPLOAD":
+        return att  # idempotent: a repeated completion of a live attachment returns the current state
+    try:
+        require_uploadable(s, att)
+    except ApiError:
+        # MC-2: refused before anything is decoded, scanned or derived; bytes that already arrived are deleted now
+        # (and again by the purge sweep, should a pre-signed POST land later). Every retry is refused the same way.
+        _discard_upload(s, att)
+        raise
     data = _fetch(att.upload_key)
     if data is None:
         raise ApiError(409, "UPLOAD_NOT_RECEIVED", "The upload has not arrived yet; upload, then complete.")
@@ -396,6 +443,8 @@ def _scan(data: bytes) -> str:
 
 
 def _apply_scan(s: Session, att: Attachment, data: bytes) -> None:
+    if att.retention_state != "ACTIVE" or att.is_deleted:
+        return  # MC-2: a withdrawn or erased attachment never becomes CLEAN and never gets variants
     status = _scan(data)
     att.scan_status = status
     if status in ("CLEAN", "INFECTED"):
@@ -453,6 +502,7 @@ def rescan_pending(s: Session) -> int:
     for att in rows:
         data = _fetch(att.upload_key)
         if data is None or km.sha256_hex(data) != att.sha256:
+            metrics.emit("AttachmentObjectMissing", 1)  # never skipped silently: the alarm sees it
             continue
         _apply_scan(s, att, data)
         n += 1
@@ -510,6 +560,7 @@ def withdraw(s: Session, ctx, att: Attachment, reason: str | None) -> Attachment
         raise ApiError(403, "PERMISSION_DENIED", "Only the uploader may withdraw this attachment.")
     _release_all(s, att)
     now = db.tx_time(s)
+    _invalidate_upload(att)
     att.retention_state = "WITHDRAWN"
     att.scan_status = "WITHDRAWN"
     att.withdrawn_on, att.withdrawn_by, att.withdrawal_reason = now, ctx.user.id, reason
@@ -517,6 +568,13 @@ def withdraw(s: Session, ctx, att: Attachment, reason: str | None) -> Attachment
         att.bytes_deleted_on = now
     metrics.emit("AttachmentWithdrawn", 1)
     return att
+
+
+def _invalidate_upload(att: Attachment) -> None:
+    """An upload that never completed can no longer complete (MC-2)."""
+    if att.upload_status == "AWAITING_UPLOAD":
+        att.upload_status = "REJECTED"
+        att.rejection_reason = "INVALIDATED"
 
 
 def erase_for_lead(s: Session, lead: Lead) -> int:
@@ -532,6 +590,7 @@ def erase_for_lead(s: Session, lead: Lead) -> int:
         erasure.add(att.id)
         if att.retention_state in ("ACTIVE", "WITHDRAWN") or att.bytes_deleted_on is None:
             _release_all(s, att, other_leads_only=True)
+        _invalidate_upload(att)
         att.retention_state = "ERASED"
         if att.scan_status == "PENDING":
             att.scan_status = "WITHDRAWN"
@@ -584,7 +643,33 @@ def purge(s: Session) -> dict[str, int]:
         if not _awaiting_same_bytes(s, att) and not _shared(s, att):
             _delete(att.upload_key)
         att.bytes_deleted_on = now
-    return {"infected_purged": len(infected), "abandoned": len(abandoned)}
+    # MC-2: withdrawn and erased attachments recently invalidated, whatever their upload state: delete any object a
+    # late pre-signed POST may have written, and any variant or upload left behind (idempotent; missing is fine).
+    invalidated = (
+        s.execute(
+            sa.select(Attachment)
+            .where(
+                Attachment.retention_state.in_(("WITHDRAWN", "ERASED")),
+                sa.or_(
+                    Attachment.bytes_deleted_on.is_(None),
+                    Attachment.bytes_deleted_on >= now - timedelta(hours=INVALIDATED_SWEEP_HOURS),
+                ),
+            )
+            .execution_options(include_deleted=True)
+        )
+        .scalars()
+        .all()
+    )
+    for att in invalidated:
+        _invalidate_upload(att)
+        if not _shared(s, att, other_leads_only=att.retention_state == "ERASED"):
+            for meta in (att.variants or {}).values():
+                _delete(km.content_key(OBJECT_PREFIX, meta["sha256"]))
+        if not _awaiting_same_bytes(s, att) and not _shared(s, att):
+            _delete(att.upload_key)
+        if att.bytes_deleted_on is None:
+            att.bytes_deleted_on = now
+    return {"infected_purged": len(infected), "abandoned": len(abandoned), "invalidated_swept": len(invalidated)}
 
 
 def validate_sha256(value: str) -> str:
