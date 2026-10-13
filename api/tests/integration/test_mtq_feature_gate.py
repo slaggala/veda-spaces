@@ -11,14 +11,13 @@ import pytest
 
 from veda.config import validate_environment
 
-# SURVEYOR and DESIGNER do not hold profile.read on their own (a pre-enablement finding recorded in the PR): the staff
-# accounts below hold SALES as well, so /auth/me loads; the route gate is also checked for the bare roles.
+# The site roles load /auth/me on their own since 0204_mtq_self_service (B1-PE-08): no SALES workaround.
 ROLES = [
     ((), True),
     (("ADMIN",), False),
     (("SALES",), False),
-    (("SURVEYOR", "SALES"), False),
-    (("DESIGNER", "SALES"), False),
+    (("SURVEYOR",), False),
+    (("DESIGNER",), False),
 ]
 GATED = [
     "/api/v1/properties",
@@ -78,7 +77,7 @@ def test_flag_off_leaves_v1_routes_untouched(api, factory):
 
 @pytest.mark.settings(mtq_site_enabled=True)
 def test_flag_on_reports_the_feature_and_opens_the_routes(api, factory):
-    factory.login(api, factory.user("SURVEYOR", "SALES"))
+    factory.login(api, factory.user("SURVEYOR"))
     assert api.get("/api/v1/auth/me").data["features"] == {"mtq_site": True}
     assert api.get("/api/v1/mtq/templates").status == 200
     assert api.call("PATCH", "/api/v1/mtq/templates", {}).status == 405  # with the flag on, normal routing applies
