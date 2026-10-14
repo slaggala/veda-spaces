@@ -137,10 +137,18 @@ def test_new_measurement_revision_makes_downstream_stale(api, factory):
     journey = ok(api_.get(f"/api/v1/properties/{prop['id']}/commercial"))
     assert journey["current_measurement_set"]["id"] == new["id"]
     assert journey["scopes"][0]["lineage"]["stale"] is True
-    # explicit regeneration: a new scope revision on the new measurements carries the staff inputs
+    # explicit regeneration: a new scope revision on the new measurements carries the staff inputs, but a staff
+    # override made on the superseded measurements is held for re-confirmation, never applied as verified
     scope2 = c.draft_scope(prop)
     kitchen = next(i for i in scope2["items"] if i["item_type_code"] == "KITCHEN")
-    assert kitchen["carried_from_item_id"] and kitchen["dimension_overrides"] == {"DRAWERS": "4"}
+    assert kitchen["carried_from_item_id"] and kitchen["dimension_overrides"] == {}
+    assert kitchen["carried_overrides"]["values"] == {"DRAWERS": "4"} and kitchen["carried_overrides"]["reason"]
+    cur = ok(api_.get(f"/api/v1/scopes/{scope2['id']}"))
+    r = api_.post(f"/api/v1/scopes/{scope2['id']}/confirm", if_match=cur["version"])
+    assert r.status == 409 and r.code == "OVERRIDES_NEED_RECONFIRMATION" and kitchen["id"] in r.json["scope_item_ids"]
+    scope2 = c.fill_staff_inputs(scope2)  # staff confirm the drawer count against the new measurements
+    kitchen = next(i for i in scope2["items"] if i["item_type_code"] == "KITCHEN")
+    assert kitchen["dimension_overrides"] == {"DRAWERS": "4"} and kitchen["carried_overrides"] == {}
     scope2 = c.confirm(scope2)
     boq2 = c.boq(scope2)
     assert boq2["measurement_set_id"] == new["id"] and boq2["revision_no"] == boq["revision_no"] + 1

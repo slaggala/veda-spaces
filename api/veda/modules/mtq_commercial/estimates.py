@@ -3,13 +3,15 @@
 **One pricing engine.** Every rate comes from the ACTIVE estimator rate card (the card the estimator and Catalogue V3
 already govern: versioned, approved, immutable once active), and every amount is the estimator engine's own
 ``line_amount_minor`` (quantity × rate, paise, half up). Provenance per line: BOQ line → card product and line →
-card version and document digest → tier → rate → amount. A later card never changes a stored estimate; ``reproduce``
-recomputes one from its pinned card document and proves it.
+card version and document digest → tier → rate → amount. An estimate is priced with exactly the card its BOQ was built
+against (same card row and document digest; anything else is refused as PRICING_CONTEXT_MISMATCH, and the BOQ is stale
+once another card is active). A later card never changes a stored estimate: it is reported stale (RATE_CARD_CHANGED,
+CATALOGUE_CHANGED), never re-priced in place, and ``reproduce`` recomputes it from its pinned card document.
 
 **Nothing is invented.** A line without an approved rate is kept, unpriced, with the reason: a tier without approved
 staff rates (RATE_CARD_NOT_APPROVED, OI-MTQ-05), a finish variant without a rate (FINISH_RATE_NOT_APPROVED), an item
 with no card line (CATALOGUE_MAPPING_MISSING), a preparation-package driver not decided (OWNER_DECISION_REQUIRED,
-OI-MTQ-15) — owner decisions, which block customer issuance — or a data gap (RATE_MISSING, QUANTITY_BASIS_CHANGED),
+OI-MTQ-15) — owner decisions, which block customer issuance — or a data gap (RATE_MISSING, QUANTITY_MISSING),
 which blocks approval. The Custom Features Allowance (ADR-012 D9) is not carried: a measured quotation replaces it
 with the actual items. Labour and installation are inside the card's supply-and-install rates; nothing separate is
 charged for them.
@@ -70,8 +72,7 @@ def _card_row(s: Session, row_id: str) -> tuple[EstimatorRateCard, ratecard.Rate
     return row, ratecard.parse(row.document)
 
 
-def _price(card: ratecard.RateCard, boq_card: ratecard.RateCard | None, line: BoqLine, item: ScopeItem | None,
-           tier: str) -> dict[str, Any]:  # fmt: skip
+def _price(card: ratecard.RateCard, line: BoqLine, item: ScopeItem | None, tier: str) -> dict[str, Any]:
     """The rate of one BOQ line: rate, status and note (never an invented value)."""
     finish = item.finish_code if item else None
     prov = {"card_version": card.version, "tier": tier, "product": line.card_product_code, "line": line.card_line_code}
@@ -84,13 +85,6 @@ def _price(card: ratecard.RateCard, boq_card: ratecard.RateCard | None, line: Bo
     if spec is None:
         return {"rate_minor": None, "rate_status": "RATE_MISSING", "provenance": prov,
                 "rate_note": f"Rate card {card.version} has no line {line.card_product_code}.{line.card_line_code}."}  # fmt: skip
-    if boq_card is not None and boq_card.version != card.version:
-        bp = boq_card.product(line.card_product_code)
-        before = next((x for x in bp.lines if x.code == line.card_line_code), None) if bp else None
-        if before is None or before.quantity != spec.quantity:
-            return {"rate_minor": None, "rate_status": "QUANTITY_BASIS_CHANGED", "provenance": prov,
-                    "rate_note": f"Rate card {card.version} measures this line differently from the BOQ's card "
-                                 f"{boq_card.version}; regenerate the BOQ."}  # fmt: skip
     if line.final_quantity_centi is None:
         return {"rate_minor": None, "rate_status": "QUANTITY_MISSING", "provenance": prov,
                 "rate_note": "The BOQ line has no quantity."}  # fmt: skip
@@ -168,6 +162,7 @@ def create(s: Session, ctx, boq: Boq, prop: Property, body) -> CostEstimate:
     """Price a reviewed, current BOQ. Supersedes the open draft (an explicit regeneration)."""
     from . import estimator_card
 
+    require_lineage(s, boq, prop)
     if boq.status != "REVIEWED":
         raise ApiError(409, "BOQ_NOT_REVIEWED", "An estimate prices a reviewed BOQ.", extra={"status": boq.status})
     reasons = lineage.boq_reasons(s, boq)
@@ -175,6 +170,14 @@ def create(s: Session, ctx, boq: Boq, prop: Property, body) -> CostEstimate:
         raise ApiError(409, "BOQ_STALE", "The BOQ is out of date; regenerate and review it first.",
                        extra={"reasons": reasons})  # fmt: skip
     card_row, card = estimator_card.active(s)
+    if card_row.id != boq.catalogue_card_id or card_row.document_sha256 != boq.catalogue_card_sha256:
+        # Exact consistency: the BOQ's lines are the product structure of the card it was built against. Pricing it
+        # with another card would silently drop lines that card adds (or keep lines it removed); regenerate instead.
+        raise ApiError(409, "PRICING_CONTEXT_MISMATCH", f"BOQ revision {boq.revision_no} was built against rate card "
+                       f"{boq.catalogue_card_version}; the active card is {card_row.card_version}. Regenerate and "
+                       "review the BOQ against the card in force, then price it.",
+                       extra={"boq_card_version": boq.catalogue_card_version,
+                              "active_card_version": card_row.card_version})  # fmt: skip
     tier = body.tier_code
     if not tier_approved(card, tier):
         raise ApiError(409, "RATE_CARD_NOT_APPROVED",
@@ -189,7 +192,6 @@ def create(s: Session, ctx, boq: Boq, prop: Property, body) -> CostEstimate:
     if draft is not None:
         draft.status = "SUPERSEDED"
         s.flush()
-    boq_card = _card_row(s, boq.catalogue_card_id)[1] if boq.catalogue_card_id != card_row.id else None
     est = CostEstimate(
         lead_id=prop.lead_id, property_id=prop.id, boq_id=boq.id, boq_revision_no=boq.revision_no,
         boq_snapshot_sha256=boq.snapshot_sha256 or "", scope_id=scope.id, scope_revision_no=scope.revision_no,
@@ -207,7 +209,7 @@ def create(s: Session, ctx, boq: Boq, prop: Property, body) -> CostEstimate:
     categories: set[str] = set()
     for line in boqs.lines(s, boq):
         item = items.get(line.scope_item_id)
-        priced = _price(card, boq_card, line, item, tier)
+        priced = _price(card, line, item, tier)
         product = card.product(line.card_product_code) if line.card_product_code else None
         category = product.category if product else "UNMAPPED"
         if not line.is_optional and product is not None:
@@ -242,6 +244,24 @@ def create(s: Session, ctx, boq: Boq, prop: Property, body) -> CostEstimate:
     s.flush()
     recompute(s, est)
     return est
+
+
+def require_lineage(s: Session, boq: Boq, prop: Property) -> None:
+    """The BOQ, its scope and its measurement set all belong to ``prop`` and to each other (never mixed lineage)."""
+    from veda.modules.mtq.models import MeasurementSet
+
+    scope = s.get(Scope, boq.scope_id)
+    mset = s.get(MeasurementSet, boq.measurement_set_id)
+    bad = []
+    if boq.property_id != prop.id:
+        bad.append("boq")
+    if scope is None or scope.property_id != prop.id or scope.measurement_set_id != boq.measurement_set_id:
+        bad.append("scope")
+    if mset is None or mset.property_id != prop.id:
+        bad.append("measurement_set")
+    if bad:
+        raise ApiError(422, "LINEAGE_MISMATCH", "The BOQ's lineage does not belong to this property.",
+                       extra={"mismatched": bad})  # fmt: skip
 
 
 def scopes_items(s: Session, scope: Scope) -> list[ScopeItem]:

@@ -4,7 +4,9 @@ A scope revision is built from the property's ACCEPTED requirements over its cur
 item per requirement, with the catalogue mapping and the resolved card inputs of its item type. A new revision carries
 staff edits (options, finish, dimension overrides with their reason, inclusion) from the latest earlier revision of the
 same requirement (``carried_from_item_id``), so a re-measure keeps decisions while the derived values follow the new
-measurements.
+measurements. A dimension override made on a superseded measurement set is not carried as verified truth: it is held
+in ``carried_overrides`` and confirm refuses until staff confirm, replace or drop it. Each revision pins the digest of
+the property's requirement decisions; a later decision makes it stale (``lineage.REQUIREMENT_FIELDS``).
 
 Only a DRAFT changes. CONFIRMED seals it (canonical JSON digest); confirming needs the measurement set to still be the
 property's current verified set and every requirement to be decided (nothing PROPOSED). Confirming supersedes the
@@ -24,7 +26,7 @@ from veda.kernel.errors import ApiError, field_error
 from veda.kernel.jcs import canonical_bytes
 from veda.modules.mtq.models import Property
 
-from . import quantity, requirements, rules, site
+from . import lineage, quantity, requirements, rules, site
 from .models import Requirement, Scope, ScopeItem
 
 EDITABLE = ("options", "finish_code", "material_key", "inclusion_code", "label", "notes")
@@ -78,7 +80,7 @@ def effective_options(item: ScopeItem, req: Requirement) -> dict[str, str]:
     return _effective_options(item, req)
 
 
-def _item_for(req: Requirement, previous: ScopeItem | None, sort: int) -> ScopeItem:
+def _item_for(req: Requirement, previous: ScopeItem | None, sort: int, *, remeasured: bool = False) -> ScopeItem:
     itype = rules.item_type(req.requirement_type_code)
     prefs = req.preferences or {}
     item = ScopeItem(
@@ -96,6 +98,7 @@ def _item_for(req: Requirement, previous: ScopeItem | None, sort: int) -> ScopeI
         finish_code=prefs.get("finish_code"),
         material_key=prefs.get("material_key"),
         dimension_overrides={},
+        carried_overrides={},
         dimension_source_code="ASSUMED",
         sort_order=sort,
     )
@@ -103,12 +106,20 @@ def _item_for(req: Requirement, previous: ScopeItem | None, sort: int) -> ScopeI
         item.carried_from_item_id = previous.id
         for f in EDITABLE:
             setattr(item, f, getattr(previous, f))
-        item.dimension_overrides = dict(previous.dimension_overrides or {})
-        item.override_reason = previous.override_reason
+        if remeasured and previous.dimension_overrides:
+            # made on a superseded measurement set: kept for staff to confirm or replace, never applied as verified
+            item.carried_overrides = {"values": dict(previous.dimension_overrides),
+                                      "reason": previous.override_reason,
+                                      "from_scope_item_id": previous.id}  # fmt: skip
+        else:
+            item.dimension_overrides = dict(previous.dimension_overrides or {})
+            item.override_reason = previous.override_reason
+            item.carried_overrides = dict(previous.carried_overrides or {})
     return item
 
 
-def _populate(s: Session, scope: Scope, facts: site.Facts, kept: dict[str, ScopeItem] | None = None) -> dict[str, Any]:
+def _populate(s: Session, scope: Scope, facts: site.Facts, kept: dict[str, ScopeItem] | None = None,
+              kept_set_id: str | None = None) -> dict[str, Any]:  # fmt: skip
     reqs = s.execute(sa.select(Requirement).where(Requirement.property_id == scope.property_id)).scalars().all()
     carried_from = _latest(s, scope.property_id, "CONFIRMED", "SUPERSEDED")
     previous: dict[str, ScopeItem] = {}
@@ -117,24 +128,36 @@ def _populate(s: Session, scope: Scope, facts: site.Facts, kept: dict[str, Scope
             i.requirement_id: i
             for i in s.execute(sa.select(ScopeItem).where(ScopeItem.scope_id == carried_from.id)).scalars()
         }
+    remeasured = carried_from is not None and carried_from.measurement_set_id != facts.mset.id
     order = {sid: n for n, sid in enumerate(facts.spaces)}
     accepted = sorted(
         (r for r in reqs if r.status == "ACCEPTED"),
         key=lambda r: (r.space_id is None, order.get(r.space_id or "", 999), r.requirement_type_code, r.dedupe_key),
     )
     for n, req in enumerate(accepted, start=1):
-        item = _item_for(req, previous.get(req.id), n * 10)
+        item = _item_for(req, previous.get(req.id), n * 10, remeasured=remeasured)
         old = (kept or {}).get(req.id)
         if old is not None:  # a refreshed draft keeps its own edits
             for f in EDITABLE:
                 setattr(item, f, getattr(old, f))
-            item.dimension_overrides = dict(old.dimension_overrides or {})
-            item.override_reason = old.override_reason
+            moved = kept_set_id is not None and kept_set_id != facts.mset.id
+            if moved and old.dimension_overrides:
+                # the draft moved to a newer measurement set: its own overrides need confirming again
+                item.carried_overrides = {"values": dict(old.dimension_overrides), "reason": old.override_reason,
+                                          "from_scope_item_id": old.id}  # fmt: skip
+                item.dimension_overrides, item.override_reason = {}, None
+            elif moved:
+                item.carried_overrides = dict(old.carried_overrides or {})
+            else:
+                item.dimension_overrides = dict(old.dimension_overrides or {})
+                item.override_reason = old.override_reason
+                item.carried_overrides = dict(old.carried_overrides or {})
             item.carried_from_item_id = old.carried_from_item_id
         item.scope_id = scope.id
         _resolve(item, req, facts)
         s.add(item)
     scope.exclusions = exclusions(s, reqs, requirements.spaces_of(s, facts.prop))
+    scope.requirements_sha256 = lineage.requirements_sha256(s, scope.property_id)
     return {
         "items": len(accepted),
         "carried_from_scope_id": carried_from.id if carried_from else None,
@@ -177,6 +200,7 @@ def create(s: Session, ctx, prop: Property, body) -> Scope:
         ruleset_version=rs.ruleset_version,
         ruleset_sha256=rules.sha256(),
         ruleset_status=rules.effective_status(),
+        requirements_sha256=lineage.requirements_sha256(s, prop.id),
         notes=body.notes,
     )
     s.add(scope)
@@ -192,6 +216,7 @@ def refresh(s: Session, ctx, scope: Scope, prop: Property) -> Scope:
     require_draft(scope)
     mset = site.require_current_verified(s, prop)
     kept = {i.requirement_id: i for i in items(s, scope)}
+    kept_set_id = scope.measurement_set_id
     from veda.kernel import audit_hook
 
     for i in kept.values():
@@ -200,7 +225,7 @@ def refresh(s: Session, ctx, scope: Scope, prop: Property) -> Scope:
     scope.measurement_set_id, scope.measurement_revision_no = mset.id, mset.revision_no
     scope.measurement_snapshot_sha256 = mset.snapshot_sha256 or ""  # a verified set is always sealed
     facts = site.load(s, prop, mset)
-    run = _populate(s, scope, facts, kept)
+    run = _populate(s, scope, facts, kept, kept_set_id)
     scope.generation_run = {**run, "refreshed_on": clock.to_rfc3339(db.tx_time(s))}
     s.flush()
     return scope
@@ -231,14 +256,42 @@ def update_item(s: Session, ctx, item: ScopeItem, scope: Scope, body) -> ScopeIt
         if overrides and not (body.override_reason or "").strip():
             raise ApiError(422, "OVERRIDE_REASON_REQUIRED", "Say why the measured value is overridden.",
                            errors=[field_error("override_reason", "REQUIRED", "A reason is required.")])  # fmt: skip
+        _check_counts(s, item, overrides)
         item.dimension_overrides = overrides
         item.override_reason = body.override_reason.strip() if overrides and body.override_reason else None
+        item.carried_overrides = {}  # staff decided: confirmed (re-entered), replaced or dropped
     if item.inclusion_code == "EXCLUDED" and item.necessity_code == "MANDATORY" and not (item.notes or "").strip():
         raise ApiError(422, "REASON_REQUIRED", "Note why a mandatory item is excluded.",
                        errors=[field_error("notes", "REQUIRED", "A note is required.")])  # fmt: skip
     item.dimension_source_code = quantity.worst_source((item.dimensions or {}).get("inputs") or {},
                                                        item.dimension_overrides or {})  # fmt: skip
     return item
+
+
+def _check_counts(s: Session, item: ScopeItem, overrides: dict[str, str]) -> None:
+    """A count input (drawers, lights) is a whole number, as the estimator requires; values are decimals."""
+    from decimal import Decimal, InvalidOperation
+
+    from . import estimator_card
+
+    kinds: dict[str, str] = {}
+    row = estimator_card.active_row(s)
+    if row is not None and item.card_product_code:
+        from veda.modules.estimator import ratecard
+
+        product = ratecard.parse(row.document).product(item.card_product_code)
+        kinds = {i.name: i.kind for i in product.inputs} if product else {}
+    for name, raw in overrides.items():
+        try:
+            v = Decimal(raw)
+        except InvalidOperation:
+            v = Decimal("NaN")
+        if not v.is_finite() or v < 0:
+            raise ApiError(422, "VALIDATION_FAILED", f"{name} is not a non-negative number.",
+                           errors=[field_error(f"dimension_overrides.{name}", "INVALID", "Not a number.")])  # fmt: skip
+        if kinds.get(name) == "count" and v != v.to_integral_value():
+            raise ApiError(422, "VALIDATION_FAILED", f"{name} is a count: a whole number.",
+                           errors=[field_error(f"dimension_overrides.{name}", "NOT_WHOLE", "Must be a whole number.")])  # fmt: skip
 
 
 def confirm(s: Session, ctx, scope: Scope, prop: Property) -> Scope:
@@ -260,10 +313,16 @@ def confirm(s: Session, ctx, scope: Scope, prop: Property) -> Scope:
             sa.select(Requirement.id).where(Requirement.property_id == prop.id, Requirement.status == "ACCEPTED")
         ).scalars()
     )
-    in_scope = {i.requirement_id for i in items(s, scope)}
-    if accepted != in_scope:
+    rows = items(s, scope)
+    in_scope = {i.requirement_id for i in rows}
+    if accepted != in_scope or lineage.requirements_sha256(s, prop.id) != scope.requirements_sha256:
         raise ApiError(409, "SCOPE_OUT_OF_DATE", "Requirements changed after this draft was built; refresh it first.",
                        extra={"missing": sorted(accepted - in_scope), "extra": sorted(in_scope - accepted)})  # fmt: skip
+    pending = [i.id for i in rows if i.carried_overrides]
+    if pending:
+        raise ApiError(409, "OVERRIDES_NEED_RECONFIRMATION", f"{len(pending)} item(s) carry staff overrides made on an "
+                       "earlier measurement revision; confirm, replace or drop each against the new measurements.",
+                       extra={"scope_item_ids": pending})  # fmt: skip
     reqs = s.execute(sa.select(Requirement).where(Requirement.property_id == prop.id)).scalars().all()
     scope.exclusions = exclusions(s, reqs, requirements.spaces_of(s, prop))
     previous = _latest(s, prop.id, "CONFIRMED")
@@ -283,6 +342,7 @@ def snapshot(s: Session, scope: Scope) -> dict[str, Any]:
         "measurement_set_id": scope.measurement_set_id,
         "measurement_snapshot_sha256": scope.measurement_snapshot_sha256,
         "ruleset": [scope.ruleset_version, scope.ruleset_sha256],
+        "requirements_sha256": scope.requirements_sha256,
         "tier_code": scope.tier_code,
         "exclusions": scope.exclusions,
         "items": [
@@ -306,6 +366,7 @@ def snapshot(s: Session, scope: Scope) -> dict[str, Any]:
                     "dimensions",
                     "dimension_overrides",
                     "override_reason",
+                    "carried_overrides",
                     "dimension_source_code",
                 )
             }  # fmt: skip
@@ -358,6 +419,7 @@ def present_item(item: ScopeItem, req: Requirement | None, spaces: dict) -> dict
         "option_rules": (item.dimensions or {}).get("option_rules") or {},
         "dimension_overrides": item.dimension_overrides or {},
         "override_reason": item.override_reason,
+        "carried_overrides": item.carried_overrides or {},
         "dimension_source_code": item.dimension_source_code,
         "carried_from_item_id": item.carried_from_item_id,
         "notes": item.notes,
@@ -380,6 +442,7 @@ def present(s: Session, scope: Scope, *, full: bool = True, state: dict | None =
         "ruleset_version": scope.ruleset_version,
         "ruleset_sha256": scope.ruleset_sha256,
         "ruleset_status": scope.ruleset_status,
+        "requirements_sha256": scope.requirements_sha256,
         "generation_run": scope.generation_run or {},
         "exclusions": scope.exclusions or [],
         "confirmed_on": clock.to_rfc3339(scope.confirmed_on) if scope.confirmed_on else None,

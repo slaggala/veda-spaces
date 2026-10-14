@@ -31,8 +31,13 @@ def test_rate_card_change_never_moves_a_stored_estimate(api, factory):
         again["subtotal_minor"] == approved["subtotal_minor"]
         and again["snapshot_sha256"] == approved["snapshot_sha256"]
     )
-    assert again["lineage"]["stale"] and again["lineage"]["reasons"][0]["code"] == "RATE_CARD_CHANGED"
+    codes = {r["code"] for r in again["lineage"]["reasons"]}
+    assert again["lineage"]["stale"] and {"RATE_CARD_CHANGED", "CATALOGUE_CHANGED"} <= codes
     assert ok(mgr.get(f"/api/v1/cost-estimates/{est['id']}/reproduce"))["reproducible"] is True
+    # the BOQ was built against the old card: pricing it with the new one is refused, never silently mixed
+    r = _estimate(c, boq)
+    assert r.status == 409 and r.code == "BOQ_STALE" and r.json["reasons"][0]["code"] == "CATALOGUE_CHANGED"
+    boq = ok(c.review(c.boq(ok(c.as_(c.estimator).get(f"/api/v1/scopes/{boq['scope_id']}")))))
     new = ok(_estimate(c, boq), 201)
     assert new["rate_card_version"] == "SYNTHETIC-3" and new["subtotal_minor"] > again["subtotal_minor"]
     diff = ok(mgr.get(f"/api/v1/cost-estimates/{est['id']}/compare/{new['id']}"))
