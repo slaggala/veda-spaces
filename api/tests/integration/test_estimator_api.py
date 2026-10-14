@@ -414,7 +414,8 @@ def test_no_route_exposes_a_rate_card(app):
     paths = [r.rule for r in app.url_map.iter_rules()]
     assert not [p for p in paths if "rate" in p.lower() or "card" in p.lower()]
     public = sorted(p for p in paths if p.startswith("/api/v1/public/"))
-    # ADR-013 adds the catalog estimator's four flagged routes (RBX-008); none of them carries a rate.
+    # ADR-013 adds the catalog estimator's four flagged routes (RBX-008); none of them carries a rate. CQX adds the
+    # customer proposal's flagged routes (RBX-009): the customer-safe projection, never a rate (test_cqx_projection).
     assert public == [
         "/api/v1/public/catalog",
         "/api/v1/public/catalog/estimates",
@@ -423,6 +424,13 @@ def test_no_route_exposes_a_rate_card(app):
         "/api/v1/public/enquiries",
         "/api/v1/public/estimates",
         "/api/v1/public/leads",
+        "/api/v1/public/proposal",
+        "/api/v1/public/proposal/acknowledgements",
+        "/api/v1/public/proposal/comparison",
+        "/api/v1/public/proposal/decision",
+        "/api/v1/public/proposal/requests",  # GET (own requests) and POST (ask): two rules
+        "/api/v1/public/proposal/requests",
+        "/api/v1/public/proposal/selections",
     ]
 
 
