@@ -523,3 +523,109 @@ run "a_bound_digest_without_the_flag_refused" {
   }
   expect_failures = [output.mtq_attachments]
 }
+
+# MTQ B2-B4 (decision log 33): both commercial flags are planned false; they turn on only with an owner-APPROVED,
+# internal-validation-only enablement record bound by its SHA-256, quotation only with estimation, estimation only
+# with the B1 site flag.
+run "the_commercial_flags_are_planned_false_by_default" {
+  command = plan
+
+  assert {
+    condition = (local.app_config["VEDA_MTQ_ESTIMATION_ENABLED"] == "false" && local.app_config["VEDA_MTQ_QUOTATION_ENABLED"] == "false" &&
+    output.mtq_commercial.enablement_record == null && length(local.commercial_config) == 2)
+    error_message = "two parameters, both false, no record bound"
+  }
+
+  assert {
+    condition     = jsondecode(file("../../../config/mtq-commercial-enablement-record.json")).status == "DRAFT" && contains(local.commercial_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is a DRAFT until the owner approves it"
+  }
+}
+
+run "an_approved_bound_record_turns_both_commercial_flags_on_in_staging" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-on.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-approved.json"
+  }
+
+  assert {
+    condition = (local.app_config["VEDA_MTQ_ESTIMATION_ENABLED"] == "true" && local.app_config["VEDA_MTQ_QUOTATION_ENABLED"] == "true" &&
+    output.mtq_commercial.enablement_record == filesha256("tests/fixtures/mtq-commercial-record-approved.json") && local.commercial_record_problems == [])
+    error_message = "both flags reach SSM with the record bound and every gate met"
+  }
+}
+
+run "estimation_may_turn_on_without_quotation" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-estimation-only.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-approved.json"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_MTQ_ESTIMATION_ENABLED"] == "true" && local.app_config["VEDA_MTQ_QUOTATION_ENABLED"] == "false"
+    error_message = "estimation without quotation is allowed"
+  }
+}
+
+run "quotation_without_estimation_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-commercial-quotation-only.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "the_commercial_flags_with_the_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path = "tests/fixtures/platform-commercial-on-draft.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "a_record_allowing_customer_issuance_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-on-customer-issuance.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-customer-issuance.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "the_commercial_record_approved_by_its_author_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-on-self.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-self-approved.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "the_commercial_flags_bound_to_another_record_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-on.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-self-approved.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "estimation_without_the_site_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-on-no-site.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-approved.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}
+
+run "a_bound_commercial_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-digest-without-flag.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-approved.json"
+  }
+  expect_failures = [output.mtq_commercial]
+}

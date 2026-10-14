@@ -162,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config, local.attachment_config
+    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config
   )
 }
 
@@ -241,6 +241,40 @@ locals {
     VEDA_ATTACHMENT_SCANNER            = local.scanner.mode
     VEDA_ATTACHMENT_CLAMD_ADDRESS      = "clamd:3310"
     VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS = tostring(local.attachments.upload_ttl_seconds)
+  }
+}
+
+# MTQ B2-B4 commercial flags (decision log 33, infra/config/staging-platform.json "mtq_commercial"). Both parameters are
+# always planned and false by default. VEDA_MTQ_ESTIMATION_ENABLED (scope, BOQ, estimate) turns on only with the B1 site
+# flag on, estimation_enabled true AND enablement_record_sha256 equal to the SHA-256 of an APPROVED, staging-only,
+# internal-validation-only infra/config/mtq-commercial-enablement-record.json with every evidence field filled.
+# VEDA_MTQ_QUOTATION_ENABLED (B4 quotations) needs the estimation flag; estimation may be on without it. Output
+# "mtq_commercial" refuses anything else; the API refuses both flags in production and the same dependencies at start.
+locals {
+  mtq_commercial = try(local.platform.mtq_commercial, {
+    status = "DECIDED", estimation_enabled = false, quotation_enabled = false, enablement_record_sha256 = null
+  })
+  commercial_record_path = var.mtq_commercial_record_path != "" ? var.mtq_commercial_record_path : "${path.module}/../../../config/mtq-commercial-enablement-record.json"
+  commercial_record      = try(jsondecode(file(local.commercial_record_path)), {})
+  commercial_evidence    = try(local.commercial_record.evidence, {})
+  commercial_run_ids     = ["ci_run_id", "deploy_flags_off_run_id", "migration_verification_run_id", "infra_apply_run_id", "drift_run_id"]
+  # Every reason the record cannot enable the flags; empty means it can (read only when estimation_enabled is true).
+  commercial_record_problems = concat(
+    fileexists(local.commercial_record_path) ? [] : ["the record file is missing"],
+    try(local.commercial_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.commercial_record.environment, "") == "staging" && try(local.commercial_record.production, true) == false ? [] : ["the record is not staging-only"],
+    try(local.commercial_record.scope.internal_protected_staging_validation_only, false) == true && try(local.commercial_record.scope.customer_issuance, true) == false ? [] : ["the record does not limit itself to internal validation without customer issuance"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.commercial_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.commercial_record.approved_by, "")) != "" && !strcontains(upper(try(local.commercial_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.commercial_record.approved_by, "") != try(local.commercial_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k in concat(["independent_review", "regression_checks", "production_isolation"], local.commercial_run_ids) :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.commercial_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.commercial_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in local.commercial_run_ids : "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.commercial_evidence[k], ""))))],
+    fileexists(local.commercial_record_path) && try(local.mtq_commercial.enablement_record_sha256, null) == (fileexists(local.commercial_record_path) ? filesha256(local.commercial_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  commercial_config = {
+    VEDA_MTQ_ESTIMATION_ENABLED = local.mtq_commercial.estimation_enabled ? "true" : "false"
+    VEDA_MTQ_QUOTATION_ENABLED  = local.mtq_commercial.quotation_enabled ? "true" : "false"
   }
 }
 
