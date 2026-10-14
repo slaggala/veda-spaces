@@ -24,9 +24,9 @@ from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, re
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants, journey, pricing, projection, references, selections
+from . import grants, journey, pricing, projection, references, requests, selections
 from . import schemas as S
-from .models import ProposalAccessGrant
+from .models import CustomerProposalRequest, ProposalAccessGrant
 
 staff_api = Api("cqx_staff", "/api/v1", tags=("customer-proposal",))
 public_api = Api("cqx_public", "/api/v1/public", tags=("customer-proposal",))
@@ -196,18 +196,70 @@ def choose_optional(req: Req):
     return private(ok(selections.summary(req.session, q)))
 
 
+@interaction_api.route("POST", "/proposal/requests", rbx="RBX-009", auth="public", body=S.RequestIn, status=201,
+                       max_body=PUBLIC_MAX_BODY, requirement="CQX-007", limits=WRITE_LIMITS,
+                       summary="Ask a question or request a change (sent to staff; it never changes the quotation)")  # fmt: skip
+def submit_request(req: Req):
+    g, q = customer(req)
+    requests.submit(req.session, g, q, req.body, req.headers.get("Idempotency-Key"))
+    return private(ok(requests.for_customer(req.session, g), status=201))
+
+
+@interaction_api.route("GET", "/proposal/requests", rbx="RBX-009", auth="public", write=False, requirement="CQX-007",
+                       limits=READ_LIMITS, summary="The customer's own questions and change requests, with answers")  # fmt: skip
+def list_requests(req: Req):
+    g, _q = customer(req)
+    return private(ok(requests.for_customer(req.session, g)))
+
+
 # --- staff: what the customer did -------------------------------------------------------------------------------------
 @staff_api.route("GET", "/quotations/<quotation_id>/customer-activity", permission="proposal.request.review",
                  write=False, requirement="CQX-004",
                  summary="The customer's optional-item choices, questions, change requests and acknowledgements")  # fmt: skip
 def customer_activity(req: Req, quotation_id: str):
     q = _quotation(req, quotation_id, "proposal.request.review")
-    return ok({"selections": selections.staff_view(req.session, q), "summary": selections.summary(req.session, q)})
+    return ok({"selections": selections.staff_view(req.session, q), "summary": selections.summary(req.session, q),
+               "requests": requests.staff_view(req.session, q)})  # fmt: skip
+
+
+def _request(req: Req, request_id: str) -> CustomerProposalRequest:
+    r = access.row_visible(req.session, req.ctx, CustomerProposalRequest, request_id, "proposal.request.review")
+    access.for_write(req.session, req.ctx, r.lead_id, r.property_id, "proposal.request.review", r)
+    req.require_version(r.version)
+    return r
+
+
+def _request_out(req: Req, r: CustomerProposalRequest) -> dict:
+    req.session.flush()
+    q = req.session.get(Quotation, r.quotation_id)
+    assert q is not None  # FK
+    return next(x for x in requests.staff_view(req.session, q) if x["id"] == r.id)
+
+
+@staff_api.route("POST", "/customer-requests/<request_id>/respond", permission="proposal.request.review",
+                 body=S.RespondIn, if_match=True, requirement="CQX-004",
+                 summary="Answer a customer question or change request (the answer is shown to the customer)")  # fmt: skip
+def respond_request(req: Req, request_id: str):
+    r = _request(req, request_id)
+    requests.respond(req.session, req.ctx, r, req.body.status, req.body.response)
+    return ok(_request_out(req, r))
+
+
+@staff_api.route("POST", "/customer-requests/<request_id>/link", permission="proposal.request.review",
+                 body=S.LinkRequestIn, if_match=True, requirement="CQX-004",
+                 summary="Link the revised version or variation that answers a change request")  # fmt: skip
+def link_request(req: Req, request_id: str):
+    r = _request(req, request_id)
+    target = _quotation(req, req.body.resulting_quotation_id, "quotation.read")
+    requests.link(req.session, req.ctx, r, target, req.body.response)
+    return ok(_request_out(req, r))
 
 
 journey.register(references.contribute)
 journey.register(pricing.contribute)
 journey.register(selections.contribute)
+journey.register(requests.contribute)
+journey.PAGE_FIELDS.update(requests.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(pricing.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(selections.PAGE_FIELDS)
 

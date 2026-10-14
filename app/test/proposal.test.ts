@@ -191,6 +191,45 @@ describe('optional items (CQX-06)', () => {
   });
 });
 
+describe('questions and change requests (CQX-07)', () => {
+  const asked = (over: Partial<Page> = {}) => samplePage({ capabilities: { interaction: true, acceptance: false },
+    requests: { can_ask: true, items: [{ ref: '#1', category: 'CHANGE_FINISH', category_label: 'Change a finish', line_ref: 'L1', room: 'Master bedroom',
+      about_version: 1, about_variation: 0, message: '<img src=x onerror=alert(1)> acrylic please', requested_quantity: null, status: 'NEEDS_CLARIFICATION',
+      status_label: 'We need a little more detail', response: 'Which colour?', sent_on: '2026-10-14T10:00:00Z', responded_on: null, answered_by_revision: null }] }, ...over });
+
+  it('lists the customer\'s requests as text (never markup) with the answer, and asks only what the category needs', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${asked()}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#questions')!;
+    expect(sec.querySelector('img')).to.equal(null);
+    expect(sec.querySelector('.msg')!.textContent).to.contain('<img src=x');
+    expect(sec.textContent).to.contain('Which colour?');
+    expect(sec.querySelector('select[name=line]')).to.equal(null);
+    const cat = sec.querySelector('select[name=category]') as HTMLSelectElement;
+    cat.value = 'CHANGE_QUANTITY';
+    cat.dispatchEvent(new Event('change'));
+    await el.updateComplete;
+    expect(sec.querySelector('select[name=line]')).to.exist;
+    expect(sec.querySelector('input[name=quantity]')).to.exist;
+    await expect(el).to.be.accessible();
+  });
+
+  it('sends one request per submission with a stable idempotency key and clears the form', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'q'.repeat(43)}`);
+    const calls = serve((path) => json(path.endsWith('/requests') ? [] : asked()));
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const form = view.shadowRoot!.querySelector('#questions form') as HTMLFormElement;
+    (form.querySelector('textarea') as HTMLTextAreaElement).value = 'Could the kitchen be ready earlier?';
+    form.requestSubmit();
+    await waitUntil(() => view.announcement.includes('sent to Veda Spaces'));
+    const post = calls.find((c) => c.path.endsWith('/requests'))!;
+    expect(post.headers['Idempotency-Key']).to.match(/^[a-f0-9]{32}$/);
+    expect((form.querySelector('textarea') as HTMLTextAreaElement).value).to.equal('');
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 

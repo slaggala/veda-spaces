@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import type { ApiProblem } from '../../core/api/problem.js';
 import { shared } from '../../design-system/styles.js';
-import { forgetToken, proposalApi, takeToken, type Page } from './api.js';
+import { forgetToken, newKey, proposalApi, takeToken, type Page } from './api.js';
 import './proposal-view.js';
 
 type Load = 'loading' | 'ready' | 'refused' | 'offline';
@@ -78,6 +78,24 @@ export class VsProposalPage extends LitElement {
     }
   }
 
+  /** One key per form submission: a retry after a slow network sends the same request, never a duplicate. */
+  private askKey: string | null = null;
+
+  private onAsk(e: CustomEvent<{ body: Record<string, unknown>; form: HTMLFormElement }>) {
+    const { body, form } = e.detail;
+    if (String(body.message ?? '').trim().length < 3) {
+      this.errors = [{ field: 'message', message: 'Please write your message (at least 3 characters).' }];
+      return;
+    }
+    this.askKey ??= newKey();
+    const key = this.askKey;
+    void this.act(async () => {
+      await proposalApi(this.token ?? '').ask(body, key);
+      this.askKey = null;
+      form.reset();
+    }, 'Your message was sent to Veda Spaces.');
+  }
+
   private onSelect(e: CustomEvent<{ line_ref: string; state: string; description: string }>) {
     const { line_ref, state, description } = e.detail;
     const words = { SELECTED: 'added to your choices', DESELECTED: 'marked not for you', REQUESTED_FOR_DISCUSSION: 'marked for discussion' }[state] ?? 'saved';
@@ -126,7 +144,7 @@ export class VsProposalPage extends LitElement {
   override render() {
     if (this.load === 'ready' && this.page) {
       return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
-        @proposal-select=${this.onSelect}></vs-proposal-view>`;
+        @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk}></vs-proposal-view>`;
     }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`

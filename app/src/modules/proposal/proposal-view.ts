@@ -21,8 +21,10 @@ export const rupees = (v: string | null | undefined) => (v ? `₹ ${v}` : null);
 export class VsProposalView extends LitElement {
   static override properties = {
     page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
-    announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false },
+    announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
   };
+  /** The category chosen in the question form (decides which fields it asks for). */
+  declare askCategory: string;
   /** Polite screen-reader announcement of the last action's result (set by the page). */
   declare announcement: string;
   /** An action is in flight: controls are disabled (slow networks never double-submit). */
@@ -101,6 +103,11 @@ export class VsProposalView extends LitElement {
     .choice { display: inline-flex; align-items: center; gap: 8px; min-height: var(--vs-target); padding: 0 var(--vs-space-3);
       border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control); cursor: pointer; background: var(--vs-surface); }
     .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; }
+    .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-3); }
+    .request { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
+    .msg, .reply { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; } .reply { padding-left: var(--vs-space-3); border-left: 2px solid var(--vs-copper); }
+    textarea, select, input:not([type=radio]) { font: inherit; padding: 8px 10px; border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control);
+      background: var(--vs-surface); color: var(--vs-ink); max-width: 100%; box-sizing: border-box; width: 100%; }
     .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--vs-space-3); margin: 0; }
     .summary dt { color: var(--vs-ink-muted); } .summary dd { margin: 0; text-align: right; font-weight: 600; white-space: nowrap; }
     .summary dt.total, .summary dd.total { font-size: 18px; color: var(--vs-ink); border-top: 2px solid var(--vs-ink); padding-top: 6px; }
@@ -127,6 +134,7 @@ export class VsProposalView extends LitElement {
     this.announcement = '';
     this.busy = false;
     this.errors = [];
+    this.askCategory = 'GENERAL_QUESTION';
   }
 
   override connectedCallback() {
@@ -299,7 +307,50 @@ export class VsProposalView extends LitElement {
   /** The proposal's sections after the rooms, in reading order. */
   protected sections(page: Page): TemplateResult {
     return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
-      ${this.optionalPanel(page)}${this.pricingPanel(page)}`;
+      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.questionsPanel(page)}`;
+  }
+
+  // --- CQX-07 questions and change requests -------------------------------------------------------------------------
+  protected questionsPanel(page: Page): TemplateResult | typeof nothing {
+    const r = page.requests;
+    if (!r || this.preview) return nothing;
+    const cats: [string, string][] = [['GENERAL_QUESTION', 'A question about the proposal'], ['LINE_QUESTION', 'A question about an item'],
+      ['ADD_ITEM', 'Add an item'], ['REMOVE_ITEM', 'Remove an item'], ['CHANGE_QUANTITY', 'Change a quantity'],
+      ['CHANGE_MATERIAL', 'Change a material'], ['CHANGE_FINISH', 'Change a finish'], ['DISCUSS_PRICE', 'Discuss the price']];
+    const needsLine = ['LINE_QUESTION', 'REMOVE_ITEM', 'CHANGE_QUANTITY', 'CHANGE_MATERIAL', 'CHANGE_FINISH'].includes(this.askCategory);
+    const allLines = [...page.proposal.rooms.flatMap((room) => room.lines.map((x) => ({ ...x, room_title: room.title }))), ...page.proposal.optional_items];
+    const submit = (e: Event) => {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const f = new FormData(form);
+      const body: Record<string, unknown> = { category: this.askCategory, message: String(f.get('message') ?? '') };
+      if (needsLine) body.line_ref = f.get('line') || null;
+      if (this.askCategory === 'ADD_ITEM' && f.get('room')) body.room_ref = f.get('room');
+      if (this.askCategory === 'CHANGE_QUANTITY' && f.get('quantity')) body.requested_quantity = f.get('quantity');
+      this.emit('proposal-ask', { body, form });
+    };
+    return html`<section class="card stack" aria-labelledby="qs" id="questions"><h2 id="qs">Questions and changes</h2>
+      <p class="small muted">Ask anything, or tell us what you would like changed. Your message goes to Veda Spaces; it does not change this proposal. If a change is agreed, you will receive a revised proposal.</p>
+      ${r.items.length ? html`<ol class="requests">${r.items.map((i) => html`<li class="request">
+          <div class="optrow"><span class="strong">${i.category_label}${i.room ? html` · ${i.room}` : nothing}</span><span class="tag">${i.status_label}</span></div>
+          <p class="msg">${i.message}</p>${i.requested_quantity ? html`<p class="small">Requested quantity: ${i.requested_quantity}</p>` : nothing}
+          ${i.response ? html`<p class="reply"><span class="small muted">Veda Spaces:</span> ${i.response}</p>` : nothing}
+          ${i.answered_by_revision ? html`<p class="small">Answered in ${i.answered_by_revision}.</p>` : nothing}</li>`)}</ol>` : nothing}
+      ${r.can_ask ? html`<form class="stack" @submit=${submit} novalidate>
+          <label class="field"><span class="label">What is it about?</span>
+            <select name="category" @change=${(e: Event) => { this.askCategory = (e.target as HTMLSelectElement).value; }} ?disabled=${this.busy}>
+              ${cats.map(([v, l]) => html`<option value=${v} ?selected=${v === this.askCategory}>${l}</option>`)}</select></label>
+          ${needsLine ? html`<label class="field"><span class="label">Which item?</span><select name="line" required ?disabled=${this.busy}>
+              <option value="">Choose an item</option>${allLines.map((x) => html`<option value=${x.ref}>${x.room_title ? `${x.room_title} – ` : ''}${x.description}</option>`)}</select></label>` : nothing}
+          ${this.askCategory === 'ADD_ITEM' ? html`<label class="field"><span class="label">Which room? (optional)</span><select name="room" ?disabled=${this.busy}>
+              <option value="">Anywhere / not sure</option>${page.proposal.rooms.map((room) => html`<option value=${room.ref}>${room.title}</option>`)}</select></label>` : nothing}
+          ${this.askCategory === 'CHANGE_QUANTITY' ? html`<label class="field"><span class="label">What quantity would you like?</span>
+              <input name="quantity" maxlength="40" autocomplete="off" ?disabled=${this.busy}></label>` : nothing}
+          <label class="field"><span class="label">Your message</span><textarea name="message" required minlength="3" maxlength="2000" rows="4" ?disabled=${this.busy}></textarea>
+            <span class="hint">Up to 2000 characters. Please do not include payment or bank details.</span></label>
+          <div><button class="btn primary" ?disabled=${this.busy}>Send to Veda Spaces</button></div></form>`
+        : html`<p class="muted">Questions and change requests are not available on this proposal here. Please contact your Veda Spaces representative.</p>`}
+    </section>`;
   }
 
   // --- CQX-06 optional items ------------------------------------------------------------------------------------------

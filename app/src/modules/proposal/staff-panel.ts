@@ -3,7 +3,7 @@ import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatAbsolute, humanize } from '../../core/format/format.js';
 import { shared, tableStyles } from '../../design-system/styles.js';
-import { previewPage, staffProposal, type Activity, type Grant, type Preview } from './api.js';
+import { previewPage, staffProposal, type Activity, type Grant, type Preview, type StaffRequest } from './api.js';
 import './proposal-view.js';
 
 const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
@@ -16,8 +16,9 @@ const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
 export class VsProposalStaff extends SessionElement {
   static override properties = {
     quotationId: { attribute: false }, quotationStatus: { attribute: false }, grants: { state: true }, preview: { state: true },
-    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true },
+    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true },
   };
+  declare chain: { id: string; label: string; status: string }[];
   declare activity: Activity | null;
   declare quotationId: string;
   declare quotationStatus: string;
@@ -33,12 +34,13 @@ export class VsProposalStaff extends SessionElement {
     button, select, input { min-height: 44px; }
     .once { border: 1px solid var(--vs-success); border-left-width: 3px; border-radius: 8px; padding: 12px 16px; background: var(--vs-surface); overflow-wrap: anywhere; }
     .preview { border: 1px solid var(--vs-line); border-radius: 8px; background: var(--vs-paper); }
+    .msg { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
   `];
 
   constructor() {
     super();
     this.quotationId = ''; this.quotationStatus = ''; this.grants = []; this.preview = null; this.issued = null;
-    this.problem = null; this.busy = false; this.activity = null;
+    this.problem = null; this.busy = false; this.activity = null; this.chain = [];
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -64,6 +66,7 @@ export class VsProposalStaff extends SessionElement {
   /** What the customer did on this version (choices, and later requests and acknowledgements). */
   protected async loadMore(): Promise<void> {
     this.activity = this.can('proposal.request.review') ? (await staffProposal.activity(this.quotationId)).data : null;
+    this.chain = this.activity?.requests.length && this.can('quotation.read') ? (await staffProposal.chain(this.quotationId)).data.versions : [];
   }
 
   private share(e: Event) {
@@ -88,10 +91,41 @@ export class VsProposalStaff extends SessionElement {
     </div>`;
   }
 
+  private answer(e: Event, r: StaffRequest) {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const status = String(f.get('status'));
+    const response = (f.get('response') as string) || null;
+    const target = f.get('target') as string | null;
+    void this.act(() => (status === 'LINK' && target ? staffProposal.link(r, target, response) : staffProposal.respond(r, status, response)));
+  }
+
+  private requestsTable(requests: StaffRequest[]) {
+    const statuses = ['UNDER_REVIEW', 'NEEDS_CLARIFICATION', 'DECLINED', 'RESOLVED'];
+    return html`<section class="card stack" aria-labelledby="creq"><h3 id="creq" class="title">Customer questions and change requests</h3>
+      ${requests.length ? requests.map((r) => html`<article class="stack card" aria-label=${`Request from ${humanize(r.recipient_kind ?? '')}`}>
+        <div class="row"><span class="chip">${humanize(r.category)}</span><span class="chip">${humanize(r.status)}</span>
+          <span class="small muted">v${r.version_no}${r.variation_no ? ` · variation ${r.variation_no}` : ''} · ${humanize(r.recipient_kind ?? '')} · ${formatAbsolute(r.sent_on)}</span></div>
+        ${r.room || r.line_ref ? html`<div class="small">${r.room ?? ''}${r.line_ref ? ` · line ${r.line_ref}` : ''}${r.requested_quantity ? ` · quantity ${r.requested_quantity}` : ''}</div>` : nothing}
+        <p class="msg">${r.message}</p>
+        ${r.response ? html`<p class="small">Answer shown to the customer: ${r.response}</p>` : nothing}
+        ${r.resulting_label ? html`<p class="small">Answered by ${r.resulting_label}</p>` : nothing}
+        ${['DECLINED', 'RESOLVED'].includes(r.status) ? nothing : html`<form class="actions" @submit=${(e: Event) => this.answer(e, r)}>
+          <label class="field"><span class="label">Status</span><select name="status">
+            ${statuses.map((st) => html`<option value=${st}>${humanize(st)}</option>`)}${this.chain.length ? html`<option value="LINK">Answered by a revision</option>` : nothing}</select></label>
+          ${this.chain.length ? html`<label class="field"><span class="label">Revision</span><select name="target"><option value="">—</option>
+            ${this.chain.map((v) => html`<option value=${v.id}>${v.label} (${humanize(v.status)})</option>`)}</select></label>` : nothing}
+          <label class="field"><span class="label">Answer (the customer sees it)</span><input name="response" maxlength="2000"></label>
+          <button class="btn" ?disabled=${this.busy}>Save</button></form>`}
+      </article>`) : html`<p class="muted">No questions or change requests yet.</p>`}
+      <p class="small muted">Customer text is never added to scope. Agree a change by revising the scope and pricing as usual, then link the revised version or variation here.</p>
+    </section>`;
+  }
+
   protected more(): TemplateResult | typeof nothing {
     const a = this.activity;
     if (!a) return nothing;
-    return html`<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
+    return html`${this.requestsTable(a.requests)}<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
       ${a.selections.length ? html`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Choice</th><th>Changes</th><th>Last change</th></tr></thead>
         <tbody>${a.selections.map((x) => html`<tr><td>${x.description ?? x.line_ref}</td><td><span class="chip">${humanize(x.state)}</span></td>
           <td>${x.change_no}</td><td>${formatAbsolute(x.changed_on)}</td></tr>`)}</tbody></table></div>

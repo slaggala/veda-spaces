@@ -48,6 +48,11 @@ export interface Selections {
   items: { ref: string; state: 'NOT_SELECTED' | 'SELECTED' | 'DESELECTED' | 'REQUESTED_FOR_DISCUSSION'; priced: boolean }[];
   selected_refs: string[]; status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED'; extra: string | null; total_with_selections: string | null;
 }
+export interface CustomerRequest {
+  ref: string; category: string; category_label: string; line_ref: string | null; room: string | null; about_version: number;
+  about_variation: number; message: string; requested_quantity: string | null; status: string; status_label: string;
+  response: string | null; sent_on: string; responded_on: string | null; answered_by_revision: string | null;
+}
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -61,6 +66,7 @@ export interface Page {
   specifications?: Specifications | null;
   pricing?: Pricing;
   selections?: Selections;
+  requests?: { can_ask: boolean; items: CustomerRequest[] };
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
 
@@ -93,6 +99,8 @@ export function proposalApi(token: string) {
     view: () => api.request<Page>(BASE, { anonymous: true, headers }),
     select: (line_ref: string, state: string) =>
       api.request<Selections>(`${BASE}/selections`, { method: 'POST', anonymous: true, headers, body: { line_ref, state }, idempotencyKey: newKey() }),
+    ask: (body: Record<string, unknown>, key: string) =>
+      api.request<CustomerRequest[]>(`${BASE}/requests`, { method: 'POST', anonymous: true, headers, body, idempotencyKey: key }),
   };
 }
 
@@ -103,9 +111,15 @@ export interface Grant {
   view_count: number; revoke_reason_code: string | null; shared_on: string; token?: string; link?: string;
 }
 export interface Preview { frozen: boolean; status: string; watermark?: string; proposal: Proposal }
+export interface StaffRequest {
+  id: string; version: number; request_kind: string; category: string; version_no: number; variation_no: number; line_ref: string | null;
+  room: string | null; message: string; requested_quantity: string | null; status: string; response: string | null;
+  recipient_kind: string | null; sent_on: string; responded_on: string | null; resulting_quotation_id: string | null; resulting_label: string | null;
+}
 export interface Activity {
   selections: { line_ref: string; description: string | null; state: string; change_no: number; changed_on: string }[];
   summary: Selections;
+  requests: StaffRequest[];
 }
 
 const P = '/api/v1';
@@ -117,6 +131,11 @@ export const staffProposal = {
   revoke: (g: Grant) => api.request<Grant>(`${P}/proposal-access-grants/${g.id}/revoke`, { method: 'POST', ifMatch: g.version }),
   preview: (quotationId: string) => api.get<Preview>(`${P}/quotations/${quotationId}/proposal-preview`),
   activity: (quotationId: string) => api.get<Activity>(`${P}/quotations/${quotationId}/customer-activity`),
+  respond: (r: StaffRequest, status: string, response: string | null) =>
+    api.request<StaffRequest>(`${P}/customer-requests/${r.id}/respond`, { method: 'POST', body: { status, response }, ifMatch: r.version }),
+  link: (r: StaffRequest, resulting_quotation_id: string, response: string | null) =>
+    api.request<StaffRequest>(`${P}/customer-requests/${r.id}/link`, { method: 'POST', body: { resulting_quotation_id, response }, ifMatch: r.version }),
+  chain: (quotationId: string) => api.get<{ versions: { id: string; label: string; status: string }[] }>(`${P}/quotations/${quotationId}/chain`),
 };
 
 /** A staff preview as a page model: the customer's view with no live state and no actions. */
