@@ -15,8 +15,7 @@ Lifecycle::
 
 Requests are open on a proposal that is open, past its validity (a revision may follow) or accepted (a change after
 acceptance is a variation); not on a superseded or withdrawn one. Each submission needs an Idempotency-Key: a retry
-returns the same request, never a duplicate. A customer sees the requests sent through links for the same quotation and
-the same recipient kind only, never another recipient's.
+returns the same request, never a duplicate. A customer sees only the requests sent through their own link (CQX N4).
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ from sqlalchemy.orm import Session
 
 from veda.kernel import clock, db, outbox
 from veda.kernel.errors import ApiError, field_error
-from veda.modules.mtq import sets as site_sets
 from veda.modules.mtq_commercial import quotations
 from veda.modules.mtq_commercial.models import Quotation
 
@@ -72,12 +70,14 @@ def submit(
     s: Session, g: ProposalAccessGrant, q: Quotation, body, idempotency_key: str | None
 ) -> CustomerProposalRequest:
     digest = key_digest(idempotency_key)
+    grants.locked(s, g, q)  # lock first, then re-read the link and the quotation (CQX N5)
+    if q.issued_on is None or q.snapshot is None:  # only ever an issued, frozen version (CQX N12)
+        raise grants.link_invalid()
     projection.frozen_document(q)
     state = grants.proposal_state(s, q)
     if state not in ASKABLE_STATES:
         raise ApiError(409, "PROPOSAL_NOT_OPEN", "Please use the latest proposal link from Veda Spaces to ask about it.",
                        extra={"state": state})  # fmt: skip
-    site_sets.lock_property(s, q.property_id)
     again = s.execute(
         sa.select(CustomerProposalRequest).where(CustomerProposalRequest.grant_id == g.id,
                                                  CustomerProposalRequest.client_key_sha256 == digest)
@@ -93,7 +93,7 @@ def submit(
     if int(open_count or 0) >= MAX_OPEN_PER_LINK:
         raise ApiError(429, "TOO_MANY_OPEN_REQUESTS", "You have many requests waiting. Veda Spaces will answer them "
                        "first; please contact your representative directly if it is urgent.")  # fmt: skip
-    refs = projection.refs(s, q)
+    refs = projection.printed(s, q)[0]  # only lines the customer can see (CQX N3)
     line = None
     if body.line_ref is not None:
         line = refs.get(body.line_ref)
@@ -150,19 +150,18 @@ def _label(s: Session, quotation_id: str | None) -> str | None:
 
 
 def for_customer(s: Session, g: ProposalAccessGrant) -> list[dict[str, Any]]:
-    """Requests sent through links for the same quotation and recipient kind (never another recipient's)."""
+    """The requests sent through this exact link, and nobody else's (CQX N4). A new link, even for the same recipient
+    kind or a rotation of this one, starts with no conversation: whether a conversation may be shared across links or
+    recipients is an owner decision not yet made, so nothing is inferred from the recipient kind."""
     rows = s.execute(
-        sa.select(CustomerProposalRequest).join(ProposalAccessGrant, ProposalAccessGrant.id == CustomerProposalRequest.grant_id)
-        .where(CustomerProposalRequest.quotation_number == g.quotation_number,
-               ProposalAccessGrant.recipient_kind == g.recipient_kind)
+        sa.select(CustomerProposalRequest).where(CustomerProposalRequest.grant_id == g.id)
         .order_by(CustomerProposalRequest.created_on)
     ).scalars().all()  # fmt: skip
     return [{"ref": f"#{n}", "category": r.category_code, "category_label": CATEGORY_LABEL[r.category_code],
-             "line_ref": r.line_ref if r.quotation_id == g.quotation_id else None, "room": r.room_label,
-             "about_version": r.version_no, "about_variation": r.variation_no, "message": r.body,
-             "requested_quantity": r.requested_quantity, "status": r.status, "status_label": STATUS_LABEL[r.status],
-             "response": r.staff_response if r.status != "OPEN" else None,
-             "sent_on": clock.to_rfc3339(r.created_on),
+             "line_ref": r.line_ref, "room": r.room_label, "about_version": r.version_no,
+             "about_variation": r.variation_no, "message": r.body, "requested_quantity": r.requested_quantity,
+             "status": r.status, "status_label": STATUS_LABEL[r.status],
+             "response": r.staff_response if r.status != "OPEN" else None, "sent_on": clock.to_rfc3339(r.created_on),
              "responded_on": clock.to_rfc3339(r.responded_on) if r.responded_on else None,
              "answered_by_revision": _label(s, r.resulting_quotation_id)} for n, r in enumerate(rows, start=1)]  # fmt: skip
 
@@ -171,7 +170,7 @@ def respond(s: Session, ctx, r: CustomerProposalRequest, status: str, response: 
     allowed = TRANSITIONS.get(r.status, ())
     if status not in allowed:
         raise ApiError(409, "INVALID_STATE", f"A request that is {r.status.lower().replace('_', ' ')} cannot become "
-                       f"{status.lower().replace('_', ' ')}.", extra={"status": r.status, "allowed": list(allowed)})  # fmt: skip
+                       f"{status.lower().replace('_', ' ')}.", extra={"request_status": r.status, "allowed": list(allowed)})  # fmt: skip
     if status in RESPONSE_REQUIRED and not response:
         raise ApiError(422, "VALIDATION_FAILED", "Tell the customer why.",
                        errors=[field_error("response", "REQUIRED", "A response is required for this status.")])  # fmt: skip
@@ -198,6 +197,11 @@ def link(
     )
     if target.property_id != r.property_id or not newer:
         raise ApiError(422, "LINEAGE_MISMATCH", "Link a newer version or a variation of the same quotation.")
+    if target.issued_on is None or target.snapshot is None or target.status not in ("ISSUED", "ACCEPTED"):
+        # A customer only ever sees issued, frozen versions: a draft, a version in review, an approved but unissued or
+        # a superseded version is never named to them (CQX N12). Link it once it is issued.
+        raise ApiError(409, "VERSION_NOT_ISSUED", "Link the revision once it is issued to the customer.",
+                       extra={"quotation_status": target.status})  # fmt: skip
     if r.status in FINAL:
         raise ApiError(409, "INVALID_STATE", "This request is already closed.")
     frm = r.status

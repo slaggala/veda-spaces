@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 
 from veda.kernel import outbox
 from veda.kernel.errors import ApiError, field_error
-from veda.modules.mtq import sets as site_sets
 from veda.modules.mtq_commercial.models import Quotation, QuotationLine
 
 from . import events, grants, policy, projection
@@ -52,12 +51,19 @@ def current(s: Session, q: Quotation) -> dict[str, CustomerOptionalSelection]:
 
 
 def optional_lines(s: Session, q: Quotation) -> dict[str, QuotationLine]:
-    return {ref: x for ref, x in projection.refs(s, q).items() if x.is_optional}
+    """The optional lines the customer can see in the frozen document (never a line it omits; CQX N3)."""
+    return projection.printed(s, q)[1]
 
 
 def line_value(x: QuotationLine) -> int:
     """What choosing ``x`` adds, exactly as the B4 decision adds it: taxable amount plus its GST."""
     return int(x.amount_minor or 0) - int(x.discount_minor or 0) + int(x.tax_minor or 0)
+
+
+def frozen_value(s: Session, q: Quotation, refs: list[str]) -> int:
+    """What the chosen printed optional items add, from their frozen prices (never mutable rows; CQX N1)."""
+    values = projection.frozen_values(s, q)["optional_minor"]
+    return sum(values.get(r, 0) for r in refs)
 
 
 def selected_lines(s: Session, q: Quotation) -> list[QuotationLine]:
@@ -66,18 +72,18 @@ def selected_lines(s: Session, q: Quotation) -> list[QuotationLine]:
 
 
 def choose(s: Session, g: ProposalAccessGrant, q: Quotation, line_ref: str, state: str) -> CustomerOptionalSelection:
-    projection.frozen_document(q)  # never act on a version whose frozen document does not verify
     if g.recipient_kind not in V.DECIDING_KINDS:
         raise ApiError(403, "RECIPIENT_NOT_AUTHORISED", "Only the primary customer's link can choose optional items; "
                        "you can ask Veda Spaces about them.")  # fmt: skip
+    grants.locked(s, g, q)  # lock first, then re-read the link and the quotation (CQX N5)
+    projection.frozen_document(q)  # never act on a version whose frozen document does not verify
     require_open(s, q)
-    site_sets.lock_property(s, q.property_id)  # one writer per property at a time (staff and customer alike)
     lines = optional_lines(s, q)
     line = lines.get(line_ref)
     if line is None:
         raise ApiError(422, "VALIDATION_FAILED", "Please choose one of the optional items of this proposal.",
                        errors=[field_error("line_ref", "NOT_OPTIONAL", "Not an optional item of this proposal.")])  # fmt: skip
-    if state == "SELECTED" and not line.is_priced:
+    if state == "SELECTED" and (not line.is_priced or line_ref not in projection.frozen_values(s, q)["optional_minor"]):
         raise ApiError(422, "VALIDATION_FAILED", "This item has no confirmed price yet; ask Veda Spaces about it.",
                        errors=[field_error("state", "PRICE_CONFIRMATION_REQUIRED", "Not priced yet.")])  # fmt: skip
     row = current(s, q).get(line_ref)
@@ -105,8 +111,8 @@ def summary(s: Session, q: Quotation) -> dict[str, Any]:
     rows = current(s, q)
     chosen = selected_lines(s, q)
     decided = policy.decision("CQX-D02")
-    live = bool(decided and decided.live_total) and q.total_minor is not None
-    extra = sum(line_value(x) for x in chosen)
+    live = bool(decided and decided.live_total) and q.total_minor is not None and q.snapshot is not None
+    extra = frozen_value(s, q, [f"L{x.position}" for x in chosen]) if chosen else 0
     return {
         "items": [
             {"ref": ref, "state": rows[ref].state if ref in rows else "NOT_SELECTED", "priced": x.is_priced}
@@ -115,7 +121,7 @@ def summary(s: Session, q: Quotation) -> dict[str, Any]:
         "selected_refs": [ref for ref, r in sorted(rows.items()) if r.state == "SELECTED" and ref in lines],
         "status": "CALCULATED" if live else PRICE_CONFIRMATION_REQUIRED,
         "extra": money(extra) if live and chosen else None,
-        "total_with_selections": money(int(q.total_minor or 0) + extra) if live else None,
+        "total_with_selections": money(projection.frozen_values(s, q)["total_minor"] + extra) if live else None,
     }
 
 

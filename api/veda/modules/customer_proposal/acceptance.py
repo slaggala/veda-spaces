@@ -43,7 +43,6 @@ from veda.kernel.ids import ANONYMOUS_USER_ID
 from veda.kernel.jcs import canonical_bytes
 from veda.modules.crm.leads import service as lead_service
 from veda.modules.crm.leads.models import Lead
-from veda.modules.mtq import sets as site_sets
 from veda.modules.mtq_commercial import policy as commercial_policy
 from veda.modules.mtq_commercial import quotations
 from veda.modules.mtq_commercial.models import Quotation
@@ -120,10 +119,21 @@ def blockers(s: Session, g: ProposalAccessGrant, q: Quotation, decision: str = "
 
 
 def total_to_accept(s: Session, q: Quotation) -> int | None:
-    chosen = selections.selected_lines(s, q)
-    if q.total_minor is None:
+    """The total with the customer's chosen items, from the frozen document only (CQX N1)."""
+    if q.total_minor is None or q.snapshot is None:
         return None
-    return int(q.total_minor) + sum(selections.line_value(x) for x in chosen)
+    frozen = projection.frozen_values(s, q)
+    refs = [f"L{x.position}" for x in selections.selected_lines(s, q)]
+    return frozen["total_minor"] + sum(frozen["optional_minor"].get(r, 0) for r in refs)
+
+
+def request_digest(g: ProposalAccessGrant, q: Quotation, body) -> str:
+    """The canonical content of a decision request; an Idempotency-Key is bound to it (CQX N2)."""
+    return hashlib.sha256(canonical_bytes({
+        "grant_id": g.id, "quotation_id": q.id, "version_no": body.version_no, "decision": body.decision,
+        "snapshot_sha256": body.snapshot_sha256, "displayed_total": body.displayed_total or None,
+        "selected_line_refs": sorted(body.selected_line_refs),
+    })).hexdigest()  # fmt: skip
 
 
 def evidence_of(s: Session, q: Quotation) -> QuotationAcceptanceEvidence | None:
@@ -142,35 +152,50 @@ def decide(s: Session, g: ProposalAccessGrant, q: Quotation, body, idempotency_k
            user_agent: str | None, request_trace: str | None) -> QuotationAcceptanceEvidence:  # fmt: skip
     digest = key_digest(idempotency_key)
     decision = "ACCEPTED" if body.decision == "ACCEPTED" else "DECLINED"
-    site_sets.lock_property(s, q.property_id)
-    s.refresh(q)
-    found = evidence_of(s, q)
-    if found is not None:
-        same = found.decision == decision and sorted(found.selected_line_refs) == sorted(body.selected_line_refs)
-        if found.client_key_sha256 == digest or same:
-            return found  # a retry or a duplicate of the same decision: idempotent
-        raise _refuse("ALREADY_DECIDED", "A decision on this version has already been recorded.")
+    # 1-2. the link is resolved (route); the recipient may decide; lock, then re-read the link and the quotation (N5)
+    if g.recipient_kind not in V.DECIDING_KINDS:
+        raise _refuse("ACCEPTANCE_UNAVAILABLE", "Only the primary customer's link can accept or decline this proposal.",
+                      reasons=["RECIPIENT_NOT_AUTHORISED"])  # fmt: skip
+    grants.locked(s, g, q)
+    # 3-4. schema (closed DTO) and decision type
+    if decision == "DECLINED" and body.selected_line_refs:
+        raise _refuse("VALIDATION_FAILED", "A decline chooses no optional items.", status=422)
+    # 5. the exact version and frozen document; live rows must still match the frozen values (N1)
     if body.version_no != q.version_no:
         raise _refuse("VERSION_MISMATCH", "This decision is for another version of the proposal. Please reload it.")
     projection.frozen_document(q)  # tampered documents are refused before anything else is compared
     if body.snapshot_sha256 != q.snapshot_sha256:
         raise _refuse("PROPOSAL_CHANGED", "The proposal you saw is not this version's document. Please reload it.")
-    found_blockers = blockers(s, g, q, decision)
-    if found_blockers:
-        words = next((b["customer"] for b in found_blockers if b.get("customer")), NOT_AVAILABLE)
-        raise _refuse("ACCEPTANCE_UNAVAILABLE", words, reasons=[b["code"] for b in found_blockers])
+    frozen = projection.frozen_values(s, q)
+    # 8-9. idempotency, for this exact canonical request only (N2)
+    canonical = request_digest(g, q, body)
+    found = evidence_of(s, q)
+    if found is not None:
+        if found.request_sha256 == canonical and found.grant_id == g.id:
+            return found  # an identical retry (same key or not): the recorded decision, nothing new
+        if found.client_key_sha256 == digest:
+            raise _refuse("IDEMPOTENCY_KEY_REUSED", "This request key was already used for a different decision.")
+        raise _refuse("ALREADY_DECIDED", "A decision on this version has already been recorded.")
+    # 6. selections and the total, from the frozen document (N1, N3)
     chosen = selections.selected_lines(s, q) if decision == "ACCEPTED" else []
     chosen_refs = sorted(f"L{x.position}" for x in chosen)
     if decision == "ACCEPTED" and chosen_refs != sorted(body.selected_line_refs):
         raise _refuse("SELECTION_MISMATCH", "Your optional choices changed. Please review them and try again.")
-    if decision == "DECLINED" and body.selected_line_refs:
-        raise _refuse("VALIDATION_FAILED", "A decline chooses no optional items.", status=422)
-    total = total_to_accept(s, q) if decision == "ACCEPTED" else q.total_minor
+    total = (frozen["total_minor"] + sum(frozen["optional_minor"].get(r, 0) for r in chosen_refs)
+             if decision == "ACCEPTED" else frozen["total_minor"])  # fmt: skip
     shown = selections.money(total)
     if decision == "ACCEPTED" and (body.displayed_total or "") != (shown or ""):
         raise _refuse("TOTAL_MISMATCH", "The total you saw is not the current total. Please reload the proposal.")
+    # 7. acknowledgements and every owner decision
+    found_blockers = blockers(s, g, q, decision)
+    if found_blockers:
+        words = next((b["customer"] for b in found_blockers if b.get("customer")), NOT_AVAILABLE)
+        raise _refuse("ACCEPTANCE_UNAVAILABLE", words, reasons=[b["code"] for b in found_blockers])
+    # 10. one atomic write (this transaction)
     quotations.record_decision(s, q, decision="ACCEPTED" if decision == "ACCEPTED" else "REJECTED", method=METHOD,
                                chosen=[x.id for x in chosen], note=None, recorded_by=ANONYMOUS_USER_ID)  # fmt: skip
+    if decision == "ACCEPTED" and q.accepted_total_minor != total:  # B4 summed the same frozen-verified values
+        projection.integrity_refused_now()
     now = q.decided_on or db.tx_time(s)
     p = projection.build(s, q)
     acks = acknowledgements.existing(s, q, g)
@@ -186,9 +211,11 @@ def decide(s: Session, g: ProposalAccessGrant, q: Quotation, body, idempotency_k
         "snapshot_sha256": q.snapshot_sha256, "issued_html_sha256": q.issued_html_sha256,
         "accepted_baseline_sha256": q.accepted_baseline_sha256, "displayed_total": shown, "accepted_total_minor":
         q.accepted_total_minor, "selected": [{"ref": f"L{x.position}", "description": x.description,
-                                              "amount": selections.money(x.amount_minor)} for x in chosen],
+                                              "price_with_gst": selections.money(frozen["optional_minor"].get(f"L{x.position}"))}
+                                             for x in chosen],
         "acknowledged": acknowledged, "decided_on": clock.to_rfc3339(now), "grant_id": g.id,
         "recipient_kind": g.recipient_kind, "request_trace": request_trace, "client_key_sha256": digest,
+        "request_sha256": canonical, "frozen_total": selections.money(frozen["total_minor"]),
         "policy": {"commercial": commercial_policy.current().version, "proposal": policy.current().version},
         "network_recorded": sorted(network), "reference": p["reference"],
     }  # fmt: skip
@@ -198,6 +225,7 @@ def decide(s: Session, g: ProposalAccessGrant, q: Quotation, body, idempotency_k
         verification_method=verification.method, snapshot_sha256=q.snapshot_sha256 or "",
         issued_html_sha256=q.issued_html_sha256 or "", displayed_total_minor=total, selected_line_refs=chosen_refs,
         acknowledgements=acknowledged, decided_on=now, request_trace=request_trace, client_key_sha256=digest,
+        request_sha256=canonical,
         network=network or None, evidence=evidence, evidence_sha256=hashlib.sha256(canonical_bytes(evidence)).hexdigest(),
     )  # fmt: skip
     s.add(row)

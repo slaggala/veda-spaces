@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 from veda.kernel import clock, db
 from veda.kernel.errors import ApiError
 from veda.kernel.jcs import canonical_bytes
-from veda.modules.mtq import sets as site_sets
 from veda.modules.mtq_commercial.models import Quotation
 
 from . import events, policy, projection
@@ -62,6 +61,9 @@ def existing(s: Session, q: Quotation, g: ProposalAccessGrant) -> dict[str, Quot
 
 
 def acknowledge(s: Session, g: ProposalAccessGrant, q: Quotation, section: str, shown: str) -> QuotationAcknowledgement:
+    from . import grants
+
+    grants.locked(s, g, q)  # lock first, then re-read the link and the quotation (CQX N5)
     p = projection.build(s, q)  # verified frozen document, or a refusal
     require_open(s, q)
     digest = p["sections"].get(section)
@@ -71,7 +73,6 @@ def acknowledge(s: Session, g: ProposalAccessGrant, q: Quotation, section: str, 
     if digest != shown:
         raise ApiError(409, "PROPOSAL_CHANGED", "What you acknowledged is not this version's text. Please reload the "
                        "proposal and read it again.")  # fmt: skip
-    site_sets.lock_property(s, q.property_id)
     found = existing(s, q, g).get(section)
     if found is not None:
         return found  # idempotent

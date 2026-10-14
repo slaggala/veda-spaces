@@ -74,17 +74,21 @@ def test_customer_quotation_journey(api, factory, key):
     q2 = ok(step(c, q1, "versions", c.estimator, {"cost_estimate_id": est["id"]}, code=201))
     req = next(x for x in ok(c.as_(c.estimator).get(f"/api/v1/quotations/{q1['id']}/customer-activity"))["requests"]
                if x["category"] == "CHANGE_FINISH")  # fmt: skip
+    r = c.as_(c.estimator).post(f"/api/v1/customer-requests/{req['id']}/link", {"resulting_quotation_id": q2["id"]},
+                                if_match=req["version"])  # fmt: skip
+    assert r.status == 409 and r.code == "VERSION_NOT_ISSUED"  # a draft is never named to the customer (N12)
+    q2 = _issue(c, q2)
     ok(c.as_(c.estimator).post(f"/api/v1/customer-requests/{req['id']}/link",
                                {"resulting_quotation_id": q2["id"], "response": "See version 2."}, if_match=req["version"]))  # fmt: skip
-    q2 = _issue(c, q2)
+    assert any(i["answered_by_revision"] == "Version 2" for i in cust.get().data["requests"]["items"])  # on its link
     g2 = share(c, q2)
     cust2 = customer(api, g2)
 
-    # 9 the customer views the revised version, compares it, and sees what answered the request
+    # 9 the customer views the revised version and compares it; the new link starts its own conversation (N4)
     page2 = cust2.get().data
     assert page2["proposal"]["version_no"] == 2 and page2["history"][0]["version_no"] == 1
     assert cust2.get("/comparison").data["comparison"]["from_version"] == 1
-    assert any(i["answered_by_revision"] == "Version 2" for i in page2["requests"]["items"])
+    assert page2["requests"]["items"] == []
 
     # 10 the superseded link
     r = cust.get()

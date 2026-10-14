@@ -254,6 +254,7 @@ class QuotationAcceptanceEvidence(AuditedBase):
     decided_on: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     request_trace: Mapped[str | None] = mapped_column(sa.String(64))  # the request id of the decision (log trace)
     client_key_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    request_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)  # canonical request (idempotency)
     network: Mapped[dict | None] = mapped_column(JSONType())  # only what CQX-D04 permits; erased with the lead
     evidence: Mapped[dict] = mapped_column(JSONType(), nullable=False)
     evidence_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
@@ -264,6 +265,7 @@ class QuotationAcceptanceEvidence(AuditedBase):
         _sha("quotation_acceptance_evidence", "snapshot_sha256"),
         _sha("quotation_acceptance_evidence", "issued_html_sha256"),
         _sha("quotation_acceptance_evidence", "client_key_sha256"),
+        _sha("quotation_acceptance_evidence", "request_sha256"),
         _sha("quotation_acceptance_evidence", "evidence_sha256"),
         # One customer decision per version: a repeat is idempotent, never a second record.
         Index("ux_quotation_acceptance_evidence__quotation", "quotation_id", unique=True, **live_where()),

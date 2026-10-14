@@ -78,6 +78,12 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
         if q.quotation_kind == "VARIATION":
             out["change"] = x.change_code.replace("_", " ").title()
             out["delta"] = _amount(x.delta_amount_minor)
+        if x.is_optional and x.is_priced and q.tax_status == "APPLIED":
+            # What choosing this item adds, as the B4 decision adds it (taxable amount plus its GST), frozen with the
+            # document so a customer's acceptance total never depends on mutable line rows (CQX N1).
+            out["price_with_gst"] = _amount(
+                int(x.amount_minor or 0) - int(x.discount_minor or 0) + int(x.tax_minor or 0)
+            )
         return out
 
     sections = []

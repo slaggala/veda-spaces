@@ -87,7 +87,7 @@ def _require_shareable(s: Session, q: Quotation) -> None:
 
     if q.status not in SHAREABLE:
         raise ApiError(409, "NOT_SHAREABLE", "Only an issued quotation is shared with a customer.",
-                       extra={"status": q.status})  # fmt: skip
+                       extra={"quotation_status": q.status})  # fmt: skip
     head = quotations.latest(s, q.quotation_number, q.variation_no)
     if head.id != q.id:
         raise ApiError(409, "QUOTATION_SUPERSEDED", "A newer version exists; share that one.",
@@ -156,7 +156,7 @@ def rotate(s: Session, ctx, g: ProposalAccessGrant) -> Issued:
     expire_if_due(s, g)
     if g.status not in V.LIVE_GRANT_STATUSES:
         raise ApiError(409, "GRANT_NOT_LIVE", "Only a live link is rotated; share a new one.",
-                       extra={"status": g.status})  # fmt: skip
+                       extra={"link_status": g.status})  # fmt: skip
     q = s.get(Quotation, g.quotation_id)
     assert q is not None
     _require_shareable(s, q)
@@ -222,6 +222,30 @@ def resolve(s: Session, token: str | None) -> tuple[ProposalAccessGrant, Quotati
     ).scalar_one_or_none()
     if g is None:
         raise link_invalid()
+    _check_live(s, g)
+    q = s.get(Quotation, g.quotation_id)
+    lead = s.get(Lead, g.lead_id)
+    if q is None or q.is_deleted or lead is None or lead.anonymized_on is not None:
+        raise link_invalid()
+    return g, q
+
+
+def locked(s: Session, g: ProposalAccessGrant, q: Quotation) -> None:
+    """Every customer mutation (choice, request, acknowledgement, decision) runs under the property lock that staff
+    writes and decisions take, and re-reads the link and the quotation under it, so a revocation, rotation, new version
+    or decision that committed while this request waited is seen before anything is written (CQX N5)."""
+    from veda.modules.mtq import sets as site_sets
+
+    site_sets.lock_property(s, q.property_id)
+    s.refresh(g)
+    s.refresh(q)
+    _check_live(s, g)
+    lead = s.get(Lead, g.lead_id)
+    if q.is_deleted or lead is None or lead.anonymized_on is not None:
+        raise link_invalid()
+
+
+def _check_live(s: Session, g: ProposalAccessGrant) -> None:
     if g.status == "REVOKED":
         if g.revoke_reason_code == "SUPERSEDED":
             raise _gone("PROPOSAL_SUPERSEDED", "A newer version of this proposal has been shared with you. Please use "
@@ -229,11 +253,6 @@ def resolve(s: Session, token: str | None) -> tuple[ProposalAccessGrant, Quotati
         raise _gone("PROPOSAL_LINK_REVOKED", "This link is no longer active. Please ask Veda Spaces for a new one.")
     if expire_if_due(s, g) or g.status == "EXPIRED":
         raise _gone("PROPOSAL_LINK_EXPIRED", "This link has expired. Please ask Veda Spaces for a new one.")
-    q = s.get(Quotation, g.quotation_id)
-    lead = s.get(Lead, g.lead_id)
-    if q is None or q.is_deleted or lead is None or lead.anonymized_on is not None:
-        raise link_invalid()
-    return g, q
 
 
 def record_view(s: Session, g: ProposalAccessGrant) -> None:

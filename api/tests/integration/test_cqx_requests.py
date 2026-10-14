@@ -108,6 +108,16 @@ def test_staff_answer_and_link_the_revision_and_the_customer_sees_it(api, factor
         f"/api/v1/customer-requests/{req['id']}/link", {"resulting_quotation_id": q["id"]}, if_match=req["version"]
     )
     assert r.status == 422 and r.code == "LINEAGE_MISMATCH"  # the same version answers nothing
+    for _ in ("draft", "in review", "approved"):  # N12: never a version the customer has not been issued
+        cur = ok(c.as_(c.founder).get(f"/api/v1/quotations/{q2['id']}"))
+        r = api_.post(f"/api/v1/customer-requests/{req['id']}/link", {"resulting_quotation_id": q2["id"]},
+                      if_match=req["version"])  # fmt: skip
+        assert r.status == 409 and r.code == "VERSION_NOT_ISSUED" and r.json["status"] == 409, (cur["status"], r)
+        if cur["status"] == "DRAFT":
+            step(c, q2, "submit", c.estimator)
+        elif cur["status"] == "INTERNAL_REVIEW":
+            step(c, q2, "approve", c.manager)
+    q2 = ok(step(c, q2, "issue", c.manager))
     req = ok(api_.post(f"/api/v1/customer-requests/{req['id']}/link",
                        {"resulting_quotation_id": q2["id"], "response": "Revised in version 2."}, if_match=req["version"]))  # fmt: skip
     assert req["status"] == "ACCEPTED_FOR_REVISION" and req["resulting_label"] == "Version 2"
@@ -151,3 +161,45 @@ def test_lead_erasure_removes_customer_text_and_closes_links(api, factory):
         grant = s.get(ProposalAccessGrant, g["id"])
         assert grant.status == "REVOKED" and grant.revoke_reason_code == "LEAD_ERASED"
     assert cust.get().status == 410
+
+
+@INTERACTION_ON
+def test_a_replacement_link_never_inherits_an_earlier_holders_conversation(api, factory):
+    """N4: requests belong to the exact link that sent them; nothing is inferred from the recipient kind."""
+    c, prop, est, q = setup(api, factory, "2BHK")
+    old = share(c, q, kind="FAMILY_MEMBER")
+    assert (
+        _ask(customer(api, old), {"category": "GENERAL_QUESTION", "message": "A private family question"}).status == 201
+    )
+    cur = next(x for x in ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/access-grants")) if x["id"] == old["id"])
+    ok(c.as_(c.sales).post(f"/api/v1/proposal-access-grants/{old['id']}/revoke", if_match=cur["version"]))
+    new = customer(api, share(c, q, kind="FAMILY_MEMBER"))
+    assert new.get("/requests").data == [] and new.get().data["requests"]["items"] == []
+    other = customer(api, share(c, q, kind="OTHER"))
+    assert other.get("/requests").data == []
+    primary = customer(api, share(c, q))
+    assert primary.get("/requests").data == []  # no shared-recipient policy exists: the primary sees only their own
+    acts = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/customer-activity"))["requests"]
+    assert [a["message"] for a in acts] == ["A private family question"]  # staff, by permission, see all
+    assert c.as_(c.designer).get(f"/api/v1/quotations/{q['id']}/customer-activity").status in (403, 404)
+
+
+@INTERACTION_ON
+def test_a_request_can_only_name_a_line_the_customer_can_see(api, factory):
+    """N3: a line the frozen document omits (a zero line) or another version's line is never a valid reference."""
+    c, prop, est, q = setup(api, factory, "2BHK")
+    cust = customer(api, share(c, q))
+    from veda.modules.customer_proposal import projection
+    from veda.modules.mtq_commercial.models import Quotation
+
+    with db.unit_of_work() as s:
+        qq = s.get(Quotation, q["id"])
+        shown, _ = projection.printed(s, qq)
+        hidden = [ref for ref in projection.refs(s, qq) if ref not in shown]
+    for ref in hidden[:3] + ["L9999"]:
+        r = _ask(
+            cust,
+            {"category": "LINE_QUESTION", "line_ref": ref, "message": "What is this line?"},
+            key=ref.ljust(32, "x"),
+        )
+        assert r.status == 422 and r.json["errors"][0]["code"] == "UNKNOWN_LINE", (ref, r)

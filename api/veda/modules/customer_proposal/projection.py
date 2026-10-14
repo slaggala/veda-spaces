@@ -74,6 +74,7 @@ FIELDS: dict[str, str] = {
     "optional_items[].priced": "whether priced",
     "optional_items[].status": "Optional",
     "optional_items[].unit_rate": "unit rate, only when OI-MTQ-10 allows it",
+    "optional_items[].price_with_gst": "what choosing the item adds including GST, frozen at issue",
     "optional_items[].room_ref": "the room it belongs to (R<n>), when it is in one",
     "optional_items[].room_title": "that room's title",
     "summary.base_total": "total of works",
@@ -142,14 +143,15 @@ LINE_FIELDS: dict[str, str] = {
     "unit_rate": "PROJECTED (present only when OI-MTQ-10 allows)",
     "change": "PROJECTED",
     "delta": "PROJECTED",
+    "price_with_gst": "PROJECTED (optional items only: what choosing it adds, frozen at issue)",
 }
 SUMMARY_FIELDS = ("base_total", "discount", "taxable", "gst", "total", "optional_total", "currency", "net_change")
 ROOM_KINDS = {"Space": "ROOM", "Project": "PROJECT", "Variation": "CHANGES"}
 
 
 def integrity_refused() -> ApiError:
-    return ApiError(409, "SNAPSHOT_INTEGRITY_FAILED", "This proposal cannot be shown right now. Veda Spaces has been "
-                    "notified; please contact your Veda Spaces representative.")  # fmt: skip
+    return ApiError(409, "SNAPSHOT_INTEGRITY_FAILED", "This proposal cannot be shown right now. Please contact your "
+                    "Veda Spaces representative.")  # fmt: skip
 
 
 def frozen_document(q: Quotation) -> dict[str, Any]:
@@ -168,7 +170,7 @@ def digest(value: Any) -> str:
 
 def _line(x: dict[str, Any], ref: str) -> dict[str, Any]:
     out = {"ref": ref, **{k: x[k] for k in ("description", "detail", "quantity", "amount", "priced", "status")}}
-    for k in ("unit_rate", "change", "delta"):
+    for k in ("unit_rate", "change", "delta", "price_with_gst"):
         if k in x:
             out[k] = x[k]
     return out
@@ -199,6 +201,72 @@ def _pair(s: Session, q: Quotation, doc: dict[str, Any]) -> tuple[list[tuple[Any
     ):
         raise integrity_refused()
     return pairs, optional
+
+
+def printed(s: Session, q: Quotation) -> tuple[dict[str, QuotationLine], dict[str, QuotationLine]]:
+    """The lines the customer can see in ``q``'s verified frozen document, by reference: (every printed line, the
+    printed optional lines). A line the document omits (a zero line) or that another version holds is never in either,
+    so a customer can never choose, ask about or accept it (CQX N3)."""
+    doc = frozen_document(q) if q.snapshot is not None else None
+    if doc is None:
+        return {}, {}
+    pairs, optional = _pair(s, q, doc)
+    shown = {f"L{x.position}": x for _sec, mine in pairs for x in mine}
+    opt = {f"L{x.position}": x for x in optional}
+    return {**shown, **opt}, opt
+
+
+def _minor(text: str | None) -> int | None:
+    from decimal import Decimal
+
+    return None if text is None else int(Decimal(text.replace(",", "")) * 100)
+
+
+def frozen_values(s: Session, q: Quotation) -> dict[str, Any]:
+    """The acceptance-relevant amounts exactly as frozen: the document's total and each printed optional item's price
+    including GST. The live rows are cross-checked against them; any disagreement is tampering and refuses (CQX N1)."""
+    doc = frozen_document(q)
+    shown, optional = printed(s, q)
+    frozen_opt = {f"L{x.position}": f for x, f in zip(optional.values(), doc.get("optional_items") or [], strict=True)}
+    total = _minor((doc.get("summary") or {}).get("total"))
+    if total is None or q.total_minor != total:
+        _tampered()
+    printed_lines = {f"L{x.position}": f for (_sec, mine), sec in zip(_pair(s, q, doc)[0], doc.get("sections") or [],
+                                                                      strict=True)
+                     for x, f in zip(mine, sec["lines"], strict=True)}  # fmt: skip
+    printed_lines |= frozen_opt
+    for ref, x in shown.items():
+        f = printed_lines[ref]
+        if (f.get("amount") if f.get("priced") else None) != (_money(x.amount_minor) if x.is_priced else None):
+            _tampered()
+    values: dict[str, int] = {}
+    for ref, f in frozen_opt.items():
+        x = optional[ref]
+        if f.get("price_with_gst") is None:
+            continue
+        frozen = _minor(f["price_with_gst"])
+        live = int(x.amount_minor or 0) - int(x.discount_minor or 0) + int(x.tax_minor or 0)
+        if frozen != live:
+            _tampered()
+        values[ref] = int(frozen or 0)
+    return {"total_minor": total, "optional_minor": values}
+
+
+def _money(minor: int | None) -> str | None:
+    from decimal import Decimal
+
+    return None if minor is None else f"{Decimal(minor) / 100:,.2f}"
+
+
+def integrity_refused_now() -> None:
+    _tampered()
+
+
+def _tampered() -> None:
+    from veda.kernel import metrics
+
+    metrics.emit("ProposalIntegrityRefused", 1)
+    raise integrity_refused()
 
 
 def refs(s: Session, q: Quotation) -> dict[str, QuotationLine]:

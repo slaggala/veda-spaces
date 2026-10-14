@@ -774,6 +774,7 @@ def upgrade() -> None:
         sa.Column("decided_on", UTCDateTime(), nullable=False),
         sa.Column("request_trace", sa.String(64), nullable=True),
         sa.Column("client_key_sha256", sa.String(64), nullable=False),
+        sa.Column("request_sha256", sa.String(64), nullable=False),
         sa.Column("network", JSONType(), nullable=True),
         sa.Column("evidence", JSONType(), nullable=False),
         sa.Column("evidence_sha256", sa.String(64), nullable=False),
@@ -862,6 +863,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "length(quotation_number) <= 24", name="ck_quotation_acceptance_evidence__quotation_number_len"
         ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "request_sha256 IS NULL OR length(request_sha256) = 64",
+            name="ck_quotation_acceptance_evidence__request_sha256_len",
+        ),
         sa.CheckConstraint(
             "length(request_trace) <= 64", name="ck_quotation_acceptance_evidence__request_trace_len"
         ).ddl_if(dialect="sqlite"),
