@@ -361,6 +361,122 @@
         "title": "ActivityPatch",
         "type": "object"
       },
+      "AdjustmentDecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "AdjustmentDecisionIn",
+        "type": "object"
+      },
+      "AdjustmentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "anyOf": [
+              {
+                "maximum": 10000000000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Minor"
+          },
+          "kind_code": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "title": "Kind Code",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope_code": {
+            "enum": [
+              "LINE",
+              "CATEGORY",
+              "PROJECT"
+            ],
+            "title": "Scope Code",
+            "type": "string"
+          },
+          "target_category": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z][A-Z0-9_]{1,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Category"
+          },
+          "target_line_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Line Id"
+          },
+          "value_bp": {
+            "anyOf": [
+              {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Bp"
+          }
+        },
+        "required": [
+          "scope_code",
+          "kind_code",
+          "reason"
+        ],
+        "title": "AdjustmentIn",
+        "type": "object"
+      },
       "AssignIn": {
         "additionalProperties": false,
         "properties": {
@@ -538,6 +654,27 @@
           }
         },
         "title": "AttachmentWithdrawIn",
+        "type": "object"
+      },
+      "BoqOverrideIn": {
+        "additionalProperties": false,
+        "properties": {
+          "quantity_centi": {
+            "maximum": 1000000000,
+            "minimum": 0,
+            "title": "Quantity Centi",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity_centi",
+          "reason"
+        ],
+        "title": "BoqOverrideIn",
         "type": "object"
       },
       "CancelLinkIn": {
@@ -928,13 +1065,46 @@
       "DecisionIn": {
         "additionalProperties": false,
         "properties": {
-          "reason": {
-            "title": "Reason",
+          "decision": {
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ],
+            "title": "Decision",
             "type": "string"
+          },
+          "method": {
+            "enum": [
+              "STAFF_RECORDED",
+              "SIGNED_COPY"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "selected_optional_line_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Selected Optional Line Ids",
+            "type": "array"
           }
         },
         "required": [
-          "reason"
+          "decision",
+          "method"
         ],
         "title": "DecisionIn",
         "type": "object"
@@ -1430,6 +1600,35 @@
           "reason"
         ],
         "title": "ErasureIn",
+        "type": "object"
+      },
+      "EstimateCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "tier_code": {
+            "default": "ESSENTIAL",
+            "enum": [
+              "ESSENTIAL",
+              "PREMIUM",
+              "LUXURY"
+            ],
+            "title": "Tier Code",
+            "type": "string"
+          }
+        },
+        "title": "EstimateCreateIn",
         "type": "object"
       },
       "EstimateRevisionIn": {
@@ -2880,6 +3079,67 @@
         "title": "PlanSetCreateIn",
         "type": "object"
       },
+      "Preferences": {
+        "additionalProperties": false,
+        "properties": {
+          "finish_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "LAMINATE",
+                  "ACRYLIC",
+                  "VENEER",
+                  "PU",
+                  "GLASS",
+                  "MEMBRANE",
+                  "CUSTOM"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Finish Code"
+          },
+          "material_key": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "pattern": "^[a-z][a-z0-9_.-]{1,79}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Material Key"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "maxProperties": 10,
+                "patternProperties": {
+                  "^[A-Z][A-Z0-9_]{1,39}$": {
+                    "pattern": "^[A-Z][A-Z0-9_]{1,39}$",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Options"
+          }
+        },
+        "title": "Preferences",
+        "type": "object"
+      },
       "ProfilePatch": {
         "additionalProperties": false,
         "properties": {
@@ -3913,6 +4173,106 @@
         "title": "PublicLeadIn",
         "type": "object"
       },
+      "QuotationCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "title": "QuotationCreateIn",
+        "type": "object"
+      },
+      "QuotationPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "title": "QuotationPatchIn",
+        "type": "object"
+      },
+      "QuotationVersionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_estimate_id": {
+            "title": "Cost Estimate Id",
+            "type": "string"
+          },
+          "cover_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cover Note"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "cost_estimate_id"
+        ],
+        "title": "QuotationVersionIn",
+        "type": "object"
+      },
       "ReauthIn": {
         "additionalProperties": false,
         "properties": {
@@ -3945,6 +4305,231 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "RequirementCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_wall_index": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Anchor Wall Index"
+          },
+          "custom_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Custom Label"
+          },
+          "necessity_code": {
+            "default": "RECOMMENDED",
+            "enum": [
+              "MANDATORY",
+              "RECOMMENDED",
+              "OPTIONAL"
+            ],
+            "title": "Necessity Code",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preferences"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "requirement_type_code": {
+            "enum": [
+              "WARDROBE",
+              "TV_UNIT",
+              "CROCKERY_UNIT",
+              "STUDY_UNIT",
+              "VANITY",
+              "DRESSER",
+              "KITCHEN",
+              "KITCHEN_TALL_UNIT",
+              "UTILITY_UNIT",
+              "BED",
+              "SIDE_TABLE",
+              "STORAGE_UNIT",
+              "FALSE_CEILING",
+              "PROFILE_LIGHTING",
+              "WALL_PANELLING",
+              "MIRROR_PANEL",
+              "CURTAIN_PELMET",
+              "PARTITION",
+              "POOJA_UNIT",
+              "WINDOW_SEATING",
+              "PAINTING",
+              "ELECTRICAL",
+              "ELECTRICAL_SHIFTING",
+              "SENSOR_LIGHTING",
+              "CUSTOM"
+            ],
+            "title": "Requirement Type Code",
+            "type": "string"
+          },
+          "source_code": {
+            "enum": [
+              "STAFF_SELECTION",
+              "CUSTOMER_REQUEST",
+              "MANUAL"
+            ],
+            "title": "Source Code",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "requirement_type_code",
+          "source_code"
+        ],
+        "title": "RequirementCreateIn",
+        "type": "object"
+      },
+      "RequirementDecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "ACCEPTED",
+              "EXCLUDED",
+              "NOT_APPLICABLE",
+              "PROPOSED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RequirementDecisionIn",
+        "type": "object"
+      },
+      "RequirementPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "custom_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Custom Label"
+          },
+          "necessity_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "MANDATORY",
+                  "RECOMMENDED",
+                  "OPTIONAL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Necessity Code"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preferences"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "RequirementPatchIn",
+        "type": "object"
+      },
       "ResetIn": {
         "additionalProperties": false,
         "properties": {
@@ -3966,6 +4551,20 @@
           "new_password"
         ],
         "title": "ResetIn",
+        "type": "object"
+      },
+      "ReturnIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReturnIn",
         "type": "object"
       },
       "RevokeIn": {
@@ -4163,6 +4762,312 @@
           "reason"
         ],
         "title": "RolesIn",
+        "type": "object"
+      },
+      "ScopeCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "tier_code": {
+            "default": "ESSENTIAL",
+            "enum": [
+              "ESSENTIAL",
+              "PREMIUM",
+              "LUXURY"
+            ],
+            "title": "Tier Code",
+            "type": "string"
+          }
+        },
+        "title": "ScopeCreateIn",
+        "type": "object"
+      },
+      "ScopeItemCreateIn": {
+        "additionalProperties": false,
+        "description": "A manual or customer-requested item added straight to a draft: it is a requirement (accepted) plus its item.",
+        "properties": {
+          "anchor_wall_index": {
+            "anyOf": [
+              {
+                "maximum": 64,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Anchor Wall Index"
+          },
+          "custom_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Custom Label"
+          },
+          "necessity_code": {
+            "default": "RECOMMENDED",
+            "enum": [
+              "MANDATORY",
+              "RECOMMENDED",
+              "OPTIONAL"
+            ],
+            "title": "Necessity Code",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preferences"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "requirement_type_code": {
+            "enum": [
+              "WARDROBE",
+              "TV_UNIT",
+              "CROCKERY_UNIT",
+              "STUDY_UNIT",
+              "VANITY",
+              "DRESSER",
+              "KITCHEN",
+              "KITCHEN_TALL_UNIT",
+              "UTILITY_UNIT",
+              "BED",
+              "SIDE_TABLE",
+              "STORAGE_UNIT",
+              "FALSE_CEILING",
+              "PROFILE_LIGHTING",
+              "WALL_PANELLING",
+              "MIRROR_PANEL",
+              "CURTAIN_PELMET",
+              "PARTITION",
+              "POOJA_UNIT",
+              "WINDOW_SEATING",
+              "PAINTING",
+              "ELECTRICAL",
+              "ELECTRICAL_SHIFTING",
+              "SENSOR_LIGHTING",
+              "CUSTOM"
+            ],
+            "title": "Requirement Type Code",
+            "type": "string"
+          },
+          "source_code": {
+            "enum": [
+              "STAFF_SELECTION",
+              "CUSTOMER_REQUEST",
+              "MANUAL"
+            ],
+            "title": "Source Code",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "requirement_type_code",
+          "source_code"
+        ],
+        "title": "ScopeItemCreateIn",
+        "type": "object"
+      },
+      "ScopeItemPatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension_overrides": {
+            "anyOf": [
+              {
+                "maxProperties": 10,
+                "patternProperties": {
+                  "^[A-Z][A-Z0-9_]{1,39}$": {
+                    "anyOf": [
+                      {
+                        "maximum": 100000.0,
+                        "minimum": 0.0,
+                        "type": "number"
+                      },
+                      {
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,13}0*$)\\d{0,8}\\.\\d{0,4}0*$)",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dimension Overrides"
+          },
+          "finish_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "LAMINATE",
+                  "ACRYLIC",
+                  "VENEER",
+                  "PU",
+                  "GLASS",
+                  "MEMBRANE",
+                  "CUSTOM"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Finish Code"
+          },
+          "inclusion_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "INCLUDED",
+                  "OPTIONAL",
+                  "EXCLUDED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Inclusion Code"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "material_key": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "pattern": "^[a-z][a-z0-9_.-]{1,79}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Material Key"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "maxProperties": 10,
+                "patternProperties": {
+                  "^[A-Z][A-Z0-9_]{1,39}$": {
+                    "pattern": "^[A-Z][A-Z0-9_]{1,39}$",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Options"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Override Reason"
+          }
+        },
+        "title": "ScopeItemPatchIn",
         "type": "object"
       },
       "SetCreateIn": {
@@ -7784,6 +8689,309 @@
         "x-requirement": "AUTH-016"
       }
     },
+    "/api/v1/boq-lines/{line_id}/override": {
+      "delete": {
+        "operationId": "mtq_estimation_clear_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a line to its calculated quantity",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.override"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-003"
+      },
+      "post": {
+        "operationId": "mtq_estimation_override_line",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoqOverrideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Override a line's quantity (the calculated value is kept; reason required)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.override"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-003"
+      }
+    },
+    "/api/v1/boqs/{boq_id}": {
+      "get": {
+        "operationId": "mtq_estimation_get_boq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "boq_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One BOQ revision: room-wise lines, project summary, derivations, issues",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-001"
+      }
+    },
+    "/api/v1/boqs/{boq_id}/cost-estimates": {
+      "post": {
+        "operationId": "mtq_estimation_create_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "boq_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Price a reviewed BOQ with the active rate card (supersedes the open draft)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-003"
+      }
+    },
+    "/api/v1/boqs/{boq_id}/diff/{other_id}": {
+      "get": {
+        "operationId": "mtq_estimation_diff_boqs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "boq_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "other_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Line differences between two BOQ revisions of a property",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-001"
+      }
+    },
+    "/api/v1/boqs/{boq_id}/review": {
+      "post": {
+        "operationId": "mtq_estimation_review_boq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "boq_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Review a BOQ: no blocking issue, lineage current; seals it for pricing",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-004"
+      }
+    },
     "/api/v1/catalog/analytics": {
       "get": {
         "operationId": "catalog_analytics",
@@ -9394,6 +10602,405 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}": {
+      "get": {
+        "operationId": "mtq_estimation_get_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One estimate: room-wise, category-wise and project views; rates only with rate.view",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/adjustments": {
+      "post": {
+        "operationId": "mtq_estimation_propose_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Propose a line, category or project discount (refused while OI-MTQ-06 is undecided)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.apply"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-005"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/approve": {
+      "post": {
+        "operationId": "mtq_estimation_approve_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a draft estimate: lineage current, no data issue, no pending discount; seals it",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-004"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/compare/{other_id}": {
+      "get": {
+        "operationId": "mtq_estimation_compare_estimates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "other_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Differences between two estimate revisions (quantity, rate, discount)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/quotations": {
+      "post": {
+        "operationId": "mtq_quotation_create_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create quotation version 1 from an approved, current estimate (number from the QUOTATION sequence)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/cost-estimates/{estimate_id}/reproduce": {
+      "get": {
+        "operationId": "mtq_estimation_reproduce_estimate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "estimate_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recompute the estimate from its pinned rate card and compare",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.rate.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-002"
+      }
+    },
+    "/api/v1/estimate-adjustments/{adjustment_id}/decision": {
+      "post": {
+        "operationId": "mtq_estimation_decide_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "adjustment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve or reject a proposed discount (never one's own)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-006"
+      }
+    },
+    "/api/v1/estimate-adjustments/{adjustment_id}/withdraw": {
+      "post": {
+        "operationId": "mtq_estimation_withdraw_discount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "adjustment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a live discount from a draft estimate",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.discount.apply"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-005"
       }
     },
     "/api/v1/estimates/{estimate_id}": {
@@ -12927,6 +14534,68 @@
         "x-requirement": "MEAS-003"
       }
     },
+    "/api/v1/mtq/commercial-policy": {
+      "get": {
+        "operationId": "mtq_estimation_get_policy",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Which owner commercial decisions are recorded (OI-MTQ-03\u202615); undecided ones block or disable",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
+    "/api/v1/mtq/scope-rules": {
+      "get": {
+        "operationId": "mtq_estimation_get_rules",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The versioned scope ruleset (item types, catalogue mapping, derivations, rules) and its status",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-001"
+      }
+    },
     "/api/v1/mtq/templates": {
       "get": {
         "operationId": "mtq_get_templates",
@@ -13629,6 +15298,132 @@
         "x-requirement": "PROP-003"
       }
     },
+    "/api/v1/properties/{property_id}/boqs": {
+      "get": {
+        "operationId": "mtq_estimation_list_boqs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every BOQ revision of a property, with staleness",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-001"
+      }
+    },
+    "/api/v1/properties/{property_id}/commercial": {
+      "get": {
+        "operationId": "mtq_estimation_get_journey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Measurement-to-quotation lineage of a property: every revision, its upstream pins and staleness",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-001"
+      }
+    },
+    "/api/v1/properties/{property_id}/cost-estimates": {
+      "get": {
+        "operationId": "mtq_estimation_list_estimates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every estimate revision of a property, with staleness and blockers",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "cost_estimate.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CEST-001"
+      }
+    },
     "/api/v1/properties/{property_id}/measurement-sets": {
       "get": {
         "operationId": "mtq_list_sets",
@@ -13719,6 +15514,274 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "MEAS-004"
+      }
+    },
+    "/api/v1/properties/{property_id}/quotations": {
+      "get": {
+        "operationId": "mtq_quotation_list_quotations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every quotation version and variation of a property",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
+    "/api/v1/properties/{property_id}/requirements": {
+      "get": {
+        "operationId": "mtq_estimation_list_requirements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Requirements of a property with their provenance and decisions",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-001"
+      },
+      "post": {
+        "operationId": "mtq_estimation_add_requirement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a staff-selected, customer-requested or manual requirement (accepted by being added)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
+    "/api/v1/properties/{property_id}/requirements/seed": {
+      "post": {
+        "operationId": "mtq_estimation_seed_requirements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Propose requirements from the ruleset and the current verified measurement set (idempotent)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
+    "/api/v1/properties/{property_id}/scopes": {
+      "get": {
+        "operationId": "mtq_estimation_list_scopes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every scope revision of a property, with staleness",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-001"
+      },
+      "post": {
+        "operationId": "mtq_estimation_create_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopeCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Draft a scope revision from the accepted requirements and the current verified measurements",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
       }
     },
     "/api/v1/properties/{property_id}/spaces": {
@@ -14188,6 +16251,735 @@
         "x-requirement": "LEAD-001"
       }
     },
+    "/api/v1/quotation-lines/{line_id}/trace": {
+      "get": {
+        "operationId": "mtq_quotation_trace_line",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A quotation line walked back: estimate line, BOQ line, scope item, requirement, measurement",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.lineage.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-007"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}": {
+      "get": {
+        "operationId": "mtq_quotation_get_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One quotation version: sections, lines, lineage, blockers, lifecycle events",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      },
+      "patch": {
+        "operationId": "mtq_quotation_patch_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a draft's title and customer cover note",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/approve": {
+      "post": {
+        "operationId": "mtq_quotation_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a version in review (four-eyes when discounted); issuance blockers stay visible",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-003"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/chain": {
+      "get": {
+        "operationId": "mtq_quotation_get_chain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every version and variation under this quotation number",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/decision": {
+      "post": {
+        "operationId": "mtq_quotation_decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the customer's acceptance (with chosen optional items) or rejection",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.decision.record"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-005"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/document": {
+      "get": {
+        "operationId": "mtq_quotation_get_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer document (frozen snapshot once issued; a marked draft before) and its HTML",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-001"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/issue": {
+      "post": {
+        "operationId": "mtq_quotation_issue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue an approved, customer-issuable version: freezes the document, sets validity, syncs the lead",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-004"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/return": {
+      "post": {
+        "operationId": "mtq_quotation_return_to_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a version in review (or approved, not issued) to draft, with a reason",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "quotation.create",
+          "quotation.approve"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/submit": {
+      "post": {
+        "operationId": "mtq_quotation_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit a draft for internal review",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/variations": {
+      "post": {
+        "operationId": "mtq_quotation_create_variation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Raise a variation (change order) to an accepted quotation from a newly approved estimate",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.variation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-006"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/versions": {
+      "post": {
+        "operationId": "mtq_quotation_new_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create the next version from an approved estimate (never edits an issued version)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "quotation.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/requirements/{requirement_id}": {
+      "patch": {
+        "operationId": "mtq_estimation_patch_requirement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requirement_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a requirement's preferences and notes",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
+    "/api/v1/requirements/{requirement_id}/decision": {
+      "post": {
+        "operationId": "mtq_estimation_decide_requirement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requirement_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept, exclude or mark not applicable (a mandatory exclusion needs a reason)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "roles_list_roles",
@@ -14564,6 +17356,350 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-008"
+      }
+    },
+    "/api/v1/scope-items/{item_id}": {
+      "patch": {
+        "operationId": "mtq_estimation_patch_scope_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopeItemPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modify a draft item: options, finish, inclusion, dimension overrides (with a reason)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
+    "/api/v1/scopes/{scope_id}": {
+      "delete": {
+        "operationId": "mtq_estimation_discard_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discard a draft scope revision (confirmed revisions are history and stay)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      },
+      "get": {
+        "operationId": "mtq_estimation_get_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One scope revision with its items, inputs and provenance",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.read"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-001"
+      }
+    },
+    "/api/v1/scopes/{scope_id}/boqs": {
+      "post": {
+        "operationId": "mtq_estimation_generate_boq",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a BOQ revision from a confirmed scope (supersedes the open one, if any)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "boq.generate"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "BOQ-002"
+      }
+    },
+    "/api/v1/scopes/{scope_id}/confirm": {
+      "post": {
+        "operationId": "mtq_estimation_confirm_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm a draft: every requirement decided, measurements still current; seals the revision",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.confirm"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-003"
+      }
+    },
+    "/api/v1/scopes/{scope_id}/items": {
+      "post": {
+        "operationId": "mtq_estimation_add_scope_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopeItemCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a manual or customer-requested item to a draft (recorded as an accepted requirement)",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
+      }
+    },
+    "/api/v1/scopes/{scope_id}/refresh": {
+      "post": {
+        "operationId": "mtq_estimation_refresh_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rebuild a draft from the accepted requirements and current measurements, keeping its edits",
+        "tags": [
+          "mtq-commercial"
+        ],
+        "x-permission": [
+          "scope.edit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCOPE-002"
       }
     },
     "/api/v1/security-events": {

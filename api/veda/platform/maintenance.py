@@ -824,6 +824,15 @@ def estimate_retention() -> dict:
                 "retention_days": settings().estimate_retention_days}  # fmt: skip
 
 
+def mtq_quotation_expiry() -> dict:
+    """MTQ B4: issued quotation versions past their validity become EXPIRED. Not scheduled: the reminder cadence and
+    expiry behaviour are owner decision OI-MTQ-08; until it is recorded no quotation can be issued anyway."""
+    from veda.modules.mtq_commercial import quotations
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return {"expired": quotations.expire_due(s)}
+
+
 def catalog_activation() -> dict:
     """Activate catalog releases whose scheduled time has come (ADR-013); each is re-validated and fails closed."""
     from veda.modules.catalog import service

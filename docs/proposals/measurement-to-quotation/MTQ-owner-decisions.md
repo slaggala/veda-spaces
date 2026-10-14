@@ -36,3 +36,8 @@ Rows B1-01…B1-06 are the B1 freeze values anticipated in [MTQ-B1-SCOPE.md §5]
 - A decision is entered exactly as the owner states it, with the instruction name and date. Interpretations, if any, are listed separately below the table and marked as the author's.
 - A blank decision blocks the block named in "Needed before" at the implementation-entry gate ([MTQ-implementation-entry-gate.md](MTQ-implementation-entry-gate.md)). It does not block independent review of the blueprint.
 - Changing a recorded decision creates a new row with a new date; earlier rows are never edited.
+
+## Implementation effects of the blank rows (author's note, 2026-10-13; not decisions)
+
+The B2–B4 implementation (`VEDA-SPACES-MTQ-B2-B3-B4-END-TO-END-COMMERCIAL-ENGINE`) records no decision. It gives each blank row OI-MTQ-03…17 a slot in `api/veda/modules/mtq_commercial/fixtures/commercial-policy.json`, null, and a defined effect while null (a refused action or a named blocker on customer issuance). The table of effects is in [B2-B4-implementation-record.md §1](../../implementation/mtq/B2-B4-implementation-record.md). Recording a decision here and filling its slot by a reviewed pull request is what changes the system's behaviour.
+

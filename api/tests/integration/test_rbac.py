@@ -443,11 +443,11 @@ def test_roles_crud_and_permission_catalog(api, factory):
     factory.login(api, founder)
     r = api.post(
         "/api/v1/roles",
-        {"code": "SALES_MANAGER", "name": "Sales Manager", "copy_from_role_id": factory.role_id("SALES")},
+        {"code": "AREA_MANAGER", "name": "Area Manager", "copy_from_role_id": factory.role_id("SALES")},
     )
     assert r.status == 201 and r.data["permission_count"] > 0
     role = r.data
-    assert api.post("/api/v1/roles", {"code": "OTHER", "name": "sales manager"}).code == "DUPLICATE", (
+    assert api.post("/api/v1/roles", {"code": "OTHER", "name": "area manager"}).code == "DUPLICATE", (
         "case-insensitive name (A-04)"
     )
     r = api.patch(f"/api/v1/roles/{role['id']}", {"code": "RENAMED"}, if_match=role["version"])
@@ -459,7 +459,7 @@ def test_roles_crud_and_permission_catalog(api, factory):
                 {"permission_code": "lead.read", "scope": "ALL"},
                 {"permission_code": "lead.assign", "scope": "ALL"},
             ],
-            "reason": "Create sales manager role",
+            "reason": "Create area manager role",
         },
     )
     assert r.status == 200 and r.json["meta"]["diff"]["added"] >= 1

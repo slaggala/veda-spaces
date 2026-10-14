@@ -73,6 +73,17 @@ REVISIONS: dict[str, list[str]] = {
         "space_electrical_point",
         "measurement_note",
     ],
+    "0201_mtq_estimation": [
+        "requirement",
+        "scope",
+        "scope_item",
+        "boq",
+        "boq_line",
+        "cost_estimate",
+        "cost_estimate_line",
+        "cost_estimate_adjustment",
+    ],
+    "0202_mtq_commercial": ["quotation", "quotation_section", "quotation_line", "quotation_event"],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

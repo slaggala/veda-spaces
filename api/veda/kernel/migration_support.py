@@ -433,6 +433,31 @@ def seed_roles_and_matrix(conn, *, audit: bool) -> None:
             )
 
 
+def refuse_role_collisions(conn, codes: tuple[str, ...]) -> None:
+    """Before a later module migration seeds the registry roles in ``codes``: stop, naming every conflict, if a live
+    role already uses one of their codes without being that system role (a custom role created through the roles API)
+    or uses one of their names under another code. Seeding would otherwise skip the custom role and then grant it the
+    new role's permissions, or fail on the unique name with no explanation."""
+    from veda.platform.rbac.registry import ROLES
+
+    wanted = {r.code: r for r in ROLES if r.code in codes}
+    names = {r.name.strip().lower(): r.code for r in wanted.values()}
+    rows = conn.execute(
+        sa.select(ROLE.c.code, ROLE.c.name_normalized, ROLE.c.is_system).where(ROLE.c.is_deleted == sa.false())
+    ).all()
+    conflicts = []
+    for code, name_norm, is_system in rows:
+        if code in wanted and not is_system:
+            conflicts.append(f"custom role {code} uses the code of system role {code}")
+        elif name_norm in names and code != names[name_norm]:
+            conflicts.append(f"role {code} uses the name of system role {names[name_norm]}")
+    if conflicts:
+        raise RuntimeError(
+            "role collision, nothing changed: " + "; ".join(conflicts) + ". Rename or retire the existing role "
+            "(an owner decision: its users and grants must be reviewed), then run the migration again."
+        )
+
+
 def seed_missing_roles(conn, codes: tuple[str, ...], *, audit: bool) -> list[str]:
     """A later module migration: insert the registry roles in ``codes`` that the database does not have yet (fresh
     databases already have them from 0003, which reads the live registry). Grants follow with grant_new_codes."""

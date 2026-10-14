@@ -40,6 +40,20 @@ from veda.modules.mtq.models import (
     SpaceOpening,
     SpaceWall,
 )
+from veda.modules.mtq_commercial.models import (
+    Boq,
+    BoqLine,
+    CostEstimate,
+    CostEstimateAdjustment,
+    CostEstimateLine,
+    Quotation,
+    QuotationEvent,
+    QuotationLine,
+    QuotationSection,
+    Requirement,
+    Scope,
+    ScopeItem,
+)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
     MfaChallenge,
@@ -59,6 +73,18 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "QuotationSection",
+    "QuotationLine",
+    "QuotationEvent",
+    "Quotation",
+    "CostEstimateLine",
+    "CostEstimateAdjustment",
+    "CostEstimate",
+    "ScopeItem",
+    "Scope",
+    "Requirement",
+    "BoqLine",
+    "Boq",
     "AdminApprovalRequest",
     "Attachment",
     "AuditLog",

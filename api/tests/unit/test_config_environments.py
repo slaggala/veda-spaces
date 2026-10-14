@@ -320,3 +320,15 @@ def test_MTQ_staging_needs_the_private_bucket_key_and_scanner(monkeypatch):
         ("VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS", "3600", "VEDA_ATTACHMENT_UPLOAD_TTL_SECONDS"),
     ):
         assert fragment in " ".join(config.validate_environment(deployed_env(monkeypatch, "staging", **{name: value})))
+
+
+def test_MTQ_commercial_flags_default_off_and_production_refuses_them(monkeypatch):
+    """MTQ B2-B4 (decision log 31): estimation and quotation are off by default and never authorised in production."""
+    s = config.Settings()
+    assert s.mtq_estimation_enabled is False and s.mtq_quotation_enabled is False
+    prod = deployed_env(monkeypatch, "production")
+    assert prod.mtq_estimation_enabled is False and prod.mtq_quotation_enabled is False
+    on = deployed_env(monkeypatch, "production", VEDA_MTQ_ESTIMATION_ENABLED="true", VEDA_MTQ_QUOTATION_ENABLED="true")
+    problems = config.validate_environment(on)
+    assert "VEDA_MTQ_ESTIMATION_ENABLED is not authorised in production (MTQ B2-B4)" in problems
+    assert "VEDA_MTQ_QUOTATION_ENABLED is not authorised in production (MTQ B2-B4)" in problems

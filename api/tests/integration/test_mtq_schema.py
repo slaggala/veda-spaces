@@ -34,12 +34,16 @@ def test_frozen_seed_copy_equals_the_vocabulary():
     assert _migration_module().LOOKUPS == vocab.LOOKUPS
 
 
-def test_reserved_revisions_are_untouched():
+def test_reserved_revisions_are_used_as_reserved():
+    """0201-0203 were reserved for B2-B4 (blocker closure §4): 0201 is MTQ estimation (B2/B3); nothing else may take
+    a reserved number, and 0203 (knowledge) stays free."""
     from tests.conftest import ROOT
 
     names = {p.name for p in (ROOT / "migrations/versions").glob("*.py")}
+    allowed = {"0201": "0201_mtq_estimation.py", "0202": "0202_mtq_commercial.py"}
     for reserved in ("0201", "0202", "0203"):
-        assert not any(n.startswith(reserved) for n in names), reserved
+        taken = {n for n in names if n.startswith(reserved)}
+        assert taken <= {allowed.get(reserved)}, (reserved, taken)
     assert "0200_mtq_site.py" in names and "0106_attachment.py" in names
 
 
@@ -185,6 +189,8 @@ def test_no_existing_table_is_altered():
         "migrations/versions/0106_attachment.py",
         ROOT_MIGRATION,
         "migrations/versions/0204_mtq_self_service.py",
+        "migrations/versions/0201_mtq_estimation.py",
+        "migrations/versions/0202_mtq_commercial.py",
     ):
         text = (ROOT / path).read_text()
         for forbidden in ("op.alter_column", "op.add_column", "op.drop_", "batch_alter_table", "op.execute("):

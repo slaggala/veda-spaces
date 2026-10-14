@@ -318,6 +318,16 @@ def _paise(value: Decimal) -> int:
     return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
+def paise(value: Decimal) -> int:
+    """Paise, rounded half up: the engine's one money rounding (MTQ B3 prices through it too)."""
+    return _paise(value)
+
+
+def line_amount_minor(quantity: Decimal, rate_minor: int) -> int:
+    """A line's amount: quantity × rate, rounded once to the paisa (the rule ``_price`` applies to every line)."""
+    return _paise(quantity * rate_minor)
+
+
 def customer_amount(minor: int) -> int:
     """A subtotal as customers see it: to the nearest ₹1,000 (never an exact line amount)."""
     return _round(Decimal(minor), CUSTOMER_ROUND_MINOR, ROUND_HALF_UP)
@@ -502,7 +512,7 @@ def _price(card, request, product, sel, instance, path, est, errors) -> None:
                 uom=line.uom,
                 quantity=qty,
                 rate_minor=rate,
-                amount_minor=_paise(qty * rate),
+                amount_minor=line_amount_minor(qty, rate),
                 typical=bool({q.input, q.height_input} & typical),
                 optional=product.category == "OPTIONAL",
             )

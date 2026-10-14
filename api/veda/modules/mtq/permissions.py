@@ -79,13 +79,37 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
 )
 
 MATRIX: dict[str, dict[str, str]] = {
-    "property.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "property.read": {
+        "FOUNDER": "A",
+        "ADMIN": "A",
+        "SALES": "O",
+        "DESIGNER": "O",
+        "SURVEYOR": "O",
+        "ESTIMATOR": "A",
+        "SALES_MANAGER": "A",
+    },
     "property.create": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O"},
     "property.update": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O"},
-    "measurement.visit.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "measurement.visit.read": {
+        "FOUNDER": "A",
+        "ADMIN": "A",
+        "SALES": "O",
+        "DESIGNER": "O",
+        "SURVEYOR": "O",
+        "ESTIMATOR": "A",
+        "SALES_MANAGER": "A",
+    },
     "measurement.visit.create": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O"},
     "measurement.visit.schedule": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O"},
     "measurement.capture": {"FOUNDER": "A", "ADMIN": "A", "DESIGNER": "O", "SURVEYOR": "O"},
-    "measurement.read": {"FOUNDER": "A", "ADMIN": "A", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
+    "measurement.read": {
+        "FOUNDER": "A",
+        "ADMIN": "A",
+        "SALES": "O",
+        "DESIGNER": "O",
+        "SURVEYOR": "O",
+        "ESTIMATOR": "A",
+        "SALES_MANAGER": "A",
+    },
     "measurement.verify": {"FOUNDER": "A", "ADMIN": "A", "DESIGNER": "O"},
 }

@@ -113,6 +113,7 @@ def make_settings(database_url: str, **overrides):
 
 def reset_process_state() -> None:
     from veda.kernel import clock, http, turnstile
+    from veda.modules.mtq_commercial import policy as mtq_policy
     from veda.platform.auth import crypto, security_events, throttle
     from veda.platform.notifications.email import CaptureEmailProvider, use_provider
     from veda.platform.rbac import resolver
@@ -126,6 +127,7 @@ def reset_process_state() -> None:
     crypto.reset_provider()
     CaptureEmailProvider.clear()
     use_provider(None)
+    mtq_policy.install_for_tests(None)  # a SYNTHETIC commercial policy never outlives its test
 
 
 @pytest.fixture

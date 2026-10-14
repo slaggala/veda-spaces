@@ -1,0 +1,730 @@
+{
+ "schema": "veda.mtq.scope-rules/1",
+ "ruleset_version": "2026.10.3",
+ "status": "PROPOSED",
+ "status_note": "Proposed content pending the owner's OI-MTQ-03 (scope rules) and OI-MTQ-04 (quantity derivations, clearances, rounding). Every generated item still needs a staff decision; nothing generated from this ruleset is customer-issuable until the register records both decisions.",
+ "sources": [
+  "docs/proposals/measurement-to-quotation/survey-and-scope-templates/04-catalogue-record-content.md \u00a72 (rule keys, necessities)",
+  "ADR-012 typical 7 ft (2134 mm) wardrobe height (ADR-012 D3)",
+  "rate card product inputs and quantity bases (the card in force at BOQ time)",
+  "04 \u00a71 'Window seating candidate: window run and sill': a window seat spans the window (its width is the span across the window openings of the tagged wall)",
+  "01 \u00a73 and 04 KITCHEN_BASE_FROM_RUNS / KITCHEN_WALL_FROM_RUNS: the base (counter) run is the sum of the tagged walls' runs and continues beneath windows; window spans are deducted from wall units only; the card's single RUN input is the counter length",
+  "04 POOJA_UNIT_FROM_WALL: pooja doors take W x H 'from the opening' when a door frame exists, i.e. the pooja room's own door; a niche unit's shutter is not a room door",
+  "B1 capture rules: a sensor light records its sensor type and switching; only NEW sensor lights with a real sensor (PIR, MICROWAVE) and sensor switching (SENSOR, BOTH) are sensor provisions",
+  "04 KITCHEN_WALL_FROM_RUNS / KITCHEN_LOFT_FROM_CLEARANCE: wall units take the tagged runs less window spans, and the loft run is the wall-unit run; the card's single RUN is therefore evaluated per line on its quantity role (RUN for base units and base shutters, WALL_UNIT_RUN for wall units, lofts and their shutters). The utility card's only measured line is a wall unit. No wall-unit bottom, chimney span or clearance is applied (OI-MTQ-04): every opening whose sill is below the lintel (or the ceiling) is deducted, and an opening without a sill or offset leaves the wall-unit run unresolved."
+ ],
+ "parameters_note": "No clearance, corner deduction, wastage or rounding beyond the estimator's 0.01 half-up is applied: those are OI-MTQ-04 values, not decided.",
+ "item_types": {
+  "WARDROBE": {
+   "label": "Wardrobe",
+   "card_product": "WARDROBE",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "WARDROBE"
+    },
+    "HEIGHT": {
+     "kind": "lintel_capped",
+     "cap_mm": 2134
+    }
+   },
+   "option_rules": {
+    "LOFT": {
+     "kind": "ceiling_clearance",
+     "above_mm": 2134,
+     "at_least_mm": 450,
+     "then": "YES",
+     "else": "NO"
+    }
+   }
+  },
+  "TV_UNIT": {
+   "label": "TV unit",
+   "card_product": "TV_UNIT",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "TV_UNIT"
+    }
+   }
+  },
+  "CROCKERY_UNIT": {
+   "label": "Crockery unit",
+   "card_product": "CROCKERY_UNIT",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "CROCKERY_UNIT"
+    },
+    "HEIGHT": {
+     "kind": "lintel_capped",
+     "cap_mm": 2134
+    }
+   }
+  },
+  "STUDY_UNIT": {
+   "label": "Study unit",
+   "card_product": "STUDY_UNIT",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "STUDY_UNIT"
+    }
+   }
+  },
+  "VANITY": {
+   "label": "Vanity",
+   "card_product": "VANITY_UNIT",
+   "fixed_options": {
+    "TYPE": "TOILET"
+   },
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "VANITY"
+    }
+   }
+  },
+  "DRESSER": {
+   "label": "Dresser",
+   "card_product": "VANITY_UNIT",
+   "fixed_options": {
+    "TYPE": "DRESSER"
+   },
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "VANITY"
+    }
+   }
+  },
+  "KITCHEN": {
+   "label": "Modular kitchen",
+   "card_product": "KITCHEN",
+   "inputs": {
+    "RUN": {
+     "kind": "tagged_run_total",
+     "tag": "KITCHEN_RUN",
+     "deduct": "floor_openings"
+    },
+    "DRAWERS": {
+     "kind": "staff",
+     "explain": "drawer count from the kitchen layout"
+    },
+    "WALL_UNIT_RUN": {
+     "kind": "wall_unit_run",
+     "tag": "KITCHEN_RUN"
+    }
+   },
+   "line_inputs": {
+    "WALL": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "SOFT_CLOSE_WALL": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "LOFT": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "SOFT_CLOSE_LOFT": {
+     "RUN": "WALL_UNIT_RUN"
+    }
+   }
+  },
+  "KITCHEN_TALL_UNIT": {
+   "label": "Kitchen tall unit",
+   "card_product": null,
+   "unmapped_reason": "No rate-card line exists for a tall unit (NEW LINE, OI-MTQ-05)"
+  },
+  "UTILITY_UNIT": {
+   "label": "Utility unit",
+   "card_product": "UTILITY",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_unit_run",
+     "tag": "KITCHEN_RUN"
+    }
+   }
+  },
+  "BED": {
+   "label": "Bed",
+   "card_product": "BED",
+   "inputs": {}
+  },
+  "SIDE_TABLE": {
+   "label": "Side table",
+   "card_product": "STORAGE_BOXES",
+   "fixed_options": {
+    "TYPE": "BEDSIDE_TABLE"
+   },
+   "inputs": {
+    "WIDTH": {
+     "kind": "staff"
+    },
+    "HEIGHT": {
+     "kind": "staff"
+    }
+   }
+  },
+  "STORAGE_UNIT": {
+   "label": "Storage unit",
+   "card_product": "STORAGE_BOXES",
+   "fixed_options": {
+    "TYPE": "TALL"
+   },
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": null
+    },
+    "HEIGHT": {
+     "kind": "lintel_capped",
+     "cap_mm": 2134
+    }
+   }
+  },
+  "FALSE_CEILING": {
+   "label": "False ceiling",
+   "card_product": "FALSE_CEILING",
+   "inputs": {
+    "AREA": {
+     "kind": "floor_area"
+    }
+   }
+  },
+  "PROFILE_LIGHTING": {
+   "label": "Profile lighting",
+   "card_product": "CEILING_PROFILE_LIGHTING",
+   "inputs": {
+    "LENGTH": {
+     "kind": "perimeter"
+    },
+    "COB": {
+     "kind": "staff"
+    }
+   }
+  },
+  "WALL_PANELLING": {
+   "label": "Wall panelling",
+   "card_product": "FEATURE_WALL",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "FEATURE_WALL"
+    },
+    "HEIGHT": {
+     "kind": "wall_height",
+     "tag": "FEATURE_WALL"
+    }
+   }
+  },
+  "MIRROR_PANEL": {
+   "label": "Mirror panel",
+   "card_product": null,
+   "unmapped_reason": "No rate-card line exists for mirror panels (NEW LINE, OI-MTQ-05)"
+  },
+  "CURTAIN_PELMET": {
+   "label": "Curtain pelmet",
+   "card_product": null,
+   "unmapped_reason": "No rate-card line exists for curtain pelmets (NEW LINE, OI-MTQ-05)"
+  },
+  "PARTITION": {
+   "label": "Partition",
+   "card_product": "PARTITION",
+   "inputs": {
+    "WIDTH": {
+     "kind": "partition_length"
+    },
+    "HEIGHT": {
+     "kind": "partition_height"
+    }
+   }
+  },
+  "POOJA_UNIT": {
+   "label": "Pooja unit",
+   "card_product": "POOJA_UNIT",
+   "inputs": {
+    "WIDTH": {
+     "kind": "wall_run",
+     "tag": "POOJA_UNIT"
+    },
+    "DOOR_WIDTH": {
+     "kind": "door_width",
+     "space_types": [
+      "POOJA"
+     ],
+     "explain": "pooja shutter width for a niche unit: entered by staff from the design (a room's entrance door is not the unit's shutter)"
+    }
+   }
+  },
+  "WINDOW_SEATING": {
+   "label": "Window seating",
+   "card_product": "WINDOW_SEATING",
+   "inputs": {
+    "WIDTH": {
+     "kind": "window_span",
+     "tag": "WINDOW_SEATING",
+     "opening_types": [
+      "WINDOW"
+     ]
+    }
+   }
+  },
+  "PAINTING": {
+   "label": "Interior painting",
+   "card_product": "PAINTING",
+   "project": true,
+   "inputs": {
+    "AREA": {
+     "kind": "property_net_wall_area",
+     "zones": [
+      "INDOOR"
+     ]
+    }
+   }
+  },
+  "ELECTRICAL": {
+   "label": "Electrical and lighting",
+   "card_product": "ELECTRICAL",
+   "project": true,
+   "inputs": {
+    "CARPET": {
+     "kind": "property_floor_area",
+     "zones": [
+      "INDOOR"
+     ]
+    },
+    "SPOTS": {
+     "kind": "electrical_count",
+     "types": [
+      "LIGHT_POINT",
+      "SENSOR_LIGHT"
+     ],
+     "statuses": [
+      "NEW"
+     ]
+    }
+   }
+  },
+  "ELECTRICAL_SHIFTING": {
+   "label": "Electrical point shifting",
+   "card_product": null,
+   "project": true,
+   "measured_count": {
+    "types": null,
+    "statuses": [
+     "SHIFT"
+    ]
+   },
+   "unmapped_reason": "No rate-card line exists for point shifting (NEW LINE, OI-MTQ-05)"
+  },
+  "SENSOR_LIGHTING": {
+   "label": "Sensor-light provision",
+   "card_product": null,
+   "project": true,
+   "measured_count": {
+    "types": [
+     "SENSOR_LIGHT"
+    ],
+    "statuses": [
+     "NEW"
+    ],
+    "sensor_types": [
+     "PIR",
+     "MICROWAVE"
+    ],
+    "switchings": [
+     "SENSOR",
+     "BOTH"
+    ]
+   },
+   "unmapped_reason": "No rate-card line exists for sensor-light provisions (NEW LINE, OI-MTQ-05)"
+  },
+  "CUSTOM": {
+   "label": "Custom item",
+   "card_product": null,
+   "unmapped_reason": "A custom item has no catalogue mapping"
+  }
+ },
+ "rules": [
+  {
+   "key": "WARDROBE_FROM_TAGGED_WALL",
+   "item": "WARDROBE",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "DRESSING",
+    "WALK_IN_CLOSET"
+   ],
+   "per": "tagged_wall",
+   "tag": "WARDROBE"
+  },
+  {
+   "key": "WARDROBE_FROM_TAGGED_WALL_GUEST",
+   "item": "WARDROBE",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "space_types": [
+    "GUEST_BEDROOM",
+    "SERVANT_ROOM"
+   ],
+   "per": "tagged_wall",
+   "tag": "WARDROBE"
+  },
+  {
+   "key": "BEDROOM_BED",
+   "item": "BED",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM"
+   ]
+  },
+  {
+   "key": "BEDROOM_SIDE_TABLE",
+   "item": "SIDE_TABLE",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM"
+   ]
+  },
+  {
+   "key": "BEDROOM_DRESSER",
+   "item": "DRESSER",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM"
+   ],
+   "per": "tagged_wall",
+   "tag": "VANITY"
+  },
+  {
+   "key": "LIVING_TV_UNIT",
+   "item": "TV_UNIT",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING"
+   ],
+   "per": "tagged_wall",
+   "tag": "TV_UNIT"
+  },
+  {
+   "key": "OTHER_TV_UNIT",
+   "item": "TV_UNIT",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM",
+    "FAMILY_LOUNGE",
+    "MEDIA_ROOM"
+   ],
+   "per": "tagged_wall",
+   "tag": "TV_UNIT"
+  },
+  {
+   "key": "STUDY_UNIT_FROM_WALL",
+   "item": "STUDY_UNIT",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "STUDY",
+    "HOME_OFFICE"
+   ],
+   "per": "tagged_wall",
+   "tag": "STUDY_UNIT"
+  },
+  {
+   "key": "BEDROOM_STUDY_UNIT",
+   "item": "STUDY_UNIT",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "space_types": [
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM"
+   ],
+   "per": "tagged_wall",
+   "tag": "STUDY_UNIT"
+  },
+  {
+   "key": "DINING_CROCKERY",
+   "item": "CROCKERY_UNIT",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "DINING"
+   ],
+   "per": "tagged_wall",
+   "tag": "CROCKERY_UNIT"
+  },
+  {
+   "key": "LIVING_CROCKERY",
+   "item": "CROCKERY_UNIT",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING"
+   ],
+   "per": "tagged_wall",
+   "tag": "CROCKERY_UNIT"
+  },
+  {
+   "key": "KITCHEN_FROM_RUNS",
+   "item": "KITCHEN",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "KITCHEN"
+   ],
+   "per": "any_tagged_wall",
+   "tag": "KITCHEN_RUN"
+  },
+  {
+   "key": "KITCHEN_TALL_UNIT",
+   "item": "KITCHEN_TALL_UNIT",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "space_types": [
+    "KITCHEN"
+   ],
+   "per": "tagged_wall",
+   "tag": "TALL_UNIT"
+  },
+  {
+   "key": "UTILITY_UNIT",
+   "item": "UTILITY_UNIT",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "space_types": [
+    "UTILITY",
+    "LAUNDRY"
+   ],
+   "per": "any_tagged_wall",
+   "tag": "KITCHEN_RUN"
+  },
+  {
+   "key": "POOJA_UNIT_FROM_WALL",
+   "item": "POOJA_UNIT",
+   "necessity": "MANDATORY",
+   "origin": "AUTO",
+   "space_types": [
+    "POOJA"
+   ],
+   "per": "tagged_wall",
+   "tag": "POOJA_UNIT"
+  },
+  {
+   "key": "POOJA_NICHE_UNIT",
+   "item": "POOJA_UNIT",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING",
+    "DINING"
+   ],
+   "per": "tagged_wall",
+   "tag": "POOJA_UNIT"
+  },
+  {
+   "key": "TOILET_VANITY",
+   "item": "VANITY",
+   "necessity": "RECOMMENDED",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "TOILET",
+    "POWDER_ROOM"
+   ]
+  },
+  {
+   "key": "TOILET_MIRROR",
+   "item": "MIRROR_PANEL",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "TOILET",
+    "POWDER_ROOM"
+   ]
+  },
+  {
+   "key": "CEILING_MAIN",
+   "item": "FALSE_CEILING",
+   "necessity": "RECOMMENDED",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING",
+    "DINING",
+    "MASTER_BEDROOM"
+   ]
+  },
+  {
+   "key": "CEILING_OTHER",
+   "item": "FALSE_CEILING",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM",
+    "KITCHEN",
+    "FAMILY_LOUNGE",
+    "MEDIA_ROOM",
+    "STUDY",
+    "HOME_OFFICE",
+    "FOYER"
+   ]
+  },
+  {
+   "key": "LIVING_PROFILE_LIGHTING",
+   "item": "PROFILE_LIGHTING",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING"
+   ]
+  },
+  {
+   "key": "FEATURE_WALL_PANELLING",
+   "item": "WALL_PANELLING",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "per": "tagged_wall",
+   "tag": "FEATURE_WALL"
+  },
+  {
+   "key": "WINDOW_SEATING",
+   "item": "WINDOW_SEATING",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "per": "tagged_wall",
+   "tag": "WINDOW_SEATING"
+  },
+  {
+   "key": "FOYER_SHOE_STORAGE",
+   "item": "STORAGE_UNIT",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "space_types": [
+    "FOYER",
+    "PASSAGE"
+   ],
+   "per": "tagged_wall",
+   "tag": "SHOE_RACK"
+  },
+  {
+   "key": "STORAGE_WALL",
+   "item": "STORAGE_UNIT",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "per": "tagged_wall",
+   "tag": "STORAGE_WALL"
+  },
+  {
+   "key": "PROPOSED_PARTITION",
+   "item": "PARTITION",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "per": "once",
+   "when": {
+    "proposed_partition": true
+   }
+  },
+  {
+   "key": "WINDOW_PELMET",
+   "item": "CURTAIN_PELMET",
+   "necessity": "OPTIONAL",
+   "origin": "AUTO",
+   "space_types": [
+    "LIVING",
+    "LIVING_DINING",
+    "MASTER_BEDROOM",
+    "BEDROOM",
+    "CHILDREN_BEDROOM",
+    "PARENTS_BEDROOM",
+    "GUEST_BEDROOM"
+   ],
+   "per": "once",
+   "when": {
+    "opening_types": [
+     "WINDOW",
+     "FRENCH_WINDOW"
+    ]
+   }
+  },
+  {
+   "key": "PROJECT_PAINTING",
+   "item": "PAINTING",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "project": true
+  },
+  {
+   "key": "PROJECT_ELECTRICAL",
+   "item": "ELECTRICAL",
+   "necessity": "OPTIONAL",
+   "origin": "RECOMMENDED",
+   "project": true
+  },
+  {
+   "key": "PROJECT_POINT_SHIFTING",
+   "item": "ELECTRICAL_SHIFTING",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "project": true,
+   "when": {
+    "electrical": {
+     "statuses": [
+      "SHIFT"
+     ]
+    }
+   }
+  },
+  {
+   "key": "PROJECT_SENSOR_LIGHTS",
+   "item": "SENSOR_LIGHTING",
+   "necessity": "RECOMMENDED",
+   "origin": "AUTO",
+   "project": true,
+   "when": {
+    "electrical": {
+     "types": [
+      "SENSOR_LIGHT"
+     ],
+     "statuses": [
+      "NEW"
+     ]
+    }
+   }
+  }
+ ]
+}

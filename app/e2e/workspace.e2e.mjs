@@ -137,6 +137,19 @@ try {
     consoleErrors.push(...provoked);
   });
 
+  await step('scope, BOQ, estimate and quotation are off by default (MTQ B2-B4 production isolation)', async () => {
+    const before = consoleErrors.length;
+    const someId = '0190a3d2e5f67a8b9c0d1e2f3a4b5c6d'; // pragma: allowlist secret (a well-formed id, not a secret)
+    await page.goto(`${BASE}/site/properties/${someId}/commercial`);
+    await page.getByText(/not enabled/).first().waitFor({ timeout: 10000 });
+    const statuses = await page.evaluate(async (id) => Promise.all(['/api/v1/mtq/scope-rules', '/api/v1/mtq/commercial-policy',
+      `/api/v1/quotations/${id}`].map(async (p) => (await fetch(p, { credentials: 'include' })).status)), someId);
+    if (statuses.some((s) => s !== 404)) throw new Error(`commercial endpoints answered ${statuses} with the MTQ flags unset`);
+    // /auth/me reporting both features off is asserted by the API suite (test_mtq_commercial_gate.py).
+    const provoked = consoleErrors.splice(before).filter((e) => !/status of 404/.test(e));
+    consoleErrors.push(...provoked);
+  });
+
   await step('sign out and sign back in with TOTP', async () => {
     await page.getByRole('button', { name: 'Account menu' }).click();
     await page.getByRole('button', { name: /Sign out/ }).click();

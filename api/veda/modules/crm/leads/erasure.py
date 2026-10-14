@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 CASCADES: tuple[str, ...] = (
     "veda.modules.attachments.service:erase_for_lead",
     "veda.modules.mtq.erasure:erase_for_lead",
+    "veda.modules.mtq_commercial.erasure:erase_for_lead",
 )
 
 
@@ -24,6 +25,7 @@ CASCADES: tuple[str, ...] = (
 DESCENDANTS: tuple[str, ...] = (
     "veda.modules.attachments.service:audit_ids_for_lead",
     "veda.modules.mtq.erasure:audit_ids_for_lead",
+    "veda.modules.mtq_commercial.erasure:audit_ids_for_lead",
 )
 
 

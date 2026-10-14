@@ -13,6 +13,7 @@ from veda.modules.catalog import permissions as catalog_permissions
 from veda.modules.crm.leads import permissions as lead_permissions
 from veda.modules.estimator import permissions as estimate_permissions
 from veda.modules.mtq import permissions as mtq_permissions
+from veda.modules.mtq_commercial import permissions as mtq_commercial_permissions
 
 from .registry_types import PermissionDef, RoleDef
 
@@ -152,12 +153,36 @@ PLATFORM_PERMISSIONS: tuple[PermissionDef, ...] = (
 # their own profile (/auth/me, /auth/mfa), the reference lists the shell fetches after every sign-in, and their own
 # notifications (the tray polls them). Profile edits and session management stay with the V1 roles until decided.
 PLATFORM_MATRIX: dict[str, dict[str, str]] = {
-    "profile.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓", "DESIGNER": "✓", "SURVEYOR": "✓"},
+    "profile.read": {
+        "FOUNDER": "✓",
+        "ADMIN": "✓",
+        "SALES": "✓",
+        "DESIGNER": "✓",
+        "SURVEYOR": "✓",
+        "ESTIMATOR": "✓",
+        "SALES_MANAGER": "✓",
+    },  # fmt: skip
     "profile.update": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
     "session.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
     "session.revoke": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
-    "notification.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O", "DESIGNER": "O", "SURVEYOR": "O"},
-    "lookup.read": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓", "DESIGNER": "✓", "SURVEYOR": "✓"},
+    "notification.read": {
+        "FOUNDER": "O",
+        "ADMIN": "O",
+        "SALES": "O",
+        "DESIGNER": "O",
+        "SURVEYOR": "O",
+        "ESTIMATOR": "O",
+        "SALES_MANAGER": "O",
+    },  # fmt: skip
+    "lookup.read": {
+        "FOUNDER": "✓",
+        "ADMIN": "✓",
+        "SALES": "✓",
+        "DESIGNER": "✓",
+        "SURVEYOR": "✓",
+        "ESTIMATOR": "✓",
+        "SALES_MANAGER": "✓",
+    },  # fmt: skip
     "user.read": {"FOUNDER": "✓", "ADMIN": "✓"},
     "user.create": {"FOUNDER": "✓", "ADMIN": "✓"},
     "user.profile.update": {"FOUNDER": "✓", "ADMIN": "✓"},
@@ -196,6 +221,16 @@ ROLES: tuple[RoleDef, ...] = (
     # MTQ B1 (0200_mtq_site): site measurement roles. Neither sees a price anywhere (blueprint §15.1).
     RoleDef("DESIGNER", "Designer", "Spaces, verification of measurement sets", mfa_required=False, sort_order=40),
     RoleDef("SURVEYOR", "Surveyor", "Measurement capture on assigned visits", mfa_required=False, sort_order=50),
+    # MTQ B2-B4 (0201_mtq_estimation): the commercial roles. The estimator prices and reviews quantities; the sales
+    # manager approves (estimates, discounts, quotations) and so must sign in with MFA (blueprint §15.1).
+    RoleDef("ESTIMATOR", "Estimator", "Scope, BOQ review and internal pricing", mfa_required=False, sort_order=60),
+    RoleDef(
+        "SALES_MANAGER",
+        "Sales manager",
+        "Commercial approvals, discounts and quotation release",
+        mfa_required=True,
+        sort_order=70,
+    ),  # fmt: skip
 )
 
 
@@ -220,6 +255,7 @@ def _entries() -> tuple[RegistryEntry, ...]:
         ("catalog", catalog_permissions.PERMISSIONS),
         ("attachments", attachment_permissions.PERMISSIONS),
         ("mtq", mtq_permissions.PERMISSIONS),
+        ("mtq_commercial", mtq_commercial_permissions.PERMISSIONS),
     ):
         for d in defs:
             resource, _, action = d.code.partition(".")
@@ -236,6 +272,7 @@ MATRIX: dict[str, dict[str, str]] = {
     **catalog_permissions.MATRIX,
     **attachment_permissions.MATRIX,
     **mtq_permissions.MATRIX,
+    **mtq_commercial_permissions.MATRIX,
 }
 
 SENSITIVE_CODES = frozenset(e.code for e in REGISTRY if e.definition.is_sensitive)

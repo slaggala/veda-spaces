@@ -1,0 +1,20 @@
+{
+ "schema": "veda.mtq.commercial-policy/1",
+ "version": "2026.10.0-UNSET",
+ "status": "OWNER_DECISIONS_PENDING",
+ "note": "Every MTQ B2-B4 commercial decision the owner has not recorded in docs/proposals/measurement-to-quotation/MTQ-owner-decisions.md stays null here. A null decision keeps its feature disabled or blocks customer issuance; it is never filled with an assumed value. A decision is recorded by a reviewed pull request that sets it, cites the register row, and changes the version.",
+ "decisions": {
+  "OI-MTQ-03": null,
+  "OI-MTQ-04": null,
+  "OI-MTQ-05": null,
+  "OI-MTQ-06": null,
+  "OI-MTQ-07": null,
+  "OI-MTQ-08": null,
+  "OI-MTQ-09": null,
+  "OI-MTQ-10": null,
+  "OI-MTQ-11": null,
+  "OI-MTQ-13": null,
+  "OI-MTQ-14": null,
+  "OI-MTQ-15": null
+ }
+}

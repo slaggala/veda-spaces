@@ -129,7 +129,9 @@ export class VsPropertyPage extends SessionElement {
           <div><span class="n">${p.derived_level_count}</span><span class="small muted">levels</span></div>
           <div><span class="n">${formatArea(p.derived_measured_floor_area_sqft_centi) || '—'}</span><span class="small muted">measured (latest verified)</span></div>
         </div>
-        ${p.configuration_label ? html`<p class="small muted">Customer's description: ${p.configuration_label}</p>` : nothing}</header>
+        ${p.configuration_label ? html`<p class="small muted">Customer's description: ${p.configuration_label}</p>` : nothing}
+        ${this.me?.features?.mtq_estimation === true && this.can('scope.read')
+          ? html`<p><a class="btn" href="/site/properties/${p.id}/commercial">Scope, BOQ and quotation</a></p>` : nothing}</header>
       ${this.problem ? html`<div role="alert" class="danger-text">${this.problem.detail ?? this.problem.title}</div>` : nothing}
       <section class="card stack" aria-labelledby="spaces"><h2 id="spaces" class="title">Spaces (walk order)</h2>
         <table><thead><tr><th>Space</th><th>Type</th><th>Level</th><th>In scope</th>${editable ? html`<th><span class="sr-only">Actions</span></th>` : nothing}</tr></thead><tbody>
