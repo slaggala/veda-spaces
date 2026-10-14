@@ -79,6 +79,10 @@ export class VsProposalView extends LitElement {
     .speccat dl { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 2px var(--vs-space-3); margin: 0; font-size: 13px; }
     .speccat dt { color: var(--vs-ink-muted); } .speccat dd { margin: 0; overflow-wrap: anywhere; }
     figure.big img { width: 100%; max-height: 70vh; object-fit: contain; } figure.big figcaption { margin-top: var(--vs-space-2); }
+    .table-like { display: grid; } .tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--vs-space-3); padding: 8px 0; border-top: 1px solid var(--vs-line); }
+    .tr.head { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--vs-ink-muted); border-top: 0; }
+    .tr .num { text-align: right; white-space: nowrap; } .tr.total { font-weight: 700; font-size: 18px; border-top: 2px solid var(--vs-ink); }
+    .milestones { margin: 0; padding-left: 20px; }
     .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--vs-space-3); margin: 0; }
     .summary dt { color: var(--vs-ink-muted); } .summary dd { margin: 0; text-align: right; font-weight: 600; white-space: nowrap; }
     .summary dt.total, .summary dd.total { font-size: 18px; color: var(--vs-ink); border-top: 2px solid var(--vs-ink); padding-top: 6px; }
@@ -263,9 +267,35 @@ export class VsProposalView extends LitElement {
     </vs-dialog>`;
   }
 
-  /** Later CQX steps add pricing, optional items, terms, questions, comparison and decision sections here. */
-  protected sections(_page: Page): TemplateResult | typeof nothing {
-    return nothing;
+  /** The proposal's sections after the rooms, in reading order. */
+  protected sections(page: Page): TemplateResult {
+    return html`${this.pricingPanel(page)}`;
+  }
+
+  // --- CQX-05 price and payment ---------------------------------------------------------------------------------------
+  protected pricingPanel(page: Page): TemplateResult | typeof nothing {
+    const pr = page.pricing;
+    if (!pr) return nothing;
+    return html`<section class="card stack" aria-labelledby="price" id="pricing"><h2 id="price">Price and payment</h2>
+      ${pr.package ? html`<p>Package: <span class="strong">${pr.package}</span></p>` : nothing}
+      <div class="table-like" role="table" aria-label="Room subtotals">
+        <div role="row" class="tr head"><span role="columnheader">Room</span><span role="columnheader" class="num">Amount</span></div>
+        ${pr.rooms.map((r) => html`<div role="row" class="tr"><span role="cell">${r.title}</span><span role="cell" class="num">${rupees(r.subtotal) ?? '—'}</span></div>`)}
+        ${pr.discount ? html`<div role="row" class="tr"><span role="cell">Discount</span><span role="cell" class="num">− ${rupees(pr.discount)}</span></div>` : nothing}
+        <div role="row" class="tr"><span role="cell">GST</span><span role="cell" class="num">${pr.gst?.amount ? rupees(pr.gst.amount) : pr.gst?.status ?? 'To be confirmed'}</span></div>
+        <div role="row" class="tr total"><span role="cell">Total</span><span role="cell" class="num">${rupees(pr.total) ?? 'To be confirmed'}</span></div>
+      </div>
+      ${pr.optional_total ? html`<p class="small muted">Optional items are not included in the total. If you chose all of them they would add ${rupees(pr.optional_total)} before any confirmation by Veda Spaces.</p>` : nothing}
+      <p class="small muted">${pr.unit_rates_shown ? 'Unit rates are shown on each line.' : 'Amounts are shown per item, room and project; unit rates are not part of this proposal.'}</p>
+      ${pr.milestones.length ? html`<h3>Payment milestones</h3><ol class="milestones">${pr.milestones.map((m) => html`<li><span class="strong">${m.label}</span> — ${m.share} · ${m.trigger}</li>`)}</ol>`
+        : html`<p class="muted">Payment milestones will be confirmed by Veda Spaces.</p>`}
+      ${pr.valid_until ? html`<p>Valid until <span class="strong">${pr.valid_until}</span>${pr.days_left !== null && pr.days_left >= 0 ? html` (${pr.days_left} day${pr.days_left === 1 ? '' : 's'} left)` : nothing}.</p>` : nothing}
+      ${pr.alternatives.length ? html`<h3>Other packages shared with you</h3><div class="table-like" role="table" aria-label="Packages">
+        <div role="row" class="tr head"><span role="columnheader">Proposal</span><span role="columnheader" class="num">Total</span></div>
+        <div role="row" class="tr"><span role="cell">${page.proposal.reference}${pr.package ? ` · ${pr.package}` : ''} (this one)</span><span role="cell" class="num">${rupees(pr.total) ?? '—'}</span></div>
+        ${pr.alternatives.map((a) => html`<div role="row" class="tr"><span role="cell">${a.reference}${a.package ? ` · ${a.package}` : ''}</span><span role="cell" class="num">${rupees(a.total) ?? '—'}</span></div>`)}
+        </div><p class="small muted">Each proposal has its own link from Veda Spaces.</p>` : nothing}
+    </section>`;
   }
 
   protected summary(page: Page): TemplateResult {

@@ -37,6 +37,13 @@ export interface Specifications { name: string; version: string; summary: string
   lines: Record<string, SpecCategory[]> }
 export interface MediaImage { title: string; alt: string; caption: string | null; label: 'Design reference' | 'Illustrative example';
   urls: { thumb?: string; mobile?: string; desktop?: string } }
+export interface Pricing {
+  currency: string; total: string | null; gst: { status: string; amount: string | null } | null; discount: string | null;
+  base_total: string | null; optional_total: string | null; rooms: { ref: string; title: string; subtotal: string | null }[];
+  milestones: { label: string; share: string; trigger: string }[]; valid_until: string | null; days_left: number | null;
+  unit_rates_shown: boolean; package: string | null;
+  alternatives: { reference: string; package: string | null; total: string | null; valid_until: string | null }[];
+}
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -48,6 +55,7 @@ export interface Page {
   notices: Notice[];
   actions: Action[];
   specifications?: Specifications | null;
+  pricing?: Pricing;
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
 

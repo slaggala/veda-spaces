@@ -24,7 +24,7 @@ from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants, journey, projection, references
+from . import grants, journey, pricing, projection, references
 from . import schemas as S
 from .models import ProposalAccessGrant
 
@@ -187,5 +187,7 @@ def view(req: Req):
 
 
 journey.register(references.contribute)
+journey.register(pricing.contribute)
+journey.PAGE_FIELDS.update(pricing.PAGE_FIELDS)
 
 ALL_APIS = (staff_api, public_api, interaction_api, acceptance_api)

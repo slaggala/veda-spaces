@@ -249,8 +249,8 @@ def build(s: Session, q: Quotation, doc: dict[str, Any] | None = None) -> dict[s
     optional_items = []
     for x, f in zip(optional, doc.get("optional_items") or [], strict=True):
         item = _line(f, f"L{x.position}")
-        room = room_of_space.get(x.space_id or "")
-        item["room_ref"], item["room_title"] = (room["ref"], room["title"]) if room else (None, None)
+        home = room_of_space.get(x.space_id or "")
+        item["room_ref"], item["room_title"] = (home["ref"], home["title"]) if home else (None, None)
         optional_items.append(item)
     for room in rooms:  # room-card counts (CQX-03), from the frozen lines only
         room["included_count"] = sum(1 for x in room["lines"] if x["status"] != "Optional")

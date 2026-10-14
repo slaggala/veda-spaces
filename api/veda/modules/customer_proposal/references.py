@@ -122,16 +122,16 @@ def media(s: Session, q: Quotation) -> dict[str, list[dict[str, Any]]]:
     public_media = view.get("media") or {}
     products = view.get("products") or {}
     by_engine: dict[str, list[str]] = {}
-    for key, product in cat.of(kinds.Product).items():
+    for key, item in cat.of(kinds.Product).items():
         if key not in products:
             continue
-        for variant in product.variants:
+        for variant in item.variants:
             keys = [m for m in (*variant.media, *products[key].get("media", ())) if m in public_media]
             by_engine.setdefault(variant.engine_product, []).extend(keys)
     out: dict[str, list[dict[str, Any]]] = {}
-    for ref, (product, _line) in _codes(s, q).items():
+    for ref, (engine_product, _line) in _codes(s, q).items():
         images = []
-        for mkey in dict.fromkeys(by_engine.get(product, [])):
+        for mkey in dict.fromkeys(by_engine.get(engine_product, [])):
             m = public_media[mkey]
             urls = m.get("urls") or {}
             if m.get("type") != "IMAGE" or not m.get("alt") or not urls:

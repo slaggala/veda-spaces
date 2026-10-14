@@ -130,6 +130,20 @@ describe('vs-proposal-view specifications and media (CQX-04)', () => {
   });
 });
 
+describe('vs-proposal-view pricing (CQX-05)', () => {
+  it('shows the frozen totals, milestones as shares and validity, with no unit rate', async () => {
+    const page = samplePage({ pricing: { currency: 'INR', total: '3,89,400.00', gst: { status: 'Included', amount: '59,400.00' }, discount: null,
+      base_total: '3,30,000.00', optional_total: '15,000.00', rooms: [{ ref: 'R1', title: 'Master bedroom', subtotal: '1,20,000.00' }],
+      milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], valid_until: '2026-11-13', days_left: 30,
+      unit_rates_shown: false, package: null, alternatives: [{ reference: 'VS-Q-2026-000002 v1', package: null, total: '4,00,000.00', valid_until: null }] } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#pricing')!;
+    expect(sec.textContent).to.contain('Booking').and.to.contain('10%').and.to.contain('30 days left').and.to.contain('unit rates are not part');
+    expect(sec.textContent).to.contain('VS-Q-2026-000002 v1');
+    await expect(el).to.be.accessible();
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 
