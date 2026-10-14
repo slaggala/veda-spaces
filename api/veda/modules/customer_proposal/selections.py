@@ -27,6 +27,7 @@ from veda.modules.mtq import sets as site_sets
 from veda.modules.mtq_commercial.models import Quotation, QuotationLine
 
 from . import events, grants, policy, projection
+from . import vocab as V
 from .models import CustomerOptionalSelection, ProposalAccessGrant
 
 PRICE_CONFIRMATION_REQUIRED = "PRICE_CONFIRMATION_REQUIRED"
@@ -66,6 +67,9 @@ def selected_lines(s: Session, q: Quotation) -> list[QuotationLine]:
 
 def choose(s: Session, g: ProposalAccessGrant, q: Quotation, line_ref: str, state: str) -> CustomerOptionalSelection:
     projection.frozen_document(q)  # never act on a version whose frozen document does not verify
+    if g.recipient_kind not in V.DECIDING_KINDS:
+        raise ApiError(403, "RECIPIENT_NOT_AUTHORISED", "Only the primary customer's link can choose optional items; "
+                       "you can ask Veda Spaces about them.")  # fmt: skip
     require_open(s, q)
     site_sets.lock_property(s, q.property_id)  # one writer per property at a time (staff and customer alike)
     lines = optional_lines(s, q)
@@ -117,8 +121,14 @@ def summary(s: Session, q: Quotation) -> dict[str, Any]:
 
 def contribute(s: Session, g: ProposalAccessGrant, q: Quotation, page: dict[str, Any]) -> None:
     page["selections"] = summary(s, q)
+    page["selections"]["can_choose"] = g.recipient_kind in V.DECIDING_KINDS
     items = page["selections"]["items"]
-    if page["capabilities"]["interaction"] and items and all(i["state"] == "NOT_SELECTED" for i in items):
+    if (
+        page["capabilities"]["interaction"]
+        and page["selections"]["can_choose"]
+        and items
+        and all(i["state"] == "NOT_SELECTED" for i in items)
+    ):
         page["actions"].append(
             {"code": "REVIEW_OPTIONAL_ITEMS", "label": "Review the optional items", "target": "optional"}
         )
@@ -136,6 +146,7 @@ PAGE_FIELDS: dict[str, str] = {
     "selections.items[].state": "the customer's choice",
     "selections.items[].priced": "whether it can be selected",
     "selections.selected_refs[]": "chosen lines",
+    "selections.can_choose": "whether this link may choose (the primary customer's only)",
     "selections.status": "CALCULATED or PRICE_CONFIRMATION_REQUIRED (CQX-D02)",
     "selections.extra": "what the choices add (only when CQX-D02 allows it)",
     "selections.total_with_selections": "total with the choices (only when CQX-D02 allows it)",

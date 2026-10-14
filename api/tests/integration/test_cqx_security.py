@@ -124,3 +124,25 @@ def test_lead_erasure_removes_network_evidence_but_keeps_the_commercial_record(a
         ev = s.execute(sa.select(QuotationAcceptanceEvidence)).scalar_one()
         assert ev.network is None and ev.decision == "ACCEPTED" and len(ev.evidence_sha256) == 64
     assert ok(c.as_(c.founder).get(f"/api/v1/quotations/{q['id']}"))["status"] == "ACCEPTED"
+
+
+@pytest.mark.settings(**FLAGS, customer_proposal_enabled=True, customer_proposal_interaction_enabled=True,
+                      customer_quotation_acceptance_enabled=True)  # fmt: skip
+def test_only_the_primary_customer_chooses_and_decides(api, factory):
+    """Independent review, merge conditions 1 and 2: other recipients view, ask and acknowledge, never choose or decide."""
+    from tests.integration.test_cqx_acceptance import _ack_required, _body, _ready
+
+    c, prop, est, q, g, primary, picked = _ready(api, factory, choose=False)
+    for kind in ("CO_OWNER", "FAMILY_MEMBER", "OTHER"):
+        other = customer(api, share(c, q, kind=kind))
+        page = _ack_required(other)
+        assert page["selections"]["can_choose"] is False
+        r = other.post("/selections", {"line_ref": next(x for x in page["proposal"]["optional_items"] if x["priced"])["ref"],
+                                       "state": "SELECTED"})  # fmt: skip
+        assert r.status == 403 and r.code == "RECIPIENT_NOT_AUTHORISED"
+        assert page["decision"]["available"] is False and "primary customer" in page["decision"]["reason"]
+        r = other.post("/decision", _body(page, displayed_total=page["proposal"]["summary"]["total"]), key=kind[0] * 32)
+        assert r.status == 409 and r.code == "ACCEPTANCE_UNAVAILABLE"
+    assert ok(c.as_(c.founder).get(f"/api/v1/quotations/{q['id']}"))["status"] == "ISSUED"
+    page = _ack_required(primary)
+    assert page["selections"]["can_choose"] is True and page["decision"]["available"] is True

@@ -49,6 +49,7 @@ from veda.modules.mtq_commercial import quotations
 from veda.modules.mtq_commercial.models import Quotation
 
 from . import acknowledgements, events, grants, policy, projection, selections
+from . import vocab as V
 from .models import ProposalAccessGrant, QuotationAcceptanceEvidence
 from .requests import key_digest
 
@@ -66,6 +67,9 @@ def blockers(s: Session, g: ProposalAccessGrant, q: Quotation, decision: str = "
     """Everything that stops a digital decision on ``q`` now, each with a staff message and, where the customer can act,
     customer words. Declining needs the method, verification and evidence decisions but no acknowledgements."""
     out: list[dict[str, Any]] = []
+    if g.recipient_kind not in V.DECIDING_KINDS:
+        out.append(_b("RECIPIENT_NOT_AUTHORISED", f"A {g.recipient_kind} link cannot decide; only the primary customer's.",
+                      customer="Only the primary customer's link can accept or decline this proposal."))  # fmt: skip
     state = grants.proposal_state(s, q)
     if state != "OPEN":
         out.append(_b("PROPOSAL_NOT_OPEN", f"The proposal is {state.lower()}."))

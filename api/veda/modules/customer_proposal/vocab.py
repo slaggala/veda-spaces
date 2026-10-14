@@ -13,6 +13,9 @@ GRANT_STATUSES = ("CREATED", "ACTIVE", "EXPIRED", "REVOKED")
 LIVE_GRANT_STATUSES = ("CREATED", "ACTIVE")
 # Who the link is for. Never a name, phone or email: the person is the lead's; the grant names only the role they play.
 RECIPIENT_KINDS = ("PRIMARY_CUSTOMER", "CO_OWNER", "FAMILY_MEMBER", "OTHER")
+# Who may change the proposal's choices and make a digital decision: the primary customer only. Other recipients (a
+# co-owner, family member, adviser) view, ask and acknowledge; extending this is an owner decision (CQX-D01's scope).
+DECIDING_KINDS = ("PRIMARY_CUSTOMER",)
 REVOKE_REASONS = ("STAFF_REVOKED", "ROTATED", "SUPERSEDED", "LEAD_ERASED", "LEAD_CLOSED")
 
 # --- CQX-06 optional items --------------------------------------------------------------------------------------------

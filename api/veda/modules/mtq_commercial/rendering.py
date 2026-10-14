@@ -338,7 +338,8 @@ def html_v2(doc: dict[str, Any]) -> str:
     if not support:
         return page
     block = "<h2>Service support (Veda Spaces)</h2><ul>" + "".join(f"<li>{_e(t)}</li>" for t in support) + "</ul>"
-    start = page.find("<h2>Warranty</h2>")
+    # The warranty list is the only "<h2>Warranty</h2><ul>" (a room titled Warranty is followed by a <table>).
+    start = page.find("<h2>Warranty</h2><ul>")
     at = page.find("</ul>", start) + len("</ul>") if start >= 0 else page.rfind("</body>")
     return page[:at] + block + page[at:]
 

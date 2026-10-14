@@ -454,7 +454,7 @@ export class VsProposalView extends LitElement {
     const items = page.proposal.optional_items;
     if (!items.length) return nothing;
     const states = new Map((page.selections?.items ?? []).map((i) => [i.ref, i.state]));
-    const can = page.capabilities.interaction && !this.preview;
+    const can = page.capabilities.interaction && !this.preview && page.selections?.can_choose !== false;
     const sel = page.selections;
     const choices: [string, string][] = [['SELECTED', 'Add to my proposal'], ['DESELECTED', 'Not for me'], ['REQUESTED_FOR_DISCUSSION', 'I would like to discuss it']];
     return html`<section class="card stack" aria-labelledby="opt" id="optional"><h2 id="opt">Optional items</h2>

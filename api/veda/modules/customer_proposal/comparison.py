@@ -143,11 +143,14 @@ def version_comparison(s: Session, q: Quotation) -> dict[str, Any] | None:
 def contribute(s: Session, g, q: Quotation, page: dict[str, Any]) -> None:
     page["comparison_available"] = bool(_issued_versions(s, q))
     if q.quotation_kind == "VARIATION":
-        page["variation"] = variation_preview(s, q)
+        view = variation_preview(s, q)
+        view.pop("status"), view.pop("issuable")  # staff-only fields
+        view["changes"] = [ch for ch in view["changes"] if ch["delta"] not in (None, "0.00") or ch["change"] != "NONE"]
+        page["variation"] = view
 
 
-_VARIATION_KEYS = ("reference", "baseline_reference", "status", "net_change", "gst.status", "gst.amount",
-                   "net_change_with_gst", "accepted_value", "value_if_accepted", "issuable", "kept_choices[].description",
+_VARIATION_KEYS = ("reference", "baseline_reference", "net_change", "gst.status", "gst.amount",
+                   "net_change_with_gst", "accepted_value", "value_if_accepted", "kept_choices[].description",
                    "kept_choices[].amount", *(f"changes[].{k}" for k in (
                        "ref", "description", "room", "change", "change_label", "quantity_before", "quantity_after",
                        "amount_before", "amount_after", "delta", "priced")))  # fmt: skip

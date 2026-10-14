@@ -10,7 +10,7 @@ RBAC is never used for customers, and customer access never grants a staff permi
 
 | Actor | Credential | Reaches |
 |---|---|---|
-| Customer (recipient of a link) | 256-bit opaque token in the link's URL fragment, sent only as the `X-Veda-Proposal` header | The customer-safe projection of exactly one version; their own choices, requests, acknowledgements and decision on it |
+| Customer (recipient of a link) | 256-bit opaque token in the link's URL fragment, sent only as the `X-Veda-Proposal` header | The customer-safe projection of exactly one version; their own requests and acknowledgements; **only the PRIMARY_CUSTOMER link** chooses optional items (one shared set per version) and makes a digital decision (`vocab.DECIDING_KINDS`; widening it is an owner decision) |
 | Staff | Bearer session (existing auth) + `proposal.*` permissions within lead scope | Sharing, previews, customer activity, evidence, revocation |
 | Anyone else | none | `404 PROPOSAL_LINK_INVALID`, rate limited |
 
@@ -46,6 +46,13 @@ RBAC is never used for customers, and customer access never grants a staff permi
 - No email, phone number or name is stored on CQX rows.
 
 ## 4. Known limits (owner decisions or later changes)
+
+Independent review follow-ups, tracked before any flag is enabled: the subject and cover note are staff text shown to
+whoever holds the link (keep customer names out of them); the idempotency replay cache can return a just-created link
+to the same staff user for 24 hours (process memory only); a link to a lost lead stays live until it expires or is
+revoked (no LEAD_CLOSED hook yet); a refused request cannot record its own EXPIRED/refusal event (housekeeping records
+expiry once it is scheduled).
+
 
 - **Link possession is the only verification implemented.** Whether that suffices for a digital decision is CQX-D01.
 - **Reference images on the proposal page** need the API host in the workspace `img-src` for `/proposal` only (a

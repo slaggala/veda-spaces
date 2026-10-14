@@ -46,7 +46,7 @@ export interface Pricing {
 }
 export interface Selections {
   items: { ref: string; state: 'NOT_SELECTED' | 'SELECTED' | 'DESELECTED' | 'REQUESTED_FOR_DISCUSSION'; priced: boolean }[];
-  selected_refs: string[]; status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED'; extra: string | null; total_with_selections: string | null;
+  selected_refs: string[]; can_choose?: boolean; status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED'; extra: string | null; total_with_selections: string | null;
 }
 export interface CustomerRequest {
   ref: string; category: string; category_label: string; line_ref: string | null; room: string | null; about_version: number;
