@@ -24,7 +24,7 @@ from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, re
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants, journey, pricing, projection, references, requests, selections
+from . import comparison, grants, journey, pricing, projection, references, requests, selections
 from . import schemas as S
 from .models import CustomerProposalRequest, ProposalAccessGrant
 
@@ -186,6 +186,21 @@ def view(req: Req):
     return private(ok(page))
 
 
+@public_api.route("GET", "/proposal/comparison", rbx="RBX-009", auth="public", write=False, requirement="CQX-008",
+                  limits=READ_LIMITS, summary="This version beside the version issued before it (frozen documents only)")  # fmt: skip
+def compare_versions(req: Req):
+    _g, q = customer(req)
+    return private(ok({"comparison": comparison.version_comparison(req.session, q)}))
+
+
+@staff_api.route("GET", "/quotations/<quotation_id>/variation-preview", permission="proposal.preview", write=False,
+                 requirement="CQX-008",
+                 summary="A variation beside the accepted baseline, as the customer would see it (staff preview)")  # fmt: skip
+def variation_preview(req: Req, quotation_id: str):
+    q = _quotation(req, quotation_id, "proposal.preview")
+    return ok(comparison.variation_preview(req.session, q))
+
+
 # --- customer: interaction --------------------------------------------------------------------------------------------
 @interaction_api.route("POST", "/proposal/selections", rbx="RBX-009", auth="public", body=S.SelectionIn,
                        max_body=PUBLIC_MAX_BODY, requirement="CQX-006", limits=WRITE_LIMITS,
@@ -259,6 +274,8 @@ journey.register(references.contribute)
 journey.register(pricing.contribute)
 journey.register(selections.contribute)
 journey.register(requests.contribute)
+journey.register(comparison.contribute)
+journey.PAGE_FIELDS.update(comparison.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(requests.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(pricing.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(selections.PAGE_FIELDS)

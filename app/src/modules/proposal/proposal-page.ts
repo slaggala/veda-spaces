@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import type { ApiProblem } from '../../core/api/problem.js';
 import { shared } from '../../design-system/styles.js';
-import { forgetToken, newKey, proposalApi, takeToken, type Page } from './api.js';
+import { forgetToken, newKey, proposalApi, takeToken, type Comparison, type Page } from './api.js';
 import './proposal-view.js';
 
 type Load = 'loading' | 'ready' | 'refused' | 'offline';
@@ -24,8 +24,9 @@ const REFUSALS: Record<string, string> = {
 export class VsProposalPage extends LitElement {
   static override properties = {
     load: { state: true }, page: { state: true }, message: { state: true }, heading: { state: true },
-    announcement: { state: true }, busy: { state: true }, errors: { state: true },
+    announcement: { state: true }, busy: { state: true }, errors: { state: true }, comparison: { state: true },
   };
+  declare comparison: Comparison | null;
   declare announcement: string;
   declare busy: boolean;
   declare errors: { field: string; message: string }[];
@@ -53,6 +54,11 @@ export class VsProposalPage extends LitElement {
     this.announcement = '';
     this.busy = false;
     this.errors = [];
+    this.comparison = null;
+  }
+
+  private onCompare() {
+    void this.act(async () => { this.comparison = (await proposalApi(this.token ?? '').compare()).data.comparison; }, 'Changes shown.');
   }
 
   /** Run one customer action, then reload the page model (the server is the only source of totals and states). */
@@ -144,7 +150,7 @@ export class VsProposalPage extends LitElement {
   override render() {
     if (this.load === 'ready' && this.page) {
       return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
-        @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk}></vs-proposal-view>`;
+        .comparison=${this.comparison} @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk} @proposal-compare=${this.onCompare}></vs-proposal-view>`;
     }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`

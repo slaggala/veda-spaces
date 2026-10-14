@@ -53,6 +53,18 @@ export interface CustomerRequest {
   about_variation: number; message: string; requested_quantity: string | null; status: string; status_label: string;
   response: string | null; sent_on: string; responded_on: string | null; answered_by_revision: string | null;
 }
+export interface VariationView {
+  reference: string; baseline_reference: string; status: string; net_change: string | null; gst: { status: string; amount: string | null };
+  net_change_with_gst: string | null; accepted_value: string | null; value_if_accepted: string | null; issuable: boolean;
+  kept_choices: { description: string; amount: string | null }[];
+  changes: { ref: string; description: string; room: string | null; change: string; change_label: string; quantity_before: string | null;
+    quantity_after: string | null; amount_before: string | null; amount_after: string | null; delta: string | null; priced: boolean }[];
+}
+export interface Comparison {
+  from_version: number; to_version: number; total_before: string | null; total_after: string | null;
+  changes: { change: 'ADDED' | 'CHANGED' | 'REMOVED'; description: string; room: string | null; before: string | null; after: string | null;
+    status: string; quantity_before?: string | null; quantity_after?: string | null }[];
+}
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -67,6 +79,8 @@ export interface Page {
   pricing?: Pricing;
   selections?: Selections;
   requests?: { can_ask: boolean; items: CustomerRequest[] };
+  comparison_available?: boolean;
+  variation?: VariationView;
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
 
@@ -99,6 +113,7 @@ export function proposalApi(token: string) {
     view: () => api.request<Page>(BASE, { anonymous: true, headers }),
     select: (line_ref: string, state: string) =>
       api.request<Selections>(`${BASE}/selections`, { method: 'POST', anonymous: true, headers, body: { line_ref, state }, idempotencyKey: newKey() }),
+    compare: () => api.request<{ comparison: Comparison | null }>(`${BASE}/comparison`, { anonymous: true, headers }),
     ask: (body: Record<string, unknown>, key: string) =>
       api.request<CustomerRequest[]>(`${BASE}/requests`, { method: 'POST', anonymous: true, headers, body, idempotencyKey: key }),
   };
@@ -135,6 +150,7 @@ export const staffProposal = {
     api.request<StaffRequest>(`${P}/customer-requests/${r.id}/respond`, { method: 'POST', body: { status, response }, ifMatch: r.version }),
   link: (r: StaffRequest, resulting_quotation_id: string, response: string | null) =>
     api.request<StaffRequest>(`${P}/customer-requests/${r.id}/link`, { method: 'POST', body: { resulting_quotation_id, response }, ifMatch: r.version }),
+  variationPreview: (quotationId: string) => api.get<VariationView>(`${P}/quotations/${quotationId}/variation-preview`),
   chain: (quotationId: string) => api.get<{ versions: { id: string; label: string; status: string }[] }>(`${P}/quotations/${quotationId}/chain`),
 };
 

@@ -230,6 +230,34 @@ describe('questions and change requests (CQX-07)', () => {
   });
 });
 
+describe('variation and version comparison (CQX-08)', () => {
+  it('shows a variation against the accepted baseline with kept choices and the cumulative position', async () => {
+    const page = samplePage({ variation: { reference: 'VS-Q-2026-000001-V01 v1', baseline_reference: 'VS-Q-2026-000001 v1', status: 'ISSUED',
+      net_change: '25,000.00', gst: { status: 'Included', amount: '4,500.00' }, net_change_with_gst: '29,500.00', accepted_value: '4,04,400.00',
+      value_if_accepted: '4,33,900.00', issuable: true, kept_choices: [{ description: 'Loft above wardrobe', amount: '15,000.00' }],
+      changes: [{ ref: 'L1', description: 'TV unit', room: 'Bedroom 2', change: 'ADD', change_label: 'Added', quantity_before: null,
+        quantity_after: '18 sq ft', amount_before: null, amount_after: '25,000.00', delta: '25,000.00', priced: true }] } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#variation')!;
+    expect(sec.textContent).to.contain('Added').and.to.contain('Loft above wardrobe').and.to.contain('₹ 4,33,900.00');
+    await expect(el).to.be.accessible();
+  });
+
+  it('fetches the comparison on request and lists what changed', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'c'.repeat(43)}`);
+    const cmp = { from_version: 1, to_version: 2, total_before: '3,00,000.00', total_after: '3,25,000.00',
+      changes: [{ change: 'ADDED', description: 'TV unit', room: 'Bedroom 2', before: null, after: '25,000.00', status: 'Included' }] };
+    serve((path) => json(path.endsWith('/comparison') ? { comparison: cmp } : samplePage({ comparison_available: true })));
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    (view.shadowRoot!.querySelector('#compare button') as HTMLButtonElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('#compare [role=table]'));
+    expect(view.shadowRoot!.querySelector('#compare')!.textContent).to.contain('TV unit').and.to.contain('₹ 3,25,000.00');
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 

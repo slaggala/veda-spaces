@@ -3,8 +3,8 @@ import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatAbsolute, humanize } from '../../core/format/format.js';
 import { shared, tableStyles } from '../../design-system/styles.js';
-import { previewPage, staffProposal, type Activity, type Grant, type Preview, type StaffRequest } from './api.js';
-import './proposal-view.js';
+import { previewPage, staffProposal, type Activity, type Grant, type Preview, type StaffRequest, type VariationView } from './api.js';
+import { tableLikeStyles, variationTable } from './proposal-view.js';
 
 const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
 
@@ -16,9 +16,10 @@ const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
 export class VsProposalStaff extends SessionElement {
   static override properties = {
     quotationId: { attribute: false }, quotationStatus: { attribute: false }, grants: { state: true }, preview: { state: true },
-    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true },
+    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true }, variation: { state: true },
   };
   declare chain: { id: string; label: string; status: string }[];
+  declare variation: VariationView | null;
   declare activity: Activity | null;
   declare quotationId: string;
   declare quotationStatus: string;
@@ -28,7 +29,7 @@ export class VsProposalStaff extends SessionElement {
   declare problem: ApiProblem | null;
   declare busy: boolean;
 
-  static override styles = [...shared, tableStyles, css`
+  static override styles = [...shared, tableStyles, tableLikeStyles, css`
     :host { display: block; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
     button, select, input { min-height: 44px; }
@@ -40,7 +41,7 @@ export class VsProposalStaff extends SessionElement {
   constructor() {
     super();
     this.quotationId = ''; this.quotationStatus = ''; this.grants = []; this.preview = null; this.issued = null;
-    this.problem = null; this.busy = false; this.activity = null; this.chain = [];
+    this.problem = null; this.busy = false; this.activity = null; this.chain = []; this.variation = null;
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -57,6 +58,7 @@ export class VsProposalStaff extends SessionElement {
     try {
       this.grants = this.can('proposal.share') ? (await staffProposal.grants(this.quotationId)).data : [];
       this.preview = this.can('proposal.preview') ? (await staffProposal.preview(this.quotationId)).data : null;
+      this.variation = this.preview?.proposal.kind === 'VARIATION' ? (await staffProposal.variationPreview(this.quotationId)).data : null;
       await this.loadMore();
     } catch (e) {
       this.problem = e as ApiProblem;
@@ -85,6 +87,8 @@ export class VsProposalStaff extends SessionElement {
       ${this.problem ? html`<vs-problem-banner .problem=${this.problem}></vs-problem-banner>` : nothing}
       ${this.can('proposal.share') ? this.sharing(shareable) : nothing}
       ${this.more()}
+      ${this.variation ? html`${this.variation.issuable ? nothing : html`<vs-banner kind="warning">Staff preview only: this variation cannot be issued yet (see the quotation's blockers, e.g. the variation policy OI-MTQ-13).</vs-banner>`}
+        <div class="preview">${variationTable(this.variation)}</div>` : nothing}
       ${this.preview ? html`<section class="stack" aria-labelledby="pv"><h3 id="pv" class="title">What the customer sees</h3>
         ${this.preview.frozen ? nothing : html`<vs-banner kind="warning">${this.preview.watermark}</vs-banner>`}
         <div class="preview"><vs-proposal-view preview .page=${previewPage(this.preview)}></vs-proposal-view></div></section>` : nothing}

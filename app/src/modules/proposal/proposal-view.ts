@@ -1,7 +1,16 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import type { VsErrorSummary } from '../../design-system/components.js';
 import { shared } from '../../design-system/styles.js';
-import { mediaUrl, type MediaImage, type Page, type ProposalLine, type Room } from './api.js';
+import { mediaUrl, type Comparison, type MediaImage, type Page, type ProposalLine, type Room, type VariationView } from './api.js';
+
+/** Row-and-column layout that never scrolls sideways (tables become stacked rows on narrow screens). */
+export const tableLikeStyles = css`
+    .table-like { display: grid; } .tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--vs-space-3); padding: 8px 0; border-top: 1px solid var(--vs-line); }
+    .tr.head { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--vs-ink-muted); border-top: 0; }
+    .tr .num { text-align: right; white-space: nowrap; } .tr.total { font-weight: 700; font-size: 18px; border-top: 2px solid var(--vs-ink); }
+    .tr.var { grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) repeat(3, auto); }
+    @media (max-width: 599px) { .tr.var { grid-template-columns: minmax(0, 1fr) auto; } .tr.var > :nth-child(3), .tr.var > :nth-child(4) { display: none; } }
+`;
 
 const STATE_LABEL: Record<Page['state'], string> = {
   OPEN: 'Open for your review', SUPERSEDED: 'Replaced by a newer version', EXPIRED: 'Past its validity',
@@ -22,7 +31,10 @@ export class VsProposalView extends LitElement {
   static override properties = {
     page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
     announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
+    comparison: { attribute: false },
   };
+  /** The comparison with the version issued before this one, once the customer asked for it. */
+  declare comparison: Comparison | null;
   /** The category chosen in the question form (decides which fields it asks for). */
   declare askCategory: string;
   /** Polite screen-reader announcement of the last action's result (set by the page). */
@@ -37,7 +49,7 @@ export class VsProposalView extends LitElement {
   /** Rooms whose image failed to load: they show the named placeholder instead. */
   declare failed: ReadonlySet<string>;
 
-  static override styles = [...shared, css`
+  static override styles = [...shared, tableLikeStyles, css`
     :host { display: block; color: var(--vs-ink); }
     a, button, summary, input, select, textarea { min-height: var(--vs-target); }
     a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible,
@@ -91,9 +103,6 @@ export class VsProposalView extends LitElement {
     .speccat dl { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 2px var(--vs-space-3); margin: 0; font-size: 13px; }
     .speccat dt { color: var(--vs-ink-muted); } .speccat dd { margin: 0; overflow-wrap: anywhere; }
     figure.big img { width: 100%; max-height: 70vh; object-fit: contain; } figure.big figcaption { margin-top: var(--vs-space-2); }
-    .table-like { display: grid; } .tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--vs-space-3); padding: 8px 0; border-top: 1px solid var(--vs-line); }
-    .tr.head { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--vs-ink-muted); border-top: 0; }
-    .tr .num { text-align: right; white-space: nowrap; } .tr.total { font-weight: 700; font-size: 18px; border-top: 2px solid var(--vs-ink); }
     .milestones { margin: 0; padding-left: 20px; }
     fieldset.optitem { border: 1px solid var(--vs-line); border-radius: var(--vs-radius-card); padding: var(--vs-space-3) var(--vs-space-4); margin: 0;
       display: grid; gap: var(--vs-space-2); min-width: 0; }
@@ -103,6 +112,7 @@ export class VsProposalView extends LitElement {
     .choice { display: inline-flex; align-items: center; gap: 8px; min-height: var(--vs-target); padding: 0 var(--vs-space-3);
       border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control); cursor: pointer; background: var(--vs-surface); }
     .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; }
+    .tr.cmp { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; }
     .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-3); }
     .request { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
     .msg, .reply { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; } .reply { padding-left: var(--vs-space-3); border-left: 2px solid var(--vs-copper); }
@@ -135,6 +145,7 @@ export class VsProposalView extends LitElement {
     this.busy = false;
     this.errors = [];
     this.askCategory = 'GENERAL_QUESTION';
+    this.comparison = null;
   }
 
   override connectedCallback() {
@@ -307,7 +318,26 @@ export class VsProposalView extends LitElement {
   /** The proposal's sections after the rooms, in reading order. */
   protected sections(page: Page): TemplateResult {
     return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
-      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.questionsPanel(page)}`;
+      ${page.variation ? variationTable(page.variation) : nothing}
+      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}`;
+  }
+
+  // --- CQX-08 comparison with the previous version -------------------------------------------------------------------
+  protected comparePanel(page: Page): TemplateResult | typeof nothing {
+    if (!page.comparison_available || this.preview) return nothing;
+    const c = this.comparison;
+    const word = { ADDED: 'Added', CHANGED: 'Changed', REMOVED: 'Removed' } as const;
+    return html`<section class="card stack" aria-labelledby="cmp" id="compare"><h2 id="cmp">What changed from the previous version</h2>
+      ${c ? html`<p>Version ${c.from_version}: ${rupees(c.total_before) ?? '—'} → version ${c.to_version}: <span class="strong">${rupees(c.total_after) ?? '—'}</span></p>
+        ${c.changes.length ? html`<div class="table-like" role="table" aria-label="Changes between versions">
+          <div role="row" class="tr head cmp"><span role="columnheader">Item</span><span role="columnheader">Change</span><span role="columnheader" class="num">Before → after</span></div>
+          ${c.changes.map((x) => html`<div role="row" class="tr cmp"><span role="cell">${x.description}${x.room ? html`<br><span class="small muted">${x.room}</span>` : nothing}</span>
+            <span role="cell">${word[x.change]}${x.quantity_before !== x.quantity_after && (x.quantity_before || x.quantity_after) ? html`<br><span class="small muted">${x.quantity_before ?? '—'} → ${x.quantity_after ?? '—'}</span>` : nothing}</span>
+            <span role="cell" class="num">${rupees(x.before) ?? '—'} → ${rupees(x.after) ?? '—'}</span></div>`)}</div>`
+          : html`<p>No item changed.</p>`}`
+        : html`<p>See exactly what is different from the version you received before.</p>
+          <div><button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-compare')}>Show the changes</button></div>`}
+    </section>`;
   }
 
   // --- CQX-07 questions and change requests -------------------------------------------------------------------------
@@ -431,3 +461,23 @@ export class VsProposalView extends LitElement {
 }
 
 customElements.define('vs-proposal-view', VsProposalView);
+
+/** A variation beside the accepted baseline (CQX-08): shared by the customer page and the staff preview. */
+export function variationTable(v: VariationView): TemplateResult {
+  return html`<section class="card stack" aria-labelledby="var" id="variation"><h2 id="var">Changes to your accepted proposal</h2>
+    <p class="small muted">Compared with your accepted proposal ${v.baseline_reference}. Your accepted proposal itself does not change.</p>
+    <div class="table-like" role="table" aria-label="Changes">
+      <div role="row" class="tr head var"><span role="columnheader">Item</span><span role="columnheader">Change</span><span role="columnheader" class="num">Before</span>
+        <span role="columnheader" class="num">After</span><span role="columnheader" class="num">Difference</span></div>
+      ${v.changes.map((x) => html`<div role="row" class="tr var"><span role="cell">${x.description}${x.room ? html`<br><span class="small muted">${x.room}</span>` : nothing}</span>
+        <span role="cell">${x.change_label}${x.quantity_before || x.quantity_after ? html`<br><span class="small muted">${x.quantity_before ?? '—'} → ${x.quantity_after ?? '—'}</span>` : nothing}</span>
+        <span role="cell" class="num">${rupees(x.amount_before) ?? '—'}</span><span role="cell" class="num">${x.priced ? rupees(x.amount_after) ?? '—' : 'To be confirmed'}</span>
+        <span role="cell" class="num">${rupees(x.delta) ?? '—'}</span></div>`)}
+      <div role="row" class="tr var total"><span role="cell">Net change</span><span role="cell"></span><span role="cell"></span><span role="cell"></span>
+        <span role="cell" class="num">${rupees(v.net_change) ?? '—'}</span></div>
+    </div>
+    <p>GST on the change: ${v.gst.amount ? rupees(v.gst.amount) : v.gst.status}. ${v.net_change_with_gst ? html`Net change with GST: <span class="strong">${rupees(v.net_change_with_gst)}</span>.` : nothing}</p>
+    ${v.kept_choices.length ? html`<p class="small">Kept from your accepted choices: ${v.kept_choices.map((k) => k.description).join('; ')}.</p>` : nothing}
+    ${v.accepted_value ? html`<p class="small">Accepted value so far: ${rupees(v.accepted_value)}${v.value_if_accepted ? html` · if you accept this change: ${rupees(v.value_if_accepted)}` : nothing}.</p>` : nothing}
+  </section>`;
+}
