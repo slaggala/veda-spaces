@@ -1,6 +1,6 @@
 import type { Route } from '@vaadin/router';
 import { session } from '../auth/session.js';
-import { evaluateGuard, type RouteMeta } from './guard.js';
+import { evaluateGuard, landingPath, type Landing, type RouteMeta } from './guard.js';
 import { navigate } from './next.js';
 
 type Loader = () => Promise<unknown>;
@@ -64,6 +64,14 @@ export const ROUTES: Def[] = [
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 
+/** Landing pages for "/" in order of preference, each with its route's own permissions (the dashboard first). */
+const LANDING_ORDER = ['/', '/site', '/leads', '/follow-ups', '/approvals', '/catalog', '/audit', '/admin/users', '/admin/roles', '/profile'];
+export const LANDINGS: Landing[] = LANDING_ORDER.map((path) => {
+  const def = ROUTES.find((d) => d.path === path);
+  if (!def) throw new Error(`landing page ${path} is not a route`);
+  return { path, anyOf: def.anyOf };
+});
+
 export const APP_TITLE = 'Veda Workspace';
 
 /** "Page · Veda Workspace" for a path; unknown paths get "Page not found". */
@@ -91,6 +99,7 @@ export function buildRoutes(): Route[] {
         mustChangePassword: session.mustChangePassword,
         path: context.pathname,
         search: window.location.pathname === context.pathname ? window.location.search : '',
+        home: context.pathname === '/' ? landingPath(session.state.me?.permissions, LANDINGS) : null,
       });
       if (redirect) {
         queueMicrotask(() => navigate(redirect));

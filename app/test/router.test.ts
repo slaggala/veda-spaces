@@ -1,7 +1,8 @@
 import { expect } from '@open-wc/testing';
 import type { Me } from '../src/core/api/types.js';
 import { filterNav, NAV_ITEMS, has, canOnRow } from '../src/core/authz/permissions.js';
-import { evaluateGuard } from '../src/core/router/guard.js';
+import { evaluateGuard, landingPath } from '../src/core/router/guard.js';
+import { LANDINGS } from '../src/core/router/routes.js';
 import { sanitizeNext } from '../src/core/router/next.js';
 
 export function makeMe(permissions: Record<string, 'ALL' | 'OWN'>, overrides: Partial<Me> = {}): Me {
@@ -61,6 +62,19 @@ describe('route guard', () => {
     const ctx = { state: { status: 'authenticated' as const, me: makeMe(SALES) }, mustChangePassword: false, path: '/admin/users' };
     expect(evaluateGuard({ access: 'auth', anyOf: ['user.read'] }, ctx)).to.match(/^\/no-access\?perm=user\.read/);
     expect(evaluateGuard({ access: 'auth', anyOf: ['lead.read'] }, { ...ctx, path: '/leads' })).to.equal(null);
+  });
+  it('lands a role without the dashboard on its first permitted page, never on No access', () => {
+    const ESTIMATOR = { 'property.read': 'ALL', 'measurement.read': 'ALL', 'scope.read': 'ALL', 'profile.read': 'ALL' } as const;
+    expect(landingPath(ESTIMATOR, LANDINGS)).to.equal('/site');
+    expect(landingPath(SALES, LANDINGS)).to.equal('/');
+    expect(landingPath({ 'profile.read': 'ALL' }, LANDINGS)).to.equal('/profile');
+    expect(landingPath({}, LANDINGS)).to.equal(null);
+    const ctx = { state: { status: 'authenticated' as const, me: makeMe(ESTIMATOR) }, mustChangePassword: false, path: '/' };
+    expect(evaluateGuard({ access: 'auth', anyOf: ['lead.read'] }, { ...ctx, home: '/site' })).to.equal('/site');
+    // Only "/" falls back: any other page the user cannot open still says No access, naming the permission.
+    expect(evaluateGuard({ access: 'auth', anyOf: ['lead.read'] }, { ...ctx, path: '/leads', home: '/site' })).to.match(/^\/no-access\?perm=lead\.read/);
+    // No permitted page at all: No access, as before.
+    expect(evaluateGuard({ access: 'auth', anyOf: ['lead.read'] }, { ...ctx, home: null })).to.match(/^\/no-access/);
   });
   it('confines RECOVERY sessions to the recovery allow-list', () => {
     const me = makeMe({}, { session: { type: 'RECOVERY', auth_methods: ['pwd', 'recovery'], mfa_verified_on: null, cooling_off_until: null } });
