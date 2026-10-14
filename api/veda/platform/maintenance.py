@@ -833,6 +833,17 @@ def mtq_quotation_expiry() -> dict:
         return {"expired": quotations.expire_due(s)}
 
 
+def customer_proposal_housekeeping() -> dict:
+    """CQX-11: record expired proposal links and remind staff once when a shared proposal nears the end of its
+    validity. Skipped while customer proposals are off."""
+    from veda.modules.customer_proposal import housekeeping
+
+    if not settings().customer_proposal_enabled:
+        return {"skipped": "customer proposals are not enabled here"}
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        return housekeeping.run(s)
+
+
 def catalog_activation() -> dict:
     """Activate catalog releases whose scheduled time has come (ADR-013); each is re-validated and fails closed."""
     from veda.modules.catalog import service
