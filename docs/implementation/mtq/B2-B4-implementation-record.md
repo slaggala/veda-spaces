@@ -160,7 +160,7 @@ The focused re-review (B2-B4 CERTIFIED WITH REMAINING MERGE CONDITIONS) found on
 
 ## 8. Protected-staging enablement (decision log 33)
 
-**Status: wired, both flags false; the enablement record is a DRAFT.**
+**Status: enabled in protected staging by owner approval of 2026-10-14 (decision log 34). The record is APPROVED, bound by its SHA-256, and limited to internal validation; customer issuance stays refused.** The wiring (decision log 33) was applied first with both flags false (2 / 0 / 0, drift clean).
 
 | Layer | Refuses |
 |---|---|
