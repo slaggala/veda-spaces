@@ -45,5 +45,5 @@
     "smoke_test": "",
     "production_isolation": ""
   },
-  "rollback": "A reviewed change sets customer_proposal.proposal_enabled, interaction_enabled and acceptance_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameters in place; the next 12-deploy renders them. Every CQX route then answers 404 and every link stops opening; data stays (links can be revoked first). Image rollback: deploy.sh --rollback to the N-1 tag (migration 0205 is expand-only)."
+  "rollback": "A reviewed change sets customer_proposal.proposal_enabled, interaction_enabled and acceptance_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameters in place; the next 12-deploy renders them. Every CQX route then answers 404 and every link stops opening; data stays (links can be revoked first). Image rollback is NOT ordinarily safe once any quotation was issued with template mtq-quotation-html/2: an image without that reader refuses those documents, so recovery is roll-forward only (docs/operations/api-runbooks.md §2.4; migration 0205 itself is expand-only)."
 }
