@@ -527,18 +527,38 @@ run "a_bound_digest_without_the_flag_refused" {
 # MTQ B2-B4 (decision log 33): both commercial flags are planned false; they turn on only with an owner-APPROVED,
 # internal-validation-only enablement record bound by its SHA-256, quotation only with estimation, estimation only
 # with the B1 site flag.
-run "the_commercial_flags_are_planned_false_by_default" {
+run "the_commercial_flags_are_planned_false_when_off" {
   command = plan
+  variables {
+    platform_config_path       = "tests/fixtures/platform-commercial-off.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-draft.json"
+  }
 
   assert {
     condition = (local.app_config["VEDA_MTQ_ESTIMATION_ENABLED"] == "false" && local.app_config["VEDA_MTQ_QUOTATION_ENABLED"] == "false" &&
     output.mtq_commercial.enablement_record == null && length(local.commercial_config) == 2)
-    error_message = "two parameters, both false, no record bound"
+    error_message = "two parameters, both false, no record bound (also the rollback state)"
   }
 
   assert {
-    condition     = jsondecode(file("../../../config/mtq-commercial-enablement-record.json")).status == "DRAFT" && contains(local.commercial_record_problems, "the record is not APPROVED")
-    error_message = "the committed record is a DRAFT until the owner approves it"
+    condition     = jsondecode(file("tests/fixtures/mtq-commercial-record-draft.json")).status == "DRAFT" && contains(local.commercial_record_problems, "the record is not APPROVED")
+    error_message = "a DRAFT record is never enough"
+  }
+}
+
+run "the_committed_commercial_record_is_approved_and_turns_both_flags_on" {
+  command = plan
+
+  assert {
+    condition = (jsondecode(file("../../../config/mtq-commercial-enablement-record.json")).status == "APPROVED" && local.commercial_record_problems == [] &&
+      local.app_config["VEDA_ENV"] == "staging" && local.app_config["VEDA_MTQ_ESTIMATION_ENABLED"] == "true" && local.app_config["VEDA_MTQ_QUOTATION_ENABLED"] == "true" &&
+    output.mtq_commercial.enablement_record == filesha256("../../../config/mtq-commercial-enablement-record.json"))
+    error_message = "owner approval of 2026-10-14 (decision log 34): APPROVED, every evidence field filled, internal validation only, bound, staging only"
+  }
+
+  assert {
+    condition     = local.commercial_record.scope.customer_issuance == false && local.commercial_record.scope.internal_protected_staging_validation_only == true
+    error_message = "the approval never authorises customer issuance"
   }
 }
 
@@ -580,7 +600,8 @@ run "quotation_without_estimation_refused" {
 run "the_commercial_flags_with_the_draft_record_refused" {
   command = plan
   variables {
-    platform_config_path = "tests/fixtures/platform-commercial-on-draft.json"
+    platform_config_path       = "tests/fixtures/platform-commercial-on-draft.json"
+    mtq_commercial_record_path = "tests/fixtures/mtq-commercial-record-draft.json"
   }
   expect_failures = [output.mtq_commercial]
 }

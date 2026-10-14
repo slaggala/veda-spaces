@@ -1,0 +1,41 @@
+{
+  "record": "MTQ-B2-B4-STAGING-ENABLEMENT",
+  "status": "DRAFT",
+  "environment": "staging",
+  "production": false,
+  "flags": [
+    "VEDA_MTQ_ESTIMATION_ENABLED",
+    "VEDA_MTQ_QUOTATION_ENABLED"
+  ],
+  "author": "MTQ B2-B4 staging enablement session (VEDA-SPACES-MTQ-B2-B4-PROTECTED-STAGING-ENABLEMENT)",
+  "approved_by": "OWNER TO FILL",
+  "approved_on": "OWNER TO FILL",
+  "scope": {
+    "internal_protected_staging_validation_only": true,
+    "staff_only": true,
+    "public_routes": false,
+    "customer_issuance": false,
+    "properties": "Synthetic test properties only; no real customer's personal information",
+    "not_authorised": [
+      "customer issuance",
+      "production",
+      "live commercial promises",
+      "GST (OI-MTQ-07 undecided)",
+      "discounts (OI-MTQ-06 undecided)",
+      "warranty, payment milestones and terms (OI-MTQ-09 undecided)",
+      "Premium/Luxury pricing without approved rate cards (OI-MTQ-05 undecided)"
+    ]
+  },
+  "evidence": {
+    "independent_review": "OWNER TO FILL",
+    "ci_run_id": "OWNER TO FILL",
+    "deploy_flags_off_run_id": "OWNER TO FILL",
+    "migration_verification_run_id": "OWNER TO FILL",
+    "regression_checks": "OWNER TO FILL",
+    "production_isolation": "OWNER TO FILL",
+    "infra_apply_run_id": "OWNER TO FILL",
+    "drift_run_id": "OWNER TO FILL"
+  },
+  "rollback": "A reviewed change sets mtq_commercial.estimation_enabled and quotation_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the two parameters in place; the next 12-deploy renders them. Every commercial route then answers 404; data stays, unreadable through the API. Image rollback: deploy.sh --rollback to the N-1 tag (the migrations are expand-only).",
+  "evidence_notes": {}
+}

@@ -1,6 +1,6 @@
 {
   "record": "MTQ-B2-B4-STAGING-ENABLEMENT",
-  "status": "DRAFT",
+  "status": "APPROVED",
   "environment": "staging",
   "production": false,
   "flags": [
@@ -8,8 +8,8 @@
     "VEDA_MTQ_QUOTATION_ENABLED"
   ],
   "author": "MTQ B2-B4 staging enablement session (VEDA-SPACES-MTQ-B2-B4-PROTECTED-STAGING-ENABLEMENT)",
-  "approved_by": "OWNER TO FILL",
-  "approved_on": "OWNER TO FILL",
+  "approved_by": "Srinivasulu Laggala",
+  "approved_on": "2026-10-14",
   "scope": {
     "internal_protected_staging_validation_only": true,
     "staff_only": true,
@@ -27,15 +27,21 @@
     ]
   },
   "evidence": {
-    "independent_review": "OWNER TO FILL",
-    "ci_run_id": "OWNER TO FILL",
-    "deploy_flags_off_run_id": "OWNER TO FILL",
-    "migration_verification_run_id": "OWNER TO FILL",
-    "regression_checks": "OWNER TO FILL",
-    "production_isolation": "OWNER TO FILL",
-    "infra_apply_run_id": "OWNER TO FILL",
-    "drift_run_id": "OWNER TO FILL"
+    "independent_review": "PR #91 (MTQ B2-B4) independently certified: NOT CERTIFIED at 851809e; CERTIFIED WITH REMAINING MERGE CONDITIONS at d4b7066; final kitchen wall-unit review at d3dcce2 CERTIFIED FOR MERGE, BUSINESS POLICIES AND STAGING VALIDATION PENDING (2026-10-14); merged as 2f5aa5f. PR #92 (staging flag wiring, both flags false) reviewed and merged by the owner as 78775eb with CI green.",
+    "ci_run_id": "38545240005",
+    "deploy_flags_off_run_id": "38539415456",
+    "migration_verification_run_id": "38540107211",
+    "regression_checks": "2026-10-14 on staging 2f5aa5f905c8 with both B2-B4 flags false: unauthenticated host probes (SSM 55c5ba86-4b68-479b-be33-ec0885d0e3a4) answer 404 for /api/v1/requirements, /scopes, /boqs, /cost-estimates, /quotations and /quotation-lines/x/trace, 401 for /api/v1/properties (B1) and /api/v1/leads, /health/ready ok; runtime settings mtq_site true, mtq_estimation false, mtq_quotation false (what /auth/me reports as features). Through Cloudflare Access with the owner signed in (Chrome): Leads list loads; Site measurement page loads; /site/properties/<id>/commercial shows 'Not enabled here' and the navigation has no commercial entry; Roles lists the system roles Estimator and Sales manager (0 users); the public Budgetary Estimate page loads on staging.vedaspaces.com (no estimate submitted); Catalogue answers no access (catalog.view), unchanged V3 state with catalog flags off.",
+    "production_isolation": "No production environment, stack or parameter was touched: every change is under /veda/staging (plan 38545365323: two /veda/staging/config parameters created, nothing else). The API refuses VEDA_MTQ_ESTIMATION_ENABLED and VEDA_MTQ_QUOTATION_ENABLED in production at start (veda/config.py, decision log 31).",
+    "infra_apply_run_id": "38545616645",
+    "drift_run_id": "38545829949"
   },
   "rollback": "A reviewed change sets mtq_commercial.estimation_enabled and quotation_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the two parameters in place; the next 12-deploy renders them. Every commercial route then answers 404; data stays, unreadable through the API. Image rollback: deploy.sh --rollback to the N-1 tag (the migrations are expand-only).",
-  "evidence_notes": {}
+  "evidence_notes": {
+    "deploy_flags_off_run_id": "12-deploy at 2f5aa5f (merge of PR #91): image veda-api@sha256:b6c13cd598bd41630a94bbab33ce9e5074680898bb976e0e3afa5639f6347f7b; preflight 'site measurement: ENABLED' (B1 unchanged); B2-B4 flags absent from api.env (false). Before it, a read-only query of the staging database (SSM 1ddd5b63-cb08-4f89-8f45-535a36c14998) found no custom role using the code or name ESTIMATOR or SALES_MANAGER (roles ADMIN, DESIGNER, FOUNDER, SALES, SURVEYOR; schema 0204_mtq_self_service). Rollback target N-1: b8a88df46ae2 (sha256:cfd26981e8b22a1d73e1ce186d1c76402828b7b043eb8467590a1cce1c6a76ff); the migrations are expand-only.",
+    "migration_verification_run_id": "13-evidence label mtq-b2b4-flags-off: s3://veda-evidence-813238078849/host/2026-10-14/i-01538ad0e744faaff/mtq-b2b4-flags-off-20261014T090852Z.tgz (sha256 ced7540ac070c835deb1d0c45c58760ac3975b73f24ac094f948ac32be6c6519, manifest verified): ready ok, migrations head, schema current 0202_mtq_commercial = image_head, api/worker/scheduler on veda-api:2f5aa5f905c8. Read-only query (SSM 55c5ba86-4b68-479b-be33-ec0885d0e3a4): tables requirement, scope, scope_item, boq, boq_line, cost_estimate, cost_estimate_line, cost_estimate_adjustment, quotation, quotation_section, quotation_line, quotation_event present and empty; ESTIMATOR and SALES_MANAGER seeded as system roles (SALES_MANAGER MFA required).",
+    "infra_apply_run_id": "11-infra-apply bound to workflow_dispatch plan run 38545365323 at 78775eb (plan sha256 a1a496d8ed69cbcf26723df48fe37355fbf06283a476a848f4af9362e8bfeb13): Apply complete! Resources: 2 added, 0 changed, 0 destroyed (module.ssm.aws_ssm_parameter.config VEDA_MTQ_ESTIMATION_ENABLED and VEDA_MTQ_QUOTATION_ENABLED, both false).",
+    "drift_run_id": "10-infra-plan (core) at 78775eb after the apply: No changes. Your infrastructure matches the configuration.",
+    "approval": "Owner approval given in session on 2026-10-14 (VEDA-SPACES-MTQ-B2-B4-PROTECTED-STAGING-ENABLEMENT): both flags on in protected staging only, internal validation only; customer issuance, production, GST, discounts, warranty, payment milestones and Premium/Luxury pricing are not authorised by this record."
+  }
 }
