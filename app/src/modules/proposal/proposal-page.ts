@@ -62,6 +62,16 @@ export class VsProposalPage extends LitElement {
     void this.act(() => proposalApi(this.token ?? '').acknowledge(section, sha256), `${title}: acknowledged.`);
   }
 
+  /** One key per decision: a retry after a lost response returns the recorded decision, never a second one. */
+  private decideKey: string | null = null;
+
+  private onDecide(e: CustomEvent<Record<string, unknown>>) {
+    this.decideKey ??= newKey();
+    const key = this.decideKey;
+    const accepted = e.detail.decision === 'ACCEPTED';
+    void this.act(async () => { await proposalApi(this.token ?? '').decide(e.detail, key); }, accepted ? 'Your acceptance was recorded.' : 'Your decision was recorded.');
+  }
+
   private onCompare() {
     void this.act(async () => { this.comparison = (await proposalApi(this.token ?? '').compare()).data.comparison; }, 'Changes shown.');
   }
@@ -156,7 +166,7 @@ export class VsProposalPage extends LitElement {
     if (this.load === 'ready' && this.page) {
       return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
         .comparison=${this.comparison} @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk} @proposal-compare=${this.onCompare}
-        @proposal-ack=${this.onAck}></vs-proposal-view>`;
+        @proposal-ack=${this.onAck} @proposal-decide=${this.onDecide}></vs-proposal-view>`;
     }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`

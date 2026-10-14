@@ -31,8 +31,10 @@ export class VsProposalView extends LitElement {
   static override properties = {
     page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
     announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
-    comparison: { attribute: false },
+    comparison: { attribute: false }, confirmed: { state: true }, declining: { state: true },
   };
+  declare confirmed: boolean;
+  declare declining: boolean;
   /** The comparison with the version issued before this one, once the customer asked for it. */
   declare comparison: Comparison | null;
   /** The category chosen in the question form (decides which fields it asks for). */
@@ -115,6 +117,8 @@ export class VsProposalView extends LitElement {
     .tr.cmp { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; }
     .term .termbody { padding: 0 var(--vs-space-4) var(--vs-space-3); } .term ul { margin: 0 0 var(--vs-space-2); padding-left: 20px; }
     .tag.ok { color: var(--vs-success); }
+    .check.confirm { align-items: flex-start; } .check.confirm input { width: 22px; height: 22px; min-height: 0; margin-top: 2px; flex: none; }
+    .declinebox { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
     .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-3); }
     .request { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
     .msg, .reply { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; } .reply { padding-left: var(--vs-space-3); border-left: 2px solid var(--vs-copper); }
@@ -148,6 +152,8 @@ export class VsProposalView extends LitElement {
     this.errors = [];
     this.askCategory = 'GENERAL_QUESTION';
     this.comparison = null;
+    this.confirmed = false;
+    this.declining = false;
   }
 
   override connectedCallback() {
@@ -321,7 +327,42 @@ export class VsProposalView extends LitElement {
   protected sections(page: Page): TemplateResult {
     return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
       ${page.variation ? variationTable(page.variation) : nothing}
-      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}`;
+      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}
+      ${this.decisionPanel(page)}`;
+  }
+
+  // --- CQX-10 decision -----------------------------------------------------------------------------------------------
+  protected decisionPanel(page: Page): TemplateResult | typeof nothing {
+    const d = page.decision;
+    if (!d || this.preview) return nothing;
+    if (d.decided) {
+      return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">${d.decided === 'ACCEPTED' ? 'You accepted this proposal' : 'You declined this proposal'}</h2>
+        ${d.by_this_link ? html`<p>Recorded on ${d.decided_on?.slice(0, 10)}${d.total ? html` for ${rupees(d.total)}` : nothing}.
+          ${d.evidence_sha256 ? html`<span class="small muted">Record reference ${d.evidence_sha256.slice(0, 12)}.</span>` : nothing}</p>`
+          : html`<p>A decision on this version was recorded on ${d.decided_on?.slice(0, 10)}.</p>`}
+        <p class="small muted">Veda Spaces will contact you about the next steps. Any later change is made as a separate change order; this proposal stays as it is.</p></section>`;
+    }
+    if (!d.available && !d.can_decline) {
+      return d.reason ? html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">Accepting this proposal</h2><p>${d.reason}</p></section>` : nothing;
+    }
+    const chosen = page.proposal.optional_items.filter((x) => (d.selected_refs ?? []).includes(x.ref));
+    const body = (decision: 'ACCEPTED' | 'DECLINED') => ({ decision, version_no: d.version_no, snapshot_sha256: d.snapshot_sha256,
+      displayed_total: decision === 'ACCEPTED' ? d.total ?? null : null, selected_line_refs: decision === 'ACCEPTED' ? d.selected_refs ?? [] : [], confirm: true });
+    return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">Your decision</h2>
+      ${d.available ? html`<p>You are accepting <span class="strong">${page.proposal.reference}</span> for <span class="strong">${rupees(d.total) ?? 'the total shown'}</span>.</p>
+        ${chosen.length ? html`<p class="small">Including your optional choices: ${chosen.map((x) => x.description).join('; ')}.</p>` : html`<p class="small">No optional items are included.</p>`}
+        <label class="check confirm"><input type="checkbox" .checked=${this.confirmed} ?disabled=${this.busy}
+          @change=${(e: Event) => { this.confirmed = (e.target as HTMLInputElement).checked; }}><span>${d.statement}</span></label>
+        <div class="row"><button class="btn primary" ?disabled=${!this.confirmed || this.busy}
+          @click=${() => this.emit('proposal-decide', body('ACCEPTED'))}>Accept this proposal</button></div>`
+        : html`<p>${d.reason}</p>`}
+      ${d.can_decline ? (this.declining
+        ? html`<div class="stack declinebox" role="group" aria-label="Decline"><p>Decline ${page.proposal.reference}? Veda Spaces may contact you about a revised proposal.</p>
+            <div class="row"><button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-decide', body('DECLINED'))}>Yes, decline</button>
+            <button class="btn ghost" @click=${() => { this.declining = false; }}>Keep it open</button></div></div>`
+        : html`<div><button class="btn ghost" ?disabled=${this.busy} @click=${() => { this.declining = true; }}>Decline this proposal</button></div>`) : nothing}
+      <p class="small muted">Your decision is recorded against exactly this version, as shown on this page. It is not a contract signature; Veda Spaces will confirm the next steps with you.</p>
+    </section>`;
   }
 
   // --- CQX-09 terms and acknowledgements -----------------------------------------------------------------------------

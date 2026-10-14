@@ -3,7 +3,7 @@ import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatAbsolute, humanize } from '../../core/format/format.js';
 import { shared, tableStyles } from '../../design-system/styles.js';
-import { previewPage, staffProposal, type Activity, type Grant, type Preview, type StaffRequest, type VariationView } from './api.js';
+import { previewPage, staffProposal, type Activity, type Grant, type Preview, type EvidenceView, type StaffRequest, type VariationView } from './api.js';
 import { tableLikeStyles, variationTable } from './proposal-view.js';
 
 const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
@@ -16,10 +16,11 @@ const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
 export class VsProposalStaff extends SessionElement {
   static override properties = {
     quotationId: { attribute: false }, quotationStatus: { attribute: false }, grants: { state: true }, preview: { state: true },
-    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true }, variation: { state: true },
+    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true }, variation: { state: true }, evidence: { state: true },
   };
   declare chain: { id: string; label: string; status: string }[];
   declare variation: VariationView | null;
+  declare evidence: EvidenceView | null;
   declare activity: Activity | null;
   declare quotationId: string;
   declare quotationStatus: string;
@@ -41,7 +42,7 @@ export class VsProposalStaff extends SessionElement {
   constructor() {
     super();
     this.quotationId = ''; this.quotationStatus = ''; this.grants = []; this.preview = null; this.issued = null;
-    this.problem = null; this.busy = false; this.activity = null; this.chain = []; this.variation = null;
+    this.problem = null; this.busy = false; this.activity = null; this.chain = []; this.variation = null; this.evidence = null;
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -68,6 +69,7 @@ export class VsProposalStaff extends SessionElement {
   /** What the customer did on this version (choices, and later requests and acknowledgements). */
   protected async loadMore(): Promise<void> {
     this.activity = this.can('proposal.request.review') ? (await staffProposal.activity(this.quotationId)).data : null;
+    this.evidence = this.can('proposal.acceptance.review') ? (await staffProposal.evidence(this.quotationId)).data : null;
     this.chain = this.activity?.requests.length && this.can('quotation.read') ? (await staffProposal.chain(this.quotationId)).data.versions : [];
   }
 
@@ -133,7 +135,17 @@ export class VsProposalStaff extends SessionElement {
       <div class="table-wrap"><table><thead><tr><th>Section</th><th>By</th><th>When</th><th>Evidence digest</th></tr></thead>
       <tbody>${a.acknowledgements.map((x) => html`<tr><td>${humanize(x.section)}</td><td>${humanize(x.recipient_kind)}</td><td>${formatAbsolute(x.acknowledged_on)}</td>
         <td class="mono">${x.evidence_sha256.slice(0, 16)}…</td></tr>`)}</tbody></table></div></section>` : nothing;
-    return html`${this.requestsTable(a.requests)}${acks}<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
+    const ev = this.evidence;
+    const decision = ev ? html`<section class="card stack" aria-labelledby="evh"><h3 id="evh" class="title">Customer decision</h3>
+      ${ev.evidence ? html`<p><span class="chip">${humanize(ev.evidence.decision)}</span> ${humanize(ev.evidence.method)} by ${humanize(ev.evidence.recipient_kind ?? '')}
+          on ${formatAbsolute(ev.evidence.decided_on)} · version ${ev.evidence.version_no}${ev.evidence.displayed_total ? ` · ₹ ${ev.evidence.displayed_total}` : ''}</p>
+        <p class="small">Evidence digest <span class="mono">${ev.evidence.evidence_sha256}</span> ${ev.evidence.evidence_verified
+          ? html`<span class="chip success">verified</span>` : html`<span class="chip danger">DIGEST MISMATCH</span>`}</p>
+        <p class="small muted">Sections acknowledged: ${ev.evidence.acknowledgements.map((x) => humanize(x.section)).join(', ') || 'none'} ·
+          optional items: ${ev.evidence.selected_line_refs.join(', ') || 'none'} · network data: ${ev.evidence.network ? Object.keys(ev.evidence.network).join(', ') : 'not recorded'}</p>`
+        : ev.blockers.length ? html`<p>Digital acceptance is not available. What still blocks it:</p><ul>${ev.blockers.map((b) => html`<li>${humanize(b.code)}${b.decision ? ` (${b.decision})` : ''}: ${b.message}</li>`)}</ul>`
+          : html`<p class="muted">No decision yet.</p>`}</section>` : nothing;
+    return html`${decision}${this.requestsTable(a.requests)}${acks}<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
       ${a.selections.length ? html`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Choice</th><th>Changes</th><th>Last change</th></tr></thead>
         <tbody>${a.selections.map((x) => html`<tr><td>${x.description ?? x.line_ref}</td><td><span class="chip">${humanize(x.state)}</span></td>
           <td>${x.change_no}</td><td>${formatAbsolute(x.changed_on)}</td></tr>`)}</tbody></table></div>

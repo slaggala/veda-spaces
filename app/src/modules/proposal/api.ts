@@ -68,6 +68,11 @@ export interface Comparison {
 export interface TermsSection { code: string; title: string; items: string[]; available: boolean; sha256: string | null; required: boolean;
   acknowledged_on: string | null }
 export interface Terms { sections: TermsSection[]; policy_decided: boolean; pending: string[] }
+export interface Decision {
+  available: boolean; decided: 'ACCEPTED' | 'DECLINED' | null; decided_on?: string; by_this_link?: boolean; total?: string | null;
+  selected_refs?: string[]; evidence_sha256?: string | null; reason?: string | null; can_decline?: boolean; version_no?: number;
+  snapshot_sha256?: string | null; statement?: string;
+}
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -84,6 +89,7 @@ export interface Page {
   requests?: { can_ask: boolean; items: CustomerRequest[] };
   comparison_available?: boolean;
   terms?: Terms;
+  decision?: Decision;
   variation?: VariationView;
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
@@ -119,6 +125,8 @@ export function proposalApi(token: string) {
       api.request<Selections>(`${BASE}/selections`, { method: 'POST', anonymous: true, headers, body: { line_ref, state }, idempotencyKey: newKey() }),
     acknowledge: (section: string, section_sha256: string) =>
       api.request<{ terms: Terms }>(`${BASE}/acknowledgements`, { method: 'POST', anonymous: true, headers, body: { section, section_sha256 } }),
+    decide: (body: Record<string, unknown>, key: string) =>
+      api.request<{ state: string; decision: Decision }>(`${BASE}/decision`, { method: 'POST', anonymous: true, headers, body, idempotencyKey: key }),
     compare: () => api.request<{ comparison: Comparison | null }>(`${BASE}/comparison`, { anonymous: true, headers }),
     ask: (body: Record<string, unknown>, key: string) =>
       api.request<CustomerRequest[]>(`${BASE}/requests`, { method: 'POST', anonymous: true, headers, body, idempotencyKey: key }),
@@ -130,6 +138,13 @@ export interface Grant {
   id: string; version: number; quotation_id: string; quotation_number: string; version_no: number; recipient_kind: string;
   recipient_label: string | null; status: string; expires_on: string; first_viewed_on: string | null; last_viewed_on: string | null;
   view_count: number; revoke_reason_code: string | null; shared_on: string; token?: string; link?: string;
+}
+export interface EvidenceView {
+  evidence: null | { decision: string; method: string; verification_method: string; decided_on: string; recipient_kind: string | null;
+    version_no: number; snapshot_sha256: string; displayed_total: string | null; selected_line_refs: string[];
+    acknowledgements: { section: string; section_sha256: string; acknowledged_on: string }[]; network: Record<string, string> | null;
+    evidence_sha256: string; evidence_verified: boolean };
+  blockers: { code: string; message: string; decision: string | null }[];
 }
 export interface Preview { frozen: boolean; status: string; watermark?: string; proposal: Proposal }
 export interface StaffRequest {
@@ -157,6 +172,7 @@ export const staffProposal = {
     api.request<StaffRequest>(`${P}/customer-requests/${r.id}/respond`, { method: 'POST', body: { status, response }, ifMatch: r.version }),
   link: (r: StaffRequest, resulting_quotation_id: string, response: string | null) =>
     api.request<StaffRequest>(`${P}/customer-requests/${r.id}/link`, { method: 'POST', body: { resulting_quotation_id, response }, ifMatch: r.version }),
+  evidence: (quotationId: string) => api.get<EvidenceView>(`${P}/quotations/${quotationId}/acceptance-evidence`),
   variationPreview: (quotationId: string) => api.get<VariationView>(`${P}/quotations/${quotationId}/variation-preview`),
   chain: (quotationId: string) => api.get<{ versions: { id: string; label: string; status: string }[] }>(`${P}/quotations/${quotationId}/chain`),
 };

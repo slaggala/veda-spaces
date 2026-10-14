@@ -472,6 +472,17 @@ def expire_due(s: Session, today=None) -> int:
 
 def decide(s: Session, ctx, q: Quotation, body) -> Quotation:
     """Record the customer's decision on the issued, latest, unexpired version (OI-MTQ-11 decides how)."""
+    return record_decision(s, q, decision=body.decision, method=body.method,
+                           chosen=list(dict.fromkeys(body.selected_optional_line_ids or [])), note=body.note,
+                           recorded_by=ctx.user.id)  # fmt: skip
+
+
+def record_decision(s: Session, q: Quotation, *, decision: str, method: str, chosen: list[str], note: str | None,
+                    recorded_by: str) -> Quotation:  # fmt: skip
+    """The one place a customer's decision on an issued version is recorded, whoever records it: staff (``decide``,
+    STAFF_RECORDED or SIGNED_COPY) or the customer through their proposal link (CQX-10, CUSTOMER_DIGITAL). Only the
+    issued, latest, unexpired version; only an approved method (OI-MTQ-11); only priced optional items of this version.
+    Acceptance freezes the effective accepted baseline (the included lines plus the chosen optional items)."""
     require_status(q, "ISSUED")
     head = latest(s, q.quotation_number, q.variation_no)
     if head.id != q.id:
@@ -483,26 +494,26 @@ def decide(s: Session, ctx, q: Quotation, body) -> Quotation:
         event(s, q, "EXPIRED", "ISSUED", "EXPIRED")
         s.flush()
         raise ApiError(409, "QUOTATION_EXPIRED", f"{number_label(q)} expired on {q.valid_until.isoformat()}.")
-    method = policy.decision("OI-MTQ-11")
-    if method is None:
+    allowed = policy.decision("OI-MTQ-11")
+    if allowed is None:
         raise ApiError(409, "OWNER_DECISION_REQUIRED", "How a customer's acceptance is recorded is not decided "
                        "(OI-MTQ-11).", extra={"decision": "OI-MTQ-11"})  # fmt: skip
-    if body.method not in method.methods:
-        raise ApiError(422, "VALIDATION_FAILED", f"{body.method} is not an approved acceptance method.",
+    if method not in allowed.methods:
+        raise ApiError(422, "VALIDATION_FAILED", f"{method} is not an approved acceptance method.",
                        errors=[field_error("method", "NOT_ALLOWED", "Not an approved method.")])  # fmt: skip
     lines = s.execute(sa.select(QuotationLine).where(QuotationLine.quotation_id == q.id)).scalars().all()
     optional = {x.id: x for x in lines if x.is_optional and x.is_priced}
-    chosen = list(dict.fromkeys(body.selected_optional_line_ids or []))
-    if body.decision == "REJECTED" and chosen:
+    chosen = list(dict.fromkeys(chosen))
+    if decision == "REJECTED" and chosen:
         raise ApiError(422, "VALIDATION_FAILED", "A rejection selects no optional items.")
     unknown = [i for i in chosen if i not in optional]
     if unknown:
         raise ApiError(422, "VALIDATION_FAILED", "Only priced optional items of this version can be selected.",
                        errors=[field_error("selected_optional_line_ids", "UNKNOWN_LINE", "Not an optional item.")])  # fmt: skip
-    q.decision_method, q.decided_on, q.decision_recorded_by = body.method, db.tx_time(s), ctx.user.id
-    q.decision_note = body.note
+    q.decision_method, q.decided_on, q.decision_recorded_by = method, db.tx_time(s), recorded_by
+    q.decision_note = note
     frm = q.status
-    if body.decision == "ACCEPTED":
+    if decision == "ACCEPTED":
         extra = sum(int(optional[i].amount_minor or 0) - int(optional[i].discount_minor or 0)
                     + int(optional[i].tax_minor or 0) for i in chosen)  # fmt: skip
         from . import variations
@@ -511,13 +522,13 @@ def decide(s: Session, ctx, q: Quotation, body) -> Quotation:
         q.accepted_total_minor = int(q.total_minor or 0) + extra
         variations.freeze_baseline(s, q, chosen)
         q.status = "ACCEPTED"
-        event(s, q, "ACCEPTED", frm, "ACCEPTED", method=body.method, selected_optional=len(chosen),
+        event(s, q, "ACCEPTED", frm, "ACCEPTED", method=method, selected_optional=len(chosen),
               accepted_total_minor=q.accepted_total_minor, accepted_baseline_sha256=q.accepted_baseline_sha256)  # fmt: skip
         if q.quotation_kind == "VARIATION":
             variations.on_accepted(s, q)
     else:
         q.status = "REJECTED"
-        event(s, q, "REJECTED", frm, "REJECTED", method=body.method)
+        event(s, q, "REJECTED", frm, "REJECTED", method=method)
     return q
 
 

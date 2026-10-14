@@ -24,7 +24,18 @@ from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, re
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import acknowledgements, comparison, grants, journey, pricing, projection, references, requests, selections
+from . import (
+    acceptance,
+    acknowledgements,
+    comparison,
+    grants,
+    journey,
+    pricing,
+    projection,
+    references,
+    requests,
+    selections,
+)
 from . import schemas as S
 from .models import CustomerProposalRequest, ProposalAccessGrant
 
@@ -238,6 +249,18 @@ def list_requests(req: Req):
     return private(ok(requests.for_customer(req.session, g)))
 
 
+# --- customer: decision -----------------------------------------------------------------------------------------------
+@acceptance_api.route("POST", "/proposal/decision", rbx="RBX-009", auth="public", body=S.DecisionIn,
+                      max_body=PUBLIC_MAX_BODY, requirement="CQX-010", limits=WRITE_LIMITS,
+                      summary="Accept or decline exactly this version, as shown (bound to its version and digest)")  # fmt: skip
+def decide(req: Req):
+    g, q = customer(req)
+    acceptance.decide(req.session, g, q, req.body, req.headers.get("Idempotency-Key"), ip=req.ip,
+                      user_agent=req.user_agent, request_trace=req.request_id)  # fmt: skip
+    page = journey.customer_view(req.session, g, q)
+    return private(ok({"state": page["state"], "decision": page["decision"]}))
+
+
 # --- staff: what the customer did -------------------------------------------------------------------------------------
 @staff_api.route("GET", "/quotations/<quotation_id>/customer-activity", permission="proposal.request.review",
                  write=False, requirement="CQX-004",
@@ -247,6 +270,15 @@ def customer_activity(req: Req, quotation_id: str):
     return ok({"selections": selections.staff_view(req.session, q), "summary": selections.summary(req.session, q),
                "requests": requests.staff_view(req.session, q),
                "acknowledgements": acknowledgements.staff_view(req.session, q)})  # fmt: skip
+
+
+@staff_api.route("GET", "/quotations/<quotation_id>/acceptance-evidence", permission="proposal.acceptance.review",
+                 write=False, requirement="CQX-005",
+                 summary="The evidence of the customer's digital decision (verified), or what still blocks one")  # fmt: skip
+def acceptance_evidence(req: Req, quotation_id: str):
+    q = _quotation(req, quotation_id, "proposal.acceptance.review")
+    kinds = {g.id: g.recipient_kind for g in grants.for_quotation(req.session, q.id)}
+    return ok(acceptance.staff_view(req.session, kinds, q))
 
 
 def _request(req: Req, request_id: str) -> CustomerProposalRequest:
@@ -288,6 +320,8 @@ journey.register(selections.contribute)
 journey.register(requests.contribute)
 journey.register(comparison.contribute)
 journey.register(acknowledgements.contribute)
+journey.register(acceptance.contribute)
+journey.PAGE_FIELDS.update(acceptance.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(acknowledgements.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(comparison.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(requests.PAGE_FIELDS)

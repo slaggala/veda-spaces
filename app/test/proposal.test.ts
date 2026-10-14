@@ -1,6 +1,6 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing';
 import '../src/design-system/components.js';
-import type { Page } from '../src/modules/proposal/api.js';
+import type { Decision, Page } from '../src/modules/proposal/api.js';
 import '../src/modules/proposal/index.js';
 import type { VsProposalView } from '../src/modules/proposal/proposal-view.js';
 
@@ -278,6 +278,48 @@ describe('terms and acknowledgements (CQX-09)', () => {
     await waitUntil(() => view.announcement.includes('acknowledged'));
     const post = calls.find((c) => c.path.endsWith('/acknowledgements'))!;
     expect(post.headers['X-Veda-Proposal']).to.equal(`vsp_${'t'.repeat(43)}`);
+  });
+});
+
+describe('decision (CQX-10)', () => {
+  const ready: Decision = { available: true, decided: null, can_decline: true, version_no: 1, snapshot_sha256: 'a'.repeat(64), total: '4,04,400.00',
+    selected_refs: ['L9'], statement: 'I accept VS-Q-2026-000001 v1 as shown.' };
+
+  it('needs an explicit confirmation, then sends exactly the version, digest, total and choices shown', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'d'.repeat(43)}`);
+    const calls: { path: string; body: unknown; key?: string }[] = [];
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), location.href).pathname;
+      calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null, key: (init?.headers as Record<string, string>)?.['Idempotency-Key'] });
+      return json(path.endsWith('/decision') ? { state: 'ACCEPTED', decision: { ...ready, decided: 'ACCEPTED' } }
+        : samplePage({ capabilities: { interaction: true, acceptance: true }, decision: { ...ready } }));
+    };
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const accept = [...view.shadowRoot!.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Accept')) as HTMLButtonElement;
+    expect(accept.disabled).to.equal(true);
+    await expect(view).to.be.accessible();
+    (view.shadowRoot!.querySelector('#decision input[type=checkbox]') as HTMLInputElement).click();
+    await view.updateComplete;
+    expect(accept.disabled).to.equal(false);
+    accept.click();
+    await waitUntil(() => calls.some((c) => c.path.endsWith('/decision')));
+    const sent = calls.find((c) => c.path.endsWith('/decision'))!;
+    expect(sent.body).to.deep.equal({ decision: 'ACCEPTED', version_no: 1, snapshot_sha256: 'a'.repeat(64), displayed_total: '4,04,400.00',
+      selected_line_refs: ['L9'], confirm: true });
+    expect(sent.key).to.match(/^[a-f0-9]{32}$/);
+  });
+
+  it('shows why acceptance is not available, and a recorded decision', async () => {
+    let el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage({ decision: { available: false, decided: null,
+      reason: 'Digital acceptance is not available for this proposal yet.' } })}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#decision')!.textContent).to.contain('not available');
+    expect(el.shadowRoot!.querySelectorAll('#decision button')).to.have.length(0);
+    el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage({ state: 'ACCEPTED', decision: { available: false, decided: 'ACCEPTED',
+      decided_on: '2026-10-14T10:00:00Z', by_this_link: true, total: '4,04,400.00', evidence_sha256: 'e'.repeat(64) } })}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#decision')!.textContent).to.contain('You accepted').and.to.contain('₹ 4,04,400.00');
   });
 });
 
