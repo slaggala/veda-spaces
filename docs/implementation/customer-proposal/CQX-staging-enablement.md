@@ -37,7 +37,9 @@ Viewing shows something only once an issued quotation exists, which needs the co
 - [ ] Interaction on: choose, drop and discuss an optional item; ask a question and a change request; staff answer and link a revised version; the customer sees the answer; staff notifications arrive once; no customer email is sent.
 - [ ] Acceptance testing on (only if the record says so, with SYNTHETIC-only expectations): with the owner decisions still null the page says acceptance is not available and the API refuses it; staff evidence lists the blockers.
 - [ ] Production isolation: no production parameter, stack or host touched; the API refuses every CQX flag in production.
-- [ ] Rollback rehearsal (below), then re-enable.
+- [ ] Rollback rehearsal (below), then re-enable; the template-v2 limitation (api-runbooks §2.4) acknowledged.
+- [ ] `customer-proposal-housekeeping` scheduled (it is not scheduled by this change).
+- [ ] Images: none are shown until the `/proposal` image policy (N10) is reviewed; placeholders only.
 
 ## 4. Evidence requirements (record fields)
 
@@ -50,8 +52,11 @@ Viewing shows something only once an issued quotation exists, which needs the co
 2. a reviewed change sets `proposal_enabled`, `interaction_enabled`, `acceptance_enabled` false and
    `enablement_record_sha256` null; approved 11-infra-apply changes the three parameters in place; the next 12-deploy
    renders them. Every CQX route then answers 404; no data is deleted.
-3. Image rollback: `deploy.sh --rollback` to the N-1 tag. Migration 0205 is expand-only (new tables; one CHECK widened to
-   admit `CUSTOMER_DIGITAL`, satisfied by every existing row), so the previous image runs on the new schema.
+3. Image rollback across this release is **not ordinarily safe** once any quotation was issued with template
+   `mtq-quotation-html/2` (every issue from this release on): the previous image cannot render those documents and
+   refuses them (fail closed). Check first (api-runbooks §2.4); if any exist, recover by **rolling forward** with a
+   corrected image. Migration 0205 itself is expand-only (new tables; one CHECK widened to admit `CUSTOMER_DIGITAL`).
+   This limitation must be acknowledged in the enablement record before viewing is enabled.
 
 ## 6. Production blockers
 

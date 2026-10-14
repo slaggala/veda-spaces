@@ -21,7 +21,7 @@ RBAC is never used for customers, and customer access never grants a staff permi
 | Token leakage through URLs, logs, proxies, `Referer` | The token lives in the fragment (never sent to a server); the page moves it to this tab's `sessionStorage` and scrubs the address bar at once; it travels only in a header; request logs record the route, never headers; `Referrer-Policy: no-referrer` | `test_cqx_access`, `test_cqx_notifications_audit::…never_hold_a_token`, `proposal.e2e.mjs` |
 | Token theft from the database | Only `SHA-256(token)` is stored; the token is shown to staff once | `test_cqx_access::…token_is_never_stored` |
 | Brute force / enumeration | 256-bit tokens; strict format check; one refusal for missing, malformed and unknown; refusals count against a per-address budget (20/minute) besides per-address and per-link read/write limits; no identifier is accepted anywhere in the customer API | `test_cqx_security::test_guessing_links_is_rate_limited_per_address`, `test_cqx_access::…same_safe_404` |
-| Cross-customer access | A token resolves server-side, on every request, to one grant and one version; every reference (`L<n>`, `R<n>`) is resolved inside that version only; requests are visible only to the same quotation and recipient kind | `test_cqx_security::test_one_customer_never_reaches…`, `test_cqx_requests::…private_to_the_recipient_kind` |
+| Cross-customer access | A token resolves server-side, on every request, to one grant and one version; every reference (`L<n>`, `R<n>`) is resolved inside that version only; requests are visible only through the link that sent them (N4) | `test_cqx_security::test_one_customer_never_reaches…`, `test_cqx_requests::…private_to_the_recipient_kind`, `…never_inherits_an_earlier_holders_conversation` |
 | Stale or forwarded links | Link expiry (1–30 days), immediate revocation, rotation, supersession when a newer version is shared; a forwarded link opens the proposal for whoever holds it, so the projection carries **no customer name** and a digital decision needs the owner's verification decision CQX-D01 | `test_cqx_access`, `test_cqx_projection` |
 | Superseded or expired quotation | Shown with its state and no actions; choices, acknowledgements and decisions refuse anything not OPEN | `test_cqx_overview`, `test_cqx_optional_items`, `test_cqx_acceptance` |
 | Replay / double submission | `Idempotency-Key` on requests and decisions; choices idempotent by state; one evidence row per version (unique index) | `test_cqx_requests`, `test_cqx_acceptance::test_duplicate…` |
@@ -45,17 +45,40 @@ RBAC is never used for customers, and customer access never grants a staff permi
   follows the quotation's retention.
 - No email, phone number or name is stored on CQX rows.
 
-## 4. Known limits (owner decisions or later changes)
+## 4. Findings register (independent certification of PR #95, and earlier review follow-ups)
 
-Independent review follow-ups, tracked before any flag is enabled: the subject and cover note are staff text shown to
-whoever holds the link (keep customer names out of them); the idempotency replay cache can return a just-created link
-to the same staff user for 24 hours (process memory only); a link to a lost lead stays live until it expires or is
-revoked (no LEAD_CLOSED hook yet); a refused request cannot record its own EXPIRED/refusal event (housekeeping records
-expiry once it is scheduled).
+Severity is as triaged in this remediation; it is not lowered to fit a test. Impact columns say whether the finding
+blocks enabling that capability (or real customers, or production) while it is open. "Fixed" names the change.
 
+| # | Finding | Severity | Viewing | Interaction | Acceptance | Real customers | Production | Status / correction or deferred requirement |
+|---|---|---|---|---|---|---|---|---|
+| N1 | Acceptance total computed from mutable line rows: a line's tax or amount changed after issue changed the accepted total while acceptance succeeded | High | — | — | Blocks | Blocks | Blocks | **Fixed**: the frozen document carries each optional item's price including GST; acceptance uses only frozen values and refuses (SNAPSHOT_INTEGRITY_FAILED) when any printed line, the total or a chosen item's value differs from the frozen document (`projection.frozen_values`) |
+| N2 | Decision idempotency evaluated before validation; the page reused one key for Accept and Decline | Medium | — | — | Blocks | Blocks | Blocks | **Fixed**: validation (authority, version, digest, frozen values) first, then idempotency against a canonical request digest stored on the evidence; same key + other content → IDEMPOTENCY_KEY_REUSED; client keys per attempt and type, retired after a definitive answer |
+| N3 | A zero line omitted from the frozen document could be chosen and accepted | Medium | — | Blocks | Blocks | Blocks | Blocks | **Fixed**: only lines printed in the verified frozen document are selectable or nameable (`projection.printed`) |
+| N4 | A new link of the same recipient kind saw an earlier holder's requests and answers | Medium | — | Blocks | — | Blocks | Blocks | **Fixed**: requests are visible only through the link that sent them; sharing a conversation across links is an owner decision (CQX-owner-decisions §3, CQX-B11) |
+| N5 | Choices, acknowledgements and requests checked state before taking the lock and did not re-read it (PostgreSQL race with acceptance, revocation, rotation) | Medium | — | Blocks | Blocks | Blocks | Blocks | **Fixed**: every customer mutation takes the property lock first and re-reads the link and quotation under it (`grants.locked`); forced-interleaving tests on both engines |
+| N6 | An image without the template-v2 reader (the previous release) refuses quotations issued with v2 | Low | Pre-enablement: runbook reviewed | same | same | — | Blocks until a production release plan exists | **Documented (MC-2)**: roll-forward only once a v2 quotation exists; `api-runbooks.md` §2.4; compatibility test proves fail-closed refusal and recovery on roll-forward |
+| N7 | CQX-D04 `retention_days` is recorded but not enforced: no job removes acceptance network evidence when it lapses | Medium | — | — | Blocks | Blocks | Blocks | **Open**: a retention job (or a decision that evidence follows quotation retention) before acceptance is enabled |
+| N8 | The integrity refusal told customers "Veda Spaces has been notified", but no monitored alert exists | Low | — | — | — | Blocks (alarm) | Blocks | **Fixed** (claim removed); deferred: a monitored alarm on `ProposalIntegrityRefused` before real customers |
+| N9 | The link token is kept in this tab's `sessionStorage` on the workspace origin: any script running on that origin (an XSS anywhere in the workspace) could read it, and it survives reloads in the tab | Low | — (synthetic staging) | — | — | Blocks | Blocks | **Open**: a dedicated proposal origin, or memory-only handling (re-open from the link after a reload), before real customers |
+| N10 | Reference images cannot load on `/proposal`: the workspace CSP `img-src` excludes the API host | Low | Images stay off | — | — | Blocks images | Blocks images | **Open**: a reviewed, path-scoped `img-src` change for `/proposal` (as for V3) and catalogue media activation; until then only placeholders are shown |
+| N11 | Focus fell to the body after actions; small touch targets (next-steps links, radios, checkbox); nested `main`; offline/5xx/429 without retry; a failed choice stayed checked | Medium | Blocks | Blocks | Blocks | Blocks | Blocks | **Fixed**: focus return, 44 px targets for every control, one main landmark, retry with safe state, radios re-synced; browser journey 62 checks |
+| N12 | A request could be linked to an unissued version (named to the customer) | Low | — | Blocks | — | Blocks | Blocks | **Fixed**: only an issued, frozen newer version can be linked (VERSION_NOT_ISSUED) |
+| R1 | Subject and cover note are staff text shown to whoever holds the link | Low | Staff guidance | — | — | Blocks | Blocks | Open: keep customer names out of them, or exclude them from the projection (owner choice) |
+| R2 | The idempotency replay cache can return a just-created link's token to the same staff user for 24 hours | Low | — | — | — | Blocks | Blocks | Open (process memory only, same user) |
+| R3 | A link to a lost or closed lead stays live until it expires or is revoked (no LEAD_CLOSED hook) | Low | — | — | — | Blocks | Blocks | Open |
+| R4 | A refused request cannot record its own refusal or EXPIRED event (it rolls back) | Low | — | — | — | — | — | Open: the housekeeping job records expiry once scheduled |
+| R5 | `customer-proposal-housekeeping` is **not scheduled** anywhere: link expiry is not recorded and staff are not reminded of expiring proposals | Low | Schedule before viewing | — | — | Blocks | Blocks | Open: schedule with the other maintenance jobs (enablement record prerequisite) |
 
+## 5. Accurate statements of current behaviour
+
+- **Token storage:** the token is **not** held only in application memory. The page moves it from the URL fragment
+  into this tab's `sessionStorage` (cleared when the tab closes; not shared with other tabs) and scrubs the address
+  bar. Any script on the workspace origin could read it while the tab is open (N9).
+- **No customer is notified** of anything, and no alarm is attached to integrity refusals yet: the customer is told
+  only to contact their Veda Spaces representative (N8).
+- **Link housekeeping is unscheduled** (R5): expiry is still enforced on every request against the clock.
+- **Proposal images are unavailable** until N10 is resolved and catalogue media is activated; the page shows named
+  placeholders.
 - **Link possession is the only verification implemented.** Whether that suffices for a digital decision is CQX-D01.
-- **Reference images on the proposal page** need the API host in the workspace `img-src` for `/proposal` only (a
-  reviewed, path-scoped change like the V3 one, `app/scripts/staging-build.mjs`); until then a referenced image is
-  blocked by CSP and the page shows its named placeholder. Catalogue media delivery is off in staging anyway.
 - **Customer-directed notifications** need an approved channel and copy (CQX-B05).

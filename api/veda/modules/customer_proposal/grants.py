@@ -3,7 +3,8 @@
 A grant is created by staff for one ISSUED (or ACCEPTED, for reference) quotation version, for one recipient kind, with
 a lifetime the staff member chooses (1 to ``MAX_DAYS`` days; a security bound, not a commercial term). The link carries
 a 256-bit random token in the URL **fragment** (``/proposal#t=…``), so it never reaches a server log, a proxy or a
-``Referer``; the page moves it into memory, scrubs the address bar and sends it only in the ``X-Veda-Proposal`` header.
+``Referer``; the page moves it into this tab's sessionStorage (not memory only: see CQX-security-model N9), scrubs the
+address bar and sends it only in the ``X-Veda-Proposal`` header.
 Only its SHA-256 is stored, so a database reader cannot use a link, and the token is shown to staff once.
 
 Lifecycle::

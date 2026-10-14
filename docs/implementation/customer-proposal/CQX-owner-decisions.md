@@ -37,6 +37,8 @@ All four slots are `null`. A SYNTHETIC copy exists only in tests (the loader ref
 | CQX-B07 | The lead's pipeline status on a digital acceptance | B4 does not move a lead to WON on a staff-recorded acceptance either; the hand-off event and lead activity are emitted, the status stays a staff action |
 | CQX-B08 | Link lifetime | Engineering bound 1–30 days chosen by staff per link; the owner may set another bound |
 | CQX-B09 | Housekeeping schedule and reminder window (3 days) | Operational; scheduled by the staging enablement record |
+| CQX-B11 | Sharing a question/change-request conversation across links (a rotated link, a newer version's link, co-owners) | No shared-recipient policy exists; requests are visible only through the link that sent them (N4) |
+| CQX-B12 | Retention period of acceptance network/device evidence, and its enforcement (N7) | CQX-D04 records a period but no job enforces it; acceptance stays blocked until it is enforced or decided otherwise |
 | CQX-B10 | Legal status of a digital acceptance | Not a contract signature; the page says so. Any e-signature or contract treatment needs legal review and an approved vendor (out of scope) |
 
 ## 4. Production

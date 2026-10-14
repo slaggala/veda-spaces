@@ -31,7 +31,9 @@
   "prerequisites": {
     "quotation_flag": "VEDA_MTQ_QUOTATION_ENABLED is on in staging (mtq_commercial, decision log 34).",
     "issued_quotation": "Viewing needs an issued quotation; issuing needs OI-MTQ-07, 08, 09 and 11 (and 03/04 for an approved ruleset) recorded by the owner. Until then no proposal can be shared, and the viewing flag shows nothing.",
-    "housekeeping_job": "veda maintenance customer-proposal-housekeeping scheduled with the other maintenance jobs (link expiry records, staff reminders)."
+    "housekeeping_job": "veda maintenance customer-proposal-housekeeping scheduled with the other maintenance jobs (link expiry records, staff reminders).",
+    "template_v2_rollback": "Acknowledge docs/operations/api-runbooks.md §2.4: once a quotation is issued with template mtq-quotation-html/2, an image without that reader refuses it; recovery is roll-forward only.",
+    "open_findings": "docs/implementation/customer-proposal/CQX-security-model.md §4: N7 and N9 block acceptance and real customers; N10 keeps images off; R5 (housekeeping) must be scheduled."
   },
   "evidence": {
     "independent_review": "",

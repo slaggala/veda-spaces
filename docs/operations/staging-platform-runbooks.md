@@ -38,7 +38,8 @@ Roles: **owner session** = the bootstrap owner role (MFA, Mumbai-only session po
 5. Pass: the job ends `deployed <tag> (<digest>) to staging`; `veda-stg-api-health` is OK within 5 minutes.
 
 **Later deploys:** the same, from the new commit. **Rollback** to N-1 follows [api-runbooks §2](api-runbooks.md)
-(`deploy.sh --rollback <n-1-tag>`), run on the host through an owner Session Manager session in
+(`deploy.sh --rollback <n-1-tag>`; across PR #95 first read api-runbooks §2.4: an image without the quotation
+template-v2 reader refuses v2 quotations, so recovery may be roll-forward only), run on the host through an owner Session Manager session in
 `/opt/veda/releases/<n-1-tag>/api/deploy` (the N-1 bundle and image are still there; ECR keeps 30 tagged images).
 
 **Failure:** `deploy.sh` stops with worker and scheduler paused when readiness fails; the command output is in
