@@ -25,7 +25,7 @@ from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants
+from . import grants, projection
 from . import schemas as S
 from .models import ProposalAccessGrant
 
@@ -160,14 +160,32 @@ def revoke(req: Req, grant_id: str):
     return ok(grants.present(g))
 
 
+# --- staff: preview ---------------------------------------------------------------------------------------------------
+@staff_api.route("GET", "/quotations/<quotation_id>/proposal-preview", permission="proposal.preview", write=False,
+                 requirement="CQX-001",
+                 summary="The quotation exactly as its customer sees it (frozen once issued; a marked preview before)")  # fmt: skip
+def preview(req: Req, quotation_id: str):
+    from veda.modules.mtq_commercial import rendering
+
+    q = _quotation(req, quotation_id, "proposal.preview")
+    if q.snapshot is not None or q.issued_html is not None:
+        return ok({"frozen": True, "status": q.status, "proposal": projection.build(req.session, q)})
+    doc = rendering.document_model(req.session, q)
+    doc.pop("draft", None)
+    return ok({"frozen": False, "status": q.status, "watermark": "Preview: not issued, not a customer document",
+               "proposal": projection.build(req.session, q, doc)})  # fmt: skip
+
+
 # --- customer: the proposal -------------------------------------------------------------------------------------------
 @public_api.route("GET", "/proposal", rbx="RBX-009", auth="public", write=True, requirement="CQX-001",
                   limits=READ_LIMITS, summary="The customer's proposal, opened by its secure link (customer-safe)")  # fmt: skip
 def view(req: Req):
     g, q = customer(req)
+    proposal = projection.build(req.session, q)  # verified frozen document, or a refusal before anything is recorded
     grants.record_view(req.session, g)
     state = grants.proposal_state(req.session, q)
-    return private(ok({"state": state, "link": {"expires_on": clock.to_rfc3339(g.expires_on), "status": g.status}}))
+    return private(ok({"state": state, "link": {"expires_on": clock.to_rfc3339(g.expires_on), "status": g.status},
+                       "proposal": proposal}))  # fmt: skip
 
 
 ALL_APIS = (staff_api, public_api, interaction_api, acceptance_api)
