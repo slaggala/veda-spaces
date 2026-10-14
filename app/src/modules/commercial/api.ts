@@ -21,6 +21,7 @@ export interface ScopeItem {
   catalogue_mapped: boolean; unmapped_reason: string | null; effective_options: Record<string, string>;
   finish_code: string | null; inputs: Record<string, InputValue>; dimension_overrides: Record<string, string>;
   override_reason: string | null; dimension_source_code: string; carried_from_item_id: string | null;
+  carried_overrides?: { values?: Record<string, string>; reason?: string | null };
 }
 export interface Scope {
   id: string; version: number; revision_no: number; status: string; tier_code: string; measurement_revision_no: number;
@@ -31,7 +32,7 @@ export interface BoqLine {
   id: string; version: number; space_id: string | null; space_label: string | null; label: string; uom_code: string | null;
   unit_text: string; formula_kind: string; derivation: string; calculated_quantity_centi: number | null;
   override_quantity_centi: number | null; override_reason: string | null; final_quantity_centi: number | null;
-  is_optional: boolean; dimension_source_code: string; status: string; issues: Issue[];
+  is_optional: boolean; dimension_source_code: string; status: string; quantity_status?: string; issues: Issue[];
 }
 export interface Boq {
   id: string; version: number; revision_no: number; status: string; scope_revision_no: number; measurement_revision_no: number;

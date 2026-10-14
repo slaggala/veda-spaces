@@ -239,6 +239,7 @@ export class VsCommercialPage extends SessionElement {
   }
 
   private itemRow(i: ScopeItem, editable: boolean) {
+    const carried = i.carried_overrides?.values && Object.keys(i.carried_overrides.values).length ? i.carried_overrides.values : null;
     const override = () => {
       const name = prompt(`Input to enter (${Object.keys(i.inputs).join(', ')})`);
       if (!name) return;
@@ -254,8 +255,13 @@ export class VsCommercialPage extends SessionElement {
       <td class="small">${Object.entries(i.inputs).map(([n, d]) => html`<div>${n}: ${i.dimension_overrides[n] ?? d.value ?? '—'} ${d.unit ?? ''}
         <span class="chip ${d.source === 'MISSING' || d.source === 'ASSUMED' ? 'warning' : ''}">${n in i.dimension_overrides ? 'staff' : d.source.toLowerCase()}</span>
         <span class="derivation">${d.explain}</span></div>`)}
-        ${i.override_reason ? html`<div class="warning-text">Override: ${i.override_reason}</div>` : nothing}</td>
-      <td>${editable ? html`<button class="btn small" aria-label="Enter a value for ${i.label}" @click=${override}>Enter value</button>` : nothing}</td></tr>`;
+        ${i.override_reason ? html`<div class="warning-text">Override: ${i.override_reason}</div>` : nothing}
+        ${carried ? html`<div class="warning-text" role="note">Entered on an earlier measurement revision, not applied until confirmed:
+          ${Object.entries(carried).map(([n, v]) => `${n} ${v}`).join(', ')}${i.carried_overrides?.reason ? ` (${i.carried_overrides.reason})` : ''}</div>` : nothing}</td>
+      <td>${editable ? html`<div class="actions"><button class="btn small" aria-label="Enter a value for ${i.label}" @click=${override}>Enter value</button>
+        ${carried ? html`<button class="btn small" aria-label="Confirm earlier values for ${i.label}" @click=${() => this.act(() => commercial.patchItem(i,
+          { dimension_overrides: carried, override_reason: `Confirmed against the new measurements: ${i.carried_overrides?.reason ?? ''}`.trim() }))}>Confirm</button>
+        <button class="btn small ghost" aria-label="Drop earlier values for ${i.label}" @click=${() => this.act(() => commercial.patchItem(i, { dimension_overrides: {} }))}>Drop</button>` : nothing}</div>` : nothing}</td></tr>`;
   }
 
   // --- BOQ ------------------------------------------------------------------------------------------------------------
@@ -285,7 +291,8 @@ export class VsCommercialPage extends SessionElement {
       <td class="num">${qty(l.final_quantity_centi)}${l.override_quantity_centi !== null ? html`<br><span class="small warning-text">calculated ${qty(l.calculated_quantity_centi)}</span>` : nothing}</td>
       <td>${l.unit_text}</td>
       <td class="derivation">${l.derivation}${l.override_reason ? html`<div class="warning-text">Override: ${l.override_reason}</div>` : nothing}</td>
-      <td>${l.issues.length ? l.issues.map((i) => html`<span class="chip ${i.severity === 'BLOCKING' ? 'danger' : 'warning'}">${humanize(i.code)}</span> `) : html`<span class="chip success">OK</span>`}</td>
+      <td>${l.quantity_status && l.quantity_status !== 'VALID' ? html`<span class="chip ${l.quantity_status === 'VALID_ZERO' ? '' : 'danger'}">${humanize(l.quantity_status)}</span> ` : nothing}
+        ${l.issues.length ? l.issues.map((i) => html`<span class="chip ${i.severity === 'BLOCKING' ? 'danger' : 'warning'}">${humanize(i.code)}</span> `) : html`<span class="chip success">OK</span>`}</td>
       <td>${editable && l.uom_code ? html`<div class="actions"><button class="btn small" aria-label="Override ${l.label}" @click=${override}>Override</button>
         ${l.override_quantity_centi !== null ? html`<button class="btn small ghost" aria-label="Clear override of ${l.label}" @click=${() => this.act(() => commercial.clearOverride(l))}>Clear</button>` : nothing}</div>` : nothing}</td></tr>`;
   }

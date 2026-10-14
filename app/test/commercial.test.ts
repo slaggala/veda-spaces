@@ -28,7 +28,8 @@ const scope = { ...journey.scopes[0], tier_code: 'ESSENTIAL', measurement_revisi
     space_label: 'Bedroom 2', item_type_code: 'WARDROBE', label: 'Wardrobe', origin_code: 'AUTO', necessity_code: 'MANDATORY',
     inclusion_code: 'INCLUDED', catalogue_mapped: true, unmapped_reason: null, effective_options: {}, finish_code: null,
     inputs: { WIDTH: { value: '10.83', unit: 'ft', source: 'MEASURED', explain: 'W2 length 3300 mm' } }, dimension_overrides: {},
-    override_reason: null, dimension_source_code: 'MEASURED', carried_from_item_id: null }] };
+    override_reason: null, dimension_source_code: 'MEASURED', carried_from_item_id: 'i0',
+    carried_overrides: { values: { HEIGHT: '7' }, reason: 'lintel hidden by a beam' } }] };
 const boq = { ...journey.boqs[0], scope_revision_no: 1, measurement_revision_no: 2, catalogue_card_version: 'SYNTHETIC-2',
   quantity_engine_version: '2026.10.1', issues: [{ code: 'RULESET_NOT_APPROVED', severity: 'WARNING', message: 'Proposed rules.' }], summary: {},
   lines: [{ id: 'l1', version: 1, space_id: 'sp1', space_label: 'Bedroom 2', label: 'Wardrobe — Body', uom_code: 'SFT', unit_text: 'sq ft',
@@ -97,6 +98,7 @@ describe('commercial workspace', () => {
       page.tab = tab;
       await waitUntil(() => page.shadowRoot!.textContent!.includes(expected), `${tab} rendered`);
       if (tab !== 'quotation') expect(page.shadowRoot!.textContent).to.include('Bedroom 2');
+      if (tab === 'scope') expect(page.shadowRoot!.textContent).to.include('not applied until confirmed').and.include('HEIGHT 7');
       await expect(page).to.be.accessible();
     }
   });
