@@ -20,7 +20,6 @@ Numbers come from the platform's number sequence (``QUOTATION``), allocated unde
 
 from __future__ import annotations
 
-import hashlib
 from datetime import timedelta
 from decimal import Decimal
 from typing import Any
@@ -31,7 +30,6 @@ from sqlalchemy.orm import Session
 from veda.kernel import clock, db, sequences
 from veda.kernel.context import acting, current_actor, system_context
 from veda.kernel.errors import ApiError, field_error
-from veda.kernel.jcs import canonical_bytes
 from veda.modules.crm.leads import service as lead_service
 from veda.modules.crm.leads.models import OPEN_STATUSES, Lead
 from veda.modules.mtq.models import Property
@@ -188,6 +186,33 @@ def require_estimate_ready(s: Session, est: CostEstimate) -> None:
                        extra={"reasons": reasons})  # fmt: skip
 
 
+def require_lineage(s: Session, est: CostEstimate, prop: Property, *quotations_: Quotation | None) -> None:
+    """Every artefact a quotation version is built from belongs to one property lineage: the quotation (and, for a
+    variation, its base and baseline), the estimate, its BOQ, the BOQ's scope and the measurement set. A mismatch is
+    refused before anything is created (422 LINEAGE_MISMATCH)."""
+    from .models import Boq
+
+    bad = [f"quotation {q.id}" for q in quotations_ if q is not None and q.property_id != prop.id]
+    if est.property_id != prop.id:
+        bad.append("estimate")
+    boq = s.get(Boq, est.boq_id)
+    if boq is None or boq.scope_id != est.scope_id or boq.measurement_set_id != est.measurement_set_id:
+        bad.append("boq")
+    if bad:
+        raise ApiError(422, "LINEAGE_MISMATCH", "The estimate's lineage does not belong to this quotation's property.",
+                       extra={"mismatched": bad})  # fmt: skip
+    assert boq is not None
+    try:
+        estimates.require_lineage(s, boq, prop)
+    except ApiError as err:
+        raise ApiError(
+            422,
+            "LINEAGE_MISMATCH",
+            "The estimate's lineage does not belong to this quotation's property.",
+            extra=err.extra,
+        ) from err
+
+
 def _new(s: Session, est: CostEstimate, prop: Property, *, number: str, version_no: int, kind: str = "BASE",
          variation_no: int = 0, supersedes: Quotation | None = None, title: str | None = None, variation_of: str | None = None, baseline: str | None = None) -> Quotation:  # fmt: skip
     q = Quotation(
@@ -209,6 +234,7 @@ def _new(s: Session, est: CostEstimate, prop: Property, *, number: str, version_
 
 
 def create(s: Session, ctx, est: CostEstimate, prop: Property, body) -> Quotation:
+    require_lineage(s, est, prop)
     require_estimate_ready(s, est)
     q = _new(s, est, prop, number=sequences.next_number(s, "QUOTATION"), version_no=1, title=body.title)
     q.cover_note = body.cover_note
@@ -241,9 +267,8 @@ def new_version(s: Session, ctx, q: Quotation, est: CostEstimate, prop: Property
         from . import variations
 
         return variations.new_version(s, ctx, q, est, prop)
+    require_lineage(s, est, prop, q)
     require_estimate_ready(s, est)
-    if est.property_id != q.property_id:
-        raise ApiError(422, "VALIDATION_FAILED", "The estimate belongs to another property.")
     if q.status in V.OPEN_QUOTATION_STATUSES:
         _supersede(s, q)
     nq = _new(s, est, prop, number=q.quotation_number, version_no=q.version_no + 1, supersedes=q,
@@ -391,10 +416,11 @@ def issue(s: Session, ctx, q: Quotation) -> Quotation:
         _supersede(s, older)
     q.issued_on, q.issued_by = now, ctx.user.id
     q.valid_until = now.date() + timedelta(days=validity.validity_days)
-    doc = rendering.document_model(s, q, frozen=True)
-    digest = hashlib.sha256(canonical_bytes(doc)).hexdigest()
-    q.snapshot, q.snapshot_sha256, q.status = doc, digest, "ISSUED"
-    event(s, q, "ISSUED", "APPROVED", "ISSUED", snapshot_sha256=digest, valid_until=q.valid_until.isoformat())
+    rendering.freeze(s, q)
+    q.status = "ISSUED"
+    event(s, q, "ISSUED", "APPROVED", "ISSUED", snapshot_sha256=q.snapshot_sha256,
+          html_sha256=q.issued_html_sha256, template_version=q.template_version,
+          valid_until=q.valid_until.isoformat())  # fmt: skip
     _sync_lead_on_issue(s, q)
     return q
 
@@ -427,7 +453,10 @@ def _sync_lead_on_issue(s: Session, q: Quotation) -> None:
 
 
 def expire_due(s: Session, today=None) -> int:
-    """ISSUED versions past their validity become EXPIRED (scheduler / CLI ``veda mtq expire-quotations``)."""
+    """ISSUED versions past their validity become EXPIRED. Run by the maintenance job ``veda maintenance
+    mtq-quotation-expiry`` (platform.maintenance.mtq_quotation_expiry); it is NOT scheduled: scheduling it is a
+    pre-customer-issuance operational requirement (OI-MTQ-08). Until then an issued version past its validity stays
+    ISSUED, and recording a decision on it expires it instead (``decide``)."""
     today = today or db.tx_time(s).date()
     n = 0
     for q in s.execute(
@@ -475,14 +504,15 @@ def decide(s: Session, ctx, q: Quotation, body) -> Quotation:
     if body.decision == "ACCEPTED":
         extra = sum(int(optional[i].amount_minor or 0) - int(optional[i].discount_minor or 0)
                     + int(optional[i].tax_minor or 0) for i in chosen)  # fmt: skip
+        from . import variations
+
         q.selected_optional_line_ids = chosen
         q.accepted_total_minor = int(q.total_minor or 0) + extra
+        variations.freeze_baseline(s, q, chosen)
         q.status = "ACCEPTED"
         event(s, q, "ACCEPTED", frm, "ACCEPTED", method=body.method, selected_optional=len(chosen),
-              accepted_total_minor=q.accepted_total_minor)  # fmt: skip
+              accepted_total_minor=q.accepted_total_minor, accepted_baseline_sha256=q.accepted_baseline_sha256)  # fmt: skip
         if q.quotation_kind == "VARIATION":
-            from . import variations
-
             variations.on_accepted(s, q)
     else:
         q.status = "REJECTED"
@@ -516,10 +546,12 @@ def events(s: Session, q: Quotation) -> list[dict[str, Any]]:
 def snapshot_verified(q: Quotation) -> bool | None:
     if q.snapshot is None:
         return None
-    return hashlib.sha256(canonical_bytes(q.snapshot)).hexdigest() == q.snapshot_sha256
+    from . import rendering
+
+    return rendering.integrity(q)
 
 
-def trace(s: Session, line: QuotationLine) -> dict[str, Any]:
+def trace(s: Session, line: QuotationLine, *, rates: bool = False) -> dict[str, Any]:
     """A quotation line walked back to the measurement (instruction: core design principle)."""
     from .models import Boq, BoqLine, Scope, ScopeItem
 
@@ -530,8 +562,11 @@ def trace(s: Session, line: QuotationLine) -> dict[str, Any]:
     est = s.get(CostEstimate, x.estimate_id)
     assert est is not None
     out["estimate_line"] = {"id": x.id, "estimate_id": x.estimate_id, "estimate_revision_no": est.revision_no,
-                            "rate_status": x.rate_status, "rate_card_version": est.rate_card_version,
-                            "tier_code": x.tier_code, "prep_component_code": x.prep_component_code}  # fmt: skip
+                            "rate_status": x.rate_status, "tier_code": x.tier_code,
+                            "prep_component_code": x.prep_component_code}  # fmt: skip
+    if rates:  # pricing provenance: only with cost_estimate.rate.view
+        out["estimate_line"].update({"rate_card_version": est.rate_card_version,
+                                     "rate_card_sha256": est.rate_card_sha256, "provenance": x.provenance})  # fmt: skip
     bl = s.get(BoqLine, x.boq_line_id) if x.boq_line_id else None
     if bl is None:
         out["driver"] = (x.provenance or {}).get("driver")
@@ -584,9 +619,12 @@ def present(s: Session, q: Quotation, ctx=None, *, full: bool = True) -> dict[st
         "issued_on": clock.to_rfc3339(q.issued_on) if q.issued_on else None, "issued_by": q.issued_by,
         "valid_until": q.valid_until.isoformat() if q.valid_until else None,
         "snapshot_sha256": q.snapshot_sha256, "snapshot_verified": snapshot_verified(q),
+        "template_version": q.template_version, "issued_html_sha256": q.issued_html_sha256,
         "decision": ({"method": q.decision_method, "decided_on": clock.to_rfc3339(q.decided_on),
                       "recorded_by": q.decision_recorded_by, "selected_optional_line_ids": q.selected_optional_line_ids,
-                      "accepted_total_minor": q.accepted_total_minor, "note": q.decision_note}
+                      "accepted_total_minor": q.accepted_total_minor, "note": q.decision_note,
+                      "accepted_baseline_sha256": q.accepted_baseline_sha256,
+                      "accepted_baseline_lines": len(q.accepted_baseline or [])}
                      if q.decided_on else None),
         "created_on": clock.to_rfc3339(q.created_on),
     }  # fmt: skip

@@ -87,8 +87,10 @@ def test_issue_freeze_accept_with_optional_items(api, factory):
     # frozen: no edit, the document is the stored snapshot
     r = c.as_(c.estimator).patch(f"/api/v1/quotations/{q['id']}", {"title": "Changed"}, if_match=q["version"])
     assert r.status == 409 and r.code == "QUOTATION_FROZEN"
-    doc = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))["document"]
-    assert doc["snapshot_verified"] is True and "draft" not in doc and doc["payment_schedule"]
+    rendered = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
+    doc = rendered["document"]
+    assert rendered["snapshot_verified"] is True and rendered["template_version"] == "mtq-quotation-html/1"
+    assert "draft" not in doc and doc["payment_schedule"] and doc["customer"]["name"]  # identity frozen at issue
     assert doc["summary"]["gst"]["status"] == "Included"
     html = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))["html"]
     for marker in INTERNAL_MARKERS:
@@ -128,7 +130,11 @@ def test_revision_supersedes_and_history_stays_stable_after_a_rate_change(api, f
     # a new version needs a re-priced, approved estimate; the old one is stale against the new card
     r = step(c, q1, "versions", c.estimator, {"cost_estimate_id": est["id"]}, code=409)
     assert r.code == "ESTIMATE_STALE"
-    est2 = ok(c.as_(c.estimator).post(f"/api/v1/boqs/{est['boq_id']}/cost-estimates", {"tier_code": "ESSENTIAL"}), 201)
+    # ... and the BOQ is rebuilt against the card now in force before it is re-priced (never mixed card contexts)
+    r = c.as_(c.estimator).post(f"/api/v1/boqs/{est['boq_id']}/cost-estimates", {"tier_code": "ESSENTIAL"})
+    assert r.status == 409 and r.code == "BOQ_STALE"
+    boq2 = ok(c.review(c.boq(ok(c.as_(c.estimator).get(f"/api/v1/scopes/{est['scope_id']}")))))
+    est2 = ok(c.as_(c.estimator).post(f"/api/v1/boqs/{boq2['id']}/cost-estimates", {"tier_code": "ESSENTIAL"}), 201)
     est2 = ok(c.as_(c.manager).post(f"/api/v1/cost-estimates/{est2['id']}/approve", if_match=est2["version"]))
     q2 = ok(step(c, q1, "versions", c.estimator, {"cost_estimate_id": est2["id"]}, code=201))
     assert (

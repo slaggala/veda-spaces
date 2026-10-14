@@ -16286,11 +16286,11 @@
           "mtq-commercial"
         ],
         "x-permission": [
-          "quotation.read"
+          "quotation.lineage.read"
         ],
         "x-permission-any-of": null,
         "x-rbac-exception": null,
-        "x-requirement": "QUOT-001"
+        "x-requirement": "QUOT-007"
       }
     },
     "/api/v1/quotations/{quotation_id}": {

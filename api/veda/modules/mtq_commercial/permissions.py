@@ -8,6 +8,8 @@ blueprint asks for four-eyes (discounts, discounted quotations).
 No code here carries a sensitivity class: the permission table only admits the platform's four classes, none of which
 fits commercial approval. Approvers are protected by role-level MFA instead (SALES_MANAGER, FOUNDER, ADMIN all require
 MFA). Unit rates and pricing provenance need ``cost_estimate.rate.view``; SALES, DESIGNER and SURVEYOR never hold it.
+The internal lineage walk of a quotation line needs ``quotation.lineage.read`` (not SALES), and its rate-card fields
+also need ``cost_estimate.rate.view``.
 """
 
 from veda.platform.rbac.registry_types import PermissionDef
@@ -80,6 +82,12 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
         "QUOT-005",
     ),  # fmt: skip
     _p(
+        "quotation.lineage.read",
+        "View quotation lineage",
+        "Walk a quotation line back to its estimate, BOQ, scope and measurements, with internal pricing provenance",
+        "QUOT-007",
+    ),  # fmt: skip
+    _p(
         "quotation.variation.create",
         "Raise variations",
         "Raise a variation (change order) to an accepted quotation",
@@ -109,4 +117,6 @@ MATRIX: dict[str, dict[str, str]] = {
     "quotation.issue": {**_ALL_COMMERCIAL, "SALES": "O"},
     "quotation.decision.record": {**_ALL_COMMERCIAL, "SALES": "O"},
     "quotation.variation.create": {**_ALL_COMMERCIAL, "ESTIMATOR": "A", "SALES": "O"},
+    # internal commercial lineage (rate-card version, pricing status, derivations): never the customer-facing roles
+    "quotation.lineage.read": {**_ALL_COMMERCIAL, "ESTIMATOR": "A"},
 }

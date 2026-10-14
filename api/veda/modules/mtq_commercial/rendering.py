@@ -6,21 +6,33 @@ assumptions, exclusions and terms. It is built from an allow-list of customer fi
 reaches it: no rate card, tier rate path, unit rate (unless the owner's OI-MTQ-10 decision says so), derivation,
 override, discount authority, approver, threshold, margin or staff name.
 
-For an issued version the model is frozen in ``quotation.snapshot`` with its digest and is the only thing rendered.
-A draft renders live, marked as a draft that is not a customer document, with what still blocks issuance. The
-customer's name is not stored in the snapshot (no personal data in the frozen document); it is added when rendered.
-``html`` renders the model as one self-contained, print-ready page (the basis for a later PDF export).
+**Issued versions are reproducible.** At ISSUE the model (with the customer's name as issued) is frozen in
+``quotation.snapshot`` and its HTML, rendered by the template version in force, in ``quotation.issued_html``, each with
+its digest, and the template version is pinned. An issued version is only ever served from those frozen bytes, never
+re-rendered with the current template; if either digest does not match, it is refused (SNAPSHOT_INTEGRITY_FAILED) and
+nothing is rendered. Templates are versioned (``TEMPLATES``): a change to the page is a new version, and earlier ones
+stay available for redaction. The only change ever made to a frozen document is lead erasure (``redact``), which
+replaces the customer-identifying fields, re-renders with the pinned template, re-seals both digests and records a
+SNAPSHOT_REDACTED event with the previous digests.
+
+A draft renders live with the current template, marked as a draft that is not a customer document, with what still
+blocks issuance. ``html`` renders the model as one self-contained, print-ready page (the basis for a later PDF
+export).
 """
 
 from __future__ import annotations
 
+import hashlib
 import html as _html
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from veda.kernel import clock
+from veda.kernel.errors import ApiError
+from veda.kernel.jcs import canonical_bytes
 from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq.models import Property
 
@@ -51,7 +63,9 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
     terms = q.terms or {}
     show_rates = bool(terms.get("show_unit_rates"))
     secs = quotations.sections(s, q)
-    rows = quotations.lines(s, q)
+    # a zero-quantity line (e.g. no new light points) stays in the BOQ, estimate and quotation for the audit trail;
+    # the customer document does not print it
+    rows = [x for x in quotations.lines(s, q) if not (x.quantity_centi == 0 and not x.amount_minor)]
     beds = int(prop.derived_bedroom_count or 0)
     kind = "Independent house" if prop.property_type_code == "INDEPENDENT_HOUSE" else "Apartment"
 
@@ -134,18 +148,80 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
     return doc
 
 
-def rendered(s: Session, q: quotations.Quotation) -> dict[str, Any]:
-    """The frozen snapshot for an issued version (verified against its digest), else the live draft model; the
-    customer's name is added here, never stored."""
-    if q.snapshot is not None:
-        doc = dict(q.snapshot)
-        doc["snapshot_verified"] = quotations.snapshot_verified(q)
-    else:
-        quotations.refresh_blockers(s, q)
-        doc = document_model(s, q)
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def freeze(s: Session, q: quotations.Quotation) -> None:
+    """The issued document: model (with the customer's name as issued) and HTML from the current template, sealed."""
+    doc = document_model(s, q, frozen=True)
     lead = s.get(Lead, q.lead_id)
     doc["customer"] = {"name": lead.name if lead else None}
-    return {"document": doc, "html": html(doc), "generated_on": clock.to_rfc3339(clock.now())}
+    page = TEMPLATES[CURRENT_TEMPLATE](doc)
+    q.snapshot, q.snapshot_sha256 = doc, hashlib.sha256(canonical_bytes(doc)).hexdigest()
+    q.template_version, q.issued_html, q.issued_html_sha256 = CURRENT_TEMPLATE, page, _sha(page)
+
+
+def integrity(q: quotations.Quotation) -> bool:
+    return (
+        q.snapshot is not None
+        and q.issued_html is not None
+        and hashlib.sha256(canonical_bytes(q.snapshot)).hexdigest() == q.snapshot_sha256
+        and _sha(q.issued_html) == q.issued_html_sha256
+        and q.template_version in TEMPLATES
+    )
+
+
+def rendered(s: Session, q: quotations.Quotation) -> dict[str, Any]:
+    """An issued version: exactly its frozen document and HTML, after verifying both digests (fail closed). A draft:
+    the live model with the current template, the customer's name added for staff."""
+    if q.snapshot is not None or q.issued_html is not None:
+        if not integrity(q):
+            raise ApiError(409, "SNAPSHOT_INTEGRITY_FAILED", f"The frozen document of {quotations.number_label(q)} "
+                           "does not match its sealed digest; it is not rendered.",
+                           extra={"quotation_id": q.id})  # fmt: skip
+        return {"document": q.snapshot, "html": q.issued_html, "template_version": q.template_version,
+                "snapshot_verified": True, "generated_on": clock.to_rfc3339(q.issued_on or clock.now())}  # fmt: skip
+    quotations.refresh_blockers(s, q)
+    doc = document_model(s, q)
+    lead = s.get(Lead, q.lead_id)
+    doc["customer"] = {"name": lead.name if lead else None}
+    return {"document": doc, "html": TEMPLATES[CURRENT_TEMPLATE](doc), "template_version": CURRENT_TEMPLATE,
+            "snapshot_verified": None, "generated_on": clock.to_rfc3339(clock.now())}  # fmt: skip
+
+
+REDACTED = "[erased]"
+
+
+def redact(s: Session, q: quotations.Quotation) -> bool:
+    """Lead erasure: replace the customer-identifying fields of a frozen document (customer name, subject, cover
+    note), re-render with the pinned template, re-seal, and record the previous digests. Amounts, lines, terms, the
+    property reference and the quotation number stay (commercial record)."""
+    if q.snapshot is None:
+        return False
+    current = q.snapshot
+    if (
+        current.get("subject") == REDACTED
+        and current.get("cover_note") in (None, REDACTED)
+        and ((current.get("customer") or {}).get("name") in (None, REDACTED))
+    ):
+        return False  # already redacted
+    before = (q.snapshot_sha256, q.issued_html_sha256)
+    doc = dict(q.snapshot)
+    doc["customer"] = {"name": REDACTED if (doc.get("customer") or {}).get("name") else None}
+    doc["subject"] = REDACTED
+    if doc.get("cover_note"):
+        doc["cover_note"] = REDACTED
+    render = TEMPLATES.get(q.template_version or "")
+    if render is None:
+        raise RuntimeError(f"template {q.template_version} of {q.id} is no longer available; keep every version")
+    page = render(doc)
+    q.snapshot, q.snapshot_sha256 = doc, hashlib.sha256(canonical_bytes(doc)).hexdigest()
+    q.issued_html, q.issued_html_sha256 = page, _sha(page)
+    quotations.event(s, q, "SNAPSHOT_REDACTED", q.status, q.status, reason_code="LEAD_ERASURE",
+                     previous_snapshot_sha256=before[0], previous_html_sha256=before[1],
+                     snapshot_sha256=q.snapshot_sha256)  # fmt: skip
+    return True
 
 
 def _e(value: Any) -> str:
@@ -239,3 +315,8 @@ def html(doc: dict[str, Any]) -> str:
         p.append(f"<p class='muted'>Terms version {_e(doc['terms_version'])}</p>")
     p.append("</body></html>")
     return "".join(p)
+
+
+# Every template version ever used for an issued quotation stays here (a new page design is a new key).
+TEMPLATES: dict[str, Callable[[dict[str, Any]], str]] = {"mtq-quotation-html/1": html}
+CURRENT_TEMPLATE = "mtq-quotation-html/1"

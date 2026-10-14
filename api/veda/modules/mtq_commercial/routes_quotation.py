@@ -89,15 +89,16 @@ def get_chain(req: Req, quotation_id: str):
                "versions": variations.chain(req.session, q.quotation_number)})  # fmt: skip
 
 
-@api.route("GET", "/quotation-lines/<line_id>/trace", permission="quotation.read", write=False,
-           requirement="QUOT-001",
+@api.route("GET", "/quotation-lines/<line_id>/trace", permission="quotation.lineage.read", write=False,
+           requirement="QUOT-007",
            summary="A quotation line walked back: estimate line, BOQ line, scope item, requirement, measurement")  # fmt: skip
 def trace_line(req: Req, line_id: str):
     line = req.session.get(QuotationLine, line_id)
     if line is None or line.is_deleted:
         raise not_found()
     _quotation(req, line.quotation_id)
-    return ok(quotations.trace(req.session, line))
+    access.row_visible(req.session, req.ctx, Quotation, line.quotation_id, "quotation.lineage.read")
+    return ok(quotations.trace(req.session, line, rates=req.ctx.scope("cost_estimate.rate.view") is not None))
 
 
 @api.route("PATCH", "/quotations/<quotation_id>", permission="quotation.create", body=S.QuotationPatchIn,
