@@ -20,6 +20,24 @@ export interface GuardContext {
   mustChangePassword: boolean;
   path: string;
   search?: string;
+  /** Where "/" sends a signed-in user who cannot open the dashboard: their first permitted page (see landingPath). */
+  home?: string | null;
+}
+
+/** A page a signed-in user may land on, in order of preference. */
+export interface Landing {
+  path: string;
+  anyOf?: readonly string[];
+}
+
+/**
+ * The first landing page the permissions allow, or null. Sign-in always continues to "/" (the dashboard, lead.read);
+ * a role without leads (Estimator: properties and commercial work only) lands on its own first page instead of
+ * "No access".
+ */
+export function landingPath(perms: Parameters<typeof hasAny>[0], candidates: readonly Landing[]): string | null {
+  const hit = candidates.find((c) => !c.anyOf?.length || hasAny(perms, c.anyOf));
+  return hit ? hit.path : null;
 }
 
 /**
@@ -42,6 +60,7 @@ export function evaluateGuard(meta: RouteMeta, ctx: GuardContext): string | null
   if (meta.recovery && !meta.chrome && ctx.path === '/recovery-mode') return '/';
   if (ctx.mustChangePassword && !meta.passwordChange) return '/change-password';
   if (meta.anyOf?.length && !hasAny(state.me?.permissions, meta.anyOf)) {
+    if (ctx.path === '/' && ctx.home && ctx.home !== '/') return ctx.home;
     return `/no-access?perm=${encodeURIComponent(meta.anyOf.join(' or '))}`;
   }
   return null;
