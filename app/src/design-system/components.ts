@@ -256,6 +256,7 @@ export class VsSkeleton extends LitElement {
     div { height: 16px; margin: 14px 0; border-radius: 2px; background: linear-gradient(90deg, var(--vs-cream), var(--vs-surface), var(--vs-cream)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
     div:nth-child(3n) { width: 70%; }
     @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { div { animation: none; } }
   `;
   constructor() {
     super();

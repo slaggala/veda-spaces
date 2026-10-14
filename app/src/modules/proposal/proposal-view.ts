@@ -67,10 +67,12 @@ export class VsProposalView extends LitElement {
       padding: 4px 10px; border-radius: var(--vs-radius-pill); border: 1px solid var(--vs-line); background: var(--vs-surface); width: fit-content; }
     .state.OPEN { color: var(--vs-success); } .state.SUPERSEDED, .state.EXPIRED, .state.UNAVAILABLE { color: var(--vs-warning); }
     .layout { display: grid; gap: var(--vs-space-5); grid-template-columns: minmax(0, 1fr); }
-    @media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 320px; } aside .sticky { position: sticky; top: var(--vs-space-4); } .bar { display: none; } }
+    @media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 320px; } aside .sticky { position: sticky; top: var(--vs-space-4); } }
     .kpis { display: grid; gap: var(--vs-space-3); grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
     .kpi { background: var(--vs-surface); border: 1px solid var(--vs-line); border-radius: var(--vs-radius-card); padding: var(--vs-space-3) var(--vs-space-4); }
     .kpi .n { font: 600 20px/28px var(--vs-font-sans); overflow-wrap: anywhere; }
+    .kpi.value { grid-column: 1 / -1; } .kpi.value .n { white-space: nowrap; font-size: 24px; line-height: 32px; }
+    @media (min-width: 600px) { .kpi.value { grid-column: auto; } .kpi.value .n { font-size: 20px; line-height: 28px; } }
     nav.rooms ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--vs-space-2); }
     nav.rooms a { display: inline-flex; align-items: center; padding: 0 var(--vs-space-3); border: 1px solid var(--vs-line); border-radius: var(--vs-radius-pill);
       color: var(--vs-ink); text-decoration: none; background: var(--vs-surface); font-weight: 500; }
@@ -124,12 +126,13 @@ export class VsProposalView extends LitElement {
     .msg, .reply { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; } .reply { padding-left: var(--vs-space-3); border-left: 2px solid var(--vs-copper); }
     textarea, select, input:not([type=radio]) { font: inherit; padding: 8px 10px; border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control);
       background: var(--vs-surface); color: var(--vs-ink); max-width: 100%; box-sizing: border-box; width: 100%; }
-    .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--vs-space-3); margin: 0; }
+    .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 0; margin: 0; } .summary dd { padding-left: var(--vs-space-3); }
     .summary dt { color: var(--vs-ink-muted); } .summary dd { margin: 0; text-align: right; font-weight: 600; white-space: nowrap; }
     .summary dt.total, .summary dd.total { font-size: 18px; color: var(--vs-ink); border-top: 2px solid var(--vs-ink); padding-top: 6px; }
     .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--vs-surface); border-top: 1px solid var(--vs-line);
       display: flex; align-items: center; gap: var(--vs-space-3); padding: var(--vs-space-2) var(--vs-space-4); box-shadow: var(--vs-shadow); }
     .bar .n { font: 600 18px/24px var(--vs-font-sans); } .bartotal { display: flex; flex-direction: column; }
+    @media (min-width: 960px) { .bar { display: none; } .wrap { padding-bottom: var(--vs-space-6); } }
     .actions-list { margin: 0; padding-left: 20px; } .actions-list a { color: var(--vs-copper-text); }
     .preview-mark { border: 2px dashed var(--vs-warning); padding: var(--vs-space-2) var(--vs-space-3); border-radius: var(--vs-radius-card); color: var(--vs-warning); font-weight: 600; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
@@ -220,7 +223,7 @@ export class VsProposalView extends LitElement {
     const rooms = p.rooms.filter((r) => r.kind === 'ROOM').length;
     return html`<section aria-labelledby="ov" class="stack"><h2 id="ov" class="sr-only">Overview</h2>
       <div class="kpis">
-        <div class="kpi"><div class="eyebrow">${p.kind === 'VARIATION' ? 'Net change' : 'Proposal value'}</div>
+        <div class="kpi value"><div class="eyebrow">${p.kind === 'VARIATION' ? 'Net change' : 'Proposal value'}</div>
           <div class="n">${rupees(p.kind === 'VARIATION' ? p.summary.net_change ?? null : p.summary.total) ?? 'To be confirmed'}</div></div>
         <div class="kpi"><div class="eyebrow">Rooms</div><div class="n">${rooms}</div></div>
         <div class="kpi"><div class="eyebrow">Version</div><div class="n">${p.version_no}</div></div>
