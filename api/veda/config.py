@@ -209,6 +209,12 @@ class Settings:
     # BOQ (B2) and the internal estimate (B3) behind ESTIMATION; quotations (B4) behind QUOTATION, which needs both.
     mtq_estimation_enabled: bool = False
     mtq_quotation_enabled: bool = False
+    # Customer Quotation Experience (CQX-15). Off by default everywhere and refused in production. Viewing a shared,
+    # issued quotation needs the quotation flag; customer interaction (optional-item choices, questions, change requests,
+    # acknowledgements) needs viewing; digital acceptance needs interaction (and, to succeed, the owner's decisions).
+    customer_proposal_enabled: bool = False
+    customer_proposal_interaction_enabled: bool = False
+    customer_quotation_acceptance_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -360,6 +366,9 @@ def load_settings(**overrides) -> Settings:
         mtq_site_enablement_sha256=_env("VEDA_MTQ_SITE_ENABLEMENT_SHA256"),
         mtq_estimation_enabled=_bool("VEDA_MTQ_ESTIMATION_ENABLED", False),
         mtq_quotation_enabled=_bool("VEDA_MTQ_QUOTATION_ENABLED", False),
+        customer_proposal_enabled=_bool("VEDA_CUSTOMER_PROPOSAL_ENABLED", False),
+        customer_proposal_interaction_enabled=_bool("VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED", False),
+        customer_quotation_acceptance_enabled=_bool("VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -413,6 +422,15 @@ def validate_environment(settings: Settings) -> list[str]:
         problems.append(
             "VEDA_MTQ_QUOTATION_ENABLED needs VEDA_MTQ_ESTIMATION_ENABLED (a quotation is built on an estimate)"
         )
+    # CQX-15: each customer-proposal flag needs the one before it, in every environment.
+    if settings.customer_proposal_enabled and not settings.mtq_quotation_enabled:
+        problems.append(
+            "VEDA_CUSTOMER_PROPOSAL_ENABLED needs VEDA_MTQ_QUOTATION_ENABLED (a proposal is an issued quotation)"
+        )
+    if settings.customer_proposal_interaction_enabled and not settings.customer_proposal_enabled:
+        problems.append("VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED needs VEDA_CUSTOMER_PROPOSAL_ENABLED")
+    if settings.customer_quotation_acceptance_enabled and not settings.customer_proposal_interaction_enabled:
+        problems.append("VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED needs VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED")
     if not settings.is_deployed:
         return problems
     env = settings.env
@@ -574,6 +592,11 @@ def validate_environment(settings: Settings) -> list[str]:
                          ("VEDA_MTQ_QUOTATION_ENABLED", settings.mtq_quotation_enabled)):  # fmt: skip
             if on:  # MTQ B2-B4: no production decision exists (decision log 31)
                 problems.append(f"{flag} is not authorised in production (MTQ B2-B4)")
+        for flag, on in (("VEDA_CUSTOMER_PROPOSAL_ENABLED", settings.customer_proposal_enabled),
+                         ("VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED", settings.customer_proposal_interaction_enabled),
+                         ("VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED", settings.customer_quotation_acceptance_enabled)):  # fmt: skip
+            if on:  # CQX: no production decision exists (decision log 35)
+                problems.append(f"{flag} is not authorised in production (customer quotation experience)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

@@ -16,6 +16,14 @@ from veda.modules.catalog.models import (
     CatalogRelease,
 )
 from veda.modules.crm.leads.models import Lead, LeadActivity, LeadNote
+from veda.modules.customer_proposal.models import (
+    CustomerOptionalSelection,
+    CustomerProposalRequest,
+    ProposalAccessGrant,
+    ProposalEvent,
+    QuotationAcceptanceEvidence,
+    QuotationAcknowledgement,
+)
 from veda.modules.estimator.models import (
     BudgetEstimate,
     BudgetEstimateAssumption,
@@ -73,6 +81,12 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "CustomerOptionalSelection",
+    "CustomerProposalRequest",
+    "ProposalAccessGrant",
+    "ProposalEvent",
+    "QuotationAcceptanceEvidence",
+    "QuotationAcknowledgement",
     "QuotationSection",
     "QuotationLine",
     "QuotationEvent",

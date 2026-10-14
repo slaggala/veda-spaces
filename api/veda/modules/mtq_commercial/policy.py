@@ -117,7 +117,9 @@ class Presentation(_Closed):  # OI-MTQ-10
 
 
 class Acceptance(_Closed):  # OI-MTQ-11
-    methods: tuple[Literal["STAFF_RECORDED", "SIGNED_COPY"], ...] = Field(min_length=1)
+    # CUSTOMER_DIGITAL: the customer accepts or declines through their secure proposal link (CQX-10); it also needs
+    # the customer-proposal decisions CQX-D01, D03 and D04 (customer_proposal.policy).
+    methods: tuple[Literal["STAFF_RECORDED", "SIGNED_COPY", "CUSTOMER_DIGITAL"], ...] = Field(min_length=1)
 
 
 class Variations(_Closed):  # OI-MTQ-13

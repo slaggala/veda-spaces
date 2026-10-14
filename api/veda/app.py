@@ -28,6 +28,8 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.catalog.routes import public_api as catalog_public_api
     from veda.modules.crm.leads import events as _lead_events  # noqa: F401  (registers handlers/resolvers)
     from veda.modules.crm.leads.routes import api as leads_api
+    from veda.modules.customer_proposal import events as _proposal_events  # noqa: F401  (registers handlers)
+    from veda.modules.customer_proposal.routes import ALL_APIS as cqx_apis
     from veda.modules.estimator import events as _estimate_events  # noqa: F401  (registers resolvers)
     from veda.modules.estimator.routes import api as estimator_api
     from veda.modules.estimator.routes import public_api as estimator_public_api
@@ -60,6 +62,7 @@ def _register_modules(app: Flask) -> None:
         mtq_api,
         mtq_estimation_api,
         mtq_quotation_api,
+        *cqx_apis,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -106,6 +109,13 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ("POST", "/api/v1/public/catalog/estimates"),
             ("GET", "/api/v1/public/catalog/media/<sha>"),
             ("POST", "/api/v1/public/catalog/events"),
+        }
+    ),
+    # CQX-01 (decision log 35): the customer's proposal, opened by its secure link; every route flagged off by default
+    # and refused in production. The token travels only in the X-Veda-Proposal header (never the URL).
+    "RBX-009": frozenset(
+        {
+            ("GET", "/api/v1/public/proposal"),
         }
     ),
     "RBX-006": frozenset(
@@ -278,9 +288,11 @@ def _preflight():
     origin, credentials = _allowed_origin()
     if origin is not None:
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        # X-Veda-Client: the estimator wizard's per-browser token (rate-limit key, ADR-012).
+        # X-Veda-Client: the estimator wizard's per-browser token (rate-limit key, ADR-012). X-Veda-Proposal: a
+        # customer proposal link's token (CQX-01), sent as a header so it never appears in a URL.
         resp.headers["Access-Control-Allow-Headers"] = (
-            "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID, X-Requested-With, X-Veda-Client"
+            "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID, X-Requested-With, X-Veda-Client, "
+            "X-Veda-Proposal"
         )
         resp.headers["Access-Control-Max-Age"] = "600"
     return resp

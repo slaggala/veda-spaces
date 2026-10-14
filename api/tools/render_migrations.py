@@ -84,6 +84,14 @@ REVISIONS: dict[str, list[str]] = {
         "cost_estimate_adjustment",
     ],
     "0202_mtq_commercial": ["quotation", "quotation_section", "quotation_line", "quotation_event"],
+    "0205_customer_proposal": [
+        "proposal_access_grant",
+        "proposal_event",
+        "customer_optional_selection",
+        "customer_proposal_request",
+        "quotation_acknowledgement",
+        "quotation_acceptance_evidence",
+    ],
 }
 
 # Columns added to existing tables by later revisions: app_user by 0008_account_security (02 §8.3),

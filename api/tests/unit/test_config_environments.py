@@ -332,3 +332,26 @@ def test_MTQ_commercial_flags_default_off_and_production_refuses_them(monkeypatc
     problems = config.validate_environment(on)
     assert "VEDA_MTQ_ESTIMATION_ENABLED is not authorised in production (MTQ B2-B4)" in problems
     assert "VEDA_MTQ_QUOTATION_ENABLED is not authorised in production (MTQ B2-B4)" in problems
+
+
+def test_CQX_flags_default_off_depend_on_each_other_and_production_refuses_them(monkeypatch):
+    """CQX-15 (decision log 35): viewing, interaction and acceptance are off by default, each needs the one before it
+    (viewing needs the quotation flag), and production refuses all three."""
+    s = config.Settings()
+    assert not (s.customer_proposal_enabled or s.customer_proposal_interaction_enabled
+                or s.customer_quotation_acceptance_enabled)  # fmt: skip
+    mtq = {"VEDA_MTQ_SITE_ENABLED": "true", "VEDA_MTQ_ESTIMATION_ENABLED": "true", "VEDA_MTQ_QUOTATION_ENABLED": "true"}
+    on = deployed_env(monkeypatch, "production", **mtq, VEDA_CUSTOMER_PROPOSAL_ENABLED="true",
+                      VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED="true", VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED="true")  # fmt: skip
+    problems = config.validate_environment(on)
+    for flag in ("VEDA_CUSTOMER_PROPOSAL_ENABLED", "VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED",
+                 "VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED"):  # fmt: skip
+        assert f"{flag} is not authorised in production (customer quotation experience)" in problems
+    for env, needs in (({"VEDA_CUSTOMER_PROPOSAL_ENABLED": "true"}, "needs VEDA_MTQ_QUOTATION_ENABLED"),
+                       ({**mtq, "VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED": "true"},
+                        "needs VEDA_CUSTOMER_PROPOSAL_ENABLED"),
+                       ({**mtq, "VEDA_CUSTOMER_PROPOSAL_ENABLED": "true",
+                         "VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED": "true"},
+                        "needs VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED")):  # fmt: skip
+        found = config.validate_environment(deployed_env(monkeypatch, "staging", **env))
+        assert any(needs in p for p in found), (env, found)
