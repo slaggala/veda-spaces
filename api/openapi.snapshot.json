@@ -36,6 +36,36 @@
         "title": "AcceptInviteIn",
         "type": "object"
       },
+      "AcknowledgeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "section": {
+            "enum": [
+              "SCOPE",
+              "ASSUMPTIONS",
+              "EXCLUSIONS",
+              "PAYMENT_MILESTONES",
+              "WARRANTY",
+              "SERVICE_SUPPORT",
+              "TERMS",
+              "VALIDITY"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "section_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Section Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section",
+          "section_sha256"
+        ],
+        "title": "AcknowledgeIn",
+        "type": "object"
+      },
       "Acknowledgement": {
         "additionalProperties": false,
         "properties": {
@@ -2317,6 +2347,32 @@
         "title": "LegIn",
         "type": "object"
       },
+      "LinkRequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Response"
+          },
+          "resulting_quotation_id": {
+            "title": "Resulting Quotation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resulting_quotation_id"
+        ],
+        "title": "LinkRequestIn",
+        "type": "object"
+      },
       "LoginIn": {
         "additionalProperties": false,
         "properties": {
@@ -4305,6 +4361,73 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "RequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "LINE_QUESTION",
+              "GENERAL_QUESTION",
+              "ADD_ITEM",
+              "REMOVE_ITEM",
+              "CHANGE_QUANTITY",
+              "CHANGE_MATERIAL",
+              "CHANGE_FINISH",
+              "DISCUSS_PRICE"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "line_ref": {
+            "anyOf": [
+              {
+                "pattern": "^L[1-9][0-9]{0,3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Line Ref"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requested_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requested Quantity"
+          },
+          "room_ref": {
+            "anyOf": [
+              {
+                "pattern": "^R[1-9][0-9]{0,2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Room Ref"
+          }
+        },
+        "required": [
+          "category",
+          "message"
+        ],
+        "title": "RequestIn",
+        "type": "object"
+      },
       "RequirementCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -4551,6 +4674,39 @@
           "new_password"
         ],
         "title": "ResetIn",
+        "type": "object"
+      },
+      "RespondIn": {
+        "additionalProperties": false,
+        "properties": {
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Response"
+          },
+          "status": {
+            "enum": [
+              "UNDER_REVIEW",
+              "NEEDS_CLARIFICATION",
+              "ACCEPTED_FOR_REVISION",
+              "DECLINED",
+              "RESOLVED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RespondIn",
         "type": "object"
       },
       "ReturnIn": {
@@ -5070,6 +5226,31 @@
         "title": "ScopeItemPatchIn",
         "type": "object"
       },
+      "SelectionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "line_ref": {
+            "pattern": "^L[1-9][0-9]{0,3}$",
+            "title": "Line Ref",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "SELECTED",
+              "DESELECTED",
+              "REQUESTED_FOR_DISCUSSION"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_ref",
+          "state"
+        ],
+        "title": "SelectionIn",
+        "type": "object"
+      },
       "SetCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -5168,6 +5349,45 @@
           }
         },
         "title": "SetPatchIn",
+        "type": "object"
+      },
+      "ShareIn": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "recipient_kind": {
+            "default": "PRIMARY_CUSTOMER",
+            "enum": [
+              "PRIMARY_CUSTOMER",
+              "CO_OWNER",
+              "FAMILY_MEMBER",
+              "OTHER"
+            ],
+            "title": "Recipient Kind",
+            "type": "string"
+          },
+          "recipient_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient Label"
+          }
+        },
+        "required": [
+          "expires_in_days"
+        ],
+        "title": "ShareIn",
         "type": "object"
       },
       "SpaceAttributes": {
@@ -10893,6 +11113,126 @@
         "x-requirement": "CEST-002"
       }
     },
+    "/api/v1/customer-requests/{request_id}/link": {
+      "post": {
+        "operationId": "cqx_staff_link_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link the revised version or variation that answers a change request",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.request.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-004"
+      }
+    },
+    "/api/v1/customer-requests/{request_id}/respond": {
+      "post": {
+        "operationId": "cqx_staff_respond_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Answer a customer question or change request (the answer is shown to the customer)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.request.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-004"
+      }
+    },
     "/api/v1/estimate-adjustments/{adjustment_id}/decision": {
       "post": {
         "operationId": "mtq_estimation_decide_discount",
@@ -16022,6 +16362,106 @@
         "x-requirement": "PROP-001"
       }
     },
+    "/api/v1/proposal-access-grants/{grant_id}/revoke": {
+      "post": {
+        "operationId": "cqx_staff_revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a link; it stops serving on the next request",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.access.revoke"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-003"
+      }
+    },
+    "/api/v1/proposal-access-grants/{grant_id}/rotate": {
+      "post": {
+        "operationId": "cqx_staff_rotate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a live link with a new one (the old link stops at once)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.share"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-002"
+      }
+    },
     "/api/v1/public/catalog": {
       "get": {
         "operationId": "catalog_public_public_catalog",
@@ -16251,6 +16691,212 @@
         "x-requirement": "LEAD-001"
       }
     },
+    "/api/v1/public/proposal": {
+      "get": {
+        "operationId": "cqx_public_view",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "The customer's proposal, opened by its secure link (customer-safe)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-001"
+      }
+    },
+    "/api/v1/public/proposal/acknowledgements": {
+      "post": {
+        "operationId": "cqx_interaction_acknowledge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Acknowledge one section of this version, bound to the digest of the text shown",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-009"
+      }
+    },
+    "/api/v1/public/proposal/comparison": {
+      "get": {
+        "operationId": "cqx_public_compare_versions",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "This version beside the version issued before it (frozen documents only)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-008"
+      }
+    },
+    "/api/v1/public/proposal/decision": {
+      "post": {
+        "operationId": "cqx_acceptance_decide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Accept or decline exactly this version, as shown (bound to its version and digest)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-010"
+      }
+    },
+    "/api/v1/public/proposal/requests": {
+      "get": {
+        "operationId": "cqx_interaction_list_requests",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "The customer's own questions and change requests, with answers",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-007"
+      },
+      "post": {
+        "operationId": "cqx_interaction_submit_request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Ask a question or request a change (sent to staff; it never changes the quotation)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-007"
+      }
+    },
+    "/api/v1/public/proposal/selections": {
+      "post": {
+        "operationId": "cqx_interaction_choose_optional",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Choose, drop or ask about an optional item (a proposal to staff; the quotation never changes)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-009",
+        "x-requirement": "CQX-006"
+      }
+    },
     "/api/v1/quotation-lines/{line_id}/trace": {
       "get": {
         "operationId": "mtq_quotation_trace_line",
@@ -16393,6 +17039,140 @@
         "x-requirement": "QUOT-002"
       }
     },
+    "/api/v1/quotations/{quotation_id}/acceptance-evidence": {
+      "get": {
+        "operationId": "cqx_staff_acceptance_evidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The evidence of the customer's digital decision (verified), or what still blocks one",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.acceptance.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-005"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/access-grants": {
+      "get": {
+        "operationId": "cqx_staff_list_grants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every link shared for a quotation version, with its state and views",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.share"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-002"
+      },
+      "post": {
+        "operationId": "cqx_staff_share",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Share an issued quotation version: a secure link for one recipient (token shown once)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.share"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-002"
+      }
+    },
     "/api/v1/quotations/{quotation_id}/approve": {
       "post": {
         "operationId": "mtq_quotation_approve",
@@ -16483,6 +17263,48 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "QUOT-001"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/customer-activity": {
+      "get": {
+        "operationId": "cqx_staff_customer_activity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer's optional-item choices, questions, change requests and acknowledgements",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.request.review"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-004"
       }
     },
     "/api/v1/quotations/{quotation_id}/decision": {
@@ -16637,6 +17459,48 @@
         "x-requirement": "QUOT-004"
       }
     },
+    "/api/v1/quotations/{quotation_id}/proposal-preview": {
+      "get": {
+        "operationId": "cqx_staff_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The quotation exactly as its customer sees it (frozen once issued; a marked preview before)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.preview"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-001"
+      }
+    },
     "/api/v1/quotations/{quotation_id}/return": {
       "post": {
         "operationId": "mtq_quotation_return_to_draft",
@@ -16746,6 +17610,48 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "QUOT-002"
+      }
+    },
+    "/api/v1/quotations/{quotation_id}/variation-preview": {
+      "get": {
+        "operationId": "cqx_staff_variation_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A variation beside the accepted baseline, as the customer would see it (staff preview)",
+        "tags": [
+          "customer-proposal"
+        ],
+        "x-permission": [
+          "proposal.preview"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CQX-008"
       }
     },
     "/api/v1/quotations/{quotation_id}/variations": {

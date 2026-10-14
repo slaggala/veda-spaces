@@ -1,0 +1,47 @@
+{
+  "record": "CUSTOMER-PROPOSAL-STAGING-ENABLEMENT",
+  "status": "DRAFT",
+  "environment": "staging",
+  "production": false,
+  "flags": [
+    "VEDA_CUSTOMER_PROPOSAL_ENABLED",
+    "VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED",
+    "VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED"
+  ],
+  "author": "Customer quotation experience session (VEDA-SPACES-CUSTOMER-QUOTATION-EXPERIENCE-END-TO-END)",
+  "approved_by": "[OWNER TO FILL]",
+  "approved_on": null,
+  "scope": {
+    "protected_staging_only": true,
+    "synthetic_customers_only": true,
+    "real_customers": false,
+    "viewing": false,
+    "interaction": false,
+    "acceptance_testing": false,
+    "customer_notifications": false,
+    "not_authorised": [
+      "production",
+      "real customers or real customer data",
+      "customer-directed messages (no approved channel or copy, CQX-B05)",
+      "digital acceptance while OI-MTQ-08, OI-MTQ-09, OI-MTQ-11 (CUSTOMER_DIGITAL), CQX-D01, CQX-D03 or CQX-D04 is undecided (the API refuses it regardless of this flag)",
+      "variation issuance while OI-MTQ-13 is undecided (B4 refuses it)",
+      "showing reference images (needs a reviewed, path-scoped img-src change for /proposal)"
+    ]
+  },
+  "prerequisites": {
+    "quotation_flag": "VEDA_MTQ_QUOTATION_ENABLED is on in staging (mtq_commercial, decision log 34).",
+    "issued_quotation": "Viewing needs an issued quotation; issuing needs OI-MTQ-07, 08, 09 and 11 (and 03/04 for an approved ruleset) recorded by the owner. Until then no proposal can be shared, and the viewing flag shows nothing.",
+    "housekeeping_job": "veda maintenance customer-proposal-housekeeping scheduled with the other maintenance jobs (link expiry records, staff reminders)."
+  },
+  "evidence": {
+    "independent_review": "",
+    "ci_run_id": "",
+    "deploy_flags_off_run_id": "",
+    "migration_verification_run_id": "",
+    "infra_apply_run_id": "",
+    "drift_run_id": "",
+    "smoke_test": "",
+    "production_isolation": ""
+  },
+  "rollback": "A reviewed change sets customer_proposal.proposal_enabled, interaction_enabled and acceptance_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameters in place; the next 12-deploy renders them. Every CQX route then answers 404 and every link stops opening; data stays (links can be revoked first). Image rollback: deploy.sh --rollback to the N-1 tag (migration 0205 is expand-only)."
+}

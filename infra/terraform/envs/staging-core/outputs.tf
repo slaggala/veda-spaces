@@ -147,3 +147,39 @@ output "mtq_commercial" {
     error_message = "VEDA_MTQ_ESTIMATION_ENABLED turns on only with an owner-APPROVED infra/config/mtq-commercial-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.commercial_record_problems)}."
   }
 }
+
+# Customer quotation experience (decision log 35): what is planned, and the gates that refuse the rest.
+output "customer_proposal" {
+  description = "Customer proposals on staging: viewing, interaction and acceptance flags (false until an owner-approved, digest-bound, synthetic-customers-only enablement record whose scope names each one)."
+  value = {
+    proposal_enabled    = local.cqx_config.VEDA_CUSTOMER_PROPOSAL_ENABLED
+    interaction_enabled = local.cqx_config.VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED
+    acceptance_enabled  = local.cqx_config.VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED
+    enablement_record   = local.cqx.enablement_record_sha256
+  }
+
+  precondition {
+    condition     = local.cqx.status == "DECIDED" && (local.cqx_any || local.cqx.enablement_record_sha256 == null)
+    error_message = "customer_proposal must be DECIDED, and a digest is bound only together with a flag (rollback clears every flag and the digest)."
+  }
+
+  precondition {
+    condition     = !local.cqx.proposal_enabled || local.mtq_commercial.quotation_enabled
+    error_message = "VEDA_CUSTOMER_PROPOSAL_ENABLED needs VEDA_MTQ_QUOTATION_ENABLED (a proposal is an issued quotation)."
+  }
+
+  precondition {
+    condition     = !local.cqx.interaction_enabled || local.cqx.proposal_enabled
+    error_message = "VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED needs VEDA_CUSTOMER_PROPOSAL_ENABLED."
+  }
+
+  precondition {
+    condition     = !local.cqx.acceptance_enabled || local.cqx.interaction_enabled
+    error_message = "VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED needs VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED."
+  }
+
+  precondition {
+    condition     = !local.cqx_any || length(local.cqx_record_problems) == 0
+    error_message = "Customer-proposal flags turn on only with an owner-APPROVED infra/config/customer-proposal-enablement-record.json bound by its SHA-256, scoped to each flag, with every evidence field filled: ${join("; ", local.cqx_record_problems)}."
+  }
+}
