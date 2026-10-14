@@ -8,8 +8,11 @@ quantity is a count of captured points), kept and reported, never dropped.
 Validation is part of the BOQ: each line carries the issue codes found when it was generated, and the BOQ the
 property-level ones. BLOCKING issues stop the review; WARNINGS are disclosed. A quantity override keeps the calculated
 value, and needs a reason; it clears the line's missing-measurement and impossible-quantity issues because the line
-then states its quantity explicitly. Review seals the BOQ (canonical JSON digest); regeneration creates a new revision
-and supersedes the open one, carrying an override only where the calculated quantity is unchanged.
+then states its quantity explicitly. No line is dropped for a zero or missing quantity; each carries a quantity status
+(VALID, VALID_ZERO, UNRESOLVED, INVALID). An included item with no catalogue line, a wrong-kind or fractional count
+input, unresolved source points or a missing final quantity block the review. Review seals the BOQ (canonical JSON
+digest) and supersedes the property's previously reviewed BOQ; regeneration creates a new revision and supersedes the
+open one, carrying an override only where the calculated quantity is unchanged.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from veda.kernel import clock, db
-from veda.kernel.errors import ApiError
+from veda.kernel.errors import ApiError, field_error
 from veda.kernel.jcs import canonical_bytes
 from veda.modules.estimator import service as estimator_service
 from veda.modules.estimator.models import EstimatorRateCard
@@ -37,8 +40,14 @@ from .models import Boq, BoqLine, Requirement, Scope, ScopeItem
 BLOCKING = frozenset({
     "MISSING_MEASUREMENT", "IMPOSSIBLE_QUANTITY", "MISSING_QUANTITY_RULE", "UNSUPPORTED_UNIT", "INVALID_OPTION",
     "STALE_MEASUREMENT", "UNVERIFIED_MEASUREMENT", "LITE_SURVEY_NOT_QUOTATION_READY", "UNEXPLAINED_OVERRIDE",
+    "QUANTITY_KIND_MISMATCH", "INVALID_COUNT", "UNRESOLVED_SOURCE_POINTS", "MANDATORY_SCOPE_MISMATCH",
+    "MISSING_QUANTITY", "UNRESOLVED_CATALOGUE_MAPPING",
 })  # fmt: skip
 CLEARED_BY_OVERRIDE = frozenset({"MISSING_MEASUREMENT", "IMPOSSIBLE_QUANTITY"})
+# How a line's quantity stands (instruction: a line never disappears because its quantity is zero or missing).
+# Excluded and not-applicable requirements are not BOQ lines: they are recorded on the scope (exclusions) and listed
+# in the BOQ summary (excluded_items, requirement_exclusions).
+INVALID_CODES = frozenset({"QUANTITY_KIND_MISMATCH", "INVALID_COUNT", "IMPOSSIBLE_QUANTITY", "UNSUPPORTED_UNIT"})
 UNIT_TEXT = {"SFT": "sq ft", "RFT": "rft", "NOS": "nos", "LUMP": "lump"}
 
 MESSAGES = {
@@ -59,12 +68,28 @@ MESSAGES = {
     "(B1-02).",
     "RULESET_NOT_APPROVED": "The scope ruleset {detail} is not approved (OI-MTQ-03, OI-MTQ-04); quantities are "
     "reviewable but not customer-issuable.",
+    "QUANTITY_KIND_MISMATCH": "{what}: {detail} The ruleset's derivation and the rate card's input disagree on the "
+    "kind of quantity; no conversion is approved, so the line cannot be quantified.",
+    "INVALID_COUNT": "{what}: {detail} Counts are whole numbers (as in the estimator); correct the entry on the scope "
+    "item.",
+    "UNRESOLVED_SOURCE_POINTS": "{what}: {detail} Complete the points in a new measurement revision.",
+    "MANDATORY_SCOPE_MISMATCH": "{what}: a mandatory requirement is quoted as optional; include it, or exclude it "
+    "with a note.",
+    "MISSING_QUANTITY": "{what}: the line has no final quantity.",
+    "UNRESOLVED_CATALOGUE_MAPPING": "{what}: {detail} An included item with no catalogue line cannot be reviewed for "
+    "pricing; exclude it, offer it as optional, or wait for its rate-card line (owner decision OI-MTQ-05).",
 }
 
 
 def issue(code: str, *, what: str = "", detail: str = "", **refs) -> dict[str, Any]:
     return {"code": code, "severity": "BLOCKING" if code in BLOCKING else "WARNING",
             "message": MESSAGES[code].format(what=what, detail=detail), **refs}  # fmt: skip
+
+
+def _unmapped(item: ScopeItem, what: str, detail: str) -> dict[str, Any]:
+    """An item with no catalogue line: blocking when it is in the committed scope, disclosed when it is optional."""
+    code = "MISSING_CATALOGUE_MAPPING" if item.inclusion_code == "OPTIONAL" else "UNRESOLVED_CATALOGUE_MAPPING"
+    return issue(code, what=what, detail=detail)
 
 
 def require_status(boq: Boq, status: str) -> None:
@@ -104,18 +129,21 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
     source_ref = {**facts.ref(item.space_id), "anchor_wall_index": item.anchor_wall_index}
     if item.card_product_code is None:
         if itype.measured_count is not None:
-            mc = itype.measured_count
-            n, why = quantity.measured_count(facts, mc.types, mc.statuses)
+            n, why, unresolved = quantity.counted(facts, itype.measured_count)
+            issues = [_unmapped(item, what, itype.unmapped_reason or "")]
+            if unresolved:
+                issues.append(issue("UNRESOLVED_SOURCE_POINTS", what=what,
+                                    detail=f"{unresolved} captured point(s) lack the sensor type or switching the "
+                                           "count needs."))  # fmt: skip
             return [{**base, "card_product_code": None, "card_line_code": None, "label": item.label, "uom_code": "NOS",
-                     "formula_kind": "MEASURED_COUNT", "formula_inputs": {"count": n}, "derivation": f"{why} = {n} nos",
-                     "measurement_source": facts.ref(None), "calculated_quantity_centi": n * 100,
-                     "dimension_source_code": "MEASURED",
-                     "issues": [issue("MISSING_CATALOGUE_MAPPING", what=what, detail=itype.unmapped_reason or "")]}]  # fmt: skip
+                     "formula_kind": "MEASURED_COUNT", "formula_inputs": {"count": n, "unresolved": unresolved},
+                     "derivation": f"{why} = {n} nos", "measurement_source": facts.ref(None),
+                     "calculated_quantity_centi": n * 100, "dimension_source_code": "MEASURED", "issues": issues}]  # fmt: skip
         return [{**base, "card_product_code": None, "card_line_code": None, "label": item.label, "uom_code": None,
                  "formula_kind": "UNMAPPED", "formula_inputs": {}, "derivation": "No catalogue line: not quantified.",
                  "measurement_source": source_ref, "calculated_quantity_centi": None,
                  "dimension_source_code": item.dimension_source_code,
-                 "issues": [issue("MISSING_CATALOGUE_MAPPING", what=what, detail=itype.unmapped_reason or "")]}]  # fmt: skip
+                 "issues": [_unmapped(item, what, itype.unmapped_reason or "")]}]  # fmt: skip
     product = card.product(item.card_product_code)
     if product is None:
         return [{**base, "card_product_code": item.card_product_code, "card_line_code": None, "label": item.label,
@@ -123,8 +151,7 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
                  "derivation": f"Rate card {card.version} has no product {item.card_product_code}.",
                  "measurement_source": source_ref, "calculated_quantity_centi": None,
                  "dimension_source_code": item.dimension_source_code,
-                 "issues": [issue("MISSING_CATALOGUE_MAPPING", what=what,
-                                  detail=f"rate card {card.version} has no product {item.card_product_code}.")]}]  # fmt: skip
+                 "issues": [_unmapped(item, what, f"rate card {card.version} has no product {item.card_product_code}.")]}]  # fmt: skip
     options = {o.name: o.default for o in product.options}
     chosen = scopes.effective_options(item, req)
     bad = []
@@ -137,6 +164,8 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
     item_issues = (
         [issue("INVALID_OPTION", what=what, detail=f"Unknown option or choice: {', '.join(bad)}.")] if bad else []
     )
+    if item.necessity_code == "MANDATORY" and item.inclusion_code == "OPTIONAL":
+        item_issues.append(issue("MANDATORY_SCOPE_MISMATCH", what=what))
     out = []
     for line in product.lines:
         if any(options.get(w.option) not in w.is_ for w in line.when):
@@ -146,6 +175,13 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
         if line.uom not in V.UOMS:
             issues.append(issue("UNSUPPORTED_UNIT", what=what, detail=line.uom))
         no_rule = [n for n in lq.missing + lq.kind_mismatch if n not in itype.inputs and n not in overrides]
+        kinds = {i.name: i.kind for i in product.inputs}
+        mismatch = [f"{n} is derived as a {(dims.get(n) or {}).get('kind')} but card {card.version} takes a {kinds[n]}."
+                    for n in lq.kind_mismatch if n not in no_rule]  # fmt: skip
+        if mismatch:
+            issues.append(issue("QUANTITY_KIND_MISMATCH", what=what, detail=" ".join(mismatch)))
+        if lq.not_whole:
+            issues.append(issue("INVALID_COUNT", what=what, detail="; ".join(lq.not_whole) + "."))
         if no_rule:
             issues.append(issue("MISSING_QUANTITY_RULE", what=what, detail=", ".join(no_rule)))
         elif lq.missing:
@@ -160,8 +196,9 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
                 if d.get("source") == "ASSUMED" and n not in overrides
             ]
             issues.append(issue("ASSUMED_DIMENSION", what=what, detail="; ".join(assumed)))
-        if lq.quantity is not None and lq.quantity <= 0:
-            continue  # the engine prices no zero line (engine._price); nothing to quantify
+        # A zero quantity is kept and classified (quantity_status), never dropped: a zero count is a valid zero, a zero
+        # length or area is out of the card's bounds (IMPOSSIBLE_QUANTITY above). The estimator skips zero lines; the
+        # BOQ keeps them for the audit trail (documented difference, MTQ/estimator parity test).
         label = f"{product.label} — {line.label}"[:300]
         out.append({**base, "card_product_code": product.code, "card_line_code": line.code, "label": label,
                     "uom_code": line.uom if line.uom in V.UOMS else None, "formula_kind": lq.formula_kind,
@@ -191,20 +228,42 @@ def effective_issues(line: BoqLine) -> list[dict[str, Any]]:
 
 
 def _status(line: BoqLine) -> str:
-    return "ISSUE" if any(i["severity"] == "BLOCKING" for i in effective_issues(line)) else "OK"
+    line.quantity_status = quantity_status(line)
+    return "ISSUE" if any(i["severity"] == "BLOCKING" for i in line_blockers(line)) else "OK"
+
+
+def quantity_status(line: BoqLine) -> str:
+    """VALID, VALID_ZERO (a measured or entered zero the card admits), UNRESOLVED (no catalogue line, a missing input,
+    unresolved source points) or INVALID (an impossible, fractional or wrong-kind quantity)."""
+    codes = {i["code"] for i in effective_issues(line)}
+    if codes & INVALID_CODES:
+        return "INVALID"
+    if line.formula_kind == "UNMAPPED" or line.final_quantity_centi is None or "UNRESOLVED_SOURCE_POINTS" in codes:
+        return "UNRESOLVED"
+    return "VALID_ZERO" if line.final_quantity_centi == 0 else "VALID"
+
+
+def line_blockers(line: BoqLine) -> list[dict[str, Any]]:
+    """Every blocking issue of a line, including a missing final quantity on a line the card quantifies."""
+    out = [i for i in effective_issues(line) if i["severity"] == "BLOCKING"]
+    if line.final_quantity_centi is None and line.formula_kind != "UNMAPPED" and not out:
+        out.append(issue("MISSING_QUANTITY", what=line.label))
+    return out
 
 
 def generate(s: Session, ctx, scope: Scope, prop: Property) -> Boq:
     if scope.status != "CONFIRMED":
         raise ApiError(409, "SCOPE_NOT_CONFIRMED", "A BOQ is generated from a confirmed scope revision.",
                        extra={"status": scope.status})  # fmt: skip
+    mset = s.get(MeasurementSet, scope.measurement_set_id)
+    assert mset is not None
+    if scope.property_id != prop.id or mset.property_id != prop.id:
+        raise ApiError(422, "LINEAGE_MISMATCH", "The scope's lineage does not belong to this property.")
     reasons = lineage.scope_reasons(s, scope)
     if reasons:
         raise ApiError(409, "SCOPE_STALE", "The scope is out of date; create and confirm a new scope revision first.",
                        extra={"reasons": reasons})  # fmt: skip
     card_row, card = active_catalogue(s)
-    mset = s.get(MeasurementSet, scope.measurement_set_id)
-    assert mset is not None
     previous = s.execute(
         sa.select(Boq).where(Boq.property_id == prop.id, Boq.status == "GENERATED")
     ).scalar_one_or_none()
@@ -348,6 +407,9 @@ def override(s: Session, ctx, line: BoqLine, boq: Boq, quantity_centi: int, reas
     require_status(boq, "GENERATED")
     if line.uom_code is None:
         raise ApiError(422, "UNSUPPORTED_UNIT", "This line has no catalogue unit; it cannot be quantified here.")
+    if line.formula_kind in ("CARD_COUNT", "MEASURED_COUNT") and quantity_centi % 100:
+        raise ApiError(422, "VALIDATION_FAILED", "A count is a whole number.",
+                       errors=[field_error("quantity", "NOT_WHOLE", "Must be a whole number.")])  # fmt: skip
     line.override_quantity_centi = quantity_centi
     line.override_reason = reason.strip()
     line.override_by, line.override_on = ctx.user.id, db.tx_time(s)
@@ -377,10 +439,15 @@ def review(s: Session, ctx, boq: Boq) -> Boq:
                        extra={"reasons": reasons})  # fmt: skip
     blocking = [i for i in boq.issues if i["severity"] == "BLOCKING"]
     for line in lines(s, boq):
-        blocking += [{**i, "line_id": line.id} for i in effective_issues(line) if i["severity"] == "BLOCKING"]
+        line.status = _status(line)
+        blocking += [{**i, "line_id": line.id} for i in line_blockers(line)]
     if blocking:
         raise ApiError(409, "BOQ_HAS_BLOCKING_ISSUES", f"{len(blocking)} blocking issue(s) must be resolved first.",
                        extra={"issues": blocking})  # fmt: skip
+    previous = latest_reviewed(s, boq.property_id)
+    if previous is not None:  # one reviewed BOQ per property: the earlier one is superseded (and reported stale)
+        previous.status = "SUPERSEDED"
+        s.flush()
     digest = snapshot_sha256(s, boq)  # computed first: the sealed-row CHECK needs it with the status
     boq.status, boq.reviewed_on, boq.reviewed_by = "REVIEWED", db.tx_time(s), ctx.user.id
     boq.snapshot_sha256 = digest
@@ -390,7 +457,7 @@ def review(s: Session, ctx, boq: Boq) -> Boq:
 LINE_FIELDS = ("id", "scope_item_id", "requirement_id", "space_id", "position", "item_type_code", "card_product_code",
                "card_line_code", "label", "uom_code", "formula_kind", "formula_inputs", "derivation",
                "measurement_source", "calculated_quantity_centi", "override_quantity_centi", "override_reason",
-               "final_quantity_centi", "is_optional", "dimension_source_code")  # fmt: skip
+               "final_quantity_centi", "is_optional", "dimension_source_code", "quantity_status")  # fmt: skip
 
 
 def snapshot_sha256(s: Session, boq: Boq) -> str:

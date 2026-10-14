@@ -12,6 +12,9 @@ Two steps, both deterministic:
 
 Lengths are kept in millimetres until the end; quantities are exact decimals rounded once, to 0.01 half up, which is
 the estimator engine's own rounding (``engine._q``). No clearance, corner deduction or wastage is applied (OI-MTQ-04).
+A run is cut by every opening, or (``deduct: floor_openings``, a counter run) only by doors and other floor-level
+openings; a wall the openings take entirely has no usable stretch (0 mm, never its full length); an opening without an
+offset leaves the stretch unknown (the wall's length, ASSUMED). Count inputs are whole numbers (as in the estimator).
 """
 
 from __future__ import annotations
@@ -21,12 +24,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from veda.modules.estimator.ratecard import LineSpec, ProductSpec, RateCard
-from veda.modules.mtq import derivation as site_derivation
 
-from .rules import InputRule, ItemType
+from .rules import ABOVE_FLOOR_OPENINGS, InputRule, ItemType, MeasuredCount
 from .site import Facts
 
-QUANTITY_ENGINE_VERSION = "2026.10.1"
+QUANTITY_ENGINE_VERSION = "2026.10.2"
 MM_PER_FT = Decimal("304.8")
 CENTI = Decimal("0.01")
 ROUNDING_POLICY = {
@@ -91,29 +93,93 @@ def _anchor_wall(facts: Facts, space_id: str | None, tag: str | None, anchor: in
     return next((w for w in walls if tag in (w.get("usable_for_code") or [])), None)
 
 
-def _clear_stretch(w: dict[str, Any]) -> tuple[int, str, str]:
-    """Longest stretch of a wall clear of openings, with its source and a sentence."""
-    segs = site_derivation.usable_segments(w)
+def _cuts(o: dict[str, Any], deduct: str) -> bool:
+    """Whether an opening interrupts a run: every opening does, except (for a base run) one above the floor."""
+    if deduct == "all_openings":
+        return True
+    return o["opening_type_code"] not in ABOVE_FLOOR_OPENINGS or o.get("sill_height_mm") == 0
+
+
+def segments(w: dict[str, Any], deduct: str = "all_openings") -> list[list[int]] | None:
+    """Stretches of a wall clear of the openings that cut it, [start_mm, end_mm] from the wall's start corner. ``None``
+    when a cutting opening has no offset (the stretches are unknown); ``[]`` when the openings take the whole wall."""
+    length = int(w["length_mm"])
+    blocks = []
+    for o in w.get("openings") or []:
+        if not _cuts(o, deduct):
+            continue
+        if o.get("offset_from_wall_start_mm") is None:
+            return None
+        start = int(o["offset_from_wall_start_mm"])
+        blocks.append((max(0, start), min(length, start + int(o["width_mm"]))))
+    out, cursor = [], 0
+    for a, b in sorted(blocks):
+        if a > cursor:
+            out.append([cursor, a])
+        cursor = max(cursor, b)
+    if cursor < length:
+        out.append([cursor, length])
+    return out
+
+
+def _kept(w: dict[str, Any], deduct: str) -> str:
+    kept = [o for o in w.get("openings") or [] if not _cuts(o, deduct)]
+    if not kept:
+        return ""
+    what = ", ".join(f"{o['opening_type_code'].lower().replace('_', ' ')} {o['width_mm']} mm" for o in kept)
+    return f"; the run continues beneath {what}"
+
+
+def _clear_stretch(w: dict[str, Any], deduct: str = "all_openings") -> tuple[int, str, str]:
+    """Longest stretch of a wall clear of the openings that cut it, with its source and a sentence. A wall the openings
+    take entirely has no stretch (0 mm, never its full length)."""
     label = f"W{w['wall_index']}"
-    if not w.get("openings"):
-        return int(w["length_mm"]), "MEASURED", f"{label} length {w['length_mm']} mm"
-    if not segs:
+    segs = segments(w, deduct)
+    if segs is None:
         return (int(w["length_mm"]), "ASSUMED",
                 f"{label} length {w['length_mm']} mm (an opening has no offset, so the clear stretch is unknown)")  # fmt: skip
+    if not any(_cuts(o, deduct) for o in w.get("openings") or []):
+        return int(w["length_mm"]), "MEASURED", f"{label} length {w['length_mm']} mm{_kept(w, deduct)}"
+    if not segs:
+        return 0, "DERIVED", f"{label}: openings take the whole {w['length_mm']} mm wall; no usable stretch"
     longest = max(b - a for a, b in segs)
-    return longest, "DERIVED", f"{label}: longest stretch clear of openings {longest} mm of {w['length_mm']} mm"
+    return (longest, "DERIVED",
+            f"{label}: longest stretch clear of openings {longest} mm of {w['length_mm']} mm{_kept(w, deduct)}")  # fmt: skip
 
 
-def _sum_points(facts: Facts, types: tuple[str, ...] | None, statuses: tuple[str, ...]) -> tuple[int, list[str]]:
-    n, spaces = 0, []
+def _wall_run(w: dict[str, Any], deduct: str) -> tuple[int, str]:
+    """Σ stretches of one wall clear of the openings that cut it, and the source."""
+    segs = segments(w, deduct)
+    if segs is None:
+        return int(w["length_mm"]), "ASSUMED"
+    if not any(_cuts(o, deduct) for o in w.get("openings") or []):
+        return int(w["length_mm"]), "MEASURED"
+    return sum(b - a for a, b in segs), "DERIVED"
+
+
+def _sum_points(facts: Facts, types: tuple[str, ...] | None, statuses: tuple[str, ...],
+                sensor_types: tuple[str, ...] = (), switchings: tuple[str, ...] = ()) -> tuple[int, list[str], int]:  # fmt: skip
+    """Σ captured points of the types and statuses, the spaces they are in, and how many of those points lack a
+    listed sensor type or switching (unresolved: not counted)."""
+    n, spaces, unresolved = 0, [], 0
     for sid in facts.spaces:
         m = facts.m(sid) or {}
-        here = sum(int(p["quantity"]) for p in m.get("electrical_points") or []
-                   if (types is None or p["point_type_code"] in types) and (not statuses or p["status_code"] in statuses))  # fmt: skip
+        here = 0
+        for p in m.get("electrical_points") or []:
+            if (types is not None and p["point_type_code"] not in types) or (
+                statuses and p["status_code"] not in statuses
+            ):
+                continue
+            if (sensor_types and p.get("sensor_type_code") not in sensor_types) or (
+                switchings and p.get("switching_code") not in switchings
+            ):
+                unresolved += int(p["quantity"])
+                continue
+            here += int(p["quantity"])
         if here:
             n += here
             spaces.append(facts.spaces[sid].label)
-    return n, spaces
+    return n, spaces, unresolved
 
 
 def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: int | None) -> dict[str, Any]:
@@ -126,7 +192,7 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
         if w is None:
             what = f"wall W{anchor}" if anchor is not None else f"a wall tagged {rule.tag}"
             return _missing(f"The verified set has no {what} in this space.")
-        mm, source, why = _clear_stretch(w)
+        mm, source, why = _clear_stretch(w, rule.deduct)
         return _length(mm, source, why, facts.ref(space_id, wall_id=w["id"], wall_index=w["wall_index"]))
     if k == "tagged_run_total":
         tagged = [w for w in facts.walls(space_id) if rule.tag in (w.get("usable_for_code") or [])]
@@ -134,15 +200,35 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
             return _missing(f"No wall in this space is tagged {rule.tag}.")
         parts, total, source = [], 0, "MEASURED"
         for w in tagged:
-            mm, src, _ = _clear_stretch(w)
-            segs = site_derivation.usable_segments(w) if w.get("openings") else [[0, int(w["length_mm"])]]
-            run = sum(b - a for a, b in segs) if segs else mm
+            run, src = _wall_run(w, rule.deduct)
             total += run
-            parts.append(f"W{w['wall_index']} {run} mm")
+            parts.append(f"W{w['wall_index']} {run} mm{_kept(w, rule.deduct)}")
             if SOURCE_RANK[src] > SOURCE_RANK[source]:
                 source = src
-        why = f"Σ stretches clear of openings on walls tagged {rule.tag}: " + " + ".join(parts) + f" = {total} mm"
+        cut = "openings" if rule.deduct == "all_openings" else "doors and other floor-level openings"
+        why = f"Σ stretches clear of {cut} on walls tagged {rule.tag}: " + " + ".join(parts) + f" = {total} mm"
         return _length(total, source, why, facts.ref(space_id, wall_ids=[w["id"] for w in tagged]))
+    if k == "window_span":
+        w = _anchor_wall(facts, space_id, rule.tag, anchor)
+        if w is None:
+            what = f"wall W{anchor}" if anchor is not None else f"a wall tagged {rule.tag}"
+            return _missing(f"The verified set has no {what} in this space.")
+        wins = [o for o in w.get("openings") or [] if o["opening_type_code"] in rule.opening_types]
+        names = "/".join(t.lower().replace("_", " ") for t in rule.opening_types)
+        refs = facts.ref(space_id, wall_id=w["id"], wall_index=w["wall_index"])
+        if not wins:
+            return _missing(f"W{w['wall_index']} has no {names}: the seat spans a window, so its width is entered by "
+                            "staff or captured in a new measurement revision.", refs)  # fmt: skip
+        if len(wins) == 1:
+            o = wins[0]
+            return _length(int(o["width_mm"]), "MEASURED", f"{names} on W{w['wall_index']} {o['width_mm']} mm wide",
+                           {**refs, "opening_id": o["id"]})  # fmt: skip
+        if any(o.get("offset_from_wall_start_mm") is None for o in wins):
+            return _missing(f"W{w['wall_index']} has {len(wins)} {names}s without offsets: the span is unknown.", refs)
+        start = min(int(o["offset_from_wall_start_mm"]) for o in wins)
+        end = max(int(o["offset_from_wall_start_mm"]) + int(o["width_mm"]) for o in wins)
+        return _length(end - start, "DERIVED", f"span across {len(wins)} {names}s on W{w['wall_index']}: "
+                       f"{start} mm to {end} mm", {**refs, "opening_ids": [o["id"] for o in wins]})  # fmt: skip
     if k == "lintel_capped":
         cap = int(rule.cap_mm or 0)
         fl = (m or {}).get("floor_to_lintel_mm")
@@ -172,12 +258,18 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
             return _missing("The space has no derived perimeter.")
         return _length(int(perimeter), "DERIVED", f"perimeter {perimeter} mm (Σ wall lengths)", facts.ref(space_id))
     if k == "door_width":
-        for w in facts.walls(space_id):
-            for o in w.get("openings") or []:
-                if o["opening_type_code"] == "DOOR":
-                    return _length(int(o["width_mm"]), "MEASURED", f"door on W{w['wall_index']} {o['width_mm']} mm wide",
-                                   facts.ref(space_id, wall_id=w["id"], opening_id=o["id"]))  # fmt: skip
-        return _missing("No door was captured on this space's walls.")
+        sp = facts.spaces.get(space_id) if space_id else None
+        if sp is None or sp.space_type_code not in rule.space_types:
+            return _missing(rule.explain or "Entered by staff on the scope item.")
+        doors = [
+            (w, o) for w in facts.walls(space_id) for o in w.get("openings") or [] if o["opening_type_code"] == "DOOR"
+        ]
+        if len(doors) != 1:
+            return _missing(f"{len(doors)} doors captured on this space's walls: its own door frame is "
+                            "ambiguous; enter the shutter width.")  # fmt: skip
+        w, o = doors[0]
+        return _length(int(o["width_mm"]), "MEASURED", f"door frame on W{w['wall_index']} {o['width_mm']} mm wide",
+                       facts.ref(space_id, wall_id=w["id"], opening_id=o["id"]))  # fmt: skip
     if k in ("partition_length", "partition_height"):
         proposed = [w for w in (m or {}).get("walls") or [] if w.get("is_proposed")]
         if not proposed:
@@ -206,7 +298,7 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
         return _area(total, "DERIVED", f"Σ {what} of {counted} {'/'.join(z.lower() for z in rule.zones)} spaces",
                      facts.ref(None))  # fmt: skip
     if k == "electrical_count":
-        n, where = _sum_points(facts, rule.types, rule.statuses)
+        n, where, _ = _sum_points(facts, rule.types, rule.statuses)
         statuses = "/".join(st.lower() for st in rule.statuses)
         return _count(n, "MEASURED", f"{n} captured {statuses} points" + (f" ({', '.join(where)})" if where else ""),
                       facts.ref(None))  # fmt: skip
@@ -252,6 +344,7 @@ class LineQuantity:
     missing: list[str] = field(default_factory=list)
     out_of_bounds: list[str] = field(default_factory=list)
     kind_mismatch: list[str] = field(default_factory=list)
+    not_whole: list[str] = field(default_factory=list)  # count inputs that are not whole numbers
     source: str = "MEASURED"
 
 
@@ -298,6 +391,10 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
         if v is None:
             result.missing.append(name)
             continue
+        if kinds[name] == "count" and v != v.to_integral_value():
+            # the estimator refuses a fractional count ("Must be a whole number."); so does the BOQ
+            result.not_whole.append(f"{name} {v} is not a whole number")
+            continue
         bound = card.bounds[kinds[name]]
         if not Decimal(str(bound.min)) <= v <= Decimal(str(bound.max)):
             result.out_of_bounds.append(
@@ -310,7 +407,7 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
         result.inputs[name] = {"value": show(v, "0.0001"), "unit": CARD_KIND_UNIT[kinds[name]], "source": src,
                                "refs": (d or {}).get("refs", {})}  # fmt: skip
         parts.append(_input_text(name, v, d, name in overrides, CARD_KIND_UNIT[kinds[name]]))
-    if result.missing or result.kind_mismatch:
+    if result.missing or result.kind_mismatch or result.not_whole:
         return result
     factor = Decimal(str(spec.factor))
     if spec.kind == "area":
@@ -342,6 +439,23 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
 
 
 def measured_count(facts: Facts, types: tuple[str, ...] | None, statuses: tuple[str, ...]) -> tuple[int, str]:
-    n, where = _sum_points(facts, types, statuses)
+    n, where, _ = _sum_points(facts, types, statuses)
     st = "/".join(s.lower() for s in statuses)
     return n, f"{n} captured {st} points" + (f" ({', '.join(where)})" if where else "")
+
+
+def counted(facts: Facts, mc: MeasuredCount) -> tuple[int, str, int]:
+    """An unmapped item's measured count: (count, sentence, unresolved points). A point lacking the listed sensor type
+    or switching is unresolved, never counted."""
+    n, where, unresolved = _sum_points(facts, mc.types, mc.statuses, mc.sensor_types, mc.switchings)
+    st = "/".join(s.lower() for s in mc.statuses)
+    need = []
+    if mc.sensor_types:
+        need.append("sensor " + "/".join(x.lower() for x in mc.sensor_types))
+    if mc.switchings:
+        need.append("switching " + "/".join(x.lower() for x in mc.switchings))
+    why = f"{n} captured {st} points" + (f" with {' and '.join(need)}" if need else "")
+    why += f" ({', '.join(where)})" if where else ""
+    if unresolved:
+        why += f"; {unresolved} without them (unresolved)"
+    return n, why, unresolved

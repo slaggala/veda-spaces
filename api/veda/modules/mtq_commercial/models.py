@@ -95,6 +95,9 @@ class Scope(AuditedBase):
     ruleset_version: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     ruleset_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
     ruleset_status: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    # Digest of the property's requirement decisions this revision was built from (lineage.requirements_sha256): a
+    # later decision changes it and makes the revision, and everything built on it, stale.
+    requirements_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
     generation_run: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)
     exclusions: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)  # declined requirements
     confirmed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
@@ -144,6 +147,9 @@ class ScopeItem(AuditedBase):
     dimensions: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)
     dimension_overrides: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)  # input → value
     override_reason: Mapped[str | None] = mapped_column(sa.String(500))
+    # Staff overrides of an earlier revision made on a different (superseded) measurement set: kept here, not applied,
+    # until staff confirm or replace them ({values, reason, from_scope_item_id}).
+    carried_overrides: Mapped[dict] = mapped_column(JSONType(), nullable=False, default=dict)
     dimension_source_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
     carried_from_item_id: Mapped[str | None] = mapped_column(GUID(), _fk("scope_item.id"))
     sort_order: Mapped[int] = mapped_column(sa.Integer, nullable=False)
@@ -203,6 +209,7 @@ class Boq(AuditedBase):
         CheckConstraint("supersedes_boq_id IS NULL OR supersedes_boq_id <> id", name="ck_boq__not_self"),
         Index("ux_boq__property_revision", "property_id", "revision_no", unique=True, **live_where()),
         Index("ux_boq__one_generated", "property_id", unique=True, **_one("boq", "GENERATED")),
+        Index("ux_boq__one_reviewed", "property_id", unique=True, **_one("boq", "REVIEWED")),
         Index("ix_boq__scope_id", "scope_id"),
         Index("ix_boq__lead_id", "lead_id"),
         Index("ix_boq__measurement_set_id", "measurement_set_id"),
@@ -239,6 +246,7 @@ class BoqLine(AuditedBase):
     is_optional: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
     dimension_source_code: Mapped[str] = mapped_column(sa.String(10), nullable=False)
     status: Mapped[str] = mapped_column(sa.String(8), nullable=False, default="OK")
+    quantity_status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="VALID")
     issue_codes: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)
 
     __table_args__ = (
@@ -246,6 +254,7 @@ class BoqLine(AuditedBase):
         in_check("boq_line", "formula_kind", V.FORMULA_KINDS),
         in_check("boq_line", "dimension_source_code", V.DIMENSION_SOURCES),
         in_check("boq_line", "status", V.LINE_STATUSES),
+        in_check("boq_line", "quantity_status", V.QUANTITY_STATUSES),
         CheckConstraint(
             "calculated_quantity_centi IS NULL OR calculated_quantity_centi >= 0", name="ck_boq_line__calculated_nn"
         ),
@@ -513,11 +522,20 @@ class Quotation(AuditedBase):
     valid_until: Mapped[date | None] = mapped_column(sa.Date)
     snapshot: Mapped[dict | None] = mapped_column(JSONType())  # the customer document, set on ISSUED
     snapshot_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    # The customer HTML frozen at ISSUE with the pinned template version: an issued quotation renders this, never the
+    # current template; a digest mismatch refuses to render (rendering.rendered).
+    template_version: Mapped[str | None] = mapped_column(sa.String(40))
+    issued_html: Mapped[str | None] = mapped_column(sa.Text)
+    issued_html_sha256: Mapped[str | None] = mapped_column(sa.String(64))
     decision_method: Mapped[str | None] = mapped_column(sa.String(16))
     decided_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     decision_recorded_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
     selected_optional_line_ids: Mapped[list] = mapped_column(JSONType(), nullable=False, default=list)
     accepted_total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    # The effective accepted customer baseline, frozen at ACCEPTED: included lines plus the optional items the customer
+    # chose (variations.effective_baseline). Variations compare against it; the issued document is never changed.
+    accepted_baseline: Mapped[list | None] = mapped_column(JSONType())
+    accepted_baseline_sha256: Mapped[str | None] = mapped_column(sa.String(64))
     decision_note: Mapped[str | None] = mapped_column(sa.String(1000))
 
     __table_args__ = (
@@ -532,9 +550,12 @@ class Quotation(AuditedBase):
             name="ck_quotation__kind",
         ),
         _sha("quotation"),
+        _sha("quotation", "issued_html_sha256"),
+        _sha("quotation", "accepted_baseline_sha256"),
         CheckConstraint(
             "status IN ('DRAFT', 'INTERNAL_REVIEW', 'APPROVED') OR status = 'SUPERSEDED' "
-            "OR (issued_on IS NOT NULL AND snapshot_sha256 IS NOT NULL AND total_minor IS NOT NULL)",
+            "OR (issued_on IS NOT NULL AND snapshot_sha256 IS NOT NULL AND total_minor IS NOT NULL "
+            "AND issued_html_sha256 IS NOT NULL AND template_version IS NOT NULL)",
             name="ck_quotation__issued_frozen",
         ),
         CheckConstraint(
@@ -542,7 +563,10 @@ class Quotation(AuditedBase):
             "AND decision_method IS NOT NULL)",
             name="ck_quotation__decided",
         ),
-        CheckConstraint("status <> 'ACCEPTED' OR accepted_total_minor IS NOT NULL", name="ck_quotation__accepted"),
+        CheckConstraint(
+            "status <> 'ACCEPTED' OR (accepted_total_minor IS NOT NULL AND accepted_baseline_sha256 IS NOT NULL)",
+            name="ck_quotation__accepted",
+        ),
         CheckConstraint(
             "optional_minor >= 0 AND discount_minor >= 0 AND taxable_minor = base_total_minor - discount_minor "
             "AND (quotation_kind = 'VARIATION' OR base_total_minor >= 0)",  # a variation's net change may be negative

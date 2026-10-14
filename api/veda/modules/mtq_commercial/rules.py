@@ -28,18 +28,19 @@ from veda.modules.mtq import vocab as SV
 
 from . import vocab as V
 
-RULESET_VERSION = "2026.10.1"
+RULESET_VERSION = "2026.10.2"
 FIXTURE = Path(__file__).with_name("fixtures") / f"scope-rules-{RULESET_VERSION}.json"
 APPROVED_STATUS = "APPROVED"
 
 INPUT_KINDS = (
     "wall_run",  # the longest stretch of the anchor (or first tagged) wall clear of openings
     "tagged_run_total",  # Σ stretches clear of openings over every wall with the tag
+    "window_span",  # the span across the listed window openings of the anchor (or first tagged) wall
     "lintel_capped",  # min(floor to lintel, cap); the cap when the lintel was not captured (ASSUMED)
     "wall_height",  # the tagged wall's own height, else the ceiling height
     "floor_area",  # the space's derived floor area
     "perimeter",  # the space's derived perimeter
-    "door_width",  # the first door on the space's walls
+    "door_width",  # the one door of a space of the listed types (its own door frame); elsewhere a staff entry
     "partition_length",  # Σ proposed partition walls
     "partition_height",  # the proposed partition's height, else the ceiling height
     "property_floor_area",  # Σ floor area of in-scope spaces in the listed zones
@@ -47,6 +48,12 @@ INPUT_KINDS = (
     "electrical_count",  # Σ captured electrical points of the listed types and statuses
     "staff",  # no derivation: staff enter it (with a reason) on the scope item
 )
+
+
+# Opening types that are above the floor by definition: a base (counter) run continues beneath them unless B1 recorded
+# the opening at floor level (sill 0). Every other opening type (doors, French windows, arches, shafts...) cuts it.
+ABOVE_FLOOR_OPENINGS = ("WINDOW", "VENTILATOR", "AC_SLEEVE")
+DEDUCTIONS = ("all_openings", "floor_openings")
 
 
 class _Closed(BaseModel):
@@ -60,12 +67,29 @@ class InputRule(_Closed):
     zones: tuple[str, ...] = ()
     types: tuple[str, ...] | None = None
     statuses: tuple[str, ...] = ()
+    deduct: str = "all_openings"  # which openings cut a run (wall_run, tagged_run_total)
+    opening_types: tuple[str, ...] = ()  # window_span: the openings spanned
+    space_types: tuple[str, ...] = ()  # door_width: the space types whose own door it is
     explain: str | None = None
 
     @model_validator(mode="after")
     def _check(self):
         if self.kind not in INPUT_KINDS:
             raise ValueError(f"unknown input kind {self.kind}")
+        if self.deduct not in DEDUCTIONS:
+            raise ValueError(f"unknown deduction {self.deduct}")
+        if self.deduct != "all_openings" and self.kind not in ("wall_run", "tagged_run_total"):
+            raise ValueError("only a run takes a deduction mode")
+        if self.kind == "window_span" and (not self.opening_types or self.tag is None):
+            raise ValueError("window_span needs a tag and opening types")
+        for o in self.opening_types:
+            if o not in SV.OPENING_TYPES:
+                raise ValueError(f"unknown opening type {o}")
+        if self.kind == "door_width" and not self.space_types:
+            raise ValueError("door_width names the space types whose own door it is")
+        for st in self.space_types:
+            if st not in SV.SPACE_TYPES:
+                raise ValueError(f"unknown space type {st}")
         if self.tag is not None and self.tag not in SV.WALL_TAGS:
             raise ValueError(f"unknown wall tag {self.tag}")
         if self.kind == "lintel_capped" and self.cap_mm is None:
@@ -93,8 +117,23 @@ class OptionRule(_Closed):
 
 
 class MeasuredCount(_Closed):
+    """A count of captured electrical points. A point of the counted type and status that lacks a listed sensor type
+    or switching is not counted: it is reported as unresolved (never guessed into the count)."""
+
     types: tuple[str, ...] | None = None
     statuses: tuple[str, ...] = ()
+    sensor_types: tuple[str, ...] = ()
+    switchings: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _check(self):
+        for st in self.sensor_types:
+            if st not in SV.SENSOR_TYPES:
+                raise ValueError(f"unknown sensor type {st}")
+        for sw in self.switchings:
+            if sw not in SV.SWITCHINGS:
+                raise ValueError(f"unknown switching {sw}")
+        return self
 
 
 class ItemType(_Closed):

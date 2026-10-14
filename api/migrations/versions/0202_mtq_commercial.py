@@ -30,6 +30,7 @@ CODES = (
     "quotation.issue",
     "quotation.decision.record",
     "quotation.variation.create",
+    "quotation.lineage.read",
 )
 
 
@@ -88,11 +89,16 @@ def upgrade() -> None:
         sa.Column("valid_until", sa.Date(), nullable=True),
         sa.Column("snapshot", JSONType(), nullable=True),
         sa.Column("snapshot_sha256", sa.String(64), nullable=True),
+        sa.Column("template_version", sa.String(40), nullable=True),
+        sa.Column("issued_html", sa.Text(), nullable=True),
+        sa.Column("issued_html_sha256", sa.String(64), nullable=True),
         sa.Column("decision_method", sa.String(16), nullable=True),
         sa.Column("decided_on", UTCDateTime(), nullable=True),
         sa.Column("decision_recorded_by", GUID(), nullable=True),
         sa.Column("selected_optional_line_ids", JSONType(), nullable=False),
         sa.Column("accepted_total_minor", sa.BigInteger(), nullable=True),
+        sa.Column("accepted_baseline", JSONType(), nullable=True),
+        sa.Column("accepted_baseline_sha256", sa.String(64), nullable=True),
         sa.Column("decision_note", sa.String(1000), nullable=True),
         sa.PrimaryKeyConstraint("id", name="pk_quotation"),
         sa.ForeignKeyConstraint(
@@ -132,7 +138,17 @@ def upgrade() -> None:
             name="fk_quotation__variation_of_quotation_id",
             ondelete="RESTRICT",
         ),
-        sa.CheckConstraint("status <> 'ACCEPTED' OR accepted_total_minor IS NOT NULL", name="ck_quotation__accepted"),
+        sa.CheckConstraint(
+            "status <> 'ACCEPTED' OR (accepted_total_minor IS NOT NULL AND accepted_baseline_sha256 IS NOT NULL)",
+            name="ck_quotation__accepted",
+        ),
+        sa.CheckConstraint(
+            "accepted_baseline IS NULL OR json_valid(accepted_baseline)", name="ck_quotation__accepted_baseline_json"
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "accepted_baseline_sha256 IS NULL OR length(accepted_baseline_sha256) = 64",
+            name="ck_quotation__accepted_baseline_sha256_len",
+        ),
         sa.CheckConstraint(
             "optional_minor >= 0 AND discount_minor >= 0 AND taxable_minor = base_total_minor - discount_minor AND (quotation_kind = 'VARIATION' OR base_total_minor >= 0)",
             name="ck_quotation__amounts",
@@ -196,8 +212,11 @@ def upgrade() -> None:
             name="ck_quotation__issued_by_format",
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
-            "status IN ('DRAFT', 'INTERNAL_REVIEW', 'APPROVED') OR status = 'SUPERSEDED' OR (issued_on IS NOT NULL AND snapshot_sha256 IS NOT NULL AND total_minor IS NOT NULL)",
+            "status IN ('DRAFT', 'INTERNAL_REVIEW', 'APPROVED') OR status = 'SUPERSEDED' OR (issued_on IS NOT NULL AND snapshot_sha256 IS NOT NULL AND total_minor IS NOT NULL AND issued_html_sha256 IS NOT NULL AND template_version IS NOT NULL)",
             name="ck_quotation__issued_frozen",
+        ),
+        sa.CheckConstraint(
+            "issued_html_sha256 IS NULL OR length(issued_html_sha256) = 64", name="ck_quotation__issued_html_sha256_len"
         ),
         sa.CheckConstraint(
             "(quotation_kind = 'BASE') = (variation_no = 0) AND (quotation_kind = 'BASE') = (variation_of_quotation_id IS NULL)",
@@ -258,6 +277,9 @@ def upgrade() -> None:
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint("tax_status IN ('GST_POLICY_REQUIRED', 'APPLIED')", name="ck_quotation__tax_status"),
         sa.CheckConstraint("length(tax_status) <= 20", name="ck_quotation__tax_status_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(template_version) <= 40", name="ck_quotation__template_version_len").ddl_if(
+            dialect="sqlite"
+        ),
         sa.CheckConstraint("terms IS NULL OR json_valid(terms)", name="ck_quotation__terms_json").ddl_if(
             dialect="sqlite"
         ),
@@ -573,7 +595,7 @@ def upgrade() -> None:
             dialect="sqlite"
         ),
         sa.CheckConstraint(
-            "event_code IN ('CREATED', 'VERSION_CREATED', 'VARIATION_CREATED', 'EDITED', 'SUBMITTED_FOR_REVIEW', 'RETURNED_TO_DRAFT', 'APPROVED', 'ISSUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'SUPERSEDED')",
+            "event_code IN ('CREATED', 'VERSION_CREATED', 'VARIATION_CREATED', 'EDITED', 'SUBMITTED_FOR_REVIEW', 'RETURNED_TO_DRAFT', 'APPROVED', 'ISSUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'SUPERSEDED', 'SNAPSHOT_REDACTED')",
             name="ck_quotation_event__event_code",
         ),
         sa.CheckConstraint("length(event_code) <= 24", name="ck_quotation_event__event_code_len").ddl_if(

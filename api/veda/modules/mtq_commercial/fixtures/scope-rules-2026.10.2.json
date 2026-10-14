@@ -1,12 +1,16 @@
 {
  "schema": "veda.mtq.scope-rules/1",
- "ruleset_version": "2026.10.1",
+ "ruleset_version": "2026.10.2",
  "status": "PROPOSED",
  "status_note": "Proposed content pending the owner's OI-MTQ-03 (scope rules) and OI-MTQ-04 (quantity derivations, clearances, rounding). Every generated item still needs a staff decision; nothing generated from this ruleset is customer-issuable until the register records both decisions.",
  "sources": [
   "docs/proposals/measurement-to-quotation/survey-and-scope-templates/04-catalogue-record-content.md \u00a72 (rule keys, necessities)",
   "ADR-012 typical 7 ft (2134 mm) wardrobe height (ADR-012 D3)",
-  "rate card product inputs and quantity bases (the card in force at BOQ time)"
+  "rate card product inputs and quantity bases (the card in force at BOQ time)",
+  "04 \u00a71 'Window seating candidate: window run and sill': a window seat spans the window (its width is the span across the window openings of the tagged wall)",
+  "01 \u00a73 and 04 KITCHEN_BASE_FROM_RUNS / KITCHEN_WALL_FROM_RUNS: the base (counter) run is the sum of the tagged walls' runs and continues beneath windows; window spans are deducted from wall units only; the card's single RUN input is the counter length",
+  "04 POOJA_UNIT_FROM_WALL: pooja doors take W x H 'from the opening' when a door frame exists, i.e. the pooja room's own door; a niche unit's shutter is not a room door",
+  "B1 capture rules: a sensor light records its sensor type and switching; only NEW sensor lights with a real sensor (PIR, MICROWAVE) and sensor switching (SENSOR, BOTH) are sensor provisions"
  ],
  "parameters_note": "No clearance, corner deduction, wastage or rounding beyond the estimator's 0.01 half-up is applied: those are OI-MTQ-04 values, not decided.",
  "item_types": {
@@ -99,7 +103,8 @@
    "inputs": {
     "RUN": {
      "kind": "tagged_run_total",
-     "tag": "KITCHEN_RUN"
+     "tag": "KITCHEN_RUN",
+     "deduct": "floor_openings"
     },
     "DRAWERS": {
      "kind": "staff",
@@ -118,7 +123,8 @@
    "inputs": {
     "WIDTH": {
      "kind": "tagged_run_total",
-     "tag": "KITCHEN_RUN"
+     "tag": "KITCHEN_RUN",
+     "deduct": "floor_openings"
     }
    }
   },
@@ -225,7 +231,11 @@
      "tag": "POOJA_UNIT"
     },
     "DOOR_WIDTH": {
-     "kind": "door_width"
+     "kind": "door_width",
+     "space_types": [
+      "POOJA"
+     ],
+     "explain": "pooja shutter width for a niche unit: entered by staff from the design (a room's entrance door is not the unit's shutter)"
     }
    }
   },
@@ -234,8 +244,11 @@
    "card_product": "WINDOW_SEATING",
    "inputs": {
     "WIDTH": {
-     "kind": "wall_run",
-     "tag": "WINDOW_SEATING"
+     "kind": "window_span",
+     "tag": "WINDOW_SEATING",
+     "opening_types": [
+      "WINDOW"
+     ]
     }
    }
   },
@@ -296,8 +309,15 @@
      "SENSOR_LIGHT"
     ],
     "statuses": [
-     "NEW",
-     "SHIFT"
+     "NEW"
+    ],
+    "sensor_types": [
+     "PIR",
+     "MICROWAVE"
+    ],
+    "switchings": [
+     "SENSOR",
+     "BOTH"
     ]
    },
    "unmapped_reason": "No rate-card line exists for sensor-light provisions (NEW LINE, OI-MTQ-05)"
@@ -683,8 +703,7 @@
       "SENSOR_LIGHT"
      ],
      "statuses": [
-      "NEW",
-      "SHIFT"
+      "NEW"
      ]
     }
    }

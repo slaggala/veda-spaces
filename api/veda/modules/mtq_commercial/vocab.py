@@ -60,6 +60,8 @@ UOMS = ("SFT", "RFT", "NOS", "LUMP")  # the rate card's units (estimator UOMS); 
 # count when the item has no card line yet (UNMAPPED lines are kept and reported, never dropped).
 FORMULA_KINDS = ("CARD_AREA", "CARD_DIRECT", "CARD_COUNT", "CARD_LUMP", "MEASURED_COUNT", "UNMAPPED")
 LINE_STATUSES = ("OK", "ISSUE")
+# How a line's quantity stands; a line is never dropped because its quantity is zero or missing (boqs.quantity_status).
+QUANTITY_STATUSES = ("VALID", "VALID_ZERO", "UNRESOLVED", "INVALID")
 
 # --- B3 estimate -------------------------------------------------------------------------------------------------------
 ESTIMATE_STATUSES = ("DRAFT", "APPROVED", "SUPERSEDED")
@@ -135,4 +137,5 @@ QUOTATION_EVENTS = (
     "REJECTED",
     "EXPIRED",
     "SUPERSEDED",
+    "SNAPSHOT_REDACTED",  # lead erasure redacted personal data in the frozen document (the only change ever made)
 )

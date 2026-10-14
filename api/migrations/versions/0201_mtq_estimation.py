@@ -54,6 +54,7 @@ CODES = (
 
 
 def upgrade() -> None:
+    ms.refuse_role_collisions(op.get_bind(), ROLES)  # before any change: a custom role must not be taken over
     # --- generated DDL (tools/render_migrations.py) ---
     op.create_table(
         "requirement",
@@ -221,6 +222,7 @@ def upgrade() -> None:
         sa.Column("ruleset_version", sa.String(20), nullable=False),
         sa.Column("ruleset_sha256", sa.String(64), nullable=False),
         sa.Column("ruleset_status", sa.String(30), nullable=False),
+        sa.Column("requirements_sha256", sa.String(64), nullable=False),
         sa.Column("generation_run", JSONType(), nullable=False),
         sa.Column("exclusions", JSONType(), nullable=False),
         sa.Column("confirmed_on", UTCDateTime(), nullable=True),
@@ -283,6 +285,9 @@ def upgrade() -> None:
             "length(property_id) = 32 AND property_id NOT GLOB '*[^0-9a-f]*' AND substr(property_id, 13, 1) = '7' AND substr(property_id, 17, 1) IN ('8', '9', 'a', 'b')",
             name="ck_scope__property_id_format",
         ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint("length(requirements_sha256) <= 64", name="ck_scope__requirements_sha256_len").ddl_if(
+            dialect="sqlite"
+        ),
         sa.CheckConstraint("revision_no >= 1", name="ck_scope__revision_no"),
         sa.CheckConstraint("length(ruleset_sha256) <= 64", name="ck_scope__ruleset_sha256_len").ddl_if(
             dialect="sqlite"
@@ -371,6 +376,7 @@ def upgrade() -> None:
         sa.Column("dimensions", JSONType(), nullable=False),
         sa.Column("dimension_overrides", JSONType(), nullable=False),
         sa.Column("override_reason", sa.String(500), nullable=True),
+        sa.Column("carried_overrides", JSONType(), nullable=False),
         sa.Column("dimension_source_code", sa.String(10), nullable=False),
         sa.Column("carried_from_item_id", GUID(), nullable=True),
         sa.Column("sort_order", sa.Integer(), nullable=False),
@@ -395,6 +401,9 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "carried_from_item_id IS NULL OR (length(carried_from_item_id) = 32 AND carried_from_item_id NOT GLOB '*[^0-9a-f]*' AND substr(carried_from_item_id, 13, 1) = '7' AND substr(carried_from_item_id, 17, 1) IN ('8', '9', 'a', 'b'))",
             name="ck_scope_item__carried_from_item_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "carried_overrides IS NULL OR json_valid(carried_overrides)", name="ck_scope_item__carried_overrides_json"
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
             "length(created_by) = 32 AND created_by NOT GLOB '*[^0-9a-f]*' AND substr(created_by, 13, 1) = '7' AND substr(created_by, 17, 1) IN ('8', '9', 'a', 'b')",
@@ -645,6 +654,14 @@ def upgrade() -> None:
         postgresql_where=sa.text("status = 'GENERATED' AND is_deleted = false"),
     )
     op.create_index(
+        "ux_boq__one_reviewed",
+        "boq",
+        ["property_id"],
+        unique=True,
+        sqlite_where=sa.text("status = 'REVIEWED' AND is_deleted = 0"),
+        postgresql_where=sa.text("status = 'REVIEWED' AND is_deleted = false"),
+    )
+    op.create_index(
         "ux_boq__property_revision",
         "boq",
         ["property_id", "revision_no"],
@@ -687,6 +704,7 @@ def upgrade() -> None:
         sa.Column("is_optional", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("dimension_source_code", sa.String(10), nullable=False),
         sa.Column("status", sa.String(8), nullable=False),
+        sa.Column("quantity_status", sa.String(12), nullable=False),
         sa.Column("issue_codes", JSONType(), nullable=False),
         sa.PrimaryKeyConstraint("id", name="pk_boq_line"),
         sa.ForeignKeyConstraint(["boq_id"], ["boq.id"], name="fk_boq_line__boq_id", ondelete="RESTRICT"),
@@ -770,6 +788,12 @@ def upgrade() -> None:
             "override_quantity_centi IS NULL OR override_quantity_centi >= 0", name="ck_boq_line__override_nn"
         ),
         sa.CheckConstraint("length(override_reason) <= 500", name="ck_boq_line__override_reason_len").ddl_if(
+            dialect="sqlite"
+        ),
+        sa.CheckConstraint(
+            "quantity_status IN ('VALID', 'VALID_ZERO', 'UNRESOLVED', 'INVALID')", name="ck_boq_line__quantity_status"
+        ),
+        sa.CheckConstraint("length(quantity_status) <= 12", name="ck_boq_line__quantity_status_len").ddl_if(
             dialect="sqlite"
         ),
         sa.CheckConstraint(
