@@ -12,7 +12,7 @@ const REFUSALS: Record<string, string> = {
   PROPOSAL_LINK_REVOKED: 'This link is no longer active. Please ask Veda Spaces for a new one.',
   PROPOSAL_LINK_EXPIRED: 'This link has expired. Please ask Veda Spaces for a new one.',
   PROPOSAL_SUPERSEDED: 'A newer version of this proposal has been shared with you. Please use the latest link from Veda Spaces.',
-  SNAPSHOT_INTEGRITY_FAILED: 'This proposal cannot be shown right now. Veda Spaces has been notified; please contact your Veda Spaces representative.',
+  SNAPSHOT_INTEGRITY_FAILED: 'This proposal cannot be shown right now. Please contact your Veda Spaces representative.',
   RATE_LIMITED: 'Too many requests from this connection. Please wait a minute and try again.',
   NOT_FOUND: 'Customer proposals are not available here.',
 };
@@ -25,7 +25,11 @@ export class VsProposalPage extends LitElement {
   static override properties = {
     load: { state: true }, page: { state: true }, message: { state: true }, heading: { state: true },
     announcement: { state: true }, busy: { state: true }, errors: { state: true }, comparison: { state: true },
+    retryable: { state: true },
   };
+  declare retryable: boolean;
+  /** The last action, kept while it may be retried (a transient failure: offline, server busy). */
+  private lastAction: (() => void) | null = null;
   declare comparison: Comparison | null;
   declare announcement: string;
   declare busy: boolean;
@@ -55,6 +59,7 @@ export class VsProposalPage extends LitElement {
     this.busy = false;
     this.errors = [];
     this.comparison = null;
+    this.retryable = false;
   }
 
   private onAck(e: CustomEvent<{ section: string; sha256: string; title: string }>) {
@@ -62,41 +67,71 @@ export class VsProposalPage extends LitElement {
     void this.act(() => proposalApi(this.token ?? '').acknowledge(section, sha256), `${title}: acknowledged.`);
   }
 
-  /** One key per decision: a retry after a lost response returns the recorded decision, never a second one. */
-  private decideKey: string | null = null;
+  /**
+   * One key per decision attempt and per decision type (an Accept never reuses a Decline's key). The key survives only
+   * a transient failure (a lost response is retried with it and returns the recorded decision); any definitive answer
+   * retires it (N2).
+   */
+  private decideKeys = new Map<string, string>();
 
   private onDecide(e: CustomEvent<Record<string, unknown>>) {
-    this.decideKey ??= newKey();
-    const key = this.decideKey;
-    const accepted = e.detail.decision === 'ACCEPTED';
-    void this.act(async () => { await proposalApi(this.token ?? '').decide(e.detail, key); }, accepted ? 'Your acceptance was recorded.' : 'Your decision was recorded.');
+    const decision = String(e.detail.decision);
+    const key = this.decideKeys.get(decision) ?? newKey();
+    this.decideKeys.set(decision, key);
+    const accepted = decision === 'ACCEPTED';
+    void this.act(async () => { await proposalApi(this.token ?? '').decide(e.detail, key); },
+      accepted ? 'Your acceptance was recorded.' : 'Your decision was recorded.', () => this.decideKeys.delete(decision));
   }
 
   private onCompare() {
     void this.act(async () => { this.comparison = (await proposalApi(this.token ?? '').compare()).data.comparison; }, 'Changes shown.');
   }
 
-  /** Run one customer action, then reload the page model (the server is the only source of totals and states). */
-  private async act(fn: () => Promise<unknown>, done: string) {
+  /**
+   * Run one customer action, then reload the page model (the server is the only source of totals and states).
+   * `definitive` runs once the server has answered (success or refusal) — never after a transient failure, so a retry
+   * of a lost request carries the same idempotency key.
+   */
+  private async act(fn: () => Promise<unknown>, done: string, definitive?: () => void) {
     this.busy = true;
     this.errors = [];
+    this.retryable = false;
     this.announcement = 'Saving…';
     try {
       await fn();
+      definitive?.();
+      this.lastAction = null;
       await this.refresh();
       this.announcement = done;
     } catch (e) {
       const p = e as ApiProblem;
       if (['PROPOSAL_LINK_REVOKED', 'PROPOSAL_LINK_EXPIRED', 'PROPOSAL_LINK_INVALID', 'PROPOSAL_SUPERSEDED'].includes(p.code)) {
+        definitive?.();
         this.refuse(p);
         return;
       }
+      if (transient(p)) {
+        this.lastAction = () => { void this.act(fn, done, definitive); };
+        this.retryable = true;
+        this.errors = [{ field: '', message: p.status === 429
+          ? 'Too many requests from this connection. Nothing was saved; please wait a minute and try again.'
+          : p.status >= 500 ? 'Veda Spaces could not save this just now. Nothing was saved; please try again.'
+            : 'You seem to be offline. Nothing was saved; check your connection and try again.' }];
+        this.announcement = 'Not saved. You can try again.';
+        return;
+      }
+      definitive?.();
+      this.lastAction = null;
       const fields = (p.errors ?? []).map((er) => ({ field: er.field, message: er.message ?? 'Please check this.' }));
       this.errors = fields.length ? fields : [{ field: '', message: p.detail || 'Something went wrong. Please try again.' }];
       this.announcement = 'Not saved.';
     } finally {
       this.busy = false;
     }
+  }
+
+  private onRetry() {
+    this.lastAction?.();
   }
 
   /** One key per form submission: a retry after a slow network sends the same request, never a duplicate. */
@@ -112,9 +147,8 @@ export class VsProposalPage extends LitElement {
     const key = this.askKey;
     void this.act(async () => {
       await proposalApi(this.token ?? '').ask(body, key);
-      this.askKey = null;
       form.reset();
-    }, 'Your message was sent to Veda Spaces.');
+    }, 'Your message was sent to Veda Spaces.', () => { this.askKey = null; });
   }
 
   private onSelect(e: CustomEvent<{ line_ref: string; state: string; description: string }>) {
@@ -145,10 +179,12 @@ export class VsProposalPage extends LitElement {
   }
 
   private refuse(p: ApiProblem) {
-    if (p.status === 0 || p.code === 'NETWORK_ERROR') {
+    if (transient(p)) {
       this.load = 'offline';
-      this.heading = 'You seem to be offline';
-      this.message = 'The proposal could not be loaded. Check your connection and try again.';
+      this.heading = p.status === 429 ? 'Please wait a moment' : p.status >= 500 ? 'Something went wrong on our side' : 'You seem to be offline';
+      this.message = p.status === 429 ? 'Too many requests from this connection. Please wait a minute, then try again.'
+        : p.status >= 500 ? 'The proposal could not be loaded just now. Please try again.'
+          : 'The proposal could not be loaded. Check your connection and try again.';
       return;
     }
     if (['PROPOSAL_LINK_REVOKED', 'PROPOSAL_LINK_EXPIRED', 'PROPOSAL_LINK_INVALID', 'PROPOSAL_SUPERSEDED'].includes(p.code)) forgetToken();
@@ -165,15 +201,21 @@ export class VsProposalPage extends LitElement {
   override render() {
     if (this.load === 'ready' && this.page) {
       return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
+        .retryable=${this.retryable} @proposal-retry=${this.onRetry}
         .comparison=${this.comparison} @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk} @proposal-compare=${this.onCompare}
         @proposal-ack=${this.onAck} @proposal-decide=${this.onDecide}></vs-proposal-view>`;
     }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`
-        <h1 tabindex="-1">${this.heading}</h1><p role=${this.load === 'offline' ? 'status' : 'alert'}>${this.message}</p>
+        <h1 tabindex="-1">${this.heading}</h1><p role="alert">${this.message}${this.load === 'offline' ? ' A Try again button follows.' : ''}</p>
         ${this.load === 'offline' ? html`<div><button class="btn primary" @click=${() => { this.load = 'loading'; void this.refresh(); }}>Try again</button></div>` : nothing}`}
     </div>`;
   }
+}
+
+/** A failure worth retrying: no answer at all, the server busy (429) or failing (5xx). */
+function transient(p: ApiProblem): boolean {
+  return p.status === 0 || p.code === 'NETWORK_ERROR' || p.status === 429 || p.status >= 500;
 }
 
 customElements.define('vs-proposal-page', VsProposalPage);

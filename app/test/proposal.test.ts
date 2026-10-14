@@ -360,3 +360,98 @@ describe('vs-proposal-page (CQX-01/03)', () => {
     expect(el.shadowRoot!.textContent).to.contain('not valid');
   });
 });
+
+describe('PR #95 remediation N2, N11 (focus, retry, keys, landmarks)', () => {
+  const interactive = (over: Partial<Page> = {}) => samplePage({ capabilities: { interaction: true, acceptance: true },
+    selections: { items: [{ ref: 'L9', state: 'NOT_SELECTED', priced: true }], selected_refs: [], can_choose: true,
+      status: 'PRICE_CONFIRMATION_REQUIRED', extra: null, total_with_selections: null },
+    decision: { available: true, decided: null, can_decline: true, version_no: 1, snapshot_sha256: 'a'.repeat(64), total: '3,89,400.00',
+      selected_refs: [], statement: 'I accept.' }, ...over });
+
+  async function open(handler: (path: string, init?: RequestInit) => Response) {
+    history.replaceState(null, '', `/proposal#t=vsp_${'f'.repeat(43)}`);
+    const calls: { path: string; body: unknown; key?: string }[] = [];
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), location.href).pathname;
+      calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null, key: (init?.headers as Record<string, string>)?.['Idempotency-Key'] });
+      return handler(path, init);
+    };
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    return { page, view, calls };
+  }
+  const deepActive = () => { let a: Element | null = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement; return a; };
+
+  it('has no main landmark of its own (the app shell provides the one main)', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${interactive()}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelectorAll('main')).to.have.length(0);
+  });
+
+  it('returns focus to the control after a saved choice, never to the body', async () => {
+    const { view } = await open((path) => json(path.endsWith('/selections') ? interactive().selections : interactive()));
+    const radio = view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('a choice that fails offline is not left checked, says nothing was saved, and can be retried', async () => {
+    let offline = true;
+    const { view, calls } = await open((path) => {
+      if (path.endsWith('/selections') && offline) throw new TypeError('Failed to fetch');
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    (view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('vs-error-summary'));
+    await view.updateComplete;
+    expect((view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement).checked).to.equal(false);
+    expect(view.shadowRoot!.querySelector('vs-error-summary')!.shadowRoot!.textContent).to.contain('Nothing was saved');
+    offline = false;
+    const retry = [...view.shadowRoot!.querySelectorAll('button')].find((b) => b.textContent!.includes('Try again')) as HTMLButtonElement;
+    retry.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    expect(calls.filter((c) => c.path.endsWith('/selections'))).to.have.length(2);
+  });
+
+  it('never reuses a Decline key for Accept, and retires a key after a definitive answer', async () => {
+    let n = 0;
+    const { view, calls } = await open((path) => {
+      if (path.endsWith('/decision')) {
+        n += 1;
+        if (n === 1) throw new TypeError('Failed to fetch'); // the Decline's response is lost
+        return json({ status: 409, code: 'ALREADY_DECIDED', title: 'x', detail: 'A decision on this version has already been recorded.' }, 409);
+      }
+      return json(interactive());
+    });
+    const root = view.shadowRoot!;
+    (root.querySelector('#decision .btn.ghost') as HTMLButtonElement).click();
+    await view.updateComplete;
+    ([...root.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Yes, decline')) as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-error-summary'));
+    (root.querySelector('#decision input[type=checkbox]') as HTMLInputElement).click();
+    await view.updateComplete;
+    ([...root.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Accept')) as HTMLButtonElement).click();
+    await waitUntil(() => calls.filter((c) => c.path.endsWith('/decision')).length === 2);
+    const [decline, accept] = calls.filter((c) => c.path.endsWith('/decision'));
+    expect(decline.key).to.match(/^[a-f0-9]{32}$/);
+    expect(accept.key).to.not.equal(decline.key);
+  });
+
+  it('an initial server failure or rate limit offers an accessible retry', async () => {
+    for (const status of [500, 429]) {
+      history.replaceState(null, '', `/proposal#t=vsp_${'r'.repeat(43)}`);
+      let first = true;
+      serve(() => { if (first) { first = false; return json({ status, code: status === 429 ? 'RATE_LIMITED' : 'INTERNAL_ERROR', title: 'x' }, status); } return json(samplePage()); });
+      const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+      await waitUntil(() => el.shadowRoot!.querySelector('[role=alert]'));
+      expect(el.shadowRoot!.querySelector('[role=alert]')!.textContent).to.contain('Try again');
+      await expect(el).to.be.accessible();
+      (el.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+      await waitUntil(() => el.shadowRoot!.querySelector('vs-proposal-view'));
+    }
+  });
+});

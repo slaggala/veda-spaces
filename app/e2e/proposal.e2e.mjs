@@ -38,7 +38,7 @@ function page(over = {}) {
       reference: 'VS-Q-2026-000001 v2', quotation_number: 'VS-Q-2026-000001', version_no: 2, variation_no: 0, issued_on: '2026-10-14',
       valid_until: '2026-11-13', subject: 'Interior works — 3 BHK apartment, Synthetic City (SYNTHETIC)', cover_note: 'SYNTHETIC proposal for browser validation.',
       property: { reference: 'VS-P-2026-000001', configuration: '3 BHK apartment', city: 'Synthetic City' }, snapshot_sha256: 'a'.repeat(64),
-      rooms, optional_items: [{ ...line('L30', 'Loft above wardrobe', '15,000.00', 'Optional'), room_ref: 'R1', room_title: 'Master bedroom' }],
+      rooms, optional_items: [{ ...line('L30', 'Loft above wardrobe', '15,000.00', 'Optional'), price_with_gst: '17,700.00', room_ref: 'R1', room_title: 'Master bedroom' }],
       summary: { base_total: '6,10,000.00', taxable: '6,10,000.00', gst: { status: 'Included', amount: '1,09,800.00' }, total: '7,19,800.00',
         optional_total: '15,000.00', currency: 'INR' },
       payment_schedule: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }, { label: 'Production', share: '50%', trigger: 'Before production (synthetic)' },
@@ -56,7 +56,7 @@ function page(over = {}) {
       optional_total: '15,000.00', rooms: rooms.map((r) => ({ ref: r.ref, title: r.title, subtotal: r.subtotal })),
       milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], valid_until: '2026-11-13', days_left: 30,
       unit_rates_shown: false, package: null, alternatives: [] },
-    selections: { items: [{ ref: 'L30', state: 'NOT_SELECTED', priced: true }], selected_refs: [], status: 'PRICE_CONFIRMATION_REQUIRED', extra: null, total_with_selections: null },
+    selections: { items: [{ ref: 'L30', state: 'NOT_SELECTED', priced: true }], selected_refs: [], can_choose: true, status: 'PRICE_CONFIRMATION_REQUIRED', extra: null, total_with_selections: null },
     requests: { can_ask: true, items: [] },
     comparison_available: true,
     terms: { policy_decided: true, pending: ['WARRANTY'], sections: [
@@ -69,7 +69,7 @@ function page(over = {}) {
 }
 
 /** Answer every /api call of one browser page. `proposal` decides the main response; nothing reaches a server. */
-async function serve(p, { proposal = () => ({ status: 200, body: { data: page() } }), delay = 0, selection = null } = {}) {
+async function serve(p, { proposal = () => ({ status: 200, body: { data: page() } }), delay = 0, selection = null, onPost = null } = {}) {
   await p.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const url = new URL(route.request().url());
     const json = (status, body) => route.fulfill({ status, contentType: status < 400 ? 'application/json' : 'application/problem+json', body: JSON.stringify(body) });
@@ -82,7 +82,16 @@ async function serve(p, { proposal = () => ({ status: 200, body: { data: page() 
       if (r === 'abort') return route.abort('internetdisconnected');
       return json(r.status, r.body);
     }
-    if (url.pathname === '/api/v1/public/proposal/selections' && selection) return json(...selection());
+    if (url.pathname === '/api/v1/public/proposal/selections' && selection) {
+      const r = selection();
+      return r === 'abort' ? route.abort('internetdisconnected') : json(...r);
+    }
+    if (route.request().method() === 'POST' && onPost) onPost(url.pathname);
+    if (url.pathname === '/api/v1/public/proposal/requests') return json(201, { data: [] });
+    if (url.pathname === '/api/v1/public/proposal/acknowledgements') return json(201, { data: { terms: page().terms } });
+    if (url.pathname === '/api/v1/public/proposal/decision') {
+      return json(200, { data: { state: 'ACCEPTED', decision: { available: false, decided: 'ACCEPTED', decided_on: '2026-10-15T10:00:00Z', by_this_link: true } } });
+    }
     return json(401, { status: 401, code: 'TOKEN_MISSING', title: 'Unauthorized' }); // no session: an anonymous customer
   });
 }
@@ -122,10 +131,12 @@ try {
     check(`${name}: token scrubbed from the address bar`, !(await p.evaluate(() => location.href)).includes(TOKEN));
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check(`${name}: no horizontal scrolling`, overflow <= 0, `overflow ${overflow}px`);
-    const small = await p.evaluate(inPage(() => deepAll('button, summary, nav.rooms a, a.roomcard, label.choice, label.check, select')
+    const small = await p.evaluate(inPage(() => deepAll('button, summary, a, input, select, textarea, label.choice, label.check')
       .filter((n) => n.getClientRects().length && getComputedStyle(n).visibility !== 'hidden')
       .map((n) => [n.textContent.trim().slice(0, 30), Math.round(n.getBoundingClientRect().height)]).filter(([, h]) => h < 44)));
-    check(`${name}: touch targets at least 44 px`, small.length === 0, JSON.stringify(small.slice(0, 5)));
+    check(`${name}: touch targets at least 44 px (links, buttons, inputs, radios, checkboxes, selects, acknowledgements)`, small.length === 0, JSON.stringify(small.slice(0, 5)));
+    const mains = await p.evaluate(inPage(() => deepAll('main, [role=main]').length));
+    check(`${name}: exactly one main landmark`, mains === 1, String(mains));
     const bar = await p.locator('vs-proposal-view .bar').isVisible();
     check(`${name}: total always in reach (sticky bar below 960 px, summary column above)`, viewport.width < 960 ? bar : !bar);
     await p.screenshot({ path: `${OUT}/proposal-${viewport.width}.png`, fullPage: true });
@@ -172,6 +183,62 @@ try {
     await p.locator('vs-error-summary [role=alert]').waitFor();
     const status = await p.locator('vs-proposal-view [role=status][aria-live=polite]').textContent();
     check('a refused action shows an error summary and announces it', status.includes('Not saved'), status);
+    await ctx.close();
+  }
+
+  // interaction in a real browser at 360 px: question, acknowledgement, acceptance; focus never falls to the body
+  {
+    const deepActive = () => p360.evaluate(() => { let a = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement;
+      return a ? `${a.tagName}#${a.id}|${(a.textContent || '').trim().slice(0, 30)}` : 'none'; });
+    const ready = page({ decision: { available: true, decided: null, can_decline: true, version_no: 2, snapshot_sha256: 'a'.repeat(64), total: '7,19,800.00',
+      selected_refs: [], statement: 'I accept VS-Q-2026-000001 v2 as shown (SYNTHETIC).' } });
+    const decided = page({ state: 'ACCEPTED', capabilities: { interaction: false, acceptance: false }, actions: [],
+      decision: { available: false, decided: 'ACCEPTED', decided_on: '2026-10-15T10:00:00Z', by_this_link: true, total: '7,19,800.00' } });
+    let accepted = false;
+    const { ctx, p: p360 } = await open(browser, { viewport: { width: 360, height: 740 }, onPost: (path) => { if (path.endsWith('/decision')) accepted = true; },
+      proposal: () => ({ status: 200, body: { data: accepted ? decided : ready } }) });
+    await p360.locator('vs-proposal-view h1').waitFor();
+    await p360.locator('#questions textarea').fill('Could the loft be taller? (SYNTHETIC)');
+    await p360.locator('#questions button.primary').click();
+    await p360.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('sent to Veda Spaces'))));
+    check('question: sent and announced', true);
+    check('question: focus stays in a logical place', !(await deepActive()).startsWith('BODY'), await deepActive());
+    await p360.locator('#term-WARRANTY summary').click();
+    await p360.locator('#term-WARRANTY button').click();
+    await p360.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('acknowledged'))));
+    check('acknowledgement: announced, focus not on the body', !(await deepActive()).startsWith('BODY'), await deepActive());
+    await p360.locator('#decision label.check').click();
+    await p360.locator('#decision button.primary').click();
+    await p360.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('acceptance was recorded'))));
+    const focused = await deepActive();
+    check('acceptance: announced; focus moves to the decision heading', focused.startsWith('H2#dc'), focused);
+    await axe(p360, 'after interaction at 360 px');
+    await ctx.close();
+  }
+  {
+    const { ctx, p: po } = await open(browser, { viewport: { width: 390, height: 844 }, selection: (() => { let n = 0; return () => (n++ === 0 ? 'abort'
+      : [200, { data: { items: [{ ref: 'L30', state: 'SELECTED', priced: true }], selected_refs: ['L30'], can_choose: true, status: 'PRICE_CONFIRMATION_REQUIRED',
+        extra: null, total_with_selections: null } }]); })() });
+    await po.locator('vs-proposal-view h1').waitFor();
+    await po.locator('fieldset.optitem label.choice').first().click();
+    await po.locator('vs-error-summary [role=alert]').waitFor();
+    const checked = await po.locator('fieldset.optitem input[value=SELECTED]').isChecked();
+    check('offline choice: the choice is not left checked', !checked);
+    const said = await po.evaluate(inPage(() => deepAll('vs-error-summary').map((e) => e.shadowRoot.textContent).join(' ')));
+    check('offline choice: a safe message', said.includes('Nothing was saved'), said.trim().slice(0, 120));
+    await po.getByRole('button', { name: 'Try again' }).click();
+    await po.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('added to your choices'))));
+    check('offline choice: the retry saves it', true);
+    await ctx.close();
+  }
+  for (const status of [500, 429]) {
+    let first = true;
+    const { ctx, p: pr } = await open(browser, { proposal: () => (first ? (first = false, { status, body: { status, code: status === 429 ? 'RATE_LIMITED' : 'INTERNAL_ERROR', title: 'x' } })
+      : { status: 200, body: { data: page() } }) });
+    await pr.locator('vs-proposal-page p[role=alert]').waitFor();
+    await pr.getByRole('button', { name: 'Try again' }).click();
+    await pr.locator('vs-proposal-view h1').waitFor();
+    check(`initial ${status}: announced with a working retry`, true);
     await ctx.close();
   }
 

@@ -10,7 +10,7 @@ import { fragmentParam } from '../../core/router/next.js';
 
 export interface ProposalLine {
   ref: string; description: string; detail: string | null; quantity: string | null; amount: string | null; priced: boolean;
-  status: string; unit_rate?: string; change?: string; delta?: string | null; room_ref?: string | null; room_title?: string | null;
+  status: string; unit_rate?: string; price_with_gst?: string; change?: string; delta?: string | null; room_ref?: string | null; room_title?: string | null;
 }
 export interface Room {
   ref: string; title: string; kind: 'ROOM' | 'PROJECT' | 'CHANGES'; subtotal: string | null; lines: ProposalLine[];

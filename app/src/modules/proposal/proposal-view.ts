@@ -31,8 +31,12 @@ export class VsProposalView extends LitElement {
   static override properties = {
     page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
     announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
-    comparison: { attribute: false }, confirmed: { state: true }, declining: { state: true },
+    comparison: { attribute: false }, confirmed: { state: true }, declining: { state: true }, retryable: { type: Boolean },
   };
+  /** The last action failed for a transient reason (offline, server busy): offer to try it again. */
+  declare retryable: boolean;
+  /** Where focus returns after an action completes (the control that started it, else its section heading). */
+  private returnFocus: { element: HTMLElement | null; section: string | null } | null = null;
   declare confirmed: boolean;
   declare declining: boolean;
   /** The comparison with the version issued before this one, once the customer asked for it. */
@@ -115,11 +119,18 @@ export class VsProposalView extends LitElement {
     .choices { display: flex; flex-wrap: wrap; gap: var(--vs-space-2); }
     .choice { display: inline-flex; align-items: center; gap: 8px; min-height: var(--vs-target); padding: 0 var(--vs-space-3);
       border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control); cursor: pointer; background: var(--vs-surface); }
-    .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; }
+    .choice, .check.confirm { position: relative; }
+    .choice input, .check.confirm input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; min-height: var(--vs-target); }
+    .choice .mark, .check.confirm .mark { width: 20px; height: 20px; flex: none; border: 2px solid var(--vs-ink-muted); background: var(--vs-surface); }
+    .choice .mark { border-radius: 50%; } .check.confirm .mark { border-radius: 4px; margin-top: 2px; }
+    .choice input:checked + .mark, .check.confirm input:checked + .mark { border-color: var(--vs-copper-strong); background: var(--vs-copper-strong);
+      box-shadow: inset 0 0 0 3px var(--vs-surface); }
+    .choice:focus-within, .check.confirm:focus-within { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
+    .choice input:disabled + .mark { opacity: .5; } .choice:has(input:disabled) { cursor: not-allowed; color: var(--vs-ink-muted); }
     .tr.cmp { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; }
     .term .termbody { padding: 0 var(--vs-space-4) var(--vs-space-3); } .term ul { margin: 0 0 var(--vs-space-2); padding-left: 20px; }
     .tag.ok { color: var(--vs-success); }
-    .check.confirm { align-items: flex-start; } .check.confirm input { width: 22px; height: 22px; min-height: 0; margin-top: 2px; flex: none; }
+    .check.confirm { align-items: flex-start; min-height: var(--vs-target); padding: var(--vs-space-2) 0; }
     .declinebox { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
     .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-3); }
     .request { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
@@ -133,7 +144,7 @@ export class VsProposalView extends LitElement {
       display: flex; align-items: center; gap: var(--vs-space-3); padding: var(--vs-space-2) var(--vs-space-4); box-shadow: var(--vs-shadow); }
     .bar .n { font: 600 18px/24px var(--vs-font-sans); } .bartotal { display: flex; flex-direction: column; }
     @media (min-width: 960px) { .bar { display: none; } .wrap { padding-bottom: var(--vs-space-6); } }
-    .actions-list { margin: 0; padding-left: 20px; } .actions-list a { color: var(--vs-copper-text); }
+    .actions-list { margin: 0; padding-left: 20px; } .actions-list a { color: var(--vs-copper-text); display: inline-flex; align-items: center; min-height: var(--vs-target); }
     .preview-mark { border: 2px dashed var(--vs-warning); padding: var(--vs-space-2) var(--vs-space-3); border-radius: var(--vs-radius-card); color: var(--vs-warning); font-weight: 600; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
     @media print {
@@ -157,6 +168,7 @@ export class VsProposalView extends LitElement {
     this.comparison = null;
     this.confirmed = false;
     this.declining = false;
+    this.retryable = false;
   }
 
   override connectedCallback() {
@@ -169,11 +181,35 @@ export class VsProposalView extends LitElement {
     super.disconnectedCallback();
   }
 
-  /** A failed action moves focus to its error summary (AX-03). */
+  /**
+   * After an action: a failure moves focus to the error summary (AX-03) and every choice shows the server's state again
+   * (a failed choice never stays checked); a success returns focus to the control that started it or, when that control
+   * is gone (a decision replaces its section), to the section's heading. Focus never falls back to the page body.
+   */
   override updated(changed: Map<string, unknown>) {
+    if (changed.has('page') || (changed.has('busy') && !this.busy)) this.syncChoices();
     if (changed.has('errors') && this.errors.length) {
       void this.updateComplete.then(() => (this.renderRoot.querySelector('vs-error-summary') as VsErrorSummary | null)?.focusSummary());
+      return;
     }
+    if (changed.has('busy') && changed.get('busy') === true && !this.busy && this.returnFocus) {
+      const { element, section } = this.returnFocus;
+      this.returnFocus = null;
+      if (element && element.isConnected && !(element as HTMLInputElement).disabled) {
+        element.focus();
+        return;
+      }
+      const heading = section ? this.renderRoot.querySelector(`#${CSS.escape(section)} h2`) as HTMLElement | null : null;
+      heading?.focus();
+    }
+  }
+
+  /** The radio buttons always show the server's choice (Lit only re-applies a property when its value changes). */
+  private syncChoices() {
+    const states = new Map((this.page?.selections?.items ?? []).map((i) => [i.ref, i.state]));
+    this.renderRoot.querySelectorAll<HTMLInputElement>('input[type=radio][data-ref]').forEach((r) => {
+      r.checked = states.get(r.dataset.ref ?? '') === r.value;
+    });
   }
 
   /** Print the whole proposal: every room opened first (a closed <details> would print its title only). */
@@ -182,6 +218,8 @@ export class VsProposalView extends LitElement {
   };
 
   protected emit(name: string, detail: unknown = null) {
+    const active = (this.renderRoot as ShadowRoot).activeElement as HTMLElement | null;
+    this.returnFocus = { element: active, section: active?.closest('section')?.id ?? null };
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
   }
 
@@ -203,12 +241,12 @@ export class VsProposalView extends LitElement {
       ${page.notices.map((n) => html`<vs-banner kind=${n.code === 'ACCEPTED' ? 'success' : n.code === 'LINK_EXPIRES_SOON' ? 'info' : 'warning'}>${n.message}</vs-banner>`)}
       ${p.cover_note ? html`<p>${p.cover_note}</p>` : nothing}
       <div class="layout">
-        <main class="stack" aria-label="Proposal">
+        <div class="stack content">
           ${this.overview(page)}
           ${this.actionsPanel(page)}
           ${this.roomsPanel(page)}
           ${this.sections(page)}
-        </main>
+        </div>
         <aside aria-label="Summary"><div class="sticky stack">${this.summary(page)}</div></aside>
       </div>
       ${this.bar(page)}
@@ -221,7 +259,7 @@ export class VsProposalView extends LitElement {
   protected overview(page: Page): TemplateResult {
     const p = page.proposal;
     const rooms = p.rooms.filter((r) => r.kind === 'ROOM').length;
-    return html`<section aria-labelledby="ov" class="stack"><h2 id="ov" class="sr-only">Overview</h2>
+    return html`<section aria-labelledby="ov" class="stack"><h2 tabindex="-1" id="ov" class="sr-only">Overview</h2>
       <div class="kpis">
         <div class="kpi value"><div class="eyebrow">${p.kind === 'VARIATION' ? 'Net change' : 'Proposal value'}</div>
           <div class="n">${rupees(p.kind === 'VARIATION' ? p.summary.net_change ?? null : p.summary.total) ?? 'To be confirmed'}</div></div>
@@ -236,7 +274,7 @@ export class VsProposalView extends LitElement {
 
   protected actionsPanel(page: Page): TemplateResult | typeof nothing {
     if (this.preview || !page.actions.length) return nothing;
-    return html`<section class="card stack" aria-labelledby="todo"><h2 id="todo">Your next steps</h2>
+    return html`<section class="card stack" aria-labelledby="todo"><h2 tabindex="-1" id="todo">Your next steps</h2>
       <ol class="actions-list">${page.actions.map((a) => html`<li><a href=${`#${a.target}`} @click=${(e: Event) => this.jump(e, a.target)}>${a.label}</a></li>`)}</ol></section>`;
   }
 
@@ -253,7 +291,7 @@ export class VsProposalView extends LitElement {
 
   protected roomsPanel(page: Page): TemplateResult {
     const rooms = page.proposal.rooms;
-    return html`<section aria-labelledby="rooms" class="stack"><h2 id="rooms">${page.proposal.kind === 'VARIATION' ? 'Changes' : 'Room by room'}</h2>
+    return html`<section aria-labelledby="rooms" class="stack"><h2 tabindex="-1" id="rooms">${page.proposal.kind === 'VARIATION' ? 'Changes' : 'Room by room'}</h2>
       <nav class="rooms" aria-label="Rooms"><ul>${rooms.map((r) => html`<li><a href=${`#${r.ref}`} @click=${(e: Event) => this.jump(e, r.ref)}>${r.title}</a></li>`)}</ul></nav>
       <div class="cards">${rooms.map((r) => this.roomCard(r))}</div>
       ${rooms.map((r) => this.roomDetail(page, r))}
@@ -328,7 +366,8 @@ export class VsProposalView extends LitElement {
 
   /** The proposal's sections after the rooms, in reading order. */
   protected sections(page: Page): TemplateResult {
-    return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
+    return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>
+        ${this.retryable ? html`<div class="no-print"><button class="btn" @click=${() => this.emit('proposal-retry')}>Try again</button></div>` : nothing}` : nothing}
       ${page.variation ? variationTable(page.variation) : nothing}
       ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}
       ${this.decisionPanel(page)}`;
@@ -339,23 +378,23 @@ export class VsProposalView extends LitElement {
     const d = page.decision;
     if (!d || this.preview) return nothing;
     if (d.decided) {
-      return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">${d.decided === 'ACCEPTED' ? 'You accepted this proposal' : 'You declined this proposal'}</h2>
+      return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 tabindex="-1" id="dc">${d.decided === 'ACCEPTED' ? 'You accepted this proposal' : 'You declined this proposal'}</h2>
         ${d.by_this_link ? html`<p>Recorded on ${d.decided_on?.slice(0, 10)}${d.total ? html` for ${rupees(d.total)}` : nothing}.
           ${d.evidence_sha256 ? html`<span class="small muted">Record reference ${d.evidence_sha256.slice(0, 12)}.</span>` : nothing}</p>`
           : html`<p>A decision on this version was recorded on ${d.decided_on?.slice(0, 10)}.</p>`}
         <p class="small muted">Veda Spaces will contact you about the next steps. Any later change is made as a separate change order; this proposal stays as it is.</p></section>`;
     }
     if (!d.available && !d.can_decline) {
-      return d.reason ? html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">Accepting this proposal</h2><p>${d.reason}</p></section>` : nothing;
+      return d.reason ? html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 tabindex="-1" id="dc">Accepting this proposal</h2><p>${d.reason}</p></section>` : nothing;
     }
     const chosen = page.proposal.optional_items.filter((x) => (d.selected_refs ?? []).includes(x.ref));
     const body = (decision: 'ACCEPTED' | 'DECLINED') => ({ decision, version_no: d.version_no, snapshot_sha256: d.snapshot_sha256,
       displayed_total: decision === 'ACCEPTED' ? d.total ?? null : null, selected_line_refs: decision === 'ACCEPTED' ? d.selected_refs ?? [] : [], confirm: true });
-    return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 id="dc">Your decision</h2>
+    return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 tabindex="-1" id="dc">Your decision</h2>
       ${d.available ? html`<p>You are accepting <span class="strong">${page.proposal.reference}</span> for <span class="strong">${rupees(d.total) ?? 'the total shown'}</span>.</p>
         ${chosen.length ? html`<p class="small">Including your optional choices: ${chosen.map((x) => x.description).join('; ')}.</p>` : html`<p class="small">No optional items are included.</p>`}
         <label class="check confirm"><input type="checkbox" .checked=${this.confirmed} ?disabled=${this.busy}
-          @change=${(e: Event) => { this.confirmed = (e.target as HTMLInputElement).checked; }}><span>${d.statement}</span></label>
+          @change=${(e: Event) => { this.confirmed = (e.target as HTMLInputElement).checked; }}><span class="mark" aria-hidden="true"></span><span>${d.statement}</span></label>
         <div class="row"><button class="btn primary" ?disabled=${!this.confirmed || this.busy}
           @click=${() => this.emit('proposal-decide', body('ACCEPTED'))}>Accept this proposal</button></div>`
         : html`<p>${d.reason}</p>`}
@@ -373,7 +412,7 @@ export class VsProposalView extends LitElement {
     const t = page.terms;
     if (!t) return nothing;
     const can = page.capabilities.interaction && !this.preview;
-    return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 id="tm">Terms and what is included</h2>
+    return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 tabindex="-1" id="tm">Terms and what is included</h2>
       ${t.policy_decided && t.pending.length && can ? html`<p class="small">Before you can accept, please read and acknowledge the sections marked "required".</p>` : nothing}
       ${t.sections.map((x) => html`<details class="room term" id=${`term-${x.code}`}><summary><h3>${x.title}</h3>
           ${x.required ? html`<span class="tag">Required</span>` : nothing}${x.acknowledged_on ? html`<span class="tag ok">Acknowledged</span>` : nothing}</summary>
@@ -393,7 +432,7 @@ export class VsProposalView extends LitElement {
     if (!page.comparison_available || this.preview) return nothing;
     const c = this.comparison;
     const word = { ADDED: 'Added', CHANGED: 'Changed', REMOVED: 'Removed' } as const;
-    return html`<section class="card stack" aria-labelledby="cmp" id="compare"><h2 id="cmp">What changed from the previous version</h2>
+    return html`<section class="card stack" aria-labelledby="cmp" id="compare"><h2 tabindex="-1" id="cmp">What changed from the previous version</h2>
       ${c ? html`<p>Version ${c.from_version}: ${rupees(c.total_before) ?? '—'} → version ${c.to_version}: <span class="strong">${rupees(c.total_after) ?? '—'}</span></p>
         ${c.changes.length ? html`<div class="table-like" role="table" aria-label="Changes between versions">
           <div role="row" class="tr head cmp"><span role="columnheader">Item</span><span role="columnheader">Change</span><span role="columnheader" class="num">Before → after</span></div>
@@ -425,7 +464,7 @@ export class VsProposalView extends LitElement {
       if (this.askCategory === 'CHANGE_QUANTITY' && f.get('quantity')) body.requested_quantity = f.get('quantity');
       this.emit('proposal-ask', { body, form });
     };
-    return html`<section class="card stack" aria-labelledby="qs" id="questions"><h2 id="qs">Questions and changes</h2>
+    return html`<section class="card stack" aria-labelledby="qs" id="questions"><h2 tabindex="-1" id="qs">Questions and changes</h2>
       <p class="small muted">Ask anything, or tell us what you would like changed. Your message goes to Veda Spaces; it does not change this proposal. If a change is agreed, you will receive a revised proposal.</p>
       ${r.items.length ? html`<ol class="requests">${r.items.map((i) => html`<li class="request">
           <div class="optrow"><span class="strong">${i.category_label}${i.room ? html` · ${i.room}` : nothing}</span><span class="tag">${i.status_label}</span></div>
@@ -457,19 +496,20 @@ export class VsProposalView extends LitElement {
     const can = page.capabilities.interaction && !this.preview && page.selections?.can_choose !== false;
     const sel = page.selections;
     const choices: [string, string][] = [['SELECTED', 'Add to my proposal'], ['DESELECTED', 'Not for me'], ['REQUESTED_FOR_DISCUSSION', 'I would like to discuss it']];
-    return html`<section class="card stack" aria-labelledby="opt" id="optional"><h2 id="opt">Optional items</h2>
+    return html`<section class="card stack" aria-labelledby="opt" id="optional"><h2 tabindex="-1" id="opt">Optional items</h2>
       <p class="small muted">Optional items are not in the total. Your choice is sent to Veda Spaces for review; it does not change the proposal by itself.</p>
       ${items.map((x) => {
         const state = states.get(x.ref) ?? 'NOT_SELECTED';
         const images = page.media?.lines?.[x.ref] ?? [];
-        return html`<fieldset class="optitem" ?disabled=${!can || this.busy}><legend><span class="strong">${x.description}</span>
+        return html`<fieldset class="optitem" ?disabled=${!can} aria-busy=${this.busy ? 'true' : 'false'}><legend><span class="strong">${x.description}</span>
             ${x.room_title ? html`<span class="small muted"> · ${x.room_title}</span>` : nothing}</legend>
           <div class="optrow"><span>${[x.quantity, x.detail].filter(Boolean).join(' · ')}</span>
             <span class="strong">${x.priced ? rupees(x.amount) : 'Price to be confirmed'}</span></div>
+          ${x.price_with_gst ? html`<p class="small muted">If added: ${rupees(x.price_with_gst)} including GST.</p>` : nothing}
           ${images.length ? this.thumbs(x.description, images) : nothing}
           ${can ? html`<div class="choices">${choices.map(([value, label]) => html`<label class="choice">
-              <input type="radio" name=${`opt-${x.ref}`} .value=${value} ?checked=${state === value} ?disabled=${value === 'SELECTED' && !x.priced}
-                @change=${() => this.emit('proposal-select', { line_ref: x.ref, state: value, description: x.description })}>${label}</label>`)}</div>`
+              <input type="radio" name=${`opt-${x.ref}`} data-ref=${x.ref} .value=${value} .checked=${state === value} ?disabled=${value === 'SELECTED' && !x.priced}
+                @change=${() => { if (this.busy) { this.syncChoices(); return; } this.emit('proposal-select', { line_ref: x.ref, state: value, description: x.description }); }}><span class="mark" aria-hidden="true"></span>${label}</label>`)}</div>`
             : html`<p class="small">Your choice: ${{ NOT_SELECTED: 'not chosen', SELECTED: 'added', DESELECTED: 'not for me', REQUESTED_FOR_DISCUSSION: 'to discuss' }[state]}</p>`}
         </fieldset>`;
       })}
@@ -483,7 +523,7 @@ export class VsProposalView extends LitElement {
   protected pricingPanel(page: Page): TemplateResult | typeof nothing {
     const pr = page.pricing;
     if (!pr) return nothing;
-    return html`<section class="card stack" aria-labelledby="price" id="pricing"><h2 id="price">Price and payment</h2>
+    return html`<section class="card stack" aria-labelledby="price" id="pricing"><h2 tabindex="-1" id="price">Price and payment</h2>
       ${pr.package ? html`<p>Package: <span class="strong">${pr.package}</span></p>` : nothing}
       <div class="table-like" role="table" aria-label="Room subtotals">
         <div role="row" class="tr head"><span role="columnheader">Room</span><span role="columnheader" class="num">Amount</span></div>
@@ -507,7 +547,7 @@ export class VsProposalView extends LitElement {
 
   protected summary(page: Page): TemplateResult {
     const s = page.proposal.summary;
-    return html`<section class="card summary stack" aria-labelledby="sum"><h2 id="sum">Summary</h2><dl>
+    return html`<section class="card summary stack" aria-labelledby="sum"><h2 tabindex="-1" id="sum">Summary</h2><dl>
       ${page.proposal.kind === 'VARIATION'
         ? html`<dt>Net change</dt><dd>${rupees(s.net_change ?? null) ?? '—'}</dd>`
         : html`<dt>Total of works</dt><dd>${rupees(s.base_total) ?? '—'}</dd>
@@ -530,7 +570,7 @@ customElements.define('vs-proposal-view', VsProposalView);
 
 /** A variation beside the accepted baseline (CQX-08): shared by the customer page and the staff preview. */
 export function variationTable(v: VariationView): TemplateResult {
-  return html`<section class="card stack" aria-labelledby="var" id="variation"><h2 id="var">Changes to your accepted proposal</h2>
+  return html`<section class="card stack" aria-labelledby="var" id="variation"><h2 tabindex="-1" id="var">Changes to your accepted proposal</h2>
     <p class="small muted">Compared with your accepted proposal ${v.baseline_reference}. Your accepted proposal itself does not change.</p>
     <div class="table-like" role="table" aria-label="Changes">
       <div role="row" class="tr head var"><span role="columnheader">Item</span><span role="columnheader">Change</span><span role="columnheader" class="num">Before</span>
