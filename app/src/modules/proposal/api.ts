@@ -29,6 +29,14 @@ export interface Proposal {
   assumptions: string[]; exclusions: string[]; terms: string[]; terms_version: string | null; unit_rates_shown: boolean;
   sections: Record<string, string | null>;
 }
+export interface SpecCategory {
+  label: string; summary: string; requirement: string; grade: string | null; thickness: string | null; finish: string | null;
+  brand_examples: string | null; equivalent_rule: string; final_selection: string; warranty_summary: string;
+}
+export interface Specifications { name: string; version: string; summary: string; equivalent_policy: string; final_selection: string;
+  lines: Record<string, SpecCategory[]> }
+export interface MediaImage { title: string; alt: string; caption: string | null; label: 'Design reference' | 'Illustrative example';
+  urls: { thumb?: string; mobile?: string; desktop?: string } }
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -39,11 +47,15 @@ export interface Page {
   capabilities: { interaction: boolean; acceptance: boolean };
   notices: Notice[];
   actions: Action[];
+  specifications?: Specifications | null;
+  media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
 
 const BASE = '/api/v1/public/proposal';
 const STORE = 'vs-proposal-link';
 export const HEADER = 'X-Veda-Proposal';
+/** Media URLs are API paths: images load from the API origin. */
+export const mediaUrl = (path: string | undefined) => (path ? api.buildUrl(path) : '');
 export const newKey = () => crypto.randomUUID().replace(/-/g, '');
 
 /** The link's token: from the fragment on first open (then scrubbed), else from this tab's storage. */

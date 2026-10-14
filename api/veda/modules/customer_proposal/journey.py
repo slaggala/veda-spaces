@@ -35,6 +35,54 @@ LINK_EXPIRY_WARNING = timedelta(days=2)
 # (s, grant, quotation, page) -> None: each CQX step adds its section of the page model and its outstanding actions.
 CONTRIBUTORS: list[Callable[[Session, ProposalAccessGrant, Quotation, dict[str, Any]], None]] = []
 
+# Every key path of the page model outside the frozen projection (classified like projection.FIELDS; test-enforced).
+PAGE_FIELDS: dict[str, str] = {
+    "state": "proposal state",
+    "link.expires_on": "link expiry",
+    "link.status": "link status",
+    "history[].version_no": "earlier issued version",
+    "history[].issued_on": "its issue date",
+    "capabilities.interaction": "customer may choose, ask and acknowledge",
+    "capabilities.acceptance": "customer may accept or decline",
+    "notices[].code": "notice code",
+    "notices[].message": "notice text",
+    "actions[].code": "outstanding action",
+    "actions[].label": "its words",
+    "actions[].target": "page anchor",
+    # CQX-04: the pinned customer specification (approved public text) and approved reference images
+    "specifications.name": "specification name",
+    "specifications.version": "specification version",
+    "specifications.summary": "specification summary",
+    "specifications.equivalent_policy": "equivalent-brand policy",
+    "specifications.final_selection": "when final selections are confirmed",
+    **{
+        f"specifications.lines.*[].{k}": "material category text"
+        for k in (
+            "label",
+            "summary",
+            "requirement",
+            "grade",
+            "thickness",
+            "finish",
+            "brand_examples",
+            "equivalent_rule",
+            "final_selection",
+            "warranty_summary",
+        )
+    },
+    "media.note": "reference-image note",
+    **{
+        f"media.{where}.{k}": "approved image"
+        for where in ("lines.*[]", "rooms.*")
+        for k in ("title", "alt", "caption", "label", "urls.thumb", "urls.mobile", "urls.desktop")
+    },
+}
+
+
+def register(fn: Callable[[Session, ProposalAccessGrant, Quotation, dict[str, Any]], None]) -> None:
+    if fn not in CONTRIBUTORS:
+        CONTRIBUTORS.append(fn)
+
 
 def history(s: Session, q: Quotation) -> list[dict[str, Any]]:
     """Earlier versions of the same quotation (or variation) that were issued to the customer: version and date only."""

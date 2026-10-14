@@ -95,6 +95,41 @@ describe('vs-proposal-view (CQX-03)', () => {
   });
 });
 
+describe('vs-proposal-view specifications and media (CQX-04)', () => {
+  const cat = { label: 'Carcass', summary: 'Moisture-resistant board', requirement: 'BWR grade board', grade: 'BWR', thickness: '18 mm',
+    finish: null, brand_examples: 'Example A, Example B', equivalent_rule: 'Equivalent grade only', final_selection: 'Confirmed at design sign-off',
+    warranty_summary: 'As per the manufacturer.' };
+  const img = { title: 'Wardrobe', alt: 'A two-door laminate wardrobe', caption: null, label: 'Illustrative example' as const,
+    urls: { thumb: '/api/v1/public/catalog/media/x', mobile: '/api/v1/public/catalog/media/y' } };
+
+  it('shows each line\'s approved specification and labelled reference images with a gallery', async () => {
+    const page = samplePage({ specifications: { name: 'Essential', version: '1.1', summary: 's', equivalent_policy: 'e', final_selection: 'f',
+      lines: { L1: [cat] } }, media: { note: 'Reference image: it does not change the scope or the price.', lines: { L1: [img, { ...img, label: 'Design reference' }] },
+      rooms: { R1: img, R2: null, R3: null } } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    const spec = root.querySelector('details.spec')!;
+    expect(spec.textContent).to.contain('BWR grade board').and.to.contain('Material warranty').and.to.contain('version 1.1');
+    const thumbs = [...root.querySelectorAll('.thumbbtn')];
+    expect(thumbs).to.have.length(2);
+    expect(thumbs[0].getAttribute('aria-label')).to.equal('Open image 1 of 2: A two-door laminate wardrobe (Illustrative example)');
+    expect(root.querySelector('.roomcard img')!.getAttribute('alt')).to.equal('A two-door laminate wardrobe');
+    expect(root.querySelector('.roomcard .imglabel')!.textContent).to.equal('Illustrative example');
+    (thumbs[1] as HTMLButtonElement).click();
+    await el.updateComplete;
+    const dialog = root.querySelector('vs-dialog')!;
+    expect(dialog.getAttribute('heading')).to.equal('Wardrobe — Body');
+    expect(dialog.textContent).to.contain('Design reference');
+    await expect(el).to.be.accessible({ ignoredRules: ['image-redundant-alt'] });
+  });
+
+  it('falls back to the named placeholder when an image cannot load', async () => {
+    const page = samplePage({ media: { note: 'n', lines: {}, rooms: { R1: { ...img, urls: { mobile: '/missing.png' } }, R2: null, R3: null } } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    await waitUntil(() => el.shadowRoot!.querySelectorAll('.roomcard .ph').length === 3, 'placeholder after a failed image', { timeout: 3000 });
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 

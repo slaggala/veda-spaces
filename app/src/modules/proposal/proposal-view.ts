@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { shared } from '../../design-system/styles.js';
-import type { Page, ProposalLine, Room } from './api.js';
+import { mediaUrl, type MediaImage, type Page, type ProposalLine, type Room } from './api.js';
 
 const STATE_LABEL: Record<Page['state'], string> = {
   OPEN: 'Open for your review', SUPERSEDED: 'Replaced by a newer version', EXPIRED: 'Past its validity',
@@ -18,9 +18,12 @@ export const rupees = (v: string | null | undefined) => (v ? `₹ ${v}` : null);
  * rooms. Rooms are native <details> (keyboard and screen-reader accessible), opened for printing.
  */
 export class VsProposalView extends LitElement {
-  static override properties = { page: { attribute: false }, preview: { type: Boolean } };
+  static override properties = { page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true } };
   declare page: Page | null;
   declare preview: boolean;
+  declare gallery: { title: string; images: MediaImage[]; index: number } | null;
+  /** Rooms whose image failed to load: they show the named placeholder instead. */
+  declare failed: ReadonlySet<string>;
 
   static override styles = [...shared, css`
     :host { display: block; color: var(--vs-ink); }
@@ -28,7 +31,7 @@ export class VsProposalView extends LitElement {
     a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible,
     textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
     .wrap { max-width: 1120px; margin: 0 auto; padding: var(--vs-space-4) var(--vs-space-4) 96px; display: grid; gap: var(--vs-space-5); }
-    header.brand { display: flex; flex-direction: column; gap: var(--vs-space-2); border-bottom: 2px solid var(--vs-copper); padding-bottom: var(--vs-space-4); }
+    .brand { display: flex; flex-direction: column; gap: var(--vs-space-2); border-bottom: 2px solid var(--vs-copper); padding-bottom: var(--vs-space-4); }
     .brandname { font-family: var(--vs-font-serif); font-size: 26px; letter-spacing: .08em; color: var(--vs-copper-text); }
     h1 { font-family: var(--vs-font-serif); font-weight: 500; font-size: 30px; line-height: 36px; margin: 0; overflow-wrap: anywhere; }
     h2 { font-family: var(--vs-font-serif); font-weight: 500; font-size: 24px; line-height: 30px; margin: 0; }
@@ -62,6 +65,20 @@ export class VsProposalView extends LitElement {
     .line .sub { grid-column: 1 / -1; font-size: 13px; color: var(--vs-ink-muted); overflow-wrap: anywhere; }
     .tag { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .06em; text-transform: uppercase; padding: 1px 8px; border-radius: var(--vs-radius-pill);
       border: 1px solid var(--vs-line); color: var(--vs-ink-muted); margin-left: 6px; white-space: nowrap; }
+    figure { margin: 0; } img { max-width: 100%; display: block; }
+    .thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--vs-cream); }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .imglabel { position: absolute; left: 8px; bottom: 8px; font: 600 11px/16px var(--vs-font-sans); padding: 2px 8px; border-radius: var(--vs-radius-pill);
+      background: var(--vs-surface); color: var(--vs-ink); border: 1px solid var(--vs-line); }
+    .thumbs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--vs-space-2); align-items: flex-start; }
+    .thumbs .sub { flex-basis: 100%; margin: 0; }
+    .thumbbtn { position: relative; padding: 0; border: 1px solid var(--vs-line); border-radius: var(--vs-radius-card); overflow: hidden; width: 120px; height: 80px;
+      background: var(--vs-cream); cursor: pointer; } .thumbbtn img { width: 100%; height: 100%; object-fit: cover; }
+    details.spec { grid-column: 1 / -1; } details.spec > summary { cursor: pointer; color: var(--vs-copper-text); font-weight: 600; display: flex; align-items: center; }
+    .speccat h4 { margin: var(--vs-space-2) 0 0; font-size: 14px; } .speccat p { margin: 4px 0; font-size: 14px; }
+    .speccat dl { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 2px var(--vs-space-3); margin: 0; font-size: 13px; }
+    .speccat dt { color: var(--vs-ink-muted); } .speccat dd { margin: 0; overflow-wrap: anywhere; }
+    figure.big img { width: 100%; max-height: 70vh; object-fit: contain; } figure.big figcaption { margin-top: var(--vs-space-2); }
     .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--vs-space-3); margin: 0; }
     .summary dt { color: var(--vs-ink-muted); } .summary dd { margin: 0; text-align: right; font-weight: 600; white-space: nowrap; }
     .summary dt.total, .summary dd.total { font-size: 18px; color: var(--vs-ink); border-top: 2px solid var(--vs-ink); padding-top: 6px; }
@@ -83,6 +100,8 @@ export class VsProposalView extends LitElement {
     super();
     this.page = null;
     this.preview = false;
+    this.gallery = null;
+    this.failed = new Set();
   }
 
   override connectedCallback() {
@@ -110,7 +129,7 @@ export class VsProposalView extends LitElement {
     const p = page.proposal;
     return html`<div class="wrap">
       ${this.preview ? html`<div class="preview-mark" role="note">Staff preview: exactly what the customer sees. No action is possible here.</div>` : nothing}
-      <header class="brand">
+      <div class="brand">
         <div class="brandname" aria-hidden="true">${p.brand.name}</div>
         <span class="eyebrow">${p.kind === 'VARIATION' ? 'Variation to your accepted proposal' : 'Your interior proposal'}</span>
         <h1>${p.subject}</h1>
@@ -118,7 +137,7 @@ export class VsProposalView extends LitElement {
           ${p.valid_until ? html`<span>Valid until ${p.valid_until}</span>` : nothing}
           <span>${p.property.configuration}${p.property.city ? html` · ${p.property.city}` : nothing}</span><span>Property ${p.property.reference}</span></div>
         <span class="state ${page.state}">${STATE_LABEL[page.state]}</span>
-      </header>
+      </div>
       ${page.notices.map((n) => html`<vs-banner kind=${n.code === 'ACCEPTED' ? 'success' : n.code === 'LINK_EXPIRES_SOON' ? 'info' : 'warning'}>${n.message}</vs-banner>`)}
       ${p.cover_note ? html`<p>${p.cover_note}</p>` : nothing}
       <div class="layout">
@@ -131,6 +150,7 @@ export class VsProposalView extends LitElement {
         <aside aria-label="Summary"><div class="sticky stack">${this.summary(page)}</div></aside>
       </div>
       ${this.bar(page)}
+      ${this.galleryDialog()}
     </div>`;
   }
 
@@ -185,9 +205,13 @@ export class VsProposalView extends LitElement {
         ${r.subtotal ? html`<span class="strong">${rupees(r.subtotal)}</span>` : nothing}</div></a>`;
   }
 
-  /** The room's image slot (CQX-04 adds approved reference images); a named placeholder otherwise. */
+  /** The room's first approved reference image, or a named placeholder (missing-image fallback). */
   protected roomImage(r: Room): TemplateResult {
-    return html`<div class="ph" aria-hidden="true">${r.title}</div>`;
+    const img = this.page?.media?.rooms?.[r.ref];
+    if (!img || this.failed.has(r.ref)) return html`<div class="ph" aria-hidden="true">${r.title}</div>`;
+    // A failed image becomes the named placeholder; nothing critical is ever shown only as an image.
+    return html`<figure class="thumb"><img src=${mediaUrl(img.urls.mobile ?? img.urls.thumb)} alt=${img.alt} loading="lazy"
+      @error=${() => { this.failed = new Set([...this.failed, r.ref]); }}><figcaption class="imglabel">${img.label}</figcaption></figure>`;
   }
 
   protected roomDetail(page: Page, r: Room): TemplateResult {
@@ -196,11 +220,47 @@ export class VsProposalView extends LitElement {
       <ul class="lines">${r.lines.map((x) => this.line(page, x))}</ul></details>`;
   }
 
-  protected line(_page: Page, x: ProposalLine): TemplateResult {
+  protected line(page: Page, x: ProposalLine): TemplateResult {
+    const specs = page.specifications?.lines?.[x.ref] ?? [];
+    const images = page.media?.lines?.[x.ref] ?? [];
     return html`<li class="line"><div><span class="strong">${x.description}</span>${x.status !== 'Included' ? html`<span class="tag">${x.status}</span>` : nothing}</div>
       <div class="amt">${x.priced ? rupees(x.amount) : html`<span class="muted">To be confirmed</span>`}</div>
       ${x.detail || x.quantity ? html`<div class="sub">${[x.quantity, x.detail].filter(Boolean).join(' · ')}</div>` : nothing}
-      ${x.change ? html`<div class="sub">${x.change}${x.delta ? ` · change ${rupees(x.delta)}` : ''}</div>` : nothing}</li>`;
+      ${x.unit_rate ? html`<div class="sub">Rate ${rupees(x.unit_rate)}</div>` : nothing}
+      ${x.change ? html`<div class="sub">${x.change}${x.delta ? ` · change ${rupees(x.delta)}` : ''}</div>` : nothing}
+      ${images.length ? this.thumbs(x.description, images) : nothing}
+      ${specs.length ? html`<details class="spec"><summary>Materials and specification</summary>${specs.map((c) => html`<div class="speccat">
+          <h4>${c.label}</h4><p>${c.summary}</p>
+          <dl>${this.spec('Requirement', c.requirement)}${this.spec('Grade', c.grade)}${this.spec('Thickness', c.thickness)}
+            ${this.spec('Finish', c.finish)}${this.spec('Brand examples', c.brand_examples)}${this.spec('Approved equivalents', c.equivalent_rule)}
+            ${this.spec('Final selection', c.final_selection)}${this.spec('Material warranty', c.warranty_summary)}</dl></div>`)}
+        <p class="small muted">Specification ${page.specifications?.name} (version ${page.specifications?.version}), as approved when this proposal was issued.</p></details>` : nothing}</li>`;
+  }
+
+  private spec(label: string, value: string | null) {
+    return value ? html`<dt>${label}</dt><dd>${value}</dd>` : nothing;
+  }
+
+  private thumbs(title: string, images: MediaImage[]) {
+    return html`<div class="thumbs" role="group" aria-label=${`Reference images: ${title}`}>
+      ${images.map((img, i) => html`<button class="thumbbtn" aria-label=${`Open image ${i + 1} of ${images.length}: ${img.alt} (${img.label})`}
+        @click=${() => { this.gallery = { title, images, index: i }; }}><img src=${mediaUrl(img.urls.thumb ?? img.urls.mobile)} alt="" loading="lazy"
+        @error=${(e: Event) => { (e.target as HTMLElement).closest('button')?.remove(); }}><span class="imglabel">${img.label}</span></button>`)}
+      <p class="sub">${this.page?.media?.note ?? ''}</p></div>`;
+  }
+
+  protected galleryDialog(): TemplateResult | typeof nothing {
+    const g = this.gallery;
+    if (!g) return nothing;
+    const img = g.images[g.index];
+    const go = (d: number) => { this.gallery = { ...g, index: (g.index + d + g.images.length) % g.images.length }; };
+    return html`<vs-dialog open wide heading=${g.title} @close=${() => { this.gallery = null; }}>
+      <figure class="big"><img src=${mediaUrl(img.urls.desktop ?? img.urls.mobile ?? img.urls.thumb)} alt=${img.alt}>
+        <figcaption><span class="tag">${img.label}</span> ${img.caption ?? img.title}</figcaption></figure>
+      <p class="small muted">${this.page?.media?.note ?? ''}</p>
+      ${g.images.length > 1 ? html`<div slot="actions"><button class="btn" @click=${() => go(-1)}>Previous</button>
+        <span role="status" class="small">${g.index + 1} of ${g.images.length}</span><button class="btn" @click=${() => go(1)}>Next</button></div>` : nothing}
+    </vs-dialog>`;
   }
 
   /** Later CQX steps add pricing, optional items, terms, questions, comparison and decision sections here. */
