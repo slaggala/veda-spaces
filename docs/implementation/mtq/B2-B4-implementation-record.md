@@ -68,7 +68,7 @@ These slots live in one versioned record, `veda/modules/mtq_commercial/fixtures/
 
 | Area | Implementation |
 |---|---|
-| Flags | `VEDA_MTQ_ESTIMATION_ENABLED` (B2/B3) and `VEDA_MTQ_QUOTATION_ENABLED` (B4), the blueprint's names; off by default; production refuses both; estimation needs the B1 flag and quotation needs estimation in every environment. Not added to staging infrastructure: no SSM parameter, no plan change. Every commercial path answers 404 while off (the B1 MC-3 gate). `/auth/me` reports both. |
+| Flags | `VEDA_MTQ_ESTIMATION_ENABLED` (B2/B3) and `VEDA_MTQ_QUOTATION_ENABLED` (B4), the blueprint's names; off by default; production refuses both; estimation needs the B1 flag and quotation needs estimation in every environment. Wired to staging-core false by default (decision log 33, §8): turning them on needs the owner-APPROVED, digest-bound `infra/config/mtq-commercial-enablement-record.json`. Every commercial path answers 404 while off (the B1 MC-3 gate). `/auth/me` reports both. |
 | RBAC | Roles ESTIMATOR and SALES_MANAGER (MFA). New codes `scope.*`, `boq.*`, `cost_estimate.*`, `quotation.*`; the new roles also get the B1 read codes and the workspace self-service rows; SALES_MANAGER gets `lead.read` (ALL). No grant of an existing role to an existing code changed. `0201` stops, changing nothing, if a custom role already uses the code or name of ESTIMATOR or SALES_MANAGER (`refuse_role_collisions`). |
 | Audit and erasure | Every new table FULL with its aggregate parent. Lead erasure replaces every free-text field that may describe the customer (notes, decision and override reasons, carried override reasons, quotation title, cover note, decision note, reasons in lifecycle events) and redacts the frozen document's customer name, subject and cover note, re-sealing it with a SNAPSHOT_REDACTED event that keeps the previous digests. Retained as the commercial record: quantities, derivations, measurement references, rates, amounts, tax, decisions and methods, statuses, dates, actor ids, digests, quotation number, property reference, configuration and city, terms. |
 | UI | `/site/properties/:id/commercial`: overview (lineage, stale, undecided owner decisions), scope, BOQ, estimate and quotation tabs, each room by room. |
@@ -112,7 +112,7 @@ Per-configuration evidence after the certification remediation: [evidence/b2-b4-
 
 1. Owner decisions OI-MTQ-03, 04, 07, 08, 09, 11 (all quotations); OI-MTQ-15 (5 BHK and independent houses); OI-MTQ-13 (variations); OI-MTQ-05 (Premium/Luxury, finish variants, items without a card line).
 2. Items the rate card has no line for (tall unit, mirror panel, pelmet, point shifting, sensor provisions, custom items) cannot be priced; when included they block BOQ review (`UNRESOLVED_CATALOGUE_MAPPING`), as optional items they stay unpriced and disclosed.
-3. Staging: the two flags are not set in staging infrastructure; turning them on needs its own enablement record, as B1 did (decision log 30).
+3. Staging: the two flags are wired false (decision log 33); turning them on needs the owner-APPROVED enablement record (§8), as B1 did (decision log 30). Staging enablement is internal validation only: customer issuance stays blocked by the undecided policies above.
 4. Field validation: B1's ten-site validation and the MTQ-G5 replay are outstanding; nothing here is validated against a real site or a real quotation.
 5. Operations: the quotation expiry job (`veda maintenance mtq-quotation-expiry`) must be scheduled before any customer issuance.
 
@@ -157,4 +157,26 @@ The focused re-review (B2-B4 CERTIFIED WITH REMAINING MERGE CONDITIONS) found on
 | Parity | Base lines agree with an estimator run on the counter run, wall-unit and loft lines with an estimator run on the wall-unit run; the estimator's single RUN is a documented difference. |
 | Erasure integrity (low residual) | Redaction re-seals only a verified document. A document already failing its digests is still redacted, its HTML withdrawn and its original digests kept, so it stays SNAPSHOT_INTEGRITY_FAILED; the SNAPSHOT_REDACTED event records INTEGRITY_FAILED_BEFORE_REDACTION. |
 | Tests | `tests/unit/test_mtq_kitchen_roles.py` (matrix A-J and the reviewer fixture), `test_mtq_estimator_parity.py::test_kitchen_roles_agree_line_by_line_with_the_estimator`, `test_mtq_quotation_integrity.py::test_erasure_never_reseals_a_tampered_document`. The SYNTHETIC end-to-end evidence is unchanged (no synthetic kitchen has a window on a counter wall). |
+
+## 8. Protected-staging enablement (decision log 33)
+
+**Status: wired, both flags false; the enablement record is a DRAFT.**
+
+| Layer | Refuses |
+|---|---|
+| staging-core (`output "mtq_commercial"`) | quotation without estimation; estimation without the B1 site flag; estimation unless `infra/config/mtq-commercial-enablement-record.json` is APPROVED by someone other than its author, dated, staging-only, `scope.internal_protected_staging_validation_only` true and `scope.customer_issuance` false, with every evidence field filled (run ids numeric) and `mtq_commercial.enablement_record_sha256` equal to the file's SHA-256; a digest without the flag |
+| API start (`veda/config.py`) | the same flag dependencies in every environment; either flag in production |
+| Routes | every commercial path answers 404, before authentication, while its flag is off |
+| Policy record | customer issuance while any required OI-MTQ slot is null (unchanged by enablement) |
+
+**Owner sequence:**
+
+1. Read-only role check on the staging database: no custom role uses the code or name ESTIMATOR or SALES_MANAGER (otherwise `0201` stops the deploy, changing nothing).
+2. `12-deploy` of main with the flags absent (false): migrations `0201_mtq_estimation`, `0202_mtq_commercial` run (head `0202_mtq_commercial`); readiness reports migrations head.
+3. Access checks with the flags off: `/auth/me` reports both false; commercial API paths answer 404; Site visits, V1, V2, Catalogue and the budget estimator unchanged.
+4. Merge the wiring change; `10-infra-plan` by dispatch on main: exactly **2 to add, 0 to change, 0 to destroy** (`/veda/staging/VEDA_MTQ_ESTIMATION_ENABLED` and `/veda/staging/VEDA_MTQ_QUOTATION_ENABLED`, both "false"). Anything else stops the sequence. Apply, then a drift run with no changes.
+5. The owner fills and approves the record; a reviewed change sets `estimation_enabled`, `quotation_enabled` true and the digest. Plan: exactly **0 / 2 / 0** (the two parameters in place). Apply, drift, deploy, readiness.
+6. Walkthrough on a synthetic property (scope, BOQ, fail-closed wall-unit geometry, override after re-measure, estimate, draft quotation to APPROVED, customer issue **refused**, lineage trace and its denial), then the flags-off rollback proof (step 5 reversed: 0 / 2 / 0), then restore through the approved record if validation continues.
+
+Results from staging are SYNTHETIC_VALIDATED at most; LIVE_VALIDATED needs genuine field measurements and reference quotations.
 

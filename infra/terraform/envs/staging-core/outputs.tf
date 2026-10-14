@@ -117,3 +117,33 @@ output "mtq_attachments" {
     error_message = "VEDA_MTQ_SITE_ENABLED turns on only with the clamd scanner and an owner-APPROVED infra/config/mtq-site-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.mtq_record_problems)}."
   }
 }
+
+# MTQ B2-B4 commercial flags (decision log 33): what is planned, and the gates that refuse the rest.
+output "mtq_commercial" {
+  description = "MTQ B2-B4 on staging: the estimation and quotation flags (false until an owner-approved, digest-bound, internal-validation-only enablement record)."
+  value = {
+    estimation_enabled = local.commercial_config.VEDA_MTQ_ESTIMATION_ENABLED
+    quotation_enabled  = local.commercial_config.VEDA_MTQ_QUOTATION_ENABLED
+    enablement_record  = local.mtq_commercial.enablement_record_sha256
+  }
+
+  precondition {
+    condition     = local.mtq_commercial.status == "DECIDED" && (local.mtq_commercial.estimation_enabled || local.mtq_commercial.enablement_record_sha256 == null)
+    error_message = "mtq_commercial must be DECIDED, and a digest is bound only together with estimation_enabled (rollback clears both flags and the digest)."
+  }
+
+  precondition {
+    condition     = !local.mtq_commercial.quotation_enabled || local.mtq_commercial.estimation_enabled
+    error_message = "VEDA_MTQ_QUOTATION_ENABLED needs VEDA_MTQ_ESTIMATION_ENABLED (a quotation is built on an estimate)."
+  }
+
+  precondition {
+    condition     = !local.mtq_commercial.estimation_enabled || local.mtq_site.site_enabled
+    error_message = "VEDA_MTQ_ESTIMATION_ENABLED needs VEDA_MTQ_SITE_ENABLED (scope is built on verified measurements)."
+  }
+
+  precondition {
+    condition     = !local.mtq_commercial.estimation_enabled || length(local.commercial_record_problems) == 0
+    error_message = "VEDA_MTQ_ESTIMATION_ENABLED turns on only with an owner-APPROVED infra/config/mtq-commercial-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.commercial_record_problems)}."
+  }
+}
