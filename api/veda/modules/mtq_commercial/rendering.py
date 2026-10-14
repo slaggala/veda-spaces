@@ -126,6 +126,7 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
             for m in terms.get("payment_milestones") or []
         ],
         "warranty": terms.get("warranty") or [],
+        "service_support": terms.get("service_support") or [],
         "assumptions": terms.get("assumptions") or [],
         "exclusions": terms.get("exclusions") or [],
         "terms": [
@@ -329,6 +330,19 @@ def html(doc: dict[str, Any]) -> str:
     return "".join(p)
 
 
+def html_v2(doc: dict[str, Any]) -> str:
+    """Version 2 (CQX-09): version 1 plus Veda Spaces' service support as its own section after the warranty, so the
+    warranty text and the service commitment are never presented as one."""
+    page = html({k: v for k, v in doc.items() if k != "service_support"})
+    support = doc.get("service_support") or []
+    if not support:
+        return page
+    block = "<h2>Service support (Veda Spaces)</h2><ul>" + "".join(f"<li>{_e(t)}</li>" for t in support) + "</ul>"
+    start = page.find("<h2>Warranty</h2>")
+    at = page.find("</ul>", start) + len("</ul>") if start >= 0 else page.rfind("</body>")
+    return page[:at] + block + page[at:]
+
+
 # Every template version ever used for an issued quotation stays here (a new page design is a new key).
-TEMPLATES: dict[str, Callable[[dict[str, Any]], str]] = {"mtq-quotation-html/1": html}
-CURRENT_TEMPLATE = "mtq-quotation-html/1"
+TEMPLATES: dict[str, Callable[[dict[str, Any]], str]] = {"mtq-quotation-html/1": html, "mtq-quotation-html/2": html_v2}
+CURRENT_TEMPLATE = "mtq-quotation-html/2"

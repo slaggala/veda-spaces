@@ -65,6 +65,9 @@ export interface Comparison {
   changes: { change: 'ADDED' | 'CHANGED' | 'REMOVED'; description: string; room: string | null; before: string | null; after: string | null;
     status: string; quantity_before?: string | null; quantity_after?: string | null }[];
 }
+export interface TermsSection { code: string; title: string; items: string[]; available: boolean; sha256: string | null; required: boolean;
+  acknowledged_on: string | null }
+export interface Terms { sections: TermsSection[]; policy_decided: boolean; pending: string[] }
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -80,6 +83,7 @@ export interface Page {
   selections?: Selections;
   requests?: { can_ask: boolean; items: CustomerRequest[] };
   comparison_available?: boolean;
+  terms?: Terms;
   variation?: VariationView;
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
@@ -113,6 +117,8 @@ export function proposalApi(token: string) {
     view: () => api.request<Page>(BASE, { anonymous: true, headers }),
     select: (line_ref: string, state: string) =>
       api.request<Selections>(`${BASE}/selections`, { method: 'POST', anonymous: true, headers, body: { line_ref, state }, idempotencyKey: newKey() }),
+    acknowledge: (section: string, section_sha256: string) =>
+      api.request<{ terms: Terms }>(`${BASE}/acknowledgements`, { method: 'POST', anonymous: true, headers, body: { section, section_sha256 } }),
     compare: () => api.request<{ comparison: Comparison | null }>(`${BASE}/comparison`, { anonymous: true, headers }),
     ask: (body: Record<string, unknown>, key: string) =>
       api.request<CustomerRequest[]>(`${BASE}/requests`, { method: 'POST', anonymous: true, headers, body, idempotencyKey: key }),
@@ -135,6 +141,7 @@ export interface Activity {
   selections: { line_ref: string; description: string | null; state: string; change_no: number; changed_on: string }[];
   summary: Selections;
   requests: StaffRequest[];
+  acknowledgements: { section: string; recipient_kind: string; acknowledged_on: string; section_sha256: string; evidence_sha256: string }[];
 }
 
 const P = '/api/v1';

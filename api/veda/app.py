@@ -120,6 +120,7 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ("POST", "/api/v1/public/proposal/selections"),
             ("POST", "/api/v1/public/proposal/requests"),
             ("GET", "/api/v1/public/proposal/requests"),
+            ("POST", "/api/v1/public/proposal/acknowledgements"),
         }
     ),
     "RBX-006": frozenset(

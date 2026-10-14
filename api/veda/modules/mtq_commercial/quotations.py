@@ -95,6 +95,7 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
         "terms_version": terms_d.terms_version if terms_d else None,
         "payment_milestones": [m.model_dump() for m in terms_d.payment_milestones] if terms_d else None,
         "warranty": list(terms_d.warranty) if terms_d else None,
+        "service_support": list(terms_d.service_support) if terms_d else [],
         "assumptions": (list(terms_d.assumptions) if terms_d else []) + assumptions,
         "exclusions": (list(terms_d.exclusions) if terms_d else []) + exclusions,
         "change_order_terms": terms_d.change_order_terms if terms_d else None,

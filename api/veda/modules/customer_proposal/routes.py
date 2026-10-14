@@ -24,7 +24,7 @@ from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, re
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import comparison, grants, journey, pricing, projection, references, requests, selections
+from . import acknowledgements, comparison, grants, journey, pricing, projection, references, requests, selections
 from . import schemas as S
 from .models import CustomerProposalRequest, ProposalAccessGrant
 
@@ -220,6 +220,17 @@ def submit_request(req: Req):
     return private(ok(requests.for_customer(req.session, g), status=201))
 
 
+@interaction_api.route("POST", "/proposal/acknowledgements", rbx="RBX-009", auth="public", body=S.AcknowledgeIn,
+                       status=201, max_body=PUBLIC_MAX_BODY, requirement="CQX-009", limits=WRITE_LIMITS,
+                       summary="Acknowledge one section of this version, bound to the digest of the text shown")  # fmt: skip
+def acknowledge(req: Req):
+    g, q = customer(req)
+    acknowledgements.acknowledge(req.session, g, q, req.body.section, req.body.section_sha256)
+    return private(
+        ok({"terms": acknowledgements.view(req.session, g, q, projection.build(req.session, q))}, status=201)
+    )
+
+
 @interaction_api.route("GET", "/proposal/requests", rbx="RBX-009", auth="public", write=False, requirement="CQX-007",
                        limits=READ_LIMITS, summary="The customer's own questions and change requests, with answers")  # fmt: skip
 def list_requests(req: Req):
@@ -234,7 +245,8 @@ def list_requests(req: Req):
 def customer_activity(req: Req, quotation_id: str):
     q = _quotation(req, quotation_id, "proposal.request.review")
     return ok({"selections": selections.staff_view(req.session, q), "summary": selections.summary(req.session, q),
-               "requests": requests.staff_view(req.session, q)})  # fmt: skip
+               "requests": requests.staff_view(req.session, q),
+               "acknowledgements": acknowledgements.staff_view(req.session, q)})  # fmt: skip
 
 
 def _request(req: Req, request_id: str) -> CustomerProposalRequest:
@@ -275,6 +287,8 @@ journey.register(pricing.contribute)
 journey.register(selections.contribute)
 journey.register(requests.contribute)
 journey.register(comparison.contribute)
+journey.register(acknowledgements.contribute)
+journey.PAGE_FIELDS.update(acknowledgements.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(comparison.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(requests.PAGE_FIELDS)
 journey.PAGE_FIELDS.update(pricing.PAGE_FIELDS)

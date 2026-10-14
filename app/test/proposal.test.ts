@@ -258,6 +258,29 @@ describe('variation and version comparison (CQX-08)', () => {
   });
 });
 
+describe('terms and acknowledgements (CQX-09)', () => {
+  const terms = { policy_decided: true, pending: ['WARRANTY'], sections: [
+    { code: 'WARRANTY', title: 'Warranty', items: ['Synthetic warranty.'], available: true, sha256: 'w'.repeat(64), required: true, acknowledged_on: null },
+    { code: 'SERVICE_SUPPORT', title: 'Service support (Veda Spaces)', items: [], available: false, sha256: null, required: false, acknowledged_on: null }] };
+
+  it('shows sections as frozen, never presents unconfirmed content, and acknowledges the digest shown', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'t'.repeat(43)}`);
+    const calls = serve((path) => json(path.endsWith('/acknowledgements') ? { terms } : samplePage({ capabilities: { interaction: true, acceptance: false }, terms })));
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const support = view.shadowRoot!.querySelector('#term-SERVICE_SUPPORT')!;
+    expect(support.textContent).to.contain('To be confirmed by Veda Spaces');
+    expect(support.querySelector('button')).to.equal(null);
+    await expect(view).to.be.accessible();
+    (view.shadowRoot!.querySelector('#term-WARRANTY button') as HTMLButtonElement).click();
+    await waitUntil(() => view.announcement.includes('acknowledged'));
+    const post = calls.find((c) => c.path.endsWith('/acknowledgements'))!;
+    expect(post.headers['X-Veda-Proposal']).to.equal(`vsp_${'t'.repeat(43)}`);
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 

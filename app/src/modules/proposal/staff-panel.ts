@@ -129,7 +129,11 @@ export class VsProposalStaff extends SessionElement {
   protected more(): TemplateResult | typeof nothing {
     const a = this.activity;
     if (!a) return nothing;
-    return html`${this.requestsTable(a.requests)}<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
+    const acks = a.acknowledgements.length ? html`<section class="card stack" aria-labelledby="acks"><h3 id="acks" class="title">Acknowledged sections</h3>
+      <div class="table-wrap"><table><thead><tr><th>Section</th><th>By</th><th>When</th><th>Evidence digest</th></tr></thead>
+      <tbody>${a.acknowledgements.map((x) => html`<tr><td>${humanize(x.section)}</td><td>${humanize(x.recipient_kind)}</td><td>${formatAbsolute(x.acknowledged_on)}</td>
+        <td class="mono">${x.evidence_sha256.slice(0, 16)}…</td></tr>`)}</tbody></table></div></section>` : nothing;
+    return html`${this.requestsTable(a.requests)}${acks}<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
       ${a.selections.length ? html`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Choice</th><th>Changes</th><th>Last change</th></tr></thead>
         <tbody>${a.selections.map((x) => html`<tr><td>${x.description ?? x.line_ref}</td><td><span class="chip">${humanize(x.state)}</span></td>
           <td>${x.change_no}</td><td>${formatAbsolute(x.changed_on)}</td></tr>`)}</tbody></table></div>

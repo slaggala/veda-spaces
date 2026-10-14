@@ -113,6 +113,8 @@ export class VsProposalView extends LitElement {
       border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control); cursor: pointer; background: var(--vs-surface); }
     .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; }
     .tr.cmp { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; }
+    .term .termbody { padding: 0 var(--vs-space-4) var(--vs-space-3); } .term ul { margin: 0 0 var(--vs-space-2); padding-left: 20px; }
+    .tag.ok { color: var(--vs-success); }
     .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-3); }
     .request { border-top: 1px solid var(--vs-line); padding-top: var(--vs-space-3); }
     .msg, .reply { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; } .reply { padding-left: var(--vs-space-3); border-left: 2px solid var(--vs-copper); }
@@ -319,7 +321,27 @@ export class VsProposalView extends LitElement {
   protected sections(page: Page): TemplateResult {
     return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
       ${page.variation ? variationTable(page.variation) : nothing}
-      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}`;
+      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}`;
+  }
+
+  // --- CQX-09 terms and acknowledgements -----------------------------------------------------------------------------
+  protected termsPanel(page: Page): TemplateResult | typeof nothing {
+    const t = page.terms;
+    if (!t) return nothing;
+    const can = page.capabilities.interaction && !this.preview;
+    return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 id="tm">Terms and what is included</h2>
+      ${t.policy_decided && t.pending.length && can ? html`<p class="small">Before you can accept, please read and acknowledge the sections marked "required".</p>` : nothing}
+      ${t.sections.map((x) => html`<details class="room term" id=${`term-${x.code}`}><summary><h3>${x.title}</h3>
+          ${x.required ? html`<span class="tag">Required</span>` : nothing}${x.acknowledged_on ? html`<span class="tag ok">Acknowledged</span>` : nothing}</summary>
+        <div class="termbody">${x.available
+          ? html`<ul>${x.items.map((i) => html`<li>${i}</li>`)}</ul>`
+          : html`<p class="muted">To be confirmed by Veda Spaces. This is not part of the proposal until it is confirmed.</p>`}
+          ${x.code === 'WARRANTY' ? html`<p class="small muted">Warranty is shown as approved; Veda Spaces' own service support is a separate section.</p>` : nothing}
+          ${can && x.available ? (x.acknowledged_on
+            ? html`<p class="small">You acknowledged this section on ${x.acknowledged_on.slice(0, 10)}.</p>`
+            : html`<button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-ack', { section: x.code, sha256: x.sha256, title: x.title })}>
+                I have read and understood: ${x.title}</button>`) : nothing}</div></details>`)}
+    </section>`;
   }
 
   // --- CQX-08 comparison with the previous version -------------------------------------------------------------------

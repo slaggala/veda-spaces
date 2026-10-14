@@ -57,6 +57,11 @@ export class VsProposalPage extends LitElement {
     this.comparison = null;
   }
 
+  private onAck(e: CustomEvent<{ section: string; sha256: string; title: string }>) {
+    const { section, sha256, title } = e.detail;
+    void this.act(() => proposalApi(this.token ?? '').acknowledge(section, sha256), `${title}: acknowledged.`);
+  }
+
   private onCompare() {
     void this.act(async () => { this.comparison = (await proposalApi(this.token ?? '').compare()).data.comparison; }, 'Changes shown.');
   }
@@ -150,7 +155,8 @@ export class VsProposalPage extends LitElement {
   override render() {
     if (this.load === 'ready' && this.page) {
       return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
-        .comparison=${this.comparison} @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk} @proposal-compare=${this.onCompare}></vs-proposal-view>`;
+        .comparison=${this.comparison} @proposal-select=${this.onSelect} @proposal-ask=${this.onAsk} @proposal-compare=${this.onCompare}
+        @proposal-ack=${this.onAck}></vs-proposal-view>`;
     }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`
