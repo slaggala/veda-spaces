@@ -20,11 +20,11 @@ from flask import request
 
 from veda.config import settings
 from veda.kernel.errors import ApiError
-from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
+from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, request_reaches
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants, journey, pricing, projection, references
+from . import grants, journey, pricing, projection, references, selections
 from . import schemas as S
 from .models import ProposalAccessGrant
 
@@ -186,8 +186,29 @@ def view(req: Req):
     return private(ok(page))
 
 
+# --- customer: interaction --------------------------------------------------------------------------------------------
+@interaction_api.route("POST", "/proposal/selections", rbx="RBX-009", auth="public", body=S.SelectionIn,
+                       max_body=PUBLIC_MAX_BODY, requirement="CQX-006", limits=WRITE_LIMITS,
+                       summary="Choose, drop or ask about an optional item (a proposal to staff; the quotation never changes)")  # fmt: skip
+def choose_optional(req: Req):
+    g, q = customer(req)
+    selections.choose(req.session, g, q, req.body.line_ref, req.body.state)
+    return private(ok(selections.summary(req.session, q)))
+
+
+# --- staff: what the customer did -------------------------------------------------------------------------------------
+@staff_api.route("GET", "/quotations/<quotation_id>/customer-activity", permission="proposal.request.review",
+                 write=False, requirement="CQX-004",
+                 summary="The customer's optional-item choices, questions, change requests and acknowledgements")  # fmt: skip
+def customer_activity(req: Req, quotation_id: str):
+    q = _quotation(req, quotation_id, "proposal.request.review")
+    return ok({"selections": selections.staff_view(req.session, q), "summary": selections.summary(req.session, q)})
+
+
 journey.register(references.contribute)
 journey.register(pricing.contribute)
+journey.register(selections.contribute)
 journey.PAGE_FIELDS.update(pricing.PAGE_FIELDS)
+journey.PAGE_FIELDS.update(selections.PAGE_FIELDS)
 
 ALL_APIS = (staff_api, public_api, interaction_api, acceptance_api)

@@ -44,6 +44,10 @@ export interface Pricing {
   unit_rates_shown: boolean; package: string | null;
   alternatives: { reference: string; package: string | null; total: string | null; valid_until: string | null }[];
 }
+export interface Selections {
+  items: { ref: string; state: 'NOT_SELECTED' | 'SELECTED' | 'DESELECTED' | 'REQUESTED_FOR_DISCUSSION'; priced: boolean }[];
+  selected_refs: string[]; status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED'; extra: string | null; total_with_selections: string | null;
+}
 export interface Notice { code: string; message: string }
 export interface Action { code: string; label: string; target: string }
 export interface Page {
@@ -56,6 +60,7 @@ export interface Page {
   actions: Action[];
   specifications?: Specifications | null;
   pricing?: Pricing;
+  selections?: Selections;
   media?: { note: string; lines: Record<string, MediaImage[]>; rooms: Record<string, MediaImage | null> };
 }
 
@@ -86,6 +91,8 @@ export function proposalApi(token: string) {
   const headers = { [HEADER]: token };
   return {
     view: () => api.request<Page>(BASE, { anonymous: true, headers }),
+    select: (line_ref: string, state: string) =>
+      api.request<Selections>(`${BASE}/selections`, { method: 'POST', anonymous: true, headers, body: { line_ref, state }, idempotencyKey: newKey() }),
   };
 }
 
@@ -96,6 +103,10 @@ export interface Grant {
   view_count: number; revoke_reason_code: string | null; shared_on: string; token?: string; link?: string;
 }
 export interface Preview { frozen: boolean; status: string; watermark?: string; proposal: Proposal }
+export interface Activity {
+  selections: { line_ref: string; description: string | null; state: string; change_no: number; changed_on: string }[];
+  summary: Selections;
+}
 
 const P = '/api/v1';
 export const staffProposal = {
@@ -105,6 +116,7 @@ export const staffProposal = {
   rotate: (g: Grant) => api.request<Grant>(`${P}/proposal-access-grants/${g.id}/rotate`, { method: 'POST', ifMatch: g.version, idempotencyKey: newKey() }),
   revoke: (g: Grant) => api.request<Grant>(`${P}/proposal-access-grants/${g.id}/revoke`, { method: 'POST', ifMatch: g.version }),
   preview: (quotationId: string) => api.get<Preview>(`${P}/quotations/${quotationId}/proposal-preview`),
+  activity: (quotationId: string) => api.get<Activity>(`${P}/quotations/${quotationId}/customer-activity`),
 };
 
 /** A staff preview as a page model: the customer's view with no live state and no actions. */

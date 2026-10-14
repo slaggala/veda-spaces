@@ -1,4 +1,5 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
+import type { VsErrorSummary } from '../../design-system/components.js';
 import { shared } from '../../design-system/styles.js';
 import { mediaUrl, type MediaImage, type Page, type ProposalLine, type Room } from './api.js';
 
@@ -18,7 +19,16 @@ export const rupees = (v: string | null | undefined) => (v ? `₹ ${v}` : null);
  * rooms. Rooms are native <details> (keyboard and screen-reader accessible), opened for printing.
  */
 export class VsProposalView extends LitElement {
-  static override properties = { page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true } };
+  static override properties = {
+    page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
+    announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false },
+  };
+  /** Polite screen-reader announcement of the last action's result (set by the page). */
+  declare announcement: string;
+  /** An action is in flight: controls are disabled (slow networks never double-submit). */
+  declare busy: boolean;
+  /** Field errors of the last action, shown in an error summary. */
+  declare errors: { field: string; message: string }[];
   declare page: Page | null;
   declare preview: boolean;
   declare gallery: { title: string; images: MediaImage[]; index: number } | null;
@@ -83,6 +93,14 @@ export class VsProposalView extends LitElement {
     .tr.head { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--vs-ink-muted); border-top: 0; }
     .tr .num { text-align: right; white-space: nowrap; } .tr.total { font-weight: 700; font-size: 18px; border-top: 2px solid var(--vs-ink); }
     .milestones { margin: 0; padding-left: 20px; }
+    fieldset.optitem { border: 1px solid var(--vs-line); border-radius: var(--vs-radius-card); padding: var(--vs-space-3) var(--vs-space-4); margin: 0;
+      display: grid; gap: var(--vs-space-2); min-width: 0; }
+    fieldset.optitem legend { padding: 0 4px; overflow-wrap: anywhere; }
+    .optrow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--vs-space-2); font-size: 14px; }
+    .choices { display: flex; flex-wrap: wrap; gap: var(--vs-space-2); }
+    .choice { display: inline-flex; align-items: center; gap: 8px; min-height: var(--vs-target); padding: 0 var(--vs-space-3);
+      border: 1px solid var(--vs-line); border-radius: var(--vs-radius-control); cursor: pointer; background: var(--vs-surface); }
+    .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; }
     .summary dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--vs-space-3); margin: 0; }
     .summary dt { color: var(--vs-ink-muted); } .summary dd { margin: 0; text-align: right; font-weight: 600; white-space: nowrap; }
     .summary dt.total, .summary dd.total { font-size: 18px; color: var(--vs-ink); border-top: 2px solid var(--vs-ink); padding-top: 6px; }
@@ -106,6 +124,9 @@ export class VsProposalView extends LitElement {
     this.preview = false;
     this.gallery = null;
     this.failed = new Set();
+    this.announcement = '';
+    this.busy = false;
+    this.errors = [];
   }
 
   override connectedCallback() {
@@ -116,6 +137,13 @@ export class VsProposalView extends LitElement {
   override disconnectedCallback() {
     window.removeEventListener('beforeprint', this.openAll);
     super.disconnectedCallback();
+  }
+
+  /** A failed action moves focus to its error summary (AX-03). */
+  override updated(changed: Map<string, unknown>) {
+    if (changed.has('errors') && this.errors.length) {
+      void this.updateComplete.then(() => (this.renderRoot.querySelector('vs-error-summary') as VsErrorSummary | null)?.focusSummary());
+    }
   }
 
   /** Print the whole proposal: every room opened first (a closed <details> would print its title only). */
@@ -155,6 +183,7 @@ export class VsProposalView extends LitElement {
       </div>
       ${this.bar(page)}
       ${this.galleryDialog()}
+      <div class="sr-only" role="status" aria-live="polite">${this.announcement}</div>
     </div>`;
   }
 
@@ -269,7 +298,38 @@ export class VsProposalView extends LitElement {
 
   /** The proposal's sections after the rooms, in reading order. */
   protected sections(page: Page): TemplateResult {
-    return html`${this.pricingPanel(page)}`;
+    return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>` : nothing}
+      ${this.optionalPanel(page)}${this.pricingPanel(page)}`;
+  }
+
+  // --- CQX-06 optional items ------------------------------------------------------------------------------------------
+  protected optionalPanel(page: Page): TemplateResult | typeof nothing {
+    const items = page.proposal.optional_items;
+    if (!items.length) return nothing;
+    const states = new Map((page.selections?.items ?? []).map((i) => [i.ref, i.state]));
+    const can = page.capabilities.interaction && !this.preview;
+    const sel = page.selections;
+    const choices: [string, string][] = [['SELECTED', 'Add to my proposal'], ['DESELECTED', 'Not for me'], ['REQUESTED_FOR_DISCUSSION', 'I would like to discuss it']];
+    return html`<section class="card stack" aria-labelledby="opt" id="optional"><h2 id="opt">Optional items</h2>
+      <p class="small muted">Optional items are not in the total. Your choice is sent to Veda Spaces for review; it does not change the proposal by itself.</p>
+      ${items.map((x) => {
+        const state = states.get(x.ref) ?? 'NOT_SELECTED';
+        const images = page.media?.lines?.[x.ref] ?? [];
+        return html`<fieldset class="optitem" ?disabled=${!can || this.busy}><legend><span class="strong">${x.description}</span>
+            ${x.room_title ? html`<span class="small muted"> · ${x.room_title}</span>` : nothing}</legend>
+          <div class="optrow"><span>${[x.quantity, x.detail].filter(Boolean).join(' · ')}</span>
+            <span class="strong">${x.priced ? rupees(x.amount) : 'Price to be confirmed'}</span></div>
+          ${images.length ? this.thumbs(x.description, images) : nothing}
+          ${can ? html`<div class="choices">${choices.map(([value, label]) => html`<label class="choice">
+              <input type="radio" name=${`opt-${x.ref}`} .value=${value} ?checked=${state === value} ?disabled=${value === 'SELECTED' && !x.priced}
+                @change=${() => this.emit('proposal-select', { line_ref: x.ref, state: value, description: x.description })}>${label}</label>`)}</div>`
+            : html`<p class="small">Your choice: ${{ NOT_SELECTED: 'not chosen', SELECTED: 'added', DESELECTED: 'not for me', REQUESTED_FOR_DISCUSSION: 'to discuss' }[state]}</p>`}
+        </fieldset>`;
+      })}
+      ${sel && sel.selected_refs.length ? html`<p class="strong" aria-live="polite">${sel.status === 'CALCULATED'
+        ? html`With your choices: ${rupees(sel.total_with_selections)} (adds ${rupees(sel.extra)}), subject to Veda Spaces' confirmation.`
+        : html`PRICE CONFIRMATION REQUIRED: Veda Spaces will confirm the price of your choices.`}</p>` : nothing}
+    </section>`;
   }
 
   // --- CQX-05 price and payment ---------------------------------------------------------------------------------------

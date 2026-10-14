@@ -144,6 +144,53 @@ describe('vs-proposal-view pricing (CQX-05)', () => {
   });
 });
 
+describe('optional items (CQX-06)', () => {
+  const withChoices = (status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED', selected: string[] = []) => samplePage({
+    capabilities: { interaction: true, acceptance: false },
+    selections: { items: [{ ref: 'L9', state: selected.includes('L9') ? 'SELECTED' : 'NOT_SELECTED', priced: true }], selected_refs: selected,
+      status, extra: status === 'CALCULATED' && selected.length ? '15,000.00' : null,
+      total_with_selections: status === 'CALCULATED' && selected.length ? '4,07,100.00' : null } });
+
+  it('offers a labelled choice per item and says the price needs confirmation', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${withChoices('PRICE_CONFIRMATION_REQUIRED', ['L9'])}></vs-proposal-view>`);
+    const set = el.shadowRoot!.querySelector('fieldset.optitem')!;
+    expect(set.querySelector('legend')!.textContent).to.contain('Loft above wardrobe');
+    const radios = [...set.querySelectorAll('input[type=radio]')] as HTMLInputElement[];
+    expect(radios.map((r) => r.closest('label')!.textContent!.trim())).to.deep.equal(['Add to my proposal', 'Not for me', 'I would like to discuss it']);
+    expect(radios[0].checked).to.equal(true);
+    expect(el.shadowRoot!.querySelector('#optional')!.textContent).to.contain('PRICE CONFIRMATION REQUIRED');
+    await expect(el).to.be.accessible();
+  });
+
+  it('shows the server total only when it is calculated, and never offers choices in preview', async () => {
+    let el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${withChoices('CALCULATED', ['L9'])}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#optional')!.textContent).to.contain('₹ 4,07,100.00');
+    el = await fixture<VsProposalView>(html`<vs-proposal-view preview .page=${withChoices('CALCULATED')}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelectorAll('input[type=radio]')).to.have.length(0);
+  });
+
+  it('sends the choice with the link header, reloads, and announces the result; a refusal lands in the error summary', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'z'.repeat(43)}`);
+    let refused = false;
+    const calls = serve((path) => (path.endsWith('/selections') && refused
+      ? json({ status: 422, code: 'VALIDATION_FAILED', title: 'x', detail: 'Please choose one of the optional items.', errors: [{ field: 'line_ref', code: 'NOT_OPTIONAL', message: 'Not an optional item of this proposal.' }] }, 422)
+      : json(path.endsWith('/selections') ? withChoices('PRICE_CONFIRMATION_REQUIRED', ['L9']).selections : withChoices('PRICE_CONFIRMATION_REQUIRED'))));
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    (view.shadowRoot!.querySelector('input[type=radio]') as HTMLInputElement).click();
+    await waitUntil(() => view.announcement.includes('added to your choices'));
+    const post = calls.find((c) => c.path.endsWith('/selections'))!;
+    expect(post.headers['X-Veda-Proposal']).to.equal(`vsp_${'z'.repeat(43)}`);
+    expect(post.headers['Idempotency-Key']).to.match(/^[a-f0-9]{32}$/);
+    refused = true;
+    (view.shadowRoot!.querySelectorAll('input[type=radio]')[1] as HTMLInputElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('vs-error-summary'));
+    expect(view.announcement).to.equal('Not saved.');
+  });
+});
+
 describe('vs-proposal-page (CQX-01/03)', () => {
   afterEach(() => sessionStorage.clear());
 

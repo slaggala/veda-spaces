@@ -22,7 +22,13 @@ const REFUSALS: Record<string, string> = {
  * The token is taken from the URL fragment and scrubbed at once (api.takeToken); every request sends it in a header.
  */
 export class VsProposalPage extends LitElement {
-  static override properties = { load: { state: true }, page: { state: true }, message: { state: true }, heading: { state: true } };
+  static override properties = {
+    load: { state: true }, page: { state: true }, message: { state: true }, heading: { state: true },
+    announcement: { state: true }, busy: { state: true }, errors: { state: true },
+  };
+  declare announcement: string;
+  declare busy: boolean;
+  declare errors: { field: string; message: string }[];
   declare load: Load;
   declare page: Page | null;
   declare message: string;
@@ -44,6 +50,38 @@ export class VsProposalPage extends LitElement {
     this.page = null;
     this.message = '';
     this.heading = '';
+    this.announcement = '';
+    this.busy = false;
+    this.errors = [];
+  }
+
+  /** Run one customer action, then reload the page model (the server is the only source of totals and states). */
+  private async act(fn: () => Promise<unknown>, done: string) {
+    this.busy = true;
+    this.errors = [];
+    this.announcement = 'Saving…';
+    try {
+      await fn();
+      await this.refresh();
+      this.announcement = done;
+    } catch (e) {
+      const p = e as ApiProblem;
+      if (['PROPOSAL_LINK_REVOKED', 'PROPOSAL_LINK_EXPIRED', 'PROPOSAL_LINK_INVALID', 'PROPOSAL_SUPERSEDED'].includes(p.code)) {
+        this.refuse(p);
+        return;
+      }
+      const fields = (p.errors ?? []).map((er) => ({ field: er.field, message: er.message ?? 'Please check this.' }));
+      this.errors = fields.length ? fields : [{ field: '', message: p.detail || 'Something went wrong. Please try again.' }];
+      this.announcement = 'Not saved.';
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private onSelect(e: CustomEvent<{ line_ref: string; state: string; description: string }>) {
+    const { line_ref, state, description } = e.detail;
+    const words = { SELECTED: 'added to your choices', DESELECTED: 'marked not for you', REQUESTED_FOR_DISCUSSION: 'marked for discussion' }[state] ?? 'saved';
+    void this.act(() => proposalApi(this.token ?? '').select(line_ref, state), `${description} ${words}.`);
   }
 
   override connectedCallback() {
@@ -86,7 +124,10 @@ export class VsProposalPage extends LitElement {
   }
 
   override render() {
-    if (this.load === 'ready' && this.page) return html`<vs-proposal-view .page=${this.page} @proposal-changed=${() => this.refresh()}></vs-proposal-view>`;
+    if (this.load === 'ready' && this.page) {
+      return html`<vs-proposal-view .page=${this.page} .announcement=${this.announcement} .busy=${this.busy} .errors=${this.errors}
+        @proposal-select=${this.onSelect}></vs-proposal-view>`;
+    }
     return html`<div class="center"><div class="brandname">Veda Spaces</div>
       ${this.load === 'loading' ? html`<h1 tabindex="-1">Opening your proposal…</h1><vs-skeleton rows="6"></vs-skeleton>` : html`
         <h1 tabindex="-1">${this.heading}</h1><p role=${this.load === 'offline' ? 'status' : 'alert'}>${this.message}</p>

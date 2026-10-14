@@ -3,7 +3,7 @@ import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatAbsolute, humanize } from '../../core/format/format.js';
 import { shared, tableStyles } from '../../design-system/styles.js';
-import { previewPage, staffProposal, type Grant, type Preview } from './api.js';
+import { previewPage, staffProposal, type Activity, type Grant, type Preview } from './api.js';
 import './proposal-view.js';
 
 const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
@@ -16,8 +16,9 @@ const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
 export class VsProposalStaff extends SessionElement {
   static override properties = {
     quotationId: { attribute: false }, quotationStatus: { attribute: false }, grants: { state: true }, preview: { state: true },
-    issued: { state: true }, problem: { state: true }, busy: { state: true },
+    issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true },
   };
+  declare activity: Activity | null;
   declare quotationId: string;
   declare quotationStatus: string;
   declare grants: Grant[];
@@ -37,7 +38,7 @@ export class VsProposalStaff extends SessionElement {
   constructor() {
     super();
     this.quotationId = ''; this.quotationStatus = ''; this.grants = []; this.preview = null; this.issued = null;
-    this.problem = null; this.busy = false;
+    this.problem = null; this.busy = false; this.activity = null;
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -60,8 +61,10 @@ export class VsProposalStaff extends SessionElement {
     }
   }
 
-  /** Later CQX steps load their staff data here. */
-  protected async loadMore(): Promise<void> { /* none yet */ }
+  /** What the customer did on this version (choices, and later requests and acknowledgements). */
+  protected async loadMore(): Promise<void> {
+    this.activity = this.can('proposal.request.review') ? (await staffProposal.activity(this.quotationId)).data : null;
+  }
 
   private share(e: Event) {
     e.preventDefault();
@@ -85,8 +88,16 @@ export class VsProposalStaff extends SessionElement {
     </div>`;
   }
 
-  /** Later CQX steps render their staff sections here. */
-  protected more(): TemplateResult | typeof nothing { return nothing; }
+  protected more(): TemplateResult | typeof nothing {
+    const a = this.activity;
+    if (!a) return nothing;
+    return html`<section class="card stack" aria-labelledby="choices"><h3 id="choices" class="title">Customer choices on optional items</h3>
+      ${a.selections.length ? html`<div class="table-wrap"><table><thead><tr><th>Item</th><th>Choice</th><th>Changes</th><th>Last change</th></tr></thead>
+        <tbody>${a.selections.map((x) => html`<tr><td>${x.description ?? x.line_ref}</td><td><span class="chip">${humanize(x.state)}</span></td>
+          <td>${x.change_no}</td><td>${formatAbsolute(x.changed_on)}</td></tr>`)}</tbody></table></div>
+        <p class="small muted">A choice is a request: it changes nothing until a revised quotation (or the customer's acceptance) includes it.</p>`
+        : html`<p class="muted">No choices yet.</p>`}</section>`;
+  }
 
   private sharing(shareable: boolean) {
     const copy = (text: string) => navigator.clipboard?.writeText(text);
