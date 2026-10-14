@@ -25,10 +25,10 @@ from typing import Any
 
 from veda.modules.estimator.ratecard import LineSpec, ProductSpec, RateCard
 
-from .rules import ABOVE_FLOOR_OPENINGS, InputRule, ItemType, MeasuredCount
+from .rules import ABOVE_FLOOR_OPENINGS, RULESET_VERSION, InputRule, ItemType, MeasuredCount
 from .site import Facts
 
-QUANTITY_ENGINE_VERSION = "2026.10.2"
+QUANTITY_ENGINE_VERSION = "2026.10.3"
 MM_PER_FT = Decimal("304.8")
 CENTI = Decimal("0.01")
 ROUNDING_POLICY = {
@@ -157,6 +157,51 @@ def _wall_run(w: dict[str, Any], deduct: str) -> tuple[int, str]:
     return sum(b - a for a, b in segs), "DERIVED"
 
 
+# Openings that start at the floor by definition (a missing sill means 0); every other opening needs its sill to be
+# placed against the wall-unit zone.
+FLOOR_OPENINGS = ("DOOR", "FRENCH_WINDOW", "ARCH")
+
+
+def _wall_unit_wall(w: dict[str, Any], zone_top: int) -> tuple[int | None, list[str], str]:
+    """One wall's wall-unit run: its length less the openings that cross the wall-unit zone (any opening whose sill is
+    below the zone top, the lintel or else the ceiling; nothing is assumed about counter height, so an opening below
+    the zone top is never treated as passable). Returns (mm or None, deducted opening ids, sentence or the problem)."""
+    label, length = f"W{w['wall_index']}", int(w["length_mm"])
+    blocks, problems, above = [], [], []
+    for o in w.get("openings") or []:
+        kind = o["opening_type_code"]
+        sill = o.get("sill_height_mm")
+        if sill is None and kind in FLOOR_OPENINGS:
+            sill = 0
+        if sill is None:
+            problems.append(f"{label}: {kind.lower()} {o['width_mm']} mm has no sill height")
+            continue
+        if int(sill) >= zone_top:
+            above.append(o)  # wholly above the wall-unit zone
+            continue
+        start = o.get("offset_from_wall_start_mm")
+        if start is None:
+            problems.append(f"{label}: {kind.lower()} {o['width_mm']} mm has no offset")
+            continue
+        a, b = int(start), int(start) + int(o["width_mm"])
+        if a < 0 or b > length or b <= a:
+            problems.append(f"{label}: {kind.lower()} at {a}–{b} mm lies outside the {length} mm wall")
+            continue
+        blocks.append((a, b, o))
+    blocks.sort(key=lambda x: x[0])
+    for (a1, b1, _), (a2, b2, _) in zip(blocks, blocks[1:], strict=False):
+        if a2 < b1:
+            problems.append(f"{label}: openings at {a1}–{b1} mm and {a2}–{b2} mm overlap")
+    if problems:
+        return None, [], "; ".join(problems)
+    run = length - sum(b - a for a, b, _ in blocks)
+    cut = " − ".join(f"{o['opening_type_code'].lower().replace('_', ' ')} {b - a} mm" for a, b, o in blocks)
+    why = f"{label} {length} mm" + (f" − {cut}" if cut else "") + (f" = {run} mm" if cut else "")
+    if above:
+        why += f" (above the zone: {', '.join(o['opening_type_code'].lower() for o in above)})"
+    return run, [o["id"] for _, _, o in blocks], why
+
+
 def _sum_points(facts: Facts, types: tuple[str, ...] | None, statuses: tuple[str, ...],
                 sensor_types: tuple[str, ...] = (), switchings: tuple[str, ...] = ()) -> tuple[int, list[str], int]:  # fmt: skip
     """Σ captured points of the types and statuses, the spaces they are in, and how many of those points lack a
@@ -208,6 +253,33 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
         cut = "openings" if rule.deduct == "all_openings" else "doors and other floor-level openings"
         why = f"Σ stretches clear of {cut} on walls tagged {rule.tag}: " + " + ".join(parts) + f" = {total} mm"
         return _length(total, source, why, facts.ref(space_id, wall_ids=[w["id"] for w in tagged]))
+    if k == "wall_unit_run":
+        tagged = [w for w in facts.walls(space_id) if rule.tag in (w.get("usable_for_code") or [])]
+        if not tagged:
+            return _missing(f"No wall in this space is tagged {rule.tag}.")
+        refs = facts.ref(space_id, wall_ids=[w["id"] for w in tagged])
+        zone_top = (m or {}).get("floor_to_lintel_mm") or (m or {}).get("ceiling_height_mm")
+        if not zone_top:
+            return _missing("Neither floor-to-lintel nor ceiling height was captured: the wall-unit zone is unknown. "
+                            "Enter the wall-unit run or correct the measurements.", refs)  # fmt: skip
+        total = 0
+        parts = []
+        problems: list[str] = []
+        cut_ids: list[str] = []
+        for w in tagged:
+            wall_run, ids, why = _wall_unit_wall(w, int(zone_top))
+            if wall_run is None:
+                problems.append(why)
+                continue
+            total += wall_run
+            parts.append(why)
+            cut_ids += ids
+        if problems:
+            return _missing("Wall-unit run not derivable (never the counter run): " + "; ".join(problems) + ". Enter "
+                            "the wall-unit run or correct the measurements.", refs)  # fmt: skip
+        source = "DERIVED" if cut_ids else "MEASURED"
+        why = f"wall-unit zone below {zone_top} mm on walls tagged {rule.tag}: " + "; ".join(parts) + f"; Σ {total} mm"
+        return _length(total, source, why, {**refs, "opening_ids": cut_ids})
     if k == "window_span":
         w = _anchor_wall(facts, space_id, rule.tag, anchor)
         if w is None:
@@ -306,7 +378,33 @@ def derive_input(rule: InputRule, facts: Facts, space_id: str | None, anchor: in
 
 
 def derive_inputs(itype: ItemType, facts: Facts, space_id: str | None, anchor: int | None) -> dict[str, dict]:
-    return {name: derive_input(rule, facts, space_id, anchor) for name, rule in itype.inputs.items()}
+    """Every ruleset input of the item, each with its quantity role, rule identifier and version, and status."""
+    out = {}
+    for name, rule in itype.inputs.items():
+        d = derive_input(rule, facts, space_id, anchor)
+        d.update(role=name, rule=rule.kind, rule_version=RULESET_VERSION,
+                 status="UNRESOLVED" if d["source"] == "MISSING" else "RESOLVED")  # fmt: skip
+        out[name] = d
+    return out
+
+
+def for_line(itype: ItemType, line_code: str, dims: dict[str, dict], overrides: dict[str, Any]) -> tuple[dict, dict]:
+    """The inputs and overrides one card line is evaluated on: its quantity role's value under the card's input
+    name. A role's own staff entry applies; another role's never does (a wall unit never takes the counter run)."""
+    roles = itype.roles_for(line_code)
+    if not roles:
+        return dims, overrides
+    d, o = dict(dims), dict(overrides)
+    for card_input, role in roles.items():
+        if role in dims:
+            d[card_input] = dims[role]
+        else:
+            d.pop(card_input, None)
+        if role in overrides:
+            o[card_input] = overrides[role]
+        else:
+            o.pop(card_input, None)
+    return d, o
 
 
 def options_from_rules(itype: ItemType, facts: Facts, space_id: str | None) -> dict[str, dict[str, str]]:
@@ -404,9 +502,10 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
         src = "STAFF" if name in overrides else (d or {}).get("source", "MISSING")
         if SOURCE_RANK.get(src, 4) > SOURCE_RANK[result.source]:
             result.source = src
+        role = (d or {}).get("role") or name
         result.inputs[name] = {"value": show(v, "0.0001"), "unit": CARD_KIND_UNIT[kinds[name]], "source": src,
-                               "refs": (d or {}).get("refs", {})}  # fmt: skip
-        parts.append(_input_text(name, v, d, name in overrides, CARD_KIND_UNIT[kinds[name]]))
+                               "role": role, "refs": (d or {}).get("refs", {})}  # fmt: skip
+        parts.append(_input_text(role, v, d, name in overrides, CARD_KIND_UNIT[kinds[name]]))
     if result.missing or result.kind_mismatch or result.not_whole:
         return result
     factor = Decimal(str(spec.factor))

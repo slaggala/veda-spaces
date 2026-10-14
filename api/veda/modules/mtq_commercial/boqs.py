@@ -170,13 +170,14 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
     for line in product.lines:
         if any(options.get(w.option) not in w.is_ for w in line.when):
             continue
-        lq = quantity.line_quantity(card, product, line, dims, overrides)
+        ldims, lover = quantity.for_line(itype, line.code, dims, overrides)  # this line's quantity roles
+        lq = quantity.line_quantity(card, product, line, ldims, lover)
         issues = list(item_issues)
         if line.uom not in V.UOMS:
             issues.append(issue("UNSUPPORTED_UNIT", what=what, detail=line.uom))
-        no_rule = [n for n in lq.missing + lq.kind_mismatch if n not in itype.inputs and n not in overrides]
+        no_rule = [n for n in lq.missing + lq.kind_mismatch if n not in itype.inputs and n not in lover]
         kinds = {i.name: i.kind for i in product.inputs}
-        mismatch = [f"{n} is derived as a {(dims.get(n) or {}).get('kind')} but card {card.version} takes a {kinds[n]}."
+        mismatch = [f"{n} is derived as a {(ldims.get(n) or {}).get('kind')} but card {card.version} takes a {kinds[n]}."
                     for n in lq.kind_mismatch if n not in no_rule]  # fmt: skip
         if mismatch:
             issues.append(issue("QUANTITY_KIND_MISMATCH", what=what, detail=" ".join(mismatch)))
@@ -185,15 +186,17 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
         if no_rule:
             issues.append(issue("MISSING_QUANTITY_RULE", what=what, detail=", ".join(no_rule)))
         elif lq.missing:
-            why = "; ".join(f"{n}: {(dims.get(n) or {}).get('explain', 'not entered')}" for n in lq.missing)
+            why = "; ".join(f"{(ldims.get(n) or {}).get('role', n)}: {(ldims.get(n) or {}).get('explain', 'not entered')}"
+                            for n in lq.missing)  # fmt: skip
             issues.append(issue("MISSING_MEASUREMENT", what=what, detail=why))
         if lq.out_of_bounds:
             issues.append(issue("IMPOSSIBLE_QUANTITY", what=what, detail="; ".join(lq.out_of_bounds) + "."))
         if lq.source == "ASSUMED":
+            used = [n for n in (line.quantity.input, line.quantity.height_input) if n]
             assumed = [
-                f"{n} {d.get('explain')}"
-                for n, d in dims.items()
-                if d.get("source") == "ASSUMED" and n not in overrides
+                f"{(ldims.get(n) or {}).get('role', n)} {(ldims.get(n) or {}).get('explain')}"
+                for n in used
+                if (ldims.get(n) or {}).get("source") == "ASSUMED" and n not in lover
             ]
             issues.append(issue("ASSUMED_DIMENSION", what=what, detail="; ".join(assumed)))
         # A zero quantity is kept and classified (quantity_status), never dropped: a zero count is a valid zero, a zero

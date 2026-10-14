@@ -8,6 +8,9 @@ quantity kinds and the amount calculation. Where they differ on purpose, the dif
 - a missing input: the estimator (a budget) substitutes the card's typical value and lists it as an assumption; the
   BOQ never substitutes a value, it reports the input missing and blocks review;
 - a zero quantity: the estimator drops the line; the BOQ keeps it, classified VALID_ZERO (never silently dropped);
+- quantity roles: the estimator takes one kitchen RUN for every kitchen line (a budget); the BOQ evaluates each line on
+  its own role (the counter run for base units, the wall-unit run for wall units and lofts). Each line still agrees
+  with the estimator run on that line's role value;
 - precision of a length: the estimator receives a customer-entered value in feet; MTQ derives feet from integer
   millimetres exactly (mm / 304.8, no intermediate rounding), so the only rounding is the shared final one.
 """
@@ -143,3 +146,22 @@ def test_exact_millimetres_then_one_rounding():
     lq = quantity.line_quantity(CARD, spec, body, dims, {})
     exact = (Decimal(2235) / Decimal("304.8")) * (Decimal(2134) / Decimal("304.8"))
     assert lq.quantity == quantity.q(exact)
+
+
+def test_kitchen_roles_agree_line_by_line_with_the_estimator():
+    """Counter run 17.72 ft, wall-unit run 13.78 ft: base lines match an estimate with RUN 17.72, wall-unit and loft
+    lines match an estimate with RUN 13.78; one estimate on either run would misprice the other lines."""
+    from veda.modules.mtq_commercial import rules
+
+    itype = rules.item_type("KITCHEN")
+    spec = CARD.product("KITCHEN")
+    overrides = {"RUN": "17.72", "WALL_UNIT_RUN": "13.78", "DRAWERS": "4"}
+    by_run = {run: {x.code: x for x in _estimator("KITCHEN", "KITCHEN", {"RUN": float(run), "DRAWERS": 4}).lines}
+              for run in ("17.72", "13.78")}  # fmt: skip
+    for line in spec.lines:
+        d, o = quantity.for_line(itype, line.code, {}, overrides)
+        lq = quantity.line_quantity(CARD, spec, line, d, o)
+        expected = by_run["13.78" if itype.roles_for(line.code) else "17.72"][line.code]
+        assert lq.quantity == expected.quantity, line.code
+        assert engine.line_amount_minor(lq.quantity, expected.rate_minor) == expected.amount_minor
+    assert by_run["17.72"]["WALL"].quantity != by_run["13.78"]["WALL"].quantity  # the roles really differ

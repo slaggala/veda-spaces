@@ -196,7 +196,12 @@ REDACTED = "[erased]"
 def redact(s: Session, q: quotations.Quotation) -> bool:
     """Lead erasure: replace the customer-identifying fields of a frozen document (customer name, subject, cover
     note), re-render with the pinned template, re-seal, and record the previous digests. Amounts, lines, terms, the
-    property reference and the quotation number stay (commercial record)."""
+    property reference and the quotation number stay (commercial record).
+
+    Only a verified document is re-sealed. A document that already fails its digests is still redacted (erasure is
+    never refused) but is not re-sealed: its personal fields are replaced, its HTML is withdrawn and its original
+    digests are kept, so it stays SNAPSHOT_INTEGRITY_FAILED and erasure never turns a tampered document into a
+    verified one. The event records INTEGRITY_FAILED_BEFORE_REDACTION for the incident."""
     if q.snapshot is None:
         return False
     current = q.snapshot
@@ -207,11 +212,18 @@ def redact(s: Session, q: quotations.Quotation) -> bool:
     ):
         return False  # already redacted
     before = (q.snapshot_sha256, q.issued_html_sha256)
+    verified = integrity(q)
     doc = dict(q.snapshot)
     doc["customer"] = {"name": REDACTED if (doc.get("customer") or {}).get("name") else None}
     doc["subject"] = REDACTED
     if doc.get("cover_note"):
         doc["cover_note"] = REDACTED
+    if not verified:
+        q.snapshot, q.issued_html = doc, None  # digests untouched: the document stays refused
+        quotations.event(s, q, "SNAPSHOT_REDACTED", q.status, q.status, reason_code="LEAD_ERASURE",
+                         integrity="INTEGRITY_FAILED_BEFORE_REDACTION", resealed=False,
+                         previous_snapshot_sha256=before[0], previous_html_sha256=before[1])  # fmt: skip
+        return True
     render = TEMPLATES.get(q.template_version or "")
     if render is None:
         raise RuntimeError(f"template {q.template_version} of {q.id} is no longer available; keep every version")
@@ -219,8 +231,8 @@ def redact(s: Session, q: quotations.Quotation) -> bool:
     q.snapshot, q.snapshot_sha256 = doc, hashlib.sha256(canonical_bytes(doc)).hexdigest()
     q.issued_html, q.issued_html_sha256 = page, _sha(page)
     quotations.event(s, q, "SNAPSHOT_REDACTED", q.status, q.status, reason_code="LEAD_ERASURE",
-                     previous_snapshot_sha256=before[0], previous_html_sha256=before[1],
-                     snapshot_sha256=q.snapshot_sha256)  # fmt: skip
+                     integrity="VERIFIED_BEFORE_REDACTION", resealed=True, previous_snapshot_sha256=before[0],
+                     previous_html_sha256=before[1], snapshot_sha256=q.snapshot_sha256)  # fmt: skip
     return True
 
 

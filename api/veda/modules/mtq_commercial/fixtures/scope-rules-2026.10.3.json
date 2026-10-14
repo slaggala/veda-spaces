@@ -1,6 +1,6 @@
 {
  "schema": "veda.mtq.scope-rules/1",
- "ruleset_version": "2026.10.2",
+ "ruleset_version": "2026.10.3",
  "status": "PROPOSED",
  "status_note": "Proposed content pending the owner's OI-MTQ-03 (scope rules) and OI-MTQ-04 (quantity derivations, clearances, rounding). Every generated item still needs a staff decision; nothing generated from this ruleset is customer-issuable until the register records both decisions.",
  "sources": [
@@ -10,7 +10,8 @@
   "04 \u00a71 'Window seating candidate: window run and sill': a window seat spans the window (its width is the span across the window openings of the tagged wall)",
   "01 \u00a73 and 04 KITCHEN_BASE_FROM_RUNS / KITCHEN_WALL_FROM_RUNS: the base (counter) run is the sum of the tagged walls' runs and continues beneath windows; window spans are deducted from wall units only; the card's single RUN input is the counter length",
   "04 POOJA_UNIT_FROM_WALL: pooja doors take W x H 'from the opening' when a door frame exists, i.e. the pooja room's own door; a niche unit's shutter is not a room door",
-  "B1 capture rules: a sensor light records its sensor type and switching; only NEW sensor lights with a real sensor (PIR, MICROWAVE) and sensor switching (SENSOR, BOTH) are sensor provisions"
+  "B1 capture rules: a sensor light records its sensor type and switching; only NEW sensor lights with a real sensor (PIR, MICROWAVE) and sensor switching (SENSOR, BOTH) are sensor provisions",
+  "04 KITCHEN_WALL_FROM_RUNS / KITCHEN_LOFT_FROM_CLEARANCE: wall units take the tagged runs less window spans, and the loft run is the wall-unit run; the card's single RUN is therefore evaluated per line on its quantity role (RUN for base units and base shutters, WALL_UNIT_RUN for wall units, lofts and their shutters). The utility card's only measured line is a wall unit. No wall-unit bottom, chimney span or clearance is applied (OI-MTQ-04): every opening whose sill is below the lintel (or the ceiling) is deducted, and an opening without a sill or offset leaves the wall-unit run unresolved."
  ],
  "parameters_note": "No clearance, corner deduction, wastage or rounding beyond the estimator's 0.01 half-up is applied: those are OI-MTQ-04 values, not decided.",
  "item_types": {
@@ -109,6 +110,24 @@
     "DRAWERS": {
      "kind": "staff",
      "explain": "drawer count from the kitchen layout"
+    },
+    "WALL_UNIT_RUN": {
+     "kind": "wall_unit_run",
+     "tag": "KITCHEN_RUN"
+    }
+   },
+   "line_inputs": {
+    "WALL": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "SOFT_CLOSE_WALL": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "LOFT": {
+     "RUN": "WALL_UNIT_RUN"
+    },
+    "SOFT_CLOSE_LOFT": {
+     "RUN": "WALL_UNIT_RUN"
     }
    }
   },
@@ -122,9 +141,8 @@
    "card_product": "UTILITY",
    "inputs": {
     "WIDTH": {
-     "kind": "tagged_run_total",
-     "tag": "KITCHEN_RUN",
-     "deduct": "floor_openings"
+     "kind": "wall_unit_run",
+     "tag": "KITCHEN_RUN"
     }
    }
   },

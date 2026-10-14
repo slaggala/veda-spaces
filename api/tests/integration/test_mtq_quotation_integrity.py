@@ -185,3 +185,30 @@ def test_lineage_trace_needs_its_own_permission(api, factory):
         bare = quotations.trace(s, s.get(QuotationLine, line["id"]), rates=False)
     assert not {"rate_card_version", "rate_card_sha256", "provenance"} & set(bare["estimate_line"])
     assert bare["boq_line"]["derivation"] and bare["measurement"]["measurement_set_id"] == est["measurement_set_id"]
+
+
+def test_erasure_never_reseals_a_tampered_document(api, factory):
+    from veda.modules.crm.leads import service as lead_service
+    from veda.modules.crm.leads.models import Lead
+    from veda.modules.mtq_commercial.models import Quotation, QuotationEvent
+
+    install_full_policy()
+    load_card()
+    c = Commercial(api, factory)
+    _, _, q = _issued(c, body={"cover_note": "For Mr Probe Person", "title": "Probe Person flat"})
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        row = s.get(Quotation, q["id"])
+        row.snapshot = {**row.snapshot, "summary": {**row.snapshot["summary"], "total": "1.00"}}  # tampered
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        lead_service.anonymize(s, s.get(Lead, q["lead_id"]), legal_basis="TEST", request_ref=None)
+    with db.unit_of_work() as s:
+        row = s.get(Quotation, q["id"])
+        assert row.snapshot["subject"] == row.snapshot["customer"]["name"] == "[erased]"  # still redacted
+        assert row.issued_html is None and "Probe" not in str(row.snapshot)
+        assert (row.snapshot_sha256, row.issued_html_sha256) == (q["snapshot_sha256"], q["issued_html_sha256"])
+        ev = s.execute(sa.select(QuotationEvent).where(QuotationEvent.quotation_id == q["id"],
+                                                       QuotationEvent.event_code == "SNAPSHOT_REDACTED")).scalar_one()  # fmt: skip
+        assert ev.detail["integrity"] == "INTEGRITY_FAILED_BEFORE_REDACTION" and ev.detail["resealed"] is False
+    r = c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document")
+    assert r.status == 409 and r.code == "SNAPSHOT_INTEGRITY_FAILED"  # never turned into a verified document
+    assert ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}"))["snapshot_verified"] is False

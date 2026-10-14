@@ -28,7 +28,7 @@ from veda.modules.mtq import vocab as SV
 
 from . import vocab as V
 
-RULESET_VERSION = "2026.10.2"
+RULESET_VERSION = "2026.10.3"
 FIXTURE = Path(__file__).with_name("fixtures") / f"scope-rules-{RULESET_VERSION}.json"
 APPROVED_STATUS = "APPROVED"
 
@@ -36,6 +36,7 @@ INPUT_KINDS = (
     "wall_run",  # the longest stretch of the anchor (or first tagged) wall clear of openings
     "tagged_run_total",  # Σ stretches clear of openings over every wall with the tag
     "window_span",  # the span across the listed window openings of the anchor (or first tagged) wall
+    "wall_unit_run",  # Σ over tagged walls of the wall-unit zone (counter to lintel) clear of the openings crossing it
     "lintel_capped",  # min(floor to lintel, cap); the cap when the lintel was not captured (ASSUMED)
     "wall_height",  # the tagged wall's own height, else the ceiling height
     "floor_area",  # the space's derived floor area
@@ -145,14 +146,26 @@ class ItemType(_Closed):
     option_rules: dict[str, OptionRule] = Field(default_factory=dict)
     measured_count: MeasuredCount | None = None
     unmapped_reason: str | None = None
+    # Quantity roles: card line → {card input: ruleset input}. A card that measures several lines with one input (the
+    # kitchen's RUN) gets, per line, the quantity of that line's own role (the wall-unit run for wall units and
+    # lofts); lines not listed use the input of the same name (the counter run for base units).
+    line_inputs: dict[str, dict[str, str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _mapping(self):
         if self.card_product is None and not self.unmapped_reason:
             raise ValueError("an item type without a card product states why")
-        if self.card_product is None and (self.inputs or self.fixed_options or self.option_rules):
+        if self.card_product is None and (self.inputs or self.fixed_options or self.option_rules or self.line_inputs):
             raise ValueError("inputs and options need a card product")
+        for line, roles in self.line_inputs.items():
+            for card_input, role in roles.items():
+                if role not in self.inputs or card_input not in self.inputs:
+                    raise ValueError(f"line {line}: {card_input} → {role} must name inputs of the item type")
         return self
+
+    def roles_for(self, line_code: str) -> dict[str, str]:
+        """card input → ruleset input for one card line (identity unless the line has its own role)."""
+        return self.line_inputs.get(line_code, {})
 
 
 class Rule(_Closed):
@@ -249,6 +262,7 @@ def public_view() -> dict[str, Any]:
                 "fixed_options": t.fixed_options,
                 "inputs": {n: i.model_dump(exclude_none=True) for n, i in t.inputs.items()},
                 "unmapped_reason": t.unmapped_reason,
+                "line_inputs": t.line_inputs,
             }
             for k, t in rs.item_types.items()
         },

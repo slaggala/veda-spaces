@@ -176,6 +176,7 @@ KNOWN_COMMITS = {
     # PR #77's first head (the plan-only PROPOSED proposal) was superseded when the pull request was rebuilt on main
     # after the merge of #76; the documents cite that pull request by number, so no commit of it is listed here.
     "851809e3b8bff0d2467267eca51055b11b41cba8": ("MTQ B2-B4 e2e: the off-by-default step checks the 404s only (the workspace authenticates by bearer header, so a bare fetch of /auth/me has no session)", "PR #91 head reviewed by the B2-B4 certification"),  # pragma: allowlist secret (commit SHA)
+    "d4b70667521c69d143f51112ce4002e473b0b19f": ("MTQ PR #91 remediation 5: record, decision log 32, SYNTHETIC evidence 2026-10-14", "PR #91 head of the focused B2-B4 re-review"),  # pragma: allowlist secret (commit SHA)
 }  # fmt: skip
 EXTRA_DOCS = (
     "README.md",

@@ -40,7 +40,11 @@ def test_ruleset_is_valid_versioned_and_still_proposed():
             product = CARD.product(t.card_product)
             assert product is not None, code
             names = {i.name for i in product.inputs}
-            assert set(t.inputs) <= names, code
+            roles = {role for m in t.line_inputs.values() for role in m.values()}
+            assert set(t.inputs) - roles <= names and not roles & names, code  # a role is never a card input name
+            lines = {ln.code for ln in product.lines}
+            for line, mapping in t.line_inputs.items():  # each role feeds an existing card line's existing input
+                assert line in lines and set(mapping) <= names, (code, line)
             for opt, choice in t.fixed_options.items():
                 assert choice in next(o for o in product.options if o.name == opt).choices
         else:
