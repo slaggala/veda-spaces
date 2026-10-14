@@ -19,13 +19,12 @@ import hashlib
 from flask import request
 
 from veda.config import settings
-from veda.kernel import clock
 from veda.kernel.errors import ApiError
 from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 from veda.modules.mtq_commercial import access
 from veda.modules.mtq_commercial.models import Quotation
 
-from . import grants, projection
+from . import grants, journey, projection
 from . import schemas as S
 from .models import ProposalAccessGrant
 
@@ -181,11 +180,10 @@ def preview(req: Req, quotation_id: str):
                   limits=READ_LIMITS, summary="The customer's proposal, opened by its secure link (customer-safe)")  # fmt: skip
 def view(req: Req):
     g, q = customer(req)
-    proposal = projection.build(req.session, q)  # verified frozen document, or a refusal before anything is recorded
+    page = journey.customer_view(req.session, g, q)  # built first: a refused document records no view
     grants.record_view(req.session, g)
-    state = grants.proposal_state(req.session, q)
-    return private(ok({"state": state, "link": {"expires_on": clock.to_rfc3339(g.expires_on), "status": g.status},
-                       "proposal": proposal}))  # fmt: skip
+    page["link"]["status"] = g.status
+    return private(ok(page))
 
 
 ALL_APIS = (staff_api, public_api, interaction_api, acceptance_api)

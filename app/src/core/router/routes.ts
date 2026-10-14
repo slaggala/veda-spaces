@@ -11,6 +11,8 @@ interface Def extends RouteMeta {
   load: Loader;
   /** Document title for the page (WCAG 2.4.2, IR-19). */
   title: string;
+  /** A complete document title instead of "title · Veda Workspace" (customer-facing pages). */
+  fullTitle?: string;
 }
 
 const auth = () => import('../../modules/auth/index.js');
@@ -20,6 +22,7 @@ const audit = () => import('../../modules/audit/index.js');
 const catalog = () => import('../../modules/catalog/index.js');
 const siteModule = () => import('../../modules/site/index.js');
 const commercialModule = () => import('../../modules/commercial/index.js');
+const proposalModule = () => import('../../modules/proposal/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -35,6 +38,9 @@ export const ROUTES: Def[] = [
   { path: '/cancel-email-change', title: 'Cancel email change', component: 'vs-cancel-email-page', access: 'public', load: auth },
   // Break-glass cancel link from the notification email (06 §7.5 step 5; DEV-005, AM-5, IR-07).
   { path: '/approvals/cancel', title: 'Cancel break-glass request', component: 'vs-approval-cancel-page', access: 'public', load: auth },
+  // CQX: the customer's proposal, opened by its secure link (the token is in the fragment; every API call answers 404
+  // while VEDA_CUSTOMER_PROPOSAL_ENABLED is off). No sign-in and no workspace chrome.
+  { path: '/proposal', title: 'Your proposal', fullTitle: 'Your proposal · Veda Spaces', component: 'vs-proposal-page', access: 'public', load: proposalModule },
   { path: '/recovery-mode', title: 'Account recovery', component: 'vs-recovery-mode-page', access: 'auth', recovery: true, load: auth },
   { path: '/change-password', title: 'Change password', component: 'vs-change-password-page', access: 'auth', passwordChange: true, load: auth },
   { path: '/no-access', title: 'No access', component: 'vs-no-access-page', access: 'auth', chrome: true, load: auth },
@@ -77,6 +83,7 @@ export const APP_TITLE = 'Veda Workspace';
 /** "Page · Veda Workspace" for a path; unknown paths get "Page not found". */
 export function titleForPath(pathname: string): string {
   const def = metaForPath(pathname) as Def | undefined;
+  if (def?.fullTitle) return def.fullTitle;
   return `${def ? def.title : 'Page not found'} · ${APP_TITLE}`;
 }
 

@@ -7,8 +7,9 @@ import {
   commercial, type Boq, type BoqLine, type Estimate, type Issue, type Journey, type Lineage, type PolicyView,
   type Quotation, type Requirement, type Scope, type ScopeItem,
 } from './api.js';
+import '../proposal/staff-panel.js';
 
-type Tab = 'overview' | 'scope' | 'boq' | 'estimate' | 'quotation';
+type Tab = 'overview' | 'scope' | 'boq' | 'estimate' | 'quotation' | 'proposal';
 const money = (minor: number | null | undefined) => (minor === null || minor === undefined ? '—' : formatINR(minor / 100));
 const qty = (centi: number | null | undefined) => (centi === null || centi === undefined ? '—' : (centi / 100).toFixed(2));
 const REQUIREMENT_TYPES = ['WARDROBE', 'TV_UNIT', 'CROCKERY_UNIT', 'STUDY_UNIT', 'VANITY', 'DRESSER', 'KITCHEN', 'KITCHEN_TALL_UNIT',
@@ -121,6 +122,9 @@ export class VsCommercialPage extends SessionElement {
       { id: 'overview', label: 'Overview' }, { id: 'scope', label: 'Scope' }, { id: 'boq', label: 'BOQ', hidden: !this.can('boq.read') },
       { id: 'estimate', label: 'Estimate', hidden: !this.can('cost_estimate.read') },
       { id: 'quotation', label: 'Quotation', hidden: !this.can('quotation.read') || j?.quotations === undefined },
+      // CQX: shown only where the deployment has customer proposals on and the user may preview or share them.
+      { id: 'proposal', label: 'Customer proposal', hidden: !this.quotation || this.me?.features?.customer_proposal !== true
+        || !this.canAny('proposal.preview', 'proposal.share') },
     ];
     return html`<div class="page stack">
       <div class="page-head"><h1 class="display">Scope and quotation${j ? html` · ${j.property_number}` : nothing}</h1></div>
@@ -140,6 +144,7 @@ export class VsCommercialPage extends SessionElement {
       case 'boq': return this.boqPanel();
       case 'estimate': return this.estimatePanel();
       case 'quotation': return this.quotationPanel();
+      case 'proposal': return html`<vs-proposal-staff .quotationId=${this.quotation?.id ?? ''} .quotationStatus=${this.quotation?.status ?? ''}></vs-proposal-staff>`;
       default: return this.overview(j);
     }
   }

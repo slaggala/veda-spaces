@@ -64,9 +64,14 @@ def issued(c: Commercial, key: str = "2BHK", *, optional: str = "ACCEPTED") -> t
     return prop, est, q
 
 
-def setup(api, factory, key: str = "2BHK", *, policy: bool = True, optional: str = "ACCEPTED"):
+# SYNTHETIC preparation drivers so 5 BHK and independent-house quotations can be issued in tests (as the MTQ end-to-end
+# suite does); the real OI-MTQ-15 decision is the owner's and stays null.
+SYNTHETIC_PREP = {"home_size_by_bedrooms": {"5": "4BHK"}, "independent_house_factor_bp": 13_000}
+
+
+def setup(api, factory, key: str = "2BHK", *, policy: bool = True, optional: str = "ACCEPTED", **decisions):
     if policy:
-        install_full_policy()
+        install_full_policy(**{"OI_MTQ_15": SYNTHETIC_PREP, **decisions})
     load_card()
     c = Commercial(api, factory)
     prop, est, q = issued(c, key, optional=optional)

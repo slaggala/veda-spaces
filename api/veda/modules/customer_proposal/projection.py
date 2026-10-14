@@ -54,6 +54,8 @@ FIELDS: dict[str, str] = {
     "rooms[].title": "room or section title",
     "rooms[].kind": "ROOM, PROJECT or CHANGES",
     "rooms[].subtotal": "approved room subtotal",
+    "rooms[].included_count": "number of included lines in the room",
+    "rooms[].optional_count": "number of optional items offered for the room",
     "rooms[].lines[].ref": "line reference (L<n>, not an identifier)",
     "rooms[].lines[].description": "item name",
     "rooms[].lines[].detail": "customer-friendly detail (finish, room)",
@@ -250,6 +252,9 @@ def build(s: Session, q: Quotation, doc: dict[str, Any] | None = None) -> dict[s
         room = room_of_space.get(x.space_id or "")
         item["room_ref"], item["room_title"] = (room["ref"], room["title"]) if room else (None, None)
         optional_items.append(item)
+    for room in rooms:  # room-card counts (CQX-03), from the frozen lines only
+        room["included_count"] = sum(1 for x in room["lines"] if x["status"] != "Optional")
+        room["optional_count"] = sum(1 for x in optional_items if x["room_ref"] == room["ref"])
     summary = {k: v for k, v in (doc.get("summary") or {}).items() if k in SUMMARY_FIELDS}
     if "gst" in summary:
         summary["gst"] = {"status": summary["gst"].get("status"), "amount": summary["gst"].get("amount")}

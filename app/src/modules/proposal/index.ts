@@ -1,0 +1,1 @@
+import './proposal-page.js';
