@@ -444,6 +444,7 @@ class LineQuantity:
     kind_mismatch: list[str] = field(default_factory=list)
     not_whole: list[str] = field(default_factory=list)  # count inputs that are not whole numbers
     source: str = "MEASURED"
+    raw: Decimal | None = None  # the exact quantity before the one rounding
 
 
 def exact_input(d: dict[str, Any] | None, override: Any, card_kind: str) -> Decimal | None:
@@ -504,7 +505,8 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
             result.source = src
         role = (d or {}).get("role") or name
         result.inputs[name] = {"value": show(v, "0.0001"), "unit": CARD_KIND_UNIT[kinds[name]], "source": src,
-                               "role": role, "refs": (d or {}).get("refs", {})}  # fmt: skip
+                               "role": role, "rule": (d or {}).get("rule"), "rule_version": (d or {}).get("rule_version"),
+                               "refs": (d or {}).get("refs", {})}  # fmt: skip
         parts.append(_input_text(role, v, d, name in overrides, CARD_KIND_UNIT[kinds[name]]))
     if result.missing or result.kind_mismatch or result.not_whole:
         return result
@@ -527,7 +529,8 @@ def line_quantity(card: RateCard, product: ProductSpec, line: LineSpec, dims: di
     else:
         raw = Decimal(1)
         parts.append("1 lump sum (card basis)")
-    qty = q(raw * factor)
+    result.raw = raw * factor
+    qty = q(result.raw)
     if factor != 1:
         parts.append(f"× {num(factor)} (card factor)")
     result.quantity = qty

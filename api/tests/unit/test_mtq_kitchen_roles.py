@@ -176,3 +176,31 @@ def test_for_line_never_hands_a_wall_line_the_counter_value():
     assert d["RUN"] == {"mm": 4200} and "RUN" not in o
     d, o = quantity.for_line(itype, "BASE", dims, {"RUN": "20"})
     assert d["RUN"] == {"mm": 5400} and o == {"RUN": "20"}
+
+
+def test_reviewer_fixture_every_line_keeps_source_rule_unit_raw_rounded_and_status():
+    f = kitchen(wall(1, 3000, ["KITCHEN_RUN"], [op("WINDOW", 1200, 900, "o1")]), wall(2, 2400, ["KITCHEN_RUN"]))
+    _, lines = run("KITCHEN", f, overrides={"DRAWERS": "4"})
+    expected = {  # line: (role, rule, run mm, card height ft, source, rounded centi)
+        "BASE": ("RUN", "tagged_run_total", 5400, "3", "MEASURED", 5315),
+        "SOFT_CLOSE": ("RUN", "tagged_run_total", 5400, "2.9", "MEASURED", 5138),
+        "WALL": ("WALL_UNIT_RUN", "wall_unit_run", 4200, "2", "DERIVED", 2756),
+        "SOFT_CLOSE_WALL": ("WALL_UNIT_RUN", "wall_unit_run", 4200, "2", "DERIVED", 2756),
+        "LOFT": ("WALL_UNIT_RUN", "wall_unit_run", 4200, "2", "DERIVED", 2756),
+        "SOFT_CLOSE_LOFT": ("WALL_UNIT_RUN", "wall_unit_run", 4200, "2", "DERIVED", 2756),
+    }
+    for code, (role, rule, run_mm, height, source, rounded) in expected.items():
+        x = lines[code]
+        used = x.formula_inputs["inputs"]["RUN"]
+        raw = Decimal(run_mm) / FT * Decimal(height)
+        assert (used["role"], used["rule"], used["rule_version"], used["source"]) == (
+            role,
+            rule,
+            "2026.10.3",
+            source,
+        ), code
+        assert Decimal(x.formula_inputs["raw_quantity"]) == raw and x.calculated_quantity_centi == centi(raw) == rounded
+        assert x.uom_code == "SFT" and x.quantity_status == "VALID" and x.status == "OK", code
+        assert used["refs"]["wall_ids"] == ["w1", "w2"]
+        assert used["refs"].get("opening_ids", []) == ([] if role == "RUN" else ["o1"]), code
+    assert lines["WALL"].calculated_quantity_centi != 3543  # no longer the counter run's 35.43 sq ft

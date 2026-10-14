@@ -206,7 +206,9 @@ def _lines_for(card: RateCard, item: ScopeItem, req: Requirement, facts: site.Fa
         out.append({**base, "card_product_code": product.code, "card_line_code": line.code, "label": label,
                     "uom_code": line.uom if line.uom in V.UOMS else None, "formula_kind": lq.formula_kind,
                     "formula_inputs": {"inputs": lq.inputs, "options": options,
-                                       "quantity_basis": _basis(line)},
+                                       "quantity_basis": _basis(line),
+                                       # the exact quantity before the one rounding (decimal string, no float)
+                                       "raw_quantity": format(lq.raw.normalize(), "f") if lq.raw is not None else None},
                     "derivation": lq.derivation or "Not quantified: " + "; ".join(i["code"] for i in issues),
                     "measurement_source": source_ref,
                     "calculated_quantity_centi": quantity.to_centi(lq.quantity) if lq.quantity is not None else None,
