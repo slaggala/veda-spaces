@@ -55,7 +55,7 @@ export interface NavItem {
   mobile?: boolean;
 }
 
-export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation';
+export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin';
 export type FeatureMap = Partial<Record<FeatureCode, boolean>>;
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -69,6 +69,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/admin/permissions', label: 'Permissions', icon: 'key', group: 'admin', anyOf: ['permission.read'] },
   { path: '/admin/founder-actions', label: 'Founder actions', icon: 'star', group: 'admin', anyOf: ['user.founder.manage'] },
   { path: '/catalog', label: 'Estimator catalog', icon: 'list', group: 'admin', anyOf: ['catalog.view'] },
+  // Commercial › Customer Promise (decision log 37): behind VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED and its view capability.
+  { path: '/commercial/customer-promise', label: 'Customer Promise', icon: 'shield', group: 'admin', anyOf: ['customer_promise.view'], feature: 'customer_promise_admin' },
   { path: '/audit', label: 'Audit log', icon: 'list', group: 'admin', anyOf: ['audit.read', 'security_event.read'] },
   { path: '/profile', label: 'Profile', icon: 'settings', group: 'account', anyOf: ['profile.read'], mobile: true },
 ];
