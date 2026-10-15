@@ -11,7 +11,7 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
-HEAD = "0207_customer_promise"
+HEAD = "0208_project_lifecycle"
 
 
 def _connect():
@@ -231,6 +231,7 @@ def test_RBAC_001_migration_order():
         "0202_mtq_commercial",
         "0205_customer_proposal",
         "0206_customer_completeness",
+        "0207_customer_promise",
         HEAD,
     ]
 

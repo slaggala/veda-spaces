@@ -1,0 +1,21 @@
+{
+  "schema": "veda.project.lifecycle-policy/1",
+  "version": "PLB-POLICY-0",
+  "status": "UNDECIDED",
+  "note": "No project-lifecycle policy has been decided by the owner. Every slot is null; the engine applies its strict defaults and refuses high-risk transitions until the owner records PLB-OD-01, PLB-OD-02 and PLB-OD-03. See docs/implementation/project-lifecycle/PLB-owner-decisions.md.",
+  "decisions": {
+    "PLB-OD-01": null,
+    "PLB-OD-02": null,
+    "PLB-OD-03": null,
+    "PLB-OD-04": null,
+    "PLB-OD-05": null,
+    "PLB-OD-06": null,
+    "PLB-OD-07": null,
+    "PLB-OD-08": null,
+    "PLB-OD-09": null,
+    "PLB-OD-10": null,
+    "PLB-OD-11": null,
+    "PLB-OD-12": null,
+    "PLB-OD-13": null
+  }
+}

@@ -63,6 +63,20 @@ from veda.modules.mtq_commercial.models import (
     Scope,
     ScopeItem,
 )
+from veda.modules.project.models import (
+    Project,
+    ProjectBaseline,
+    ProjectBlocker,
+    ProjectChecklistItem,
+    ProjectEvent,
+    ProjectMember,
+    ProjectMilestone,
+    ProjectQcCheck,
+    ProjectSiteReadiness,
+    ProjectSnag,
+    ProjectStage,
+    ProjectTransition,
+)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (
     MfaChallenge,
@@ -82,6 +96,18 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "Project",
+    "ProjectBaseline",
+    "ProjectBlocker",
+    "ProjectChecklistItem",
+    "ProjectEvent",
+    "ProjectMember",
+    "ProjectMilestone",
+    "ProjectQcCheck",
+    "ProjectSiteReadiness",
+    "ProjectSnag",
+    "ProjectStage",
+    "ProjectTransition",
     "CustomerPromiseEvent",
     "CustomerPromisePack",
     "CustomerPromiseReview",
