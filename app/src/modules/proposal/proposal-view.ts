@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import type { VsErrorSummary } from '../../design-system/components.js';
 import { shared } from '../../design-system/styles.js';
-import { mediaUrl, type Comparison, type MediaImage, type Page, type ProposalLine, type Room, type VariationView } from './api.js';
+import { mediaUrl, type Comparison, type Contact, type InfoEntry, type Information, type MediaImage, type Page, type ProposalLine, type Room,
+  type SpecCategory, type TermsSection, type VariationView } from './api.js';
 
 /** Row-and-column layout that never scrolls sideways (tables become stacked rows on narrow screens). */
 export const tableLikeStyles = css`
@@ -18,6 +19,17 @@ const STATE_LABEL: Record<Page['state'], string> = {
 };
 
 export const rupees = (v: string | null | undefined) => (v ? `₹ ${v}` : null);
+
+/** Shown wherever the owner has not approved the content yet: never a default, never generic advice. */
+const TBC = 'To be confirmed by Veda Spaces.';
+const STATUS_TEXT: Record<string, string> = {
+  REQUIRED: 'Required', NOT_REQUIRED: 'Not required', TO_BE_CONFIRMED: 'To be confirmed', READY: 'Ready', NOT_READY: 'Not ready',
+  CUSTOMER_ACTION_REQUIRED: 'Your action needed', NOT_APPLICABLE: 'Not applicable',
+};
+/** Where each acknowledgeable section is read: beside the content it is about (CQX-09 acknowledgements unchanged). */
+const TERM_HOME: Record<string, string> = {
+  SCOPE: 'scope', ASSUMPTIONS: 'scope', EXCLUSIONS: 'scope', PAYMENT_MILESTONES: 'pricing', WARRANTY: 'warranty', SERVICE_SUPPORT: 'warranty',
+};
 
 /**
  * <vs-proposal-view>: renders one customer proposal page model (CQX-03 onwards). Pure: it shows exactly what the
@@ -151,6 +163,16 @@ export class VsProposalView extends LitElement {
     .bar .n { font: 600 18px/24px var(--vs-font-sans); } .bartotal { display: flex; flex-direction: column; }
     @media (min-width: 960px) { .bar { display: none; } .wrap { padding-bottom: var(--vs-space-6); } }
     .actions-list { margin: 0; padding-left: 20px; } .actions-list a { color: var(--vs-copper-text); display: inline-flex; align-items: center; min-height: var(--vs-target); }
+    .contact { display: grid; gap: 4px; } .contact a { color: var(--vs-copper-text); display: inline-flex; align-items: center; min-height: var(--vs-target);
+      min-width: var(--vs-target); overflow-wrap: anywhere; }
+    .entries { margin: 0; padding-left: 20px; display: grid; gap: 4px; } .entries li { overflow-wrap: anywhere; }
+    .status { font: 600 11px/16px var(--vs-font-sans); letter-spacing: .06em; text-transform: uppercase; padding: 1px 8px; border-radius: var(--vs-radius-pill);
+      border: 1px solid var(--vs-line); white-space: nowrap; margin-left: 6px; }
+    .status.REQUIRED, .status.CUSTOMER_ACTION_REQUIRED, .status.NOT_READY { color: var(--vs-warning); } .status.READY { color: var(--vs-success); }
+    .stages { margin: 0; padding-left: 20px; display: grid; gap: var(--vs-space-2); }
+    .dims { grid-column: 1 / -1; font-size: 13px; overflow-wrap: anywhere; }
+    .tbc { color: var(--vs-ink-muted); font-style: italic; }
+    .grouphead { margin: var(--vs-space-3) 0 0; }
     .preview-mark { border: 2px dashed var(--vs-warning); padding: var(--vs-space-2) var(--vs-space-3); border-radius: var(--vs-radius-card); color: var(--vs-warning); font-weight: 600; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
     @media print {
@@ -300,6 +322,7 @@ export class VsProposalView extends LitElement {
       <div class="layout">
         <div class="stack content">
           ${this.overview(page)}
+          ${this.contactPanel(page)}
           ${this.actionsPanel(page)}
           ${this.roomsPanel(page)}
           ${this.sections(page)}
@@ -332,7 +355,11 @@ export class VsProposalView extends LitElement {
   protected actionsPanel(page: Page): TemplateResult | typeof nothing {
     if (this.preview || !page.actions.length) return nothing;
     return html`<section class="card stack" aria-labelledby="todo"><h2 tabindex="-1" id="todo">Your next steps</h2>
-      <ol class="actions-list">${page.actions.map((a) => html`<li><a href=${`#${a.target}`} @click=${(e: Event) => this.jump(e, a.target)}>${a.label}</a></li>`)}</ol></section>`;
+      <ol class="actions-list">${page.actions.map((a) => {
+        // the acknowledgements sit beside their content now: "the terms" goes to the first one still to read
+        const target = a.target === 'terms' && page.terms?.pending.length ? `term-${page.terms.pending[0]}` : a.target;
+        return html`<li><a href=${`#${target}`} @click=${(e: Event) => this.jump(e, target)}>${a.label}</a></li>`;
+      })}</ol></section>`;
   }
 
   protected jump(e: Event, id: string) {
@@ -384,15 +411,29 @@ export class VsProposalView extends LitElement {
     return html`<li class="line"><div><span class="strong">${x.description}</span>${x.status !== 'Included' ? html`<span class="tag">${x.status}</span>` : nothing}</div>
       <div class="amt">${x.priced ? rupees(x.amount) : html`<span class="muted">To be confirmed</span>`}</div>
       ${x.detail || x.quantity ? html`<div class="sub">${[x.quantity, x.detail].filter(Boolean).join(' · ')}</div>` : nothing}
+      ${this.dims(x)}
       ${x.unit_rate ? html`<div class="sub">Rate ${rupees(x.unit_rate)}</div>` : nothing}
       ${x.change ? html`<div class="sub">${x.change}${x.delta ? ` · change ${rupees(x.delta)}` : ''}</div>` : nothing}
       ${images.length ? this.thumbs(x.description, images) : nothing}
-      ${specs.length ? html`<details class="spec"><summary>Materials and specification</summary>${specs.map((c) => html`<div class="speccat">
-          <h4>${c.label}</h4><p>${c.summary}</p>
-          <dl>${this.spec('Requirement', c.requirement)}${this.spec('Grade', c.grade)}${this.spec('Thickness', c.thickness)}
-            ${this.spec('Finish', c.finish)}${this.spec('Brand examples', c.brand_examples)}${this.spec('Approved equivalents', c.equivalent_rule)}
-            ${this.spec('Final selection', c.final_selection)}${this.spec('Material warranty', c.warranty_summary)}</dl></div>`)}
+      ${specs.length ? html`<details class="spec"><summary>Materials and hardware</summary>${specs.map((c) => this.specCategory(c))}
         <p class="small muted">Specification ${page.specifications?.name} (version ${page.specifications?.version}), as approved when this proposal was issued.</p></details>` : nothing}</li>`;
+  }
+
+  /** The line's verified sizes; an assumed or missing size is never shown, only said to be confirmed (CTB-02). */
+  protected dims(x: ProposalLine): TemplateResult | typeof nothing {
+    if (!x.dimension_status) return nothing;
+    const sizes = (x.dimensions ?? []).map((d) => `${d.label} ${d.value}`).join(' · ');
+    return html`<div class="dims">${sizes ? html`<span>Size: ${sizes}</span>` : nothing}${x.dimension_status === 'TO_BE_CONFIRMED'
+      ? html`${sizes ? ' · ' : ''}<span class="tbc">Dimension to be confirmed</span>` : nothing}</div>`;
+  }
+
+  protected specCategory(c: SpecCategory): TemplateResult {
+    return html`<div class="speccat"><h4>${c.label}</h4><p>${c.summary}</p>
+      <dl>${this.spec('Requirement', c.requirement)}${this.spec('Grade', c.grade)}${this.spec('Thickness', c.thickness)}
+        ${this.spec('Finish', c.finish)}${this.spec('Hardware', c.hardware_category ?? null)}${this.spec('Brand examples', c.brand_examples)}
+        ${this.spec('Approved equivalents', c.equivalent_rule)}${this.spec('Final selection', c.final_selection)}
+        ${this.spec('Manufacturer warranty', c.warranty_summary)}</dl>
+      ${c.details?.length ? html`<ul class="entries">${c.details.map((d) => html`<li>${d}</li>`)}</ul>` : nothing}</div>`;
   }
 
   private spec(label: string, value: string | null) {
@@ -427,8 +468,11 @@ export class VsProposalView extends LitElement {
         ${this.retryable ? html`<div class="no-print"><button class="btn" aria-disabled=${this.busy ? 'true' : 'false'}
           @click=${() => this.emit('proposal-retry')}>${this.busy ? 'Trying again…' : 'Try again'}</button></div>` : nothing}` : nothing}
       ${page.variation ? variationTable(page.variation) : nothing}
-      ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}
-      ${this.decisionPanel(page)}`;
+      ${this.scopePanel(page)}${this.materialsPanel(page)}
+      ${this.pricingPanel(page)}${this.optionalPanel(page)}
+      ${this.beforeStartPanel(page)}${this.warrantyPanel(page)}
+      ${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}
+      ${this.decisionPanel(page)}${this.nextPanel(page)}`;
   }
 
   // --- CQX-10 decision -----------------------------------------------------------------------------------------------
@@ -468,24 +512,144 @@ export class VsProposalView extends LitElement {
   }
 
   // --- CQX-09 terms and acknowledgements -----------------------------------------------------------------------------
+  /** One acknowledgeable section (CQX-09): its approved text, and the acknowledgement while interaction is open. */
+  protected termItem(page: Page, x: TermsSection): TemplateResult {
+    const can = page.capabilities.interaction && !this.preview;
+    return html`<details class="room term" id=${`term-${x.code}`}><summary><h3>${x.title}</h3>
+        ${x.required ? html`<span class="tag">Required</span>` : nothing}${x.acknowledged_on ? html`<span class="tag ok">Acknowledged</span>` : nothing}</summary>
+      <div class="termbody">${x.available
+        ? html`<ul>${x.items.map((i) => html`<li>${i}</li>`)}</ul>`
+        : html`<p class="muted">To be confirmed by Veda Spaces. This is not part of the proposal until it is confirmed.</p>`}
+        ${x.code === 'WARRANTY' ? html`<p class="small muted">Warranty is shown as approved; Veda Spaces' own service support is a separate section.</p>` : nothing}
+        ${can && x.available ? (x.acknowledged_on
+          ? html`<p class="small">You acknowledged this section on ${x.acknowledged_on.slice(0, 10)}.</p>`
+          : html`<button class="btn" data-field=${`ack-${x.code}`} aria-disabled=${this.busy ? 'true' : 'false'}
+              aria-invalid=${this.invalid(`ack-${x.code}`).invalid} aria-describedby=${this.invalid(`ack-${x.code}`).describedby}
+              @click=${() => this.emit('proposal-ack', { section: x.code, sha256: x.sha256, title: x.title })}>
+              I have read and understood: ${x.title}</button>${this.errorText(`ack-${x.code}`)}`) : nothing}</div></details>`;
+  }
+
+  /** The acknowledgeable sections that live in ``home`` (TERM_HOME; anything else is in Terms). */
+  protected termsIn(page: Page, home: string): TemplateResult[] {
+    return (page.terms?.sections ?? []).filter((x) => (TERM_HOME[x.code] ?? 'terms') === home).map((x) => this.termItem(page, x));
+  }
+
   protected termsPanel(page: Page): TemplateResult | typeof nothing {
     const t = page.terms;
     if (!t) return nothing;
     const can = page.capabilities.interaction && !this.preview;
-    return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 tabindex="-1" id="tm">Terms and what is included</h2>
-      ${t.policy_decided && t.pending.length && can ? html`<p class="small">Before you can accept, please read and acknowledge the sections marked "required".</p>` : nothing}
-      ${t.sections.map((x) => html`<details class="room term" id=${`term-${x.code}`}><summary><h3>${x.title}</h3>
-          ${x.required ? html`<span class="tag">Required</span>` : nothing}${x.acknowledged_on ? html`<span class="tag ok">Acknowledged</span>` : nothing}</summary>
-        <div class="termbody">${x.available
-          ? html`<ul>${x.items.map((i) => html`<li>${i}</li>`)}</ul>`
-          : html`<p class="muted">To be confirmed by Veda Spaces. This is not part of the proposal until it is confirmed.</p>`}
-          ${x.code === 'WARRANTY' ? html`<p class="small muted">Warranty is shown as approved; Veda Spaces' own service support is a separate section.</p>` : nothing}
-          ${can && x.available ? (x.acknowledged_on
-            ? html`<p class="small">You acknowledged this section on ${x.acknowledged_on.slice(0, 10)}.</p>`
-            : html`<button class="btn" data-field=${`ack-${x.code}`} aria-disabled=${this.busy ? 'true' : 'false'}
-                aria-invalid=${this.invalid(`ack-${x.code}`).invalid} aria-describedby=${this.invalid(`ack-${x.code}`).describedby}
-                @click=${() => this.emit('proposal-ack', { section: x.code, sha256: x.sha256, title: x.title })}>
-                I have read and understood: ${x.title}</button>${this.errorText(`ack-${x.code}`)}`) : nothing}</div></details>`)}
+    return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 tabindex="-1" id="tm">Terms</h2>
+      ${t.policy_decided && t.pending.length && can ? html`<p class="small">Before you can accept, please read and acknowledge every section marked "required" on this page.</p>` : nothing}
+      ${this.termsIn(page, 'terms')}
+    </section>`;
+  }
+
+  // --- CTB customer completeness (OI-MTQ-18 sections; each says when it is to be confirmed) --------------------------
+  private info(page: Page): Information | null {
+    return page.proposal.information ?? null;
+  }
+
+  private tbc(text = TBC): TemplateResult {
+    return html`<p class="tbc">${text}</p>`;
+  }
+
+  private entries(rows: InfoEntry[] | null | undefined, status = false): TemplateResult {
+    if (!rows?.length) return this.tbc();
+    return html`<ul class="entries">${rows.map((r) => html`<li>${r.text}${status && r.status
+      ? html`<span class="status ${r.status}">${STATUS_TEXT[r.status] ?? r.status}</span>` : nothing}</li>`)}</ul>`;
+  }
+
+  protected contactCard(c: Contact): TemplateResult {
+    const tel = c.phone ? c.phone.replace(/[^+0-9]/g, '') : '';
+    return html`<div class="contact"><span class="strong">${c.display_name}</span><span class="small muted">${c.role}</span>
+      ${c.phone ? html`<a href=${`tel:${tel}`}>${c.phone}</a>` : nothing}
+      ${c.email ? html`<a href=${`mailto:${c.email}`}>${c.email}</a>` : nothing}
+      ${c.hours ? html`<span class="small">${c.hours}</span>` : nothing}
+      ${c.channel_note ? html`<span class="small muted">${c.channel_note}</span>` : nothing}</div>`;
+  }
+
+  /** CTB-01 and CTB-17: the quotation contact first; general support and escalation one tap away. */
+  protected contactPanel(page: Page): TemplateResult | typeof nothing {
+    const info = this.info(page);
+    const c = info?.contacts;
+    const support = c?.support ?? [];
+    return html`<section class="card stack" aria-labelledby="contact" id="your-contact"><h2 tabindex="-1" id="contact">Your Veda Spaces contact</h2>
+      ${c?.quotation ? this.contactCard(c.quotation) : this.tbc('Contact details to be confirmed by Veda Spaces.')}
+      <details class="room"><summary><h3>Other ways to reach Veda Spaces</h3></summary><div class="termbody stack">
+        ${support.length ? support.map((x) => this.contactCard(x)) : this.tbc()}
+        ${info?.support_escalation ? html`<p>${info.support_escalation}</p>` : nothing}</div></details>
+    </section>`;
+  }
+
+  /** CTB-04 to CTB-06 and CTB-08: what is included, what is not, what the customer arranges, site-dependent work. */
+  protected scopePanel(page: Page): TemplateResult {
+    const info = this.info(page);
+    const sdw = info?.site_dependent_work;
+    return html`<section class="card stack" aria-labelledby="scopeh" id="scope"><h2 tabindex="-1" id="scopeh">What's included, what's not and what you arrange</h2>
+      <details class="room" open><summary><h3>What is included</h3></summary><div class="termbody stack">
+        <p>Every item listed room by room above, at the quantities and sizes shown.</p>
+        ${info?.project_inclusions?.length ? html`<p class="strong">For the whole project</p>${this.entries(info.project_inclusions)}` : nothing}</div></details>
+      <details class="room"><summary><h3>What is not included</h3></summary><div class="termbody">
+        ${page.proposal.exclusions.length ? html`<ul class="entries">${page.proposal.exclusions.map((e) => html`<li>${e}</li>`)}</ul>` : this.tbc()}</div></details>
+      <details class="room"><summary><h3>What you arrange</h3></summary><div class="termbody">${this.entries(info?.client_responsibilities, true)}</div></details>
+      <details class="room"><summary><h3>Site-dependent work</h3></summary><div class="termbody stack">
+        ${sdw ? html`<p>${sdw.intro}</p>${sdw.categories.length ? this.entries(sdw.categories) : nothing}<p class="strong">${sdw.approval_rule}</p>` : this.tbc()}</div></details>
+      ${this.termsIn(page, 'scope')}
+    </section>`;
+  }
+
+  /** CTB-03: the approved specification, materials then hardware; never hidden when it is missing. */
+  protected materialsPanel(page: Page): TemplateResult {
+    const spec = page.specifications;
+    const cats = spec?.categories ?? [];
+    const group = (g: 'MATERIAL' | 'HARDWARE') => cats.filter((c) => (c.group ?? 'MATERIAL') === g);
+    return html`<section class="card stack" aria-labelledby="math" id="materials"><h2 tabindex="-1" id="math">Materials and hardware</h2>
+      ${spec ? html`<p>${spec.summary}</p>
+        <details class="room"><summary><h3>Materials</h3></summary><div class="termbody">${group('MATERIAL').length ? group('MATERIAL').map((c) => this.specCategory(c)) : this.tbc()}</div></details>
+        <details class="room"><summary><h3>Hardware</h3></summary><div class="termbody">${group('HARDWARE').length ? group('HARDWARE').map((c) => this.specCategory(c)) : this.tbc()}</div></details>
+        <p class="small">${spec.equivalent_policy}</p><p class="small muted">${spec.final_selection}</p>
+        <p class="small muted">Specification ${spec.name} (version ${spec.version}), as approved when this proposal was issued.</p>`
+        : this.tbc('Specification to be confirmed by Veda Spaces.')}
+    </section>`;
+  }
+
+  /** CTB-07: what must be ready before installation, with this site's status as Veda Spaces recorded it. */
+  protected beforeStartPanel(page: Page): TemplateResult {
+    const info = this.info(page);
+    return html`<section class="card stack" aria-labelledby="starth" id="before-start"><h2 tabindex="-1" id="starth">Before we start</h2>
+      <p class="small muted">What needs to be in place at your home before installation, and where it stands.</p>
+      ${this.entries(info?.site_readiness, true)}
+    </section>`;
+  }
+
+  /** CTB-11 to CTB-13 and CTB-15: manufacturer-backed warranty and Veda Spaces' service support, kept apart. */
+  protected warrantyPanel(page: Page): TemplateResult {
+    const info = this.info(page);
+    const sg = info?.service_guidance;
+    return html`<section class="card stack" aria-labelledby="warh" id="warranty"><h2 tabindex="-1" id="warh">Warranty and service</h2>
+      <details class="room"><summary><h3>Manufacturer-backed warranty</h3></summary><div class="termbody stack">
+        ${info?.manufacturer_warranty_note ? html`<p>${info.manufacturer_warranty_note}</p>` : this.tbc()}
+        ${page.specifications?.warranty_summary ? html`<p class="small">${page.specifications.warranty_summary}</p>` : nothing}
+        <p class="small muted">A manufacturer's warranty is the manufacturer's own; it does not extend Veda Spaces' service support.</p></div></details>
+      ${this.termsIn(page, 'warranty')}
+      <details class="room"><summary><h3>What the warranty does not cover</h3></summary><div class="termbody">${this.entries(info?.warranty_exclusions)}</div></details>
+      <details class="room"><summary><h3>Need help after handover?</h3></summary><div class="termbody stack">
+        ${sg ? html`${sg.contact ? this.contactCard(sg.contact) : nothing}
+          ${sg.what_to_provide.length ? html`<p class="strong">Please tell us</p><ul class="entries">${sg.what_to_provide.map((t) => html`<li>${t}</li>`)}</ul>` : nothing}
+          ${sg.reference_process ? html`<p>${sg.reference_process}</p>` : nothing}${sg.escalation ? html`<p>${sg.escalation}</p>` : nothing}`
+          : this.tbc()}</div></details>
+      <details class="room"><summary><h3>Care and maintenance</h3></summary><div class="termbody">${this.entries(info?.care)}</div></details>
+    </section>`;
+  }
+
+  /** CTB-14 and CTB-16: the stages after acceptance (no duration unless the owner approved it) and handover. */
+  protected nextPanel(page: Page): TemplateResult {
+    const info = this.info(page);
+    const steps = info?.next_steps;
+    return html`<section class="card stack" aria-labelledby="nexth" id="next"><h2 tabindex="-1" id="nexth">What happens after you approve</h2>
+      ${steps?.length ? html`<ol class="stages">${steps.map((x) => html`<li><span class="strong">${x.label}</span>: ${x.text}${x.duration ? html` <span class="small muted">(${x.duration})</span>` : nothing}</li>`)}</ol>`
+        : this.tbc()}
+      <details class="room"><summary><h3>At handover</h3></summary><div class="termbody">${this.entries(info?.handover)}</div></details>
     </section>`;
   }
 
@@ -610,8 +774,14 @@ export class VsProposalView extends LitElement {
       </div>
       ${pr.optional_total ? html`<p class="small muted">Optional items are not included in the total. If you chose all of them they would add ${rupees(pr.optional_total)} before any confirmation by Veda Spaces.</p>` : nothing}
       <p class="small muted">${pr.unit_rates_shown ? 'Unit rates are shown on each line.' : 'Amounts are shown per item, room and project; unit rates are not part of this proposal.'}</p>
-      ${pr.milestones.length ? html`<h3>Payment milestones</h3><ol class="milestones">${pr.milestones.map((m) => html`<li><span class="strong">${m.label}</span> — ${m.share} · ${m.trigger}</li>`)}</ol>`
-        : html`<p class="muted">Payment milestones will be confirmed by Veda Spaces.</p>`}
+      ${pr.milestones.length ? html`<h3>Payment milestones</h3><div class="table-like" role="table" aria-label="Payment milestones">
+          <div role="row" class="tr head"><span role="columnheader">Milestone</span><span role="columnheader" class="num">Amount</span></div>
+          ${pr.milestones.map((m) => html`<div role="row" class="tr"><span role="cell"><span class="strong">${m.label}</span> · ${m.share}<br><span class="small muted">${m.trigger}</span></span>
+            <span role="cell" class="num">${rupees(m.amount) ?? 'To be confirmed'}</span></div>`)}</div>
+          ${pr.milestones.some((m) => m.amount) ? html`<p class="small muted">Amounts are the proposal total split by the shares above; optional items you choose are confirmed separately.</p>` : nothing}`
+        : this.tbc('Payment plan to be confirmed by Veda Spaces.')}
+      ${this.info(page)?.payment_safety ? html`<p class="small">${this.info(page)?.payment_safety}</p>` : this.tbc('How to pay will be confirmed by Veda Spaces.')}
+      ${this.termsIn(page, 'pricing')}
       ${pr.valid_until ? html`<p>Valid until <span class="strong">${pr.valid_until}</span>${pr.days_left !== null && pr.days_left >= 0 ? html` (${pr.days_left} day${pr.days_left === 1 ? '' : 's'} left)` : nothing}.</p>` : nothing}
       ${pr.alternatives.length ? html`<h3>Other packages shared with you</h3><div class="table-like" role="table" aria-label="Packages">
         <div role="row" class="tr head"><span role="columnheader">Proposal</span><span role="columnheader" class="num">Total</span></div>

@@ -18,8 +18,35 @@ const TOKEN = `vsp_${'S'.repeat(43)}`;
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 function line(ref, description, amount, status = 'Included') {
-  return { ref, description, detail: 'Laminate finish', quantity: '42.5 sq ft', amount, priced: true, status };
+  return { ref, description, detail: 'Laminate finish', quantity: '42.5 sq ft', amount, priced: true, status,
+    dimensions: [{ label: 'Width', value: '8.2 ft' }, { label: 'Height', value: '7 ft' }], dimension_status: ref === 'L1' ? 'TO_BE_CONFIRMED' : 'CONFIRMED' };
 }
+// SYNTHETIC customer information (OI-MTQ-18): invented for the browser journey, not Veda Spaces content.
+const CONTACT = { display_name: 'SYNTHETIC Quotation Desk', role: 'Quotation consultant (synthetic)', phone: '+00 0000 000000',
+  email: 'desk@synthetic.example', hours: 'SYNTHETIC hours', channel_note: null };
+const INFO = {
+  content_version: 'SYN-C1', contacts: { quotation: CONTACT, support: [{ ...CONTACT, display_name: 'SYNTHETIC Support' }], service: [] },
+  support_escalation: 'SYNTHETIC escalation route.', project_inclusions: [{ code: 'I1', text: 'SYNTHETIC installation of the listed items.' }],
+  client_responsibilities: [{ code: 'A1', category: 'APPLIANCE_MODEL', text: 'SYNTHETIC: share your appliance models.', status: 'REQUIRED' }],
+  site_readiness: [{ code: 'F1', category: 'FLOORING', text: 'SYNTHETIC: flooring complete.', status: 'CUSTOMER_ACTION_REQUIRED' }],
+  site_dependent_work: { intro: 'SYNTHETIC: some needs show only on site.', approval_rule: 'SYNTHETIC: agreed with you as a change order first.',
+    categories: [{ code: 'E1', category: 'ELECTRICAL', text: 'SYNTHETIC electrical changes.' }] },
+  manufacturer_warranty_note: 'SYNTHETIC manufacturer note.', warranty_exclusions: [{ code: 'X1', text: 'SYNTHETIC: damage from misuse.' }],
+  service_guidance: { contact: { ...CONTACT, display_name: 'SYNTHETIC Service' }, what_to_provide: ['SYNTHETIC: your reference.'],
+    reference_process: 'SYNTHETIC: you receive a reference.', escalation: null },
+  handover: [{ code: 'H1', category: 'FINAL_INSPECTION', text: 'SYNTHETIC joint inspection.' }],
+  care: [{ code: 'C1', category: 'FURNITURE_CLEANING', text: 'SYNTHETIC: wipe with a dry cloth.' }],
+  next_steps: [{ code: 'S1', stage: 'PROPOSAL_ACCEPTED', label: 'Proposal accepted', text: 'SYNTHETIC step.', duration: null }],
+  payment_safety: 'SYNTHETIC: payment instructions only through approved Veda Spaces channels.',
+};
+const SPEC = { name: 'SYNTHETIC Essential', version: '1.1', summary: 'SYNTHETIC specification.', equivalent_policy: 'SYNTHETIC equivalents.',
+  final_selection: 'SYNTHETIC final selection.', warranty_summary: 'SYNTHETIC manufacturer warranty summary.', lines: {},
+  categories: [
+    { code: 'board', label: 'Board', summary: 'SYNTHETIC board.', requirement: 'SYNTHETIC grade', grade: null, thickness: '18 mm', finish: null,
+      brand_examples: null, equivalent_rule: 'SYNTHETIC rule', final_selection: 'SYNTHETIC', warranty_summary: 'SYNTHETIC', hardware_category: null, details: [], group: 'MATERIAL' },
+    { code: 'hinges', label: 'Hinges', summary: 'SYNTHETIC hinges.', requirement: 'SYNTHETIC soft close', grade: null, thickness: null, finish: null,
+      brand_examples: null, equivalent_rule: 'SYNTHETIC rule', final_selection: 'SYNTHETIC', warranty_summary: 'SYNTHETIC', hardware_category: 'Hinges and channels', details: [], group: 'HARDWARE' },
+  ] };
 function page(over = {}) {
   const rooms = ['Master bedroom', 'Bedroom 2', 'Bedroom 3', 'Kitchen', 'Living room'].map((title, i) => ({
     ref: `R${i + 1}`, title, kind: 'ROOM', subtotal: '1,20,000.00', included_count: 2, optional_count: i === 0 ? 1 : 0,
@@ -45,16 +72,16 @@ function page(over = {}) {
         { label: 'Handover', share: '40%', trigger: 'On handover (synthetic)' }],
       warranty: ['Synthetic warranty text.'], service_support: [], assumptions: ['Synthetic assumption.'], exclusions: ['Synthetic exclusion.'],
       terms: ['Synthetic change-order terms.', 'Synthetic cancellation terms.'], terms_version: 'SYN-T1', unit_rates_shown: false,
-      sections: { SCOPE: 'b'.repeat(64) },
+      sections: { SCOPE: 'b'.repeat(64) }, information: INFO,
     },
-    specifications: null,
+    specifications: SPEC,
     media: { note: 'Reference image: it illustrates the kind of item and does not change the scope or the price.',
       lines: { L1: [{ title: 'Wardrobe', alt: 'A two-door laminate wardrobe', caption: null, label: 'Illustrative example', urls: { thumb: '/api/v1/public/catalog/media/ok' } }] },
       rooms: { R1: { title: 'Wardrobe', alt: 'A two-door laminate wardrobe', caption: null, label: 'Illustrative example', urls: { mobile: '/api/v1/public/catalog/media/missing' } },
         R2: null, R3: null, R4: null, R5: null, R6: null } },
     pricing: { currency: 'INR', total: '7,19,800.00', gst: { status: 'Included', amount: '1,09,800.00' }, discount: null, base_total: '6,10,000.00',
       optional_total: '15,000.00', rooms: rooms.map((r) => ({ ref: r.ref, title: r.title, subtotal: r.subtotal })),
-      milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], valid_until: '2026-11-13', days_left: 30,
+      milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)', amount: '71,980.00' }], valid_until: '2026-11-13', days_left: 30,
       unit_rates_shown: false, package: null, alternatives: [] },
     selections: { items: [{ ref: 'L30', state: 'NOT_SELECTED', priced: true }], selected_refs: [], can_choose: true, status: 'PRICE_CONFIRMATION_REQUIRED', extra: null, total_with_selections: null },
     requests: { can_ask: true, items: [] },
@@ -193,7 +220,8 @@ try {
     const has = (re) => measured.some((x) => re.test(x.what));
     const missing = Object.entries({ 'button': /^button /, 'next-step link': /^a Review the optional/, 'room link': /^a Bedroom 2/, 'text input': /^input\[text\]/,
       'textarea': /^textarea/, 'radio (optional item)': /^input\[radio\]/, 'checkbox (decision)': /^input\[checkbox\]/, 'select': /^select/,
-      'acknowledgement': /^button I have read/, 'error-summary link': /^a Please write/, 'Try again': /^button Try again/ })
+      'acknowledgement': /^button I have read/, 'error-summary link': /^a Please write/, 'Try again': /^button Try again/,
+      'contact phone link': /^a \+00/, 'contact e-mail link': /^a desk@synthetic/ })
       .filter(([, re]) => !has(re)).map(([k]) => k);
     check(`${name}: touch-target check covered every kind of control`, missing.length === 0, missing.join(', '));
     check(`${name}: no page error`, errors.length === 0, errors.join(' | '));
@@ -276,7 +304,8 @@ try {
     check('slow retry: focus stays on the Try again control while it runs', during?.tag === 'BUTTON' && during.text.includes('Trying again'), label(during));
     await p.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('acknowledged'))));
     const after = await focusedIn(p);
-    check('slow retry: afterwards focus is on the terms heading (the acknowledged button is gone)', after?.tag === 'H2' && after.id === 'tm', label(after));
+    // the warranty acknowledgement sits in "Warranty and service" (CTB): focus returns to that section's heading
+    check('slow retry: afterwards focus is on its section heading (the acknowledged button is gone)', after?.tag === 'H2' && after.id === 'warh', label(after));
     await ctx.close();
   }
 
@@ -361,6 +390,56 @@ try {
     check('print: every section opened, the action bar hidden', printed && hidden);
     await p.pdf({ path: `${OUT}/proposal-print.pdf`, format: 'A4' });
     check('print: renders to A4', fs.statSync(`${OUT}/proposal-print.pdf`).size > 1000);
+    await ctx.close();
+  }
+
+  // customer completeness (CTB): summary first with the Veda contact, sizes, scope, readiness, warranty, next steps
+  for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 }]) {
+    const { ctx, p } = await open(browser, { viewport });
+    await p.locator('vs-proposal-view h1').waitFor();
+    const order = await p.evaluate(inPage(() => deepAll('section h2[id]').map((h) => h.textContent.trim())));
+    const at = (t) => order.findIndex((x) => x.startsWith(t));
+    const expected = ['Your Veda Spaces contact', 'Room by room', "What's included", 'Materials and hardware', 'Price and payment',
+      'Optional items', 'Before we start', 'Warranty and service', 'Terms', 'Questions and changes', 'What happens after you approve'];
+    const positions = expected.map(at);
+    check(`${viewport.width} px: sections in the customer order (summary first … what happens next)`,
+      positions.every((n) => n >= 0) && positions.every((n, i) => i === 0 || n > positions[i - 1]), JSON.stringify(order));
+    check(`${viewport.width} px: the Veda contact is reachable by phone and e-mail`,
+      await p.locator('#your-contact a[href^="tel:"]').first().isVisible() && await p.locator('#your-contact a[href^="mailto:"]').first().isVisible());
+    await p.locator('details#R1').evaluate((d) => { d.open = true; });
+    check(`${viewport.width} px: verified sizes, and an unverified one said to be confirmed`,
+      (await p.locator('details#R1 .dims').first().textContent()).includes('Dimension to be confirmed'));
+    for (const sel of ['#scope', '#before-start', '#warranty', '#next']) {
+      await p.locator(`${sel} details`).evaluateAll((ds) => ds.forEach((d) => { d.open = true; }));
+    }
+    const statuses = await p.locator('.status').allTextContents();
+    check(`${viewport.width} px: responsibility and readiness statuses shown in words`, statuses.includes('Required') && statuses.includes('Your action needed'));
+    const overflow = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(`${viewport.width} px: every section open, still no horizontal scrolling`, overflow <= 0, `overflow ${overflow}px`);
+    await targets(p, `${viewport.width} px (all sections open)`);
+    await axe(p, `${viewport.width} px, all sections open`);
+    await ctx.close();
+  }
+  {
+    const tbc = { content_version: null, contacts: { quotation: null, support: [], service: [] }, support_escalation: null, project_inclusions: null,
+      client_responsibilities: null, site_readiness: null, site_dependent_work: null, manufacturer_warranty_note: null, warranty_exclusions: null,
+      service_guidance: null, handover: null, care: null, next_steps: null, payment_safety: null };
+    const bare = page();
+    bare.proposal.information = tbc;
+    bare.specifications = null;
+    bare.pricing.milestones = [];
+    const { ctx, p } = await open(browser, { viewport: { width: 390, height: 844 }, proposal: () => ({ status: 200, body: { data: bare } }) });
+    await p.locator('vs-proposal-view h1').waitFor();
+    const said = await p.evaluate(inPage(() => deepAll('vs-proposal-view').map((v) => v.shadowRoot.textContent).join(' ')));
+    check('nothing approved yet: each section says it is to be confirmed', ['Contact details to be confirmed', 'Specification to be confirmed',
+      'Payment plan to be confirmed', 'How to pay will be confirmed'].every((w) => said.includes(w)));
+    // the validity countdown ("30 days left", OI-MTQ-08) is a fact, not a promise; any other duration or claim fails
+    const promise = said.match(/\b\d+\s*(working\s+)?(days?|weeks?|months?|years?)\b(?! left)|guarantee|lifetime|free service/i);
+    check('nothing approved yet: no promise, duration or claim is shown', !promise, promise?.[0] ?? '');
+    await axe(p, 'nothing approved yet');
+    await p.emulateMedia({ media: 'print' });
+    await p.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    check('print: the new sections print open too', await p.evaluate(inPage(() => deepAll('details').every((d) => d.open))));
     await ctx.close();
   }
 
