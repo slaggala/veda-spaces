@@ -62,13 +62,45 @@ blocks enabling that capability (or real customers, or production) while it is o
 | N8 | The integrity refusal told customers "Veda Spaces has been notified", but no monitored alert exists | Low | — | — | — | Blocks (alarm) | Blocks | **Fixed** (claim removed); deferred: a monitored alarm on `ProposalIntegrityRefused` before real customers |
 | N9 | The link token is kept in this tab's `sessionStorage` on the workspace origin: any script running on that origin (an XSS anywhere in the workspace) could read it, and it survives reloads in the tab | Low | — (synthetic staging) | — | — | Blocks | Blocks | **Open**: a dedicated proposal origin, or memory-only handling (re-open from the link after a reload), before real customers |
 | N10 | Reference images cannot load on `/proposal`: the workspace CSP `img-src` excludes the API host | Low | Images stay off | — | — | Blocks images | Blocks images | **Open**: a reviewed, path-scoped `img-src` change for `/proposal` (as for V3) and catalogue media activation; until then only placeholders are shown |
-| N11 | Focus fell to the body after actions; small touch targets (next-steps links, radios, checkbox); nested `main`; offline/5xx/429 without retry; a failed choice stayed checked | Medium | Blocks | Blocks | Blocks | Blocks | Blocks | **Fixed**: focus return, 44 px targets for every control, one main landmark, retry with safe state, radios re-synced; browser journey 62 checks |
+| N11 | Customer-page focus and touch targets (history in §4.1): focus fell to the body after actions; small touch targets; nested `main`; offline/5xx/429 without retry; a failed choice stayed checked. Re-review residuals: focus on the body after a slow or retried initial load and after a retried action; error-summary links did not focus their control, which had no `aria-invalid`/`aria-describedby`; the touch-target check measured height only | Medium | Blocks | Blocks | Blocks | Blocks | Blocks | **Open — remediation in progress** (§4.1): page-entry focus on the proposal title; retry keeps the initiating control; error-summary links focus their exact control, marked invalid and described by its error; touch targets checked for width and height |
 | N12 | A request could be linked to an unissued version (named to the customer) | Low | — | Blocks | — | Blocks | Blocks | **Fixed**: only an issued, frozen newer version can be linked (VERSION_NOT_ISSUED) |
 | R1 | Subject and cover note are staff text shown to whoever holds the link | Low | Staff guidance | — | — | Blocks | Blocks | Open: keep customer names out of them, or exclude them from the projection (owner choice) |
 | R2 | The idempotency replay cache can return a just-created link's token to the same staff user for 24 hours | Low | — | — | — | Blocks | Blocks | Open (process memory only, same user) |
 | R3 | A link to a lost or closed lead stays live until it expires or is revoked (no LEAD_CLOSED hook) | Low | — | — | — | Blocks | Blocks | Open |
 | R4 | A refused request cannot record its own refusal or EXPIRED event (it rolls back) | Low | — | — | — | — | — | Open: the housekeeping job records expiry once scheduled |
 | R5 | `customer-proposal-housekeeping` is **not scheduled** anywhere: link expiry is not recorded and staff are not reminded of expiring proposals | Low | Schedule before viewing | — | — | Blocks | Blocks | Open: schedule with the other maintenance jobs (enablement record prerequisite) |
+
+### 4.1 N11 history (customer page focus and accessibility)
+
+- **Original finding (independent certification of `a0e0343`):** focus fell to the body after customer actions;
+  next-steps links, radios and the decision checkbox were under 44 px; the view nested a `main` inside the shell's
+  `main`; an offline, 5xx or 429 failure (initial load or action) offered no retry; a choice that failed stayed checked.
+- **First correction (`471051c`):** focus returned to the initiating control, else its section heading; 44 px targets;
+  one main landmark; retry for transient failures; radios re-synced with the server's state.
+- **Focused re-review residuals (at `6e68626`):** (1) after a slow initial load, or a retry after 500, 429 or a network
+  failure, focus stayed on the body; (2) after a failed action's Try again, focus could fall to the body (the retry
+  button replaced the remembered control and then disappeared); (3) error-summary links did not move focus to the
+  invalid control, and the textarea exposed no `aria-invalid`/`aria-describedby`; (4) the browser touch-target check
+  measured height only.
+- **Final corrections:** (1) the proposal title (`h1#proposal-title`, `tabindex="-1"`, named by the proposal's subject)
+  is the page-entry target: focus moves there only when the page as a whole changes to the proposal (initial, slow or
+  retried load), never on the refresh after an action; (2) a retry keeps the original action's control; the Try again
+  control stays on screen (aria-disabled, "Trying again…") while the retry runs, a failed retry focuses the error
+  summary, a successful one returns focus to the initiating control or, when it is gone, its section heading (else the
+  title); busy controls are `aria-disabled` or read-only instead of `disabled`, so a focused control keeps focus while a
+  slow request runs, and a second action is refused until the first answers; (3) every field error links to its control
+  (`data-field`), the control carries `aria-invalid="true"` and `aria-describedby="err-<field>"` (before any hint) with
+  a unique inline error, editing the field clears its invalid state without moving focus, and an error about the
+  request as a whole is plain text (no link that goes nowhere); summary links are 44 × 44 px; (4) the browser check
+  measures width and height separately for every visible button, link, input (text, radio, checkbox), select,
+  textarea, summary, acknowledgement, Try again and error-summary link, in three page states, and fails if any of these
+  kinds was not measured.
+- **Validation evidence:** frontend unit tests 143 passed (four new); browser journey `app/e2e/proposal.e2e.mjs`
+  128/128 at 360, 390, 768 and 1280 px (page-entry focus after normal, slow, 500, 429 and offline loads; action retry
+  after offline, 500 and 429; slow retry; error-summary navigation for textarea, text input, radio, acknowledgement and
+  checkbox; axe in each error state; width and height separately); a mutation probe (next-steps links narrowed to
+  30 px wide, 44 px tall) failed only the width check.
+- **Impact while open:** blocks viewing, interaction, acceptance, real customers and production (Medium).
 
 ## 5. Accurate statements of current behaviour
 

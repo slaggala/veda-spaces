@@ -40,6 +40,8 @@ Viewing shows something only once an issued quotation exists, which needs the co
 - [ ] Rollback rehearsal (below), then re-enable; the template-v2 limitation (api-runbooks §2.4) acknowledged.
 - [ ] `customer-proposal-housekeeping` scheduled (it is not scheduled by this change).
 - [ ] Images: none are shown until the `/proposal` image policy (N10) is reviewed; placeholders only.
+- [ ] Open findings respected (CQX-security-model §4): acceptance testing stays off while N7 is open; N9 blocks real
+      customers only (synthetic staging may proceed under the record's scope); images off while N10 is open.
 
 ## 4. Evidence requirements (record fields)
 

@@ -41,6 +41,15 @@ All four slots are `null`. A SYNTHETIC copy exists only in tests (the loader ref
 | CQX-B12 | Retention period of acceptance network/device evidence, and its enforcement (N7) | CQX-D04 records a period but no job enforces it; acceptance stays blocked until it is enforced or decided otherwise |
 | CQX-B10 | Legal status of a digital acceptance | Not a contract signature; the page says so. Any e-signature or contract treatment needs legal review and an approved vendor (out of scope) |
 
+## 3a. Engineering findings that gate enablement (not owner decisions; CQX-security-model §4)
+
+| Finding | Gates | Does not gate |
+|---|---|---|
+| N7 (acceptance-evidence retention not enforced; CQX-B12) | Acceptance, real customers, production | Viewing, interaction |
+| N9 (link token in `sessionStorage` on the workspace origin) | Real customers, production | Synthetic staging viewing, interaction and acceptance testing |
+| N10 (proposal image policy) | Images (they stay off) | Viewing without images |
+| N8 (no monitored alarm behind an integrity refusal) | Real customers, production | Synthetic staging |
+
 ## 4. Production
 
 Production refuses every CQX flag at API start. A production decision would need, at least: every row above, the staging

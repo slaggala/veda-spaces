@@ -443,7 +443,8 @@ export class VsErrorSummary extends LitElement {
     div:focus { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
     strong { color: var(--vs-danger); }
     ul { margin: 6px 0 0; padding-left: 18px; }
-    a { color: var(--vs-copper-text); }
+    a { color: var(--vs-copper-text); display: inline-flex; align-items: center; min-height: var(--vs-target, 44px); min-width: var(--vs-target, 44px); }
+    a:focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
   `;
   constructor() {
     super();
@@ -458,10 +459,12 @@ export class VsErrorSummary extends LitElement {
     return html`<div role="alert" tabindex="-1">
       <strong>Please fix ${n} ${n === 1 ? 'thing' : 'things'}</strong>
       <ul>${this.errors.map(
-        (e) => html`<li><a href="#" @click=${(ev: Event) => {
+        // A field error links to its control (the host handles focus-field); an error about the request as a whole has
+        // no control to go to, so it is plain text rather than a link that does nothing.
+        (e) => (e.field ? html`<li><a href=${`#err-${e.field}`} @click=${(ev: Event) => {
           ev.preventDefault();
           this.dispatchEvent(new CustomEvent('focus-field', { detail: e.field, bubbles: true, composed: true }));
-        }}>${e.message}</a></li>`,
+        }}>${e.message}</a></li>` : html`<li>${e.message}</li>`),
       )}</ul>
     </div>`;
   }

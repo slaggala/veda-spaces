@@ -32,7 +32,10 @@ export class VsProposalView extends LitElement {
     page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
     announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
     comparison: { attribute: false }, confirmed: { state: true }, declining: { state: true }, retryable: { type: Boolean },
+    corrected: { state: true },
   };
+  /** Fields the customer has edited since the last error: no longer marked invalid (the summary stays until resent). */
+  declare corrected: ReadonlySet<string>;
   /** The last action failed for a transient reason (offline, server busy): offer to try it again. */
   declare retryable: boolean;
   /** Where focus returns after an action completes (the control that started it, else its section heading). */
@@ -45,7 +48,10 @@ export class VsProposalView extends LitElement {
   declare askCategory: string;
   /** Polite screen-reader announcement of the last action's result (set by the page). */
   declare announcement: string;
-  /** An action is in flight: controls are disabled (slow networks never double-submit). */
+  /**
+   * An action is in flight: actions are refused until it answers (slow networks never double-submit). Controls are
+   * marked aria-disabled (text fields read-only) rather than disabled, so the focused control keeps focus meanwhile.
+   */
   declare busy: boolean;
   /** Field errors of the last action, shown in an error summary. */
   declare errors: { field: string; message: string }[];
@@ -169,6 +175,13 @@ export class VsProposalView extends LitElement {
     this.confirmed = false;
     this.declining = false;
     this.retryable = false;
+    this.corrected = new Set();
+  }
+
+  /** Page entry (the proposal arrived after a load, a slow load or a retry): focus the proposal's title. */
+  async focusEntry() {
+    await this.updateComplete;
+    (this.renderRoot.querySelector('#proposal-title') as HTMLElement | null)?.focus();
   }
 
   override connectedCallback() {
@@ -186,6 +199,10 @@ export class VsProposalView extends LitElement {
    * (a failed choice never stays checked); a success returns focus to the control that started it or, when that control
    * is gone (a decision replaces its section), to the section's heading. Focus never falls back to the page body.
    */
+  override willUpdate(changed: Map<string, unknown>) {
+    if (changed.has('errors')) this.corrected = new Set();
+  }
+
   override updated(changed: Map<string, unknown>) {
     if (changed.has('page') || (changed.has('busy') && !this.busy)) this.syncChoices();
     if (changed.has('errors') && this.errors.length) {
@@ -200,7 +217,7 @@ export class VsProposalView extends LitElement {
         return;
       }
       const heading = section ? this.renderRoot.querySelector(`#${CSS.escape(section)} h2`) as HTMLElement | null : null;
-      heading?.focus();
+      (heading ?? this.renderRoot.querySelector('#proposal-title') as HTMLElement | null)?.focus();
     }
   }
 
@@ -217,22 +234,62 @@ export class VsProposalView extends LitElement {
     this.renderRoot.querySelectorAll('details').forEach((d) => { d.open = true; });
   };
 
+  /**
+   * Raise a customer action. While one is in flight nothing else is sent. The control that started it is remembered so
+   * focus can return there; a retry keeps the original action's control (the Try again button itself goes away).
+   */
   protected emit(name: string, detail: unknown = null) {
-    const active = (this.renderRoot as ShadowRoot).activeElement as HTMLElement | null;
-    this.returnFocus = { element: active, section: active?.closest('section')?.id ?? null };
+    if (this.busy) return;
+    if (name !== 'proposal-retry') {
+      const active = (this.renderRoot as ShadowRoot).activeElement as HTMLElement | null;
+      this.returnFocus = { element: active, section: active?.closest('section')?.id ?? null };
+    }
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
   }
+
+  // --- field errors (AX-03): each refused field is linked from the summary and marked invalid on its control ---------
+  /** The error of field `key` while it is uncorrected. */
+  private fieldError(key: string) {
+    return this.corrected.has(key) ? null : this.errors.find((e) => e.field === key) ?? null;
+  }
+
+  /** aria-invalid and aria-describedby for the control of `key` (the error first, then any hint). */
+  private invalid(key: string, hint?: string) {
+    const error = this.fieldError(key);
+    return { invalid: error ? 'true' : nothing, describedby: [error ? `err-${key}` : '', hint ?? ''].filter(Boolean).join(' ') || nothing };
+  }
+
+  private errorText(key: string) {
+    const error = this.fieldError(key);
+    return error ? html`<span class="error" id=${`err-${key}`}>${error.message}</span>` : nothing;
+  }
+
+  private correct(key: string) {
+    if (this.fieldError(key)) this.corrected = new Set([...this.corrected, key]);
+  }
+
+  /** An error-summary link: open, show and focus the exact control (a choice group: its chosen, else first, option). */
+  private focusField = (e: Event) => {
+    const key = (e as CustomEvent<string>).detail;
+    const control = this.renderRoot.querySelector(`[data-field="${CSS.escape(key)}"]:checked`) as HTMLElement | null
+      ?? this.renderRoot.querySelector(`[data-field="${CSS.escape(key)}"]:not(:disabled)`) as HTMLElement | null;
+    if (!control) return;
+    const details = control.closest('details');
+    if (details) details.open = true;
+    control.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    control.focus({ preventScroll: true });
+  };
 
   override render() {
     const page = this.page;
     if (!page) return nothing;
     const p = page.proposal;
-    return html`<div class="wrap">
+    return html`<div class="wrap" @focus-field=${this.focusField}>
       ${this.preview ? html`<div class="preview-mark" role="note">Staff preview: exactly what the customer sees. No action is possible here.</div>` : nothing}
       <div class="brand">
         <div class="brandname" aria-hidden="true">${p.brand.name}</div>
         <span class="eyebrow">${p.kind === 'VARIATION' ? 'Variation to your accepted proposal' : 'Your interior proposal'}</span>
-        <h1>${p.subject}</h1>
+        <h1 id="proposal-title" tabindex="-1">${p.subject}</h1>
         <div class="meta"><span>${p.reference}</span><span>Issued ${p.issued_on}</span>
           ${p.valid_until ? html`<span>Valid until ${p.valid_until}</span>` : nothing}
           <span>${p.property.configuration}${p.property.city ? html` · ${p.property.city}` : nothing}</span><span>Property ${p.property.reference}</span></div>
@@ -367,7 +424,8 @@ export class VsProposalView extends LitElement {
   /** The proposal's sections after the rooms, in reading order. */
   protected sections(page: Page): TemplateResult {
     return html`${this.errors.length ? html`<vs-error-summary .errors=${this.errors}></vs-error-summary>
-        ${this.retryable ? html`<div class="no-print"><button class="btn" @click=${() => this.emit('proposal-retry')}>Try again</button></div>` : nothing}` : nothing}
+        ${this.retryable ? html`<div class="no-print"><button class="btn" aria-disabled=${this.busy ? 'true' : 'false'}
+          @click=${() => this.emit('proposal-retry')}>${this.busy ? 'Trying again…' : 'Try again'}</button></div>` : nothing}` : nothing}
       ${page.variation ? variationTable(page.variation) : nothing}
       ${this.optionalPanel(page)}${this.pricingPanel(page)}${this.termsPanel(page)}${this.comparePanel(page)}${this.questionsPanel(page)}
       ${this.decisionPanel(page)}`;
@@ -393,16 +451,18 @@ export class VsProposalView extends LitElement {
     return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 tabindex="-1" id="dc">Your decision</h2>
       ${d.available ? html`<p>You are accepting <span class="strong">${page.proposal.reference}</span> for <span class="strong">${rupees(d.total) ?? 'the total shown'}</span>.</p>
         ${chosen.length ? html`<p class="small">Including your optional choices: ${chosen.map((x) => x.description).join('; ')}.</p>` : html`<p class="small">No optional items are included.</p>`}
-        <label class="check confirm"><input type="checkbox" .checked=${this.confirmed} ?disabled=${this.busy}
-          @change=${(e: Event) => { this.confirmed = (e.target as HTMLInputElement).checked; }}><span class="mark" aria-hidden="true"></span><span>${d.statement}</span></label>
-        <div class="row"><button class="btn primary" ?disabled=${!this.confirmed || this.busy}
+        <label class="check confirm"><input type="checkbox" .checked=${this.confirmed} data-field="confirm"
+          aria-invalid=${this.invalid('confirm').invalid} aria-describedby=${this.invalid('confirm').describedby}
+          @change=${(e: Event) => { this.confirmed = (e.target as HTMLInputElement).checked; this.correct('confirm'); }}><span class="mark" aria-hidden="true"></span><span>${d.statement}</span></label>
+        ${this.errorText('confirm')}
+        <div class="row"><button class="btn primary" ?disabled=${!this.confirmed} aria-disabled=${this.busy ? 'true' : 'false'}
           @click=${() => this.emit('proposal-decide', body('ACCEPTED'))}>Accept this proposal</button></div>`
         : html`<p>${d.reason}</p>`}
       ${d.can_decline ? (this.declining
         ? html`<div class="stack declinebox" role="group" aria-label="Decline"><p>Decline ${page.proposal.reference}? Veda Spaces may contact you about a revised proposal.</p>
-            <div class="row"><button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-decide', body('DECLINED'))}>Yes, decline</button>
+            <div class="row"><button class="btn" aria-disabled=${this.busy ? 'true' : 'false'} @click=${() => this.emit('proposal-decide', body('DECLINED'))}>Yes, decline</button>
             <button class="btn ghost" @click=${() => { this.declining = false; }}>Keep it open</button></div></div>`
-        : html`<div><button class="btn ghost" ?disabled=${this.busy} @click=${() => { this.declining = true; }}>Decline this proposal</button></div>`) : nothing}
+        : html`<div><button class="btn ghost" aria-disabled=${this.busy ? 'true' : 'false'} @click=${() => { if (!this.busy) this.declining = true; }}>Decline this proposal</button></div>`) : nothing}
       <p class="small muted">Your decision is recorded against exactly this version, as shown on this page. It is not a contract signature; Veda Spaces will confirm the next steps with you.</p>
     </section>`;
   }
@@ -422,8 +482,10 @@ export class VsProposalView extends LitElement {
           ${x.code === 'WARRANTY' ? html`<p class="small muted">Warranty is shown as approved; Veda Spaces' own service support is a separate section.</p>` : nothing}
           ${can && x.available ? (x.acknowledged_on
             ? html`<p class="small">You acknowledged this section on ${x.acknowledged_on.slice(0, 10)}.</p>`
-            : html`<button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-ack', { section: x.code, sha256: x.sha256, title: x.title })}>
-                I have read and understood: ${x.title}</button>`) : nothing}</div></details>`)}
+            : html`<button class="btn" data-field=${`ack-${x.code}`} aria-disabled=${this.busy ? 'true' : 'false'}
+                aria-invalid=${this.invalid(`ack-${x.code}`).invalid} aria-describedby=${this.invalid(`ack-${x.code}`).describedby}
+                @click=${() => this.emit('proposal-ack', { section: x.code, sha256: x.sha256, title: x.title })}>
+                I have read and understood: ${x.title}</button>${this.errorText(`ack-${x.code}`)}`) : nothing}</div></details>`)}
     </section>`;
   }
 
@@ -441,7 +503,7 @@ export class VsProposalView extends LitElement {
             <span role="cell" class="num">${rupees(x.before) ?? '—'} → ${rupees(x.after) ?? '—'}</span></div>`)}</div>`
           : html`<p>No item changed.</p>`}`
         : html`<p>See exactly what is different from the version you received before.</p>
-          <div><button class="btn" ?disabled=${this.busy} @click=${() => this.emit('proposal-compare')}>Show the changes</button></div>`}
+          <div><button class="btn" aria-disabled=${this.busy ? 'true' : 'false'} @click=${() => this.emit('proposal-compare')}>Show the changes</button></div>`}
     </section>`;
   }
 
@@ -473,17 +535,28 @@ export class VsProposalView extends LitElement {
           ${i.answered_by_revision ? html`<p class="small">Answered in ${i.answered_by_revision}.</p>` : nothing}</li>`)}</ol>` : nothing}
       ${r.can_ask ? html`<form class="stack" @submit=${submit} novalidate>
           <label class="field"><span class="label">What is it about?</span>
-            <select name="category" @change=${(e: Event) => { this.askCategory = (e.target as HTMLSelectElement).value; }} ?disabled=${this.busy}>
+            <select name="category" data-field="category" aria-invalid=${this.invalid('category').invalid} aria-describedby=${this.invalid('category').describedby}
+              @change=${(e: Event) => { this.askCategory = (e.target as HTMLSelectElement).value; this.correct('category'); }}>
               ${cats.map(([v, l]) => html`<option value=${v} ?selected=${v === this.askCategory}>${l}</option>`)}</select></label>
-          ${needsLine ? html`<label class="field"><span class="label">Which item?</span><select name="line" required ?disabled=${this.busy}>
-              <option value="">Choose an item</option>${allLines.map((x) => html`<option value=${x.ref}>${x.room_title ? `${x.room_title} – ` : ''}${x.description}</option>`)}</select></label>` : nothing}
-          ${this.askCategory === 'ADD_ITEM' ? html`<label class="field"><span class="label">Which room? (optional)</span><select name="room" ?disabled=${this.busy}>
-              <option value="">Anywhere / not sure</option>${page.proposal.rooms.map((room) => html`<option value=${room.ref}>${room.title}</option>`)}</select></label>` : nothing}
+          ${this.errorText('category')}
+          ${needsLine ? html`<label class="field"><span class="label">Which item?</span><select name="line" required data-field="line"
+              aria-invalid=${this.invalid('line').invalid} aria-describedby=${this.invalid('line').describedby} @change=${() => this.correct('line')}>
+              <option value="">Choose an item</option>${allLines.map((x) => html`<option value=${x.ref}>${x.room_title ? `${x.room_title} – ` : ''}${x.description}</option>`)}</select>
+              ${this.errorText('line')}</label>` : nothing}
+          ${this.askCategory === 'ADD_ITEM' ? html`<label class="field"><span class="label">Which room? (optional)</span><select name="room" data-field="room"
+              aria-invalid=${this.invalid('room').invalid} aria-describedby=${this.invalid('room').describedby} @change=${() => this.correct('room')}>
+              <option value="">Anywhere / not sure</option>${page.proposal.rooms.map((room) => html`<option value=${room.ref}>${room.title}</option>`)}</select>
+              ${this.errorText('room')}</label>` : nothing}
           ${this.askCategory === 'CHANGE_QUANTITY' ? html`<label class="field"><span class="label">What quantity would you like?</span>
-              <input name="quantity" maxlength="40" autocomplete="off" ?disabled=${this.busy}></label>` : nothing}
-          <label class="field"><span class="label">Your message</span><textarea name="message" required minlength="3" maxlength="2000" rows="4" ?disabled=${this.busy}></textarea>
-            <span class="hint">Up to 2000 characters. Please do not include payment or bank details.</span></label>
-          <div><button class="btn primary" ?disabled=${this.busy}>Send to Veda Spaces</button></div></form>`
+              <input name="quantity" maxlength="40" autocomplete="off" data-field="quantity" ?readonly=${this.busy}
+                aria-invalid=${this.invalid('quantity').invalid} aria-describedby=${this.invalid('quantity').describedby} @input=${() => this.correct('quantity')}>
+              ${this.errorText('quantity')}</label>` : nothing}
+          <label class="field"><span class="label">Your message</span><textarea name="message" required minlength="3" maxlength="2000" rows="4"
+              data-field="message" ?readonly=${this.busy} aria-invalid=${this.invalid('message').invalid}
+              aria-describedby=${this.invalid('message', 'ask-message-hint').describedby} @input=${() => this.correct('message')}></textarea>
+            ${this.errorText('message')}
+            <span class="hint" id="ask-message-hint">Up to 2000 characters. Please do not include payment or bank details.</span></label>
+          <div><button class="btn primary" aria-disabled=${this.busy ? 'true' : 'false'}>Send to Veda Spaces</button></div></form>`
         : html`<p class="muted">Questions and change requests are not available on this proposal here. Please contact your Veda Spaces representative.</p>`}
     </section>`;
   }
@@ -508,8 +581,11 @@ export class VsProposalView extends LitElement {
           ${x.price_with_gst ? html`<p class="small muted">If added: ${rupees(x.price_with_gst)} including GST.</p>` : nothing}
           ${images.length ? this.thumbs(x.description, images) : nothing}
           ${can ? html`<div class="choices">${choices.map(([value, label]) => html`<label class="choice">
-              <input type="radio" name=${`opt-${x.ref}`} data-ref=${x.ref} .value=${value} .checked=${state === value} ?disabled=${value === 'SELECTED' && !x.priced}
-                @change=${() => { if (this.busy) { this.syncChoices(); return; } this.emit('proposal-select', { line_ref: x.ref, state: value, description: x.description }); }}><span class="mark" aria-hidden="true"></span>${label}</label>`)}</div>`
+              <input type="radio" name=${`opt-${x.ref}`} data-ref=${x.ref} data-field=${`opt-${x.ref}`} .value=${value} .checked=${state === value}
+                ?disabled=${value === 'SELECTED' && !x.priced}
+                aria-invalid=${this.invalid(`opt-${x.ref}`).invalid} aria-describedby=${this.invalid(`opt-${x.ref}`).describedby}
+                @change=${() => { if (this.busy) { this.syncChoices(); return; } this.emit('proposal-select', { line_ref: x.ref, state: value, description: x.description }); }}><span class="mark" aria-hidden="true"></span>${label}</label>`)}</div>
+              ${this.errorText(`opt-${x.ref}`)}`
             : html`<p class="small">Your choice: ${{ NOT_SELECTED: 'not chosen', SELECTED: 'added', DESELECTED: 'not for me', REQUESTED_FOR_DISCUSSION: 'to discuss' }[state]}</p>`}
         </fieldset>`;
       })}

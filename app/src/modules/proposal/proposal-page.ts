@@ -64,7 +64,8 @@ export class VsProposalPage extends LitElement {
 
   private onAck(e: CustomEvent<{ section: string; sha256: string; title: string }>) {
     const { section, sha256, title } = e.detail;
-    void this.act(() => proposalApi(this.token ?? '').acknowledge(section, sha256), `${title}: acknowledged.`);
+    void this.act(() => proposalApi(this.token ?? '').acknowledge(section, sha256), `${title}: acknowledged.`, undefined,
+      () => `ack-${section}`);
   }
 
   /**
@@ -80,7 +81,8 @@ export class VsProposalPage extends LitElement {
     this.decideKeys.set(decision, key);
     const accepted = decision === 'ACCEPTED';
     void this.act(async () => { await proposalApi(this.token ?? '').decide(e.detail, key); },
-      accepted ? 'Your acceptance was recorded.' : 'Your decision was recorded.', () => this.decideKeys.delete(decision));
+      accepted ? 'Your acceptance was recorded.' : 'Your decision was recorded.', () => this.decideKeys.delete(decision),
+      (field) => (field === 'confirm' ? 'confirm' : ''));
   }
 
   private onCompare() {
@@ -90,18 +92,25 @@ export class VsProposalPage extends LitElement {
   /**
    * Run one customer action, then reload the page model (the server is the only source of totals and states).
    * `definitive` runs once the server has answered (success or refusal) — never after a transient failure, so a retry
-   * of a lost request carries the same idempotency key.
+   * of a lost request carries the same idempotency key. `field` maps a refused field of the request to the control the
+   * error summary links to ('' for an error about the request as a whole). A retry keeps the error and its Try again
+   * button on screen until it has an answer, so focus never leaves that context while it runs.
    */
-  private async act(fn: () => Promise<unknown>, done: string, definitive?: () => void) {
+  private async act(fn: () => Promise<unknown>, done: string, definitive?: () => void,
+    field: (name: string) => string = () => '', retrying = false) {
     this.busy = true;
-    this.errors = [];
-    this.retryable = false;
-    this.announcement = 'Saving…';
+    if (!retrying) {
+      this.errors = [];
+      this.retryable = false;
+    }
+    this.announcement = retrying ? 'Trying again…' : 'Saving…';
     try {
       await fn();
       definitive?.();
       this.lastAction = null;
       await this.refresh();
+      this.errors = [];
+      this.retryable = false;
       this.announcement = done;
     } catch (e) {
       const p = e as ApiProblem;
@@ -111,7 +120,7 @@ export class VsProposalPage extends LitElement {
         return;
       }
       if (transient(p)) {
-        this.lastAction = () => { void this.act(fn, done, definitive); };
+        this.lastAction = () => { void this.act(fn, done, definitive, field, true); };
         this.retryable = true;
         this.errors = [{ field: '', message: p.status === 429
           ? 'Too many requests from this connection. Nothing was saved; please wait a minute and try again.'
@@ -122,7 +131,8 @@ export class VsProposalPage extends LitElement {
       }
       definitive?.();
       this.lastAction = null;
-      const fields = (p.errors ?? []).map((er) => ({ field: er.field, message: er.message ?? 'Please check this.' }));
+      this.retryable = false;
+      const fields = (p.errors ?? []).map((er) => ({ field: field(er.field ?? ''), message: er.message ?? 'Please check this.' }));
       this.errors = fields.length ? fields : [{ field: '', message: p.detail || 'Something went wrong. Please try again.' }];
       this.announcement = 'Not saved.';
     } finally {
@@ -131,7 +141,7 @@ export class VsProposalPage extends LitElement {
   }
 
   private onRetry() {
-    this.lastAction?.();
+    if (!this.busy) this.lastAction?.();
   }
 
   /** One key per form submission: a retry after a slow network sends the same request, never a duplicate. */
@@ -148,13 +158,15 @@ export class VsProposalPage extends LitElement {
     void this.act(async () => {
       await proposalApi(this.token ?? '').ask(body, key);
       form.reset();
-    }, 'Your message was sent to Veda Spaces.', () => { this.askKey = null; });
+    }, 'Your message was sent to Veda Spaces.', () => { this.askKey = null; },
+    (f) => ({ message: 'message', line_ref: 'line', room_ref: 'room', requested_quantity: 'quantity', category: 'category' })[f] ?? '');
   }
 
   private onSelect(e: CustomEvent<{ line_ref: string; state: string; description: string }>) {
     const { line_ref, state, description } = e.detail;
     const words = { SELECTED: 'added to your choices', DESELECTED: 'marked not for you', REQUESTED_FOR_DISCUSSION: 'marked for discussion' }[state] ?? 'saved';
-    void this.act(() => proposalApi(this.token ?? '').select(line_ref, state), `${description} ${words}.`);
+    void this.act(() => proposalApi(this.token ?? '').select(line_ref, state), `${description} ${words}.`, undefined,
+      () => `opt-${line_ref}`);
   }
 
   override connectedCallback() {
@@ -194,8 +206,21 @@ export class VsProposalPage extends LitElement {
     this.message = REFUSALS[p.code] ?? 'Something went wrong. Please try again, or contact Veda Spaces.';
   }
 
-  override updated() {
-    if (this.load !== 'ready') (this.renderRoot.querySelector('h1') as HTMLElement | null)?.focus();
+  /**
+   * Page entry: whenever the page changes what it shows as a whole (opening, a refusal, the proposal arriving after a
+   * slow load or a retry), focus moves to that page's heading, so a keyboard or screen-reader user starts at the top
+   * with its name. A refresh after a customer action keeps `load` at 'ready' and never moves focus here.
+   */
+  override updated(changed: Map<string, unknown>) {
+    if (!changed.has('load') && !changed.has('heading')) return;
+    if (this.load !== 'ready') {
+      (this.renderRoot.querySelector('h1') as HTMLElement | null)?.focus();
+      return;
+    }
+    if (changed.has('load') && changed.get('load') !== 'ready') {
+      const view = this.renderRoot.querySelector('vs-proposal-view') as (HTMLElement & { focusEntry(): Promise<void> }) | null;
+      void view?.focusEntry();
+    }
   }
 
   override render() {

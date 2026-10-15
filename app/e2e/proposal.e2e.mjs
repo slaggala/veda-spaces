@@ -69,7 +69,7 @@ function page(over = {}) {
 }
 
 /** Answer every /api call of one browser page. `proposal` decides the main response; nothing reaches a server. */
-async function serve(p, { proposal = () => ({ status: 200, body: { data: page() } }), delay = 0, selection = null, onPost = null } = {}) {
+async function serve(p, { proposal = () => ({ status: 200, body: { data: page() } }), delay = 0, selection = null, onPost = null, handlers = {} } = {}) {
   await p.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const url = new URL(route.request().url());
     const json = (status, body) => route.fulfill({ status, contentType: status < 400 ? 'application/json' : 'application/problem+json', body: JSON.stringify(body) });
@@ -85,6 +85,11 @@ async function serve(p, { proposal = () => ({ status: 200, body: { data: page() 
     if (url.pathname === '/api/v1/public/proposal/selections' && selection) {
       const r = selection();
       return r === 'abort' ? route.abort('internetdisconnected') : json(...r);
+    }
+    if (handlers[url.pathname]) {
+      const r = handlers[url.pathname]();
+      if (r === 'abort') return route.abort('internetdisconnected');
+      if (r) return json(...r);
     }
     if (route.request().method() === 'POST' && onPost) onPost(url.pathname);
     if (url.pathname === '/api/v1/public/proposal/requests') return json(201, { data: [] });
@@ -115,6 +120,44 @@ function deepAll(selector) {
 }
 const inPage = (fn) => `(() => { ${deepAll.toString()}; return (${fn.toString()})(); })()`;
 
+/**
+ * Every visible interactive customer control is at least 44 x 44 CSS px (WCAG 2.5.5 / the design system's --vs-target):
+ * width and height are checked separately, so either one alone fails. A radio or checkbox is measured by its own hit
+ * area (the input covers its whole label). Returns the kinds of control measured, so callers can prove coverage.
+ */
+async function targets(p, name) {
+  const sizes = await p.evaluate(inPage(() => deepAll('button, summary, a[href], input, select, textarea, [role=button], [tabindex="0"]')
+    .filter((n) => n.getClientRects().length && getComputedStyle(n).visibility !== 'hidden' && !n.closest('[aria-hidden=true]'))
+    .map((n) => { const r = n.getBoundingClientRect(); const kind = n.tagName.toLowerCase() + (n.type && n.tagName === 'INPUT' ? `[${n.type}]` : '');
+      return { kind, what: `${kind} ${(n.textContent || n.name || '').trim().slice(0, 24)}`, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 }; })));
+  const kinds = new Set(sizes.map((x) => x.kind));
+  const narrow = sizes.filter((x) => x.w < 44);
+  const short = sizes.filter((x) => x.h < 44);
+  check(`${name}: touch targets at least 44 px wide (${sizes.length} controls: ${[...kinds].sort().join(', ')})`, sizes.length > 0 && narrow.length === 0, JSON.stringify(narrow.slice(0, 5)));
+  check(`${name}: touch targets at least 44 px tall`, sizes.length > 0 && short.length === 0, JSON.stringify(short.slice(0, 5)));
+  return sizes;
+}
+
+/** The focused element, through shadow roots, with its accessibility state and the text of what describes it. */
+const focusedIn = (p) => p.evaluate(() => {
+  let a = document.activeElement;
+  while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement;
+  if (!a) return null;
+  const root = a.getRootNode();
+  const ids = (a.getAttribute('aria-describedby') || '').split(' ').filter(Boolean);
+  const r = a.getBoundingClientRect();
+  return { tag: a.tagName, id: a.id, field: a.dataset?.field ?? '', name: a.getAttribute('name') ?? '', text: (a.textContent || '').trim().slice(0, 40),
+    invalid: a.getAttribute('aria-invalid'), describedby: ids, described: ids.map((i) => root.getElementById(i)?.textContent?.trim() ?? null),
+    visible: r.bottom > 0 && r.top < innerHeight };
+});
+const label = (f) => (f ? `${f.tag}#${f.id}${f.field ? `[${f.field}]` : ''} ${f.text}` : 'none');
+
+/** A page model whose decision is open (the confirmation checkbox and the Accept button are on the page). */
+const decidable = (over = {}) => page({ decision: { available: true, decided: null, can_decline: true, version_no: 2, snapshot_sha256: 'a'.repeat(64),
+  total: '7,19,800.00', selected_refs: [], statement: 'I accept VS-Q-2026-000001 v2 as shown (SYNTHETIC).' }, ...over });
+const SELECTED = { items: [{ ref: 'L30', state: 'SELECTED', priced: true }], selected_refs: ['L30'], can_choose: true, status: 'PRICE_CONFIRMATION_REQUIRED',
+  extra: null, total_with_selections: null };
+
 async function axe(p, name) {
   await p.addScriptTag({ content: AXE });
   const v = await p.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }))
@@ -126,22 +169,169 @@ const browser = await chromium.launch();
 try {
   for (const [name, viewport] of [['360 px', { width: 360, height: 740 }], ['mobile portrait', { width: 390, height: 844 }],
     ['tablet', { width: 768, height: 1024 }], ['desktop', { width: 1280, height: 800 }]]) {
-    const { ctx, p, errors } = await open(browser, { viewport });
+    const { ctx, p, errors } = await open(browser, { viewport, proposal: () => ({ status: 200, body: { data: decidable() } }), selection: () => 'abort' });
     await p.locator('vs-proposal-view h1').waitFor();
     check(`${name}: token scrubbed from the address bar`, !(await p.evaluate(() => location.href)).includes(TOKEN));
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check(`${name}: no horizontal scrolling`, overflow <= 0, `overflow ${overflow}px`);
-    const small = await p.evaluate(inPage(() => deepAll('button, summary, a, input, select, textarea, label.choice, label.check')
-      .filter((n) => n.getClientRects().length && getComputedStyle(n).visibility !== 'hidden')
-      .map((n) => [n.textContent.trim().slice(0, 30), Math.round(n.getBoundingClientRect().height)]).filter(([, h]) => h < 44)));
-    check(`${name}: touch targets at least 44 px (links, buttons, inputs, radios, checkboxes, selects, acknowledgements)`, small.length === 0, JSON.stringify(small.slice(0, 5)));
+    await p.locator('#term-WARRANTY summary').click(); // the acknowledgement control is inside its (closed) section
+    const measured = await targets(p, `${name} (proposal)`);
     const mains = await p.evaluate(inPage(() => deepAll('main, [role=main]').length));
     check(`${name}: exactly one main landmark`, mains === 1, String(mains));
     const bar = await p.locator('vs-proposal-view .bar').isVisible();
     check(`${name}: total always in reach (sticky bar below 960 px, summary column above)`, viewport.width < 960 ? bar : !bar);
     await p.screenshot({ path: `${OUT}/proposal-${viewport.width}.png`, fullPage: true });
     await axe(p, name);
+    // a field error (text input, textarea and the error-summary link) and a failed action (its Try again control)
+    await p.locator('#questions select[name=category]').selectOption('CHANGE_QUANTITY');
+    await p.locator('#questions button.primary').click();
+    await p.locator('vs-error-summary a').waitFor();
+    measured.push(...await targets(p, `${name} (field error)`));
+    await p.locator('fieldset.optitem label.choice').first().click();
+    await p.getByRole('button', { name: 'Try again' }).waitFor();
+    measured.push(...await targets(p, `${name} (failed action)`));
+    const has = (re) => measured.some((x) => re.test(x.what));
+    const missing = Object.entries({ 'button': /^button /, 'next-step link': /^a Review the optional/, 'room link': /^a Bedroom 2/, 'text input': /^input\[text\]/,
+      'textarea': /^textarea/, 'radio (optional item)': /^input\[radio\]/, 'checkbox (decision)': /^input\[checkbox\]/, 'select': /^select/,
+      'acknowledgement': /^button I have read/, 'error-summary link': /^a Please write/, 'Try again': /^button Try again/ })
+      .filter(([, re]) => !has(re)).map(([k]) => k);
+    check(`${name}: touch-target check covered every kind of control`, missing.length === 0, missing.join(', '));
     check(`${name}: no page error`, errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // page entry: after a normal, a slow, and a retried load (500, 429, offline) focus is on the proposal's title
+  for (const [how, opts] of [['normal load', {}], ['slow load', { delay: 1500 }],
+    ['retry after 500', { fail: { status: 500, body: { status: 500, code: 'INTERNAL_ERROR', title: 'x' } } }],
+    ['retry after 429', { fail: { status: 429, body: { status: 429, code: 'RATE_LIMITED', title: 'x' } } }],
+    ['retry after a network failure', { fail: 'abort' }]]) {
+    let first = true;
+    const { fail, ...rest } = opts;
+    const { ctx, p } = await open(browser, { viewport: { width: 390, height: 844 }, ...rest,
+      proposal: () => (fail && first ? (first = false, fail) : { status: 200, body: { data: page() } }) });
+    if (fail) {
+      await p.locator('vs-proposal-page p[role=alert]').waitFor();
+      const onError = await focusedIn(p);
+      check(`${how}: the failure takes focus (its heading) and offers Try again`, onError?.tag === 'H1' && await p.getByRole('button', { name: 'Try again' }).isVisible(), label(onError));
+      await p.getByRole('button', { name: 'Try again' }).click();
+    }
+    await p.locator('vs-proposal-view h1').waitFor();
+    await p.waitForFunction(() => { let a = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement; return a?.id === 'proposal-title'; },
+      null, { timeout: 3000 }).catch(() => {});
+    const f = await focusedIn(p);
+    check(`${how}: focus lands on the proposal title (named), never the body`, f?.id === 'proposal-title' && f.text.includes('Interior works'), label(f));
+    await ctx.close();
+  }
+  {
+    // a background refresh after an action never pulls focus back to the title
+    const { ctx, p } = await open(browser, { selection: () => [200, { data: SELECTED }] });
+    await p.locator('vs-proposal-view h1').waitFor();
+    await p.locator('fieldset.optitem input[value=SELECTED]').focus();
+    await p.keyboard.press('Space');
+    await p.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('added to your choices'))));
+    const f = await focusedIn(p);
+    check('refresh after an action: focus stays on the choice, not the title', f?.tag === 'INPUT' && f.field === 'opt-L30', label(f));
+    await ctx.close();
+  }
+
+  // a failed action and its retry: focus stays in the error context, then returns to the control that started it
+  for (const [how, failure] of [['offline', 'abort'], ['500', [500, { status: 500, code: 'INTERNAL_ERROR', title: 'x' }]],
+    ['429', [429, { status: 429, code: 'RATE_LIMITED', title: 'x' }]]]) {
+    let n = 0;
+    const { ctx, p } = await open(browser, { selection: () => (n++ < 2 ? failure : [200, { data: SELECTED }]), delay: 0 });
+    await p.locator('vs-proposal-view h1').waitFor();
+    await p.locator('fieldset.optitem input[value=SELECTED]').focus();
+    await p.keyboard.press('Space');
+    await p.getByRole('button', { name: 'Try again' }).waitFor();
+    const failed = await focusedIn(p);
+    check(`action ${how}: focus moves to the error summary`, failed?.tag === 'DIV' && failed.text.startsWith('Please fix'), label(failed));
+    await p.getByRole('button', { name: 'Try again' }).focus();
+    await p.keyboard.press('Enter');
+    await p.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('Not saved'))));
+    await p.getByRole('button', { name: 'Try again' }).waitFor();
+    const again = await focusedIn(p);
+    check(`action ${how}: a failed retry keeps focus in the error context`, again?.tag === 'DIV' && again.text.startsWith('Please fix') || again?.text === 'Try again', label(again));
+    await p.getByRole('button', { name: 'Try again' }).focus();
+    await p.keyboard.press('Enter');
+    await p.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('added to your choices'))));
+    const back = await focusedIn(p);
+    check(`action ${how}: a successful retry returns focus to the choice that started it`, back?.tag === 'INPUT' && back.field === 'opt-L30', label(back));
+    await ctx.close();
+  }
+  {
+    // slow retry of an acknowledgement: focus never drops to the body while it runs; afterwards it is on the terms heading
+    let n = 0;
+    const acked = () => { const m = page(); m.terms.sections[0].acknowledged_on = '2026-10-15T10:00:00Z'; m.terms.pending = []; return m; };
+    const { ctx, p } = await open(browser, { proposal: () => ({ status: 200, body: { data: n > 1 ? acked() : page() } }),
+      handlers: { '/api/v1/public/proposal/acknowledgements': () => (n++ === 0 ? 'abort' : null) } });
+    await p.locator('vs-proposal-view h1').waitFor();
+    await p.locator('#term-WARRANTY summary').click();
+    await p.locator('#term-WARRANTY button').click();
+    await p.getByRole('button', { name: 'Try again' }).waitFor();
+    await p.route((url) => url.pathname === '/api/v1/public/proposal', async (route) => { await new Promise((r) => setTimeout(r, 800)); await route.fallback(); });
+    await p.getByRole('button', { name: 'Try again' }).focus();
+    await p.keyboard.press('Enter');
+    await p.waitForTimeout(300);
+    const during = await focusedIn(p);
+    check('slow retry: focus stays on the Try again control while it runs', during?.tag === 'BUTTON' && during.text.includes('Trying again'), label(during));
+    await p.waitForFunction(inPage(() => deepAll('[aria-live=polite]').some((n) => n.textContent.includes('acknowledged'))));
+    const after = await focusedIn(p);
+    check('slow retry: afterwards focus is on the terms heading (the acknowledged button is gone)', after?.tag === 'H2' && after.id === 'tm', label(after));
+    await ctx.close();
+  }
+
+  // error-summary navigation: each link focuses its exact control, which is marked invalid and described by its error
+  {
+    const problem = (field, message) => [422, { status: 422, code: 'VALIDATION_FAILED', title: 'x', detail: message, errors: [{ field, code: 'INVALID', message }] }];
+    const { ctx, p, errors } = await open(browser, { viewport: { width: 360, height: 740 }, proposal: () => ({ status: 200, body: { data: decidable() } }),
+      selection: () => problem('line_ref', 'This optional item cannot be chosen.'),
+      handlers: { '/api/v1/public/proposal/requests': () => problem('requested_quantity', 'Please give the quantity as a number.'),
+        '/api/v1/public/proposal/acknowledgements': () => problem('section_sha256', 'This section changed; please read it again.'),
+        '/api/v1/public/proposal/decision': () => problem('confirm', 'Please confirm the statement before accepting.') } });
+    await p.locator('vs-proposal-view h1').waitFor();
+    const follow = async (what, field, start, after) => {
+      await start();
+      const link = p.locator('vs-error-summary a').first();
+      await link.waitFor();
+      await p.evaluate(() => window.scrollTo(0, 0));
+      await link.focus();
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => { let a = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement;
+        const r = a?.getBoundingClientRect(); return r && r.bottom > 0 && r.top < innerHeight; }, null, { timeout: 3000 }).catch(() => {});
+      const f = await focusedIn(p);
+      check(`error summary → ${what}: focus on the exact control, scrolled into view`, f?.field === field && f.visible, label(f));
+      check(`error summary → ${what}: aria-invalid and aria-describedby name the error`, f?.invalid === 'true' && f.describedby[0] === `err-${field}`
+        && Boolean(f.described[0]) && (await link.textContent()).includes(f.described[0]), JSON.stringify({ invalid: f?.invalid, by: f?.describedby, said: f?.described }));
+      const ids = await p.evaluate(inPage(() => deepAll('[id^=err-]').map((n) => n.id)));
+      check(`error summary → ${what}: error ids are unique`, ids.length === new Set(ids).size, ids.join(','));
+      if (after) {
+        await after();
+        const g = await focusedIn(p);
+        check(`error summary → ${what}: correcting clears the invalid state without moving focus`, g?.field === field && g.invalid === null
+          && !g.describedby.includes(`err-${field}`), label(g));
+      }
+    };
+    await follow('textarea', 'message', async () => { await p.locator('#questions button.primary').click(); },
+      async () => { await p.keyboard.type('Corrected (SYNTHETIC)'); });
+    await axe(p, 'field error on the textarea');
+    await follow('text input', 'quantity', async () => {
+      await p.locator('#questions select[name=category]').selectOption('CHANGE_QUANTITY');
+      await p.locator('#questions textarea').fill('More lofts please (SYNTHETIC)');
+      await p.locator('#questions input[name=quantity]').fill('lots');
+      await p.locator('#questions button.primary').click();
+    }, async () => { await p.keyboard.press('End'); await p.keyboard.type('3'); });
+    await follow('radio (optional item)', 'opt-L30', async () => { await p.locator('fieldset.optitem label.choice').first().click(); });
+    await axe(p, 'field error on a choice');
+    await follow('acknowledgement', 'ack-WARRANTY', async () => {
+      await p.locator('#term-WARRANTY summary').click();
+      await p.locator('#term-WARRANTY button').click();
+    });
+    await axe(p, 'field error on an acknowledgement');
+    await follow('decision checkbox', 'confirm', async () => {
+      await p.locator('#decision label.check').click();
+      await p.locator('#decision button.primary').click();
+    }, async () => { await p.keyboard.press('Space'); await p.keyboard.press('Space'); });
+    check('error summary: no page error', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 

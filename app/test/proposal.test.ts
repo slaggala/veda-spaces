@@ -441,6 +441,88 @@ describe('PR #95 remediation N2, N11 (focus, retry, keys, landmarks)', () => {
     expect(accept.key).to.not.equal(decline.key);
   });
 
+  it('focuses the proposal title when it arrives, also after a retried load; never on a refresh after an action', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'e'.repeat(43)}`);
+    let first = true;
+    serve((path) => {
+      if (first && path.endsWith('/proposal')) { first = false; return json({ status: 500, code: 'INTERNAL_ERROR', title: 'x' }, 500); }
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => el.shadowRoot!.querySelector('[role=alert]'));
+    expect(deepActive()!.tagName).to.equal('H1');
+    (el.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+    await waitUntil(() => deepActive()?.id === 'proposal-title');
+    const title = deepActive() as HTMLElement;
+    expect(title.textContent).to.contain('Interior works');
+    expect(title.getAttribute('tabindex')).to.equal('-1');
+    const view = el.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    const radio = view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('after a failed action, a successful retry returns focus to the control that started it', async () => {
+    let fails = 2;
+    const { view } = await open((path) => {
+      if (path.endsWith('/selections') && fails > 0) {
+        fails -= 1;
+        const failure = json({ status: 503, code: 'UNAVAILABLE', title: 'x' }, 503);
+        // the retry answers slowly, so the test can see it in flight
+        return (fails === 0 ? new Promise((r) => setTimeout(() => r(failure), 150)) : failure) as unknown as Response;
+      }
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    const root = view.shadowRoot!;
+    const radio = root.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => root.querySelector('vs-error-summary'));
+    const retry = () => [...root.querySelectorAll('button')].find((b) => /Try again|Trying again/.test(b.textContent!)) as HTMLButtonElement;
+    retry().focus();
+    retry().click();
+    await waitUntil(() => view.busy);
+    expect(retry().getAttribute('aria-disabled')).to.equal('true'); // still there, and focused, while the retry runs
+    expect(deepActive()).to.equal(retry());
+    await waitUntil(() => !view.busy); // the retry failed
+    // a failed retry: focus stays in the error context (the summary, inside its own shadow root, or the Try again button)
+    await waitUntil(() => root.activeElement?.tagName === 'VS-ERROR-SUMMARY' || deepActive() === retry());
+    expect(deepActive()).to.not.equal(document.body);
+    retry().click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('an error-summary link focuses its exact control, which is marked invalid and described by the error', async () => {
+    const { view } = await open(() => json(interactive({ requests: { can_ask: true, items: [] } })));
+    const root = view.shadowRoot!;
+    (root.querySelector('#questions button.primary') as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-error-summary')?.shadowRoot?.querySelector('a'));
+    const textarea = root.querySelector('textarea[name=message]') as HTMLTextAreaElement;
+    expect(textarea.getAttribute('aria-invalid')).to.equal('true');
+    expect(textarea.getAttribute('aria-describedby')).to.equal('err-message ask-message-hint');
+    expect(root.getElementById('err-message')!.textContent).to.contain('at least 3 characters');
+    (root.querySelector('vs-error-summary')!.shadowRoot!.querySelector('a') as HTMLAnchorElement).click();
+    expect(deepActive()).to.equal(textarea);
+    textarea.value = 'Corrected';
+    textarea.dispatchEvent(new Event('input'));
+    await view.updateComplete;
+    expect(textarea.hasAttribute('aria-invalid')).to.equal(false);
+    expect(textarea.getAttribute('aria-describedby')).to.equal('ask-message-hint');
+    expect(deepActive()).to.equal(textarea);
+  });
+
+  it('an error about the request as a whole is text, not a link that goes nowhere', async () => {
+    const el = await fixture(html`<vs-error-summary .errors=${[{ field: '', message: 'Nothing was saved.' }, { field: 'message', message: 'Write more.' }]}></vs-error-summary>`);
+    const items = [...el.shadowRoot!.querySelectorAll('li')];
+    expect(items[0].querySelector('a')).to.equal(null);
+    expect(items[1].querySelector('a')!.getAttribute('href')).to.equal('#err-message');
+  });
+
   it('an initial server failure or rate limit offers an accessible retry', async () => {
     for (const status of [500, 429]) {
       history.replaceState(null, '', `/proposal#t=vsp_${'r'.repeat(43)}`);
