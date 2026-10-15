@@ -84,6 +84,7 @@ REVISIONS: dict[str, list[str]] = {
         "cost_estimate_adjustment",
     ],
     "0202_mtq_commercial": ["quotation", "quotation_section", "quotation_line", "quotation_event"],
+    "0207_customer_promise": ["customer_promise_pack", "customer_promise_review", "customer_promise_event"],
     "0205_customer_proposal": [
         "proposal_access_grant",
         "proposal_event",

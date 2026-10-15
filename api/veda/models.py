@@ -16,6 +16,7 @@ from veda.modules.catalog.models import (
     CatalogRelease,
 )
 from veda.modules.crm.leads.models import Lead, LeadActivity, LeadNote
+from veda.modules.customer_promise.models import CustomerPromiseEvent, CustomerPromisePack, CustomerPromiseReview
 from veda.modules.customer_proposal.models import (
     CustomerOptionalSelection,
     CustomerProposalRequest,
@@ -81,6 +82,9 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "CustomerPromiseEvent",
+    "CustomerPromisePack",
+    "CustomerPromiseReview",
     "CustomerOptionalSelection",
     "CustomerProposalRequest",
     "ProposalAccessGrant",

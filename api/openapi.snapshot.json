@@ -1253,6 +1253,37 @@
         "title": "DeviceInfo",
         "type": "object"
       },
+      "DraftIn": {
+        "additionalProperties": false,
+        "properties": {
+          "based_on_pack_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Based On Pack Id"
+          },
+          "change_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Change Summary"
+          }
+        },
+        "title": "DraftIn",
+        "type": "object"
+      },
       "DuplicateResolutionIn": {
         "additionalProperties": false,
         "properties": {
@@ -4393,6 +4424,20 @@
         "title": "QuotationVersionIn",
         "type": "object"
       },
+      "ReasonIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReasonIn",
+        "type": "object"
+      },
       "ReauthIn": {
         "additionalProperties": false,
         "properties": {
@@ -4785,6 +4830,36 @@
           "reason"
         ],
         "title": "ReturnIn",
+        "type": "object"
+      },
+      "ReviewIn": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Comment"
+          },
+          "decision": {
+            "enum": [
+              "APPROVED",
+              "CHANGES_REQUESTED"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ReviewIn",
         "type": "object"
       },
       "RevokeIn": {
@@ -5288,6 +5363,22 @@
           }
         },
         "title": "ScopeItemPatchIn",
+        "type": "object"
+      },
+      "SectionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "additionalProperties": true,
+            "maxProperties": 3,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "SectionIn",
         "type": "object"
       },
       "SelectionIn": {
@@ -6295,6 +6386,25 @@
           "reason"
         ],
         "title": "StatusIn",
+        "type": "object"
+      },
+      "SummaryIn": {
+        "additionalProperties": false,
+        "properties": {
+          "change_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Change Summary"
+          }
+        },
+        "title": "SummaryIn",
         "type": "object"
       },
       "SyncBatchIn": {
@@ -11175,6 +11285,762 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CEST-002"
+      }
+    },
+    "/api/v1/customer-promise": {
+      "get": {
+        "operationId": "customer_promise_landing",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The Customer Promise landing page: published and open versions, completeness, OI-MTQ-18 state",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-001"
+      }
+    },
+    "/api/v1/customer-promise/versions": {
+      "get": {
+        "operationId": "customer_promise_list_versions",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every version, newest first: status, people, dates and quotation counts",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-001"
+      },
+      "post": {
+        "operationId": "customer_promise_create_version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a draft from the published version, or from an earlier one (rollback by a new version)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.draft.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-002"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}": {
+      "get": {
+        "operationId": "customer_promise_get_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One version: sections, changes, reviews, problems, permitted actions",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-001"
+      },
+      "patch": {
+        "operationId": "customer_promise_patch_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummaryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a draft's change summary",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.draft.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-002"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/abandon": {
+      "post": {
+        "operationId": "customer_promise_discard",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discard an unwanted draft (kept as DISCARDED, never deleted)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.draft.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-002"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/approve": {
+      "post": {
+        "operationId": "customer_promise_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a fully reviewed version for publication (four-eyes)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.approve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-010"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/changes": {
+      "get": {
+        "operationId": "customer_promise_changes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "against",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Against"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What changed, in words: against the published version (or a chosen version)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-001"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/preview": {
+      "get": {
+        "operationId": "customer_promise_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The version as customers would see it (PREVIEW / NOT PUBLISHED); recorded",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.preview"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-012"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/publish": {
+      "post": {
+        "operationId": "customer_promise_publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish an approved version; the published one is superseded, in one transaction",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.publish"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-011"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/return": {
+      "post": {
+        "operationId": "customer_promise_return_to_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a version in review or approved to draft, with a reason",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "customer_promise.submit",
+          "customer_promise.approve"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-007"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/sections/{section_code}": {
+      "put": {
+        "operationId": "customer_promise_save_section",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "section_code",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save one section of a draft (every content rule applies)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "customer_promise.edit",
+          "customer_promise.contacts.edit",
+          "customer_promise.warranty.edit",
+          "customer_promise.payment_safety.edit"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-003"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/sections/{section_code}/review": {
+      "post": {
+        "operationId": "customer_promise_review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "section_code",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a changed section, or request changes (returns the version to draft)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "customer_promise.review",
+          "customer_promise.review.sensitive"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-008"
+      }
+    },
+    "/api/v1/customer-promise/versions/{pack_id}/submit": {
+      "post": {
+        "operationId": "customer_promise_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit a draft for review",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.submit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-007"
+      }
+    },
+    "/api/v1/customer-promise/vocabulary": {
+      "get": {
+        "operationId": "customer_promise_vocabulary",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sections, categories and states the editor offers (structure only)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-001"
       }
     },
     "/api/v1/customer-requests/{request_id}/link": {

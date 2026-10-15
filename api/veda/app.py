@@ -28,6 +28,7 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.catalog.routes import public_api as catalog_public_api
     from veda.modules.crm.leads import events as _lead_events  # noqa: F401  (registers handlers/resolvers)
     from veda.modules.crm.leads.routes import api as leads_api
+    from veda.modules.customer_promise.routes import api as customer_promise_api
     from veda.modules.customer_proposal import events as _proposal_events  # noqa: F401  (registers handlers)
     from veda.modules.customer_proposal.routes import ALL_APIS as cqx_apis
     from veda.modules.estimator import events as _estimate_events  # noqa: F401  (registers resolvers)
@@ -63,6 +64,7 @@ def _register_modules(app: Flask) -> None:
         mtq_estimation_api,
         mtq_quotation_api,
         *cqx_apis,
+        customer_promise_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)

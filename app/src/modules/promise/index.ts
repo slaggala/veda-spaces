@@ -1,0 +1,1 @@
+import './promise-page.js';

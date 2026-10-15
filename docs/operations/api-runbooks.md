@@ -112,6 +112,19 @@ quotation issued from that release on uses. Versions 1 and 2 are kept byte for b
 - Proven by `api/tests/integration/test_cqx_remediation.py::test_a_current_template_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers`
   and `api/tests/integration/test_cqx_completeness.py::test_a_document_issued_with_template_2_still_renders_and_shows_its_sections_as_to_be_confirmed`.
 
+### 2.5 Customer Promise (decision log 37, migration 0207)
+
+- Migration 0207 is expand-only (three new tables, thirteen permission codes); the N-1 image ignores them. Quotations
+  carry their customer pack in their own terms and frozen documents, so an image without the portal still serves every
+  issued quotation; rollback across it needs no data change.
+- **Wrong customer content published:** never edit rows. Publish a corrected version, or a rollback version (a draft
+  from an earlier published version), through review, four-eyes approval and publication. Issued quotations keep what
+  they froze; open drafts are refused at issue (`CUSTOMER_PROMISE_SUPERSEDED`) until revised.
+- **`CUSTOMER_PROMISE_INTEGRITY_FAILED`:** the published content no longer matches its digest; quotation drafting fails
+  closed. Treat as a security incident (§8), then publish a new version.
+- **Switch the portal off:** `VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED=false` (every route 404). Quotations keep binding to
+  the published pack while OI-MTQ-18 delegates to it; only the owner's OI-MTQ-18 record changes that.
+
 ## 3. Disaster rollback: restore a snapshot
 
 Use this only when a migration or a defect corrupted data. **The restored database must then be served by a fixed

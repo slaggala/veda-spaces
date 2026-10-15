@@ -75,7 +75,9 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
     validity = policy.decision("OI-MTQ-08")
     terms_d = policy.decision("OI-MTQ-09")
     shown = policy.decision("OI-MTQ-10")
-    pack = policy.decision("OI-MTQ-18")
+    from veda.modules.customer_promise import binding
+
+    pack, promise = binding.for_quotation(s)
     scope = s.get(Scope, est.scope_id)
     assert scope is not None
     spaces = requirements.spaces_of(s, s.get(Property, est.property_id))  # type: ignore[arg-type]  # FK guarantees the row
@@ -103,8 +105,10 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
         "cancellation_terms": terms_d.cancellation_terms if terms_d else None,
         "general_terms": list(terms_d.general_terms) if terms_d else [],
         "show_unit_rates": bool(shown.show_unit_rates) if shown else False,
-        # OI-MTQ-18 as recorded when this version was drafted (frozen into the issued document; None: to be confirmed)
-        "customer_pack": pack.model_dump(mode="json") if pack else None,
+        # OI-MTQ-18 as recorded when this version was drafted (frozen into the issued document; None: to be confirmed):
+        # the recorded pack, or the published Customer Promise Pack with its reference (customer_promise.binding)
+        "customer_pack": pack,
+        **({"customer_promise": promise} if promise else {}),
     }
 
 
@@ -363,6 +367,11 @@ def issuance_blockers(s: Session, q: Quotation) -> list[dict[str, Any]]:
                         "severity": "BLOCKING", "decision": "OI-MTQ-13",
                         "message": f"{rate_changes} line(s) change an accepted rate; the variation policy does not "
                                    "permit rate changes."})  # fmt: skip
+    from veda.modules.customer_promise import binding
+
+    promise = binding.stale_blocker(s, q.terms)
+    if promise is not None:
+        out.append(promise)
     unpriced = s.execute(
         sa.select(sa.func.count())
         .select_from(QL)
@@ -446,7 +455,8 @@ def issue(s: Session, ctx, q: Quotation) -> Quotation:
     q.status = "ISSUED"
     event(s, q, "ISSUED", "APPROVED", "ISSUED", snapshot_sha256=q.snapshot_sha256,
           html_sha256=q.issued_html_sha256, template_version=q.template_version,
-          valid_until=q.valid_until.isoformat())  # fmt: skip
+          valid_until=q.valid_until.isoformat(),
+          **({"customer_promise": promise} if (promise := (q.terms or {}).get("customer_promise")) else {}))  # fmt: skip
     _sync_lead_on_issue(s, q)
     return q
 
