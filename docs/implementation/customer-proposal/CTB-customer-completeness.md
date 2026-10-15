@@ -6,7 +6,7 @@ the Customer Quotation Experience lacked customer **content and fields**, not ar
 
 A mature competitor quotation was used only as a completeness benchmark. Nothing of it is copied: no wording, layout,
 claims, warranty durations, payment terms, policies, statistics, legal language or branding. Everything a customer sees
-comes from Veda Spaces-controlled content, and where the owner has not approved that content the page says
+comes from Veda Spaces-controlled content (fixture rule and guard: [reference-content-policy.md](../../engineering/reference-content-policy.md)), and where the owner has not approved that content the page says
 **"to be confirmed by Veda Spaces"**.
 
 ## 1. What a customer can now answer, and from where

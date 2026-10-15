@@ -1,0 +1,47 @@
+{
+ "note": "Counts only (category -> file -> count) of real-looking low-entropy values that test and fixture sources on main held before the guard; never values. A new one, or a higher count, fails tests/unit/test_reference_content_guard.py. New fixtures use synthetic forms.",
+ "counts": {
+  "bank-account-like number": {
+   "infra/tests/fixtures/aut106-runtime-iam-plan.json": 11
+  },
+  "e-mail address": {
+   "api/tests/integration/test_leads.py": 1,
+   "api/tests/unit/test_config_environments.py": 1,
+   "api/tests/unit/test_estimator_engine.py": 1,
+   "app/e2e/site-release/index.html": 1
+  },
+  "mobile number": {
+   "api/tests/integration/test_api_contract.py": 3,
+   "api/tests/integration/test_attachments.py": 1,
+   "api/tests/integration/test_catalog_rules_api.py": 3,
+   "api/tests/integration/test_consent_dev004.py": 4,
+   "api/tests/integration/test_consent_rr12.py": 3,
+   "api/tests/integration/test_estimator_api.py": 4,
+   "api/tests/integration/test_intake_lock.py": 2,
+   "api/tests/integration/test_leads.py": 13,
+   "api/tests/integration/test_leads_remediation.py": 2,
+   "api/tests/integration/test_mtq_properties.py": 4,
+   "api/tests/integration/test_mtq_schema.py": 3,
+   "api/tests/integration/test_mtq_visits.py": 3,
+   "api/tests/integration/test_pii_tracking.py": 2,
+   "api/tests/integration/test_rbac.py": 2,
+   "api/tests/support/mtq.py": 1,
+   "api/tests/unit/test_customer_spec.py": 1,
+   "api/tests/unit/test_logging_pii.py": 1,
+   "app/e2e/access.e2e.mjs": 1,
+   "app/e2e/estimator-v2-prototype.e2e.mjs": 1,
+   "app/e2e/estimator-v2.e2e.mjs": 1,
+   "app/e2e/estimator.e2e.mjs": 2,
+   "app/e2e/site-release/404.html": 3,
+   "app/e2e/site-release/assets/app.js": 1,
+   "app/e2e/site-release/estimate.html": 2,
+   "app/e2e/site-release/index.html": 6,
+   "app/e2e/site-release/warranty.html": 6,
+   "app/e2e/site.e2e.mjs": 7,
+   "app/e2e/workspace.e2e.mjs": 1,
+   "app/test/format.test.ts": 2,
+   "app/test/leads-logic.test.ts": 1,
+   "app/test/telemetry.test.ts": 1
+  }
+ }
+}
