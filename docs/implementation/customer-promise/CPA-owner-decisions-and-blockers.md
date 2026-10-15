@@ -28,7 +28,7 @@ owner-decision registers and reviewed pull requests.
 
 ## 3. Staging-enablement blockers
 
-- The flag is not wired to staging (no SSM parameter, no enablement record); a wiring change is required.
+- The flag is wired to staging false (decision log 38, `staging-platform.json` "customer_promise") with a DRAFT record `infra/config/customer-promise-enablement-record.json`; turning it on needs that record APPROVED by the owner with its evidence, bound by SHA-256, then an approved apply and a deploy.
 - CPA-D02 persona holders and a second account for four-eyes.
 - This pull request's independent review.
 

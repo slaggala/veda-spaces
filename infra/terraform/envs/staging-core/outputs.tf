@@ -183,3 +183,22 @@ output "customer_proposal" {
     error_message = "Customer-proposal flags turn on only with an owner-APPROVED infra/config/customer-proposal-enablement-record.json bound by its SHA-256, scoped to each flag, with every evidence field filled: ${join("; ", local.cqx_record_problems)}."
   }
 }
+
+# Customer Promise administration (decision log 37): what is planned, and the gates that refuse the rest.
+output "customer_promise" {
+  description = "Customer Promise administration on staging: the staff-only flag (false until an owner-approved, digest-bound, synthetic-content-only enablement record)."
+  value = {
+    admin_enabled     = local.cpa_config.VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED
+    enablement_record = local.cpa.enablement_record_sha256
+  }
+
+  precondition {
+    condition     = local.cpa.status == "DECIDED" && (local.cpa.admin_enabled || local.cpa.enablement_record_sha256 == null)
+    error_message = "customer_promise must be DECIDED, and a digest is bound only together with admin_enabled (rollback clears both)."
+  }
+
+  precondition {
+    condition     = !local.cpa.admin_enabled || length(local.cpa_record_problems) == 0
+    error_message = "VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED turns on only with an owner-APPROVED infra/config/customer-promise-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.cpa_record_problems)}."
+  }
+}

@@ -740,3 +740,73 @@ run "a_bound_customer_proposal_digest_without_a_flag_refused" {
   }
   expect_failures = [output.customer_proposal]
 }
+
+# Customer Promise administration (decision log 37): one staff-only flag planned false; it turns on only with an
+# owner-APPROVED, staging-only, synthetic-content-only record bound by its SHA-256 whose approver is not its author.
+run "the_customer_promise_flag_is_planned_false" {
+  command = plan
+
+  assert {
+    condition     = local.app_config["VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED"] == "false" && output.customer_promise.enablement_record == null && length(local.cpa_config) == 1
+    error_message = "one parameter, false, no record bound (also the rollback state)"
+  }
+
+  assert {
+    condition     = jsondecode(file("../../../config/customer-promise-enablement-record.json")).status == "DRAFT" && contains(local.cpa_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+  }
+
+  assert {
+    condition     = local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal flag is separate from customer-proposal viewing"
+  }
+}
+
+run "an_approved_record_turns_the_portal_on" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-on.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-approved.json"
+  }
+
+  assert {
+    condition     = output.customer_promise.admin_enabled == "true" && local.cpa_record_problems == [] && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal on, bound to an approved record; customer-proposal viewing untouched"
+  }
+}
+
+run "the_customer_promise_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-on-draft.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-draft.json"
+  }
+  expect_failures = [output.customer_promise]
+}
+
+run "a_self_approved_customer_promise_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-on-self.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-self-approved.json"
+  }
+  expect_failures = [output.customer_promise]
+}
+
+run "a_customer_promise_record_for_production_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-on-production.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-production.json"
+  }
+  expect_failures = [output.customer_promise]
+}
+
+run "a_bound_customer_promise_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-digest-without-flag.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-approved.json"
+  }
+  expect_failures = [output.customer_promise]
+}

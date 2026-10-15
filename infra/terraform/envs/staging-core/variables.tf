@@ -81,6 +81,12 @@ variable "customer_proposal_record_path" {
   default     = ""
 }
 
+variable "customer_promise_record_path" {
+  description = "The Customer Promise staging enablement record (tests only; empty means infra/config/customer-promise-enablement-record.json)."
+  type        = string
+  default     = ""
+}
+
 variable "mtq_commercial_record_path" {
   description = "The MTQ B2-B4 staging enablement record (tests only; empty means infra/config/mtq-commercial-enablement-record.json)."
   type        = string
