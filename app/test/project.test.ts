@@ -211,4 +211,63 @@ describe('Project page (vs-project-page)', () => {
   });
 });
 
+describe('Project page: final safety closure (M1, M2, S1)', () => {
+  const originalFetch = window.fetch;
+  afterEach(() => { window.fetch = originalFetch; });
+
+  async function openTab(mock: Mock, tab: string) {
+    const m = await mountWith('vs-project-page', mock);
+    await waitUntil(() => m.root.querySelector('dl.hero'), 'project loaded');
+    (m.root.querySelector('vs-tabs') as HTMLElement).dispatchEvent(new CustomEvent('tab-change', { detail: tab }));
+    await m.el.updateComplete;
+    return m;
+  }
+
+  it('offers a customer-promised date only when owner decision PLB-OD-13 lets this person record one', async () => {
+    const { el, root } = await openTab({}, 'milestones');
+    button(root, 'Add a milestone').click();
+    await el.updateComplete;
+    expect(root.querySelector('#project-form [name=customer_promised_date]')).to.equal(null);
+    expect(root.querySelector('#project-form')!.textContent).to.contain('needs owner decision PLB-OD-13');
+    const allowed = project();
+    allowed.actions = { ...allowed.actions, record_promised_date: true };
+    const second = await openTab({ detail: allowed }, 'milestones');
+    button(second.root, 'Add a milestone').click();
+    await second.el.updateComplete;
+    expect(second.root.querySelector('#project-form [name=customer_promised_date]')).to.exist;
+  });
+
+  it('changes a snag\'s blocking only through its own reasoned command, when PLB-OD-06 allows', async () => {
+    const snag = { id: 'n1', version: 3, snag_no: 1, category: 'FINISH', customer_title: 'Synthetic snag', description: null, space: null, space_id: null,
+      item_reference: null, is_blocking: true, classification_reason: null, owner: null, responsible_party: 'VEDA', status: 'OPEN',
+      allowed_next: ['IN_PROGRESS', 'CLOSED'], target_date: null, evidence: null, resolution_note: null, resolved_on: null, resolved_by: null,
+      closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null };
+    const plain = project({ snags: [snag] });
+    const first = await openTab({ detail: plain }, 'quality');
+    expect([...first.root.querySelectorAll('button')].some((b) => b.textContent?.includes('Change blocking'))).to.equal(false);
+    const allowed = project({ snags: [snag] });
+    allowed.actions = { ...allowed.actions, reclassify_snag: true };
+    const { el, root, calls } = await openTab({ detail: allowed }, 'quality');
+    button(root, 'Change blocking').click();
+    await el.updateComplete;
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-dialog textarea[aria-invalid=true]'), 'reason required');
+    expect(calls.filter((c) => c.method === 'POST')).to.have.length(0);
+    (root.querySelector('#project-form textarea[name=reason]') as HTMLTextAreaElement).value = 'Cosmetic only; agreed on site';
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => calls.some((c) => c.method === 'POST'), 'sent');
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.path).to.equal('/api/v1/projects/p1/snags/n1/classification');
+    expect(post.body).to.deep.equal({ is_blocking: false, reason: 'Cosmetic only; agreed on site' });
+    expect(post.ifMatch).to.equal('"3"');
+  });
+
+  it('shows an owner who can no longer act as needing reassignment, keeping the assignment', async () => {
+    const p = project({ needs_reassignment: ['DESIGN'] });
+    p.team = p.team.map((m) => (m.responsibility === 'DESIGN' ? { ...m, eligible: false } : m));
+    const { root } = await openTab({ detail: p }, 'overview');
+    expect(text(root)).to.contain('Needs reassignment: Design').and.to.contain('SYNTHETIC Designer');
+  });
+});
+
 void row;

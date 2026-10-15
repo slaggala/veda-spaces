@@ -378,14 +378,14 @@ export class VsProjectPage extends SessionElement {
 
   private addMilestone(p: ProjectDetail) {
     this.open({ title: 'Add a milestone', submit: 'Add', done: 'Milestone added.',
-      intro: 'A planned date is an internal plan, never a commitment to the customer. Record a customer-promised date only if it was already promised.',
+      intro: `A planned date is an internal plan, never a commitment to the customer.${p.actions.record_promised_date ? ' Record a customer-promised date only if it was already promised.' : ' A customer-promised date is a customer commitment: recording one needs owner decision PLB-OD-13.'}`,
       fields: [
         { name: 'milestone_code', label: 'Type', kind: 'select', required: true, options: opt(this.vocab?.milestone_types ?? []) },
         { name: 'label', label: 'Label (internal)', kind: 'text', required: true, maxLength: 120 },
         { name: 'stage_code', label: 'Stage it belongs to', kind: 'select', required: true, value: p.stage.code,
           options: p.stages.filter((s) => !s.terminal && s.status !== 'COMPLETED').map((s) => [s.code, s.label]) },
         { name: 'planned_date', label: 'Planned date (internal)', kind: 'date' },
-        { name: 'customer_promised_date', label: 'Customer-promised date (only if already promised)', kind: 'date' },
+        ...(p.actions.record_promised_date ? [{ name: 'customer_promised_date', label: 'Customer-promised date (only if already promised)', kind: 'date' as const }] : []),
         { name: 'customer_label', label: 'Customer-safe label (optional)', kind: 'text', maxLength: 120, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
         { name: 'owner_responsibility', label: 'Responsibility', kind: 'select', options: opt(this.vocab?.responsibilities ?? []) },
         { name: 'depends_on_milestone_id', label: 'Depends on', kind: 'select', options: p.milestones.map((m) => [m.id, m.label]) },
@@ -400,7 +400,7 @@ export class VsProjectPage extends SessionElement {
           options: opt(['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'BLOCKED', 'CANCELLED', 'NOT_APPLICABLE']) },
         { name: 'status_reason', label: 'Reason (cancelled or not applicable)', kind: 'textarea', maxLength: 500 },
         { name: 'planned_date', label: 'Planned date (internal)', kind: 'date', value: m.planned_date },
-        { name: 'customer_promised_date', label: 'Customer-promised date (only if already promised)', kind: 'date', value: m.customer_promised_date },
+        ...(p.actions.record_promised_date ? [{ name: 'customer_promised_date', label: 'Customer-promised date (only if already promised)', kind: 'date' as const, value: m.customer_promised_date }] : []),
       ],
       run: (b) => projectApi.updateMilestone(p, m, b) });
   }
@@ -445,7 +445,9 @@ export class VsProjectPage extends SessionElement {
       fields: [
         { name: 'category', label: 'Category', kind: 'select', required: true, value: category ?? null, options: opt(this.vocab?.qc_categories ?? []) },
         { name: 'result', label: 'Result', kind: 'select', required: true, options: opt(this.vocab?.qc_results ?? []) },
-        { name: 'observation', label: 'Observation (required for a failure)', kind: 'textarea', classification: 'INTERNAL_ONLY' },
+        { name: 'observation', label: 'Observation (required for a failure)', kind: 'textarea', classification: 'INTERNAL_ONLY',
+          hint: p.actions.qc_required_not_applicable ? 'Not applicable on a required category needs a reason here.'
+            : 'Not applicable on a required category needs owner decision PLB-OD-08.' },
         { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((s) => [s.id, s.label]) },
         ...this.evidenceFields(p),
         ...(recheckOf ? [{ name: 'recheck_of_id', label: 'Recheck of', kind: 'select' as const, required: true, value: recheckOf, options: [[recheckOf, 'The failed check']] as [string, string][] }] : []),
@@ -470,6 +472,14 @@ export class VsProjectPage extends SessionElement {
         ...this.evidenceFields(p),
       ],
       run: (b) => projectApi.raiseSnag(p, b) });
+  }
+
+  private reclassify(p: ProjectDetail, s: Snag) {
+    const to = !s.is_blocking;
+    this.open({ title: `Snag ${s.snag_no}: ${to ? 'make it block the handover' : 'stop it blocking the handover'}`, submit: 'Change', done: 'Snag reclassified.',
+      intro: 'This changes handover readiness. It is recorded with your reason, the previous and the new classification.',
+      fields: [{ name: 'reason', label: 'Reason', kind: 'textarea', required: true, maxLength: 500, ...REASON }],
+      run: (b) => projectApi.reclassifySnag(p, s, { is_blocking: to, ...b }) });
   }
 
   private snagStatus(p: ProjectDetail, s: Snag, status: string) {
@@ -537,7 +547,9 @@ export class VsProjectPage extends SessionElement {
     const active = p.team.filter((m) => m.active);
     return html`<section class="stack" aria-labelledby="team-h"><div class="row"><h2 id="team-h">Owners and team</h2><span class="spacer"></span>
         ${p.actions.assign_team ? html`<button class="btn" @click=${() => this.assign(p)}>Assign</button>` : nothing}</div>
+      ${p.needs_reassignment.length ? html`<vs-banner kind="warning">Needs reassignment: ${p.needs_reassignment.map(humanize).join(', ')}. The assigned owner can no longer act on this project; the assignment is kept in the history.</vs-banner>` : nothing}
       ${active.length ? html`<ul class="plain">${active.map((m) => html`<li>${humanize(m.responsibility)}: <strong>${who(m.user)}</strong>
+        ${!m.eligible && m.responsibility !== 'MEMBER' ? html` <span class="badge warn">Needs reassignment</span>` : nothing}
         <span class="muted small">since ${when(m.assigned_on)}</span>
         ${p.actions.assign_team ? html` <button class="btn small ghost" @click=${() => this.removeMember(p, m)} aria-label=${`End ${who(m.user)}'s ${humanize(m.responsibility).toLowerCase()} assignment`}>End</button>` : nothing}</li>`)}</ul>`
         : html`<p class="muted">No one is assigned yet.</p>`}
@@ -699,8 +711,11 @@ export class VsProjectPage extends SessionElement {
           <dt>Owner</dt><dd>${who(s.owner, 'Not assigned')} · ${party(s.responsible_party)}</dd>
           ${s.description ? html`<dt>Details</dt><dd>${s.description}</dd>` : nothing}
           ${s.resolution_note ? html`<dt>Resolution</dt><dd>${s.resolution_note}</dd>` : nothing}</dl>
+        ${s.classification_reason ? html`<p class="small muted">Classification changed: ${s.classification_reason}</p>` : nothing}
         ${a.manage_snag && s.allowed_next.length ? html`<div class="actions">${s.allowed_next.map((st) => html`<button class="btn small" @click=${() => this.snagStatus(p, s, st)}
-          aria-label=${`Snag ${s.snag_no}: ${humanize(st)}`}>${humanize(st)}</button>`)}</div>` : nothing}</li>`)}</ul>` : html`<p class="muted">No snags.</p>`}`;
+          aria-label=${`Snag ${s.snag_no}: ${humanize(st)}`}>${humanize(st)}</button>`)}
+          ${a.reclassify_snag && !['RESOLVED', 'CLOSED'].includes(s.status) ? html`<button class="btn small ghost" @click=${() => this.reclassify(p, s)}
+            aria-label=${`Snag ${s.snag_no}: change whether it blocks the handover`}>Change blocking</button>` : nothing}</div>` : nothing}</li>`)}</ul>` : html`<p class="muted">No snags.</p>`}`;
   }
 
   private renderHandover(p: ProjectDetail): TemplateResult {

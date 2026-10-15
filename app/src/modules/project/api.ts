@@ -76,7 +76,7 @@ export interface QcRow {
 }
 export interface Snag {
   id: string; version: number; snag_no: number; category: string; customer_title: string; description: string | null; space: string | null;
-  space_id: string | null; item_reference: string | null; is_blocking: boolean; owner: Person | null; responsible_party: string; status: string;
+  space_id: string | null; item_reference: string | null; is_blocking: boolean; classification_reason: string | null; owner: Person | null; responsible_party: string; status: string;
   allowed_next: string[]; target_date: string | null; evidence: Evidence | null; resolution_note: string | null; resolved_on: string | null;
   resolved_by: Person | null; closed_on: string | null; closed_by: Person | null; qc_check_id: string | null; raised_on: string | null; raised_by: Person | null;
 }
@@ -105,12 +105,14 @@ export interface TimelineEvent { id: string; code: string; stage_code: string | 
   detail: Record<string, unknown>; by: Person | null; on: string | null }
 export interface Attention { severity: 'ACTION' | 'GATING' | 'SITE' | 'INFORMATIONAL'; kind: string; title: string; who: string;
   action: string | null; blocks: string | null; entity: EntityRef }
-export interface TeamMember { id: string; version: number; user: Person | null; responsibility: string; active: boolean; assigned_on: string | null;
+export interface TeamMember { id: string; version: number; user: Person | null; responsibility: string; active: boolean; eligible: boolean; assigned_on: string | null;
   assigned_by: Person | null; removed_on: string | null; removed_by: Person | null; removal_reason: string | null }
 export interface Actions {
   request_transition: boolean; complete_handover: boolean; approve_transition: boolean; assign_team: boolean; complete_checklist: boolean;
   checklist_not_applicable: boolean; manage_milestone: boolean; raise_blocker: boolean; resolve_blocker: boolean; manage_site_readiness: boolean;
   manage_qc: boolean; manage_snag: boolean; view_commercial_baseline: boolean; view_audit: boolean;
+  /** Owner decisions PLB-OD-13, PLB-OD-06, PLB-OD-08 recorded and naming a capability this person holds here. */
+  record_promised_date: boolean; reclassify_snag: boolean; qc_required_not_applicable: boolean;
 }
 export interface ProjectDetail {
   id: string; version: number; project_number: string; status: string; source: string; property: PropertyRef; quotation_number: string;
@@ -121,7 +123,7 @@ export interface ProjectDetail {
   owner: Person | null; next_milestone: ProjectRow['next_milestone']; readiness: Evaluation | null; awaiting_approval: Transition | null;
   handover_readiness: HandoverReadiness; site_readiness_state: 'NOT_ASSESSED' | 'READY' | 'BLOCKED' | 'TO_BE_CONFIRMED';
   attention: Attention[]; next_actions: { gate: string; code: string; who: string; message: string; entity: EntityRef | null }[];
-  team: TeamMember[]; stages: Stage[]; checklist: ChecklistGroup[]; blockers: Blocker[]; milestones: Milestone[]; site_readiness: ReadinessItem[];
+  team: TeamMember[]; needs_reassignment: string[]; stages: Stage[]; checklist: ChecklistGroup[]; blockers: Blocker[]; milestones: Milestone[]; site_readiness: ReadinessItem[];
   qc: { required_categories: string[]; categories: { category: string; required: boolean; latest: QcRow | null }[]; history: QcRow[] };
   snags: Snag[]; baseline: BaselineView; transitions: Transition[]; timeline: TimelineEvent[]; spaces: { id: string; label: string }[];
   evidence_options: { id: string; category: string; attached_to: string; uploaded_on: string | null }[];
@@ -174,4 +176,6 @@ export const projectApi = {
   recordQc: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/qc-checks`, body, { idempotencyKey: newIdempotencyKey() }),
   raiseSnag: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/snags`, body, { idempotencyKey: newIdempotencyKey() }),
   snagStatus: (p: ProjectDetail, s: Snag, body: Body) => api.post<ProjectDetail>(`${at(p)}/snags/${s.id}/status`, body, { ifMatch: s.version }),
+  reclassifySnag: (p: ProjectDetail, s: Snag, body: Body) =>
+    api.post<ProjectDetail>(`${at(p)}/snags/${s.id}/classification`, body, { ifMatch: s.version }),
 };

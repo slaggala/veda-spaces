@@ -86,7 +86,8 @@ function detail(state) {
       ? [{ gate: 'QC_PASSED', code: 'QC_FAILED', message: 'Quality check finish and surfaces failed; fix and recheck it.', responsible_party: 'VEDA' }] : [] },
     site_readiness_state: state.site === 'READY' ? 'READY' : 'BLOCKED', attention,
     next_actions: blockers.map((b) => ({ gate: b.gate, code: b.code, who: b.responsible_party, message: b.message, entity: b.entity })),
-    team: [{ id: 'mem1', version: 1, user: OPS, responsibility: 'PROJECT', active: true, assigned_on: '2026-10-14T10:00:00Z', assigned_by: OPS, removed_on: null, removed_by: null, removal_reason: null }],
+    needs_reassignment: [],
+    team: [{ id: 'mem1', version: 1, user: OPS, responsibility: 'PROJECT', active: true, eligible: true, assigned_on: '2026-10-14T10:00:00Z', assigned_by: OPS, removed_on: null, removed_by: null, removal_reason: null }],
     stages: STAGES.map((c, i) => ({ code: c, label: label(c), description: '', sequence: i + 1, customer_stage: 'SITE_READINESS', owner_responsibility: 'PROJECT',
       terminal: c === 'HANDED_OVER', status: i < idx ? 'COMPLETED' : i === idx ? 'ACTIVE' : 'NOT_STARTED', entered_on: null, entered_by: null, completed_on: null,
       completed_by: null, exit: null })),
@@ -122,7 +123,7 @@ function detail(state) {
     transitions: state.transitions, timeline: state.timeline, spaces: [{ id: 's1', label: 'Kitchen' }], evidence_options: [],
     actions: { request_transition: true, complete_handover: true, approve_transition: false, assign_team: true, complete_checklist: true, checklist_not_applicable: false,
       manage_milestone: true, raise_blocker: true, resolve_blocker: true, manage_site_readiness: true, manage_qc: true, manage_snag: true,
-      view_commercial_baseline: true, view_audit: true },
+      view_commercial_baseline: true, view_audit: true, record_promised_date: false, reclassify_snag: false, qc_required_not_applicable: false },
     policy: POLICY, classification: { classes: ['INTERNAL_ONLY', 'POTENTIALLY_CUSTOMER_SAFE', 'CUSTOMER_ACTION'], default: 'INTERNAL_ONLY', fields: {}, published: false },
     last_material_change: '2026-10-15T09:00:00Z',
   };
