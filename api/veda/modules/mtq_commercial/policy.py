@@ -139,7 +139,7 @@ class PrepDrivers(_Closed):  # OI-MTQ-15
     independent_house_factor_bp: Annotated[int | None, Field(ge=1, le=50_000)] = None
 
 
-SHAPES: dict[str, type[_Closed]] = {
+SHAPES: dict[str, type[BaseModel]] = {
     "OI-MTQ-03": Rules,
     "OI-MTQ-04": Rules,
     "OI-MTQ-05": Rates,
