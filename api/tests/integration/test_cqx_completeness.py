@@ -146,7 +146,11 @@ def test_dimensions_follow_the_measurement_lineage_and_never_guess(api, factory)
         row = s.get(Quotation, q["id"])
         rows = [x for x in quotations.lines(s, row) if not (x.quantity_centi == 0 and not x.amount_minor)]
         inputs = rendering._formula_inputs(s, rows)
-        expected = sorted(json.dumps([x.description, *customer_pack.dimensions(inputs.get(x.id))]) for x in rows)
+        expected = sorted(
+            json.dumps([x.description, *customer_pack.dimensions(fi, overridden=ov)])
+            for x in rows
+            for fi, ov in [inputs.get(x.id, (None, False))]
+        )
     p = customer(api, share(c, q)).get().data["proposal"]
     lines = [x for r in p["rooms"] for x in r["lines"]] + p["optional_items"]
     sized = [x for x in lines if "dimension_status" in x]
@@ -257,3 +261,65 @@ def test_materials_and_hardware_come_from_the_approved_specification_and_the_che
     assert items["SIZE"]["status"] == ("ANSWERED" if size_ok else "TO_BE_CONFIRMED")
     assert all(i["status"] == "ANSWERED" for code, i in items.items() if code != "SIZE"), items
     assert pv["trust_checklist"]["customer_ready"] is size_ok
+
+
+def test_an_overridden_quantity_never_shows_a_size_that_contradicts_it(api, factory):
+    """Review finding 1: staff override a measured line's quantity; its measured inputs no longer describe the priced
+    quantity, so the customer sees no size, only "dimension to be confirmed"."""
+    install_full_policy(OI_MTQ_15=SYNTHETIC_PREP)
+    load_card()
+    c = Commercial(api, factory)
+    prop = c.site("3BHK")
+    c.seed(prop)
+    c.decide_all(prop, optional="ACCEPTED")
+    scope = c.confirm(c.fill_staff_inputs(c.draft_scope(prop)))
+    boq = c.boq(scope)
+    target = next(
+        x for x in boq["lines"]
+        if any((d or {}).get("source") == "MEASURED" and d.get("unit") == "ft"
+               for d in ((x.get("formula_inputs") or {}).get("inputs") or {}).values())
+        and x["uom_code"] in ("SFT", "RFT") and not x["is_optional"]
+    )  # fmt: skip
+    api_ = c.as_(c.estimator)
+    ok(api_.post(f"/api/v1/boq-lines/{target['id']}/override",
+                 {"quantity_centi": (target["final_quantity_centi"] or 100) + 100, "reason": "Layout differs on site"},
+                 if_match=target["version"]))  # fmt: skip
+    boq = ok(c.review(boq))
+    est = ok(api_.post(f"/api/v1/boqs/{boq['id']}/cost-estimates", {"tier_code": "ESSENTIAL"}), 201)
+    est = ok(c.as_(c.manager).post(f"/api/v1/cost-estimates/{est['id']}/approve", if_match=est["version"]))
+    q = ok(api_.post(f"/api/v1/cost-estimates/{est['id']}/quotations", {}), 201)
+    issued = _issue(c, q)
+    from veda.modules.mtq_commercial.models import CostEstimateLine, QuotationLine
+
+    with db.unit_of_work() as s:
+        import sqlalchemy as sa
+
+        position = s.execute(
+            sa.select(QuotationLine.position).join(CostEstimateLine, CostEstimateLine.id == QuotationLine.cost_estimate_line_id)
+            .where(QuotationLine.quotation_id == issued["id"], CostEstimateLine.boq_line_id == target["id"])
+        ).scalar_one()  # fmt: skip
+    p = customer(api, share(c, issued)).get().data["proposal"]
+    line = next(x for r in p["rooms"] for x in r["lines"] if x["ref"] == f"L{position}")
+    assert line["dimension_status"] == "TO_BE_CONFIRMED" and line["dimensions"] == []
+
+
+def test_choices_are_audited_and_carried_to_the_next_version(api, factory):
+    """Review findings 6 and 7: the EDITED event records the stored choices (codes only), and a new version keeps the
+    choices its pack still has instead of silently reverting to "to be confirmed"."""
+    install_full_policy(OI_MTQ_15=SYNTHETIC_PREP, OI_MTQ_18=SYNTHETIC_PACK)
+    load_card()
+    c = Commercial(api, factory)
+    _, est, q = _draft(c, "2BHK")
+    chosen = {"contact_code": "SYN_QUOTE_DESK", "responsibilities": {"SYN_LIFT": "NOT_REQUIRED"},
+              "readiness": {"SYN_FLOOR": "READY"}}  # fmt: skip
+    ok(_patch(c, q, chosen))
+    from veda.modules.mtq_commercial.models import QuotationEvent
+
+    with db.unit_of_work() as s:
+        import sqlalchemy as sa
+
+        edited = s.execute(sa.select(QuotationEvent).where(QuotationEvent.quotation_id == q["id"],
+                                                           QuotationEvent.event_code == "EDITED")).scalars().all()  # fmt: skip
+        assert [e.detail.get("customer_information") for e in edited] == [chosen]
+    nxt = ok(step(c, q, "versions", c.estimator, {"cost_estimate_id": est["id"]}, code=201))
+    assert nxt["version_no"] == 2 and nxt["customer_inputs"] == chosen

@@ -583,8 +583,9 @@ describe('CQX customer completeness (CTB): contact, sizes, scope, materials, pay
     expect(root.querySelector('#warranty #term-WARRANTY')).to.exist;
     expect(root.querySelector('#terms #term-TERMS')).to.exist;
     expect(root.querySelector('.actions-list a')!.getAttribute('href')).to.equal('#term-WARRANTY');
-    // the manufacturer's warranty never reads as Veda Spaces' own obligation
-    expect(root.querySelector('#warranty')!.textContent).to.contain('does not extend Veda Spaces’ service support'.replace('’', "'"));
+    // the manufacturer-backed warranty and Veda Spaces' service support are separate panels, never one text
+    const panels = [...root.querySelectorAll('#warranty details > summary h3')].map((h) => h.textContent);
+    expect(panels).to.include('Manufacturer-backed warranty').and.to.include('What the warranty does not cover');
     await expect(el).to.be.accessible();
   });
 });

@@ -11,10 +11,16 @@ frozen into the issued document (``rendering.freeze``); a later change to the pa
 Per version, staff choose the quotation contact and the status of each responsibility and readiness item
 (``quotation.customer_inputs``); the frozen document carries the result.
 
-Copy governance: free text refuses money amounts, durations (a duration appears only in a next-step stage's own
-``duration`` field, which recording approves), e-mail addresses and phone numbers outside the contact fields, bank,
-IFSC, UPI or card details, and unsupported superlative claims. Contacts must be confirmed as Veda Spaces business
-channels approved for publication; personal staff contact data is never a valid entry.
+Copy governance (a safety net, not a substitute for the owner's review of every text it records): free text refuses
+money (currency words and symbols, grouped or long figures, percentages), durations and time promises in figures or
+words ("3 days", "ten years", "same-day", "next day", "within a week"; a duration appears only in a next-step stage's
+own ``duration`` field, which recording approves), e-mail addresses and phone numbers outside the contact fields,
+links, web addresses and QR codes, bank, IFSC, UPI or card details, and a list of unsupported superlative claims. It
+cannot recognise every phrasing, so the owner's review stays the control. Contacts must be confirmed as Veda Spaces
+business channels approved for publication: a free-mail e-mail (gmail, yahoo, outlook…) is refused, and when the pack
+names ``email_domains`` every contact e-mail must use one of them. A contact's ``display_name`` is a desk or role name,
+or a staff name the person agreed to publish; once frozen into an issued quotation it stays with that commercial record
+(removing a published staff name later is a new quotation version, not an edit of the issued one).
 """
 
 from __future__ import annotations
@@ -25,8 +31,24 @@ from typing import Annotated, Any, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-_MONEY = re.compile(r"₹|\brs\.?\s*\d|\binr\b|\brupees?\b|\blakhs?\b|\bcrores?\b", re.I)
-_DURATION = re.compile(r"\b\d+\s*[- ]?\s*(working\s+)?(hours?|hrs?|days?|weeks?|months?|years?|yrs?)\b", re.I)
+# Money: currency words and symbols, Indian-grouped or long figures (1,50,000; 50,000; 150000) and percentages (the
+# payment shares are OI-MTQ-09's, never pack text).
+_MONEY = re.compile(r"₹|\brs\.?\s*\d|\binr\b|\brupees?\b|\blakhs?\b|\bcrores?\b|\b\d{1,3}(?:,\d{2})*,\d{3}\b|\b\d{4,}\b|"
+                    r"\d\s*%|\bper\s*cent\b|\bpercent\b", re.I)  # fmt: skip
+_NUMBER_WORDS = (r"(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|"
+                 r"forty|forty-five|sixty|ninety|few|several|couple\s+of)")  # fmt: skip
+# Durations and time promises, in figures or words: "3 working days", "ten years", "twelve-month", "45d", "same-day",
+# "next day", "within a day", "24x7", "round the clock".
+_DURATION = re.compile(
+    rf"\b{_NUMBER_WORDS}\s*[- ]?\s*(?:working\s+|business\s+|calendar\s+)?(?:hours?|hrs?|days?|weeks?|months?|years?|yrs?)\b"
+    r"|\b\d+\s*(?:d|h|hr|hrs|w|wk|wks|m|mo|yr|y)\b|\bsame[- ]day\b|\bnext[- ](?:working\s+|business\s+)?day\b|\bovernight\b|"
+    r"\b24\s*[x/×]\s*7\b|\bround[- ]the[- ]clock\b|\bwithin\s+(?:an?\s+)?(?:hour|day|week|month|year)\b",
+    re.I,
+)  # fmt: skip
+# Links and payment instruments: any URL or link shortener, a WhatsApp link, a QR code (a page must never route a
+# customer to a payment or contact channel the owner did not record as a contact).
+_LINK = re.compile(r"https?://|\bwww\.|\bwa\.me\b|\bbit\.ly\b|\b[\w-]+\.(?:com|in|net|org|co|io|me|ly|link|app)\b|\bqr\b|\bscan\b",
+                   re.I)  # fmt: skip
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 _PHONE = re.compile(r"(?:\+?\d[\d\s()-]{8,}\d)")
 # Account details, not the words: an IFSC code, an account or card number, a UPI handle (an approved payment-safety
@@ -35,8 +57,9 @@ _BANK = re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b|\b\d{9,19}\b|\ba/c\b|\b[\w.-]{2,}@
 _CLAIMS = re.compile(r"\b(no\.?\s*1\b|number\s+one\b|most\s+trusted\b|best\s+in\b|india'?s\s+(best|most)\b|"
                      r"lifetime\b|guaranteed?\b|100\s*%|free\s+service\b|world[- ]class\b|award[- ]winning\b)",
                      re.I)  # fmt: skip
-_GUARDS = ((_MONEY, "an amount of money"), (_DURATION, "a time duration"), (_EMAIL, "an e-mail address"),
-           (_PHONE, "a phone number"), (_BANK, "payment or bank details"), (_CLAIMS, "an unsupported claim"))  # fmt: skip
+_GUARDS = ((_MONEY, "an amount of money or a percentage"), (_DURATION, "a time duration or time promise"),
+           (_EMAIL, "an e-mail address"), (_PHONE, "a phone number"), (_BANK, "payment or bank details"),
+           (_LINK, "a link, web address or QR code"), (_CLAIMS, "an unsupported claim"))  # fmt: skip
 
 
 def _copy(value: str) -> str:
@@ -50,7 +73,7 @@ def _copy(value: str) -> str:
 def _duration(value: str) -> str:
     """A next-step stage's approved duration: the one place a time may appear; no money, contacts or claims."""
     for pattern, what in _GUARDS:
-        if pattern is not _DURATION and pattern.search(value):
+        if pattern not in (_DURATION, _MONEY) and pattern.search(value):
             raise ValueError(f"a stage duration must not contain {what}")
     return value
 
@@ -105,7 +128,13 @@ class Contact(_Closed):
     def _reachable(self):
         if not (self.phone or self.email):
             raise ValueError("a contact needs a business phone or a business e-mail")
+        if self.email and self.email.split("@")[1].lower() in FREE_MAIL:
+            raise ValueError("a contact e-mail must be a Veda Spaces business address, not a personal mailbox")
         return self
+
+
+FREE_MAIL = frozenset({"gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "outlook.com", "hotmail.com", "live.com",
+                       "icloud.com", "me.com", "rediffmail.com", "proton.me", "protonmail.com", "aol.com", "zoho.com"})  # fmt: skip
 
 
 class Entry(_Closed):
@@ -167,6 +196,8 @@ class Stage(_Closed):
 
 class CustomerPack(_Closed):  # OI-MTQ-18
     content_version: Annotated[str, Field(min_length=1, max_length=20)]
+    # Veda Spaces' business e-mail domains; when given, every contact e-mail must use one of them
+    email_domains: tuple[Annotated[str, Field(pattern=r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")], ...] = ()
     contacts: tuple[Contact, ...] = ()
     support_escalation: Copy | None = None
     project_inclusions: tuple[Entry, ...] = ()
@@ -192,6 +223,10 @@ class CustomerPack(_Closed):  # OI-MTQ-18
             codes = [x.code for x in self.site_dependent_work.categories]
             if len(codes) != len(set(codes)):
                 raise ValueError("site_dependent_work.categories: codes must be unique")
+        if self.email_domains:
+            for c in self.contacts:
+                if c.email and c.email.split("@")[1].lower() not in self.email_domains:
+                    raise ValueError(f"contact {c.code}: the e-mail is not on an approved Veda Spaces domain")
         sg = self.service_guidance
         if sg and sg.contact_code and not any(c.code == sg.contact_code and c.kind in ("SERVICE", "SUPPORT")
                                               for c in self.contacts):  # fmt: skip
@@ -225,6 +260,20 @@ def validate_inputs(pack: dict[str, Any] | None, inputs: dict[str, Any]) -> dict
         raise ApiError(422, "VALIDATION_FAILED", "Some choices are not part of the approved pack.", errors=errors)
     return {"contact_code": contact, "responsibilities": dict(inputs.get("responsibilities") or {}),
             "readiness": dict(inputs.get("readiness") or {})}  # fmt: skip
+
+
+def carry_over(pack: dict[str, Any] | None, previous: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A new version keeps the previous version's choices whose codes its pack still has (anything else is dropped and
+    shows "to be confirmed"); None when there is no pack or nothing to keep."""
+    if not pack or not previous:
+        return None
+    contacts = {c["code"] for c in pack.get("contacts") or [] if c["kind"] == "QUOTATION"}
+    resp = {x["code"] for x in pack.get("client_responsibilities") or []}
+    ready = {x["code"] for x in pack.get("site_readiness") or []}
+    kept = {"contact_code": previous.get("contact_code") if previous.get("contact_code") in contacts else None,
+            "responsibilities": {k: v for k, v in (previous.get("responsibilities") or {}).items() if k in resp},
+            "readiness": {k: v for k, v in (previous.get("readiness") or {}).items() if k in ready}}  # fmt: skip
+    return kept if (kept["contact_code"] or kept["responsibilities"] or kept["readiness"]) else None
 
 
 # --- the frozen document's customer information (rendering.document_model) --------------------------------------------
@@ -351,13 +400,28 @@ def _figure(value: str, unit: str) -> str:
     return f"{d:f} {unit}"
 
 
-def dimensions(formula_inputs: dict[str, Any] | None) -> tuple[list[dict[str, str]], str | None]:
-    """(the line's customer dimensions, status) from its BOQ line's resolved inputs. Status is None when the line has
-    no size (a count or a lump sum), "CONFIRMED" when every size input is verified, else "TO_BE_CONFIRMED" (only the
-    verified ones are shown)."""
-    inputs = (formula_inputs or {}).get("inputs") or {}
+def dimensions(
+    formula_inputs: dict[str, Any] | None, *, overridden: bool = False
+) -> tuple[list[dict[str, str]], str | None]:
+    """(the line's customer dimensions, status) from its BOQ line's resolved inputs and quantity basis.
+
+    Status is None when the line has no size (a count or a lump sum); "CONFIRMED" when every size input its quantity
+    basis needs is present and verified; otherwise "TO_BE_CONFIRMED", showing only the verified ones. A line whose
+    quantity staff overrode shows no size at all ("to be confirmed"): the measured inputs may no longer describe the
+    priced quantity, and a size that contradicts the quantity is never shown."""
+    fi = formula_inputs or {}
+    inputs = fi.get("inputs") or {}
+    basis = fi.get("quantity_basis") or {}
+    needed = [n for n in (basis.get("input"), basis.get("height_input")) if n in DIMENSION_LABELS]
+    sized = needed or [
+        n for n in DIMENSION_LABELS if isinstance(inputs.get(n), dict) and inputs[n].get("unit") in ("ft", "sq ft")
+    ]
+    if not sized:
+        return [], None
+    if overridden:
+        return [], "TO_BE_CONFIRMED"
     shown: list[dict[str, str]] = []
-    pending = False
+    pending = any(n not in inputs for n in needed)  # a size input the basis needs but the measurement did not give
     for name in DIMENSION_LABELS:
         d = inputs.get(name)
         if not isinstance(d, dict) or d.get("unit") not in ("ft", "sq ft"):
@@ -366,6 +430,4 @@ def dimensions(formula_inputs: dict[str, Any] | None) -> tuple[list[dict[str, st
             shown.append({"label": DIMENSION_LABELS[name], "value": _figure(str(d["value"]), d["unit"])})
         else:
             pending = True
-    if not shown and not pending:
-        return [], None
     return shown, ("TO_BE_CONFIRMED" if pending else "CONFIRMED")

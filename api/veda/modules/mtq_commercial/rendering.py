@@ -83,7 +83,8 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
         if q.quotation_kind == "VARIATION":
             out["change"] = x.change_code.replace("_", " ").title()
             out["delta"] = _amount(x.delta_amount_minor)
-        dims, dim_status = customer_pack.dimensions(inputs_of.get(x.id))
+        fi, overridden = inputs_of.get(x.id, (None, False))
+        dims, dim_status = customer_pack.dimensions(fi, overridden=overridden)
         if dim_status is not None:
             out["dimensions"], out["dimension_status"] = dims, dim_status
         if x.is_optional and x.is_priced and q.tax_status == "APPLIED":
@@ -161,8 +162,9 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
     return doc
 
 
-def _formula_inputs(s: Session, rows: list) -> dict[str, dict]:
-    """Quotation line id → its BOQ line's resolved inputs (estimate line → BOQ line), for the line's dimensions."""
+def _formula_inputs(s: Session, rows: list) -> dict[str, tuple[dict | None, bool]]:
+    """Quotation line id → (its BOQ line's resolved inputs and quantity basis, whether staff overrode its quantity),
+    through estimate line → BOQ line, for the line's dimensions."""
     import sqlalchemy as sa
 
     from .models import BoqLine, CostEstimateLine
@@ -173,12 +175,14 @@ def _formula_inputs(s: Session, rows: list) -> dict[str, dict]:
     boq_of = dict(s.execute(sa.select(CostEstimateLine.id, CostEstimateLine.boq_line_id)
                             .where(CostEstimateLine.id.in_(ids))).all())  # fmt: skip
     boq_ids = [b for b in boq_of.values() if b]
-    inputs = (
-        dict(s.execute(sa.select(BoqLine.id, BoqLine.formula_inputs).where(BoqLine.id.in_(boq_ids))).all())
-        if boq_ids
-        else {}
-    )
-    return {x.id: inputs.get(boq_of.get(x.cost_estimate_line_id)) for x in rows if x.cost_estimate_line_id}
+    found = (
+        s.execute(sa.select(BoqLine.id, BoqLine.formula_inputs, BoqLine.override_quantity_centi).where(BoqLine.id.in_(boq_ids))).all()
+        if boq_ids else []
+    )  # fmt: skip
+    inputs = {i: (fi, ov is not None) for i, fi, ov in found}
+    return {
+        x.id: inputs.get(boq_of.get(x.cost_estimate_line_id), (None, False)) for x in rows if x.cost_estimate_line_id
+    }
 
 
 def _schedule(q: quotations.Quotation, terms: dict[str, Any]) -> list[dict[str, Any]]:
@@ -435,7 +439,7 @@ def html_v3(doc: dict[str, Any]) -> str:
 
     base["sections"] = [{**sec, "lines": with_dims(sec["lines"])} for sec in doc["sections"]]
     base["optional_items"] = with_dims(doc["optional_items"])
-    base["payment_schedule"] = [{**m, "trigger": f"{m['trigger']} ({m['amount']})" if m.get("amount") else m["trigger"]}
+    base["payment_schedule"] = [{**m, "trigger": f"{m['trigger']}; amount ₹ {m['amount']}" if m.get("amount") else m["trigger"]}
                                 for m in doc.get("payment_schedule") or []]  # fmt: skip
     page = html_v2(base)
     contacts = info.get("contacts") or {}

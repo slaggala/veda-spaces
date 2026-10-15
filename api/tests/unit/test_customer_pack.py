@@ -30,10 +30,43 @@ def test_the_synthetic_pack_is_a_valid_shape():
     "Write to someone@example.com.", "Pay to ZZZZ0SYN001.", "Account 00000000000000.", "Pay synthetic@okexample.",
     "The No. 1 synthetic studio.", "Lifetime support for synthetic items.", "100% synthetic satisfaction.", "Free service for everyone.",
     "Guaranteed synthetic results.",
+    # independent review finding 2: durations in words, plain amounts, percentages, links and QR codes
+    "We respond within one working day.", "Same-day visit promised.", "Warranty of ten years on hardware.",
+    "Twelve-month warranty", "Delivery in 45d", "Pay 1,50,000 at booking.", "Pay 40% advance before production.",
+    "Pay only at https://pay.example.in/veda", "Scan the QR code sent on WhatsApp", "Visit veda.in for offers.",
 ])  # fmt: skip
 def test_customer_copy_refuses_money_durations_contacts_bank_details_and_claims(text):
     with pytest.raises(ValidationError):
         cp.CustomerPack.model_validate(_pack(project_inclusions=[{"code": "X1", "text": text}]))
+
+
+@pytest.mark.parametrize("text", [
+    "Clean with a dry cloth.", "Flooring complete before installation.", "Some needs become clear only on site.",
+    "Veda Spaces never asks for payment into a personal account.", "The service team gives you a request reference.",
+])  # fmt: skip
+def test_ordinary_customer_copy_passes(text):
+    assert cp.CustomerPack.model_validate(_pack(project_inclusions=[{"code": "X1", "text": text}]))
+
+
+def test_a_contact_e_mail_is_a_business_address():
+    personal = {**SYNTHETIC_PACK["contacts"][0], "email": f"someone.personal@{sorted(cp.FREE_MAIL)[0]}"}
+    with pytest.raises(ValidationError):
+        cp.CustomerPack.model_validate(_pack(contacts=[personal]))
+    with pytest.raises(ValidationError):  # not on the owner's approved domains
+        cp.CustomerPack.model_validate(_pack(email_domains=["vedaspaces.example"]))
+    assert cp.CustomerPack.model_validate(_pack(email_domains=["synthetic.example"]))
+
+
+def test_a_new_version_keeps_only_the_choices_its_pack_still_has():
+    previous = {"contact_code": "SYN_QUOTE_DESK", "responsibilities": {"SYN_LIFT": "NOT_REQUIRED", "GONE": "REQUIRED"},
+                "readiness": {"SYN_FLOOR": "READY"}}  # fmt: skip
+    assert cp.carry_over(SYNTHETIC_PACK, previous) == {"contact_code": "SYN_QUOTE_DESK",
+                                                      "responsibilities": {"SYN_LIFT": "NOT_REQUIRED"},
+                                                      "readiness": {"SYN_FLOOR": "READY"}}  # fmt: skip
+    smaller = _pack(contacts=SYNTHETIC_PACK["contacts"][1:], site_readiness=[])
+    assert cp.carry_over(smaller, previous) == {"contact_code": None, "responsibilities": {"SYN_LIFT": "NOT_REQUIRED"},
+                                                "readiness": {}}  # fmt: skip
+    assert cp.carry_over(None, previous) is None and cp.carry_over(SYNTHETIC_PACK, None) is None
 
 
 def test_a_contact_must_be_an_approved_business_channel():
@@ -89,10 +122,17 @@ def test_dimensions_come_only_from_verified_inputs():
     )
     assert cp.dimensions({"inputs": {"COB": {"value": "4", "unit": "nos", "source": "STAFF"}}}) == ([], None)
     assert cp.dimensions(None) == ([], None)
-    assert cp.dimensions({"inputs": {"WIDTH": {"value": None, "unit": "ft", "source": "MISSING"}}}) == (
-        [],
-        "TO_BE_CONFIRMED",
-    )
+    # the quantity basis names an input the measurement did not give (line_quantity never stores a missing one)
+    area_line = {"inputs": {"WIDTH": {"value": "8", "unit": "ft", "source": "MEASURED"}},
+                 "quantity_basis": {"kind": "area", "input": "WIDTH", "height_input": "HEIGHT"}}  # fmt: skip
+    assert cp.dimensions(area_line) == ([{"label": "Width", "value": "8 ft"}], "TO_BE_CONFIRMED")
+    # a quantity staff overrode: no size at all, only "to be confirmed"
+    assert cp.dimensions(area_line, overridden=True) == ([], "TO_BE_CONFIRMED")
+    measured = {"inputs": {"WIDTH": {"value": "10", "unit": "ft", "source": "MEASURED"}},
+                "quantity_basis": {"kind": "direct", "input": "WIDTH"}}  # fmt: skip
+    assert cp.dimensions(measured) == ([{"label": "Width", "value": "10 ft"}], "CONFIRMED")
+    assert cp.dimensions(measured, overridden=True) == ([], "TO_BE_CONFIRMED")
+    assert cp.dimensions({"inputs": {}, "quantity_basis": {"kind": "lump"}}, overridden=True) == ([], None)
 
 
 # Rendered by the templates of the PR #95 release, before this change (digests taken from that code): an issued
@@ -145,7 +185,7 @@ def test_template_3_shows_every_section_or_says_it_is_to_be_confirmed():
            "payment_schedule": [{**SAMPLE["payment_schedule"][0], "amount": "1,41,600.00"}]}  # fmt: skip
     page = rendering.html_v3(doc)
     assert "SYNTHETIC Quotation Desk" in page and "quotes@synthetic.example" in page
-    assert "Width 8.2 ft · dimension to be confirmed" in page and "(1,41,600.00)" in page
+    assert "Width 8.2 ft · dimension to be confirmed" in page and "amount ₹ 1,41,600.00" in page
     assert "<span class='tag'>Ready</span>" in page and "<span class='tag'>Required</span>" in page
     assert "SYNTHETIC: payment instructions" in page and "Customer information version SYN-C1" in page
 

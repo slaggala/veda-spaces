@@ -116,10 +116,14 @@ blocks enabling that capability (or real customers, or production) while it is o
 - **Contacts are business channels only**: each must carry `business_channel_approved: true` and a business phone or
   e-mail; codes stay internal (never projected). Lead erasure does not touch them (they are not customer data); it still
   erases the customer's name, subject and cover note and re-seals with the pinned template.
-- **Copy rules** refuse money amounts, durations (only a next-step stage's own duration field may carry one), e-mail and
-  phone numbers outside contact fields, bank, IFSC, UPI and card details, and unsupported superlative claims.
+- **Copy rules** (a safety net under the owner's review) refuse money (symbols, words, grouped or long figures,
+  percentages), durations and time promises in figures or words (only a next-step stage's own duration field may carry
+  one), e-mail and phone numbers outside contact fields, links, web addresses and QR codes, bank, IFSC, UPI and card
+  details, and unsupported superlative claims. Contact e-mails refuse free-mail domains (and must use the owner's
+  `email_domains` when listed).
 - **Dimensions** come only from the BOQ line's verified inputs (measured, derived or a staff value recorded with its
-  reason); no measurement-engine detail (sources, explanations, wall references) is projected.
+  reason); a line with a BOQ quantity override, or missing a size input, shows "to be confirmed" and no size; no
+  measurement-engine detail (sources, explanations, wall references) is projected.
 - **Nothing from the competitor benchmark** is used; tests check the page for its distinctive wording and for durations,
   guarantees and "lifetime" or "free service" claims.
 

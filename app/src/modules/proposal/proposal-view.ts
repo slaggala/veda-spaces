@@ -587,7 +587,7 @@ export class VsProposalView extends LitElement {
     const sdw = info?.site_dependent_work;
     return html`<section class="card stack" aria-labelledby="scopeh" id="scope"><h2 tabindex="-1" id="scopeh">What's included, what's not and what you arrange</h2>
       <details class="room" open><summary><h3>What is included</h3></summary><div class="termbody stack">
-        <p>Every item listed room by room above, at the quantities and sizes shown.</p>
+        <p>The items listed room by room above.</p>
         ${info?.project_inclusions?.length ? html`<p class="strong">For the whole project</p>${this.entries(info.project_inclusions)}` : nothing}</div></details>
       <details class="room"><summary><h3>What is not included</h3></summary><div class="termbody">
         ${page.proposal.exclusions.length ? html`<ul class="entries">${page.proposal.exclusions.map((e) => html`<li>${e}</li>`)}</ul>` : this.tbc()}</div></details>
@@ -630,7 +630,7 @@ export class VsProposalView extends LitElement {
       <details class="room"><summary><h3>Manufacturer-backed warranty</h3></summary><div class="termbody stack">
         ${info?.manufacturer_warranty_note ? html`<p>${info.manufacturer_warranty_note}</p>` : this.tbc()}
         ${page.specifications?.warranty_summary ? html`<p class="small">${page.specifications.warranty_summary}</p>` : nothing}
-        <p class="small muted">A manufacturer's warranty is the manufacturer's own; it does not extend Veda Spaces' service support.</p></div></details>
+</div></details>
       ${this.termsIn(page, 'warranty')}
       <details class="room"><summary><h3>What the warranty does not cover</h3></summary><div class="termbody">${this.entries(info?.warranty_exclusions)}</div></details>
       <details class="room"><summary><h3>Need help after handover?</h3></summary><div class="termbody stack">

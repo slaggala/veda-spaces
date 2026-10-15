@@ -278,7 +278,20 @@ def new_version(s: Session, ctx, q: Quotation, est: CostEstimate, prop: Property
     nq = _new(s, est, prop, number=q.quotation_number, version_no=q.version_no + 1, supersedes=q,
               title=(body.title if body else None) or q.title)  # fmt: skip
     _populate(s, nq, est)
-    event(s, nq, "VERSION_CREATED", None, "DRAFT", supersedes_quotation_id=q.id, cost_estimate_id=est.id)
+    from . import customer_pack
+
+    # the contact and statuses staff chose carry over where the new version's pack still has those codes
+    nq.customer_inputs = customer_pack.carry_over((nq.terms or {}).get("customer_pack"), q.customer_inputs)
+    event(
+        s,
+        nq,
+        "VERSION_CREATED",
+        None,
+        "DRAFT",
+        supersedes_quotation_id=q.id,
+        cost_estimate_id=est.id,
+        customer_information=nq.customer_inputs,
+    )
     refresh_blockers(s, nq)
     return nq
 
@@ -312,7 +325,8 @@ def edit(s: Session, ctx, q: Quotation, body) -> Quotation:
             else customer_pack.validate_inputs((q.terms or {}).get("customer_pack"),
                                                body.customer_information.model_dump())
         )  # fmt: skip
-    event(s, q, "EDITED", "DRAFT", "DRAFT", fields=sorted(data))
+    extra = {"customer_information": q.customer_inputs} if "customer_information" in data else {}
+    event(s, q, "EDITED", "DRAFT", "DRAFT", fields=sorted(data), **extra)
     return q
 
 

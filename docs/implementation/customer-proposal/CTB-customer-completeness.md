@@ -33,8 +33,13 @@ comes from Veda Spaces-controlled content, and where the owner has not approved 
   default status REQUIRED / NOT_REQUIRED / TO_BE_CONFIRMED), site readiness (closed categories), site-dependent work
   (intro, approval rule, categories), manufacturer-warranty note, warranty exclusions, service guidance, handover, care,
   next steps (stage order fixed; optional approved duration), payment safety. It is not an issuance blocker.
-- **Copy rules**: free text refuses money amounts, durations, e-mail and phone outside contact fields, bank, IFSC, UPI
-  or card details, and unsupported claims (superlatives, "lifetime", "guaranteed", "100 %", "free service"…).
+- **Copy rules** (a safety net; the owner's review of every text stays the control): free text refuses money (currency
+  words and symbols, grouped or long figures, percentages), durations and time promises in figures or words ("3 days",
+  "ten years", "45d", "same-day", "next day", "within a week"), e-mail and phone outside contact fields, links, web
+  addresses and QR codes, bank, IFSC, UPI or card details, and unsupported claims ("lifetime", "guaranteed",
+  "100 %", "free service", superlatives). Contact e-mails refuse free-mail domains and, when the pack lists
+  `email_domains`, must use one of them; a contact's display name is a desk or role name, or a staff name the person
+  agreed to publish.
 - **Per-version choices** (migration `0206_customer_completeness`, expand-only: `quotation.customer_inputs`): the
   quotation contact and each responsibility and readiness status, set on a draft through the existing PATCH, validated
   against the pack frozen in the version's terms (`CUSTOMER_PACK_NOT_DECIDED` when none). Staff panel: a Customer
@@ -42,9 +47,11 @@ comes from Veda Spaces-controlled content, and where the owner has not approved 
 - **Frozen document** (format 2, template `mtq-quotation-html/3`): line dimensions (CTB-02), milestone amounts
   (CTB-09), and the customer information block. The pack is copied into the terms snapshot when the version is
   drafted and frozen at issue; a later pack change never changes an issued version (test-proved).
-- **Dimensions** follow quotation line → estimate line → BOQ line → its resolved measurement inputs. Only MEASURED,
-  DERIVED or STAFF (recorded with a reason) values are shown; ASSUMED or missing makes the line "dimension to be
-  confirmed". Counts (drawers, points) stay quantities. Nothing is recalculated in CQX.
+- **Dimensions** follow quotation line → estimate line → BOQ line → its resolved measurement inputs and quantity basis.
+  Only MEASURED, DERIVED or STAFF (recorded with a reason) values are shown; an ASSUMED input, or a size input the basis
+  needs that the measurement did not give, makes the line "dimension to be confirmed". A line whose quantity staff
+  overrode in the BOQ shows **no** size, only "dimension to be confirmed" (its measured inputs may no longer describe the
+  priced quantity). Counts (drawers, points) stay quantities. Nothing is recalculated in CQX.
 - **Milestone amounts**: the frozen total split by the approved shares in whole paise; leftover paise go to the largest
   remainders (earlier milestone first), so the amounts always add up to the total exactly (2,000 random cases tested).
   A variation carries no amounts; a document issued before template 3 shows the shares only.
@@ -81,7 +88,21 @@ review); service guidance; handover expectations; care guidance; next-step stage
 statement. The existing OI-MTQ-07/08/09/11 decisions (GST, validity, terms and payment milestones, acceptance) and an
 approved customer specification remain prerequisites for a complete proposal.
 
-## 6. Evidence (SYNTHETIC_VALIDATED)
+## 6. Independent review and remediation
+
+A fresh-context review of the first complete head found the baseline **certified with merge conditions**:
+
+| # | Finding | Severity | Correction |
+|---|---|---|---|
+| 1 | A BOQ quantity override left the measured inputs in place, so a line could show a size contradicting its priced quantity; a size input missing from the measurement did not mark the line "to be confirmed" | Medium | Overridden lines show no size ("to be confirmed"); the quantity basis's missing size inputs mark the line "to be confirmed"; integration test through a real BOQ override |
+| 2 | Copy rules caught durations and money only in digit forms, and not links, QR codes or percentages | Medium | Words and abbreviations for durations and time promises, grouped and long figures, percentages, links, web addresses and QR codes refused; the docstring states what is enforced and that the owner's review stays the control |
+| 3 | A contact's "business channel" was only a self-asserted flag | Low | Free-mail domains refused; optional `email_domains` enforced; display-name and frozen-name handling documented |
+| 4 | Template 3 printed milestone amounts without a currency | Low | "amount ₹ …" (before any template-3 document is issued) |
+| 5 | Two engineering sentences read like policy | Low | Removed or made neutral |
+| 6 | The edit event recorded only the field name | Low | The event records the stored choices (codes only) |
+| 7 | A new version dropped the staff choices | Low | Carried over where the new pack still has the codes |
+
+## 7. Evidence (SYNTHETIC_VALIDATED)
 
 API: `tests/unit/test_customer_pack.py`, `tests/integration/test_cqx_completeness.py` and the updated pricing,
 template and compatibility tests; app: `test/proposal.test.ts`, `test/proposal-staff.test.ts`; browser:
