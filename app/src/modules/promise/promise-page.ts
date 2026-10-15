@@ -1,4 +1,5 @@
 import { css, html, nothing, type TemplateResult } from 'lit';
+import { styleMap } from 'lit/directives/style-map.js';
 import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatFull, humanize } from '../../core/format/format.js';
@@ -57,7 +58,8 @@ export class VsPromisePage extends SessionElement {
   static override styles = [...shared, pageStyles, tableStyles, css`
     .btn.small { min-height: var(--vs-target); }
     .btn { white-space: nowrap; min-width: var(--vs-target); }
-    .cards { display: grid; gap: var(--vs-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+    /* not ".cards": that is tableStyles' responsive-table class, and a grid there splits header and body (staging defect) */
+    .version-cards { display: grid; gap: var(--vs-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
     .layout { display: grid; gap: var(--vs-space-5); grid-template-columns: minmax(0, 1fr); }
     @media (min-width: 1024px) { .layout { grid-template-columns: 240px minmax(0, 1fr); } }
     nav.sections ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -302,7 +304,7 @@ export class VsPromisePage extends SessionElement {
         <strong>Owner decision OI-MTQ-18:</strong> ${l.authority.message}
         ${l.authority.register_reference ? html`<br><span class="small">Register reference: ${l.authority.register_reference} (${l.authority.decided_on})</span>` : nothing}
       </vs-banner>
-      <div class="cards">
+      <div class="version-cards">
         ${this.versionCard('Published version', l.published, 'Nothing is published yet.')}
         ${this.versionCard('Version in progress', l.open, 'No draft is in progress.')}
       </div>
@@ -415,7 +417,7 @@ export class VsPromisePage extends SessionElement {
         Contact chosen per quotation and each site's readiness are set by staff on the quotation, so they show as to be confirmed here.</p>
       <div class="row widths" role="group" aria-label="Preview width">${WIDTHS.map(([label, px]) => html`<button class="btn small"
         aria-pressed=${this.width === px ? 'true' : 'false'} @click=${() => (this.width = px)}>${label} ${px}px</button>`)}</div>
-      <div class="frame" style=${`max-width: ${this.width}px`} data-width=${this.width}>
+      <div class="frame" style=${styleMap({ maxWidth: `${this.width}px` })} data-width=${this.width}>
         <vs-promise-preview .page=${previewPage(p.information, p.content_version)}></vs-promise-preview></div>`;
   }
 

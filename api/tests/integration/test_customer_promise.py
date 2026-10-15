@@ -18,6 +18,7 @@ from veda.modules.customer_promise import sections as SEC
 from veda.modules.customer_promise.models import CustomerPromiseEvent, CustomerPromisePack, CustomerPromiseReview
 from veda.modules.mtq_commercial.customer_pack import FREE_MAIL
 from veda.platform.audit.models import AuditLog
+from veda.platform.identity.models import User
 
 pytestmark = ON
 
@@ -437,3 +438,26 @@ def test_audit_log_records_field_changes_and_events_carry_no_secrets(api, factor
         for e in s.execute(sa.select(CustomerPromiseEvent)).scalars():
             text = str(e.detail or "") + str(e.reason or "")
             assert "token" not in text.lower() and "password" not in text.lower()
+
+
+# --- defects found in protected staging (2026-10-15) ------------------------------------------------------------------
+def test_people_without_a_display_name_are_named_by_their_full_name(api, factory):
+    """Staging showed "Unknown user" for an account with no display name; staff see the full name instead."""
+    t = Team(api, factory)
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        s.get(User, t.author.id).display_name = None
+    p = t.draft()
+    with db.unit_of_work(write=False) as s:
+        full_name = s.get(User, t.author.id).full_name
+    assert t.get(t.author, p["id"])["created_by"]["display_name"] == full_name
+
+
+def test_the_business_channel_confirmation_is_asked_for_in_plain_words(api, factory):
+    t = Team(api, factory)
+    p = t.draft()
+    value = copy.deepcopy(SECTION_VALUES["CONTACTS"])
+    value["contacts"][0]["business_channel_approved"] = False
+    r = t.save(p, "CONTACTS", value, status=422)
+    messages = [e["message"] for e in r.json["errors"]]
+    assert "Confirm that this is a Veda Spaces business channel approved for publication." in messages
+    assert not any("Input should be" in m for m in messages)

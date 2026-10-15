@@ -191,6 +191,8 @@ def _pydantic(err: ValidationError) -> list[dict[str, str]]:
     for e in err.errors()[:20]:
         loc = ".".join(str(p) if not isinstance(p, int) else f"[{p}]" for p in e["loc"]).replace(".[", "[")
         msg = str(e["msg"]).removeprefix("Value error, ")
+        if e["loc"] and e["loc"][-1] == "business_channel_approved":
+            msg = "Confirm that this is a Veda Spaces business channel approved for publication."
         found.append({"field": loc or "content", "code": "INVALID", "message": msg})
     return found
 

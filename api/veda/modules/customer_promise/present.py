@@ -30,7 +30,7 @@ class People:
             return None
         if uid not in self.cache:
             u = self.s.get(User, uid)
-            self.cache[uid] = {"id": uid, "display_name": u.display_name if u else None}
+            self.cache[uid] = {"id": uid, "display_name": (u.display_name or u.full_name) if u else None}
         return self.cache[uid]
 
 
