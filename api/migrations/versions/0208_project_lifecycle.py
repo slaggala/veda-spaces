@@ -1492,6 +1492,7 @@ def upgrade() -> None:
         sa.Column("customer_title", sa.String(160), nullable=False),
         sa.Column("description", sa.String(2000), nullable=True),
         sa.Column("is_blocking", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("classification_reason", sa.String(500), nullable=True),
         sa.Column("owner_user_id", GUID(), nullable=True),
         sa.Column("responsible_party", sa.String(16), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
@@ -1544,6 +1545,9 @@ def upgrade() -> None:
             name="ck_project_snag__category",
         ),
         sa.CheckConstraint("length(category) <= 20", name="ck_project_snag__category_len").ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
+            "length(classification_reason) <= 500", name="ck_project_snag__classification_reason_len"
+        ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
             "(status = 'CLOSED') = (closed_on IS NOT NULL AND closed_by IS NOT NULL)", name="ck_project_snag__closed"
         ),
@@ -1694,7 +1698,7 @@ def upgrade() -> None:
             dialect="sqlite"
         ),
         sa.CheckConstraint(
-            "event_code IN ('PROJECT_CREATED', 'BASELINE_RECORDED', 'VARIATION_ACCEPTED', 'MEMBER_ASSIGNED', 'OWNER_ASSIGNED', 'MEMBER_REMOVED', 'TRANSITION_REFUSED', 'TRANSITION_AWAITING_APPROVAL', 'TRANSITION_REJECTED', 'TRANSITION_WITHDRAWN', 'STAGE_COMPLETED', 'STAGE_ENTERED', 'CHECKLIST_ITEM_COMPLETED', 'CHECKLIST_ITEM_NOT_APPLICABLE', 'CHECKLIST_ITEM_REOPENED', 'MILESTONE_ADDED', 'MILESTONE_CHANGED', 'BLOCKER_RAISED', 'BLOCKER_UPDATED', 'BLOCKER_RESOLVED', 'BLOCKER_CANCELLED', 'SITE_READINESS_ADDED', 'SITE_READINESS_UPDATED', 'QC_RECORDED', 'SNAG_RAISED', 'SNAG_UPDATED', 'SNAG_RESOLVED', 'SNAG_CLOSED', 'HANDOVER_READY', 'HANDED_OVER')",
+            "event_code IN ('PROJECT_CREATED', 'BASELINE_RECORDED', 'VARIATION_ACCEPTED', 'MEMBER_ASSIGNED', 'OWNER_ASSIGNED', 'MEMBER_REMOVED', 'TRANSITION_REFUSED', 'TRANSITION_AWAITING_APPROVAL', 'TRANSITION_REJECTED', 'TRANSITION_WITHDRAWN', 'STAGE_COMPLETED', 'STAGE_ENTERED', 'CHECKLIST_ITEM_COMPLETED', 'CHECKLIST_ITEM_NOT_APPLICABLE', 'CHECKLIST_ITEM_REOPENED', 'MILESTONE_ADDED', 'MILESTONE_CHANGED', 'BLOCKER_RAISED', 'BLOCKER_UPDATED', 'BLOCKER_RESOLVED', 'BLOCKER_CANCELLED', 'SITE_READINESS_ADDED', 'SITE_READINESS_UPDATED', 'QC_RECORDED', 'SNAG_RAISED', 'SNAG_UPDATED', 'SNAG_RECLASSIFIED', 'SNAG_RESOLVED', 'SNAG_CLOSED', 'HANDOVER_READY', 'HANDED_OVER')",
             name="ck_project_event__event_code",
         ),
         sa.CheckConstraint("length(event_code) <= 32", name="ck_project_event__event_code_len").ddl_if(

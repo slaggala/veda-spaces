@@ -6599,6 +6599,25 @@
         "title": "ShareIn",
         "type": "object"
       },
+      "SnagClassificationIn": {
+        "additionalProperties": false,
+        "properties": {
+          "is_blocking": {
+            "title": "Is Blocking",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "is_blocking",
+          "reason"
+        ],
+        "title": "SnagClassificationIn",
+        "type": "object"
+      },
       "SnagIn": {
         "additionalProperties": false,
         "properties": {
@@ -6780,18 +6799,6 @@
             ],
             "default": null,
             "title": "Evidence Reference"
-          },
-          "is_blocking": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Is Blocking"
           },
           "owner_user_id": {
             "anyOf": [
@@ -19044,6 +19051,75 @@
           }
         ],
         "summary": "Change a snag's owner, target date or details",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-027"
+      }
+    },
+    "/api/v1/projects/{project_id}/snags/{snag_id}/classification": {
+      "post": {
+        "operationId": "project_reclassify_snag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snag_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnagClassificationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change whether a snag blocks the handover (owner decision PLB-OD-06; reason required)",
         "tags": [
           "project"
         ],

@@ -346,6 +346,7 @@ def _snag(n: ProjectSnag, people: People, spaces: dict[str, str]) -> dict[str, A
     return {"id": n.id, "version": n.version, "snag_no": n.snag_no, "category": n.category,
             "customer_title": n.customer_title, "description": n.description, "space": spaces.get(n.space_id or ""),
             "space_id": n.space_id, "item_reference": n.item_reference, "is_blocking": n.is_blocking,
+            "classification_reason": n.classification_reason,
             "owner": people(n.owner_user_id), "responsible_party": n.responsible_party, "status": n.status,
             "allowed_next": list(service.SNAG_FLOW[n.status]), "target_date": _day(n.target_date),
             "evidence": _evidence(n), "resolution_note": n.resolution_note, "resolved_on": _when(n.resolved_on),
@@ -454,6 +455,13 @@ def _next_actions(ev: dict[str, Any] | None) -> list[dict[str, Any]]:
     return out
 
 
+def _owner_can(s: Session, ctx, p: Project, code: str, attr: str) -> bool:
+    """Whether the owner's decision ``code`` is recorded and names a capability the person holds here."""
+    od = policy.decision(code)
+    capability = getattr(od, attr, None) if od is not None else None
+    return p.status == "ACTIVE" and capability is not None and access.can(s, ctx, p, capability)
+
+
 def _actions(s: Session, ctx, p: Project, waiting) -> dict[str, bool]:
     active = p.status == "ACTIVE"
 
@@ -469,6 +477,9 @@ def _actions(s: Session, ctx, p: Project, waiting) -> dict[str, bool]:
             "resolve_blocker": can("project.resolve_blocker"),
             "manage_site_readiness": can("project.manage_site_readiness"), "manage_qc": can("project.manage_qc"),
             "manage_snag": can("project.manage_snag"),
+            "record_promised_date": _owner_can(s, ctx, p, "PLB-OD-13", "capability"),
+            "reclassify_snag": _owner_can(s, ctx, p, "PLB-OD-06", "snag_reclassification_capability"),
+            "qc_required_not_applicable": _owner_can(s, ctx, p, "PLB-OD-08", "not_applicable_capability"),
             "view_commercial_baseline": access.can(s, ctx, p, "project.view_commercial_baseline"),
             "view_audit": access.can(s, ctx, p, "project.view_audit")}  # fmt: skip
 
@@ -547,10 +558,13 @@ def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
         "attention": _attention(ev, blockers, site, snags, milestones, waiting),
         "next_actions": _next_actions(ev),
         "team": [{"id": m.id, "version": m.version, "user": people(m.user_id), "responsibility": m.responsibility,
-                  "active": m.is_active, "assigned_on": _when(m.created_on), "assigned_by": people(m.created_by),
+                  "active": m.is_active, "eligible": m.is_active and gates.owner_eligible(s, m),
+                  "assigned_on": _when(m.created_on), "assigned_by": people(m.created_by),
                   "removed_on": _when(m.removed_on), "removed_by": people(m.removed_by),
                   "removal_reason": m.removal_reason} for m in members_all],
         "stages": _stages(s, p, d, people), "checklist": _checklist(s, p, d, people), "blockers": blockers,
+        "needs_reassignment": sorted(m.responsibility for m in members_all if m.is_active
+                                     and m.responsibility != "MEMBER" and not gates.owner_eligible(s, m)),
         "milestones": milestones, "site_readiness": site, "qc": _qc(s, p, people, spaces), "snags": snags,
         "baseline": _baseline(s, ctx, p),
         "transitions": [_transition(t, people, audit) for t in transitions],

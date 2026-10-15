@@ -402,6 +402,8 @@ class ProjectSnag(_ProjectRow, _Evidence, AuditedBase):
     customer_title: Mapped[str] = mapped_column(sa.String(160), nullable=False)  # potentially customer-safe
     description: Mapped[str | None] = mapped_column(sa.String(2000))  # internal
     is_blocking: Mapped[bool] = mapped_column(Bool(), nullable=False, default=True, server_default=sa.true())
+    # why the gating classification last changed (the change itself is a SNAG_RECLASSIFIED event)
+    classification_reason: Mapped[str | None] = mapped_column(sa.String(500))
     owner_user_id: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
     responsible_party: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="VEDA")
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="OPEN")

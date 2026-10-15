@@ -100,12 +100,38 @@ def _checklist(s: Session, p: Project, frm: str) -> list[dict[str, Any]]:
             for r in rows if r.state == "OPEN" and r.item_code not in optional]  # fmt: skip
 
 
+def owner_eligible(s: Session, m: ProjectMember) -> bool:
+    """S1: whether an assigned owner can still act, re-read from the authoritative account and grants: an active person
+    who still holds project.view and the responsibility's capability. The assignment itself is never removed here."""
+    from veda.platform.identity.models import User
+    from veda.platform.rbac.resolver import load_grants
+
+    from .permissions import RESPONSIBILITY_CAPABILITY
+
+    u = s.get(User, m.user_id)
+    if u is None or u.is_deleted or u.status != "ACTIVE" or u.user_type != "HUMAN":
+        return False
+    granted = load_grants(s, u.id).granted
+    return (
+        granted.get("project.view") is not None and granted.get(RESPONSIBILITY_CAPABILITY[m.responsibility]) is not None
+    )
+
+
 def _owners(s: Session, p: Project, d: Definition, to: str) -> list[dict[str, Any]]:
-    held = {r for (r,) in s.execute(sa.select(ProjectMember.responsibility).where(
-        ProjectMember.project_id == p.id, ProjectMember.is_active == sa.true()))}  # fmt: skip
-    return [_b("OWNER_ASSIGNED", "OWNER_MISSING", f"No {r.lower()} owner is assigned for {d.stage(to).label.lower()}.",
-               responsible_party="VEDA", responsibility=r)
-            for r in required_owners(p, d, to) if r not in held]  # fmt: skip
+    holders = {m.responsibility: m for m in s.execute(sa.select(ProjectMember).where(
+        ProjectMember.project_id == p.id, ProjectMember.is_active == sa.true(),
+        ProjectMember.responsibility != "MEMBER")).scalars()}  # fmt: skip
+    out = []
+    for r in required_owners(p, d, to):
+        m = holders.get(r)
+        if m is None:
+            out.append(_b("OWNER_ASSIGNED", "OWNER_MISSING", f"No {r.lower()} owner is assigned for "
+                          f"{d.stage(to).label.lower()}.", responsible_party="VEDA", responsibility=r))  # fmt: skip
+        elif not owner_eligible(s, m):
+            out.append(_b("OWNER_ASSIGNED", "OWNER_INELIGIBLE", f"The {r.lower()} owner can no longer act on this "
+                          "project (account not active, or the capability was withdrawn); reassign the responsibility.",
+                          responsible_party="VEDA", responsibility=r, entity={"type": "member", "id": m.id}))  # fmt: skip
+    return out
 
 
 def _site(s: Session, p: Project) -> list[dict[str, Any]]:

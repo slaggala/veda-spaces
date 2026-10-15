@@ -220,3 +220,72 @@ class Projects:
                 ok(self.as_(user or self.ops).patch(f"{BASE}/{p['id']}/site-readiness/{r['id']}", {"status": "READY"},
                                                     if_match=r["version"]))  # fmt: skip
         return self.get(p)
+
+
+ORDER = ("DESIGN_FINALISATION", "SCOPE_FROZEN", "SITE_READINESS", "PRODUCTION_READINESS", "IN_PRODUCTION",
+         "READY_FOR_INSTALLATION", "INSTALLATION", "QUALITY_CHECK", "SNAGGING", "READY_FOR_HANDOVER")  # fmt: skip
+
+
+def advance_to(t: Projects, p: dict, stage: str, *, qc: tuple[str, ...] = QC_REQUIRED) -> dict:
+    """Move a staffed project stage by stage to ``stage`` (needs a policy without four-eyes on the moves crossed). Before
+    SNAGGING it records PASS for ``qc``."""
+    current = t.get(p)["stage"]["code"]
+    for to in ORDER[ORDER.index(current) + 1 if current in ORDER else 0 :]:
+        if to == "PRODUCTION_READINESS":
+            t.ready_site(p)
+        if to == "SNAGGING":
+            for cat in qc:
+                ok(t.as_(t.ops).post(f"{BASE}/{p['id']}/qc-checks", {"category": cat, "result": "PASS"}), 201)
+        p = t.advance(p, to)
+        if to == stage:
+            break
+    return t.get(p)
+
+
+def no_four_eyes() -> dict:
+    return synthetic_policy(PLB_OD_03={"lifecycle_version": lifecycle.current().version, "transitions": []})
+
+
+def race(app, monkeypatch, first_token: str, first, second, *, module=None, name: str = "require", pause: float = 2.0):
+    """Run ``first(client)`` paused right after its permission check (before the project lock) while ``second()`` runs
+    and commits; then the first resumes. Returns (first's response, second's result)."""
+    import threading
+
+    from tests.support.api import ApiClient
+    from veda.modules.project import access
+
+    module = module or access
+    a = ApiClient(app.test_client())
+    a.token = first_token
+    paused, done = threading.Event(), threading.Event()
+    threads: dict[str, threading.Thread] = {}
+    original = getattr(module, name)
+
+    def wrapped(*args, **kw):
+        result = original(*args, **kw)
+        if threading.current_thread() is threads.get("first") and not paused.is_set():
+            paused.set()
+            done.wait(timeout=pause)
+        return result
+
+    monkeypatch.setattr(module, name, wrapped)
+    out: dict = {}
+
+    def run_first():
+        out["first"] = first(a)
+
+    def run_second():
+        assert paused.wait(timeout=20), "the first request never reached its pause"
+        out["second"] = second()
+        done.set()
+
+    threads["first"], threads["second"] = threading.Thread(target=run_first), threading.Thread(target=run_second)
+    for th in threads.values():
+        th.start()
+    for th in threads.values():
+        th.join(timeout=60)
+    monkeypatch.setattr(module, name, original)
+    assert "first" in out and "second" in out, out
+    for r in out.values():
+        assert getattr(r, "status", 200) < 500, r
+    return out["first"], out["second"]

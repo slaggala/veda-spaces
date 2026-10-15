@@ -177,6 +177,8 @@ def test_checklist_items_need_a_reason_and_the_permission_to_be_not_applicable(t
 
 def test_milestones_keep_planned_actual_and_promised_dates_apart_and_complete_explicitly(team):
     t, p = team, team.p
+    # a customer-promised date needs owner decision PLB-OD-13 (M1): a SYNTHETIC one naming the milestone capability
+    install(synthetic_policy(PLB_OD_13={"capability": "project.manage_milestone", "reference": "SYNTHETIC"}))
     t.staff(p)
     api = t.as_(t.ops)
     d = ok(api.post(f"{BASE}/{p['id']}/milestones", {"milestone_code": "DESIGN_SIGN_OFF", "label": "Design sign-off",

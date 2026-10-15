@@ -10,13 +10,17 @@ while one is null, behaves as follows (the strict default fails closed; nothing 
 | PLB-OD-03 | Transitions that need an independent (four-eyes) approval | No approval step on STANDARD transitions; HIGH-risk transitions refused |
 | PLB-OD-04 | Ownership responsibilities required before a stage is entered | The stage's owning responsibility must be assigned |
 | PLB-OD-07 | Checklist items that are optional | Every item is required (done, or not applicable with reason and permission) |
-| PLB-OD-08 | Quality-check categories required | Every category except OTHER |
+| PLB-OD-06 | Gating classification: who may change a snag between blocking and non-blocking | Refused (OWNER_DECISION_REQUIRED) |
+| PLB-OD-08 | Quality-check categories required, and who may mark a required one NOT_APPLICABLE | Every category except OTHER; NOT_APPLICABLE on a required category refused |
 | PLB-OD-09 | Handover evidence required | Both an acknowledgement reference and an evidence attachment |
+| PLB-OD-13 | Who may record or change a customer-promised date (a customer commitment) | Refused (OWNER_DECISION_REQUIRED) |
 
-The other slots (PLB-OD-05, 06, 10 … 13) are recorded decisions the code does not read yet: milestone definitions,
-which blockers are gating and who classifies them, how a project is triggered from acceptance, use of THIRD_PARTY
-responsibility, rework/cancellation/on-hold, and customer-promised dates. They are listed so the register is
-complete; see docs/implementation/project-lifecycle/PLB-owner-decisions.md.
+The other slots (PLB-OD-05, 10, 11, 12) are recorded decisions the code does not read yet: milestone definitions, how
+a project is triggered from acceptance, use of THIRD_PARTY responsibility, rework/cancellation/on-hold. They are listed
+so the register is complete; see docs/implementation/project-lifecycle/PLB-owner-decisions.md.
+
+Where a decision says who may act, it names a ``project.*`` capability; the engine enforces exactly that capability
+(in the project's scope) and invents no persona.
 
 Tests may install a record marked SYNTHETIC (``install_for_tests``); the loader refuses that marker anywhere but the
 test environment, so a synthetic decision can never reach staging or production.
@@ -45,22 +49,38 @@ LABELS = {
     "PLB-OD-03": "stage transitions that need an independent (four-eyes) approval",
     "PLB-OD-04": "required project roles (ownership responsibilities per stage)",
     "PLB-OD-05": "milestone definitions",
-    "PLB-OD-06": "which blockers are gating, and who may classify them",
+    "PLB-OD-06": "which blockers are gating, and who may change a snag's gating classification",
     "PLB-OD-07": "checklist items that are optional",
-    "PLB-OD-08": "quality-check requirements",
+    "PLB-OD-08": "quality-check requirements (required categories; who may mark one not applicable)",
     "PLB-OD-09": "handover evidence requirements",
     "PLB-OD-10": "how a project is created from an accepted quotation (trigger and acceptance evidence)",
     "PLB-OD-11": "use of the THIRD_PARTY responsibility",
     "PLB-OD-12": "rework (backward transitions), cancellation and on-hold",
-    "PLB-OD-13": "who may record a customer-promised date and how it is governed",
+    "PLB-OD-13": "who may record or change a customer-promised date",
 }
-CONSUMED = ("PLB-OD-01", "PLB-OD-02", "PLB-OD-03", "PLB-OD-04", "PLB-OD-07", "PLB-OD-08", "PLB-OD-09")
+CONSUMED = (
+    "PLB-OD-01",
+    "PLB-OD-02",
+    "PLB-OD-03",
+    "PLB-OD-04",
+    "PLB-OD-06",
+    "PLB-OD-07",
+    "PLB-OD-08",
+    "PLB-OD-09",
+    "PLB-OD-13",
+)
 Hex64 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 TransitionKey = Annotated[str, Field(pattern=r"^[A-Z_]+>[A-Z_]+$")]
 
 
 class _Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+def _project_codes() -> tuple[str, ...]:
+    from .permissions import CODES
+
+    return CODES
 
 
 def _member(values: tuple[str, ...]):
@@ -139,8 +159,25 @@ class OptionalItems(_Closed):  # PLB-OD-07
         return self
 
 
+Capability = Annotated[str, AfterValidator(_member(_project_codes()))]
+
+
 class QcRequirements(_Closed):  # PLB-OD-08
     required_categories: tuple[Annotated[str, AfterValidator(_member(V.QC_CATEGORIES))], ...]
+    # who may mark a required category NOT_APPLICABLE (with a reason); None: nobody may
+    not_applicable_capability: Capability | None = None
+
+
+class GatingClassification(_Closed):  # PLB-OD-06
+    snag_reclassification_capability: Capability  # who may change a snag between blocking and non-blocking
+    reference: Annotated[str, Field(min_length=1, max_length=200)]
+    decision: Annotated[str | None, Field(max_length=2000)] = None
+
+
+class PromisedDates(_Closed):  # PLB-OD-13
+    capability: Capability  # who may record, change or clear a customer-promised date
+    reference: Annotated[str, Field(min_length=1, max_length=200)]
+    decision: Annotated[str | None, Field(max_length=2000)] = None
 
 
 class HandoverEvidence(_Closed):  # PLB-OD-09
@@ -159,14 +196,14 @@ SHAPES: dict[str, type[BaseModel]] = {
     "PLB-OD-03": IndependentApproval,
     "PLB-OD-04": RequiredRoles,
     "PLB-OD-05": Recorded,
-    "PLB-OD-06": Recorded,
+    "PLB-OD-06": GatingClassification,
     "PLB-OD-07": OptionalItems,
     "PLB-OD-08": QcRequirements,
     "PLB-OD-09": HandoverEvidence,
     "PLB-OD-10": Recorded,
     "PLB-OD-11": Recorded,
     "PLB-OD-12": Recorded,
-    "PLB-OD-13": Recorded,
+    "PLB-OD-13": PromisedDates,
 }
 
 

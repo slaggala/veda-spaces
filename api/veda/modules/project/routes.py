@@ -330,6 +330,15 @@ def update_snag(req: Req, project_id: str, snag_id: str):
     return _detail(req, p)
 
 
+@api.route("POST", "/projects/<project_id>/snags/<snag_id>/classification", permission="project.manage_snag",
+           body=S.SnagClassificationIn, if_match=True, requirement="PLB-027",
+           summary="Change whether a snag blocks the handover (owner decision PLB-OD-06; reason required)")  # fmt: skip
+def reclassify_snag(req: Req, project_id: str, snag_id: str):
+    p, sn = _snag(req, project_id, snag_id)
+    service.reclassify_snag(req.session, req.ctx, p, sn, req.body, req.if_match)
+    return _detail(req, p)
+
+
 @api.route("POST", "/projects/<project_id>/snags/<snag_id>/status", permission="project.manage_snag",
            body=S.SnagStatusIn, if_match=True, requirement="PLB-027",
            summary="Move a snag: in progress, ready for recheck, resolved (recheck passed), closed")  # fmt: skip

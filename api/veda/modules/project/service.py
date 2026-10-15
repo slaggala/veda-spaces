@@ -24,7 +24,7 @@ from veda.modules.mtq.models import PropertySpace
 from veda.platform.identity.models import User
 from veda.platform.rbac.resolver import load_grants
 
-from . import access, baseline, events, gates, lifecycle
+from . import access, baseline, events, gates, lifecycle, policy
 from . import vocab as V
 from .models import (
     Project,
@@ -90,6 +90,16 @@ def eligible_user(s: Session, p: Project, user_id: str, code: str, field: str) -
         raise ApiError(422, "VALIDATION_FAILED", f"That person cannot act on this project (needs {code}).",
                        errors=[field_error(field, "NOT_ELIGIBLE", f"Needs {code} on this project.")])  # fmt: skip
     return u
+
+
+def owner_controlled(s: Session, ctx, p: Project, code: str, capability: str | None, what: str) -> None:
+    """An action the owner governs: refused while the decision ``code`` is unrecorded (or names no capability), then
+    allowed exactly to the capability the decision names, in this project's scope. No persona is assumed."""
+    if capability is None:
+        r = policy.required(code)
+        raise ApiError(409, "OWNER_DECISION_REQUIRED", f"{r['message']} Until it is, {what} is refused.",
+                       extra={"decision": code})  # fmt: skip
+    access.require(s, ctx, p, capability)
 
 
 def _stage_open(p: Project, stage_code: str) -> None:
@@ -362,10 +372,18 @@ def _dependency(s: Session, p: Project, m: ProjectMilestone | None, depends_on: 
     return dep.id
 
 
+def _promised_date(s: Session, ctx, p: Project) -> None:
+    """PLB-13/M1: a customer-promised date is a customer commitment, governed by owner decision PLB-OD-13."""
+    od = policy.decision("PLB-OD-13")
+    owner_controlled(s, ctx, p, "PLB-OD-13", od.capability if od else None, "recording a customer-promised date")
+
+
 def add_milestone(s: Session, ctx, p: Project, body) -> ProjectMilestone:
     access.for_write(s, ctx, p, "project.manage_milestone", precondition=False)
     lifecycle.get(p.lifecycle_version).stage(body.stage_code)
     _stage_open(p, body.stage_code)
+    if body.customer_promised_date is not None:
+        _promised_date(s, ctx, p)
     m = ProjectMilestone(project_id=p.id, lead_id=p.lead_id, milestone_code=body.milestone_code, label=body.label,
                          customer_label=body.customer_label, description=body.description,
                          stage_code=body.stage_code, status="PLANNED" if body.planned_date else "NOT_STARTED",
@@ -387,9 +405,12 @@ def _iso(d: date | None) -> str | None:
 def update_milestone(s: Session, ctx, p: Project, m: ProjectMilestone, body,
                      if_match: int | None) -> ProjectMilestone:  # fmt: skip
     access.for_write(s, ctx, p, "project.manage_milestone", m, if_match=if_match, match=m)
+    _stage_open(p, m.stage_code)  # S2: a completed stage's milestones are its record
     if m.status == "COMPLETED":
         raise ApiError(409, "INVALID_STATE", "A completed milestone is not changed.")
     given = body.provided()
+    if "customer_promised_date" in given and body.customer_promised_date != m.customer_promised_date:
+        _promised_date(s, ctx, p)  # recording, changing and clearing a promise are all the owner's to govern
     frm = m.status
     for f in ("label", "customer_label", "description", "planned_date", "customer_promised_date",
               "owner_responsibility"):  # fmt: skip
@@ -417,6 +438,7 @@ def complete_milestone(s: Session, ctx, p: Project, m: ProjectMilestone, body,
                        if_match: int | None) -> ProjectMilestone:  # fmt: skip
     """PLB-14: completion is explicit, with its actual date; never inferred from the calendar."""
     access.for_write(s, ctx, p, "project.manage_milestone", m, if_match=if_match, match=m)
+    _stage_open(p, m.stage_code)
     if m.status in V.MILESTONE_CLOSED:
         raise ApiError(409, "INVALID_STATE", f"This milestone is {m.status.lower().replace('_', ' ')}.")
     if body.actual_date > db.tx_time(s).date():
@@ -594,6 +616,12 @@ def record_qc(s: Session, ctx, p: Project, body) -> ProjectQcCheck:
     if body.result == "FAIL" and not body.observation:
         raise ApiError(422, "VALIDATION_FAILED", "Describe what failed.",
                        errors=[field_error("observation", "REQUIRED", "Required for a failed check.")])  # fmt: skip
+    override = body.result == "NOT_APPLICABLE" and body.category in gates.required_qc(p)
+    if override:  # S3: never a silent bypass of handover readiness
+        od = policy.decision("PLB-OD-08")
+        owner_controlled(s, ctx, p, "PLB-OD-08", od.not_applicable_capability if od else None,
+                         "marking a required quality-check category not applicable")  # fmt: skip
+        _reason(body.observation, "a required category does not apply", "observation")
     recheck = None
     if body.recheck_of_id:
         recheck = child(s, ProjectQcCheck, p, body.recheck_of_id)
@@ -607,7 +635,8 @@ def record_qc(s: Session, ctx, p: Project, body) -> ProjectQcCheck:
     s.add(c)
     s.flush()
     events.record(s, p, "QC_RECORDED", stage=p.stage_code, to=c.result, qc_check_id=c.id, category=c.category,
-                  recheck_of_id=c.recheck_of_id, evidence_attachment_id=c.evidence_attachment_id)  # fmt: skip
+                  recheck_of_id=c.recheck_of_id, evidence_attachment_id=c.evidence_attachment_id,
+                  required_not_applicable=override or None)  # fmt: skip
     _done(p, s)
     return c
 
@@ -652,15 +681,37 @@ def update_snag(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match: in
         eligible_user(s, p, body.owner_user_id, "project.manage_snag", "owner_user_id")
     if "evidence_attachment_id" in given:
         sn.evidence_attachment_id = evidence(s, p, body.evidence_attachment_id)
-    blocking_before = sn.is_blocking
     for f in ("description", "owner_user_id", "responsible_party", "target_date", "evidence_reference"):
         if f in given:
             setattr(sn, f, getattr(body, f))
-    if "is_blocking" in given and body.is_blocking is not None:
-        sn.is_blocking = body.is_blocking
     events.record(s, p, "SNAG_UPDATED", stage=p.stage_code, frm=sn.status, to=sn.status, snag_id=sn.id,
-                  snag_no=sn.snag_no, blocking=sn.is_blocking,
-                  blocking_changed=blocking_before != sn.is_blocking, fields=sorted(given))  # fmt: skip
+                  snag_no=sn.snag_no, fields=sorted(given))  # fmt: skip
+    _done(p, s)
+    return sn
+
+
+def _gating(blocking: bool) -> str:
+    return "BLOCKING" if blocking else "NON_BLOCKING"
+
+
+def reclassify_snag(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match: int | None) -> ProjectSnag:
+    """M2: moving a snag between blocking and non-blocking changes handover-readiness gating. Its own command, governed
+    by owner decision PLB-OD-06 (refused while unrecorded), with a reason and an immutable SNAG_RECLASSIFIED event
+    (previous and new classification; the actor and time are the event's)."""
+    access.for_write(s, ctx, p, "project.manage_snag", sn, if_match=if_match, match=sn)
+    if sn.status in ("RESOLVED", "CLOSED"):
+        raise ApiError(409, "INVALID_STATE", f"Snag {sn.snag_no} is {sn.status.lower()}.")
+    if body.is_blocking == sn.is_blocking:
+        raise ApiError(
+            409, "NO_CHANGE", f"Snag {sn.snag_no} is already {_gating(sn.is_blocking).lower().replace('_', '-')}."
+        )
+    od = policy.decision("PLB-OD-06")
+    owner_controlled(s, ctx, p, "PLB-OD-06", od.snag_reclassification_capability if od else None,
+                     "changing whether a snag blocks the handover")  # fmt: skip
+    frm, to = _gating(sn.is_blocking), _gating(body.is_blocking)
+    sn.classification_reason = _reason(body.reason, "the classification changes")[:500]
+    sn.is_blocking = body.is_blocking
+    events.record(s, p, "SNAG_RECLASSIFIED", stage=p.stage_code, frm=frm, to=to, snag_id=sn.id, snag_no=sn.snag_no)
     _done(p, s)
     return sn
 

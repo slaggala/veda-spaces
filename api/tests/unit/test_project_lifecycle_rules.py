@@ -155,3 +155,18 @@ def test_erasure_covers_every_personal_field_the_audit_registry_names():
     for table in TABLES:
         pii = set(policy_for(table).pii) if policy_for(table) else set()
         assert pii <= erased.get(table, set()), f"{table}: {pii - erased.get(table, set())} not erased with the lead"
+
+
+def test_owner_decisions_that_say_who_may_act_name_a_real_project_capability():
+    base = {"schema": "veda.project.lifecycle-policy/1", "version": "X", "status": "SYNTHETIC_TEST_ONLY", "note": "",
+            "decisions": dict.fromkeys(policy.SHAPES)}  # fmt: skip
+    good = {"PLB-OD-06": {"snag_reclassification_capability": "project.manage_snag", "reference": "R"},
+            "PLB-OD-08": {"required_categories": ["FINISH_AND_SURFACES"], "not_applicable_capability": "project.manage_qc"},
+            "PLB-OD-13": {"capability": "project.manage_milestone", "reference": "R"}}  # fmt: skip
+    policy.Policy.model_validate({**base, "decisions": {**base["decisions"], **good}})
+    for code, value in (("PLB-OD-06", {"snag_reclassification_capability": "lead.read", "reference": "R"}),
+                        ("PLB-OD-08", {"required_categories": [], "not_applicable_capability": "anything"}),
+                        ("PLB-OD-13", {"capability": "SALES_MANAGER", "reference": "R"})):  # fmt: skip
+        with pytest.raises(ValueError):
+            policy.Policy.model_validate({**base, "decisions": {**base["decisions"], code: value}})
+    assert {"PLB-OD-06", "PLB-OD-08", "PLB-OD-13"} <= set(policy.CONSUMED)

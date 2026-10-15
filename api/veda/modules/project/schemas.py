@@ -185,9 +185,13 @@ class SnagPatch(Closed):
     owner_user_id: Id | None = None
     responsible_party: Party | None = None
     target_date: CalendarDate | None = None
-    is_blocking: bool | None = None
     evidence_attachment_id: Id | None = None
     evidence_reference: Ref = None
+
+
+class SnagClassificationIn(Closed):
+    is_blocking: bool
+    reason: Annotated[str, text(500, min_len=5)]
 
 
 class SnagStatusIn(Closed):

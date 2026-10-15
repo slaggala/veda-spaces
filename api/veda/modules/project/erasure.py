@@ -35,7 +35,17 @@ TEXT_FIELDS: list[tuple] = [
     (ProjectChecklistItem, ("note", "not_applicable_reason", "reopen_reason", "evidence_reference")),
     (ProjectMilestone, ("label", "customer_label", "description", "status_reason", "evidence_reference")),
     (ProjectQcCheck, ("observation", "evidence_reference")),
-    (ProjectSnag, ("customer_title", "description", "item_reference", "resolution_note", "evidence_reference")),
+    (
+        ProjectSnag,
+        (
+            "customer_title",
+            "description",
+            "item_reference",
+            "resolution_note",
+            "classification_reason",
+            "evidence_reference",
+        ),
+    ),
     (ProjectTransition, ("reason", "decision_reason", "acknowledgement_reference", "observations")),
     (ProjectMember, ("removal_reason",)),
 ]

@@ -319,7 +319,16 @@ register(
         "project_snag",
         FULL,
         parent=("project", "project_id"),
-        pii=frozenset({"customer_title", "description", "item_reference", "resolution_note", "evidence_reference"}),
+        pii=frozenset(
+            {
+                "customer_title",
+                "description",
+                "item_reference",
+                "resolution_note",
+                "classification_reason",
+                "evidence_reference",
+            }
+        ),
     )
 )
 register(AuditPolicy("project_event", FULL, parent=("project", "project_id")))
