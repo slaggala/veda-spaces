@@ -686,6 +686,272 @@
         "title": "AttachmentWithdrawIn",
         "type": "object"
       },
+      "BlockerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assigned To"
+          },
+          "blocks_stage_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "BOOKED",
+                  "DESIGN_FINALISATION",
+                  "SCOPE_FROZEN",
+                  "SITE_READINESS",
+                  "PRODUCTION_READINESS",
+                  "IN_PRODUCTION",
+                  "READY_FOR_INSTALLATION",
+                  "INSTALLATION",
+                  "QUALITY_CHECK",
+                  "SNAGGING",
+                  "READY_FOR_HANDOVER",
+                  "HANDED_OVER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Blocks Stage Code"
+          },
+          "category": {
+            "enum": [
+              "DESIGN",
+              "CUSTOMER_DECISION",
+              "SITE",
+              "ACCESS",
+              "MATERIAL_SPECIFICATION",
+              "COMMERCIAL",
+              "PRODUCTION",
+              "INSTALLATION",
+              "QUALITY",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "customer_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Action"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "impact": {
+            "enum": [
+              "GATING",
+              "INFORMATIONAL"
+            ],
+            "title": "Impact",
+            "type": "string"
+          },
+          "related_checklist_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Checklist Item Id"
+          },
+          "related_milestone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Milestone Id"
+          },
+          "related_quotation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Quotation Id"
+          },
+          "related_site_readiness_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Site Readiness Id"
+          },
+          "responsible_party": {
+            "enum": [
+              "CUSTOMER",
+              "VEDA",
+              "THIRD_PARTY",
+              "TO_BE_CONFIRMED"
+            ],
+            "title": "Responsible Party",
+            "type": "string"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Date"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "impact",
+          "title",
+          "responsible_party"
+        ],
+        "title": "BlockerIn",
+        "type": "object"
+      },
+      "BlockerPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assigned To"
+          },
+          "customer_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Action"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "enum": [
+                  "CUSTOMER",
+                  "VEDA",
+                  "THIRD_PARTY",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Responsible Party"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "OPEN",
+                  "IN_PROGRESS",
+                  "WAITING_CUSTOMER",
+                  "WAITING_VEDA"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Date"
+          }
+        },
+        "title": "BlockerPatch",
+        "type": "object"
+      },
       "BoqOverrideIn": {
         "additionalProperties": false,
         "properties": {
@@ -1028,6 +1294,72 @@
         "title": "ChangeIn",
         "type": "object"
       },
+      "ChecklistIn": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "not_applicable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not Applicable Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "state": {
+            "enum": [
+              "DONE",
+              "NOT_APPLICABLE"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "ChecklistIn",
+        "type": "object"
+      },
       "ConsentRecapture": {
         "additionalProperties": false,
         "description": "Staff consent, at creation or as re-consent (04 \u00a75.4, DEV-004, RR-12): how it was obtained, with a note.",
@@ -1090,6 +1422,25 @@
           "channel"
         ],
         "title": "ConsentWithdrawIn",
+        "type": "object"
+      },
+      "CreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "property_id": {
+            "title": "Property Id",
+            "type": "string"
+          },
+          "quotation_id": {
+            "title": "Quotation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quotation_id",
+          "property_id"
+        ],
+        "title": "CreateIn",
         "type": "object"
       },
       "CustomerInputsIn": {
@@ -1960,6 +2311,69 @@
         "title": "GrantItem",
         "type": "object"
       },
+      "HandoverIn": {
+        "additionalProperties": false,
+        "properties": {
+          "acknowledgement_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Acknowledgement Reference"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "handover_on": {
+            "format": "date",
+            "title": "Handover On",
+            "type": "string"
+          },
+          "observations": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Observations"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "handover_on"
+        ],
+        "title": "HandoverIn",
+        "type": "object"
+      },
       "InviteIn": {
         "additionalProperties": false,
         "properties": {
@@ -2769,6 +3183,46 @@
         "title": "MeasurementNoteIn",
         "type": "object"
       },
+      "MemberIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "responsibility": {
+            "enum": [
+              "COMMERCIAL",
+              "DESIGN",
+              "PROJECT",
+              "SITE",
+              "QUALITY",
+              "HANDOVER",
+              "MEMBER"
+            ],
+            "title": "Responsibility",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "responsibility"
+        ],
+        "title": "MemberIn",
+        "type": "object"
+      },
       "MfaRecoveryIn": {
         "additionalProperties": false,
         "properties": {
@@ -2853,6 +3307,313 @@
           "code"
         ],
         "title": "MfaVerifyIn",
+        "type": "object"
+      },
+      "MilestoneCompleteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_date": {
+            "format": "date",
+            "title": "Actual Date",
+            "type": "string"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          }
+        },
+        "required": [
+          "actual_date"
+        ],
+        "title": "MilestoneCompleteIn",
+        "type": "object"
+      },
+      "MilestoneIn": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Label"
+          },
+          "customer_promised_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Promised Date"
+          },
+          "depends_on_milestone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depends On Milestone Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "milestone_code": {
+            "enum": [
+              "DESIGN_SIGN_OFF",
+              "SCOPE_FREEZE",
+              "SITE_READY",
+              "PRODUCTION_RELEASE",
+              "PRODUCTION_COMPLETE",
+              "DELIVERY_TO_SITE",
+              "INSTALLATION_START",
+              "INSTALLATION_COMPLETE",
+              "QUALITY_CHECK_COMPLETE",
+              "HANDOVER",
+              "OTHER"
+            ],
+            "title": "Milestone Code",
+            "type": "string"
+          },
+          "owner_responsibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "COMMERCIAL",
+                  "DESIGN",
+                  "PROJECT",
+                  "SITE",
+                  "QUALITY",
+                  "HANDOVER",
+                  "MEMBER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner Responsibility"
+          },
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Date"
+          },
+          "stage_code": {
+            "enum": [
+              "BOOKED",
+              "DESIGN_FINALISATION",
+              "SCOPE_FROZEN",
+              "SITE_READINESS",
+              "PRODUCTION_READINESS",
+              "IN_PRODUCTION",
+              "READY_FOR_INSTALLATION",
+              "INSTALLATION",
+              "QUALITY_CHECK",
+              "SNAGGING",
+              "READY_FOR_HANDOVER",
+              "HANDED_OVER"
+            ],
+            "title": "Stage Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "milestone_code",
+          "label",
+          "stage_code"
+        ],
+        "title": "MilestoneIn",
+        "type": "object"
+      },
+      "MilestonePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Label"
+          },
+          "customer_promised_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Promised Date"
+          },
+          "depends_on_milestone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depends On Milestone Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "owner_responsibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "COMMERCIAL",
+                  "DESIGN",
+                  "PROJECT",
+                  "SITE",
+                  "QUALITY",
+                  "HANDOVER",
+                  "MEMBER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner Responsibility"
+          },
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Date"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "NOT_STARTED",
+                  "PLANNED",
+                  "IN_PROGRESS",
+                  "BLOCKED",
+                  "CANCELLED",
+                  "NOT_APPLICABLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status Reason"
+          }
+        },
+        "title": "MilestonePatch",
         "type": "object"
       },
       "NoteIn": {
@@ -4313,6 +5074,99 @@
         "title": "PublicLeadIn",
         "type": "object"
       },
+      "QcIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "DIMENSIONS_AND_ALIGNMENT",
+              "FINISH_AND_SURFACES",
+              "HARDWARE_AND_OPERATION",
+              "SERVICES_FITMENT",
+              "CLEANLINESS_AND_PROTECTION",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Observation"
+          },
+          "recheck_of_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recheck Of Id"
+          },
+          "result": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOT_APPLICABLE",
+              "TO_BE_CONFIRMED"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "category",
+          "result"
+        ],
+        "title": "QcIn",
+        "type": "object"
+      },
       "QuotationCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -4424,6 +5278,178 @@
         "title": "QuotationVersionIn",
         "type": "object"
       },
+      "ReadinessIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "FLOORING",
+              "PAINTING",
+              "DOORS_WINDOWS",
+              "ELECTRICAL_SUPPLY",
+              "WATER",
+              "ACCESS",
+              "SERVICE_LIFT",
+              "WORK_AREA_CLEARANCE",
+              "BUILDER_SOCIETY_APPROVAL",
+              "APPLIANCE_INFORMATION",
+              "CIVIL_WORK",
+              "PLUMBING_DEPENDENCIES",
+              "ELECTRICAL_DEPENDENCIES",
+              "OTHER",
+              "CLIENT_SUPPLIED_ITEM",
+              "APPLIANCE_MODEL",
+              "APPLIANCE_DIMENSIONS",
+              "ELECTRICITY",
+              "SERVICE_LIFT_ACCESS",
+              "WORKING_ACCESS",
+              "BUILDER_SOCIETY_PERMISSION",
+              "CIVIL_READINESS",
+              "PLUMBING_READINESS",
+              "ELECTRICAL_READINESS"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "READINESS",
+              "RESPONSIBILITY"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "category",
+          "label"
+        ],
+        "title": "ReadinessIn",
+        "type": "object"
+      },
+      "ReadinessPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Action"
+          },
+          "customer_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Action"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due Date"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "enum": [
+                  "CUSTOMER",
+                  "VEDA",
+                  "THIRD_PARTY",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Responsible Party"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "READY",
+                  "NOT_READY",
+                  "CUSTOMER_ACTION_REQUIRED",
+                  "VEDA_ACTION_REQUIRED",
+                  "NOT_APPLICABLE",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          }
+        },
+        "title": "ReadinessPatch",
+        "type": "object"
+      },
       "ReasonIn": {
         "additionalProperties": false,
         "properties": {
@@ -4468,6 +5494,20 @@
           "reason"
         ],
         "title": "RejectIn",
+        "type": "object"
+      },
+      "RemoveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RemoveIn",
         "type": "object"
       },
       "RequestIn": {
@@ -4783,6 +5823,20 @@
           "new_password"
         ],
         "title": "ResetIn",
+        "type": "object"
+      },
+      "ResolutionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "resolution": {
+            "title": "Resolution",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resolution"
+        ],
+        "title": "ResolutionIn",
         "type": "object"
       },
       "RespondIn": {
@@ -5543,6 +6597,279 @@
           "expires_in_days"
         ],
         "title": "ShareIn",
+        "type": "object"
+      },
+      "SnagIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "CARPENTRY",
+              "FINISH",
+              "HARDWARE",
+              "ALIGNMENT",
+              "DAMAGE",
+              "SERVICES_FITMENT",
+              "CLEANING",
+              "MISSING_ITEM",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "customer_title": {
+            "title": "Customer Title",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "is_blocking": {
+            "default": true,
+            "title": "Is Blocking",
+            "type": "boolean"
+          },
+          "item_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Item Reference"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner User Id"
+          },
+          "qc_check_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Qc Check Id"
+          },
+          "responsible_party": {
+            "default": "VEDA",
+            "enum": [
+              "CUSTOMER",
+              "VEDA",
+              "THIRD_PARTY",
+              "TO_BE_CONFIRMED"
+            ],
+            "title": "Responsible Party",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Date"
+          }
+        },
+        "required": [
+          "category",
+          "customer_title"
+        ],
+        "title": "SnagIn",
+        "type": "object"
+      },
+      "SnagPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "is_blocking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Is Blocking"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner User Id"
+          },
+          "responsible_party": {
+            "anyOf": [
+              {
+                "enum": [
+                  "CUSTOMER",
+                  "VEDA",
+                  "THIRD_PARTY",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Responsible Party"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Date"
+          }
+        },
+        "title": "SnagPatch",
+        "type": "object"
+      },
+      "SnagStatusIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "status": {
+            "enum": [
+              "IN_PROGRESS",
+              "READY_FOR_RECHECK",
+              "RESOLVED",
+              "CLOSED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SnagStatusIn",
         "type": "object"
       },
       "SpaceAttributes": {
@@ -6496,6 +7823,46 @@
           "token"
         ],
         "title": "TokenIn",
+        "type": "object"
+      },
+      "TransitionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "to_stage": {
+            "enum": [
+              "BOOKED",
+              "DESIGN_FINALISATION",
+              "SCOPE_FROZEN",
+              "SITE_READINESS",
+              "PRODUCTION_READINESS",
+              "IN_PRODUCTION",
+              "READY_FOR_INSTALLATION",
+              "INSTALLATION",
+              "QUALITY_CHECK",
+              "SNAGGING",
+              "READY_FOR_HANDOVER",
+              "HANDED_OVER"
+            ],
+            "title": "To Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to_stage"
+        ],
+        "title": "TransitionIn",
         "type": "object"
       },
       "UserProfilePatch": {
@@ -16314,6 +17681,1844 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-016"
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "project_list_projects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "mine",
+                "blocked",
+                "action_required",
+                "site_readiness",
+                "installation",
+                "handover"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stage",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "BOOKED",
+                    "DESIGN_FINALISATION",
+                    "SCOPE_FROZEN",
+                    "SITE_READINESS",
+                    "PRODUCTION_READINESS",
+                    "IN_PRODUCTION",
+                    "READY_FOR_INSTALLATION",
+                    "INSTALLATION",
+                    "QUALITY_CHECK",
+                    "SNAGGING",
+                    "READY_FOR_HANDOVER",
+                    "HANDED_OVER"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stage"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Owner"
+            }
+          },
+          {
+            "in": "query",
+            "name": "blocker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "gating",
+                    "any",
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Blocker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "readiness",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ready",
+                    "blocked",
+                    "awaiting_approval"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Readiness"
+            }
+          },
+          {
+            "in": "query",
+            "name": "milestone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "overdue",
+                    "planned",
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Milestone"
+            }
+          },
+          {
+            "in": "query",
+            "name": "handover",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ready",
+                    "not_ready"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Handover"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Authorised projects (views and filters): stage, owner, next milestone, readiness, blockers",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-010"
+      },
+      "post": {
+        "operationId": "project_create_project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Book an accepted quotation as a project (refused for any other commercial state)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.create_from_acceptance"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-001"
+      }
+    },
+    "/api/v1/projects/vocabulary": {
+      "get": {
+        "operationId": "project_vocabulary",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The lifecycle definition in force and the codes the pages offer",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-005"
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "operationId": "project_get_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One project: overview, attention, next actions, stages, checklists, blockers, baseline, timeline",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-011"
+      }
+    },
+    "/api/v1/projects/{project_id}/blockers": {
+      "post": {
+        "operationId": "project_raise_blocker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Raise a gating blocker or an informational issue",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.raise_blocker"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-018"
+      }
+    },
+    "/api/v1/projects/{project_id}/blockers/{blocker_id}": {
+      "patch": {
+        "operationId": "project_update_blocker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "blocker_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockerPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a blocker's status or owner",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.resolve_blocker"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-018"
+      }
+    },
+    "/api/v1/projects/{project_id}/blockers/{blocker_id}/cancel": {
+      "post": {
+        "operationId": "project_cancel_blocker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "blocker_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolutionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a blocker raised in error",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.resolve_blocker"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-018"
+      }
+    },
+    "/api/v1/projects/{project_id}/blockers/{blocker_id}/resolve": {
+      "post": {
+        "operationId": "project_resolve_blocker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "blocker_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolutionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a blocker, saying how",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.resolve_blocker"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-018"
+      }
+    },
+    "/api/v1/projects/{project_id}/checklist/{item_id}/complete": {
+      "post": {
+        "operationId": "project_complete_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChecklistIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete a checklist item, or mark it not applicable with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.complete_checklist"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-015"
+      }
+    },
+    "/api/v1/projects/{project_id}/checklist/{item_id}/reopen": {
+      "post": {
+        "operationId": "project_reopen_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reopen a checklist item, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.complete_checklist"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-015"
+      }
+    },
+    "/api/v1/projects/{project_id}/handover": {
+      "post": {
+        "operationId": "project_handover",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete the handover with its evidence, through the handover gates",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.complete_handover"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-029"
+      }
+    },
+    "/api/v1/projects/{project_id}/history": {
+      "get": {
+        "operationId": "project_history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Audit history of the project's records: who changed what, when (names of fields, never their values)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.view_audit"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-035"
+      }
+    },
+    "/api/v1/projects/{project_id}/milestones": {
+      "post": {
+        "operationId": "project_add_milestone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a milestone",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_milestone"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-013"
+      }
+    },
+    "/api/v1/projects/{project_id}/milestones/{milestone_id}": {
+      "patch": {
+        "operationId": "project_update_milestone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestonePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan or change a milestone (completion is explicit: /complete)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_milestone"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-013"
+      }
+    },
+    "/api/v1/projects/{project_id}/milestones/{milestone_id}/complete": {
+      "post": {
+        "operationId": "project_complete_milestone",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneCompleteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete a milestone with its actual date",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_milestone"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-014"
+      }
+    },
+    "/api/v1/projects/{project_id}/qc-checks": {
+      "post": {
+        "operationId": "project_record_qc",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QcIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a quality-check result (or a recheck)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_qc"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-026"
+      }
+    },
+    "/api/v1/projects/{project_id}/readiness": {
+      "get": {
+        "operationId": "project_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_stage",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "BOOKED",
+                    "DESIGN_FINALISATION",
+                    "SCOPE_FROZEN",
+                    "SITE_READINESS",
+                    "PRODUCTION_READINESS",
+                    "IN_PRODUCTION",
+                    "READY_FOR_INSTALLATION",
+                    "INSTALLATION",
+                    "QUALITY_CHECK",
+                    "SNAGGING",
+                    "READY_FOR_HANDOVER",
+                    "HANDED_OVER"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "To Stage"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Evaluate the gates of a move to the next (or a named) stage; read-only",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-007"
+      }
+    },
+    "/api/v1/projects/{project_id}/site-readiness": {
+      "post": {
+        "operationId": "project_add_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a site-readiness item the accepted quotation did not list",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_site_readiness"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-017"
+      }
+    },
+    "/api/v1/projects/{project_id}/site-readiness/{item_id}": {
+      "patch": {
+        "operationId": "project_update_readiness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the site's readiness for an item and the action it needs",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_site_readiness"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-017"
+      }
+    },
+    "/api/v1/projects/{project_id}/snags": {
+      "post": {
+        "operationId": "project_raise_snag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnagIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Raise a snag",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-027"
+      }
+    },
+    "/api/v1/projects/{project_id}/snags/{snag_id}": {
+      "patch": {
+        "operationId": "project_update_snag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snag_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnagPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a snag's owner, target date or details",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-027"
+      }
+    },
+    "/api/v1/projects/{project_id}/snags/{snag_id}/status": {
+      "post": {
+        "operationId": "project_snag_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snag_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnagStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move a snag: in progress, ready for recheck, resolved (recheck passed), closed",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-027"
+      }
+    },
+    "/api/v1/projects/{project_id}/team": {
+      "post": {
+        "operationId": "project_assign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign an owner (one per responsibility) or a team member",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.assign_team"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-008"
+      }
+    },
+    "/api/v1/projects/{project_id}/team/{member_id}/remove": {
+      "post": {
+        "operationId": "project_remove_member",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End an assignment, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.assign_team"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-009"
+      }
+    },
+    "/api/v1/projects/{project_id}/transitions": {
+      "post": {
+        "operationId": "project_request_transition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request the move to the next stage; recorded as REFUSED (with blockers), AWAITING_APPROVAL or COMPLETED",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_stage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-006"
+      }
+    },
+    "/api/v1/projects/{project_id}/transitions/{transition_id}/approve": {
+      "post": {
+        "operationId": "project_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "transition_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a transition awaiting independent approval (every gate is evaluated again)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.approve_transition"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-034"
+      }
+    },
+    "/api/v1/projects/{project_id}/transitions/{transition_id}/reject": {
+      "post": {
+        "operationId": "project_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "transition_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject a transition, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.approve_transition"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-034"
+      }
+    },
+    "/api/v1/projects/{project_id}/transitions/{transition_id}/withdraw": {
+      "post": {
+        "operationId": "project_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "transition_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a transition awaiting approval, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": [
+          "project.manage_stage",
+          "project.complete_handover"
+        ],
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-006"
       }
     },
     "/api/v1/properties": {
