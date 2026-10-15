@@ -17,6 +17,13 @@ A null slot never becomes a default. Instead:
 | OI-MTQ-15 | Preparation-package drivers (5 BHK, independent house) | Those charges unpriced; not customer-issuable |
 | OI-MTQ-18 | Customer information pack: business contacts, responsibilities, site readiness, site-dependent work, warranty exclusions, service guidance, handover, care, next steps, payment safety (``customer_pack``) | Every section shown "to be confirmed"; not an issuance blocker (a real-customer gate: CQX trust checklist) |
 
+OI-MTQ-18 is recorded in one of two forms. The pack itself (``CustomerPack``, the PR #96 form, used by tests), or the
+owner's authorisation of the Customer Promise portal as the pack's governed source (``PromiseAuthority``): the decision
+names the register reference, and from then on quotations take the Customer Promise Pack that is *published* through
+the portal's review, four-eyes approval and publication (``veda.modules.customer_promise.binding``). A draft, a
+submitted or an approved-but-unpublished pack never satisfies OI-MTQ-18, and while no pack is published every section
+stays "to be confirmed".
+
 Tests may install a policy marked SYNTHETIC (``install_for_tests``); the loader refuses that marker anywhere but the
 test environment, so a synthetic decision can never reach staging or production.
 """
@@ -156,6 +163,21 @@ SHAPES: dict[str, type[BaseModel]] = {
 }
 
 
+class PromiseAuthority(_Closed):  # OI-MTQ-18 as the governance boundary of the Customer Promise portal
+    source: Literal["CUSTOMER_PROMISE_ADMIN"]
+    register_reference: Annotated[str, Field(min_length=3, max_length=200)]  # the owner-decision register entry
+    decided_on: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
+
+
+# A register row recorded in another form than its SHAPES model, chosen by the key that marks it.
+ALTERNATIVES: dict[str, tuple[str, type[BaseModel]]] = {"OI-MTQ-18": ("source", PromiseAuthority)}
+
+
+def _shape(code: str, value: dict[str, Any]) -> type[BaseModel]:
+    alt = ALTERNATIVES.get(code)
+    return alt[1] if alt is not None and alt[0] in value else SHAPES[code]
+
+
 class Policy(_Closed):
     schema_: Literal["veda.mtq.commercial-policy/1"] = Field(alias="schema")
     version: Annotated[str, Field(min_length=1, max_length=40)]
@@ -171,12 +193,12 @@ class Policy(_Closed):
             raise ValueError(f"decisions must name exactly {sorted(SHAPES)}")
         for code, value in self.decisions.items():
             if value is not None:
-                SHAPES[code].model_validate(value)
+                _shape(code, value).model_validate(value)
         return self
 
     def get(self, code: str) -> Any:
         value = self.decisions.get(code)
-        return None if value is None else SHAPES[code].model_validate(value)
+        return None if value is None else _shape(code, value).model_validate(value)
 
 
 _override: tuple[Policy, str] | None = None

@@ -15,12 +15,13 @@ Copy governance (a safety net, not a substitute for the owner's review of every 
 money (currency words and symbols, grouped or long figures, percentages), durations and time promises in figures or
 words ("3 days", "ten years", "same-day", "next day", "within a week"; a duration appears only in a next-step stage's
 own ``duration`` field, which recording approves), e-mail addresses and phone numbers outside the contact fields,
-links, web addresses and QR codes, bank, IFSC, UPI or card details, and a list of unsupported superlative claims. It
-cannot recognise every phrasing, so the owner's review stays the control. Contacts must be confirmed as Veda Spaces
-business channels approved for publication: a free-mail e-mail (gmail, yahoo, outlook…) is refused, and when the pack
-names ``email_domains`` every contact e-mail must use one of them. A contact's ``display_name`` is a desk or role name,
-or a staff name the person agreed to publish; once frozen into an issued quotation it stays with that commercial record
-(removing a published staff name later is a new quotation version, not an edit of the issued one).
+links, web addresses and QR codes, bank, IFSC, UPI or card details, markup or script, and a list of unsupported
+superlative claims. It cannot recognise every phrasing, so the owner's review stays the control. Contacts must be
+confirmed as Veda Spaces business channels approved for publication: a free-mail e-mail (gmail, yahoo, outlook…) is
+refused, and when the pack names ``email_domains`` every contact e-mail must use one of them. A contact's
+``display_name`` is a desk or role name, or a staff name the person agreed to publish; once frozen into an issued
+quotation it stays with that commercial record (removing a published staff name later is a new quotation version, not
+an edit of the issued one).
 """
 
 from __future__ import annotations
@@ -55,9 +56,12 @@ _PHONE = re.compile(r"(?:\+?\d[\d\s()-]{8,}\d)")
 # statement may say which channels Veda Spaces recognises, but never carries the details themselves).
 _BANK = re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b|\b\d{9,19}\b|\ba/c\b|\b[\w.-]{2,}@(?:ok)?[a-z]{2,}\b(?!\.[a-z])", re.I)
 _CLAIMS = re.compile(r"\b(no\.?\s*1\b|number\s+one\b|most\s+trusted\b|best\s+in\b|india'?s\s+(best|most)\b|"
-                     r"lifetime\b|guaranteed?\b|100\s*%|free\s+service\b|world[- ]class\b|award[- ]winning\b)",
+                     r"lifetime\b|lifelong\b|decades?\b|guaranteed?\b|100\s*%|free\s+service\b|world[- ]class\b|"
+                     r"award[- ]winning\b)",
                      re.I)  # fmt: skip
-_GUARDS = ((_MONEY, "an amount of money or a percentage"), (_DURATION, "a time duration or time promise"),
+# Markup and script: customer copy is plain text (every surface escapes it; nothing here is ever rendered as HTML).
+_MARKUP = re.compile(r"<\s*[a-z/!?]|&#?\w+;|\bjavascript\s*:|\bdata\s*:\s*\w+/|\bon[a-z]+\s*=", re.I)
+_GUARDS = ((_MARKUP, "markup or script"), (_MONEY, "an amount of money or a percentage"), (_DURATION, "a time duration or time promise"),
            (_EMAIL, "an e-mail address"), (_PHONE, "a phone number"), (_BANK, "payment or bank details"),
            (_LINK, "a link, web address or QR code"), (_CLAIMS, "an unsupported claim"))  # fmt: skip
 
