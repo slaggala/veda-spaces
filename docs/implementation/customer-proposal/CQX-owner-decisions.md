@@ -34,6 +34,10 @@ Null. While null, every section below shows "to be confirmed by Veda Spaces" (ne
 blocked; real customers need it (with the staff trust checklist complete). Shape and copy rules:
 `mtq_commercial/customer_pack.py`; per-version staff choices: the quotation contact and each item's status.
 
+Since decision log 37 the owner may record OI-MTQ-18 as the Customer Promise portal being the source: the sections are
+then authored, reviewed, approved and published in the workspace, and quotations freeze the published pack
+([CPA implementation record](../customer-promise/CPA-implementation-record.md) §6).
+
 | Section | What the owner records |
 |---|---|
 | Contacts | Veda Spaces business channels approved for publication (quotation, support, service): name, role, business phone and/or e-mail, hours; never personal contact data |
