@@ -743,8 +743,12 @@ run "a_bound_customer_proposal_digest_without_a_flag_refused" {
 
 # Customer Promise administration (decision log 37): one staff-only flag planned false; it turns on only with an
 # owner-APPROVED, staging-only, synthetic-content-only record bound by its SHA-256 whose approver is not its author.
-run "the_customer_promise_flag_is_planned_false" {
+run "the_customer_promise_flag_is_planned_false_when_off" {
   command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-cpa-off.json"
+    customer_promise_record_path = "tests/fixtures/cpa-record-draft.json"
+  }
 
   assert {
     condition     = local.app_config["VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED"] == "false" && output.customer_promise.enablement_record == null && length(local.cpa_config) == 1
@@ -752,13 +756,25 @@ run "the_customer_promise_flag_is_planned_false" {
   }
 
   assert {
-    condition     = jsondecode(file("../../../config/customer-promise-enablement-record.json")).status == "DRAFT" && contains(local.cpa_record_problems, "the record is not APPROVED")
-    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+    condition     = jsondecode(file("tests/fixtures/cpa-record-draft.json")).status == "DRAFT" && contains(local.cpa_record_problems, "the record is not APPROVED")
+    error_message = "a DRAFT record is never enough"
+  }
+}
+
+run "the_committed_customer_promise_record_is_approved_and_turns_the_portal_on" {
+  command = plan
+
+  assert {
+    condition = (jsondecode(file("../../../config/customer-promise-enablement-record.json")).status == "APPROVED" && local.cpa_record_problems == [] &&
+      local.app_config["VEDA_ENV"] == "staging" && local.app_config["VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED"] == "true" &&
+    output.customer_promise.enablement_record == filesha256("../../../config/customer-promise-enablement-record.json"))
+    error_message = "owner approval of 2026-10-15 (decision log 39): APPROVED, every evidence field filled, synthetic content only, bound, staging only"
   }
 
   assert {
-    condition     = local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
-    error_message = "the portal flag is separate from customer-proposal viewing"
+    condition = (local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED"] == "false" &&
+    local.app_config["VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED"] == "false")
+    error_message = "the portal is separate: every customer-proposal flag stays off"
   }
 }
 
