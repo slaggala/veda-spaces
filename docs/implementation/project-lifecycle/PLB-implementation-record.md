@@ -162,7 +162,9 @@ A milestone has a type, an internal label, an optional customer-safe label, a de
 status: `NOT_STARTED`, `PLANNED`, `IN_PROGRESS`, `BLOCKED`, `COMPLETED`, `CANCELLED` or `NOT_APPLICABLE`.
 
 Three dates are kept apart: the planned date (internal, never a commitment), the actual date and the customer-promised
-date. A customer-promised date is recorded only when one was already promised; how those dates are governed is PLB-OD-13.
+date. A customer-promised date is a customer commitment. While PLB-OD-13 is unrecorded, recording, changing or clearing
+one is refused with `OWNER_DECISION_REQUIRED`. Once it is recorded, only the capability the decision names may do so.
+Planned and actual dates are not affected.
 
 Rules:
 
@@ -171,6 +173,8 @@ Rules:
 - A milestone cannot complete before the milestone it depends on, or while a gating blocker on it is open.
 - Cycles in dependencies are refused.
 - Cancelled and not-applicable milestones need a reason.
+- Once a milestone's stage is completed, the milestone cannot be edited or completed (`STAGE_COMPLETED`). No correction
+  workflow exists; correcting a completed stage's record is part of PLB-OD-12.
 
 ## 8. Blockers
 
@@ -207,12 +211,17 @@ quotation.
 
 ## 10. QC, snags and handover
 
-**Quality checks** are append-only rows. Each has a category, a result (`PASS`, `FAIL`, `NOT_APPLICABLE` or
+**Quality checks** are append-only rows. `NOT_APPLICABLE` on a required category is refused while PLB-OD-08 names no
+`not_applicable_capability`. Afterwards it needs that capability and a reason (the observation), and its timeline event
+marks it as a required-category override. Each has a category, a result (`PASS`, `FAIL`, `NOT_APPLICABLE` or
 `TO_BE_CONFIRMED`), an optional space, an observation (required for `FAIL`), evidence, and an optional link to the check
 it rechecks. The latest result per category counts. Checks are recorded from the quality-check stage on.
 
 **Snags** have a project number, an optional space and item reference, a category, a customer-safe title and an internal
-description. Each also has a blocking flag, an owner, a responsible party, a target date, evidence and a resolution. They
+description. Whether a snag blocks the handover is set when it is raised. Changing it afterwards has its own command,
+`POST /snags/{id}/classification`, which needs a reason and records a `SNAG_RECLASSIFIED` event (previous and new
+classification, actor, time). It is refused while PLB-OD-06 is unrecorded, and afterwards allowed only to the capability
+that decision names. Ordinary snag edits cannot change the classification. Each also has a blocking flag, an owner, a responsible party, a target date, evidence and a resolution. They
 move `OPEN → IN_PROGRESS → READY_FOR_RECHECK → RESOLVED` (the recheck needs a note) `→ CLOSED`. A recheck can send one
 back to `IN_PROGRESS`, and a snag can be closed without a fix only with a reason.
 
@@ -243,6 +252,11 @@ responsibility has one active holder. The holder must be an active person with `
 capability ([capability map](PLB-capability-map.md)).
 
 Replacing an owner needs a reason, and ending an assignment needs a reason. Every change is audited and on the timeline.
+
+The owner gate re-reads the assigned owner's account and grants every time it is evaluated. An owner whose account is no
+longer active, or who no longer holds `project.view` and the responsibility's capability, does not satisfy the gate
+(`OWNER_INELIGIBLE`). The assignment stays in the history, and the project shows the responsibility as needing
+reassignment.
 
 OWN scope means an active team member. Visibility needs both the capability and the scope. A project outside read scope
 answers 404, including for a guessed id. An out-of-scope action on a visible project answers 403. Child-row ids are
@@ -291,7 +305,21 @@ authentication while it is off. Production refuses it. It is coupled to no other
 `features.project_lifecycle`, and the Projects navigation item needs both that feature and `project.view`. Turning it
 off hides projects and changes no commercial behaviour; the acceptance hook only appends lineage for booked chains.
 
-**API.** The API adds 29 routes under `/api/v1/projects`; OpenAPI shows nothing else changed.
+**API.** The API adds 30 routes under `/api/v1/projects`; OpenAPI shows nothing else changed.
+
+## 16a. PR #101 final safety closure
+
+Instruction `VEDA-SPACES-PR101-FINAL-SAFETY-CLOSURE`:
+
+- **M1:** customer-promised dates are governed by PLB-OD-13 (§7).
+- **M2:** snag gating reclassification is a command governed by PLB-OD-06 (§10).
+- **S1:** an ineligible owner does not satisfy the owner gate (§12).
+- **S2:** a completed stage's milestones cannot be changed (§7).
+- **S3:** `NOT_APPLICABLE` on a required quality-check category is governed by PLB-OD-08 (§10).
+- **S4:** a configuration regression test proves production refuses the flag.
+
+Forced interleavings were added for a promised-date write, a snag reclassification, a disabled owner and a required-QC
+override, each racing a transition. Every one is decided on committed state, on both engines.
 
 ## 17. Explicitly deferred workstreams
 
