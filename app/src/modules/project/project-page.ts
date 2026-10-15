@@ -76,6 +76,7 @@ export class VsProjectPage extends SessionElement {
     .actions { display: flex; flex-wrap: wrap; gap: var(--vs-space-2); }
     .btn { white-space: normal; text-align: left; }
     .btn.small { min-height: var(--vs-target); }
+    td .btn { white-space: nowrap; min-width: var(--vs-target); }
     td, th { overflow-wrap: anywhere; }
     ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
     ol.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--vs-space-2); }
@@ -275,7 +276,7 @@ export class VsProjectPage extends SessionElement {
           hint: 'For example the number of the signed handover sheet.' },
         { name: 'evidence_attachment_id', label: 'Handover evidence', kind: 'select', hint: 'A scanned photo already attached to this property.',
           options: p.evidence_options.map((o) => [o.id, `${humanize(o.category)} · ${humanize(o.attached_to)} · ${o.uploaded_on ? formatRelative(o.uploaded_on) : ''}`]) },
-        { name: 'observations', label: 'Non-blocking observations (internal)', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
+        { name: 'observations', label: 'Non-blocking observations', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
       ],
       run: (b) => projectApi.handover(p, b) });
   }
@@ -315,7 +316,7 @@ export class VsProjectPage extends SessionElement {
       intro: na && i.required ? 'This item is required: marking it not applicable needs its own permission and a reason.' : undefined,
       fields: [
         ...(na ? [{ name: 'not_applicable_reason', label: 'Why it does not apply', kind: 'textarea' as const, required: true, ...REASON }] : []),
-        { name: 'note', label: 'Note (internal)', kind: 'textarea', classification: 'INTERNAL_ONLY' },
+        { name: 'note', label: 'Note', kind: 'textarea', classification: 'INTERNAL_ONLY' },
         ...this.evidenceFields(p),
       ],
       run: (b) => projectApi.completeItem(p, i, { state: na ? 'NOT_APPLICABLE' : 'DONE', ...b }) });
@@ -342,11 +343,11 @@ export class VsProjectPage extends SessionElement {
         { name: 'impact', label: 'Impact', kind: 'select', required: true, options: [['GATING', 'Gating: stops progress'], ['INFORMATIONAL', 'For information only']] },
         { name: 'blocks_stage_code', label: 'Stops (gating only)', kind: 'select', options: p.stages.filter((s) => !s.terminal).map((s) => [s.code, s.label]) },
         { name: 'category', label: 'Category', kind: 'select', required: true, options: opt(v?.blocker_categories ?? []) },
-        { name: 'title', label: 'Title (internal)', kind: 'text', required: true, minLength: 3, maxLength: 160, classification: 'INTERNAL_ONLY' },
+        { name: 'title', label: 'Title', kind: 'text', required: true, minLength: 3, maxLength: 160, classification: 'INTERNAL_ONLY' },
         { name: 'responsible_party', label: 'Who needs to act', kind: 'select', required: true, options: (v?.responsible_parties ?? []).map((c) => [c, party(c)]) },
         { name: 'customer_action', label: 'What the customer needs to do (when the customer acts)', kind: 'textarea', maxLength: 300,
           classification: 'CUSTOMER_ACTION', hint: 'Customer-safe words: it may be shown to the customer in a future portal.' },
-        { name: 'description', label: 'Details (internal)', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
+        { name: 'description', label: 'Details', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
         { name: 'assigned_to', label: 'Assigned to', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, `${who(m.user)} (${humanize(m.responsibility)})`]) },
         { name: 'target_date', label: 'Target resolution date', kind: 'date' },
       ],
@@ -418,11 +419,11 @@ export class VsProjectPage extends SessionElement {
         { name: 'status', label: 'Status', kind: 'select', required: true, value: r.status, options: opt(this.vocab?.readiness_statuses ?? []) },
         { name: 'responsible_party', label: 'Who needs to act', kind: 'select', value: r.responsible_party,
           options: (this.vocab?.responsible_parties ?? []).map((c) => [c, party(c)]) },
-        { name: 'action', label: 'Action needed (internal)', kind: 'textarea', maxLength: 500, value: r.action, classification: 'INTERNAL_ONLY' },
+        { name: 'action', label: 'Action needed', kind: 'textarea', maxLength: 500, value: r.action, classification: 'INTERNAL_ONLY' },
         { name: 'customer_action', label: 'What the customer needs to do', kind: 'textarea', maxLength: 300, value: r.customer_action,
           classification: 'CUSTOMER_ACTION', hint: 'Customer-safe words: it may be shown to the customer in a future portal.' },
         { name: 'due_date', label: 'Due date', kind: 'date', value: r.due_date },
-        { name: 'note', label: 'Note (internal)', kind: 'textarea', value: r.note, classification: 'INTERNAL_ONLY' },
+        { name: 'note', label: 'Note', kind: 'textarea', value: r.note, classification: 'INTERNAL_ONLY' },
         ...this.evidenceFields(p),
       ],
       run: (b) => projectApi.updateReadiness(p, r, b) });
@@ -444,7 +445,7 @@ export class VsProjectPage extends SessionElement {
       fields: [
         { name: 'category', label: 'Category', kind: 'select', required: true, value: category ?? null, options: opt(this.vocab?.qc_categories ?? []) },
         { name: 'result', label: 'Result', kind: 'select', required: true, options: opt(this.vocab?.qc_results ?? []) },
-        { name: 'observation', label: 'Observation (required for a failure; internal)', kind: 'textarea', classification: 'INTERNAL_ONLY' },
+        { name: 'observation', label: 'Observation (required for a failure)', kind: 'textarea', classification: 'INTERNAL_ONLY' },
         { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((s) => [s.id, s.label]) },
         ...this.evidenceFields(p),
         ...(recheckOf ? [{ name: 'recheck_of_id', label: 'Recheck of', kind: 'select' as const, required: true, value: recheckOf, options: [[recheckOf, 'The failed check']] as [string, string][] }] : []),
@@ -458,7 +459,7 @@ export class VsProjectPage extends SessionElement {
         { name: 'category', label: 'Category', kind: 'select', required: true, options: opt(this.vocab?.snag_categories ?? []) },
         { name: 'customer_title', label: 'Title (customer-safe words)', kind: 'text', required: true, minLength: 3, maxLength: 160,
           classification: 'POTENTIALLY_CUSTOMER_SAFE' },
-        { name: 'description', label: 'Details (internal)', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
+        { name: 'description', label: 'Details', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
         { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((s) => [s.id, s.label]) },
         { name: 'item_reference', label: 'Item or unit (optional)', kind: 'text', maxLength: 200 },
         { name: 'is_blocking', label: 'Blocks the handover until resolved', kind: 'checkbox', value: true },
@@ -598,8 +599,8 @@ export class VsProjectPage extends SessionElement {
         <span class="badge info">${humanize(b.status)}</span><span class="small muted">${humanize(b.category)}</span></div>
       <h3>${b.title}</h3>
       <dl class="meta"><dt>Who needs to act</dt><dd>${party(b.responsible_party)}</dd>
-        ${b.customer_action ? html`<dt>Customer action</dt><dd>${b.customer_action} <span class="class-tag">(${CLASS_LABEL.CUSTOMER_ACTION})</span></dd>` : nothing}
-        ${b.description ? html`<dt>Details</dt><dd>${b.description} <span class="class-tag">(${CLASS_LABEL.INTERNAL_ONLY})</span></dd>` : nothing}
+        ${b.customer_action ? html`<dt>Customer action</dt><dd>${b.customer_action} <span class="class-tag">· ${CLASS_LABEL.CUSTOMER_ACTION}</span></dd>` : nothing}
+        ${b.description ? html`<dt>Details</dt><dd>${b.description} <span class="class-tag">· ${CLASS_LABEL.INTERNAL_ONLY}</span></dd>` : nothing}
         <dt>Assigned to</dt><dd>${who(b.assigned_to, 'Not assigned')}</dd>
         <dt>Raised</dt><dd>${who(b.raised_by)}, ${when(b.raised_on)}</dd>
         ${b.target_date ? html`<dt>Target</dt><dd>${formatDate(b.target_date)}</dd>` : nothing}

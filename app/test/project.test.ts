@@ -198,7 +198,7 @@ describe('Project page (vs-project-page)', () => {
     expect(text(root)).to.contain('Original accepted baseline').and.not.to.contain('Accepted value');
     (root.querySelector('vs-tabs') as HTMLElement).dispatchEvent(new CustomEvent('tab-change', { detail: 'blockers' }));
     await el.updateComplete;
-    expect(text(root)).to.contain('Customer action (customer-safe wording)').and.to.contain('Internal only');
+    expect(text(root)).to.contain('Customer-safe wording').and.to.contain('Internal only');
   });
 
   it('offers the approval only to someone other than the requester, and withdrawal to the requester', async () => {

@@ -8,7 +8,7 @@ export const SEVERITY: Record<string, string> = { ACTION: 'Your action', GATING:
 export const OUTCOME: Record<string, string> = { REFUSED: 'Refused', AWAITING_APPROVAL: 'Awaiting approval', COMPLETED: 'Completed',
   REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn' };
 export const CLASS_LABEL: Record<string, string> = { INTERNAL_ONLY: 'Internal only', POTENTIALLY_CUSTOMER_SAFE: 'May be shown to the customer later',
-  CUSTOMER_ACTION: 'Customer action (customer-safe wording)' };
+  CUSTOMER_ACTION: 'Customer-safe wording' };
 
 export const who = (p: Person | null | undefined, empty = '—') => p?.display_name ?? (p ? 'Unknown user' : empty);
 export const when = (iso: string | null | undefined) => (iso ? formatFull(iso) : '—');

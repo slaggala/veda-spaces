@@ -30,6 +30,7 @@ export class VsProjectListPage extends SessionElement {
 
   static override styles = [...shared, pageStyles, tableStyles, badgeStyles, css`
     .views { display: flex; flex-wrap: wrap; gap: var(--vs-space-2); }
+    .btn.small { min-height: var(--vs-target); }
     .views button[aria-pressed='true'] { border-color: var(--vs-copper-strong); color: var(--vs-copper-text); background: var(--vs-cream); }
     .filters { display: grid; gap: var(--vs-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); align-items: end; }
     td, th { overflow-wrap: anywhere; }
