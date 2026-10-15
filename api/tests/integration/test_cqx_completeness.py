@@ -99,10 +99,14 @@ def test_a_recorded_pack_and_the_staff_choices_are_frozen_at_issue_and_never_cha
     assert info["content_version"] == "SYN-C1"
     assert info["contacts"]["quotation"]["display_name"] == "SYNTHETIC Quotation Desk"
     assert [x["display_name"] for x in info["contacts"]["support"]] == ["SYNTHETIC Support"]
-    assert {r["code"]: r["status"] for r in info["client_responsibilities"]} == {"SYN_APPLIANCE": "REQUIRED",
-                                                                                 "SYN_LIFT": "NOT_REQUIRED"}
-    assert {r["code"]: r["status"] for r in info["site_readiness"]} == {"SYN_FLOOR": "CUSTOMER_ACTION_REQUIRED",
-                                                                        "SYN_POWER": "TO_BE_CONFIRMED"}
+    assert {r["code"]: r["status"] for r in info["client_responsibilities"]} == {
+        "SYN_APPLIANCE": "REQUIRED",
+        "SYN_LIFT": "NOT_REQUIRED",
+    }
+    assert {r["code"]: r["status"] for r in info["site_readiness"]} == {
+        "SYN_FLOOR": "CUSTOMER_ACTION_REQUIRED",
+        "SYN_POWER": "TO_BE_CONFIRMED",
+    }
     assert info["service_guidance"]["contact"]["display_name"] == "SYNTHETIC Service"
     assert [s["stage"] for s in info["next_steps"]] == ["PROPOSAL_ACCEPTED", "VEDA_CONFIRMATION", "HANDOVER"]
     text = json.dumps(before)
@@ -152,7 +156,9 @@ def test_dimensions_follow_the_measurement_lineage_and_never_guess(api, factory)
     assert shown == expected  # every line's sizes are exactly its BOQ line's verified inputs
     for x in lines:
         for d in x.get("dimensions", []):
-            assert re.fullmatch(r"(Width|Height|Depth|Total run|Wall-unit run|Length|Door width|Area|Floor area)", d["label"])
+            assert re.fullmatch(
+                r"(Width|Height|Depth|Total run|Wall-unit run|Length|Door width|Area|Floor area)", d["label"]
+            )
             assert re.fullmatch(r"\d+(\.\d{1,2})? (ft|sq ft)", d["value"]), d
     # nothing of the measurement engine reaches the customer
     text = json.dumps(p)

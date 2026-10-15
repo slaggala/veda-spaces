@@ -50,7 +50,9 @@ def test_next_steps_follow_the_stage_order_and_codes_are_unique():
     with pytest.raises(ValidationError):
         cp.CustomerPack.model_validate(_pack(next_steps=list(reversed(steps))))
     with pytest.raises(ValidationError):
-        cp.CustomerPack.model_validate(_pack(warranty_exclusions=[{"code": "A1", "text": "x"}, {"code": "A1", "text": "y"}]))
+        cp.CustomerPack.model_validate(
+            _pack(warranty_exclusions=[{"code": "A1", "text": "x"}, {"code": "A1", "text": "y"}])
+        )
     # a duration appears only in a stage's own duration field (recording it is the approval)
     timed = [{**steps[0], "duration": "About 2 weeks"}]
     assert cp.CustomerPack.model_validate(_pack(next_steps=timed)).next_steps[0].duration == "About 2 weeks"
@@ -82,16 +84,23 @@ def test_dimensions_come_only_from_verified_inputs():
     assert shown == [{"label": "Width", "value": "8.2 ft"}, {"label": "Height", "value": "7 ft"}]
     assert status == "TO_BE_CONFIRMED"  # the assumed run is not shown, and the line says so
     assert cp.dimensions({"inputs": {"AREA": {"value": "72.5", "unit": "sq ft", "source": "DERIVED"}}}) == (
-        [{"label": "Area", "value": "72.5 sq ft"}], "CONFIRMED")
+        [{"label": "Area", "value": "72.5 sq ft"}],
+        "CONFIRMED",
+    )
     assert cp.dimensions({"inputs": {"COB": {"value": "4", "unit": "nos", "source": "STAFF"}}}) == ([], None)
     assert cp.dimensions(None) == ([], None)
-    assert cp.dimensions({"inputs": {"WIDTH": {"value": None, "unit": "ft", "source": "MISSING"}}}) == ([], "TO_BE_CONFIRMED")
+    assert cp.dimensions({"inputs": {"WIDTH": {"value": None, "unit": "ft", "source": "MISSING"}}}) == (
+        [],
+        "TO_BE_CONFIRMED",
+    )
 
 
 # Rendered by the templates of the PR #95 release, before this change (digests taken from that code): an issued
 # document is re-rendered with its pinned template on redaction, so versions 1 and 2 must never change.
-GOLDEN = {"mtq-quotation-html/1": "a18f4d3264acc713522e91416c8a3d988846eddda5b082a5c1130cde87f16570",
-          "mtq-quotation-html/2": "0f97535d32f3e719cca9cf037489098d41955632982a896de058eab4c7db92f8"}  # fmt: skip
+GOLDEN = {
+    "mtq-quotation-html/1": "a18f4d3264acc713522e91416c8a3d988846eddda5b082a5c1130cde87f16570",  # pragma: allowlist secret (SHA-256 of rendered HTML)
+    "mtq-quotation-html/2": "0f97535d32f3e719cca9cf037489098d41955632982a896de058eab4c7db92f8",  # pragma: allowlist secret (SHA-256 of rendered HTML)
+}
 SAMPLE = {
     "document_version": "mtq-quotation-document/1", "brand": {"name": "Veda Spaces", "tagline": "Interiors, measured and made"},
     "title": "Quotation", "quotation_number": "VS-Q-2026-000009", "reference": "VS-Q-2026-000009 v1", "version_no": 1,
