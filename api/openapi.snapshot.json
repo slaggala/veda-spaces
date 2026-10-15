@@ -19184,6 +19184,48 @@
         "x-requirement": "PLB-008"
       }
     },
+    "/api/v1/projects/{project_id}/team/candidates": {
+      "get": {
+        "operationId": "project_team_candidates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "People who may hold each responsibility on this project (names only)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.assign_team"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PLB-008"
+      }
+    },
     "/api/v1/projects/{project_id}/team/{member_id}/remove": {
       "post": {
         "operationId": "project_remove_member",

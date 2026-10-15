@@ -340,3 +340,23 @@ def test_commercial_amounts_and_the_audit_trail_need_their_own_capabilities(team
     assert {h["entity_type"] for h in history} >= {"project", "project_member", "project_stage", "project_baseline"}
     assert all(set(h) == {"entity_type", "entity_id", "action", "changed_fields", "by", "on", "via"} for h in history)
     assert t.get(p, t.ops)["baseline"]["lineage"][0]["accepted_total_minor"] > 0
+
+
+def test_team_candidates_and_evidence_options_stay_within_the_project(team):
+    from tests.support.mtq import photo
+
+    t, p = team, team.p
+    cands = ok(t.as_(t.manager).get(f"{BASE}/{p['id']}/team/candidates"))
+    by_id = {c["id"]: c for c in cands}
+    assert set(by_id[t.ops.id]["responsibilities"]) >= {"PROJECT", "SITE", "QUALITY", "HANDOVER", "MEMBER"}
+    assert by_id[t.designer.id]["responsibilities"] == ["DESIGN", "MEMBER"]
+    assert set(by_id[t.ops.id]) == {"id", "display_name", "responsibilities"}  # names only
+    assert t.as_(t.designer).get(f"{BASE}/{p['id']}/team/candidates").status == 403
+    t.staff(p)
+    att = photo(t.as_(t.founder), "property", t.prop["id"])
+    options = t.get(p, t.ops)["evidence_options"]
+    assert options[0]["id"] == att["id"]  # newest first; the site's measurement photos are citable too
+    assert all(set(o) == {"id", "category", "attached_to", "uploaded_on"} for o in options)
+    assert t.get(p, t.surveyor)["evidence_options"] == [o for o in options]  # a member who records site readiness
+    assert t.as_(t.c.sales).get(f"{BASE}/{p['id']}").status == 404  # owns the lead, not on the team: not disclosed
+    assert t.get(p, t.approver)["evidence_options"] == []  # sees every project, records no evidence

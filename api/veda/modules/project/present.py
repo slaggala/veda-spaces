@@ -473,6 +473,41 @@ def _actions(s: Session, ctx, p: Project, waiting) -> dict[str, bool]:
             "view_audit": access.can(s, ctx, p, "project.view_audit")}  # fmt: skip
 
 
+EVIDENCE_CODES = ("project.complete_checklist", "project.manage_milestone", "project.manage_site_readiness",
+                  "project.manage_qc", "project.manage_snag", "project.complete_handover")  # fmt: skip
+
+
+def evidence_options(s: Session, ctx, p: Project) -> list[dict[str, Any]]:
+    """PLB-39: the scanned, available attachments of this project's customer record that may be cited as evidence
+    (references only: category, what it is attached to and when; never a URL or the file)."""
+    from veda.modules.attachments import service as att
+    from veda.modules.attachments.models import Attachment
+
+    if p.status != "ACTIVE" or not any(access.can(s, ctx, p, c) for c in EVIDENCE_CODES):
+        return []
+    rows = s.execute(sa.select(Attachment).where(Attachment.lead_id == p.lead_id, Attachment.scan_status == "CLEAN")
+                     .order_by(Attachment.created_on.desc()).limit(100)).scalars()  # fmt: skip
+    return [{"id": a.id, "category": a.category_code, "attached_to": a.entity_type, "uploaded_on": _when(a.created_on)}
+            for a in rows if att.is_available(a)]  # fmt: skip
+
+
+def candidates(s: Session, p: Project) -> list[dict[str, Any]]:
+    """PLB-08: active people who may hold each responsibility on this project (the capability it needs, and
+    project.view). Names only; the assignment is validated again by the server."""
+    from veda.platform.rbac.resolver import holders_of, load_grants
+
+    from .permissions import RESPONSIBILITY_CAPABILITY
+
+    people = People(s)
+    out = []
+    for uid in holders_of(s, "project.view"):
+        granted = load_grants(s, uid).granted
+        fits = [r for r, code in RESPONSIBILITY_CAPABILITY.items() if granted.get(code) is not None]
+        if fits:
+            out.append({**(people(uid) or {}), "responsibilities": fits})
+    return sorted(out, key=lambda x: (x.get("display_name") or "").casefold())
+
+
 def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
     people = People(s)
     d = lifecycle.get(p.lifecycle_version)
@@ -521,6 +556,7 @@ def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
         "transitions": [_transition(t, people, audit) for t in transitions],
         "timeline": _timeline(s, p, people),
         "spaces": [{"id": k, "label": v} for k, v in spaces.items()],
+        "evidence_options": evidence_options(s, ctx, p),
         "actions": _actions(s, ctx, p, waiting),
         "policy": policy.public_view(),
         "classification": classification.public_view(),

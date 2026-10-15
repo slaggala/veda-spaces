@@ -124,6 +124,14 @@ def assign(req: Req, project_id: str):
     return _detail(req, p)
 
 
+@api.route("GET", "/projects/<project_id>/team/candidates", permission="project.assign_team", write=False,
+           requirement="PLB-008", summary="People who may hold each responsibility on this project (names only)")  # fmt: skip
+def team_candidates(req: Req, project_id: str):
+    p = _project(req, project_id)
+    access.require(req.session, req.ctx, p, "project.assign_team")
+    return ok(present.candidates(req.session, p))
+
+
 @api.route("POST", "/projects/<project_id>/team/<member_id>/remove", permission="project.assign_team",
            body=S.RemoveIn, if_match=True, requirement="PLB-009", summary="End an assignment, with a reason")  # fmt: skip
 def remove_member(req: Req, project_id: str, member_id: str):
