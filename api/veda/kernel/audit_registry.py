@@ -255,6 +255,12 @@ register(
         pii=frozenset({"network"}),
     )
 )
+# --- Customer Promise (0207): FULL, so every section save is in audit_log with the fields it changed. The content is
+# business copy approved for publication (contacts are Veda Spaces business channels); no customer data. The published
+# copy is the frozen customer form of the content (already audited), so it is not repeated.
+register(AuditPolicy("customer_promise_pack", FULL, excluded=frozenset({"published_content"})))
+register(AuditPolicy("customer_promise_review", FULL, parent=("customer_promise_pack", "pack_id")))
+register(AuditPolicy("customer_promise_event", FULL, parent=("customer_promise_pack", "pack_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

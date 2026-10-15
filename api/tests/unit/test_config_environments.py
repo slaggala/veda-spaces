@@ -355,3 +355,14 @@ def test_CQX_flags_default_off_depend_on_each_other_and_production_refuses_them(
                         "needs VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED")):  # fmt: skip
         found = config.validate_environment(deployed_env(monkeypatch, "staging", **env))
         assert any(needs in p for p in found), (env, found)
+
+
+def test_customer_promise_admin_is_off_by_default_and_production_refuses_it(monkeypatch):
+    """Decision log 37: the Customer Promise portal is off by default everywhere and refused in production."""
+    assert config.Settings().customer_promise_admin_enabled is False
+    on = deployed_env(monkeypatch, "production", VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED="true")
+    assert "VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED is not authorised in production (Customer Promise)" in (
+        config.validate_environment(on)
+    )
+    staging = deployed_env(monkeypatch, "staging", VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED="true")
+    assert not [p for p in config.validate_environment(staging) if "CUSTOMER_PROMISE" in p]
