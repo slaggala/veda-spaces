@@ -62,7 +62,7 @@ blocks enabling that capability (or real customers, or production) while it is o
 | N8 | The integrity refusal told customers "Veda Spaces has been notified", but no monitored alert exists | Low | — | — | — | Blocks (alarm) | Blocks | **Fixed** (claim removed); deferred: a monitored alarm on `ProposalIntegrityRefused` before real customers |
 | N9 | The link token is kept in this tab's `sessionStorage` on the workspace origin: any script running on that origin (an XSS anywhere in the workspace) could read it, and it survives reloads in the tab | Low | — (synthetic staging) | — | — | Blocks | Blocks | **Open**: a dedicated proposal origin, or memory-only handling (re-open from the link after a reload), before real customers |
 | N10 | Reference images cannot load on `/proposal`: the workspace CSP `img-src` excludes the API host | Low | Images stay off | — | — | Blocks images | Blocks images | **Open**: a reviewed, path-scoped `img-src` change for `/proposal` (as for V3) and catalogue media activation; until then only placeholders are shown |
-| N11 | Customer-page focus and touch targets (history in §4.1): focus fell to the body after actions; small touch targets; nested `main`; offline/5xx/429 without retry; a failed choice stayed checked. Re-review residuals: focus on the body after a slow or retried initial load and after a retried action; error-summary links did not focus their control, which had no `aria-invalid`/`aria-describedby`; the touch-target check measured height only | Medium | Blocks | Blocks | Blocks | Blocks | Blocks | **Open — remediation in progress** (§4.1): page-entry focus on the proposal title; retry keeps the initiating control; error-summary links focus their exact control, marked invalid and described by its error; touch targets checked for width and height |
+| N11 | Customer-page focus and touch targets (history in §4.1): focus fell to the body after actions; small touch targets; nested `main`; offline/5xx/429 without retry; a failed choice stayed checked. Re-review residuals: focus on the body after a slow or retried initial load and after a retried action; error-summary links did not focus their control, which had no `aria-invalid`/`aria-describedby`; the touch-target check measured height only | Medium | Blocks while open | Blocks while open | Blocks while open | Blocks while open | Blocks while open | **Fixed** (§4.1; CI run 38677895154 green, browser journey 128/128): page-entry focus on the proposal title; retry keeps the initiating control; error-summary links focus their exact control, marked invalid and described by its error; touch targets checked for width and height |
 | N12 | A request could be linked to an unissued version (named to the customer) | Low | — | Blocks | — | Blocks | Blocks | **Fixed**: only an issued, frozen newer version can be linked (VERSION_NOT_ISSUED) |
 | R1 | Subject and cover note are staff text shown to whoever holds the link | Low | Staff guidance | — | — | Blocks | Blocks | Open: keep customer names out of them, or exclude them from the projection (owner choice) |
 | R2 | The idempotency replay cache can return a just-created link's token to the same staff user for 24 hours | Low | — | — | — | Blocks | Blocks | Open (process memory only, same user) |
@@ -100,7 +100,11 @@ blocks enabling that capability (or real customers, or production) while it is o
   after offline, 500 and 429; slow retry; error-summary navigation for textarea, text input, radio, acknowledgement and
   checkbox; axe in each error state; width and height separately); a mutation probe (next-steps links narrowed to
   30 px wide, 44 px tall) failed only the width check.
-- **Impact while open:** blocks viewing, interaction, acceptance, real customers and production (Medium).
+- **CI verification:** run 38677895154 (all six jobs green, including `browser e2e + axe` with the proposal journey
+  128/128 and `app` with the unit tests) on the commit that carried these corrections with N11 still marked open.
+- **Status:** **Fixed.** While it was open it blocked viewing, interaction, acceptance, real customers and production
+  (Medium); it no longer blocks any of them. Remaining customer-page gates are other findings (N9 real customers,
+  N10 images).
 
 ## 5. Accurate statements of current behaviour
 
