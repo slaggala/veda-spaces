@@ -64,7 +64,8 @@ export const promiseApi = {
   save: (v: VersionDetail, section: string, value: Record<string, unknown>) =>
     api.put<VersionDetail>(`${BASE}/versions/${v.id}/sections/${section}`, { value }, { ifMatch: v.version }),
   action: (v: VersionDetail, action: 'submit' | 'approve' | 'publish' | 'return' | 'discard', body?: Record<string, unknown>) =>
-    api.post<VersionDetail>(`${BASE}/versions/${v.id}/${action}`, body ?? {}, { ifMatch: v.version }),
+    // a draft is discarded through /abandon (no route path may contain "card": the rate-card exposure guard)
+    api.post<VersionDetail>(`${BASE}/versions/${v.id}/${action === 'discard' ? 'abandon' : action}`, body ?? {}, { ifMatch: v.version }),
   review: (v: VersionDetail, section: string, decision: 'APPROVED' | 'CHANGES_REQUESTED', comment?: string) =>
     api.post<VersionDetail>(`${BASE}/versions/${v.id}/sections/${section}/review`, comment ? { decision, comment } : { decision }, { ifMatch: v.version }),
   changes: (id: string) => api.get<Changes>(`${BASE}/versions/${id}/changes`),

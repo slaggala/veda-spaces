@@ -11488,6 +11488,66 @@
         "x-requirement": "CPA-002"
       }
     },
+    "/api/v1/customer-promise/versions/{pack_id}/abandon": {
+      "post": {
+        "operationId": "customer_promise_discard",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pack_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discard an unwanted draft (kept as DISCARDED, never deleted)",
+        "tags": [
+          "customer-promise"
+        ],
+        "x-permission": [
+          "customer_promise.draft.create"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPA-002"
+      }
+    },
     "/api/v1/customer-promise/versions/{pack_id}/approve": {
       "post": {
         "operationId": "customer_promise_approve",
@@ -11605,66 +11665,6 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CPA-001"
-      }
-    },
-    "/api/v1/customer-promise/versions/{pack_id}/discard": {
-      "post": {
-        "operationId": "customer_promise_discard",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "pack_id",
-            "required": true,
-            "schema": {
-              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "If-Match",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReasonIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {}
-            },
-            "description": "Problem"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Discard an unwanted draft (kept, never deleted)",
-        "tags": [
-          "customer-promise"
-        ],
-        "x-permission": [
-          "customer_promise.draft.create"
-        ],
-        "x-permission-any-of": null,
-        "x-rbac-exception": null,
-        "x-requirement": "CPA-002"
       }
     },
     "/api/v1/customer-promise/versions/{pack_id}/preview": {

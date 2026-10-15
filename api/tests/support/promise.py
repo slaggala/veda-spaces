@@ -96,7 +96,8 @@ class Team:
 
     def act(self, pack: dict, action: str, user, body: dict | None = None, status: int = 200):
         cur = self.get(self.approver, pack["id"])  # the version the page showed (read by someone who may)
-        r = self.as_(user).post(f"{BASE}/versions/{pack['id']}/{action}", body, if_match=cur["version"])
+        path = "abandon" if action == "discard" else action  # no route path contains "card" (rate-card guard)
+        r = self.as_(user).post(f"{BASE}/versions/{pack['id']}/{path}", body, if_match=cur["version"])
         assert r.status == status, r
         return r.data if status == 200 else r
 

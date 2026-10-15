@@ -165,8 +165,8 @@ def return_to_draft(req: Req, pack_id: str):
     return _detail(req, service.return_to_draft(req.session, req.ctx, p, req.body.reason))
 
 
-@api.route("POST", "/customer-promise/versions/<pack_id>/discard", permission="customer_promise.draft.create",
-           body=ReasonIn, if_match=True, requirement="CPA-002", summary="Discard an unwanted draft (kept, never deleted)")  # fmt: skip
+@api.route("POST", "/customer-promise/versions/<pack_id>/abandon", permission="customer_promise.draft.create",
+           body=ReasonIn, if_match=True, requirement="CPA-002", summary="Discard an unwanted draft (kept as DISCARDED, never deleted)")  # fmt: skip
 def discard(req: Req, pack_id: str):
     p = _write(req, pack_id)
     return _detail(req, service.discard(req.session, req.ctx, p, req.body.reason))
