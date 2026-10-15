@@ -43,6 +43,7 @@ def test_customer_copy_refuses_money_durations_contacts_bank_details_and_claims(
 @pytest.mark.parametrize("text", [
     "Clean with a dry cloth.", "Flooring complete before installation.", "Some needs become clear only on site.",
     "Veda Spaces never asks for payment into a personal account.", "The service team gives you a request reference.",
+    "Mon–Sat, 10 am to 7 pm", "We will scan the site for hidden pipes before drilling.", "Electrical points at 2 m height.",
 ])  # fmt: skip
 def test_ordinary_customer_copy_passes(text):
     assert cp.CustomerPack.model_validate(_pack(project_inclusions=[{"code": "X1", "text": text}]))
@@ -76,6 +77,16 @@ def test_a_contact_must_be_an_approved_business_channel():
     unreachable = {k: v for k, v in SYNTHETIC_PACK["contacts"][0].items() if k not in ("phone", "email")}
     with pytest.raises(ValidationError):
         cp.CustomerPack.model_validate(_pack(contacts=[unreachable]))
+
+
+@pytest.mark.parametrize(
+    "duration", ["2 weeks after ₹ 50,000 is paid", "3 weeks, 40% on start", "Rs 5000 deposit, 1 week"]
+)
+def test_a_stage_duration_still_refuses_money(duration):
+    """Independent re-review: the duration field may carry a time, never an amount."""
+    step = {**SYNTHETIC_PACK["next_steps"][0], "duration": duration}
+    with pytest.raises(ValidationError):
+        cp.CustomerPack.model_validate(_pack(next_steps=[step]))
 
 
 def test_next_steps_follow_the_stage_order_and_codes_are_unique():

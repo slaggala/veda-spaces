@@ -102,6 +102,11 @@ A fresh-context review of the first complete head found the baseline **certified
 | 6 | The edit event recorded only the field name | Low | The event records the stored choices (codes only) |
 | 7 | A new version dropped the staff choices | Low | Carried over where the new pack still has the codes |
 
+A focused re-review closed findings 1–7 and found one defect introduced by the remediation: a next-step stage's
+`duration` no longer refused money (Medium). It is restored (only the duration rule itself is exempt there) with a test,
+and two false positives it noted ("scan the site", "2 m height") and a missing free-mail domain are corrected. The
+copy rules remain a safety net: phrasings such as an amount in words still depend on the owner's review.
+
 ## 7. Evidence (SYNTHETIC_VALIDATED)
 
 API: `tests/unit/test_customer_pack.py`, `tests/integration/test_cqx_completeness.py` and the updated pricing,

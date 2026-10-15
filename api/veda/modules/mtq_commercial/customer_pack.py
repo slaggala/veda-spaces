@@ -41,13 +41,13 @@ _NUMBER_WORDS = (r"(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|
 # "next day", "within a day", "24x7", "round the clock".
 _DURATION = re.compile(
     rf"\b{_NUMBER_WORDS}\s*[- ]?\s*(?:working\s+|business\s+|calendar\s+)?(?:hours?|hrs?|days?|weeks?|months?|years?|yrs?)\b"
-    r"|\b\d+\s*(?:d|h|hr|hrs|w|wk|wks|m|mo|yr|y)\b|\bsame[- ]day\b|\bnext[- ](?:working\s+|business\s+)?day\b|\bovernight\b|"
+    r"|\b\d+\s*(?:d|h|hr|hrs|w|wk|wks|mo|yr|y)\b|\bsame[- ]day\b|\bnext[- ](?:working\s+|business\s+)?day\b|\bovernight\b|"
     r"\b24\s*[x/×]\s*7\b|\bround[- ]the[- ]clock\b|\bwithin\s+(?:an?\s+)?(?:hour|day|week|month|year)\b",
     re.I,
 )  # fmt: skip
 # Links and payment instruments: any URL or link shortener, a WhatsApp link, a QR code (a page must never route a
 # customer to a payment or contact channel the owner did not record as a contact).
-_LINK = re.compile(r"https?://|\bwww\.|\bwa\.me\b|\bbit\.ly\b|\b[\w-]+\.(?:com|in|net|org|co|io|me|ly|link|app)\b|\bqr\b|\bscan\b",
+_LINK = re.compile(r"https?://|\bwww\.|\bwa\.me\b|\bbit\.ly\b|\b[\w-]+\.(?:com|in|net|org|co|io|me|ly|link|app)\b|\bqr\b",
                    re.I)  # fmt: skip
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 _PHONE = re.compile(r"(?:\+?\d[\d\s()-]{8,}\d)")
@@ -73,7 +73,7 @@ def _copy(value: str) -> str:
 def _duration(value: str) -> str:
     """A next-step stage's approved duration: the one place a time may appear; no money, contacts or claims."""
     for pattern, what in _GUARDS:
-        if pattern not in (_DURATION, _MONEY) and pattern.search(value):
+        if pattern is not _DURATION and pattern.search(value):
             raise ValueError(f"a stage duration must not contain {what}")
     return value
 
@@ -133,7 +133,7 @@ class Contact(_Closed):
         return self
 
 
-FREE_MAIL = frozenset({"gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "outlook.com", "hotmail.com", "live.com",
+FREE_MAIL = frozenset({"gmail.com", "gmail.co.in", "googlemail.com", "yahoo.com", "yahoo.co.in", "ymail.com", "outlook.com", "hotmail.com", "live.com",
                        "icloud.com", "me.com", "rediffmail.com", "proton.me", "protonmail.com", "aol.com", "zoho.com"})  # fmt: skip
 
 
