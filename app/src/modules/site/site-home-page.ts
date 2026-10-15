@@ -78,7 +78,9 @@ export class VsSiteHomePage extends SessionElement {
 
   private async start(v: Visit) {
     try {
-      const started = (await site.visitStatus(v, { to_status: 'IN_PROGRESS' })).data;
+      // A visit already in progress (started here earlier, or from the property page) is continued, not started again:
+      // the server refuses IN_PROGRESS -> IN_PROGRESS, which left such a visit with no way into capture (staging defect).
+      const started = v.status === 'IN_PROGRESS' ? v : (await site.visitStatus(v, { to_status: 'IN_PROGRESS' })).data;
       const set = (await site.openSet(started.id, {})).data;
       navigate(`/site/sets/${set.id}/capture`);
     } catch (e) {
