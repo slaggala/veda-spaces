@@ -75,6 +75,7 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
     validity = policy.decision("OI-MTQ-08")
     terms_d = policy.decision("OI-MTQ-09")
     shown = policy.decision("OI-MTQ-10")
+    pack = policy.decision("OI-MTQ-18")
     scope = s.get(Scope, est.scope_id)
     assert scope is not None
     spaces = requirements.spaces_of(s, s.get(Property, est.property_id))  # type: ignore[arg-type]  # FK guarantees the row
@@ -102,6 +103,8 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
         "cancellation_terms": terms_d.cancellation_terms if terms_d else None,
         "general_terms": list(terms_d.general_terms) if terms_d else [],
         "show_unit_rates": bool(shown.show_unit_rates) if shown else False,
+        # OI-MTQ-18 as recorded when this version was drafted (frozen into the issued document; None: to be confirmed)
+        "customer_pack": pack.model_dump(mode="json") if pack else None,
     }
 
 
@@ -275,7 +278,20 @@ def new_version(s: Session, ctx, q: Quotation, est: CostEstimate, prop: Property
     nq = _new(s, est, prop, number=q.quotation_number, version_no=q.version_no + 1, supersedes=q,
               title=(body.title if body else None) or q.title)  # fmt: skip
     _populate(s, nq, est)
-    event(s, nq, "VERSION_CREATED", None, "DRAFT", supersedes_quotation_id=q.id, cost_estimate_id=est.id)
+    from . import customer_pack
+
+    # the contact and statuses staff chose carry over where the new version's pack still has those codes
+    nq.customer_inputs = customer_pack.carry_over((nq.terms or {}).get("customer_pack"), q.customer_inputs)
+    event(
+        s,
+        nq,
+        "VERSION_CREATED",
+        None,
+        "DRAFT",
+        supersedes_quotation_id=q.id,
+        cost_estimate_id=est.id,
+        customer_information=nq.customer_inputs,
+    )
     refresh_blockers(s, nq)
     return nq
 
@@ -301,7 +317,16 @@ def edit(s: Session, ctx, q: Quotation, body) -> Quotation:
         q.title = body.title
     if "cover_note" in data:
         q.cover_note = body.cover_note
-    event(s, q, "EDITED", "DRAFT", "DRAFT", fields=sorted(data))
+    if "customer_information" in data:
+        from . import customer_pack
+
+        q.customer_inputs = (
+            None if body.customer_information is None
+            else customer_pack.validate_inputs((q.terms or {}).get("customer_pack"),
+                                               body.customer_information.model_dump())
+        )  # fmt: skip
+    extra = {"customer_information": q.customer_inputs} if "customer_information" in data else {}
+    event(s, q, "EDITED", "DRAFT", "DRAFT", fields=sorted(data), **extra)
     return q
 
 
@@ -621,7 +646,7 @@ def present(s: Session, q: Quotation, ctx=None, *, full: bool = True) -> dict[st
                     "estimate_revision_no": q.estimate_revision_no,
                     "estimate_snapshot_sha256": q.estimate_snapshot_sha256},
         "status": q.status, "title": q.title, "cover_note": q.cover_note, "tier_code": q.tier_code,
-        "policy_version": q.policy_version, "terms": q.terms or {}, "currency": q.currency,
+        "policy_version": q.policy_version, "terms": q.terms or {}, "customer_inputs": q.customer_inputs, "currency": q.currency,
         "base_total_minor": q.base_total_minor, "optional_minor": q.optional_minor,
         "discount_minor": q.discount_minor, "taxable_minor": q.taxable_minor, "tax_status": q.tax_status,
         "tax_minor": q.tax_minor, "total_minor": q.total_minor,

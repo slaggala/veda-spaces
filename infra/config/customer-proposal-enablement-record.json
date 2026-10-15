@@ -32,8 +32,9 @@
     "quotation_flag": "VEDA_MTQ_QUOTATION_ENABLED is on in staging (mtq_commercial, decision log 34).",
     "issued_quotation": "Viewing needs an issued quotation; issuing needs OI-MTQ-07, 08, 09 and 11 (and 03/04 for an approved ruleset) recorded by the owner. Until then no proposal can be shared, and the viewing flag shows nothing.",
     "housekeeping_job": "veda maintenance customer-proposal-housekeeping scheduled with the other maintenance jobs (link expiry records, staff reminders).",
-    "template_v2_rollback": "Acknowledge docs/operations/api-runbooks.md §2.4: once a quotation is issued with template mtq-quotation-html/2, an image without that reader refuses it; recovery is roll-forward only.",
-    "open_findings": "docs/implementation/customer-proposal/CQX-security-model.md §4: N7 blocks acceptance (and real customers); N9 blocks real customers (not synthetic staging viewing, interaction or acceptance testing); N10 keeps images off; R5 (housekeeping) must be scheduled before viewing."
+    "template_v2_rollback": "Acknowledge docs/operations/api-runbooks.md §2.4: once a quotation is issued with template mtq-quotation-html/2 or /3, an image without that reader refuses it; recovery is roll-forward only.",
+    "open_findings": "docs/implementation/customer-proposal/CQX-security-model.md §4: N7 blocks acceptance (and real customers); N9 blocks real customers (not synthetic staging viewing, interaction or acceptance testing); N10 keeps images off; R5 (housekeeping) must be scheduled before viewing.",
+    "customer_completeness": "OI-MTQ-18 (customer information pack) is null: every new section shows 'to be confirmed', which is acceptable for synthetic viewing only. Real customers need OI-MTQ-18 recorded, a quotation contact chosen per version and the staff trust checklist complete (customer_ready)."
   },
   "evidence": {
     "independent_review": "",
@@ -45,5 +46,5 @@
     "smoke_test": "",
     "production_isolation": ""
   },
-  "rollback": "A reviewed change sets customer_proposal.proposal_enabled, interaction_enabled and acceptance_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameters in place; the next 12-deploy renders them. Every CQX route then answers 404 and every link stops opening; data stays (links can be revoked first). Image rollback is NOT ordinarily safe once any quotation was issued with template mtq-quotation-html/2: an image without that reader refuses those documents, so recovery is roll-forward only (docs/operations/api-runbooks.md §2.4; migration 0205 itself is expand-only)."
+  "rollback": "A reviewed change sets customer_proposal.proposal_enabled, interaction_enabled and acceptance_enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameters in place; the next 12-deploy renders them. Every CQX route then answers 404 and every link stops opening; data stays (links can be revoked first). Image rollback is NOT ordinarily safe once any quotation was issued with template mtq-quotation-html/2 or /3: an image without that reader refuses those documents, so recovery is roll-forward only (docs/operations/api-runbooks.md §2.4; migration 0205 itself is expand-only)."
 }

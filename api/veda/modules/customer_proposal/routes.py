@@ -35,6 +35,7 @@ from . import (
     references,
     requests,
     selections,
+    trust,
 )
 from . import schemas as S
 from .models import CustomerProposalRequest, ProposalAccessGrant
@@ -178,12 +179,17 @@ def preview(req: Req, quotation_id: str):
     from veda.modules.mtq_commercial import rendering
 
     q = _quotation(req, quotation_id, "proposal.preview")
+    # CTB-18: whether a customer could answer every basic question from this proposal (staff guidance; never a block)
+    spec = references.specifications(req.session, q)
     if q.snapshot is not None or q.issued_html is not None:
-        return ok({"frozen": True, "status": q.status, "proposal": projection.build(req.session, q)})
+        proposal = projection.build(req.session, q)
+        return ok({"frozen": True, "status": q.status, "proposal": proposal,
+                   "trust_checklist": trust.checklist(proposal, spec)})  # fmt: skip
     doc = rendering.document_model(req.session, q)
     doc.pop("draft", None)
+    proposal = projection.build(req.session, q, doc)
     return ok({"frozen": False, "status": q.status, "watermark": "Preview: not issued, not a customer document",
-               "proposal": projection.build(req.session, q, doc)})  # fmt: skip
+               "proposal": proposal, "trust_checklist": trust.checklist(proposal, spec)})  # fmt: skip
 
 
 # --- customer: the proposal -------------------------------------------------------------------------------------------

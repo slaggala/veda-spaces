@@ -293,17 +293,19 @@ def test_rotation_racing_a_choice_refuses_the_old_link(app, api, factory, monkey
 
 
 # --- MC-2 -------------------------------------------------------------------------------------------------------------
-def test_a_template_v2_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers(
+def test_a_current_template_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers(
     api, factory, monkeypatch
 ):
-    """MC-2 / N6: an image without the v2 reader (the previous release) refuses a v2 document (fail closed: no
-    rendering, no acceptance); rolling forward to an image with the reader serves it again, byte for byte."""
+    """MC-2 / N6: an image without the current template's reader (the previous release) refuses a document issued
+    with it (fail closed: no rendering, no acceptance); rolling forward to an image with the reader serves it again,
+    byte for byte. Since the customer-completeness release the current template is version 3 (its rollback image, the
+    PR #95 release, reads versions 1 and 2)."""
     c, prop, est, q, g, cust, picked = _ready(api, factory, choose=False)
     staff_doc = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
-    assert staff_doc["template_version"] == "mtq-quotation-html/2"
+    assert staff_doc["template_version"] == "mtq-quotation-html/3"
     from veda.modules.mtq_commercial import rendering
 
-    v2 = rendering.TEMPLATES.pop("mtq-quotation-html/2")  # the rollback image knows only version 1
+    v3 = rendering.TEMPLATES.pop("mtq-quotation-html/3")  # the rollback image knows only versions 1 and 2
     try:
         r = c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document")
         assert r.status == 409 and r.code == "SNAPSHOT_INTEGRITY_FAILED"
@@ -312,7 +314,7 @@ def test_a_template_v2_document_under_a_rollback_image_is_refused_not_misrendere
                      "selected_line_refs": [], "confirm": True}  # fmt: skip
         assert cust.post("/decision", page_body, key="rb".ljust(32, "x")).code == "SNAPSHOT_INTEGRITY_FAILED"
     finally:
-        rendering.TEMPLATES["mtq-quotation-html/2"] = v2  # roll forward
+        rendering.TEMPLATES["mtq-quotation-html/3"] = v3  # roll forward
     again = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
     assert again["html"] == staff_doc["html"] and again["snapshot_verified"] is True
     assert cust.get().status == 200

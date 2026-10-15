@@ -3,10 +3,13 @@ import type { ApiProblem } from '../../core/api/problem.js';
 import { SessionElement } from '../../core/authz/session-element.js';
 import { formatAbsolute, humanize } from '../../core/format/format.js';
 import { shared, tableStyles } from '../../design-system/styles.js';
-import { previewPage, staffProposal, type Activity, type Grant, type Preview, type EvidenceView, type StaffRequest, type VariationView } from './api.js';
+import { previewPage, staffProposal, type Activity, type CustomerInputs, type Grant, type Preview, type EvidenceView, type QuotationForInfo,
+  type StaffRequest, type VariationView } from './api.js';
 import { tableLikeStyles, variationTable } from './proposal-view.js';
 
 const KINDS = ['PRIMARY_CUSTOMER', 'CO_OWNER', 'FAMILY_MEMBER', 'OTHER'];
+const RESPONSIBILITY = ['REQUIRED', 'NOT_REQUIRED', 'TO_BE_CONFIRMED'];
+const READINESS = ['READY', 'NOT_READY', 'CUSTOMER_ACTION_REQUIRED', 'NOT_APPLICABLE', 'TO_BE_CONFIRMED'];
 
 /**
  * <vs-proposal-staff>: the staff side of one quotation version's customer proposal (CQX). Share a secure link (shown
@@ -17,7 +20,10 @@ export class VsProposalStaff extends SessionElement {
   static override properties = {
     quotationId: { attribute: false }, quotationStatus: { attribute: false }, grants: { state: true }, preview: { state: true },
     issued: { state: true }, problem: { state: true }, busy: { state: true }, activity: { state: true }, chain: { state: true }, variation: { state: true }, evidence: { state: true },
+    quotation: { state: true },
   };
+  /** The version's customer information pack and staff's choices (OI-MTQ-18, CTB). */
+  declare quotation: QuotationForInfo | null;
   declare chain: { id: string; label: string; status: string }[];
   declare variation: VariationView | null;
   declare evidence: EvidenceView | null;
@@ -42,7 +48,7 @@ export class VsProposalStaff extends SessionElement {
   constructor() {
     super();
     this.quotationId = ''; this.quotationStatus = ''; this.grants = []; this.preview = null; this.issued = null;
-    this.problem = null; this.busy = false; this.activity = null; this.chain = []; this.variation = null; this.evidence = null;
+    this.problem = null; this.busy = false; this.activity = null; this.chain = []; this.variation = null; this.evidence = null; this.quotation = null;
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -59,6 +65,7 @@ export class VsProposalStaff extends SessionElement {
     try {
       this.grants = this.can('proposal.share') ? (await staffProposal.grants(this.quotationId)).data : [];
       this.preview = this.can('proposal.preview') ? (await staffProposal.preview(this.quotationId)).data : null;
+      this.quotation = this.can('quotation.read') ? (await staffProposal.quotation(this.quotationId)).data : null;
       this.variation = this.preview?.proposal.kind === 'VARIATION' ? (await staffProposal.variationPreview(this.quotationId)).data : null;
       await this.loadMore();
     } catch (e) {
@@ -89,12 +96,68 @@ export class VsProposalStaff extends SessionElement {
       ${this.problem ? html`<vs-problem-banner .problem=${this.problem}></vs-problem-banner>` : nothing}
       ${this.can('proposal.share') ? this.sharing(shareable) : nothing}
       ${this.more()}
+      ${this.customerInfo()}
+      ${this.trust()}
       ${this.variation ? html`${this.variation.issuable ? nothing : html`<vs-banner kind="warning">Staff preview only: this variation cannot be issued yet (see the quotation's blockers, e.g. the variation policy OI-MTQ-13).</vs-banner>`}
         <div class="preview">${variationTable(this.variation)}</div>` : nothing}
       ${this.preview ? html`<section class="stack" aria-labelledby="pv"><h3 id="pv" class="title">What the customer sees</h3>
         ${this.preview.frozen ? nothing : html`<vs-banner kind="warning">${this.preview.watermark}</vs-banner>`}
         <div class="preview"><vs-proposal-view preview .page=${previewPage(this.preview)}></vs-proposal-view></div></section>` : nothing}
     </div>`;
+  }
+
+  private saveInfo(e: Event) {
+    e.preventDefault();
+    const q = this.quotation;
+    if (!q) return;
+    const f = new FormData(e.target as HTMLFormElement);
+    const pick = (prefix: string) => Object.fromEntries([...f.entries()].filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k.slice(prefix.length), String(v)]));
+    const body: CustomerInputs = { contact_code: (f.get('contact') as string) || null, responsibilities: pick('resp:'), readiness: pick('ready:') };
+    void this.act(() => staffProposal.saveCustomerInfo(q, body));
+  }
+
+  /** CTB-01/06/07: choose this version's Veda Spaces contact and each item's status, from the approved pack only. */
+  private customerInfo() {
+    const q = this.quotation;
+    if (!q) return nothing;
+    const pack = q.terms?.customer_pack ?? null;
+    const head = html`<h3 id="ci" class="title">Customer information</h3>`;
+    if (!pack) {
+      return html`<section class="stack" aria-labelledby="ci">${head}<p class="muted">The customer information pack (owner decision OI-MTQ-18) is not
+        recorded for this version: the customer sees each of its sections as "to be confirmed". Nothing can be chosen here yet.</p></section>`;
+    }
+    const inputs = q.customer_inputs ?? { contact_code: null, responsibilities: {}, readiness: {} };
+    const editable = q.status === 'DRAFT' && this.can('quotation.create');
+    const quoteContacts = pack.contacts.filter((c) => c.kind === 'QUOTATION');
+    const select = (name: string, options: string[], value: string) => html`<select name=${name} ?disabled=${!editable}>
+      ${options.map((o) => html`<option value=${o} ?selected=${o === value}>${humanize(o)}</option>`)}</select>`;
+    return html`<section class="stack" aria-labelledby="ci">${head}
+      <p class="small muted">Approved pack version ${pack.content_version}. ${editable ? 'Choices are frozen into the customer document when this version is issued.'
+        : 'This version is no longer a draft: its choices are fixed.'}</p>
+      <form class="stack" @submit=${(e: Event) => this.saveInfo(e)}>
+        <label class="field"><span class="label">Veda Spaces contact for this proposal</span>
+          <select name="contact" ?disabled=${!editable}><option value="">To be confirmed</option>
+            ${quoteContacts.map((c) => html`<option value=${c.code} ?selected=${c.code === inputs.contact_code}>${c.display_name} · ${c.role}</option>`)}</select></label>
+        ${pack.client_responsibilities.length ? html`<fieldset class="stack"><legend class="label">What the customer arranges</legend>
+          ${pack.client_responsibilities.map((x) => html`<label class="field"><span>${x.text}</span>
+            ${select(`resp:${x.code}`, RESPONSIBILITY, inputs.responsibilities[x.code] ?? x.default_status ?? 'TO_BE_CONFIRMED')}</label>`)}</fieldset>` : nothing}
+        ${pack.site_readiness.length ? html`<fieldset class="stack"><legend class="label">Site readiness</legend>
+          ${pack.site_readiness.map((x) => html`<label class="field"><span>${x.text}</span>
+            ${select(`ready:${x.code}`, READINESS, inputs.readiness[x.code] ?? 'TO_BE_CONFIRMED')}</label>`)}</fieldset>` : nothing}
+        ${editable ? html`<div><button class="btn primary" ?disabled=${this.busy}>Save customer information</button></div>` : nothing}
+      </form></section>`;
+  }
+
+  /** CTB-18: whether a customer could answer each basic question from this proposal (guidance; never a block). */
+  private trust() {
+    const t = this.preview?.trust_checklist;
+    if (!t) return nothing;
+    return html`<section class="stack" aria-labelledby="tc"><h3 id="tc" class="title">Customer trust checklist</h3>
+      <p>${t.customer_ready ? 'Every basic customer question is answered by this proposal.'
+        : 'Some answers are still to be confirmed. Viewing on protected staging may proceed; real customers need every answer.'}</p>
+      <ul class="stack">${t.items.map((i) => html`<li><span class="strong">${i.question}</span>
+        <span class="small">· ${i.status === 'ANSWERED' ? 'Answered' : 'To be confirmed'}</span>
+        ${i.missing ? html`<span class="small muted"> ${i.missing}</span>` : nothing}</li>`)}</ul></section>`;
   }
 
   private answer(e: Event, r: StaffRequest) {

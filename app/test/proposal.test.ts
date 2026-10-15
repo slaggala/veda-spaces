@@ -3,42 +3,11 @@ import '../src/design-system/components.js';
 import type { Decision, Page } from '../src/modules/proposal/api.js';
 import '../src/modules/proposal/index.js';
 import type { VsProposalView } from '../src/modules/proposal/proposal-view.js';
+import { samplePage } from './support/proposal-sample.js';
 
 /** CQX: the customer proposal page. SYNTHETIC page models; the API is mocked; the server decides everything. */
 
-export function samplePage(over: Partial<Page> = {}): Page {
-  const line = (ref: string, description: string, amount: string, status = 'Included') =>
-    ({ ref, description, detail: 'Laminate finish', quantity: '42.5 sq ft', amount, priced: true, status });
-  return {
-    state: 'OPEN',
-    link: { expires_on: '2099-01-01T00:00:00Z', status: 'ACTIVE' },
-    history: [],
-    capabilities: { interaction: false, acceptance: false },
-    notices: [],
-    actions: [],
-    proposal: {
-      schema: 'veda.customer-proposal/1', kind: 'QUOTATION', title: 'Quotation', brand: { name: 'Veda Spaces', tagline: 'Interiors, measured and made' },
-      reference: 'VS-Q-2026-000001 v1', quotation_number: 'VS-Q-2026-000001', version_no: 1, variation_no: 0, issued_on: '2026-10-14',
-      valid_until: '2026-11-13', subject: 'Interior works — 3 BHK apartment', cover_note: null,
-      property: { reference: 'VS-P-2026-000001', configuration: '3 BHK apartment', city: 'Synthetic City' }, snapshot_sha256: 'a'.repeat(64),
-      rooms: [
-        { ref: 'R1', title: 'Master bedroom', kind: 'ROOM', subtotal: '1,20,000.00', included_count: 2, optional_count: 1,
-          lines: [line('L1', 'Wardrobe — Body', '90,000.00'), line('L2', 'Wardrobe — Shutters', '30,000.00')] },
-        { ref: 'R2', title: 'Kitchen', kind: 'ROOM', subtotal: '2,00,000.00', included_count: 1, optional_count: 0,
-          lines: [line('L3', 'Kitchen — Base units', '2,00,000.00')] },
-        { ref: 'R3', title: 'Project-wide', kind: 'PROJECT', subtotal: '10,000.00', included_count: 1, optional_count: 0,
-          lines: [line('L4', 'Site protection', '10,000.00')] },
-      ],
-      optional_items: [{ ...line('L9', 'Loft above wardrobe', '15,000.00', 'Optional'), room_ref: 'R1', room_title: 'Master bedroom' }],
-      summary: { base_total: '3,30,000.00', taxable: '3,30,000.00', gst: { status: 'Included', amount: '59,400.00' }, total: '3,89,400.00',
-        optional_total: '15,000.00', currency: 'INR' },
-      payment_schedule: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], warranty: ['Synthetic warranty.'],
-      service_support: [], assumptions: ['Synthetic assumption.'], exclusions: ['Synthetic exclusion.'], terms: ['Synthetic terms.'],
-      terms_version: 'SYN-T1', unit_rates_shown: false, sections: { SCOPE: 'b'.repeat(64) },
-    },
-    ...over,
-  };
-}
+export { samplePage };
 
 function serve(handler: (path: string, init?: RequestInit) => Response) {
   const calls: { path: string; headers: Record<string, string> }[] = [];
@@ -60,7 +29,7 @@ describe('vs-proposal-view (CQX-03)', () => {
     const cards = [...root.querySelectorAll('.roomcard')];
     expect(cards).to.have.length(3);
     expect(cards[0].getAttribute('aria-label')).to.equal('Master bedroom: 2 included items, 1 optional, ₹ 1,20,000.00');
-    expect(root.querySelectorAll('details.room')).to.have.length(3);
+    expect(root.querySelectorAll('details.room[id^="R"]')).to.have.length(3); // the three room panels (other sections collapse too)
     expect(root.textContent).to.contain('₹ 3,89,400.00');
     await expect(el).to.be.accessible();
   });
@@ -109,7 +78,7 @@ describe('vs-proposal-view specifications and media (CQX-04)', () => {
     const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
     const root = el.shadowRoot!;
     const spec = root.querySelector('details.spec')!;
-    expect(spec.textContent).to.contain('BWR grade board').and.to.contain('Material warranty').and.to.contain('version 1.1');
+    expect(spec.textContent).to.contain('BWR grade board').and.to.contain('Manufacturer warranty').and.to.contain('version 1.1');
     const thumbs = [...root.querySelectorAll('.thumbbtn')];
     expect(thumbs).to.have.length(2);
     expect(thumbs[0].getAttribute('aria-label')).to.equal('Open image 1 of 2: A two-door laminate wardrobe (Illustrative example)');
@@ -535,5 +504,88 @@ describe('PR #95 remediation N2, N11 (focus, retry, keys, landmarks)', () => {
       (el.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
       await waitUntil(() => el.shadowRoot!.querySelector('vs-proposal-view'));
     }
+  });
+});
+
+describe('CQX customer completeness (CTB): contact, sizes, scope, materials, payment, readiness, warranty, next steps', () => {
+  const contact = { display_name: 'SYNTHETIC Desk', role: 'Consultant (synthetic)', phone: '+00 0000 000000', email: 'desk@synthetic.example',
+    hours: 'SYNTHETIC hours', channel_note: null };
+  const info = {
+    content_version: 'SYN-C1', contacts: { quotation: contact, support: [{ ...contact, display_name: 'SYNTHETIC Support' }], service: [] },
+    support_escalation: 'SYNTHETIC escalation.', project_inclusions: [{ code: 'I1', text: 'SYNTHETIC installation.' }],
+    client_responsibilities: [{ code: 'A1', category: 'APPLIANCE_MODEL', text: 'SYNTHETIC appliance models.', status: 'REQUIRED' }],
+    site_readiness: [{ code: 'F1', category: 'FLOORING', text: 'SYNTHETIC flooring.', status: 'CUSTOMER_ACTION_REQUIRED' }],
+    site_dependent_work: { intro: 'SYNTHETIC intro.', approval_rule: 'SYNTHETIC: agreed as a change order first.',
+      categories: [{ code: 'E1', category: 'ELECTRICAL', text: 'SYNTHETIC electrical.' }] },
+    manufacturer_warranty_note: 'SYNTHETIC manufacturer note.', warranty_exclusions: [{ code: 'X1', text: 'SYNTHETIC misuse.' }],
+    service_guidance: { contact: null, what_to_provide: ['SYNTHETIC reference.'], reference_process: 'SYNTHETIC process.', escalation: null },
+    handover: [{ code: 'H1', category: 'FINAL_INSPECTION', text: 'SYNTHETIC inspection.' }], care: [{ code: 'C1', category: 'FURNITURE_CLEANING', text: 'SYNTHETIC care.' }],
+    next_steps: [{ code: 'S1', stage: 'PROPOSAL_ACCEPTED', label: 'Accepted', text: 'SYNTHETIC step.', duration: null }],
+    payment_safety: 'SYNTHETIC: payment instructions only through approved channels.',
+  };
+  const tbcInfo = { content_version: null, contacts: { quotation: null, support: [], service: [] }, support_escalation: null,
+    project_inclusions: null, client_responsibilities: null, site_readiness: null, site_dependent_work: null, manufacturer_warranty_note: null,
+    warranty_exclusions: null, service_guidance: null, handover: null, care: null, next_steps: null, payment_safety: null };
+  const terms = { policy_decided: true, pending: ['WARRANTY'], sections: ['SCOPE', 'EXCLUSIONS', 'PAYMENT_MILESTONES', 'WARRANTY', 'TERMS'].map((code) => ({
+    code, title: code, items: ['SYNTHETIC text.'], available: true, sha256: 'a'.repeat(64), required: code === 'WARRANTY', acknowledged_on: null })) };
+  const page = (information: unknown, extra: Partial<Page> = {}) => {
+    const base = samplePage();
+    const rooms = base.proposal.rooms.map((r, i) => ({ ...r, lines: r.lines.map((x, j) => (i === 0 && j === 0
+      ? { ...x, dimensions: [{ label: 'Width', value: '8.2 ft' }], dimension_status: 'TO_BE_CONFIRMED' as const }
+      : i === 0 && j === 1 ? { ...x, dimensions: [{ label: 'Area', value: '42.5 sq ft' }], dimension_status: 'CONFIRMED' as const } : x)) }));
+    return { ...base, actions: [{ code: 'ACKNOWLEDGE_TERMS', label: 'Read and acknowledge the terms', target: 'terms' }], terms,
+      capabilities: { interaction: true, acceptance: false },
+      proposal: { ...base.proposal, rooms, information: information as Page['proposal']['information'],
+        payment_schedule: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)', amount: information === tbcInfo ? null : '38,940.00' }] },
+      pricing: { currency: 'INR', total: '3,89,400.00', gst: { status: 'Included', amount: '59,400.00' }, discount: null, base_total: '3,30,000.00',
+        optional_total: null, rooms: [], milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)',
+          amount: information === tbcInfo ? null : '38,940.00' }], valid_until: null, days_left: null, unit_rates_shown: false, package: null, alternatives: [] },
+      ...extra } as Page;
+  };
+  const text = (el: Element) => el.shadowRoot!.textContent!.replace(/\s+/g, ' ');
+
+  it('says what is to be confirmed when the owner has not approved it, and promises nothing', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page(tbcInfo, { specifications: null })}></vs-proposal-view>`);
+    const t = text(el);
+    for (const words of ['Contact details to be confirmed by Veda Spaces.', 'Specification to be confirmed by Veda Spaces.',
+      'How to pay will be confirmed by Veda Spaces.', 'Your Veda Spaces contact', "What's included, what's not and what you arrange",
+      'Materials and hardware', 'Before we start', 'Warranty and service', 'What happens after you approve', 'Need help after handover?']) {
+      expect(t).to.contain(words);
+    }
+    expect(el.shadowRoot!.querySelectorAll('.tbc').length).to.be.greaterThan(8);
+    expect(t).to.not.match(/\b\d+\s*(working\s+)?(days?|weeks?|months?|years?)\b|guarantee|lifetime|free service/i);
+    await expect(el).to.be.accessible();
+  });
+
+  it('shows the approved content: the contact, sizes, statuses, amounts, hardware and the stages', async () => {
+    const spec = { name: 'Essential', version: '1.1', summary: 'SYNTHETIC spec.', equivalent_policy: 'SYNTHETIC equivalents.', final_selection: 'SYNTHETIC selection.',
+      warranty_summary: 'SYNTHETIC manufacturer warranty summary.', lines: {},
+      categories: [{ code: 'board', label: 'Board', summary: 'SYNTHETIC board.', requirement: 'BWR', grade: null, thickness: null, finish: null,
+        brand_examples: null, equivalent_rule: 'Eq', final_selection: 'Later', warranty_summary: 'Maker', hardware_category: null, group: 'MATERIAL' as const },
+      { code: 'hinges', label: 'Hinges', summary: 'SYNTHETIC hinges.', requirement: 'Soft close', grade: null, thickness: null, finish: null,
+        brand_examples: null, equivalent_rule: 'Eq', final_selection: 'Later', warranty_summary: 'Maker', hardware_category: 'Hinges and channels', group: 'HARDWARE' as const }] };
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page(info, { specifications: spec })}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    const t = text(el);
+    expect(root.querySelector('#your-contact a[href="tel:+000000000000"]')).to.exist;
+    expect(root.querySelector('#your-contact a[href="mailto:desk@synthetic.example"]')).to.exist;
+    expect(t).to.contain('Size: Width 8.2 ft · Dimension to be confirmed').and.to.contain('Size: Area 42.5 sq ft');
+    expect(root.querySelector('#scope .status.REQUIRED')!.textContent).to.equal('Required');
+    expect(root.querySelector('#before-start .status.CUSTOMER_ACTION_REQUIRED')!.textContent).to.equal('Your action needed');
+    expect(root.querySelector('#pricing [aria-label="Payment milestones"]')!.textContent).to.contain('₹ 38,940.00');
+    expect(t).to.contain('SYNTHETIC: payment instructions only through approved channels.');
+    expect(root.querySelector('#materials')!.textContent).to.contain('Hinges and channels').and.to.contain('SYNTHETIC board.');
+    expect(root.querySelector('#next .stages')!.textContent).to.contain('Accepted');
+    expect(t).to.contain('SYNTHETIC: agreed as a change order first.');
+    // each acknowledgement sits beside what it is about; "the terms" goes to the first one still to read
+    expect(root.querySelector('#scope #term-EXCLUSIONS')).to.exist;
+    expect(root.querySelector('#pricing #term-PAYMENT_MILESTONES')).to.exist;
+    expect(root.querySelector('#warranty #term-WARRANTY')).to.exist;
+    expect(root.querySelector('#terms #term-TERMS')).to.exist;
+    expect(root.querySelector('.actions-list a')!.getAttribute('href')).to.equal('#term-WARRANTY');
+    // the manufacturer-backed warranty and Veda Spaces' service support are separate panels, never one text
+    const panels = [...root.querySelectorAll('#warranty details > summary h3')].map((h) => h.textContent);
+    expect(panels).to.include('Manufacturer-backed warranty').and.to.include('What the warranty does not cover');
+    await expect(el).to.be.accessible();
   });
 });

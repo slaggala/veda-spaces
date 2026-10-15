@@ -106,6 +106,27 @@ blocks enabling that capability (or real customers, or production) while it is o
   (Medium); it no longer blocks any of them. Remaining customer-page gates are other findings (N9 real customers,
   N10 images).
 
+## 4.2 Customer completeness (OI-MTQ-18, template 3)
+
+- **New public fields** (classified in `projection.FIELDS`, `DOCUMENT_FIELDS`, `LINE_FIELDS`, `journey.PAGE_FIELDS` and
+  `pricing.PAGE_FIELDS`; an unclassified field fails the tests): line dimensions and their status, milestone amounts,
+  the customer information block (contacts, inclusions, responsibilities, readiness, site-dependent work, warranty note
+  and exclusions, service guidance, handover, care, next steps, payment safety) and the specification's categories with
+  their hardware category and group.
+- **Contacts are business channels only**: each must carry `business_channel_approved: true` and a business phone or
+  e-mail; codes stay internal (never projected). Lead erasure does not touch them (they are not customer data); it still
+  erases the customer's name, subject and cover note and re-seals with the pinned template.
+- **Copy rules** (a safety net under the owner's review) refuse money (symbols, words, grouped or long figures,
+  percentages), durations and time promises in figures or words (only a next-step stage's own duration field may carry
+  one), e-mail and phone numbers outside contact fields, links, web addresses and QR codes, bank, IFSC, UPI and card
+  details, and unsupported superlative claims. Contact e-mails refuse free-mail domains (and must use the owner's
+  `email_domains` when listed).
+- **Dimensions** come only from the BOQ line's verified inputs (measured, derived or a staff value recorded with its
+  reason); a line with a BOQ quantity override, or missing a size input, shows "to be confirmed" and no size; no
+  measurement-engine detail (sources, explanations, wall references) is projected.
+- **Nothing from the competitor benchmark** is used; tests check the page for its distinctive wording and for durations,
+  guarantees and "lifetime" or "free service" claims.
+
 ## 5. Accurate statements of current behaviour
 
 - **Token storage:** the token is **not** held only in application memory. The page moves it from the URL fragment

@@ -8,9 +8,34 @@ import { fragmentParam } from '../../core/router/next.js';
  * it does not stay in the visible URL, a bookmark or a shared screenshot.
  */
 
+export interface Dimension { label: string; value: string }
 export interface ProposalLine {
   ref: string; description: string; detail: string | null; quantity: string | null; amount: string | null; priced: boolean;
   status: string; unit_rate?: string; price_with_gst?: string; change?: string; delta?: string | null; room_ref?: string | null; room_title?: string | null;
+  /** Verified sizes only (a measured, derived or staff-confirmed value); absent when the item has no size. */
+  dimensions?: Dimension[]; dimension_status?: 'CONFIRMED' | 'TO_BE_CONFIRMED';
+}
+export interface Milestone { label: string; share: string; trigger: string; amount?: string | null }
+/** A Veda Spaces business contact approved for customers (never personal data). */
+export interface Contact { display_name: string; role: string; phone: string | null; email: string | null; hours: string | null;
+  channel_note: string | null }
+export interface InfoEntry { code: string; text: string; category?: string; status?: string }
+/** The customer information pack as frozen with this version (OI-MTQ-18); null: to be confirmed by Veda Spaces. */
+export interface Information {
+  content_version: string | null;
+  contacts: { quotation: Contact | null; support: Contact[]; service: Contact[] };
+  support_escalation: string | null;
+  project_inclusions: InfoEntry[] | null;
+  client_responsibilities: InfoEntry[] | null;
+  site_readiness: InfoEntry[] | null;
+  site_dependent_work: { intro: string; approval_rule: string; categories: InfoEntry[] } | null;
+  manufacturer_warranty_note: string | null;
+  warranty_exclusions: InfoEntry[] | null;
+  service_guidance: { contact: Contact | null; what_to_provide: string[]; reference_process: string | null; escalation: string | null } | null;
+  handover: InfoEntry[] | null;
+  care: InfoEntry[] | null;
+  next_steps: { code: string; stage: string; label: string; text: string; duration: string | null }[] | null;
+  payment_safety: string | null;
 }
 export interface Room {
   ref: string; title: string; kind: 'ROOM' | 'PROJECT' | 'CHANGES'; subtotal: string | null; lines: ProposalLine[];
@@ -25,22 +50,25 @@ export interface Proposal {
   quotation_number: string; version_no: number; variation_no: number; issued_on: string; valid_until: string | null;
   subject: string; cover_note: string | null; property: { reference: string; configuration: string; city: string | null };
   snapshot_sha256: string | null; rooms: Room[]; optional_items: ProposalLine[]; summary: Summary;
-  payment_schedule: { label: string; share: string; trigger: string }[]; warranty: string[]; service_support: string[];
+  payment_schedule: Milestone[]; warranty: string[]; service_support: string[];
   assumptions: string[]; exclusions: string[]; terms: string[]; terms_version: string | null; unit_rates_shown: boolean;
   sections: Record<string, string | null>;
+  /** Absent only in a staff preview built before this release's API. */
+  information?: Information;
 }
 export interface SpecCategory {
   label: string; summary: string; requirement: string; grade: string | null; thickness: string | null; finish: string | null;
   brand_examples: string | null; equivalent_rule: string; final_selection: string; warranty_summary: string;
+  hardware_category?: string | null; code?: string; details?: string[]; group?: 'MATERIAL' | 'HARDWARE';
 }
 export interface Specifications { name: string; version: string; summary: string; equivalent_policy: string; final_selection: string;
-  lines: Record<string, SpecCategory[]> }
+  warranty_summary?: string | null; lines: Record<string, SpecCategory[]>; categories?: SpecCategory[] }
 export interface MediaImage { title: string; alt: string; caption: string | null; label: 'Design reference' | 'Illustrative example';
   urls: { thumb?: string; mobile?: string; desktop?: string } }
 export interface Pricing {
   currency: string; total: string | null; gst: { status: string; amount: string | null } | null; discount: string | null;
   base_total: string | null; optional_total: string | null; rooms: { ref: string; title: string; subtotal: string | null }[];
-  milestones: { label: string; share: string; trigger: string }[]; valid_until: string | null; days_left: number | null;
+  milestones: Milestone[]; valid_until: string | null; days_left: number | null;
   unit_rates_shown: boolean; package: string | null;
   alternatives: { reference: string; package: string | null; total: string | null; valid_until: string | null }[];
 }
@@ -146,7 +174,9 @@ export interface EvidenceView {
     evidence_sha256: string; evidence_verified: boolean };
   blockers: { code: string; message: string; decision: string | null }[];
 }
-export interface Preview { frozen: boolean; status: string; watermark?: string; proposal: Proposal }
+export interface TrustItem { code: string; question: string; status: 'ANSWERED' | 'TO_BE_CONFIRMED'; missing: string | null }
+export interface Preview { frozen: boolean; status: string; watermark?: string; proposal: Proposal;
+  trust_checklist?: { customer_ready: boolean; items: TrustItem[] } }
 export interface StaffRequest {
   id: string; version: number; request_kind: string; category: string; version_no: number; variation_no: number; line_ref: string | null;
   room: string | null; message: string; requested_quantity: string | null; status: string; response: string | null;
@@ -159,8 +189,19 @@ export interface Activity {
   acknowledgements: { section: string; recipient_kind: string; acknowledged_on: string; section_sha256: string; evidence_sha256: string }[];
 }
 
+/** The customer information pack as recorded in a version's terms (OI-MTQ-18), and staff's choices for that version. */
+export interface PackItem { code: string; category: string; text: string; default_status?: string }
+export interface CustomerPack { content_version: string; contacts: { code: string; kind: string; display_name: string; role: string }[];
+  client_responsibilities: PackItem[]; site_readiness: PackItem[] }
+export interface CustomerInputs { contact_code: string | null; responsibilities: Record<string, string>; readiness: Record<string, string> }
+export interface QuotationForInfo { id: string; version: number; status: string; terms: { customer_pack?: CustomerPack | null };
+  customer_inputs: CustomerInputs | null }
+
 const P = '/api/v1';
 export const staffProposal = {
+  quotation: (quotationId: string) => api.get<QuotationForInfo>(`${P}/quotations/${quotationId}`),
+  saveCustomerInfo: (q: QuotationForInfo, body: CustomerInputs) =>
+    api.patch<QuotationForInfo>(`${P}/quotations/${q.id}`, { customer_information: body }, { ifMatch: q.version }),
   grants: (quotationId: string) => api.get<Grant[]>(`${P}/quotations/${quotationId}/access-grants`),
   share: (quotationId: string, body: { recipient_kind: string; recipient_label?: string | null; expires_in_days: number }) =>
     api.request<Grant>(`${P}/quotations/${quotationId}/access-grants`, { method: 'POST', body, idempotencyKey: newKey() }),

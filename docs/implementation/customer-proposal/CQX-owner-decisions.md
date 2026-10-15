@@ -28,6 +28,26 @@ All four slots are `null`. A SYNTHETIC copy exists only in tests (the loader ref
 | OI-MTQ-13 | Variation policy: variations are previewed (staff only) but not issued, so a customer never receives one |
 | OI-MTQ-15 | 5 BHK and independent-house preparation drivers: B4 does not issue those configurations |
 
+## 2a. Customer information pack (new register row OI-MTQ-18, `mtq_commercial/fixtures/commercial-policy.json`)
+
+Null. While null, every section below shows "to be confirmed by Veda Spaces" (never a default); issuance is not
+blocked; real customers need it (with the staff trust checklist complete). Shape and copy rules:
+`mtq_commercial/customer_pack.py`; per-version staff choices: the quotation contact and each item's status.
+
+| Section | What the owner records |
+|---|---|
+| Contacts | Veda Spaces business channels approved for publication (quotation, support, service): name, role, business phone and/or e-mail, hours; never personal contact data |
+| Support escalation | The escalation route a customer can use |
+| Project inclusions | Project-level inclusions (e.g. installation) that Veda Spaces confirms for every proposal |
+| Customer responsibilities | What a customer arranges (appliance models and sizes, access, power, water, permissions, readiness), each with a default status |
+| Site readiness | What must be ready before installation (flooring, painting stage, doors, power, water, access, lift, clearance, approvals, dependencies) |
+| Site-dependent work | Why some needs show only on site, and the approval rule (priced and agreed as a variation before any work) |
+| Manufacturer warranty note, warranty exclusions | How manufacturer-backed warranty is presented, and what it does not cover (legal review) |
+| Service guidance | How to request service after handover: channel, what to provide, reference process, escalation (no response-time promise unless approved) |
+| Handover, care | Handover expectations (protection, cleaning, joint inspection, snags, evidence) and care guidance |
+| Next steps | The stages after acceptance (blueprint terminology); a duration only where the owner approves one |
+| Payment safety | Which payment channels Veda Spaces recognises (no account, IFSC, UPI or card details) |
+
 ## 3. Blockers outside the two policy files
 
 | Code | Blocker | Why it is not decided here |

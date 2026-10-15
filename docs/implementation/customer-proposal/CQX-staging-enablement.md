@@ -40,6 +40,11 @@ Viewing shows something only once an issued quotation exists, which needs the co
 - [ ] Rollback rehearsal (below), then re-enable; the template-v2 limitation (api-runbooks §2.4) acknowledged.
 - [ ] `customer-proposal-housekeeping` scheduled (it is not scheduled by this change).
 - [ ] Images: none are shown until the `/proposal` image policy (N10) is reviewed; placeholders only.
+- [ ] Customer completeness (CTB): with OI-MTQ-18 null every new section says "to be confirmed" (contact, what you
+      arrange, before we start, site-dependent work, warranty exclusions, service, care, next steps, how to pay); with a
+      SYNTHETIC pack recorded, the staff choices (contact, statuses) appear exactly as frozen; item sizes show only
+      verified values; milestone amounts add up to the total; the staff trust checklist lists what is missing.
+- [ ] Real customers additionally need the trust checklist complete (`customer_ready`) for the proposal shared.
 - [ ] Open findings respected (CQX-security-model §4): acceptance testing stays off while N7 is open; N9 blocks real
       customers only (synthetic staging may proceed under the record's scope); images off while N10 is open.
 
@@ -54,9 +59,9 @@ Viewing shows something only once an issued quotation exists, which needs the co
 2. a reviewed change sets `proposal_enabled`, `interaction_enabled`, `acceptance_enabled` false and
    `enablement_record_sha256` null; approved 11-infra-apply changes the three parameters in place; the next 12-deploy
    renders them. Every CQX route then answers 404; no data is deleted.
-3. Image rollback across this release is **not ordinarily safe** once any quotation was issued with template
-   `mtq-quotation-html/2` (every issue from this release on): the previous image cannot render those documents and
-   refuses them (fail closed). Check first (api-runbooks §2.4); if any exist, recover by **rolling forward** with a
+3. Image rollback across PR #95 or the customer-completeness release is **not ordinarily safe** once any quotation
+   was issued with template `mtq-quotation-html/2` or `/3` (every issue from those releases on): an image without that
+   template cannot render those documents and refuses them (fail closed). Check first (api-runbooks §2.4); if any exist, recover by **rolling forward** with a
    corrected image. Migration 0205 itself is expand-only (new tables; one CHECK widened to admit `CUSTOMER_DIGITAL`).
    This limitation must be acknowledged in the enablement record before viewing is enabled.
 

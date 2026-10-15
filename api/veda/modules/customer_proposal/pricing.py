@@ -1,9 +1,11 @@
 """Pricing and package presentation (CQX-05): the frozen amounts, arranged for a customer; nothing recomputed.
 
 Every amount is the frozen document's own text (project total, room subtotals, line and optional amounts, GST when the
-owner decided it, the approved discount shown on the document). Nothing is derived that the owner has not approved: no
-per-milestone rupee amounts (milestones are shown as the approved shares and triggers; their rounding is not decided),
-no percentages of the total, no unit rates unless OI-MTQ-10 allows them (they are then already in the frozen lines).
+owner decided it, the approved discount shown on the document). Milestone amounts are the frozen document's own: since
+template 3 the B4 freeze splits the frozen total by the approved shares (whole paise, the leftover paise to the largest
+remainders, earlier milestone first), so they always add up to the total (``customer_pack.milestone_amounts``); a
+document issued before has none, and the page shows the shares only. No unit rates unless OI-MTQ-10 allows them (they
+are then already in the frozen lines).
 
 Packages: the version's package is named only by its approved customer specification. A comparison lists only other
 packages that were issued for the same property **and shared with the same recipient kind** (each customer link opens
@@ -101,6 +103,7 @@ PAGE_FIELDS: dict[str, str] = {
     "pricing.milestones[].label": "milestone",
     "pricing.milestones[].share": "approved share",
     "pricing.milestones[].trigger": "approved trigger",
+    "pricing.milestones[].amount": "frozen milestone amount (reconciles exactly with the frozen total)",
     "pricing.valid_until": "validity end",
     "pricing.days_left": "days of validity left (live)",
     "pricing.unit_rates_shown": "OI-MTQ-10",

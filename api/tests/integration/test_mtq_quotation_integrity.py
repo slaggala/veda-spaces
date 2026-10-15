@@ -89,14 +89,14 @@ def test_issued_document_survives_a_template_change(api, factory, monkeypatch):
     c = Commercial(api, factory)
     _, est, q = _issued(c)
     first = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
-    assert first["template_version"] == "mtq-quotation-html/2" and first["snapshot_verified"] is True
+    assert first["template_version"] == "mtq-quotation-html/3" and first["snapshot_verified"] is True
     from veda.modules.mtq_commercial import rendering
 
     monkeypatch.setitem(rendering.TEMPLATES, "mtq-quotation-html/99", lambda doc: "<html>a new design</html>")
     monkeypatch.setattr(rendering, "CURRENT_TEMPLATE", "mtq-quotation-html/99")
     again = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
     assert again["html"] == first["html"] and again["document"] == first["document"]
-    assert again["template_version"] == "mtq-quotation-html/2"
+    assert again["template_version"] == "mtq-quotation-html/3"
     draft = ok(c.as_(c.estimator).post(f"/api/v1/cost-estimates/{est['id']}/quotations", {}), 201)
     assert (
         ok(c.as_(c.estimator).get(f"/api/v1/quotations/{draft['id']}/document"))["html"] == "<html>a new design</html>"

@@ -104,6 +104,55 @@ FIELDS: dict[str, str] = {
     "sections.SERVICE_SUPPORT": "digest",
     "sections.TERMS": "digest",
     "sections.VALIDITY": "digest",
+    # CQX customer completeness (OI-MTQ-18, template 3): verified dimensions, milestone amounts, customer information
+    **{
+        f"{where}.dimensions[].{k}": what
+        for where in ("rooms[].lines[]", "optional_items[]")
+        for k, what in (
+            ("label", "dimension name (Width, Height, Total run, Area…)"),
+            ("value", "verified value and unit"),
+        )
+    },
+    **{
+        f"{where}.dimension_status": "CONFIRMED or TO_BE_CONFIRMED (an assumed or missing size is never shown)"
+        for where in ("rooms[].lines[]", "optional_items[]")
+    },
+    "payment_schedule[].amount": "milestone amount from the frozen total and the approved share (reconciles exactly)",
+    "information.content_version": "customer information pack version (OI-MTQ-18), frozen at issue",
+    **{
+        f"information.contacts.{who}.{k}": f"Veda Spaces business contact ({who}): {k.replace('_', ' ')}"
+        for who in ("quotation", "support[]", "service[]")
+        for k in ("display_name", "role", "phone", "email", "hours", "channel_note")
+    },
+    "information.support_escalation": "approved support escalation route",
+    **{
+        f"information.{sec}[].{k}": f"approved {sec.replace('_', ' ')}: {k}"
+        for sec, keys in (
+            ("project_inclusions", ("code", "text")),
+            ("warranty_exclusions", ("code", "text")),
+            ("client_responsibilities", ("code", "category", "text", "status")),
+            ("site_readiness", ("code", "category", "text", "status")),
+            ("handover", ("code", "category", "text")),
+            ("care", ("code", "category", "text")),
+            ("next_steps", ("code", "stage", "label", "text", "duration")),
+        )
+        for k in keys
+    },
+    "information.site_dependent_work.intro": "approved site-dependent-work explanation",
+    "information.site_dependent_work.approval_rule": "approved rule: priced and agreed as a variation first",
+    **{
+        f"information.site_dependent_work.categories[].{k}": "approved site-dependent work category"
+        for k in ("code", "category", "text")
+    },
+    "information.manufacturer_warranty_note": "approved note on manufacturer-backed warranty",
+    **{
+        f"information.service_guidance.contact.{k}": f"service contact: {k.replace('_', ' ')}"
+        for k in ("display_name", "role", "phone", "email", "hours", "channel_note")
+    },
+    "information.service_guidance.what_to_provide[]": "what to include in a service request",
+    "information.service_guidance.reference_process": "how a service request is referenced",
+    "information.service_guidance.escalation": "service escalation route",
+    "information.payment_safety": "approved statement of the payment channels Veda Spaces recognises (no account details)",
 }
 
 # Every key of the frozen B4 document (rendering.document_model + rendering.freeze): PROJECTED or EXCLUDED, with why.
@@ -130,6 +179,7 @@ DOCUMENT_FIELDS: dict[str, str] = {
     "exclusions": "PROJECTED",
     "terms": "PROJECTED",
     "terms_version": "PROJECTED",
+    "customer_information": "PROJECTED as information (OI-MTQ-18 approved copy; contacts are business channels)",
     "customer": "EXCLUDED: the customer's name (a proposal opens for whoever holds the link)",
     "draft": "EXCLUDED: staff-only draft notes and blockers (never in a frozen document)",
 }
@@ -144,6 +194,8 @@ LINE_FIELDS: dict[str, str] = {
     "change": "PROJECTED",
     "delta": "PROJECTED",
     "price_with_gst": "PROJECTED (optional items only: what choosing it adds, frozen at issue)",
+    "dimensions": "PROJECTED (verified sizes only)",
+    "dimension_status": "PROJECTED",
 }
 SUMMARY_FIELDS = ("base_total", "discount", "taxable", "gst", "total", "optional_total", "currency", "net_change")
 ROOM_KINDS = {"Space": "ROOM", "Project": "PROJECT", "Variation": "CHANGES"}
@@ -170,7 +222,7 @@ def digest(value: Any) -> str:
 
 def _line(x: dict[str, Any], ref: str) -> dict[str, Any]:
     out = {"ref": ref, **{k: x[k] for k in ("description", "detail", "quantity", "amount", "priced", "status")}}
-    for k in ("unit_rate", "change", "delta", "price_with_gst"):
+    for k in ("unit_rate", "change", "delta", "price_with_gst", "dimensions", "dimension_status"):
         if k in x:
             out[k] = x[k]
     return out
@@ -347,7 +399,8 @@ def build(s: Session, q: Quotation, doc: dict[str, Any] | None = None) -> dict[s
         "rooms": rooms,
         "optional_items": optional_items,
         "summary": summary,
-        "payment_schedule": [{k: m.get(k) for k in ("label", "share", "trigger")} for m in doc.get("payment_schedule") or []],
+        "payment_schedule": [{k: m.get(k) for k in ("label", "share", "trigger", "amount")}
+                             for m in doc.get("payment_schedule") or []],
         "warranty": list(doc.get("warranty") or []),
         "service_support": list(doc.get("service_support") or []),
         "assumptions": list(doc.get("assumptions") or []),
@@ -356,7 +409,62 @@ def build(s: Session, q: Quotation, doc: dict[str, Any] | None = None) -> dict[s
         "terms_version": doc.get("terms_version"),
         "unit_rates_shown": unit_rates,
         "sections": section_digests(doc, rooms),
+        "information": information(doc),
     }  # fmt: skip
+
+
+_CONTACT = ("display_name", "role", "phone", "email", "hours", "channel_note")
+
+
+def information(doc: dict[str, Any]) -> dict[str, Any]:
+    """The frozen customer information block, allow-listed again key by key. A document issued before template 3 has
+    none: every section is then None (shown "to be confirmed"), never filled from the current pack."""
+    from veda.modules.mtq_commercial import customer_pack
+
+    info = doc.get("customer_information") or customer_pack.information(None, None)
+
+    def contact(c: dict[str, Any] | None) -> dict[str, Any] | None:
+        return {k: c.get(k) for k in _CONTACT} if c else None
+
+    def rows(key: str, keys: tuple[str, ...]) -> list[dict[str, Any]] | None:
+        found = info.get(key)
+        return [{k: r.get(k) for k in keys} for r in found] if found else None
+
+    contacts = info.get("contacts") or {}
+    sdw, sg = info.get("site_dependent_work"), info.get("service_guidance")
+    return {
+        "content_version": info.get("content_version"),
+        "contacts": {
+            "quotation": contact(contacts.get("quotation")),
+            "support": [contact(c) for c in contacts.get("support") or []],
+            "service": [contact(c) for c in contacts.get("service") or []],
+        },  # fmt: skip
+        "support_escalation": info.get("support_escalation"),
+        "project_inclusions": rows("project_inclusions", ("code", "text")),
+        "client_responsibilities": rows("client_responsibilities", ("code", "category", "text", "status")),
+        "site_readiness": rows("site_readiness", ("code", "category", "text", "status")),
+        "site_dependent_work": {
+            "intro": sdw.get("intro"),
+            "approval_rule": sdw.get("approval_rule"),
+            "categories": [{k: c.get(k) for k in ("code", "category", "text")} for c in sdw.get("categories") or []],
+        }
+        if sdw
+        else None,  # fmt: skip
+        "manufacturer_warranty_note": info.get("manufacturer_warranty_note"),
+        "warranty_exclusions": rows("warranty_exclusions", ("code", "text")),
+        "service_guidance": {
+            "contact": contact(sg.get("contact")),
+            "what_to_provide": list(sg.get("what_to_provide") or []),
+            "reference_process": sg.get("reference_process"),
+            "escalation": sg.get("escalation"),
+        }
+        if sg
+        else None,  # fmt: skip
+        "handover": rows("handover", ("code", "category", "text")),
+        "care": rows("care", ("code", "category", "text")),
+        "next_steps": rows("next_steps", ("code", "stage", "label", "text", "duration")),
+        "payment_safety": info.get("payment_safety"),
+    }
 
 
 def paths(value: Any, prefix: str = "") -> set[str]:

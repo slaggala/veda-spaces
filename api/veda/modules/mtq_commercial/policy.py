@@ -1,4 +1,4 @@
-"""The owner's commercial decisions for MTQ B2-B4, as one versioned record (owner-decision register OI-MTQ-03…15).
+"""The owner's commercial decisions for MTQ B2-B4, as one versioned record (owner-decision register OI-MTQ-03…18).
 
 ``fixtures/commercial-policy.json`` holds a slot per register row. Every slot is null today: nothing has been decided.
 A null slot never becomes a default. Instead:
@@ -15,6 +15,7 @@ A null slot never becomes a default. Instead:
 | OI-MTQ-11 | How acceptance is recorded | Acceptance cannot be recorded |
 | OI-MTQ-13 | Variation (change-order) policy | Variations draftable, not issuable |
 | OI-MTQ-15 | Preparation-package drivers (5 BHK, independent house) | Those charges unpriced; not customer-issuable |
+| OI-MTQ-18 | Customer information pack: business contacts, responsibilities, site readiness, site-dependent work, warranty exclusions, service guidance, handover, care, next steps, payment safety (``customer_pack``) | Every section shown "to be confirmed"; not an issuance blocker (a real-customer gate: CQX trust checklist) |
 
 Tests may install a policy marked SYNTHETIC (``install_for_tests``); the loader refuses that marker anywhere but the
 test environment, so a synthetic decision can never reach staging or production.
@@ -32,6 +33,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from veda.config import settings
 
+from .customer_pack import CustomerPack
+
 FIXTURE = Path(__file__).with_name("fixtures") / "commercial-policy.json"
 SYNTHETIC = "SYNTHETIC_TEST_ONLY"
 DECISION_LABELS = {
@@ -47,6 +50,7 @@ DECISION_LABELS = {
     "OI-MTQ-13": "variation (change-order) policy",
     "OI-MTQ-14": "provisional sums",
     "OI-MTQ-15": "preparation-package drivers for 5 BHK and independent houses",
+    "OI-MTQ-18": "customer information pack (contacts, responsibilities, site readiness, service, handover, next steps)",
 }
 BP = Annotated[int, Field(ge=0, le=10_000)]
 Text = Annotated[str, Field(min_length=1, max_length=2000)]
@@ -135,7 +139,7 @@ class PrepDrivers(_Closed):  # OI-MTQ-15
     independent_house_factor_bp: Annotated[int | None, Field(ge=1, le=50_000)] = None
 
 
-SHAPES: dict[str, type[_Closed]] = {
+SHAPES: dict[str, type[BaseModel]] = {
     "OI-MTQ-03": Rules,
     "OI-MTQ-04": Rules,
     "OI-MTQ-05": Rates,
@@ -148,6 +152,7 @@ SHAPES: dict[str, type[_Closed]] = {
     "OI-MTQ-13": Variations,
     "OI-MTQ-14": Presentation,  # placeholder shape: provisional sums are not implemented while undecided
     "OI-MTQ-15": PrepDrivers,
+    "OI-MTQ-18": CustomerPack,
 }
 
 

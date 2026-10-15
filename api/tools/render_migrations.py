@@ -111,6 +111,8 @@ DEFERRED_COLUMNS = {
     "budget_estimate": {"customer_spec_id", "customer_spec_sha256"},
     # 0104_catalog_idempotency adds public idempotency to catalog_configuration.
     "catalog_configuration": {"idempotency_key", "request_fingerprint"},
+    # 0206_customer_completeness adds staff's per-version customer information choices to quotation.
+    "quotation": {"customer_inputs"},
 }
 
 
