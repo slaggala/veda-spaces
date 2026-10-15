@@ -91,20 +91,26 @@ Evidence to record: the `schema-status` output, the `deploy.sh` transcript, the 
 - **Owner category:** Operations. The decision to roll back rather than forward-fix is the Architecture Owner's for any security-relevant defect.
 - **Status:** this procedure has not been rehearsed (RG-7 open).
 
-### 2.4 Quotation template versions (MTQ B4 / customer proposals, PR #95)
+### 2.4 Quotation template versions (MTQ B4 / customer proposals, PR #95 and customer completeness)
 
 Issued quotations are sealed with the HTML template version in force (`quotation.template_version`) and are only ever
 served from those frozen bytes, by an image that knows that version (`rendering.TEMPLATES`). PR #95 introduced
-`mtq-quotation-html/2`, which every quotation issued from that release on uses.
+`mtq-quotation-html/2`; the customer-completeness release introduces `mtq-quotation-html/3` (contact, item sizes,
+milestone amounts and the customer information sections, migration `0206_customer_completeness`), which every
+quotation issued from that release on uses. Versions 1 and 2 are kept byte for byte (test-enforced goldens).
 
-- **An older image cannot serve a v2 quotation.** It refuses it, fail closed: the staff document, the customer
-  proposal and any decision on it answer `SNAPSHOT_INTEGRITY_FAILED`, and a lead erasure that must redact a v2 document
-  stops with an error instead of re-rendering it. Nothing is altered or mis-rendered.
-- **Before rolling back across PR #95,** check whether any v2 quotation exists, inside the target image's container:
-  `docker compose run --rm --no-deps api python -c "import sqlalchemy as sa; from veda.kernel import db; from veda.modules.mtq_commercial.models import Quotation; s=db.new_session(write=False); print(s.execute(sa.select(sa.func.count()).select_from(Quotation).where(Quotation.template_version=='mtq-quotation-html/2')).scalar())"`.
-  If the count is not zero, **recovery is roll-forward only** (§2.2): a corrected image that still carries the v2
-  reader. Roll back only if a rollback image with a compatible v2 reader exists.
-- Proven by `api/tests/integration/test_cqx_remediation.py::test_a_template_v2_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers`.
+- **An older image cannot serve a quotation issued with a newer template.** It refuses it, fail closed: the staff
+  document, the customer proposal and any decision on it answer `SNAPSHOT_INTEGRITY_FAILED`, and a lead erasure that
+  must redact such a document stops with an error instead of re-rendering it. Nothing is altered or mis-rendered.
+- **Before rolling back across either release,** check whether any quotation issued with a template the target image
+  lacks exists, inside the target image's container (for a rollback to the PR #95 release, count `/3`; to an image
+  before PR #95, count `/2` and `/3`):
+  `docker compose run --rm --no-deps api python -c "import sqlalchemy as sa; from veda.kernel import db; from veda.modules.mtq_commercial.models import Quotation; s=db.new_session(write=False); print(s.execute(sa.select(Quotation.template_version, sa.func.count()).group_by(Quotation.template_version)).all())"`.
+  If any such quotation exists, **recovery is roll-forward only** (§2.2): a corrected image that still carries every
+  reader. Roll back only if the rollback image has a compatible reader for every issued version.
+- Migration 0206 is expand-only (one nullable column); the N-1 image ignores it.
+- Proven by `api/tests/integration/test_cqx_remediation.py::test_a_current_template_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers`
+  and `api/tests/integration/test_cqx_completeness.py::test_a_document_issued_with_template_2_still_renders_and_shows_its_sections_as_to_be_confirmed`.
 
 ## 3. Disaster rollback: restore a snapshot
 

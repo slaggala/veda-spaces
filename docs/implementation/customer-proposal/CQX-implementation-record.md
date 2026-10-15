@@ -77,3 +77,8 @@ lineage or pricing view. Measurement-to-proposal traceability for staff stays th
 
 See `evidence/CQX-synthetic-validation-2026-10-14.md` (20 scenarios × 5 configurations, SYNTHETIC_VALIDATED) and the PR
 description for the CI matrix.
+
+## Follow-up: customer completeness (decision log 36)
+
+The customer information pack (OI-MTQ-18), item sizes, milestone amounts, template `mtq-quotation-html/3`, the
+summary-first page and the staff trust checklist: [CTB-customer-completeness.md](CTB-customer-completeness.md).
