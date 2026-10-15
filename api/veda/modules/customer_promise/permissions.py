@@ -47,8 +47,8 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
        "Approve or request changes to ordinary sections of a submitted version (never one you saved or submitted)",
        "CPA-008"),
     _p("customer_promise.review.sensitive", "Review sensitive Customer Promise sections",
-       "Approve or request changes to customer responsibilities, site-dependent work, warranty, warranty exclusions "
-       "and payment safety (never one you saved or submitted)", "CPA-009", "ACCESS_CONTROL"),
+       "Approve or request changes to contacts and support, customer responsibilities, site-dependent work, warranty, "
+       "warranty exclusions and payment safety (never one you saved or submitted)", "CPA-009", "ACCESS_CONTROL"),
     _p("customer_promise.approve", "Approve Customer Promise versions",
        "Approve a fully reviewed version for publication (never one you contributed to)", "CPA-010", "ACCESS_CONTROL"),
     _p("customer_promise.publish", "Publish Customer Promise versions",

@@ -45,7 +45,7 @@ Twelve administration sections own the pack's fields (`customer_promise/sections
 
 | Section | Pack fields | Edit capability | Sensitive (review needs `review.sensitive`) |
 |---|---|---|---|
-| Contact and support | `email_domains`, `contacts`, `support_escalation` | `contacts.edit` | no |
+| Contact and support | `email_domains`, `contacts`, `support_escalation` | `contacts.edit` | **yes** (where customers are told to reach and pay Veda Spaces) |
 | Project inclusions | `project_inclusions` | `edit` | no |
 | Customer responsibilities | `client_responsibilities` | `edit` | **yes** |
 | Site readiness | `site_readiness` | `edit` | no |
@@ -116,9 +116,11 @@ DRAFT ─submit─► IN_REVIEW ─(every changed section approved) approve─�
 
 ## 5. Concurrency (CPA-28)
 
-Every write sends `If-Match` with the version the user saw; a stale page gets 409 `VERSION_CONFLICT` and nothing
-changes (missing `If-Match`: 428). Review, approval, return and publication re-read the version under a row lock on
-PostgreSQL; the partial unique indexes make a second open draft or a second PUBLISHED row impossible. Forced
+Every write sends `If-Match` with the version the user saw; a page that is stale when the request arrives gets 409
+`VERSION_CONFLICT` and nothing changes (missing `If-Match`: 428). Review, approval, return and publication then re-read
+the version under a row lock on PostgreSQL and re-check its state, so a request overtaken by a conflicting commit is
+refused (`INVALID_STATE`), while two non-conflicting decisions (reviews of different sections) both succeed. Issuing a
+quotation locks the published pack row, so it serialises with a concurrent publication; the partial unique indexes make a second open draft or a second PUBLISHED row impossible. Forced
 interleavings (`test_customer_promise_races.py`, SQLite and PostgreSQL): two publishers on one version, two
 simultaneous new drafts, and conflicting reviews of one section each end with exactly one success.
 
@@ -173,3 +175,18 @@ desktop widths, completeness and history.
 | Manufacturer warranty facts from the catalogue (CPA-07) | Referenced, not duplicated | The CQX page already shows the frozen catalogue specification's warranty summary beside the note |
 | Scheduled (future-effective) publication (CPA-32) | Deferred | No safe activation scheduler exists; publication is immediate |
 | Standalone "supersede" capability | Folded into publish | Superseding without a replacement would leave no current pack |
+
+## 10. Independent review (PR #97)
+
+Verdict at the docs commit: **CERTIFIED FOR MERGE** (no High or Medium findings). Addressed in the review-fix commit:
+Contact and support is now a sensitive section (finding 3: moving every contact channel and allowed domain needed only
+ordinary review); issuing locks the published pack row (finding 2: issue could race a publication on PostgreSQL); the
+landing page degrades instead of failing with 409 when the published pack fails its digest (finding 5); the concurrency
+wording above (finding 7). Recorded, not changed:
+
+| Finding | Disposition |
+|---|---|
+| 1. `policy.public_view` reports OI-MTQ-18 "decided" once it delegates to the portal, though customers see "to be confirmed" until a pack is published | Staff hint only; the gate is correct. The portal landing page states the real customer state per area |
+| 4. Payment-safety copy rules can be evaded by rephrasing (spaced handles, numbers in words) | Documented limit of the copy rules; the sensitive (control) review of payment safety stays mandatory (CPA-D04) |
+| 6. Usage counts scan every quotation's terms on each page | Acceptable at current volume; index the reference if quotation volume grows |
+| Design notes: an author holding `publish` can publish what someone else approved; one person with `review`, `review.sensitive` and `approve` can review and approve | Per the capability model (two people minimum); persona holders are the owner's decision CPA-D02 |

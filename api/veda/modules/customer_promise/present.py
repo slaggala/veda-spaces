@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from veda.kernel import clock
+from veda.kernel.errors import ApiError
 from veda.platform.identity.models import User
 
 from . import binding, service
@@ -137,7 +138,11 @@ def landing(s: Session, ctx) -> dict[str, Any]:
     open_p = service.open_version(s)
     authority = binding.authority_state()
     delegated = authority["state"] == binding.DELEGATED
-    published = binding.verified(current) if current else None
+    integrity_failed = False
+    try:
+        published = binding.verified(current) if current else None
+    except ApiError:  # fail closed for quotations; the page still opens so a corrected version can be published
+        published, integrity_failed = None, True
     terms = policy.decision("OI-MTQ-09")
     areas = []
     for a in SEC.AREAS:
@@ -170,6 +175,7 @@ def landing(s: Session, ctx) -> dict[str, Any]:
                                "freeze the published Customer Promise Pack.",
         }[authority["state"]]},
         "published": summary(s, current, people, usage) if current else None,
+        "published_integrity_failed": integrity_failed,
         "open": summary(s, open_p, people, usage) if open_p else None,
         "pending_reviews": service.pending_reviews(s, open_p) if open_p and open_p.status == "IN_REVIEW" else [],
         "areas": areas,

@@ -16,7 +16,7 @@ quotation's content.
 | `customer_promise.payment_safety.edit` | Edit the payment-safety wording | — |
 | `customer_promise.submit` | Submit a draft for review; return a version to draft | — |
 | `customer_promise.review` | Review ordinary sections | — |
-| `customer_promise.review.sensitive` | Review customer responsibilities, site-dependent work, warranty, exclusions, payment safety | ACCESS_CONTROL (MFA) |
+| `customer_promise.review.sensitive` | Review contacts and support, customer responsibilities, site-dependent work, warranty, exclusions, payment safety | ACCESS_CONTROL (MFA) |
 | `customer_promise.approve` | Approve a fully reviewed version; return it to draft | ACCESS_CONTROL (MFA) |
 | `customer_promise.publish` | Publish an approved version (supersedes the published one) | ACCESS_CONTROL (MFA) |
 | `customer_promise.preview` | Preview a version as customers would see it | — |

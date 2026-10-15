@@ -87,6 +87,12 @@ def stale_blocker(s: Session, terms: dict[str, Any] | None) -> dict[str, Any] | 
     current = current_published(s)
     if current is None:
         return None
+    if s.get_bind().dialect.name == "postgresql":  # issue and a concurrent publication serialise on the published row
+        s.execute(sa.select(CustomerPromisePack.id).where(CustomerPromisePack.id == current.id).with_for_update())
+        s.refresh(current)
+        if current.status != "PUBLISHED":
+            return {"code": "CUSTOMER_PROMISE_SUPERSEDED", "kind": "DATA", "severity": "BLOCKING",
+                    "message": "A newer Customer Promise Pack was just published; create a new version to include it."}  # fmt: skip
     carried = (terms or {}).get("customer_promise") or {}
     if carried.get("pack_id") == current.id and carried.get("sha256") == current.published_sha256:
         return None

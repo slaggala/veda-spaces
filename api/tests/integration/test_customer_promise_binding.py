@@ -169,3 +169,17 @@ def test_a_tampered_published_pack_is_refused(api, factory):
     with actor(system_context("CLI")), db.unit_of_work(write=False) as s, pytest.raises(ApiError) as err:
         binding.for_quotation(s)
     assert err.value.code == "CUSTOMER_PROMISE_INTEGRITY_FAILED"
+
+
+def test_a_published_pack_failing_its_digest_still_opens_the_landing_page(api, factory):
+    """Independent review (PR #97) finding 5: fail closed for quotations, degrade (not 409) for the portal."""
+    t = Team(api, factory)
+    install_full_policy(OI_MTQ_15=SYNTHETIC_PREP, OI_MTQ_18=AUTHORITY)
+    v = t.publish_new()
+    with actor(system_context("CLI")), db.unit_of_work(write=True) as s:
+        row = s.get(CustomerPromisePack, v["id"])
+        row.published_content = {**row.published_content, "payment_safety": "SYNTHETIC tampered."}
+    page = ok(t.as_(t.viewer).get(BASE))
+    assert page["published_integrity_failed"] is True
+    assert all(a["owner_approved_content"] is False for a in page["areas"] if a["section"])
+    assert t.draft()["status"] == "DRAFT"  # recovery: a new version can be started

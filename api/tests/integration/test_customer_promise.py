@@ -15,8 +15,8 @@ from tests.support.promise import BASE, ON, ORDINARY, SECTION_VALUES, SENSITIVE,
 from veda.kernel import db
 from veda.kernel.context import actor, system_context
 from veda.modules.customer_promise import sections as SEC
-from veda.modules.mtq_commercial.customer_pack import FREE_MAIL
 from veda.modules.customer_promise.models import CustomerPromiseEvent, CustomerPromisePack, CustomerPromiseReview
+from veda.modules.mtq_commercial.customer_pack import FREE_MAIL
 from veda.platform.audit.models import AuditLog
 
 pytestmark = ON

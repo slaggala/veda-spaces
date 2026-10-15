@@ -34,7 +34,7 @@ SECTION_VALUES: dict[str, dict[str, Any]] = {
     "NEXT_STEPS": {"next_steps": copy.deepcopy(SYNTHETIC_PACK["next_steps"])},
     "PAYMENT_SAFETY": {"payment_safety": SYNTHETIC_PACK["payment_safety"]},
 }  # fmt: skip
-SENSITIVE = ("RESPONSIBILITIES", "SITE_WORK", "WARRANTY", "EXCLUSIONS", "PAYMENT_SAFETY")
+SENSITIVE = ("RESPONSIBILITIES", "SITE_WORK", "WARRANTY", "EXCLUSIONS", "PAYMENT_SAFETY", "CONTACTS")
 ORDINARY = tuple(c for c in SECTION_VALUES if c not in SENSITIVE)
 AUTHOR_GRANTS = ("customer_promise.contacts.edit", "customer_promise.warranty.edit",
                  "customer_promise.payment_safety.edit")  # fmt: skip

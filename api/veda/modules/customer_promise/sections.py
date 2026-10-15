@@ -3,7 +3,7 @@
 A pack's content is the customer information pack of PR #96 (``customer_pack.CustomerPack``, OI-MTQ-18), edited section
 by section. Each section owns some of the pack's keys, names the capability that edits it and the one that reviews
 it, and is either ordinary or *sensitive* (liability-bearing: what the customer must do, site-dependent work and its
-approval rule, warranty statements and exclusions, payment safety). Sensitive sections are reviewed only by holders of
+approval rule, warranty statements and exclusions, payment safety, and the contact channels). Sensitive sections are reviewed only by holders of
 ``customer_promise.review.sensitive``. Four-eyes applies to every section: nobody reviews or approves a section they
 saved or a version they submitted.
 
@@ -46,8 +46,10 @@ class Section:
 
 
 SECTIONS: tuple[Section, ...] = (
+    # sensitive: the contacts and their allowed e-mail domains are where a customer is told to reach (and pay) Veda
+    # Spaces; moving them is a payment-redirection risk, so the control review applies (independent review, PR #97)
     Section("CONTACTS", "Contact and support", ("email_domains", "contacts", "support_escalation"),
-            "customer_promise.contacts.edit"),
+            "customer_promise.contacts.edit", sensitive=True),
     Section("INCLUSIONS", "Project inclusions", ("project_inclusions",), "customer_promise.edit"),
     Section("RESPONSIBILITIES", "Customer responsibilities", ("client_responsibilities",), "customer_promise.edit",
             sensitive=True),
