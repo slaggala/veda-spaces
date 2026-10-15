@@ -47,7 +47,8 @@ export interface Me {
   email_change: { proposed_email: string; requested_on: string; expires_on: string } | null;
   must_change_password?: boolean;
   /** MC-3: deployment features that are switched on (absent on older APIs: everything off). */
-  features?: Partial<Record<'mtq_site' | 'mtq_estimation' | 'mtq_quotation', boolean>>;
+  features?: Partial<Record<'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_proposal' | 'customer_proposal_interaction'
+    | 'customer_quotation_acceptance', boolean>>;
   version: number;
 }
 

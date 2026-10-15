@@ -132,5 +132,13 @@
     "estimation_enabled": true,
     "quotation_enabled": true,
     "enablement_record_sha256": "c14a904d8be4c7a4c3cfa76fbca4870d571f22d0d69509b2a59cb13a8cd12926"
+  },
+  "customer_proposal": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-QUOTATION-EXPERIENCE-END-TO-END (2026-10-14), recorded as given: the customer quotation experience is wired to staging with three independent flags, all false: VEDA_CUSTOMER_PROPOSAL_ENABLED (viewing a shared, issued quotation), VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED (optional-item choices, questions, change requests, acknowledgements; needs viewing) and VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED (digital acceptance; needs interaction). Viewing needs the B4 quotation flag. Production refuses all three (the API refuses them at start). A flag may turn on only by a reviewed change that sets it true and enablement_record_sha256 to the SHA-256 of infra/config/customer-proposal-enablement-record.json once that record is APPROVED by the owner, staging-only, synthetic customers only, with every evidence field filled and its scope naming each flag turned on; acceptance is never enabled merely to test viewing. staging-core refuses anything else. Rollback: every flag false and enablement_record_sha256 null.",
+    "proposal_enabled": false,
+    "interaction_enabled": false,
+    "acceptance_enabled": false,
+    "enablement_record_sha256": null
   }
 }

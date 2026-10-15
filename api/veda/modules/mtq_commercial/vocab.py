@@ -123,7 +123,8 @@ CHANGE_CODES = (
     "CHANGE_FINISH",
     "CHANGE_RATE",
 )
-DECISION_METHODS = ("STAFF_RECORDED", "SIGNED_COPY")
+# CUSTOMER_DIGITAL (0205_customer_proposal): the customer decided through their secure proposal link (CQX-10).
+DECISION_METHODS = ("STAFF_RECORDED", "SIGNED_COPY", "CUSTOMER_DIGITAL")
 QUOTATION_EVENTS = (
     "CREATED",
     "VERSION_CREATED",

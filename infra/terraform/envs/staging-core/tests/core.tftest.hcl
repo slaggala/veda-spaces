@@ -650,3 +650,93 @@ run "a_bound_commercial_digest_without_the_flag_refused" {
   }
   expect_failures = [output.mtq_commercial]
 }
+
+# Customer quotation experience (decision log 35): three flags planned false; each turns on only with an owner-APPROVED,
+# synthetic-customers-only record bound by its SHA-256 whose scope names it; viewing needs the quotation flag,
+# interaction needs viewing, acceptance needs interaction.
+run "the_customer_proposal_flags_are_planned_false" {
+  command = plan
+
+  assert {
+    condition = (local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED"] == "false" &&
+    local.app_config["VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED"] == "false" && output.customer_proposal.enablement_record == null && length(local.cqx_config) == 3)
+    error_message = "three parameters, all false, no record bound (also the rollback state)"
+  }
+
+  assert {
+    condition     = jsondecode(file("../../../config/customer-proposal-enablement-record.json")).status == "DRAFT" && contains(local.cqx_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+  }
+}
+
+run "an_approved_record_scoped_to_viewing_turns_viewing_on_only" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-viewing-on.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-viewing.json"
+  }
+
+  assert {
+    condition = (output.customer_proposal.proposal_enabled == "true" && output.customer_proposal.interaction_enabled == "false" &&
+    output.customer_proposal.acceptance_enabled == "false" && local.cqx_record_problems == [])
+    error_message = "viewing alone, bound to an approved record that authorises viewing"
+  }
+}
+
+run "an_approved_record_scoped_to_all_three_turns_them_on" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-all-on.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-all.json"
+  }
+
+  assert {
+    condition     = output.customer_proposal.acceptance_enabled == "true" && local.cqx_record_problems == []
+    error_message = "acceptance testing on only when the approved record's scope says so"
+  }
+}
+
+run "acceptance_outside_the_records_scope_refused" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-acceptance-not-in-scope.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-viewing.json"
+  }
+  expect_failures = [output.customer_proposal]
+}
+
+run "interaction_without_viewing_refused" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-interaction-only.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-all.json"
+  }
+  expect_failures = [output.customer_proposal]
+}
+
+run "viewing_without_the_quotation_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-no-quotation.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-viewing.json"
+  }
+  expect_failures = [output.customer_proposal]
+}
+
+run "the_customer_proposal_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-draft.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-draft.json"
+  }
+  expect_failures = [output.customer_proposal]
+}
+
+run "a_bound_customer_proposal_digest_without_a_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path          = "tests/fixtures/platform-cqx-digest-without-flag.json"
+    customer_proposal_record_path = "tests/fixtures/cqx-record-approved-viewing.json"
+  }
+  expect_failures = [output.customer_proposal]
+}

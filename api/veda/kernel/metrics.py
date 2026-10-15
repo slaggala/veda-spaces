@@ -33,6 +33,8 @@ APPROVED_METRICS = frozenset(
         "MediaSignatureAgeHours", "MediaNonCleanRequested", "MediaStorageAccessDenied", "MediaKmsAccessDenied",
         # MTQ B1 attachments (ATT): uploads registered, rejected, infected, withdrawn, and bytes missing at delivery.
         "AttachmentCreated", "AttachmentRejected", "AttachmentInfected", "AttachmentWithdrawn", "AttachmentObjectMissing",
+        # CQX: a proposal whose frozen document fails its digests (never shown), and refused customer decisions.
+        "ProposalIntegrityRefused", "ProposalDecisionRefused",
     }
 )  # fmt: skip
 

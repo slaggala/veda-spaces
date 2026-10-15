@@ -89,7 +89,7 @@ def test_issue_freeze_accept_with_optional_items(api, factory):
     assert r.status == 409 and r.code == "QUOTATION_FROZEN"
     rendered = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))
     doc = rendered["document"]
-    assert rendered["snapshot_verified"] is True and rendered["template_version"] == "mtq-quotation-html/1"
+    assert rendered["snapshot_verified"] is True and rendered["template_version"] == "mtq-quotation-html/2"
     assert "draft" not in doc and doc["payment_schedule"] and doc["customer"]["name"]  # identity frozen at issue
     assert doc["summary"]["gst"]["status"] == "Included"
     html = ok(c.as_(c.sales).get(f"/api/v1/quotations/{q['id']}/document"))["html"]

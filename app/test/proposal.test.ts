@@ -1,0 +1,539 @@
+import { expect, fixture, html, waitUntil } from '@open-wc/testing';
+import '../src/design-system/components.js';
+import type { Decision, Page } from '../src/modules/proposal/api.js';
+import '../src/modules/proposal/index.js';
+import type { VsProposalView } from '../src/modules/proposal/proposal-view.js';
+
+/** CQX: the customer proposal page. SYNTHETIC page models; the API is mocked; the server decides everything. */
+
+export function samplePage(over: Partial<Page> = {}): Page {
+  const line = (ref: string, description: string, amount: string, status = 'Included') =>
+    ({ ref, description, detail: 'Laminate finish', quantity: '42.5 sq ft', amount, priced: true, status });
+  return {
+    state: 'OPEN',
+    link: { expires_on: '2099-01-01T00:00:00Z', status: 'ACTIVE' },
+    history: [],
+    capabilities: { interaction: false, acceptance: false },
+    notices: [],
+    actions: [],
+    proposal: {
+      schema: 'veda.customer-proposal/1', kind: 'QUOTATION', title: 'Quotation', brand: { name: 'Veda Spaces', tagline: 'Interiors, measured and made' },
+      reference: 'VS-Q-2026-000001 v1', quotation_number: 'VS-Q-2026-000001', version_no: 1, variation_no: 0, issued_on: '2026-10-14',
+      valid_until: '2026-11-13', subject: 'Interior works — 3 BHK apartment', cover_note: null,
+      property: { reference: 'VS-P-2026-000001', configuration: '3 BHK apartment', city: 'Synthetic City' }, snapshot_sha256: 'a'.repeat(64),
+      rooms: [
+        { ref: 'R1', title: 'Master bedroom', kind: 'ROOM', subtotal: '1,20,000.00', included_count: 2, optional_count: 1,
+          lines: [line('L1', 'Wardrobe — Body', '90,000.00'), line('L2', 'Wardrobe — Shutters', '30,000.00')] },
+        { ref: 'R2', title: 'Kitchen', kind: 'ROOM', subtotal: '2,00,000.00', included_count: 1, optional_count: 0,
+          lines: [line('L3', 'Kitchen — Base units', '2,00,000.00')] },
+        { ref: 'R3', title: 'Project-wide', kind: 'PROJECT', subtotal: '10,000.00', included_count: 1, optional_count: 0,
+          lines: [line('L4', 'Site protection', '10,000.00')] },
+      ],
+      optional_items: [{ ...line('L9', 'Loft above wardrobe', '15,000.00', 'Optional'), room_ref: 'R1', room_title: 'Master bedroom' }],
+      summary: { base_total: '3,30,000.00', taxable: '3,30,000.00', gst: { status: 'Included', amount: '59,400.00' }, total: '3,89,400.00',
+        optional_total: '15,000.00', currency: 'INR' },
+      payment_schedule: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], warranty: ['Synthetic warranty.'],
+      service_support: [], assumptions: ['Synthetic assumption.'], exclusions: ['Synthetic exclusion.'], terms: ['Synthetic terms.'],
+      terms_version: 'SYN-T1', unit_rates_shown: false, sections: { SCOPE: 'b'.repeat(64) },
+    },
+    ...over,
+  };
+}
+
+function serve(handler: (path: string, init?: RequestInit) => Response) {
+  const calls: { path: string; headers: Record<string, string> }[] = [];
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = new URL(String(input), location.href).pathname;
+    calls.push({ path, headers: (init?.headers ?? {}) as Record<string, string> });
+    return handler(path, init);
+  };
+  return calls;
+}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(status < 400 ? { data: body } : body), { status, headers: { 'Content-Type': status < 400 ? 'application/json' : 'application/problem+json' } });
+
+describe('vs-proposal-view (CQX-03)', () => {
+  it('shows the overview, room cards with counts and room-by-room detail, accessibly', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage()}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    expect(root.querySelector('h1')!.textContent).to.contain('3 BHK');
+    const cards = [...root.querySelectorAll('.roomcard')];
+    expect(cards).to.have.length(3);
+    expect(cards[0].getAttribute('aria-label')).to.equal('Master bedroom: 2 included items, 1 optional, ₹ 1,20,000.00');
+    expect(root.querySelectorAll('details.room')).to.have.length(3);
+    expect(root.textContent).to.contain('₹ 3,89,400.00');
+    await expect(el).to.be.accessible();
+  });
+
+  it('jumps to a room from its card and opens it, moving focus there', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage()}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    (root.querySelector('a.roomcard[href="#R2"]') as HTMLAnchorElement).click();
+    const room = root.querySelector('#R2') as HTMLDetailsElement;
+    expect(room.open).to.equal(true);
+    expect(root.activeElement).to.equal(room);
+  });
+
+  it('marks states, earlier versions and staff preview, and never offers actions in preview', async () => {
+    const page = samplePage({ state: 'SUPERSEDED', history: [{ version_no: 1, issued_on: '2026-10-01' }],
+      notices: [{ code: 'SUPERSEDED', message: 'A newer version of this proposal is available.' }],
+      actions: [{ code: 'X', label: 'Do something', target: 'sum' }] });
+    page.proposal.version_no = 2;
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view preview .page=${page}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    expect(root.textContent).to.contain('Replaced by a newer version');
+    expect(root.textContent).to.contain('version 1 (2026-10-01)');
+    expect(root.querySelector('.preview-mark')).to.exist;
+    expect(root.textContent).not.to.contain('Do something');
+    expect(root.querySelector('.bar')).to.equal(null);
+  });
+
+  it('opens every room before printing', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage()}></vs-proposal-view>`);
+    window.dispatchEvent(new Event('beforeprint'));
+    expect([...el.shadowRoot!.querySelectorAll('details')].every((d) => (d as HTMLDetailsElement).open)).to.equal(true);
+  });
+});
+
+describe('vs-proposal-view specifications and media (CQX-04)', () => {
+  const cat = { label: 'Carcass', summary: 'Moisture-resistant board', requirement: 'BWR grade board', grade: 'BWR', thickness: '18 mm',
+    finish: null, brand_examples: 'Example A, Example B', equivalent_rule: 'Equivalent grade only', final_selection: 'Confirmed at design sign-off',
+    warranty_summary: 'As per the manufacturer.' };
+  const img = { title: 'Wardrobe', alt: 'A two-door laminate wardrobe', caption: null, label: 'Illustrative example' as const,
+    urls: { thumb: '/api/v1/public/catalog/media/x', mobile: '/api/v1/public/catalog/media/y' } };
+
+  it('shows each line\'s approved specification and labelled reference images with a gallery', async () => {
+    const page = samplePage({ specifications: { name: 'Essential', version: '1.1', summary: 's', equivalent_policy: 'e', final_selection: 'f',
+      lines: { L1: [cat] } }, media: { note: 'Reference image: it does not change the scope or the price.', lines: { L1: [img, { ...img, label: 'Design reference' }] },
+      rooms: { R1: img, R2: null, R3: null } } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const root = el.shadowRoot!;
+    const spec = root.querySelector('details.spec')!;
+    expect(spec.textContent).to.contain('BWR grade board').and.to.contain('Material warranty').and.to.contain('version 1.1');
+    const thumbs = [...root.querySelectorAll('.thumbbtn')];
+    expect(thumbs).to.have.length(2);
+    expect(thumbs[0].getAttribute('aria-label')).to.equal('Open image 1 of 2: A two-door laminate wardrobe (Illustrative example)');
+    expect(root.querySelector('.roomcard img')!.getAttribute('alt')).to.equal('A two-door laminate wardrobe');
+    expect(root.querySelector('.roomcard .imglabel')!.textContent).to.equal('Illustrative example');
+    (thumbs[1] as HTMLButtonElement).click();
+    await el.updateComplete;
+    const dialog = root.querySelector('vs-dialog')!;
+    expect(dialog.getAttribute('heading')).to.equal('Wardrobe — Body');
+    expect(dialog.textContent).to.contain('Design reference');
+    await expect(el).to.be.accessible({ ignoredRules: ['image-redundant-alt'] });
+  });
+
+  it('falls back to the named placeholder when an image cannot load', async () => {
+    const page = samplePage({ media: { note: 'n', lines: {}, rooms: { R1: { ...img, urls: { mobile: '/missing.png' } }, R2: null, R3: null } } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    await waitUntil(() => el.shadowRoot!.querySelectorAll('.roomcard .ph').length === 3, 'placeholder after a failed image', { timeout: 3000 });
+  });
+});
+
+describe('vs-proposal-view pricing (CQX-05)', () => {
+  it('shows the frozen totals, milestones as shares and validity, with no unit rate', async () => {
+    const page = samplePage({ pricing: { currency: 'INR', total: '3,89,400.00', gst: { status: 'Included', amount: '59,400.00' }, discount: null,
+      base_total: '3,30,000.00', optional_total: '15,000.00', rooms: [{ ref: 'R1', title: 'Master bedroom', subtotal: '1,20,000.00' }],
+      milestones: [{ label: 'Booking', share: '10%', trigger: 'On acceptance (synthetic)' }], valid_until: '2026-11-13', days_left: 30,
+      unit_rates_shown: false, package: null, alternatives: [{ reference: 'VS-Q-2026-000002 v1', package: null, total: '4,00,000.00', valid_until: null }] } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#pricing')!;
+    expect(sec.textContent).to.contain('Booking').and.to.contain('10%').and.to.contain('30 days left').and.to.contain('unit rates are not part');
+    expect(sec.textContent).to.contain('VS-Q-2026-000002 v1');
+    await expect(el).to.be.accessible();
+  });
+});
+
+describe('optional items (CQX-06)', () => {
+  const withChoices = (status: 'CALCULATED' | 'PRICE_CONFIRMATION_REQUIRED', selected: string[] = []) => samplePage({
+    capabilities: { interaction: true, acceptance: false },
+    selections: { items: [{ ref: 'L9', state: selected.includes('L9') ? 'SELECTED' : 'NOT_SELECTED', priced: true }], selected_refs: selected,
+      status, extra: status === 'CALCULATED' && selected.length ? '15,000.00' : null,
+      total_with_selections: status === 'CALCULATED' && selected.length ? '4,07,100.00' : null } });
+
+  it('offers a labelled choice per item and says the price needs confirmation', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${withChoices('PRICE_CONFIRMATION_REQUIRED', ['L9'])}></vs-proposal-view>`);
+    const set = el.shadowRoot!.querySelector('fieldset.optitem')!;
+    expect(set.querySelector('legend')!.textContent).to.contain('Loft above wardrobe');
+    const radios = [...set.querySelectorAll('input[type=radio]')] as HTMLInputElement[];
+    expect(radios.map((r) => r.closest('label')!.textContent!.trim())).to.deep.equal(['Add to my proposal', 'Not for me', 'I would like to discuss it']);
+    expect(radios[0].checked).to.equal(true);
+    expect(el.shadowRoot!.querySelector('#optional')!.textContent).to.contain('PRICE CONFIRMATION REQUIRED');
+    await expect(el).to.be.accessible();
+  });
+
+  it('shows the server total only when it is calculated, and never offers choices in preview', async () => {
+    let el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${withChoices('CALCULATED', ['L9'])}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#optional')!.textContent).to.contain('₹ 4,07,100.00');
+    el = await fixture<VsProposalView>(html`<vs-proposal-view preview .page=${withChoices('CALCULATED')}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelectorAll('input[type=radio]')).to.have.length(0);
+  });
+
+  it('sends the choice with the link header, reloads, and announces the result; a refusal lands in the error summary', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'z'.repeat(43)}`);
+    let refused = false;
+    const calls = serve((path) => (path.endsWith('/selections') && refused
+      ? json({ status: 422, code: 'VALIDATION_FAILED', title: 'x', detail: 'Please choose one of the optional items.', errors: [{ field: 'line_ref', code: 'NOT_OPTIONAL', message: 'Not an optional item of this proposal.' }] }, 422)
+      : json(path.endsWith('/selections') ? withChoices('PRICE_CONFIRMATION_REQUIRED', ['L9']).selections : withChoices('PRICE_CONFIRMATION_REQUIRED'))));
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    (view.shadowRoot!.querySelector('input[type=radio]') as HTMLInputElement).click();
+    await waitUntil(() => view.announcement.includes('added to your choices'));
+    const post = calls.find((c) => c.path.endsWith('/selections'))!;
+    expect(post.headers['X-Veda-Proposal']).to.equal(`vsp_${'z'.repeat(43)}`);
+    expect(post.headers['Idempotency-Key']).to.match(/^[a-f0-9]{32}$/);
+    refused = true;
+    (view.shadowRoot!.querySelectorAll('input[type=radio]')[1] as HTMLInputElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('vs-error-summary'));
+    expect(view.announcement).to.equal('Not saved.');
+  });
+});
+
+describe('questions and change requests (CQX-07)', () => {
+  const asked = (over: Partial<Page> = {}) => samplePage({ capabilities: { interaction: true, acceptance: false },
+    requests: { can_ask: true, items: [{ ref: '#1', category: 'CHANGE_FINISH', category_label: 'Change a finish', line_ref: 'L1', room: 'Master bedroom',
+      about_version: 1, about_variation: 0, message: '<img src=x onerror=alert(1)> acrylic please', requested_quantity: null, status: 'NEEDS_CLARIFICATION',
+      status_label: 'We need a little more detail', response: 'Which colour?', sent_on: '2026-10-14T10:00:00Z', responded_on: null, answered_by_revision: null }] }, ...over });
+
+  it('lists the customer\'s requests as text (never markup) with the answer, and asks only what the category needs', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${asked()}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#questions')!;
+    expect(sec.querySelector('img')).to.equal(null);
+    expect(sec.querySelector('.msg')!.textContent).to.contain('<img src=x');
+    expect(sec.textContent).to.contain('Which colour?');
+    expect(sec.querySelector('select[name=line]')).to.equal(null);
+    const cat = sec.querySelector('select[name=category]') as HTMLSelectElement;
+    cat.value = 'CHANGE_QUANTITY';
+    cat.dispatchEvent(new Event('change'));
+    await el.updateComplete;
+    expect(sec.querySelector('select[name=line]')).to.exist;
+    expect(sec.querySelector('input[name=quantity]')).to.exist;
+    await expect(el).to.be.accessible();
+  });
+
+  it('sends one request per submission with a stable idempotency key and clears the form', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'q'.repeat(43)}`);
+    const calls = serve((path) => json(path.endsWith('/requests') ? [] : asked()));
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const form = view.shadowRoot!.querySelector('#questions form') as HTMLFormElement;
+    (form.querySelector('textarea') as HTMLTextAreaElement).value = 'Could the kitchen be ready earlier?';
+    form.requestSubmit();
+    await waitUntil(() => view.announcement.includes('sent to Veda Spaces'));
+    const post = calls.find((c) => c.path.endsWith('/requests'))!;
+    expect(post.headers['Idempotency-Key']).to.match(/^[a-f0-9]{32}$/);
+    expect((form.querySelector('textarea') as HTMLTextAreaElement).value).to.equal('');
+  });
+});
+
+describe('variation and version comparison (CQX-08)', () => {
+  it('shows a variation against the accepted baseline with kept choices and the cumulative position', async () => {
+    const page = samplePage({ variation: { reference: 'VS-Q-2026-000001-V01 v1', baseline_reference: 'VS-Q-2026-000001 v1', status: 'ISSUED',
+      net_change: '25,000.00', gst: { status: 'Included', amount: '4,500.00' }, net_change_with_gst: '29,500.00', accepted_value: '4,04,400.00',
+      value_if_accepted: '4,33,900.00', issuable: true, kept_choices: [{ description: 'Loft above wardrobe', amount: '15,000.00' }],
+      changes: [{ ref: 'L1', description: 'TV unit', room: 'Bedroom 2', change: 'ADD', change_label: 'Added', quantity_before: null,
+        quantity_after: '18 sq ft', amount_before: null, amount_after: '25,000.00', delta: '25,000.00', priced: true }] } });
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${page}></vs-proposal-view>`);
+    const sec = el.shadowRoot!.querySelector('#variation')!;
+    expect(sec.textContent).to.contain('Added').and.to.contain('Loft above wardrobe').and.to.contain('₹ 4,33,900.00');
+    await expect(el).to.be.accessible();
+  });
+
+  it('fetches the comparison on request and lists what changed', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'c'.repeat(43)}`);
+    const cmp = { from_version: 1, to_version: 2, total_before: '3,00,000.00', total_after: '3,25,000.00',
+      changes: [{ change: 'ADDED', description: 'TV unit', room: 'Bedroom 2', before: null, after: '25,000.00', status: 'Included' }] };
+    serve((path) => json(path.endsWith('/comparison') ? { comparison: cmp } : samplePage({ comparison_available: true })));
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    (view.shadowRoot!.querySelector('#compare button') as HTMLButtonElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('#compare [role=table]'));
+    expect(view.shadowRoot!.querySelector('#compare')!.textContent).to.contain('TV unit').and.to.contain('₹ 3,25,000.00');
+  });
+});
+
+describe('terms and acknowledgements (CQX-09)', () => {
+  const terms = { policy_decided: true, pending: ['WARRANTY'], sections: [
+    { code: 'WARRANTY', title: 'Warranty', items: ['Synthetic warranty.'], available: true, sha256: 'w'.repeat(64), required: true, acknowledged_on: null },
+    { code: 'SERVICE_SUPPORT', title: 'Service support (Veda Spaces)', items: [], available: false, sha256: null, required: false, acknowledged_on: null }] };
+
+  it('shows sections as frozen, never presents unconfirmed content, and acknowledges the digest shown', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'t'.repeat(43)}`);
+    const calls = serve((path) => json(path.endsWith('/acknowledgements') ? { terms } : samplePage({ capabilities: { interaction: true, acceptance: false }, terms })));
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const support = view.shadowRoot!.querySelector('#term-SERVICE_SUPPORT')!;
+    expect(support.textContent).to.contain('To be confirmed by Veda Spaces');
+    expect(support.querySelector('button')).to.equal(null);
+    await expect(view).to.be.accessible();
+    (view.shadowRoot!.querySelector('#term-WARRANTY button') as HTMLButtonElement).click();
+    await waitUntil(() => view.announcement.includes('acknowledged'));
+    const post = calls.find((c) => c.path.endsWith('/acknowledgements'))!;
+    expect(post.headers['X-Veda-Proposal']).to.equal(`vsp_${'t'.repeat(43)}`);
+  });
+});
+
+describe('decision (CQX-10)', () => {
+  const ready: Decision = { available: true, decided: null, can_decline: true, version_no: 1, snapshot_sha256: 'a'.repeat(64), total: '4,04,400.00',
+    selected_refs: ['L9'], statement: 'I accept VS-Q-2026-000001 v1 as shown.' };
+
+  it('needs an explicit confirmation, then sends exactly the version, digest, total and choices shown', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'d'.repeat(43)}`);
+    const calls: { path: string; body: unknown; key?: string }[] = [];
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), location.href).pathname;
+      calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null, key: (init?.headers as Record<string, string>)?.['Idempotency-Key'] });
+      return json(path.endsWith('/decision') ? { state: 'ACCEPTED', decision: { ...ready, decided: 'ACCEPTED' } }
+        : samplePage({ capabilities: { interaction: true, acceptance: true }, decision: { ...ready } }));
+    };
+    const pageEl = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => pageEl.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = pageEl.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    const accept = [...view.shadowRoot!.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Accept')) as HTMLButtonElement;
+    expect(accept.disabled).to.equal(true);
+    await expect(view).to.be.accessible();
+    (view.shadowRoot!.querySelector('#decision input[type=checkbox]') as HTMLInputElement).click();
+    await view.updateComplete;
+    expect(accept.disabled).to.equal(false);
+    accept.click();
+    await waitUntil(() => calls.some((c) => c.path.endsWith('/decision')));
+    const sent = calls.find((c) => c.path.endsWith('/decision'))!;
+    expect(sent.body).to.deep.equal({ decision: 'ACCEPTED', version_no: 1, snapshot_sha256: 'a'.repeat(64), displayed_total: '4,04,400.00',
+      selected_line_refs: ['L9'], confirm: true });
+    expect(sent.key).to.match(/^[a-f0-9]{32}$/);
+  });
+
+  it('shows why acceptance is not available, and a recorded decision', async () => {
+    let el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage({ decision: { available: false, decided: null,
+      reason: 'Digital acceptance is not available for this proposal yet.' } })}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#decision')!.textContent).to.contain('not available');
+    expect(el.shadowRoot!.querySelectorAll('#decision button')).to.have.length(0);
+    el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${samplePage({ state: 'ACCEPTED', decision: { available: false, decided: 'ACCEPTED',
+      decided_on: '2026-10-14T10:00:00Z', by_this_link: true, total: '4,04,400.00', evidence_sha256: 'e'.repeat(64) } })}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelector('#decision')!.textContent).to.contain('You accepted').and.to.contain('₹ 4,04,400.00');
+  });
+});
+
+describe('vs-proposal-page (CQX-01/03)', () => {
+  afterEach(() => sessionStorage.clear());
+
+  it('takes the token from the fragment, scrubs the address bar and sends it only as a header', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'x'.repeat(43)}`);
+    const calls = serve(() => json(samplePage()));
+    const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => el.shadowRoot!.querySelector('vs-proposal-view'));
+    expect(window.location.hash).to.equal('');
+    expect(calls[0].path).to.equal('/api/v1/public/proposal');
+    expect(calls[0].headers['X-Veda-Proposal']).to.equal(`vsp_${'x'.repeat(43)}`);
+    expect(calls[0].headers.Authorization).to.equal(undefined);
+    expect(document.title).to.equal('Your proposal · Veda Spaces');
+  });
+
+  it('explains a revoked, expired or superseded link safely and forgets it', async () => {
+    for (const [code, words] of [['PROPOSAL_LINK_REVOKED', 'no longer active'], ['PROPOSAL_LINK_EXPIRED', 'has expired'],
+      ['PROPOSAL_SUPERSEDED', 'newer version']] as const) {
+      history.replaceState(null, '', `/proposal#t=vsp_${'y'.repeat(43)}`);
+      serve(() => json({ status: 410, code, title: 'Gone', detail: 'x' }, 410));
+      const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+      await waitUntil(() => el.shadowRoot!.querySelector('[role="alert"]'));
+      expect(el.shadowRoot!.textContent).to.contain(words);
+      expect(sessionStorage.getItem('vs-proposal-link')).to.equal(null);
+      await expect(el).to.be.accessible();
+    }
+  });
+
+  it('without a link says so without calling the API', async () => {
+    history.replaceState(null, '', '/proposal');
+    const calls = serve(() => json(samplePage()));
+    const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => el.shadowRoot!.querySelector('[role="alert"]'));
+    expect(calls).to.have.length(0);
+    expect(el.shadowRoot!.textContent).to.contain('not valid');
+  });
+});
+
+describe('PR #95 remediation N2, N11 (focus, retry, keys, landmarks)', () => {
+  const interactive = (over: Partial<Page> = {}) => samplePage({ capabilities: { interaction: true, acceptance: true },
+    selections: { items: [{ ref: 'L9', state: 'NOT_SELECTED', priced: true }], selected_refs: [], can_choose: true,
+      status: 'PRICE_CONFIRMATION_REQUIRED', extra: null, total_with_selections: null },
+    decision: { available: true, decided: null, can_decline: true, version_no: 1, snapshot_sha256: 'a'.repeat(64), total: '3,89,400.00',
+      selected_refs: [], statement: 'I accept.' }, ...over });
+
+  async function open(handler: (path: string, init?: RequestInit) => Response) {
+    history.replaceState(null, '', `/proposal#t=vsp_${'f'.repeat(43)}`);
+    const calls: { path: string; body: unknown; key?: string }[] = [];
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), location.href).pathname;
+      calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null, key: (init?.headers as Record<string, string>)?.['Idempotency-Key'] });
+      return handler(path, init);
+    };
+    const page = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => page.shadowRoot!.querySelector('vs-proposal-view'));
+    const view = page.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    await view.updateComplete;
+    return { page, view, calls };
+  }
+  const deepActive = () => { let a: Element | null = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement; return a; };
+
+  it('has no main landmark of its own (the app shell provides the one main)', async () => {
+    const el = await fixture<VsProposalView>(html`<vs-proposal-view .page=${interactive()}></vs-proposal-view>`);
+    expect(el.shadowRoot!.querySelectorAll('main')).to.have.length(0);
+  });
+
+  it('returns focus to the control after a saved choice, never to the body', async () => {
+    const { view } = await open((path) => json(path.endsWith('/selections') ? interactive().selections : interactive()));
+    const radio = view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('a choice that fails offline is not left checked, says nothing was saved, and can be retried', async () => {
+    let offline = true;
+    const { view, calls } = await open((path) => {
+      if (path.endsWith('/selections') && offline) throw new TypeError('Failed to fetch');
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    (view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement).click();
+    await waitUntil(() => view.shadowRoot!.querySelector('vs-error-summary'));
+    await view.updateComplete;
+    expect((view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement).checked).to.equal(false);
+    expect(view.shadowRoot!.querySelector('vs-error-summary')!.shadowRoot!.textContent).to.contain('Nothing was saved');
+    offline = false;
+    const retry = [...view.shadowRoot!.querySelectorAll('button')].find((b) => b.textContent!.includes('Try again')) as HTMLButtonElement;
+    retry.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    expect(calls.filter((c) => c.path.endsWith('/selections'))).to.have.length(2);
+  });
+
+  it('never reuses a Decline key for Accept, and retires a key after a definitive answer', async () => {
+    let n = 0;
+    const { view, calls } = await open((path) => {
+      if (path.endsWith('/decision')) {
+        n += 1;
+        if (n === 1) throw new TypeError('Failed to fetch'); // the Decline's response is lost
+        return json({ status: 409, code: 'ALREADY_DECIDED', title: 'x', detail: 'A decision on this version has already been recorded.' }, 409);
+      }
+      return json(interactive());
+    });
+    const root = view.shadowRoot!;
+    (root.querySelector('#decision .btn.ghost') as HTMLButtonElement).click();
+    await view.updateComplete;
+    ([...root.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Yes, decline')) as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-error-summary'));
+    (root.querySelector('#decision input[type=checkbox]') as HTMLInputElement).click();
+    await view.updateComplete;
+    ([...root.querySelectorAll('#decision button')].find((b) => b.textContent!.includes('Accept')) as HTMLButtonElement).click();
+    await waitUntil(() => calls.filter((c) => c.path.endsWith('/decision')).length === 2);
+    const [decline, accept] = calls.filter((c) => c.path.endsWith('/decision'));
+    expect(decline.key).to.match(/^[a-f0-9]{32}$/);
+    expect(accept.key).to.not.equal(decline.key);
+  });
+
+  it('focuses the proposal title when it arrives, also after a retried load; never on a refresh after an action', async () => {
+    history.replaceState(null, '', `/proposal#t=vsp_${'e'.repeat(43)}`);
+    let first = true;
+    serve((path) => {
+      if (first && path.endsWith('/proposal')) { first = false; return json({ status: 500, code: 'INTERNAL_ERROR', title: 'x' }, 500); }
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+    await waitUntil(() => el.shadowRoot!.querySelector('[role=alert]'));
+    expect(deepActive()!.tagName).to.equal('H1');
+    (el.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+    await waitUntil(() => deepActive()?.id === 'proposal-title');
+    const title = deepActive() as HTMLElement;
+    expect(title.textContent).to.contain('Interior works');
+    expect(title.getAttribute('tabindex')).to.equal('-1');
+    const view = el.shadowRoot!.querySelector('vs-proposal-view') as VsProposalView;
+    const radio = view.shadowRoot!.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('after a failed action, a successful retry returns focus to the control that started it', async () => {
+    let fails = 2;
+    const { view } = await open((path) => {
+      if (path.endsWith('/selections') && fails > 0) {
+        fails -= 1;
+        const failure = json({ status: 503, code: 'UNAVAILABLE', title: 'x' }, 503);
+        // the retry answers slowly, so the test can see it in flight
+        return (fails === 0 ? new Promise((r) => setTimeout(() => r(failure), 150)) : failure) as unknown as Response;
+      }
+      return json(path.endsWith('/selections') ? interactive().selections : interactive());
+    });
+    const root = view.shadowRoot!;
+    const radio = root.querySelector('input[type=radio][value=SELECTED]') as HTMLInputElement;
+    radio.focus();
+    radio.click();
+    await waitUntil(() => root.querySelector('vs-error-summary'));
+    const retry = () => [...root.querySelectorAll('button')].find((b) => /Try again|Trying again/.test(b.textContent!)) as HTMLButtonElement;
+    retry().focus();
+    retry().click();
+    await waitUntil(() => view.busy);
+    expect(retry().getAttribute('aria-disabled')).to.equal('true'); // still there, and focused, while the retry runs
+    expect(deepActive()).to.equal(retry());
+    await waitUntil(() => !view.busy); // the retry failed
+    // a failed retry: focus stays in the error context (the summary, inside its own shadow root, or the Try again button)
+    await waitUntil(() => root.activeElement?.tagName === 'VS-ERROR-SUMMARY' || deepActive() === retry());
+    expect(deepActive()).to.not.equal(document.body);
+    retry().click();
+    await waitUntil(() => view.announcement.includes('added'));
+    await view.updateComplete;
+    expect(deepActive()).to.equal(radio);
+  });
+
+  it('an error-summary link focuses its exact control, which is marked invalid and described by the error', async () => {
+    const { view } = await open(() => json(interactive({ requests: { can_ask: true, items: [] } })));
+    const root = view.shadowRoot!;
+    (root.querySelector('#questions button.primary') as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-error-summary')?.shadowRoot?.querySelector('a'));
+    const textarea = root.querySelector('textarea[name=message]') as HTMLTextAreaElement;
+    expect(textarea.getAttribute('aria-invalid')).to.equal('true');
+    expect(textarea.getAttribute('aria-describedby')).to.equal('err-message ask-message-hint');
+    expect(root.getElementById('err-message')!.textContent).to.contain('at least 3 characters');
+    (root.querySelector('vs-error-summary')!.shadowRoot!.querySelector('a') as HTMLAnchorElement).click();
+    expect(deepActive()).to.equal(textarea);
+    textarea.value = 'Corrected';
+    textarea.dispatchEvent(new Event('input'));
+    await view.updateComplete;
+    expect(textarea.hasAttribute('aria-invalid')).to.equal(false);
+    expect(textarea.getAttribute('aria-describedby')).to.equal('ask-message-hint');
+    expect(deepActive()).to.equal(textarea);
+  });
+
+  it('an error about the request as a whole is text, not a link that goes nowhere', async () => {
+    const el = await fixture(html`<vs-error-summary .errors=${[{ field: '', message: 'Nothing was saved.' }, { field: 'message', message: 'Write more.' }]}></vs-error-summary>`);
+    const items = [...el.shadowRoot!.querySelectorAll('li')];
+    expect(items[0].querySelector('a')).to.equal(null);
+    expect(items[1].querySelector('a')!.getAttribute('href')).to.equal('#err-message');
+  });
+
+  it('an initial server failure or rate limit offers an accessible retry', async () => {
+    for (const status of [500, 429]) {
+      history.replaceState(null, '', `/proposal#t=vsp_${'r'.repeat(43)}`);
+      let first = true;
+      serve(() => { if (first) { first = false; return json({ status, code: status === 429 ? 'RATE_LIMITED' : 'INTERNAL_ERROR', title: 'x' }, status); } return json(samplePage()); });
+      const el = await fixture(html`<vs-proposal-page></vs-proposal-page>`);
+      await waitUntil(() => el.shadowRoot!.querySelector('[role=alert]'));
+      expect(el.shadowRoot!.querySelector('[role=alert]')!.textContent).to.contain('Try again');
+      await expect(el).to.be.accessible();
+      (el.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+      await waitUntil(() => el.shadowRoot!.querySelector('vs-proposal-view'));
+    }
+  });
+});

@@ -99,6 +99,8 @@ class Terms(_Closed):  # OI-MTQ-09 (legal review recorded with the decision)
     terms_version: Annotated[str, Field(min_length=1, max_length=20)]
     payment_milestones: tuple[Milestone, ...] = Field(min_length=1)
     warranty: tuple[Text, ...] = Field(min_length=1)
+    # Veda Spaces' own service support (CQX-09), kept apart from the warranty text: both are shown, never merged.
+    service_support: tuple[Text, ...] = ()
     assumptions: tuple[Text, ...] = ()
     exclusions: tuple[Text, ...] = Field(min_length=1)
     change_order_terms: Text
@@ -117,7 +119,9 @@ class Presentation(_Closed):  # OI-MTQ-10
 
 
 class Acceptance(_Closed):  # OI-MTQ-11
-    methods: tuple[Literal["STAFF_RECORDED", "SIGNED_COPY"], ...] = Field(min_length=1)
+    # CUSTOMER_DIGITAL: the customer accepts or declines through their secure proposal link (CQX-10); it also needs
+    # the customer-proposal decisions CQX-D01, D03 and D04 (customer_proposal.policy).
+    methods: tuple[Literal["STAFF_RECORDED", "SIGNED_COPY", "CUSTOMER_DIGITAL"], ...] = Field(min_length=1)
 
 
 class Variations(_Closed):  # OI-MTQ-13

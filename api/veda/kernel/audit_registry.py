@@ -229,6 +229,32 @@ register(
 register(AuditPolicy("quotation_section", FULL, parent=("quotation", "quotation_id")))
 register(AuditPolicy("quotation_line", FULL, parent=("quotation", "quotation_id")))
 register(AuditPolicy("quotation_event", FULL, parent=("quotation", "quotation_id")))
+# --- CQX (0205): the customer quotation experience. FULL, each linked to its quotation (or grant). Personal data: the
+# customer's request text, staff responses, an optional recipient label and any network evidence an owner policy permits;
+# all erased with the lead. Token digests are not secrets of any use without the token; no token is ever stored.
+register(
+    AuditPolicy("proposal_access_grant", FULL, parent=("quotation", "quotation_id"), pii=frozenset({"recipient_label"}))
+)
+register(AuditPolicy("proposal_event", FULL, parent=("quotation", "quotation_id")))
+register(AuditPolicy("customer_optional_selection", FULL, parent=("quotation", "quotation_id")))
+register(
+    AuditPolicy(
+        "customer_proposal_request",
+        FULL,
+        parent=("quotation", "quotation_id"),
+        pii=frozenset({"body", "staff_response", "requested_quantity"}),
+    )
+)
+register(AuditPolicy("quotation_acknowledgement", FULL, parent=("quotation", "quotation_id")))
+register(
+    AuditPolicy(
+        "quotation_acceptance_evidence",
+        FULL,
+        parent=("quotation", "quotation_id"),
+        excluded=frozenset({"evidence"}),
+        pii=frozenset({"network"}),
+    )
+)
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

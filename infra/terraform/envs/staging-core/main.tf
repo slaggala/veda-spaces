@@ -162,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config
+    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config
   )
 }
 
@@ -275,6 +275,47 @@ locals {
   commercial_config = {
     VEDA_MTQ_ESTIMATION_ENABLED = local.mtq_commercial.estimation_enabled ? "true" : "false"
     VEDA_MTQ_QUOTATION_ENABLED  = local.mtq_commercial.quotation_enabled ? "true" : "false"
+  }
+}
+
+# Customer quotation experience flags (decision log 35, infra/config/staging-platform.json "customer_proposal"). All
+# three parameters are always planned and false by default. Viewing (VEDA_CUSTOMER_PROPOSAL_ENABLED) needs the B4
+# quotation flag; interaction needs viewing; acceptance needs interaction. A flag turns on only with an owner-APPROVED,
+# staging-only, synthetic-customers-only infra/config/customer-proposal-enablement-record.json bound by its SHA-256,
+# every evidence field filled, whose scope names that capability (viewing, interaction, acceptance_testing): acceptance
+# is never enabled merely to test viewing. Output "customer_proposal" refuses anything else; the API refuses all three in
+# production and the same dependencies at start.
+locals {
+  cqx = try(local.platform.customer_proposal, {
+    status = "DECIDED", proposal_enabled = false, interaction_enabled = false, acceptance_enabled = false, enablement_record_sha256 = null
+  })
+  cqx_any         = local.cqx.proposal_enabled || local.cqx.interaction_enabled || local.cqx.acceptance_enabled
+  cqx_record_path = var.customer_proposal_record_path != "" ? var.customer_proposal_record_path : "${path.module}/../../../config/customer-proposal-enablement-record.json"
+  cqx_record      = try(jsondecode(file(local.cqx_record_path)), {})
+  cqx_evidence    = try(local.cqx_record.evidence, {})
+  cqx_scope       = try(local.cqx_record.scope, {})
+  cqx_run_ids     = ["ci_run_id", "deploy_flags_off_run_id", "migration_verification_run_id", "infra_apply_run_id", "drift_run_id"]
+  # Every reason the record cannot enable the flags that are on; empty means it can (read only when a flag is on).
+  cqx_record_problems = concat(
+    fileexists(local.cqx_record_path) ? [] : ["the record file is missing"],
+    try(local.cqx_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.cqx_record.environment, "") == "staging" && try(local.cqx_record.production, true) == false ? [] : ["the record is not staging-only"],
+    try(local.cqx_scope.protected_staging_only, false) == true && try(local.cqx_scope.synthetic_customers_only, false) == true && try(local.cqx_scope.real_customers, true) == false ? [] : ["the record does not limit itself to protected staging with synthetic customers"],
+    !local.cqx.proposal_enabled || try(local.cqx_scope.viewing, false) == true ? [] : ["the record's scope does not authorise viewing"],
+    !local.cqx.interaction_enabled || try(local.cqx_scope.interaction, false) == true ? [] : ["the record's scope does not authorise interaction"],
+    !local.cqx.acceptance_enabled || try(local.cqx_scope.acceptance_testing, false) == true ? [] : ["the record's scope does not authorise acceptance testing"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.cqx_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.cqx_record.approved_by, "")) != "" && !strcontains(upper(try(local.cqx_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.cqx_record.approved_by, "") != try(local.cqx_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k in concat(["independent_review", "smoke_test", "production_isolation"], local.cqx_run_ids) :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.cqx_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.cqx_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in local.cqx_run_ids : "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.cqx_evidence[k], ""))))],
+    fileexists(local.cqx_record_path) && try(local.cqx.enablement_record_sha256, null) == (fileexists(local.cqx_record_path) ? filesha256(local.cqx_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  cqx_config = {
+    VEDA_CUSTOMER_PROPOSAL_ENABLED             = local.cqx.proposal_enabled ? "true" : "false"
+    VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED = local.cqx.interaction_enabled ? "true" : "false"
+    VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED = local.cqx.acceptance_enabled ? "true" : "false"
   }
 }
 

@@ -91,6 +91,21 @@ Evidence to record: the `schema-status` output, the `deploy.sh` transcript, the 
 - **Owner category:** Operations. The decision to roll back rather than forward-fix is the Architecture Owner's for any security-relevant defect.
 - **Status:** this procedure has not been rehearsed (RG-7 open).
 
+### 2.4 Quotation template versions (MTQ B4 / customer proposals, PR #95)
+
+Issued quotations are sealed with the HTML template version in force (`quotation.template_version`) and are only ever
+served from those frozen bytes, by an image that knows that version (`rendering.TEMPLATES`). PR #95 introduced
+`mtq-quotation-html/2`, which every quotation issued from that release on uses.
+
+- **An older image cannot serve a v2 quotation.** It refuses it, fail closed: the staff document, the customer
+  proposal and any decision on it answer `SNAPSHOT_INTEGRITY_FAILED`, and a lead erasure that must redact a v2 document
+  stops with an error instead of re-rendering it. Nothing is altered or mis-rendered.
+- **Before rolling back across PR #95,** check whether any v2 quotation exists, inside the target image's container:
+  `docker compose run --rm --no-deps api python -c "import sqlalchemy as sa; from veda.kernel import db; from veda.modules.mtq_commercial.models import Quotation; s=db.new_session(write=False); print(s.execute(sa.select(sa.func.count()).select_from(Quotation).where(Quotation.template_version=='mtq-quotation-html/2')).scalar())"`.
+  If the count is not zero, **recovery is roll-forward only** (§2.2): a corrected image that still carries the v2
+  reader. Roll back only if a rollback image with a compatible v2 reader exists.
+- Proven by `api/tests/integration/test_cqx_remediation.py::test_a_template_v2_document_under_a_rollback_image_is_refused_not_misrendered_and_roll_forward_recovers`.
+
 ## 3. Disaster rollback: restore a snapshot
 
 Use this only when a migration or a defect corrupted data. **The restored database must then be served by a fixed

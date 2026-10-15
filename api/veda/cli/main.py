@@ -224,6 +224,7 @@ JOBS = {
     "follow-up-reminders": "follow_up_reminders",
     "spam-review": "spam_review",
     "mtq-quotation-expiry": "mtq_quotation_expiry",
+    "customer-proposal-housekeeping": "customer_proposal_housekeeping",
 }
 
 

@@ -1,0 +1,12 @@
+{
+ "schema": "veda.customer-proposal-policy/1",
+ "version": "2026.10.0-UNSET",
+ "status": "OWNER_DECISIONS_PENDING",
+ "note": "Every customer-proposal decision the owner has not recorded stays null here. A null decision keeps its customer action disabled (fail closed); it is never filled with an assumed value. A decision is recorded by a reviewed pull request that sets it, cites the decision code (docs/implementation/customer-proposal/CQX-owner-decisions.md) and changes the version.",
+ "decisions": {
+  "CQX-D01": null,
+  "CQX-D02": null,
+  "CQX-D03": null,
+  "CQX-D04": null
+ }
+}

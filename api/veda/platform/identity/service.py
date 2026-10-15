@@ -98,6 +98,9 @@ def me_payload(s: Session, ctx) -> dict:
             "mtq_site": bool(settings().mtq_site_enabled),
             "mtq_estimation": bool(settings().mtq_estimation_enabled),
             "mtq_quotation": bool(settings().mtq_quotation_enabled),
+            "customer_proposal": bool(settings().customer_proposal_enabled),
+            "customer_proposal_interaction": bool(settings().customer_proposal_interaction_enabled),
+            "customer_quotation_acceptance": bool(settings().customer_quotation_acceptance_enabled),
         },
         "version": user.version,
     }
