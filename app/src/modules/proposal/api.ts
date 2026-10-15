@@ -189,8 +189,19 @@ export interface Activity {
   acknowledgements: { section: string; recipient_kind: string; acknowledged_on: string; section_sha256: string; evidence_sha256: string }[];
 }
 
+/** The customer information pack as recorded in a version's terms (OI-MTQ-18), and staff's choices for that version. */
+export interface PackItem { code: string; category: string; text: string; default_status?: string }
+export interface CustomerPack { content_version: string; contacts: { code: string; kind: string; display_name: string; role: string }[];
+  client_responsibilities: PackItem[]; site_readiness: PackItem[] }
+export interface CustomerInputs { contact_code: string | null; responsibilities: Record<string, string>; readiness: Record<string, string> }
+export interface QuotationForInfo { id: string; version: number; status: string; terms: { customer_pack?: CustomerPack | null };
+  customer_inputs: CustomerInputs | null }
+
 const P = '/api/v1';
 export const staffProposal = {
+  quotation: (quotationId: string) => api.get<QuotationForInfo>(`${P}/quotations/${quotationId}`),
+  saveCustomerInfo: (q: QuotationForInfo, body: CustomerInputs) =>
+    api.patch<QuotationForInfo>(`${P}/quotations/${q.id}`, { customer_information: body }, { ifMatch: q.version }),
   grants: (quotationId: string) => api.get<Grant[]>(`${P}/quotations/${quotationId}/access-grants`),
   share: (quotationId: string, body: { recipient_kind: string; recipient_label?: string | null; expires_in_days: number }) =>
     api.request<Grant>(`${P}/quotations/${quotationId}/access-grants`, { method: 'POST', body, idempotencyKey: newKey() }),
