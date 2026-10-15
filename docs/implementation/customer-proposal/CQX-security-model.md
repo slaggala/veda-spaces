@@ -72,12 +72,12 @@ blocks enabling that capability (or real customers, or production) while it is o
 
 ### 4.1 N11 history (customer page focus and accessibility)
 
-- **Original finding (independent certification of `a0e0343`):** focus fell to the body after customer actions;
+- **Original finding (independent certification of PR #95 before remediation):** focus fell to the body after customer actions;
   next-steps links, radios and the decision checkbox were under 44 px; the view nested a `main` inside the shell's
   `main`; an offline, 5xx or 429 failure (initial load or action) offered no retry; a choice that failed stayed checked.
-- **First correction (`471051c`):** focus returned to the initiating control, else its section heading; 44 px targets;
+- **First correction (PR #95 remediation, N11 commit):** focus returned to the initiating control, else its section heading; 44 px targets;
   one main landmark; retry for transient failures; radios re-synced with the server's state.
-- **Focused re-review residuals (at `6e68626`):** (1) after a slow initial load, or a retry after 500, 429 or a network
+- **Focused re-review residuals (after the first remediation):** (1) after a slow initial load, or a retry after 500, 429 or a network
   failure, focus stayed on the body; (2) after a failed action's Try again, focus could fall to the body (the retry
   button replaced the remembered control and then disappeared); (3) error-summary links did not move focus to the
   invalid control, and the textarea exposed no `aria-invalid`/`aria-describedby`; (4) the browser touch-target check
