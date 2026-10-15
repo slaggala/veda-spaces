@@ -537,6 +537,9 @@ class Quotation(AuditedBase):
     accepted_baseline: Mapped[list | None] = mapped_column(JSONType())
     accepted_baseline_sha256: Mapped[str | None] = mapped_column(sa.String(64))
     decision_note: Mapped[str | None] = mapped_column(sa.String(1000))
+    # Staff's per-version choices against the customer information pack (OI-MTQ-18; 0206): the quotation contact and
+    # the status of each responsibility and site-readiness item. Read at issue only; NULL: every item to be confirmed.
+    customer_inputs: Mapped[dict | None] = mapped_column(JSONType())
 
     __table_args__ = (
         in_check("quotation", "status", V.QUOTATION_STATUSES),

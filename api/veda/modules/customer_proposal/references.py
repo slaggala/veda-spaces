@@ -33,7 +33,11 @@ from veda.modules.mtq_commercial.models import CostEstimateLine, Quotation
 log = logging.getLogger("veda.customer_proposal")
 MEDIA_NOTE = "Reference image: it illustrates the kind of item and does not change the scope or the price."
 SPEC_FIELDS = ("label", "summary", "requirement", "grade", "thickness", "finish", "brand_examples", "equivalent_rule",
-               "final_selection", "warranty_summary")  # fmt: skip
+               "final_selection", "warranty_summary", "hardware_category")  # fmt: skip
+# A category is hardware when its approved specification names a hardware category (hinges, channels, soft-close,
+# accessories…); everything else is a material (carcass, board, shutters, surfaces, edges…). Data-driven: the
+# specification decides, this module never classifies by name.
+CATEGORY_FIELDS = (*SPEC_FIELDS, "code", "details")
 
 
 def _codes(s: Session, q: Quotation) -> dict[str, tuple[str, str]]:
@@ -75,7 +79,8 @@ def pinned_spec(s: Session, q: Quotation):
 
 
 def specifications(s: Session, q: Quotation) -> dict[str, Any] | None:
-    """{"name", "version", "summary", "equivalent_policy", "final_selection", "lines": {ref: [category]}} or None."""
+    """{"name", "version", "summary", "equivalent_policy", "final_selection", "warranty_summary", "lines": {ref:
+    [category]}, "categories": [category with its group]} or None (the page says SPECIFICATION TO BE CONFIRMED)."""
     from veda.modules.estimator import customer_spec
 
     row = pinned_spec(s, q)
@@ -87,7 +92,8 @@ def specifications(s: Session, q: Quotation) -> dict[str, Any] | None:
     except Exception:  # an invalid stored document is withheld, never half-shown
         log.error("customer_proposal.spec_invalid", extra={"spec_code": row.spec_code})
         return None
-    cats = {c["code"]: c for c in view["categories"]}
+    hardware = {c.code: c.hardware_category for c in spec.categories}
+    cats = {c["code"]: {**c, "hardware_category": hardware.get(c["code"])} for c in view["categories"]}
     by_line: dict[str, list[dict[str, Any]]] = {}
     for ref, (product, line) in _codes(s, q).items():
         hits = [
@@ -98,9 +104,15 @@ def specifications(s: Session, q: Quotation) -> dict[str, Any] | None:
         if hits:
             by_line[ref] = [{k: (", ".join(v) if isinstance(v := cats[code].get(k), list) else v) for k in SPEC_FIELDS}
                             for code in hits]  # fmt: skip
+    categories = []
+    for raw in view["categories"]:
+        c = cats[raw["code"]]
+        row = {k: (", ".join(v) if isinstance(v := c.get(k), list) and k != "details" else v) for k in CATEGORY_FIELDS}
+        row["group"] = "HARDWARE" if c.get("hardware_category") else "MATERIAL"
+        categories.append(row)
     return {"name": view["name"], "version": view["version"], "summary": view["summary"],
             "equivalent_policy": view["equivalent_policy"], "final_selection": view["final_selection"],
-            "lines": by_line}  # fmt: skip
+            "warranty_summary": view.get("warranty_summary"), "lines": by_line, "categories": categories}  # fmt: skip
 
 
 def media(s: Session, q: Quotation) -> dict[str, list[dict[str, Any]]]:

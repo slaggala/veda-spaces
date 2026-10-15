@@ -110,3 +110,48 @@ def customer(api, grant: dict) -> Customer:
 
 __all__ = ["ACCEPTANCE_ON", "Commercial", "Customer", "INTERACTION_ON", "PROPOSAL_ON", "customer", "issued", "ok",
            "setup", "share", "step"]  # fmt: skip
+
+
+# SYNTHETIC customer information pack (OI-MTQ-18) for exercising the decided paths. Every value is invented for tests:
+# not a Veda Spaces contact, rule, responsibility, warranty or promise. The real decision stays null.
+SYNTHETIC_PACK: dict[str, Any] = {
+    "content_version": "SYN-C1",
+    "contacts": [
+        {"code": "SYN_QUOTE_DESK", "kind": "QUOTATION", "display_name": "SYNTHETIC Quotation Desk",
+         "role": "Quotation consultant (synthetic)", "phone": "+00 0000 000000", "email": "quotes@synthetic.example",
+         "hours": "SYNTHETIC hours", "business_channel_approved": True},
+        {"code": "SYN_SUPPORT", "kind": "SUPPORT", "display_name": "SYNTHETIC Support", "role": "Customer care (synthetic)",
+         "email": "support@synthetic.example", "business_channel_approved": True},
+        {"code": "SYN_SERVICE", "kind": "SERVICE", "display_name": "SYNTHETIC Service", "role": "Service team (synthetic)",
+         "phone": "+00 0000 000001", "business_channel_approved": True},
+    ],
+    "support_escalation": "SYNTHETIC escalation route.",
+    "project_inclusions": [{"code": "SYN_INSTALL", "text": "SYNTHETIC installation of the listed items."}],
+    "client_responsibilities": [
+        {"code": "SYN_APPLIANCE", "category": "APPLIANCE_MODEL", "text": "SYNTHETIC: share your appliance models.",
+         "default_status": "REQUIRED"},
+        {"code": "SYN_LIFT", "category": "SERVICE_LIFT_ACCESS", "text": "SYNTHETIC: service lift access."},
+    ],
+    "site_readiness": [
+        {"code": "SYN_FLOOR", "category": "FLOORING", "text": "SYNTHETIC: flooring complete."},
+        {"code": "SYN_POWER", "category": "ELECTRICAL_SUPPLY", "text": "SYNTHETIC: power available."},
+    ],
+    "site_dependent_work": {
+        "intro": "SYNTHETIC: some needs become clear only on site.",
+        "approval_rule": "SYNTHETIC: such work is agreed with you as a change order before it starts.",
+        "categories": [{"code": "SYN_ELEC", "category": "ELECTRICAL", "text": "SYNTHETIC electrical changes."}],
+    },
+    "manufacturer_warranty_note": "SYNTHETIC: manufacturer warranty follows each manufacturer's own terms.",
+    "warranty_exclusions": [{"code": "SYN_MISUSE", "text": "SYNTHETIC: damage from misuse."}],
+    "service_guidance": {"contact_code": "SYN_SERVICE", "what_to_provide": ["SYNTHETIC: your quotation reference."],
+                         "reference_process": "SYNTHETIC: you receive a request reference.",
+                         "escalation": "SYNTHETIC service escalation."},
+    "handover": [{"code": "SYN_INSPECT", "category": "FINAL_INSPECTION", "text": "SYNTHETIC joint inspection."}],
+    "care": [{"code": "SYN_DRY", "category": "FURNITURE_CLEANING", "text": "SYNTHETIC: wipe with a dry cloth."}],
+    "next_steps": [
+        {"code": "SYN_ACCEPTED", "stage": "PROPOSAL_ACCEPTED", "label": "Proposal accepted", "text": "SYNTHETIC step."},
+        {"code": "SYN_CONFIRM", "stage": "VEDA_CONFIRMATION", "label": "Veda confirmation", "text": "SYNTHETIC step."},
+        {"code": "SYN_HANDOVER", "stage": "HANDOVER", "label": "Handover", "text": "SYNTHETIC step."},
+    ],
+    "payment_safety": "SYNTHETIC: payment instructions come only through approved Veda Spaces channels.",
+}

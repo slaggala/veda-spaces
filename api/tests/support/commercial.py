@@ -185,6 +185,7 @@ SYNTHETIC_POLICY: dict[str, Any] = {
         "OI-MTQ-13": {"allowed": True, "rate_changes_allowed": False},
         "OI-MTQ-14": None,
         "OI-MTQ-15": {"home_size_by_bedrooms": {}, "independent_house_factor_bp": None},
+        "OI-MTQ-18": None,  # the customer information pack: tests that need it install SYNTHETIC_PACK
     },
 }
 

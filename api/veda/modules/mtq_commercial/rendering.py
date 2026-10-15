@@ -1,8 +1,11 @@
 """The customer quotation document (instruction B4.2, B4.7; blueprint §10.1).
 
 ``document_model`` builds the customer-facing model: brand, quotation number and version, date, validity, the property
-reference, room-wise sections, optional items, totals (GST only when decided), payment milestones, warranty,
-assumptions, exclusions and terms. It is built from an allow-list of customer fields, so internal costing never
+reference, room-wise sections (each line with its verified dimensions), optional items, totals (GST only when decided),
+payment milestones (with their amounts from the frozen total), warranty, assumptions, exclusions, terms, and the
+customer information pack (OI-MTQ-18: contacts, responsibilities, site readiness, site-dependent work, warranty
+exclusions, service guidance, handover, care, next steps, payment safety; each section absent until the owner records
+it). It is built from an allow-list of customer fields, so internal costing never
 reaches it: no rate card, tier rate path, unit rate (unless the owner's OI-MTQ-10 decision says so), derivation,
 override, discount authority, approver, threshold, margin or staff name.
 
@@ -36,9 +39,10 @@ from veda.kernel.jcs import canonical_bytes
 from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq.models import Property
 
-from . import quotations
+from . import customer_pack, quotations
 
-DOCUMENT_VERSION = "mtq-quotation-document/1"
+# 2: lines carry dimensions, milestones their amounts, and the document the customer information block (template 3).
+DOCUMENT_VERSION = "mtq-quotation-document/2"
 UNIT = {"SFT": "sq ft", "RFT": "running ft", "NOS": "nos", "LUMP": "lump sum"}
 BRAND = {"name": "Veda Spaces", "tagline": "Interiors, measured and made"}
 
@@ -68,6 +72,7 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
     rows = [x for x in quotations.lines(s, q) if not (x.quantity_centi == 0 and not x.amount_minor)]
     beds = int(prop.derived_bedroom_count or 0)
     kind = "Independent house" if prop.property_type_code == "INDEPENDENT_HOUSE" else "Apartment"
+    inputs_of = _formula_inputs(s, rows)
 
     def line(x) -> dict[str, Any]:
         out = {"description": x.description, "detail": x.detail, "quantity": _qty(x.quantity_centi, x.uom_code),
@@ -78,6 +83,9 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
         if q.quotation_kind == "VARIATION":
             out["change"] = x.change_code.replace("_", " ").title()
             out["delta"] = _amount(x.delta_amount_minor)
+        dims, dim_status = customer_pack.dimensions(inputs_of.get(x.id))
+        if dim_status is not None:
+            out["dimensions"], out["dimension_status"] = dims, dim_status
         if x.is_optional and x.is_priced and q.tax_status == "APPLIED":
             # What choosing this item adds, as the B4 decision adds it (taxable amount plus its GST), frozen with the
             # document so a customer's acceptance total never depends on mutable line rows (CQX N1).
@@ -127,10 +135,7 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
             "optional_total": _amount(q.optional_minor) if q.optional_minor else None,
             "currency": q.currency,
         },
-        "payment_schedule": [
-            {"label": m["label"], "share": f"{Decimal(m['share_bp']) / 100:g}%", "trigger": m["trigger"]}
-            for m in terms.get("payment_milestones") or []
-        ],
+        "payment_schedule": _schedule(q, terms),
         "warranty": terms.get("warranty") or [],
         "service_support": terms.get("service_support") or [],
         "assumptions": terms.get("assumptions") or [],
@@ -145,6 +150,7 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
             if t
         ],  # fmt: skip
         "terms_version": terms.get("terms_version"),
+        "customer_information": customer_pack.information(terms.get("customer_pack"), q.customer_inputs),
     }
     if q.quotation_kind == "VARIATION":
         doc["summary"]["net_change"] = _amount(q.base_total_minor)
@@ -153,6 +159,40 @@ def document_model(s: Session, q: quotations.Quotation, *, frozen: bool = False)
                         "customer_issuable": not (q.blockers or []),
                         "blockers": [b.get("message", b["code"]) for b in (q.blockers or [])]}  # fmt: skip
     return doc
+
+
+def _formula_inputs(s: Session, rows: list) -> dict[str, dict]:
+    """Quotation line id → its BOQ line's resolved inputs (estimate line → BOQ line), for the line's dimensions."""
+    import sqlalchemy as sa
+
+    from .models import BoqLine, CostEstimateLine
+
+    ids = [x.cost_estimate_line_id for x in rows if x.cost_estimate_line_id]
+    if not ids:
+        return {}
+    boq_of = dict(s.execute(sa.select(CostEstimateLine.id, CostEstimateLine.boq_line_id)
+                            .where(CostEstimateLine.id.in_(ids))).all())  # fmt: skip
+    boq_ids = [b for b in boq_of.values() if b]
+    inputs = (
+        dict(s.execute(sa.select(BoqLine.id, BoqLine.formula_inputs).where(BoqLine.id.in_(boq_ids))).all())
+        if boq_ids
+        else {}
+    )
+    return {x.id: inputs.get(boq_of.get(x.cost_estimate_line_id)) for x in rows if x.cost_estimate_line_id}
+
+
+def _schedule(q: quotations.Quotation, terms: dict[str, Any]) -> list[dict[str, Any]]:
+    """The approved milestones with their amounts: the frozen total split by the approved shares, reconciling exactly
+    (customer_pack.milestone_amounts). A variation's schedule is its base quotation's; it carries no amounts here."""
+    milestones = terms.get("payment_milestones") or []
+    amounts = None
+    if q.quotation_kind != "VARIATION":
+        amounts = customer_pack.milestone_amounts(q.total_minor, [int(m["share_bp"]) for m in milestones])
+    return [
+        {"label": m["label"], "share": f"{Decimal(m['share_bp']) / 100:g}%", "trigger": m["trigger"],
+         "amount": customer_pack.money(amounts[i]) if amounts else None}
+        for i, m in enumerate(milestones)
+    ]  # fmt: skip
 
 
 def _sha(text: str) -> str:
@@ -350,6 +390,108 @@ def html_v2(doc: dict[str, Any]) -> str:
     return page[:at] + block + page[at:]
 
 
+TBC = "To be confirmed by Veda Spaces."
+STATUS_TEXT = {"REQUIRED": "Required", "NOT_REQUIRED": "Not required", "TO_BE_CONFIRMED": "To be confirmed",
+               "READY": "Ready", "NOT_READY": "Not ready", "CUSTOMER_ACTION_REQUIRED": "Your action needed",
+               "NOT_APPLICABLE": "Not applicable"}  # fmt: skip
+
+
+def _dims_text(x: dict[str, Any]) -> str | None:
+    if "dimension_status" not in x:
+        return None
+    sizes = " · ".join(f"{d['label']} {d['value']}" for d in x.get("dimensions") or [])
+    if x["dimension_status"] == "CONFIRMED":
+        return sizes
+    return f"{sizes} · dimension to be confirmed" if sizes else "Dimension to be confirmed"
+
+
+def _contact_html(c: dict[str, Any] | None) -> str:
+    if not c:
+        return "<p class='muted'>Contact details to be confirmed.</p>"
+    parts = [f"<strong>{_e(c['display_name'])}</strong>, {_e(c['role'])}"]
+    parts += [_e(v) for v in (c.get("phone"), c.get("email"), c.get("hours")) if v]
+    return (
+        "<p>"
+        + "<br>".join(parts)
+        + (f"<br><span class='muted'>{_e(c['channel_note'])}</span>" if c.get("channel_note") else "")
+        + "</p>"
+    )
+
+
+def html_v3(doc: dict[str, Any]) -> str:
+    """Version 3 (CQX customer completeness): version 2, with each line's verified dimensions under its detail, each
+    milestone's amount, the Veda Spaces contact after the heading, and the customer information sections (what is
+    included, what is not, what the customer arranges, site-dependent work, before we start, warranty exclusions,
+    service, handover, care, what happens next, payment safety). A section the owner has not approved says so."""
+    info = doc.get("customer_information") or {}
+    base = {k: v for k, v in doc.items() if k != "customer_information"}
+
+    def with_dims(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out = []
+        for x in lines:
+            extra = _dims_text(x)
+            out.append({**x, "detail": " · ".join(t for t in (x.get("detail"), extra) if t) or None})
+        return out
+
+    base["sections"] = [{**sec, "lines": with_dims(sec["lines"])} for sec in doc["sections"]]
+    base["optional_items"] = with_dims(doc["optional_items"])
+    base["payment_schedule"] = [{**m, "trigger": f"{m['trigger']} ({m['amount']})" if m.get("amount") else m["trigger"]}
+                                for m in doc.get("payment_schedule") or []]  # fmt: skip
+    page = html_v2(base)
+    contacts = info.get("contacts") or {}
+    head = "<h2>Your Veda Spaces contact</h2>" + _contact_html(contacts.get("quotation"))
+    at = page.find("</header>") + len("</header>")
+    page = page[:at] + head + page[at:]
+
+    def items(rows: list[dict[str, Any]] | None, status: bool = False) -> str:
+        if not rows:
+            return f"<p class='muted'>{_e(TBC)}</p>"
+        return "<ul>" + "".join(f"<li>{_e(r['text'])}" + (f" <span class='tag'>{_e(STATUS_TEXT.get(r['status'], r['status']))}</span>"
+                                                           if status else "") + "</li>" for r in rows) + "</ul>"  # fmt: skip
+
+    blocks = ["<h2>What is included</h2>" + items(info.get("project_inclusions")),
+              "<h2>What you arrange</h2>" + items(info.get("client_responsibilities"), status=True)]  # fmt: skip
+    sdw = info.get("site_dependent_work")
+    blocks.append("<h2>Site-dependent work</h2>" + (
+        f"<p>{_e(sdw['intro'])}</p>" + items(sdw.get("categories") or None) + f"<p>{_e(sdw['approval_rule'])}</p>"
+        if sdw else f"<p class='muted'>{_e(TBC)}</p>"))  # fmt: skip
+    blocks.append("<h2>Before we start</h2>" + items(info.get("site_readiness"), status=True))
+    note = info.get("manufacturer_warranty_note")
+    blocks.append(
+        "<h2>Manufacturer warranty</h2>" + (f"<p>{_e(note)}</p>" if note else f"<p class='muted'>{_e(TBC)}</p>")
+    )
+    blocks.append("<h2>What the warranty does not cover</h2>" + items(info.get("warranty_exclusions")))
+    sg = info.get("service_guidance")
+    if sg:
+        body = _contact_html(sg.get("contact")) if sg.get("contact") else ""
+        body += (
+            ("<ul>" + "".join(f"<li>{_e(t)}</li>" for t in sg.get("what_to_provide") or []) + "</ul>")
+            if sg.get("what_to_provide")
+            else ""
+        )
+        body += "".join(f"<p>{_e(sg[k])}</p>" for k in ("reference_process", "escalation") if sg.get(k))
+    else:
+        body = f"<p class='muted'>{_e(TBC)}</p>"
+    blocks.append("<h2>Need help after handover?</h2>" + body)
+    blocks.append("<h2>Handover</h2>" + items(info.get("handover")))
+    blocks.append("<h2>Care and maintenance</h2>" + items(info.get("care")))
+    steps = info.get("next_steps")
+    blocks.append("<h2>What happens after you accept</h2>" + (
+        "<ol>" + "".join(f"<li><strong>{_e(x['label'])}</strong>: {_e(x['text'])}"
+                         + (f" <span class='muted'>({_e(x['duration'])})</span>" if x.get("duration") else "") + "</li>"
+                         for x in steps) + "</ol>" if steps else f"<p class='muted'>{_e(TBC)}</p>"))  # fmt: skip
+    support = contacts.get("support") or []
+    blocks.append("<h2>Support</h2>" + ("".join(_contact_html(c) for c in support) if support else f"<p class='muted'>{_e(TBC)}</p>")
+                  + (f"<p>{_e(info['support_escalation'])}</p>" if info.get("support_escalation") else ""))  # fmt: skip
+    blocks.append("<h2>Payments</h2>" + (f"<p>{_e(info['payment_safety'])}</p>" if info.get("payment_safety")
+                                         else f"<p class='muted'>{_e(TBC)}</p>"))  # fmt: skip
+    if info.get("content_version"):
+        blocks.append(f"<p class='muted'>Customer information version {_e(info['content_version'])}</p>")
+    end = page.rfind("</body>")
+    return page[:end] + "".join(blocks) + page[end:]
+
+
 # Every template version ever used for an issued quotation stays here (a new page design is a new key).
-TEMPLATES: dict[str, Callable[[dict[str, Any]], str]] = {"mtq-quotation-html/1": html, "mtq-quotation-html/2": html_v2}
-CURRENT_TEMPLATE = "mtq-quotation-html/2"
+TEMPLATES: dict[str, Callable[[dict[str, Any]], str]] = {"mtq-quotation-html/1": html, "mtq-quotation-html/2": html_v2,
+                                                         "mtq-quotation-html/3": html_v3}  # fmt: skip
+CURRENT_TEMPLATE = "mtq-quotation-html/3"

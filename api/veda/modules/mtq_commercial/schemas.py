@@ -123,9 +123,23 @@ class QuotationCreateIn(Closed):
     cover_note: Annotated[str | None, optional_text(4000)] = None
 
 
+PackCode = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{1,39}$")]
+
+
+class CustomerInputsIn(Closed):
+    """Staff's choices for one draft version against its customer information pack (OI-MTQ-18): codes only."""
+
+    contact_code: PackCode | None = None
+    responsibilities: Annotated[dict[PackCode, Literal["REQUIRED", "NOT_REQUIRED", "TO_BE_CONFIRMED"]],
+                                Field(max_length=60)] = Field(default_factory=dict)  # fmt: skip
+    readiness: Annotated[dict[PackCode, Literal["READY", "NOT_READY", "CUSTOMER_ACTION_REQUIRED", "NOT_APPLICABLE",
+                                                "TO_BE_CONFIRMED"]], Field(max_length=60)] = Field(default_factory=dict)  # fmt: skip
+
+
 class QuotationPatchIn(Closed):
     title: Annotated[str | None, optional_text(160)] = None
     cover_note: Annotated[str | None, optional_text(4000)] = None
+    customer_information: CustomerInputsIn | None = None
 
 
 class QuotationVersionIn(Closed):

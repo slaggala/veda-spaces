@@ -75,6 +75,7 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
     validity = policy.decision("OI-MTQ-08")
     terms_d = policy.decision("OI-MTQ-09")
     shown = policy.decision("OI-MTQ-10")
+    pack = policy.decision("OI-MTQ-18")
     scope = s.get(Scope, est.scope_id)
     assert scope is not None
     spaces = requirements.spaces_of(s, s.get(Property, est.property_id))  # type: ignore[arg-type]  # FK guarantees the row
@@ -102,6 +103,8 @@ def terms_snapshot(s: Session, est: CostEstimate, *, variation: bool = False) ->
         "cancellation_terms": terms_d.cancellation_terms if terms_d else None,
         "general_terms": list(terms_d.general_terms) if terms_d else [],
         "show_unit_rates": bool(shown.show_unit_rates) if shown else False,
+        # OI-MTQ-18 as recorded when this version was drafted (frozen into the issued document; None: to be confirmed)
+        "customer_pack": pack.model_dump(mode="json") if pack else None,
     }
 
 
@@ -301,6 +304,14 @@ def edit(s: Session, ctx, q: Quotation, body) -> Quotation:
         q.title = body.title
     if "cover_note" in data:
         q.cover_note = body.cover_note
+    if "customer_information" in data:
+        from . import customer_pack
+
+        q.customer_inputs = (
+            None if body.customer_information is None
+            else customer_pack.validate_inputs((q.terms or {}).get("customer_pack"),
+                                               body.customer_information.model_dump())
+        )  # fmt: skip
     event(s, q, "EDITED", "DRAFT", "DRAFT", fields=sorted(data))
     return q
 
@@ -621,7 +632,7 @@ def present(s: Session, q: Quotation, ctx=None, *, full: bool = True) -> dict[st
                     "estimate_revision_no": q.estimate_revision_no,
                     "estimate_snapshot_sha256": q.estimate_snapshot_sha256},
         "status": q.status, "title": q.title, "cover_note": q.cover_note, "tier_code": q.tier_code,
-        "policy_version": q.policy_version, "terms": q.terms or {}, "currency": q.currency,
+        "policy_version": q.policy_version, "terms": q.terms or {}, "customer_inputs": q.customer_inputs, "currency": q.currency,
         "base_total_minor": q.base_total_minor, "optional_minor": q.optional_minor,
         "discount_minor": q.discount_minor, "taxable_minor": q.taxable_minor, "tax_status": q.tax_status,
         "tax_minor": q.tax_minor, "total_minor": q.total_minor,

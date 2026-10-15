@@ -4,6 +4,7 @@ packages the customer was explicitly given. SYNTHETIC only; SYNTHETIC_VALIDATED.
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 
 from tests.support.commercial import install_full_policy
 from tests.support.proposal import PROPOSAL_ON, customer, ok, setup, share, step
@@ -18,7 +19,11 @@ def test_pricing_is_the_frozen_amounts_and_derives_nothing_unapproved(api, facto
     assert pr["total"] == summary["total"] and pr["gst"] == summary["gst"] and pr["base_total"] == summary["base_total"]
     assert [r["subtotal"] for r in pr["rooms"]] == [r["subtotal"] for r in page["proposal"]["rooms"]]
     assert pr["milestones"] == page["proposal"]["payment_schedule"]
-    assert all(set(m) == {"label", "share", "trigger"} for m in pr["milestones"])  # no rupee amount per milestone
+    # CTB-09: each milestone's amount is frozen at issue from the frozen total and the approved share, and the amounts
+    # add up to the total exactly (previously no amount was shown; the split is now customer_pack.milestone_amounts)
+    assert all(set(m) == {"label", "share", "trigger", "amount"} for m in pr["milestones"])
+    paise = [int(Decimal(m["amount"].replace(",", "")) * 100) for m in pr["milestones"]]
+    assert sum(paise) == int(Decimal(summary["total"].replace(",", "")) * 100)
     assert pr["unit_rates_shown"] is False and '"unit_rate":' not in json.dumps(page)
     assert pr["days_left"] == 30 and pr["alternatives"] == []
     assert pr["package"] is None  # no approved specification pinned: the package is not named by invention

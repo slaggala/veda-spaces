@@ -1092,6 +1092,59 @@
         "title": "ConsentWithdrawIn",
         "type": "object"
       },
+      "CustomerInputsIn": {
+        "additionalProperties": false,
+        "description": "Staff's choices for one draft version against its customer information pack (OI-MTQ-18): codes only.",
+        "properties": {
+          "contact_code": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z][A-Z0-9_]{1,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contact Code"
+          },
+          "readiness": {
+            "maxProperties": 60,
+            "patternProperties": {
+              "^[A-Z][A-Z0-9_]{1,39}$": {
+                "enum": [
+                  "READY",
+                  "NOT_READY",
+                  "CUSTOMER_ACTION_REQUIRED",
+                  "NOT_APPLICABLE",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              }
+            },
+            "title": "Readiness",
+            "type": "object"
+          },
+          "responsibilities": {
+            "maxProperties": 60,
+            "patternProperties": {
+              "^[A-Z][A-Z0-9_]{1,39}$": {
+                "enum": [
+                  "REQUIRED",
+                  "NOT_REQUIRED",
+                  "TO_BE_CONFIRMED"
+                ],
+                "type": "string"
+              }
+            },
+            "title": "Responsibilities",
+            "type": "object"
+          }
+        },
+        "title": "CustomerInputsIn",
+        "type": "object"
+      },
       "DecisionIn": {
         "additionalProperties": false,
         "properties": {
@@ -4274,6 +4327,17 @@
             ],
             "default": null,
             "title": "Cover Note"
+          },
+          "customer_information": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomerInputsIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "title": {
             "anyOf": [

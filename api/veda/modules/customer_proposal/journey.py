@@ -68,8 +68,30 @@ PAGE_FIELDS: dict[str, str] = {
             "equivalent_rule",
             "final_selection",
             "warranty_summary",
+            "hardware_category",
         )
     },
+    # CQX customer completeness (CTB-03): the whole approved specification, grouped into materials and hardware
+    "specifications.warranty_summary": "the specification's approved manufacturer-warranty note (no duration)",
+    **{
+        f"specifications.categories[].{k}": "approved specification category text"
+        for k in (
+            "code",
+            "label",
+            "summary",
+            "requirement",
+            "grade",
+            "thickness",
+            "finish",
+            "brand_examples",
+            "equivalent_rule",
+            "final_selection",
+            "warranty_summary",
+            "hardware_category",
+            "details[]",
+            "group",
+        )
+    },  # fmt: skip
     "media.note": "reference-image note",
     **{
         f"media.{where}.{k}": "approved image"
