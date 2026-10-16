@@ -36,6 +36,9 @@ class PortalAccount(AuditedBase):
 
     email_normalized: Mapped[str] = mapped_column(sa.String(254), nullable=False)
     display_name: Mapped[str] = mapped_column(sa.String(150), nullable=False)
+    # The enquiry the display name was copied from (staff gave no name), so erasing that enquiry renames the account;
+    # null when staff chose the name. Never another person's name: see erasure.erase_for_lead.
+    name_source_lead_id: Mapped[str | None] = mapped_column(GUID(), _fk("lead.id"))
     status: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="ACTIVE")
     last_signed_in_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     erased_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
@@ -44,6 +47,7 @@ class PortalAccount(AuditedBase):
         in_check("portal_account", "status", V.ACCOUNT_STATUSES),
         CheckConstraint("erased_on IS NULL OR status = 'DISABLED'", name="ck_portal_account__erased"),
         Index("ux_portal_account__email", "email_normalized", unique=True, **live_where()),
+        Index("ix_portal_account__name_source", "name_source_lead_id"),
     )
 
 

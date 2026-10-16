@@ -203,7 +203,8 @@ def revoke(req: Req, access_id: str):
         raise not_found()
     # Within the lead's scope, even while the lead is soft-deleted (its access would otherwise return on restore).
     scope = req.ctx.scope("portal.access.revoke")
-    owned = req.session.execute(lead_scope.owned_lead_ids(req.ctx.user.id).where(Lead.id == a.lead_id)).first()
+    owned = req.session.execute(lead_scope.owned_lead_ids(req.ctx.user.id).where(Lead.id == a.lead_id),
+                                execution_options={"include_deleted": True}).first()  # fmt: skip
     if scope is None or (scope == "OWN" and owned is None):
         raise not_found()
     check_version(req.if_match, a.version)

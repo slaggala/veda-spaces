@@ -44,6 +44,7 @@ def upgrade() -> None:
         sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
         sa.Column("email_normalized", sa.String(254), nullable=False),
         sa.Column("display_name", sa.String(150), nullable=False),
+        sa.Column("name_source_lead_id", GUID(), nullable=True),
         sa.Column("status", sa.String(10), nullable=False),
         sa.Column("last_signed_in_on", UTCDateTime(), nullable=True),
         sa.Column("erased_on", UTCDateTime(), nullable=True),
@@ -53,6 +54,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["deleted_by"], ["app_user.id"], name="fk_portal_account__deleted_by", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["name_source_lead_id"], ["lead.id"], name="fk_portal_account__name_source_lead_id", ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(
             ["updated_by"], ["app_user.id"], name="fk_portal_account__updated_by", ondelete="RESTRICT"
@@ -78,6 +82,10 @@ def upgrade() -> None:
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint("is_deleted IN (0, 1)", name="ck_portal_account__is_deleted_bool").ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
+            "name_source_lead_id IS NULL OR (length(name_source_lead_id) = 32 AND name_source_lead_id NOT GLOB '*[^0-9a-f]*' AND substr(name_source_lead_id, 13, 1) = '7' AND substr(name_source_lead_id, 17, 1) IN ('8', '9', 'a', 'b'))",
+            name="ck_portal_account__name_source_lead_id_format",
+        ).ddl_if(dialect="sqlite"),
+        sa.CheckConstraint(
             "(is_deleted = false AND deleted_on IS NULL AND deleted_by IS NULL) OR (is_deleted = true AND deleted_on IS NOT NULL AND deleted_by IS NOT NULL)",
             name="ck_portal_account__soft_delete_consistent",
         ),
@@ -90,6 +98,7 @@ def upgrade() -> None:
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint("version >= 1", name="ck_portal_account__version_positive"),
     )
+    op.create_index("ix_portal_account__name_source", "portal_account", ["name_source_lead_id"])
     op.create_index(
         "ux_portal_account__email",
         "portal_account",

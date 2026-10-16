@@ -255,5 +255,36 @@ def test_access_can_be_revoked_while_the_enquiry_is_soft_deleted(api, factory):
     r = t.as_(t.founder).call("DELETE", f"/api/v1/leads/{prop['lead_id']}", {"reason": "Synthetic duplicate"},
                               if_match=lead["version"])  # fmt: skip
     assert r.status in (200, 204), r
-    r = t.as_(t.manager).post(f"/api/v1/portal-access/{row['id']}/revoke", {}, if_match=row["version"])
-    assert r.status == 200 and r.data[0]["status"] == "REVOKED"
+    r = t.as_(t.c.sales).post(f"/api/v1/portal-access/{row['id']}/revoke", {}, if_match=row["version"])
+    assert r.status == 200 and r.data[0]["status"] == "REVOKED"  # the enquiry's own consultant (OWN scope)
+
+
+def _erase(lead_id: str) -> None:
+    from veda.modules.crm.leads import service as lead_service
+    from veda.modules.crm.leads.models import Lead
+
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        lead_service.anonymize(s, s.get(Lead, lead_id), legal_basis="SYNTHETIC erasure test", request_ref=None)
+
+
+def test_erasure_never_renames_a_customer_to_another_persons_name(api, factory):
+    """Re-review N1: an account named by staff keeps its name; one named from the erased enquiry and left only as a
+    family member on someone else's enquiry takes a neutral name, never that other person's."""
+    from veda.modules.crm.leads.models import Lead
+
+    t = Portal(api, factory)
+    prop_a, _, _ = t.issued("2BHK")
+    prop_b, _, _ = t.issued("3BHK")
+    with db.unit_of_work(write=False) as s:
+        name_b = s.get(Lead, prop_b["lead_id"]).name
+    # staff chose the name: erasing the enquiry it was granted on leaves it alone
+    t.grant(prop_a["lead_id"], "chosen@example.test", display_name="Asha (synthetic)")
+    t.grant(prop_b["lead_id"], "chosen@example.test", relationship="FAMILY_MEMBER")
+    # named from enquiry A by default, and only a family member on B
+    t.grant(prop_a["lead_id"], "family@example.test")
+    t.grant(prop_b["lead_id"], "family@example.test", relationship="FAMILY_MEMBER")
+    _erase(prop_a["lead_id"])
+    names = {r["account"]["email"]: r["account"]["display_name"] for r in t.access(prop_b["lead_id"])}
+    assert names["chosen@example.test"] == "Asha (synthetic)"
+    assert names["family@example.test"] == "Customer" != name_b
+    assert t.sign_in("family@example.test").home().data["customer"]["name"] == "Customer"

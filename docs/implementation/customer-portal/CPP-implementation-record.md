@@ -108,6 +108,8 @@ A fresh reviewer certified the branch with one merge condition. The findings and
 | F6: a docstring claimed no digest reaches customers; unused definitions | Fixed. The CQX projection's frozen-document digest is named. Unused definitions removed. |
 | F7: access on a soft-deleted lead could not be revoked (it would return on restore) | Fixed. Revocation works within scope while the lead is soft-deleted. Tested. |
 | Missing test: a link redeemed twice at once | Added on both engines (one session, one refusal). |
+| Re-review N1 (Medium, merge condition): the F1 fix renamed a surviving shared account to the name of another enquiry it held, possibly someone else's | Fixed. The account records which enquiry its name was copied from (`name_source_lead_id`; null when staff chose the name). Only an account named from the erased enquiry is renamed: to the name of an enquiry it holds as primary customer, else the neutral "Customer". A chosen name is never touched. Tested. |
+| Re-review N2: the enquiry's own consultant (OWN scope) still could not revoke on a soft-deleted lead | Fixed. The scope check sees soft-deleted leads. Tested with the consultant. |
 
 ## Found during this work (outside this change)
 

@@ -90,11 +90,12 @@ def _lock_lead(s: Session, lead_id: str) -> None:
         s.execute(sa.select(Lead.id).where(Lead.id == lead_id).with_for_update())
 
 
-def _account(s: Session, email: str, display_name: str) -> PortalAccount:
+def _account(s: Session, email: str, display_name: str, name_source_lead_id: str | None) -> PortalAccount:
     found = s.execute(sa.select(PortalAccount).where(PortalAccount.email_normalized == email)).scalar_one_or_none()
     if found is not None:
-        return found
-    account = PortalAccount(email_normalized=email, display_name=display_name, status="ACTIVE")
+        return found  # an existing account keeps its name: a second enquiry never renames anyone
+    account = PortalAccount(email_normalized=email, display_name=display_name, status="ACTIVE",
+                            name_source_lead_id=name_source_lead_id)  # fmt: skip
     try:
         with s.begin_nested():  # two invitations of one new email at once: the second finds the first's row
             s.add(account)
@@ -113,7 +114,8 @@ def grant(s: Session, ctx, lead: Lead, body) -> PortalAccess:
     if not EMAIL_RE.match(email):
         raise ApiError(422, "VALIDATION_FAILED", "A customer email address is needed to invite them.",
                        errors=[field_error("email", "REQUIRED", "An email address the customer reads.")])  # fmt: skip
-    account = _account(s, email, (body.display_name or lead.name).strip()[:150])
+    chosen = (body.display_name or "").strip()
+    account = _account(s, email, (chosen or lead.name).strip()[:150], None if chosen else lead.id)
     if account.status != "ACTIVE":
         raise ApiError(409, "PORTAL_ACCOUNT_DISABLED", "That customer's portal account is disabled.")
     if any(a.lead_id == lead.id for a in active_access(s, account.id)):
