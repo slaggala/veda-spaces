@@ -1,0 +1,15 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}{% if kind == "handover_ready" %}Your handover summary is ready in your Veda Spaces project portal{% else %}We have received your report{% endif %}{% endblock %}
+{% block headline %}{% if kind == "handover_ready" %}Your handover summary is ready{% else %}Thank you for telling us{% endif %}{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+{% if kind == "handover_ready" %}Veda Spaces has prepared the handover summary for your home. Please review it in your project portal.
+{% else %}We have received the issue you reported. Our team will review it, and you can follow it in your project portal.
+{% endif %}
+Open your project portal:
+{{ link }}
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p>{% if kind == "handover_ready" %}<p>Veda Spaces has prepared the handover summary for your home. Please review it in your project portal.</p>{% else %}<p>We have received the issue you reported. Our team will review it, and you can follow it in your project portal.</p>{% endif %}<p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Open your project portal</a></p>
+{% endblock %}

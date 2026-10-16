@@ -554,14 +554,18 @@ def withdraw_role_grants(conn, role_code: str, codes: tuple[str, ...], *, audit:
     if kept:
         raise RuntimeError(f"refusing to withdraw {kept} from {role_code}: the role matrix still grants them")
     role = conn.execute(
-        sa.select(ROLE.c.id).where(ROLE.c.code == role_code, ROLE.c.is_system == sa.true(), ROLE.c.is_deleted == sa.false())
+        sa.select(ROLE.c.id).where(
+            ROLE.c.code == role_code, ROLE.c.is_system == sa.true(), ROLE.c.is_deleted == sa.false()
+        )
     ).scalar()
     if role is None:
         return 0
     rows = conn.execute(
         sa.select(ROLE_PERMISSION.c.id, ROLE_PERMISSION.c.version, PERMISSION.c.code)
         .join(PERMISSION, PERMISSION.c.id == ROLE_PERMISSION.c.permission_id)
-        .where(ROLE_PERMISSION.c.role_id == role, ROLE_PERMISSION.c.is_deleted == sa.false(), PERMISSION.c.code.in_(codes))
+        .where(
+            ROLE_PERMISSION.c.role_id == role, ROLE_PERMISSION.c.is_deleted == sa.false(), PERMISSION.c.code.in_(codes)
+        )
     ).all()
     now = clock.now()
     tx = new_id()
@@ -569,8 +573,14 @@ def withdraw_role_grants(conn, role_code: str, codes: tuple[str, ...], *, audit:
         conn.execute(
             ROLE_PERMISSION.update()
             .where(ROLE_PERMISSION.c.id == row.id)
-            .values(is_deleted=True, deleted_on=now, deleted_by=SYSTEM_USER_ID, updated_on=now,
-                    updated_by=SYSTEM_USER_ID, version=row.version + 1)  # fmt: skip
+            .values(
+                is_deleted=True,
+                deleted_on=now,
+                deleted_by=SYSTEM_USER_ID,
+                updated_on=now,
+                updated_by=SYSTEM_USER_ID,
+                version=row.version + 1,
+            )  # fmt: skip
         )
         if audit:
             write_audit(conn, entity_type="role_permission", entity_id=row.id, action="DELETE",

@@ -24,19 +24,22 @@ from veda.modules.mtq.models import PropertySpace
 from veda.platform.identity.models import User
 from veda.platform.rbac.resolver import load_grants
 
-from . import access, baseline, events, gates, lifecycle, policy
+from . import access, baseline, events, gates, lifecycle, policy, quality
 from . import vocab as V
 from .models import (
     Project,
     ProjectBlocker,
     ProjectChecklistItem,
+    ProjectHandoverPackage,
     ProjectMember,
     ProjectMilestone,
     ProjectQcCheck,
+    ProjectQcPoint,
     ProjectSiteReadiness,
     ProjectSnag,
     ProjectStage,
     ProjectTransition,
+    ProjectWorkPackage,
 )
 from .permissions import RESPONSIBILITY_CAPABILITY
 
@@ -111,6 +114,10 @@ def _stage_open(p: Project, stage_code: str) -> None:
 def _done(p: Project, s: Session) -> None:
     access.touch(s, p)
     s.flush()
+
+
+# Shared with the execution modules (work, reports, handover).
+reason, space, stage_open, done = _reason, _space, _stage_open, _done
 
 
 # --- team (PLB-08, PLB-09) ---------------------------------------------------------------------------------------------
@@ -224,9 +231,16 @@ def complete_handover(s: Session, ctx, p: Project, body, if_match: int | None) -
     if body.handover_on > db.tx_time(s).date():
         raise ApiError(422, "VALIDATION_FAILED", "A handover date cannot be in the future.",
                        errors=[field_error("handover_on", "FUTURE_DATE", "Not after today.")])  # fmt: skip
-    handover = {"handover_on": body.handover_on, "acknowledgement_reference": body.acknowledgement_reference,
+    from . import handover as packages
+
+    pkg = packages.current(s, p)  # PEX D5: the handover (and any approval of it) is bound to this package and digest
+    ack = body.acknowledgement_reference
+    if not (ack or "").strip() and pkg is not None and pkg.acknowledged_on is not None:
+        ack = packages.portal_reference(pkg)  # the customer acknowledged this package in the portal
+    handover = {"handover_on": body.handover_on, "acknowledgement_reference": ack,
                 "evidence_attachment_id": evidence(s, p, body.evidence_attachment_id),
-                "observations": body.observations}  # fmt: skip
+                "observations": body.observations, "handover_package_id": pkg.id if pkg else None,
+                "handover_package_sha256": pkg.content_sha256 if pkg else None}  # fmt: skip
     return _decide(s, ctx, p, "HANDOVER", "HANDED_OVER", body.reason, handover)
 
 
@@ -243,7 +257,8 @@ def approve(s: Session, ctx, p: Project, t: ProjectTransition, note: str | None,
     if ctx.user.id == t.created_by:
         raise ApiError(409, "FOUR_EYES_REQUIRED", "You requested this transition; someone else approves it.")
     handover = {"acknowledgement_reference": t.acknowledgement_reference,
-                "evidence_attachment_id": t.evidence_attachment_id} if t.kind == "HANDOVER" else None  # fmt: skip
+                "evidence_attachment_id": t.evidence_attachment_id, "handover_package_id": t.handover_package_id,
+                "handover_package_sha256": t.handover_package_sha256} if t.kind == "HANDOVER" else None  # fmt: skip
     if t.from_stage != p.stage_code:
         raise ApiError(409, "INVALID_STATE", "The project moved on since this transition was requested.")
     if handover is not None and handover["evidence_attachment_id"]:
@@ -308,11 +323,18 @@ def _apply(s: Session, ctx, p: Project, t: ProjectTransition) -> None:
         to.status, to.completed_on, to.completed_by = "COMPLETED", now, ctx.user.id
         p.status, p.handed_over_on, p.handed_over_by = "HANDED_OVER", now, ctx.user.id
         current = baseline.current(s, p)
+        if t.handover_package_id:
+            pkg = s.get(ProjectHandoverPackage, t.handover_package_id)
+            pkg.status, pkg.completed_on = "COMPLETED", now
         events.record(s, p, "HANDED_OVER", stage=t.to_stage, transition_id=t.id, baseline_id=current.id,
                       baseline_seq=current.sequence_no, baseline_sha256=current.baseline_sha256,
-                      handover_on=t.handover_on.isoformat() if t.handover_on else None)  # fmt: skip
+                      handover_on=t.handover_on.isoformat() if t.handover_on else None,
+                      package_id=t.handover_package_id, package_sha256=t.handover_package_sha256)  # fmt: skip
+        # PLB-30/PEX-024: what a future warranty/service workstream needs to find the handed-over scope; ids and digests
         events.notify(s, p, events.HANDED_OVER, transition_id=t.id, baseline_id=current.id, lead_id=p.lead_id,
-                      property_id=p.property_id, source_quotation_id=p.source_quotation_id)  # fmt: skip
+                      property_id=p.property_id, source_quotation_id=p.source_quotation_id,
+                      handover_package_id=t.handover_package_id,
+                      handover_package_sha256=t.handover_package_sha256)  # fmt: skip
     else:
         events.notify(s, p, events.STAGE_ENTERED, transition_id=t.id)
     _done(p, s)
@@ -496,6 +518,9 @@ def raise_blocker(s: Session, ctx, p: Project, body, source: str = "STAFF") -> P
                            errors=[field_error("related_quotation_id", "NOT_A_VARIATION", "Not a variation of "
                                                "this project.")])  # fmt: skip
         b.related_quotation_id = q.id
+    if body.related_work_package_id:
+        b.related_work_package_id = child(s, ProjectWorkPackage, p, body.related_work_package_id).id
+    b.customer_summary = body.customer_summary
     s.add(b)
     s.flush()
     events.record(s, p, "BLOCKER_RAISED", stage=p.stage_code, to="OPEN", blocker_id=b.id, category=b.category,
@@ -518,7 +543,7 @@ def update_blocker(s: Session, ctx, p: Project, b: ProjectBlocker, body, if_matc
     before_assignee = b.assigned_to
     if "assigned_to" in given and body.assigned_to:
         eligible_user(s, p, body.assigned_to, "project.view", "assigned_to")
-    for f in ("description", "customer_action", "responsible_party", "assigned_to", "target_date"):
+    for f in ("description", "customer_action", "responsible_party", "assigned_to", "target_date", "customer_summary"):
         if f in given:
             setattr(b, f, getattr(body, f))
     if "status" in given and body.status is not None:
@@ -607,41 +632,140 @@ def update_readiness(s: Session, ctx, p: Project, r: ProjectSiteReadiness, body,
     return r
 
 
-# --- quality check (PLB-26) --------------------------------------------------------------------------------------------
+# --- quality check (PLB-26; PEX-020 … PEX-024) ------------------------------------------------------------------------
+def add_qc_point(s: Session, ctx, p: Project, body) -> ProjectQcPoint:
+    """The QC plan: one thing that must be checked. Its scope (category, space, work) is fixed once added."""
+    access.for_write(s, ctx, p, "project.manage_qc", precondition=False)
+    wp = child(s, ProjectWorkPackage, p, body.work_package_id) if body.work_package_id else None
+    space_id = _space(s, p, body.space_id) if body.space_id else (wp.space_id if wp else None)
+    n = s.execute(sa.select(sa.func.max(ProjectQcPoint.point_no)).where(ProjectQcPoint.project_id == p.id)).scalar()
+    pt = ProjectQcPoint(project_id=p.id, lead_id=p.lead_id, point_no=(n or 0) + 1, category=body.category,
+                        space_id=space_id, work_package_id=wp.id if wp else None, label=body.label,
+                        evidence_required=body.evidence_required, status="ACTIVE")  # fmt: skip
+    s.add(pt)
+    s.flush()
+    events.record(s, p, "QC_POINT_ADDED", stage=p.stage_code, to="ACTIVE", qc_point_id=pt.id, point_no=pt.point_no,
+                  category=pt.category, work_package_id=pt.work_package_id,
+                  evidence_required=pt.evidence_required)  # fmt: skip
+    _done(p, s)
+    return pt
+
+
+def withdraw_qc_point(
+    s: Session, ctx, p: Project, pt: ProjectQcPoint, why: str, if_match: int | None
+) -> ProjectQcPoint:
+    """Only before any result (review D2): a point with a result is satisfied by a PASS or it stays open."""
+    access.for_write(s, ctx, p, "project.manage_qc", pt, if_match=if_match, match=pt)
+    if pt.status != "ACTIVE":
+        raise ApiError(409, "INVALID_STATE", f"QC-{pt.point_no} is withdrawn.")
+    used = s.execute(sa.select(ProjectQcCheck.id).where(ProjectQcCheck.qc_point_id == pt.id,
+                                                        ProjectQcCheck.is_deleted == sa.false())).first()  # fmt: skip
+    if used is not None:
+        raise ApiError(409, "QC_POINT_HAS_RESULT", f"QC-{pt.point_no} already has a result; it is satisfied by a pass, "
+                       "not withdrawn.")  # fmt: skip
+    pt.withdrawn_reason = _reason(why, "the planned check is withdrawn")
+    pt.status, pt.withdrawn_by, pt.withdrawn_on = "WITHDRAWN", ctx.user.id, db.tx_time(s)
+    events.record(s, p, "QC_POINT_WITHDRAWN", stage=p.stage_code, frm="ACTIVE", to="WITHDRAWN", qc_point_id=pt.id)
+    _done(p, s)
+    return pt
+
+
+def _scope_error(field: str, message: str) -> ApiError:
+    return ApiError(422, "VALIDATION_FAILED", message, errors=[field_error(field, "RECHECK_SCOPE", message)])
+
+
 def record_qc(s: Session, ctx, p: Project, body) -> ProjectQcCheck:
     access.for_write(s, ctx, p, "project.manage_qc", precondition=False)
-    d = lifecycle.get(p.lifecycle_version)
-    if d.sequence(p.stage_code) < d.sequence("QUALITY_CHECK"):
-        raise ApiError(409, "INVALID_STATE", "Quality checks are recorded from the quality-check stage on.")
+    rows = quality.checks(s, p)
+    recheck = child(s, ProjectQcCheck, p, body.recheck_of_id) if body.recheck_of_id else None
+    chain: list[ProjectQcCheck] = []
+    if recheck is not None:
+        chain = quality.chain_of(rows, recheck)
+        if chain[-1].id != recheck.id:
+            raise ApiError(409, "RECHECK_NOT_LATEST", "That check was already rechecked; recheck the latest result.",
+                           extra={"latest_id": chain[-1].id})  # fmt: skip
+        if recheck.category != body.category:
+            raise ApiError(422, "VALIDATION_FAILED", "A recheck is of the same category.",
+                           errors=[field_error("recheck_of_id", "CATEGORY_MISMATCH", "Same category.")])  # fmt: skip
+        root = chain[0]  # D12: a recheck stays within its chain's point, work and space
+        for field, given, held in (("qc_point_id", body.qc_point_id, root.qc_point_id),
+                                   ("work_package_id", body.work_package_id, root.work_package_id),
+                                   ("space_id", body.space_id, root.space_id)):  # fmt: skip
+            if given is not None and given != held:
+                raise _scope_error(field, "A recheck keeps the planned check, work and space of what it rechecks.")
+        point_id, wp_id, space_id = root.qc_point_id, root.work_package_id, root.space_id
+        if body.result == "TO_BE_CONFIRMED":  # D1: a recheck records a result; it never parks a failure
+            raise ApiError(422, "VALIDATION_FAILED", "A recheck records a result (pass, fail or not applicable).",
+                           errors=[field_error("result", "RECHECK_NEEDS_RESULT", "Not to-be-confirmed.")])  # fmt: skip
+    else:
+        point = child(s, ProjectQcPoint, p, body.qc_point_id) if body.qc_point_id else None
+        if point is not None:
+            if point.status != "ACTIVE":
+                raise ApiError(409, "QC_POINT_WITHDRAWN", f"QC-{point.point_no} was withdrawn.")
+            if point.category != body.category:
+                raise ApiError(422, "VALIDATION_FAILED", "The result is of the planned check's category.",
+                               errors=[field_error("category", "CATEGORY_MISMATCH", "The point's category.")])  # fmt: skip
+            if body.work_package_id is not None and body.work_package_id != point.work_package_id:
+                raise _scope_error("work_package_id", "The planned check fixes the work it checks.")
+            if body.space_id is not None and body.space_id != point.space_id:
+                raise _scope_error("space_id", "The planned check fixes the space it checks.")
+            if quality.point_head(rows, point.id) is not None:
+                raise ApiError(409, "QC_POINT_HAS_RESULT", f"QC-{point.point_no} already has a result; record a "
+                               "recheck of it.")  # fmt: skip
+            point_id, wp_id, space_id = point.id, point.work_package_id, point.space_id
+        else:
+            point_id, wp_id, space_id = None, body.work_package_id, body.space_id
+    wp = child(s, ProjectWorkPackage, p, wp_id) if wp_id else None
+    if wp is not None:
+        if wp.status != "COMPLETED":  # the work is checked once it is done (any stage)
+            raise ApiError(409, "WORK_NOT_COMPLETED", f"WP-{wp.package_no} is not completed; check it once it is.")
+    else:
+        d = lifecycle.get(p.lifecycle_version)
+        if d.sequence(p.stage_code) < d.sequence("QUALITY_CHECK"):
+            raise ApiError(409, "INVALID_STATE", "Quality checks are recorded from the quality-check stage on.")
     if body.result == "FAIL" and not body.observation:
         raise ApiError(422, "VALIDATION_FAILED", "Describe what failed.",
                        errors=[field_error("observation", "REQUIRED", "Required for a failed check.")])  # fmt: skip
+    point = s.get(ProjectQcPoint, point_id) if point_id else None
+    if body.result == "NOT_APPLICABLE" and point is not None:  # D2
+        raise ApiError(409, "NOT_APPLICABLE_ON_PLANNED_CHECK", f"QC-{point.point_no} was planned; if it no longer "
+                       "applies, withdraw it before any result, with a reason.")  # fmt: skip
     override = body.result == "NOT_APPLICABLE" and body.category in gates.required_qc(p)
     if override:  # S3: never a silent bypass of handover readiness
         od = policy.decision("PLB-OD-08")
         owner_controlled(s, ctx, p, "PLB-OD-08", od.not_applicable_capability if od else None,
                          "marking a required quality-check category not applicable")  # fmt: skip
         _reason(body.observation, "a required category does not apply", "observation")
-    recheck = None
-    if body.recheck_of_id:
-        recheck = child(s, ProjectQcCheck, p, body.recheck_of_id)
-        if recheck.category != body.category:
-            raise ApiError(422, "VALIDATION_FAILED", "A recheck is of the same category.",
-                           errors=[field_error("recheck_of_id", "CATEGORY_MISMATCH", "Same category.")])  # fmt: skip
+    if chain and quality.ever_failed(chain) and body.result != "FAIL":  # D1, D8: remediation, then independence
+        raised = quality.snags_from(s, chain)
+        still = quality.open_snags(raised)
+        if still:
+            raise ApiError(409, "REMEDIATION_OPEN", f"{len(still)} snag(s) raised from this failure are still open; "
+                           "they are verified before the recheck.", extra={"snag_ids": [n.id for n in still]})  # fmt: skip
+        if ctx.user.id in quality.conflicted(s, p, raised):
+            raise ApiError(409, "SEGREGATION_REQUIRED", "You fixed (or own) the remediation of this failure; someone "
+                           "else rechecks it.")  # fmt: skip
+    ev_id = evidence(s, p, body.evidence_attachment_id)
+    if point is not None and point.evidence_required and body.result == "PASS" and ev_id is None:
+        raise ApiError(422, "VALIDATION_FAILED", f"QC-{point.point_no} needs evidence of the pass.",
+                       errors=[field_error("evidence_attachment_id", "EVIDENCE_REQUIRED", "Required.")])  # fmt: skip
     c = ProjectQcCheck(project_id=p.id, lead_id=p.lead_id, category=body.category, result=body.result,
-                       space_id=_space(s, p, body.space_id), observation=body.observation,
-                       evidence_attachment_id=evidence(s, p, body.evidence_attachment_id),
-                       evidence_reference=body.evidence_reference, recheck_of_id=recheck.id if recheck else None)  # fmt: skip
+                       space_id=_space(s, p, space_id), observation=body.observation, evidence_attachment_id=ev_id,
+                       evidence_reference=body.evidence_reference, recheck_of_id=recheck.id if recheck else None,
+                       qc_point_id=point_id, work_package_id=wp.id if wp else None)  # fmt: skip
     s.add(c)
     s.flush()
     events.record(s, p, "QC_RECORDED", stage=p.stage_code, to=c.result, qc_check_id=c.id, category=c.category,
                   recheck_of_id=c.recheck_of_id, evidence_attachment_id=c.evidence_attachment_id,
+                  qc_point_id=c.qc_point_id, work_package_id=c.work_package_id,
                   required_not_applicable=override or None)  # fmt: skip
     _done(p, s)
     return c
 
 
-# --- snags (PLB-27) ----------------------------------------------------------------------------------------------------
+# --- snags (PLB-27; PEX-030 … PEX-033) ---------------------------------------------------------------------------------
+# Repository statuses in the instruction's terms: OPEN = identified, IN_PROGRESS = assigned and being fixed,
+# READY_FOR_RECHECK = resolved by the fixer, RESOLVED = verified by someone independent, CLOSED.
 SNAG_FLOW = {
     "OPEN": ("IN_PROGRESS", "CLOSED"),
     "IN_PROGRESS": ("READY_FOR_RECHECK", "CLOSED"),
@@ -651,23 +775,29 @@ SNAG_FLOW = {
 }
 
 
-def raise_snag(s: Session, ctx, p: Project, body) -> ProjectSnag:
+def raise_snag(s: Session, ctx, p: Project, body, source: str | None = None) -> ProjectSnag:
     access.for_write(s, ctx, p, "project.manage_snag", precondition=False)
     if body.owner_user_id:
         eligible_user(s, p, body.owner_user_id, "project.manage_snag", "owner_user_id")
     qc = child(s, ProjectQcCheck, p, body.qc_check_id) if body.qc_check_id else None
+    wp = child(s, ProjectWorkPackage, p, body.work_package_id) if body.work_package_id else None
+    if wp is None and qc is not None and qc.work_package_id:
+        wp = s.get(ProjectWorkPackage, qc.work_package_id)
     n = s.execute(sa.select(sa.func.max(ProjectSnag.snag_no)).where(ProjectSnag.project_id == p.id)).scalar() or 0
+    src = source or ("QUALITY_CHECK" if qc is not None else "STAFF")
     sn = ProjectSnag(project_id=p.id, lead_id=p.lead_id, snag_no=n + 1, space_id=_space(s, p, body.space_id),
                      item_reference=body.item_reference, category=body.category, customer_title=body.customer_title,
                      description=body.description, is_blocking=body.is_blocking, owner_user_id=body.owner_user_id,
                      responsible_party=body.responsible_party, status="OPEN", target_date=body.target_date,
-                     qc_check_id=qc.id if qc else None,
+                     qc_check_id=qc.id if qc else None, work_package_id=wp.id if wp else None, source=src,
+                     priority=body.priority, customer_visible=body.customer_visible or src == "CUSTOMER",
                      evidence_attachment_id=evidence(s, p, body.evidence_attachment_id),
                      evidence_reference=body.evidence_reference)  # fmt: skip
     s.add(sn)
     s.flush()
     events.record(s, p, "SNAG_RAISED", stage=p.stage_code, to="OPEN", snag_id=sn.id, snag_no=sn.snag_no,
-                  category=sn.category, blocking=sn.is_blocking, qc_check_id=sn.qc_check_id)  # fmt: skip
+                  category=sn.category, blocking=sn.is_blocking, qc_check_id=sn.qc_check_id, source=sn.source,
+                  work_package_id=sn.work_package_id)  # fmt: skip
     _done(p, s)
     return sn
 
@@ -681,8 +811,15 @@ def update_snag(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match: in
         eligible_user(s, p, body.owner_user_id, "project.manage_snag", "owner_user_id")
     if "evidence_attachment_id" in given:
         sn.evidence_attachment_id = evidence(s, p, body.evidence_attachment_id)
-    for f in ("description", "owner_user_id", "responsible_party", "target_date", "evidence_reference"):
-        if f in given:
+    if "work_package_id" in given:
+        sn.work_package_id = child(s, ProjectWorkPackage, p, body.work_package_id).id if body.work_package_id else None
+    if "customer_visible" in given and body.customer_visible is not None:
+        if sn.source == "CUSTOMER" and not body.customer_visible:
+            raise ApiError(409, "CUSTOMER_REPORTED", f"Snag {sn.snag_no} was reported by the customer; it stays "
+                           "visible to them.")  # fmt: skip
+        sn.customer_visible = body.customer_visible
+    for f in ("description", "owner_user_id", "responsible_party", "target_date", "evidence_reference", "priority"):
+        if f in given and not (f == "priority" and body.priority is None):
             setattr(sn, f, getattr(body, f))
     events.record(s, p, "SNAG_UPDATED", stage=p.stage_code, frm=sn.status, to=sn.status, snag_id=sn.id,
                   snag_no=sn.snag_no, fields=sorted(given))  # fmt: skip
@@ -716,22 +853,65 @@ def reclassify_snag(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match
     return sn
 
 
+def _independent(s: Session, ctx, p: Project, sn: ProjectSnag) -> None:
+    """D8: the verifier is none of the snag's fixers (every fix cycle) and not its owner."""
+    if ctx.user.id in quality.conflicted(s, p, [sn]):
+        raise ApiError(409, "SEGREGATION_REQUIRED", f"You fixed (or own) snag {sn.snag_no}; someone else verifies it.")
+
+
 def snag_status(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match: int | None) -> ProjectSnag:
-    access.for_write(s, ctx, p, "project.manage_snag", sn, if_match=if_match, match=sn)
     frm, to = sn.status, body.status
+    verifying = (frm == "READY_FOR_RECHECK" and to in ("RESOLVED", "IN_PROGRESS")) or (
+        to == "CLOSED" and frm != "RESOLVED"
+    )
+    access.for_write(s, ctx, p, "project.verify_snag" if verifying else "project.manage_snag", sn, if_match=if_match,
+                     match=sn)  # fmt: skip
+    frm = sn.status  # re-read under the lock
+    verifying = (frm == "READY_FOR_RECHECK" and to in ("RESOLVED", "IN_PROGRESS")) or (
+        to == "CLOSED" and frm != "RESOLVED"
+    )
+    if verifying:
+        access.require(s, ctx, p, "project.verify_snag")
     if to not in SNAG_FLOW[frm]:
         raise ApiError(409, "INVALID_STATE", f"Snag {sn.snag_no} cannot go from {frm.lower().replace('_', ' ')} to "
                        f"{to.lower().replace('_', ' ')}.", extra={"status": frm, "allowed": list(SNAG_FLOW[frm])})  # fmt: skip
     now = db.tx_time(s)
-    if to == "RESOLVED":
+    detail: dict[str, Any] = {}
+    if frm == "OPEN" and to == "IN_PROGRESS" and sn.responsible_party == "VEDA" and not sn.owner_user_id:
+        raise ApiError(409, "SNAG_UNASSIGNED", f"Assign snag {sn.snag_no} to the person fixing it first.")
+    if to == "READY_FOR_RECHECK":
+        sn.fix_note = _reason(body.note, "what was fixed", "note")
+        sn.fixed_by, sn.fixed_on = ctx.user.id, now
+        if body.evidence_attachment_id:
+            sn.resolution_evidence_attachment_id = evidence(s, p, body.evidence_attachment_id)
+        detail["evidence_attachment_id"] = sn.resolution_evidence_attachment_id
+        code = "SNAG_FIXED"
+    elif frm == "READY_FOR_RECHECK" and to == "RESOLVED":
+        _independent(s, ctx, p, sn)
         sn.resolution_note = _reason(body.note, "the recheck passed", "note")
         sn.resolved_on, sn.resolved_by = now, ctx.user.id
-    if to == "CLOSED":
-        if frm != "RESOLVED":
+        code = "SNAG_RESOLVED"
+    elif frm == "READY_FOR_RECHECK" and to == "IN_PROGRESS":
+        _independent(s, ctx, p, sn)
+        _reason(body.note, "the recheck failed", "note")
+        code = "SNAG_RECHECK_FAILED"
+    elif to == "CLOSED":
+        if frm == "RESOLVED":
+            sn.closure_code = "FIXED"
+        else:
+            if body.closure_code not in V.SNAG_CLOSED_WITHOUT_FIX:
+                raise ApiError(422, "VALIDATION_FAILED", "Say why the snag is closed without a fix.",
+                               errors=[field_error("closure_code", "REQUIRED",
+                                                   "Duplicate, not a defect or raised in error.")])  # fmt: skip
+            _independent(s, ctx, p, sn)
             sn.resolution_note = _reason(body.note, "the snag is closed without a fix", "note")
+            sn.closure_code = body.closure_code
         sn.closed_on, sn.closed_by = now, ctx.user.id
+        detail["closure_code"] = sn.closure_code
+        code = "SNAG_CLOSED"
+    else:
+        code = "SNAG_UPDATED"
     sn.status = to
-    code = {"RESOLVED": "SNAG_RESOLVED", "CLOSED": "SNAG_CLOSED"}.get(to, "SNAG_UPDATED")
-    events.record(s, p, code, stage=p.stage_code, frm=frm, to=to, snag_id=sn.id, snag_no=sn.snag_no)
+    events.record(s, p, code, stage=p.stage_code, frm=frm, to=to, snag_id=sn.id, snag_no=sn.snag_no, **detail)
     _done(p, s)
     return sn

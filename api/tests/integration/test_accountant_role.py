@@ -54,7 +54,10 @@ def test_upgrading_withdraws_the_temporary_mapping_and_grants_the_accountant(tmp
         now = clock.now()
         with eng.begin() as conn:  # what a database migrated before 0211 holds
             role = {r: i for r, i in conn.execute(sa.text("SELECT code, id FROM role"))}
-            perms = {c: i for c, i in conn.execute(sa.text("SELECT code, id FROM permission WHERE code LIKE 'commercials.%'"))}
+            perms = {
+                c: i
+                for c, i in conn.execute(sa.text("SELECT code, id FROM permission WHERE code LIKE 'commercials.%'"))
+            }
             conn.execute(sa.text("DELETE FROM role_permission WHERE role_id = :r"), {"r": role["ACCOUNTANT"]})
             held = set(_codes(conn, "SALES_MANAGER"))
             for code in P.CODES:
@@ -63,7 +66,9 @@ def test_upgrading_withdraws_the_temporary_mapping_and_grants_the_accountant(tmp
                                                                     role_id=role["SALES_MANAGER"],
                                                                     permission_id=perms[code], scope="ALL"))  # fmt: skip
             assert _codes(conn, "SALES_MANAGER") == sorted(P.CODES)
-            versions = dict(conn.execute(sa.text("SELECT id, authz_version FROM app_user WHERE user_type = 'HUMAN'")).all())
+            versions = dict(
+                conn.execute(sa.text("SELECT id, authz_version FROM app_user WHERE user_type = 'HUMAN'")).all()
+            )
         eng.dispose()
         command.upgrade(cfg, "head")
         eng = db.create_engine(url)
@@ -75,7 +80,9 @@ def test_upgrading_withdraws_the_temporary_mapping_and_grants_the_accountant(tmp
             audits = conn.execute(sa.text("SELECT reason FROM audit_log WHERE entity_type = 'role_permission' AND "
                                           "action = 'DELETE' AND performed_via = 'MIGRATION'")).scalars().all()  # fmt: skip
             assert sorted(a.split(" ")[0] for a in audits) == sorted(P.WITHDRAWN_FROM_SALES_MANAGER)
-            after = dict(conn.execute(sa.text("SELECT id, authz_version FROM app_user WHERE user_type = 'HUMAN'")).all())
+            after = dict(
+                conn.execute(sa.text("SELECT id, authz_version FROM app_user WHERE user_type = 'HUMAN'")).all()
+            )
             assert all(after[u] > v for u, v in versions.items())  # sessions lose the codes at once
         eng.dispose()
     finally:

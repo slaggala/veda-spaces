@@ -8,7 +8,12 @@ Personas:
 - ``approver``: an independent approver (SALES_MANAGER granted ``project.approve_transition``);
 - ``manager``: SALES_MANAGER (books projects, assigns the first team);
 - ``designer``, ``surveyor``: their repository roles (OWN: member projects only);
-- ``outsider``: a DESIGNER who is on no project's team.
+- ``outsider``: a DESIGNER who is on no project's team;
+- ``quality``: the independent quality persona (PEX): an ESTIMATOR granted ``project.view``, ``project.manage_qc`` and
+  ``project.verify_snag`` at OWN scope, a team member, who verifies what ops fixed.
+
+Project delivery (PEX): the harness installs a SYNTHETIC delivery policy with no commercial condition (PEX-D02 NONE)
+and no customer portal actions (PEX-D01 null); tests of those decisions install their own (``delivery``).
 """
 
 from __future__ import annotations
@@ -27,7 +32,9 @@ BASE = "/api/v1/projects"
 OPS_CODES = ("project.view", "project.assign_team", "project.manage_stage", "project.complete_checklist",
              "project.checklist.not_applicable", "project.manage_milestone", "project.raise_blocker",
              "project.resolve_blocker", "project.manage_site_readiness", "project.manage_qc", "project.manage_snag",
-             "project.complete_handover", "project.view_commercial_baseline", "project.view_audit")  # fmt: skip
+             "project.complete_handover", "project.view_commercial_baseline", "project.view_audit",
+             "project.manage_work")  # fmt: skip
+QUALITY_CODES = ("project.view", "project.manage_qc", "project.verify_snag")
 FOUR_EYES = ("SNAGGING>READY_FOR_HANDOVER",)
 QC_REQUIRED = ("DIMENSIONS_AND_ALIGNMENT", "FINISH_AND_SURFACES")
 
@@ -53,6 +60,18 @@ def synthetic_policy(**decisions: Any) -> dict:
     for k, v in decisions.items():
         doc["decisions"][k.replace("_", "-")] = v
     return doc
+
+
+def delivery(pex_d01: dict | None = None, pex_d02: str | None = "NONE") -> None:
+    """A SYNTHETIC project-delivery policy (never a Veda decision): PEX-D02 as ``pex_d02`` (None: undecided)."""
+    from veda.modules.project import delivery_policy
+
+    delivery_policy.install_for_tests({
+        "schema": "veda.project.delivery-policy/1", "version": "PEX-SYNTHETIC-1", "status": "SYNTHETIC_TEST_ONLY",
+        "note": "Synthetic test policy; never a Veda decision.",
+        "decisions": {"PEX-D01": {**pex_d01, "reference": "SYNTHETIC"} if pex_d01 else None,
+                      "PEX-D02": {"condition": pex_d02, "reference": "SYNTHETIC"} if pex_d02 else None},
+    })  # fmt: skip
 
 
 def install(doc: dict | None) -> None:
@@ -86,6 +105,10 @@ class Projects:
         self.designer = factory.user("DESIGNER")
         self.surveyor = factory.user("SURVEYOR")
         self.outsider = factory.user("DESIGNER")
+        self.quality = factory.user("ESTIMATOR")
+        for code in QUALITY_CODES:
+            factory.grant(self.quality, code, scope="OWN")
+        delivery()
 
     def as_(self, user):
         if getattr(user, "token", None) is None:
@@ -170,7 +193,8 @@ class Projects:
         """The default team: ops owns PROJECT, SITE, QUALITY and HANDOVER, the designer owns DESIGN, the surveyor is a
         member, and the manager is the commercial owner."""
         for user, resp in ((self.ops, "PROJECT"), (self.ops, "SITE"), (self.ops, "QUALITY"), (self.ops, "HANDOVER"),
-                           (self.designer, "DESIGN"), (self.surveyor, "MEMBER"), (self.manager, "COMMERCIAL")):  # fmt: skip
+                           (self.designer, "DESIGN"), (self.surveyor, "MEMBER"), (self.manager, "COMMERCIAL"),
+                           (self.quality, "MEMBER")):  # fmt: skip
             self.team(p, user, resp)
         return self.get(p)
 
@@ -207,6 +231,32 @@ class Projects:
         r = self.transition(p, to)
         assert r["outcome"] == "COMPLETED", r["transition"]["blockers"]
         return r["project"]
+
+    def package(self, p: dict, user=None, status: int = 201):
+        """Prepare the handover package (READY_FOR_HANDOVER, every gate but the evidence met)."""
+        r = self.as_(user or self.ops).post(f"{BASE}/{p['id']}/handover-package", {}, if_match=self.get(p)["version"])
+        assert r.status == status, r
+        return r.data if status == 201 else r
+
+    def snag_through(self, p: dict, snag_id: str, to: str = "RESOLVED") -> dict:
+        """Take a snag through its flow: ops owns and fixes it, the quality persona verifies (and closes)."""
+        url = f"{BASE}/{p['id']}/snags/{snag_id}"
+
+        def cur() -> dict:
+            return next(x for x in self.get(p)["snags"] if x["id"] == snag_id)
+
+        if cur()["owner"] is None:
+            ok(self.as_(self.ops).patch(url, {"owner_user_id": self.ops.id}, if_match=cur()["version"]))
+        steps = [("IN_PROGRESS", self.ops, None), ("READY_FOR_RECHECK", self.ops, "Fixed (synthetic)"),
+                 ("RESOLVED", self.quality, "Rechecked and verified (synthetic)"), ("CLOSED", self.quality, None)]  # fmt: skip
+        for status, user, note in steps:
+            if cur()["status"] == to:
+                break
+            if status not in cur()["allowed_next"]:
+                continue
+            ok(self.as_(user).post(f"{url}/status", {"status": status, **({"note": note} if note else {})},
+                                   if_match=cur()["version"]))  # fmt: skip
+        return cur()
 
     def ready_site(self, p: dict, user=None) -> dict:
         cur = self.get(p)

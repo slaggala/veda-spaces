@@ -133,6 +133,9 @@ def reset_process_state() -> None:
     from veda.modules.commercials import policy as commercials_policy
 
     commercials_policy.install_for_tests(None)  # nor a SYNTHETIC commercials policy
+    from veda.modules.project import delivery_policy
+
+    delivery_policy.install_for_tests(None)  # nor a SYNTHETIC project-delivery policy
 
 
 @pytest.fixture

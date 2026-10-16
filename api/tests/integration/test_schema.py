@@ -11,7 +11,7 @@ from veda.kernel import audit_registry, clock, conformance, db
 from veda.kernel.context import actor, system_context
 from veda.kernel.ids import new_id
 
-HEAD = "0211_accountant_role"
+HEAD = "0212_project_execution"
 
 
 def _connect():
@@ -235,6 +235,7 @@ def test_RBAC_001_migration_order():
         "0208_project_lifecycle",
         "0209_customer_portal",
         "0210_project_commercials",
+        "0211_accountant_role",
         HEAD,
     ]
 

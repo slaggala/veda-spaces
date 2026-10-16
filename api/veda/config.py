@@ -231,6 +231,10 @@ class Settings:
     # (every staff route answers 404, the portal shows no commercial data) and refused in production. It turns no other
     # feature on: the customer view appears only where the portal's own flag is also on.
     project_commercials_enabled: bool = False
+    # Project execution delivery in the portal (PEX, decision log 45): the customer's view of work, quality checks, snags,
+    # their own issue reports and the handover package. Off by default everywhere and refused in production. It shows
+    # nothing unless the portal's and the Project Lifecycle's own flags are also on; it turns neither on.
+    project_delivery_portal_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -389,6 +393,7 @@ def load_settings(**overrides) -> Settings:
         project_lifecycle_enabled=_bool("VEDA_PROJECT_LIFECYCLE_ENABLED", False),
         customer_portal_enabled=_bool("VEDA_CUSTOMER_PORTAL_ENABLED", False),
         project_commercials_enabled=_bool("VEDA_PROJECT_COMMERCIALS_ENABLED", False),
+        project_delivery_portal_enabled=_bool("VEDA_PROJECT_DELIVERY_PORTAL_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -625,6 +630,10 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append("VEDA_CUSTOMER_PORTAL_ENABLED is not authorised in production (Customer Project Portal)")
         if settings.project_commercials_enabled:  # no production decision exists (decision log 44)
             problems.append("VEDA_PROJECT_COMMERCIALS_ENABLED is not authorised in production (Project Commercials)")
+        if settings.project_delivery_portal_enabled:  # no production decision exists (decision log 45)
+            problems.append(
+                "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED is not authorised in production (project delivery in the portal)"
+            )
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

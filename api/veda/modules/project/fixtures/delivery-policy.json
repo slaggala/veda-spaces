@@ -1,0 +1,10 @@
+{
+  "schema": "veda.project.delivery-policy/1",
+  "version": "PEX-POLICY-0",
+  "status": "UNDECIDED",
+  "note": "No project-delivery decision has been recorded by the owner. PEX-D01 (customer portal actions) and PEX-D02 (commercial condition for handover) are null: customers cannot report issues or acknowledge a handover in the portal, and the commercial condition fails closed. See docs/implementation/project-execution/PEX-owner-decisions.md.",
+  "decisions": {
+    "PEX-D01": null,
+    "PEX-D02": null
+  }
+}

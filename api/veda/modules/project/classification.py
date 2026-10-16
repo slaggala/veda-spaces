@@ -10,7 +10,10 @@ classified here (a unit test refuses an unclassified or stale entry):
 - ``CUSTOMER_ACTION``: the customer-worded description of something the customer must do (only where the responsible
   party is CUSTOMER).
 
-Nothing reads this to publish anything: there is no customer route, projection or notification in this workstream.
+PEX: the portal's delivery view (``delivery.py``) reads only SAFE and CUSTOMER_ACTION fields, and only while
+VEDA_PROJECT_DELIVERY_PORTAL_ENABLED (with the portal and lifecycle flags) is on; it asserts the class of each field it
+reads. A customer report's description and area are the customer's own words, shown back only to that customer's
+portal; the handover package's content is built from customer-safe fields only.
 """
 
 from __future__ import annotations
@@ -40,10 +43,19 @@ _SAFE: dict[str, dict[str, str]] = {
     "project_site_readiness": {"kind": SAFE, "item_code": SAFE, "category": SAFE, "promise_content_version": SAFE,
                                "status": SAFE, "responsible_party": SAFE, "due_date": SAFE,
                                "customer_action": CUSTOMER_ACTION},
-    "project_blocker": {"responsible_party": SAFE, "customer_action": CUSTOMER_ACTION, "target_date": SAFE},
-    "project_qc_check": {},
-    "project_snag": {"snag_no": SAFE, "category": SAFE, "customer_title": SAFE, "status": SAFE, "space_id": SAFE},
+    "project_blocker": {"responsible_party": SAFE, "customer_action": CUSTOMER_ACTION, "target_date": SAFE,
+                        "customer_summary": SAFE, "impact": SAFE, "status": SAFE},
+    "project_qc_check": {"result": SAFE},
+    "project_snag": {"snag_no": SAFE, "category": SAFE, "customer_title": SAFE, "status": SAFE, "space_id": SAFE,
+                     "customer_visible": SAFE, "source": SAFE, "closure_code": SAFE},
     "project_event": {},
+    "project_work_package": {"stage_code": SAFE, "customer_label": SAFE, "customer_visible": SAFE, "status": SAFE,
+                             "actual_start": SAFE, "actual_finish": SAFE},
+    "project_qc_point": {},
+    "project_customer_report": {"report_no": SAFE, "description": SAFE, "area": SAFE, "status": SAFE,
+                                "decline_code": SAFE, "response": SAFE, "triaged_on": SAFE},
+    "project_handover_package": {"package_no": SAFE, "status": SAFE, "content": SAFE, "content_sha256": SAFE,
+                                 "acknowledged_on": SAFE, "completed_on": SAFE},
 }  # fmt: skip
 
 
@@ -65,4 +77,9 @@ def listed() -> dict[str, dict[str, str]]:
 
 def public_view() -> dict[str, Any]:
     """The non-internal fields, for the workspace's badges ("may be shown to the customer later")."""
-    return {"classes": list(CLASSES), "default": INTERNAL, "fields": listed(), "published": False}
+    return {
+        "classes": list(CLASSES),
+        "default": INTERNAL,
+        "fields": listed(),
+        "published_through": "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED",
+    }

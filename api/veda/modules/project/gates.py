@@ -13,6 +13,12 @@ Which gates apply:
 - **Configurable**: the owner's gates for the transition (PLB-OD-02), else the definition's strict defaults.
 
 An informational blocker never stops anything (PLB-19); it is listed so staff see it.
+
+Execution (PEX) adds structural gates that no owner gate list can drop: WORK_COMPLETE on every move (the work of this
+stage and earlier ones is closed, none with a failed check); CUSTOMER_REPORTS_TRIAGED and COMMERCIAL_CONDITION on the
+moves to READY_FOR_HANDOVER and HANDED_OVER; HANDOVER_PACKAGE on the handover itself (the bound package is current and
+unchanged), so an approval re-verifies it. Quality is read from check chains (``quality``), never "latest per
+category". ``handover_readiness`` is derived from ``evaluate``: there is one computation.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from . import baseline, lifecycle, policy
+from . import baseline, lifecycle, policy, quality
 from . import vocab as V
 from .lifecycle import GATES, Definition, Transition
 from .models import (
@@ -166,30 +172,34 @@ def _milestones(s: Session, p: Project, frm: str) -> list[dict[str, Any]]:
 
 
 def latest_qc(s: Session, p: Project) -> dict[str, ProjectQcCheck]:
+    """For display: per category, the head of its most recent chain (gates read every chain, never this)."""
     out: dict[str, ProjectQcCheck] = {}
-    for r in s.execute(sa.select(ProjectQcCheck).where(ProjectQcCheck.project_id == p.id)
-                       .order_by(ProjectQcCheck.created_on, ProjectQcCheck.id)).scalars():  # fmt: skip
-        out[r.category] = r
+    for c in sorted(quality.heads(s, p), key=lambda r: (r.created_on, r.id)):
+        out[c.category] = c
     return out
 
 
 def _qc(s: Session, p: Project, *, passed: bool) -> list[dict[str, Any]]:
     gate = "QC_PASSED" if passed else "QC_RECORDED"
-    latest = latest_qc(s, p)
+    rows = quality.checks(s, p)
+    heads = [c[-1] for c in quality.chains(rows)]
     out = []
     for cat in required_qc(p):
-        r = latest.get(cat)
+        mine = [h for h in heads if h.category == cat]
         label = cat.lower().replace("_", " ")
-        if r is None or r.result == "TO_BE_CONFIRMED":
+        if not any(h.result != "TO_BE_CONFIRMED" for h in mine):
             out.append(_b(gate, "QC_NOT_RECORDED", f"Quality check {label} has no result.", responsible_party="VEDA",
                           category=cat))  # fmt: skip
-        elif passed and r.result == "FAIL":
-            out.append(_b(gate, "QC_FAILED", f"Quality check {label} failed; fix and recheck it.",
-                          responsible_party="VEDA", entity={"type": "qc_check", "id": r.id}, category=cat))  # fmt: skip
-    if passed:  # a failed result in any category (required or not) is never ready for handover
-        out += [_b(gate, "QC_FAILED", f"Quality check {cat.lower().replace('_', ' ')} failed; fix and recheck it.",
-                   responsible_party="VEDA", entity={"type": "qc_check", "id": r.id}, category=cat)
-                for cat, r in latest.items() if r.result == "FAIL" and cat not in required_qc(p)]  # fmt: skip
+    # A recorded head is PASS, FAIL or an authorised NOT_APPLICABLE (never on a planned point): a FAIL is QC_FAILED below.
+    for pt in quality.points(s, p):
+        head = quality.point_head(rows, pt.id)
+        if head is None or head.result == "TO_BE_CONFIRMED":
+            out.append(_b(gate, "QC_POINT_NOT_RECORDED", f"Planned check QC-{pt.point_no} has no result.",
+                          responsible_party="VEDA", entity={"type": "qc_point", "id": pt.id}, category=pt.category))  # fmt: skip
+    if passed:  # a chain ending in a failure (any category, any room, any work) is never ready for handover
+        out += [_b(gate, "QC_FAILED", f"Quality check {h.category.lower().replace('_', ' ')} failed; fix and recheck "
+                   "it.", responsible_party="VEDA", entity={"type": "qc_check", "id": h.id}, category=h.category)
+                for h in heads if h.result == "FAIL"]  # fmt: skip
     return out
 
 
@@ -209,7 +219,10 @@ def _handover(s: Session, p: Project, handover: dict[str, Any] | None) -> list[d
         return None
     ack, evidence, _ = handover_requirements()
     out = []
-    if ack and not (handover.get("acknowledgement_reference") or "").strip():
+    from . import handover as packages
+
+    portal_ack = packages.acknowledged(s, handover)  # the customer acknowledged this exact package in the portal
+    if ack and not portal_ack and not (handover.get("acknowledgement_reference") or "").strip():
         out.append(_b("HANDOVER_EVIDENCE", "ACKNOWLEDGEMENT_MISSING", "The customer's handover acknowledgement "
                       "reference is required.", responsible_party="VEDA"))  # fmt: skip
     if evidence and not handover.get("evidence_attachment_id"):
@@ -277,6 +290,16 @@ def evaluate(s: Session, p: Project, to: str | None = None, *, command: str = "S
     if t is None:
         return _result(p, d, frm, to, None, gates, False)
     gate("NO_GATING_BLOCKERS", "STRUCTURAL", _gating(s, p, d, t.to))
+    from . import commercial, reports, work  # execution modules import the service, which imports this module
+
+    gate("WORK_COMPLETE", "STRUCTURAL", work.gate(s, p, frm))
+    if t.to in lifecycle.HANDOVER_MOVES:
+        gate("CUSTOMER_REPORTS_TRIAGED", "STRUCTURAL", reports.gate(s, p))
+        gate("COMMERCIAL_CONDITION", "STRUCTURAL", commercial.blockers(s, p))
+    if t.command == "HANDOVER" and command == "HANDOVER" and handover is not None:
+        from . import handover as packages
+
+        gate("HANDOVER_PACKAGE", "STRUCTURAL", packages.gate(s, p, handover))
     chosen = owner_gates(p, t)
     approval = four_eyes(p, t)
     if t.risk == "HIGH":
@@ -333,30 +356,43 @@ def _result(p: Project, d: Definition, frm: str, to: str | None, t: Transition |
 
 
 def handover_readiness(s: Session, p: Project) -> dict[str, Any]:
-    """PLB-28: what still stands between the project and its handover, whatever its current stage: the configurable
-    gates of the two handover transitions plus the structural ones (evidence is given at the handover itself)."""
+    """PLB-28 / PEX-045 (review D7): what still stands between the project and its handover, derived from ``evaluate``.
+
+    In READY_FOR_HANDOVER it is the evaluation of the handover move itself, without the evidence given at completion.
+    Before that, it is every gate of the two handover moves that does not depend on the current stage's own checklist,
+    milestones or owners, plus open work anywhere in the project, and it says the stage is not reached yet."""
+    from . import commercial, reports, work
+
     d = lifecycle.get(p.lifecycle_version)
     if p.status == "HANDED_OVER":
-        return {"ready": True, "handed_over": True, "blockers": []}
+        return {"ready": True, "handed_over": True, "stage_reached": True, "blockers": []}
+    stage_open = d.sequence(p.stage_code) < d.sequence("READY_FOR_HANDOVER")
+    if not stage_open:
+        ev = evaluate(s, p, "HANDED_OVER", command="HANDOVER")
+        found = [b for b in ev["blockers"] if b["gate"] not in ("HANDOVER_EVIDENCE", "HANDOVER_PACKAGE")]
+        return {"ready": not found, "handed_over": False, "stage_reached": True, "blockers": found,
+                "commercial_position": commercial.position(s, p)}  # fmt: skip
     found: list[dict[str, Any]] = []
     seen: set[tuple] = set()
+
+    def add(items: list[dict[str, Any]]) -> None:
+        for b in items:
+            k = (b["code"], str(b.get("entity")), b.get("category"))
+            if k not in seen:
+                seen.add(k)
+                found.append(b)
+
     for t in (d.transition("SNAGGING", "READY_FOR_HANDOVER"), d.transition("READY_FOR_HANDOVER", "HANDED_OVER")):
         if t is None:
             continue
         chosen = owner_gates(p, t)
         for code in chosen if chosen is not None else t.default_gates:
-            res = {
-                "QC_PASSED": lambda: _qc(s, p, passed=True),
-                "SNAGS_RESOLVED": lambda: _snags(s, p),
-                "VARIATIONS_CLOSED": lambda: _variations(s, p),
-            }.get(code, lambda: [])()
-            for b in res:
-                k = (b["code"], str(b.get("entity")), b.get("category"))
-                if k not in seen:
-                    seen.add(k)
-                    found.append(b)
-    found += _gating(s, p, d, "HANDED_OVER")
-    found += [_b("BASELINE_VALID", x["code"], x["message"]) for x in baseline.problems(s, p)]
-    stage_open = d.sequence(p.stage_code) < d.sequence("READY_FOR_HANDOVER")
-    return {"ready": not found and not stage_open, "handed_over": False, "stage_reached": not stage_open,
-            "blockers": found}  # fmt: skip
+            add({"QC_PASSED": lambda: _qc(s, p, passed=True), "SNAGS_RESOLVED": lambda: _snags(s, p),
+                 "VARIATIONS_CLOSED": lambda: _variations(s, p)}.get(code, lambda: [])())  # fmt: skip
+    add(_gating(s, p, d, "HANDED_OVER"))
+    add(work.gate(s, p, "HANDED_OVER"))
+    add(reports.gate(s, p))
+    add(commercial.blockers(s, p))
+    add([_b("BASELINE_VALID", x["code"], x["message"]) for x in baseline.problems(s, p)])
+    return {"ready": False, "handed_over": False, "stage_reached": False, "blockers": found,
+            "commercial_position": commercial.position(s, p)}  # fmt: skip

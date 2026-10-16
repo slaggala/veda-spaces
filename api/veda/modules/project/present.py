@@ -20,7 +20,21 @@ from veda.modules.mtq_commercial import quotations
 from veda.modules.mtq_commercial.models import Quotation
 from veda.platform.identity.models import User
 
-from . import access, baseline, classification, events, gates, lifecycle, policy, service
+from . import (
+    access,
+    baseline,
+    classification,
+    delivery_policy,
+    events,
+    gates,
+    handover,
+    lifecycle,
+    policy,
+    quality,
+    reports,
+    service,
+    work,
+)
 from . import vocab as V
 from .models import (
     Project,
@@ -287,7 +301,9 @@ def _blocker(b: ProjectBlocker, d, people: People) -> dict[str, Any]:
             "resolution": b.resolution, "resolved_on": _when(b.resolved_on), "resolved_by": people(b.resolved_by),
             "raised_on": _when(b.created_on), "raised_by": people(b.created_by),
             "related": {"milestone_id": b.related_milestone_id, "checklist_item_id": b.related_checklist_item_id,
-                        "site_readiness_id": b.related_site_readiness_id, "quotation_id": b.related_quotation_id}}  # fmt: skip
+                        "site_readiness_id": b.related_site_readiness_id, "quotation_id": b.related_quotation_id,
+                        "work_package_id": b.related_work_package_id},
+            "customer_summary": b.customer_summary}  # fmt: skip
 
 
 def _milestone(m: ProjectMilestone, today: date) -> dict[str, Any]:
@@ -326,20 +342,32 @@ def _spaces(s: Session, p: Project) -> dict[str, str]:
 
 
 def _qc(s: Session, p: Project, people: People, spaces: dict[str, str]) -> dict[str, Any]:
-    rows = list(s.execute(sa.select(ProjectQcCheck).where(ProjectQcCheck.project_id == p.id)
-                          .order_by(ProjectQcCheck.created_on.desc(), ProjectQcCheck.id.desc())).scalars())  # fmt: skip
+    rows = quality.checks(s, p)
     latest = gates.latest_qc(s, p)
     required = gates.required_qc(p)
+    chains = quality.chains(rows)
 
     def row(c: ProjectQcCheck) -> dict[str, Any]:
         return {"id": c.id, "category": c.category, "result": c.result, "space": spaces.get(c.space_id or ""),
                 "space_id": c.space_id, "observation": c.observation, "evidence": _evidence(c),
-                "recheck_of_id": c.recheck_of_id, "checked_by": people(c.created_by), "checked_on": _when(c.created_on)}  # fmt: skip
+                "recheck_of_id": c.recheck_of_id, "qc_point_id": c.qc_point_id, "work_package_id": c.work_package_id,
+                "checked_by": people(c.created_by), "checked_on": _when(c.created_on)}  # fmt: skip
 
+    points = []
+    for pt in quality.points(s, p, active=False):
+        head = quality.point_head(rows, pt.id)
+        points.append({"id": pt.id, "version": pt.version, "point_no": pt.point_no, "category": pt.category,
+                       "label": pt.label, "space": spaces.get(pt.space_id or ""), "space_id": pt.space_id,
+                       "work_package_id": pt.work_package_id, "evidence_required": pt.evidence_required,
+                       "status": pt.status, "withdrawn_reason": pt.withdrawn_reason,
+                       "result": head.result if head else None, "head_id": head.id if head else None})  # fmt: skip
     return {"required_categories": list(required),
             "categories": [{"category": cat, "required": cat in required,
                             "latest": row(latest[cat]) if cat in latest else None} for cat in V.QC_CATEGORIES],
-            "history": [row(c) for c in rows]}  # fmt: skip
+            "points": points,
+            "chains": [{"head": row(c[-1]), "length": len(c), "ever_failed": quality.ever_failed(c),
+                        "root_id": c[0].id} for c in chains],
+            "history": [row(c) for c in sorted(rows, key=lambda r: (r.created_on, r.id), reverse=True)]}  # fmt: skip
 
 
 def _snag(n: ProjectSnag, people: People, spaces: dict[str, str]) -> dict[str, Any]:
@@ -351,7 +379,48 @@ def _snag(n: ProjectSnag, people: People, spaces: dict[str, str]) -> dict[str, A
             "allowed_next": list(service.SNAG_FLOW[n.status]), "target_date": _day(n.target_date),
             "evidence": _evidence(n), "resolution_note": n.resolution_note, "resolved_on": _when(n.resolved_on),
             "resolved_by": people(n.resolved_by), "closed_on": _when(n.closed_on), "closed_by": people(n.closed_by),
-            "qc_check_id": n.qc_check_id, "raised_on": _when(n.created_on), "raised_by": people(n.created_by)}  # fmt: skip
+            "qc_check_id": n.qc_check_id, "raised_on": _when(n.created_on), "raised_by": people(n.created_by),
+            "work_package_id": n.work_package_id, "source": n.source, "priority": n.priority,
+            "customer_visible": n.customer_visible, "fixed_by": people(n.fixed_by), "fixed_on": _when(n.fixed_on),
+            "fix_note": n.fix_note, "closure_code": n.closure_code,
+            "resolution_evidence": {"attachment_id": n.resolution_evidence_attachment_id}
+            if n.resolution_evidence_attachment_id else None}  # fmt: skip
+
+
+def _work(s: Session, p: Project, people: People, spaces: dict[str, str], today: date) -> list[dict[str, Any]]:
+    checks = quality.checks(s, p)
+    return [{"id": w.id, "version": w.version, "package_no": w.package_no, "stage_code": w.stage_code,
+             "space": spaces.get(w.space_id or ""), "space_id": w.space_id, "title": w.title,
+             "description": w.description, "customer_label": w.customer_label, "customer_visible": w.customer_visible,
+             "owner": people(w.owner_user_id), "depends_on_id": w.depends_on_id, "status": w.status,
+             "state": work.derived_state(s, w, checks), "scheduled": bool(w.planned_start or w.planned_finish),
+             "planned_start": _day(w.planned_start), "planned_finish": _day(w.planned_finish),
+             "plan_revision": w.plan_revision, "replan_reason": w.replan_reason,
+             "past_planned_finish": bool(w.planned_finish and w.planned_finish < today
+                                         and w.status not in V.WORK_PACKAGE_CLOSED),
+             "actual_start": _day(w.actual_start), "actual_finish": _day(w.actual_finish),
+             "started_by": people(w.started_by), "completed_by": people(w.completed_by),
+             "completion_note": w.completion_note, "reopen_reason": w.reopen_reason, "cancel_reason": w.cancel_reason,
+             "evidence": _evidence(w)} for w in work.rows(s, p)]  # fmt: skip
+
+
+def _reports(s: Session, p: Project, people: People) -> list[dict[str, Any]]:
+    return [{"id": r.id, "version": r.version, "report_no": r.report_no, "channel": r.channel,
+             "description": r.description, "area": r.area, "status": r.status, "snag_id": r.snag_id,
+             "decline_code": r.decline_code, "response": r.response, "reported_on": _when(r.created_on),
+             "recorded_by": people(r.created_by) if r.channel == "STAFF" else None,
+             "triaged_by": people(r.triaged_by), "triaged_on": _when(r.triaged_on)} for r in reports.rows(s, p)]  # fmt: skip
+
+
+def _packages(s: Session, p: Project, people: People) -> list[dict[str, Any]]:
+    out = []
+    for pkg in handover.packages(s, p):
+        item = handover.present(pkg)
+        item["prepared_by"] = people(pkg.created_by)
+        item["superseded_by"] = people(pkg.superseded_by)
+        item["stale"] = handover.staleness(s, p, pkg) if pkg.status == "PREPARED" else None
+        out.append(item)
+    return out
 
 
 def _baseline(s: Session, ctx, p: Project) -> dict[str, Any]:
@@ -408,7 +477,8 @@ def _timeline(s: Session, p: Project, people: People) -> list[dict[str, Any]]:
 
 
 def _attention(ev: dict[str, Any] | None, blockers: list[dict[str, Any]], site: list[dict[str, Any]],
-               snags: list[dict[str, Any]], milestones: list[dict[str, Any]], waiting) -> list[dict[str, Any]]:  # fmt: skip
+               snags: list[dict[str, Any]], milestones: list[dict[str, Any]], waiting,
+               work_rows: list[dict[str, Any]] = (), report_rows: list[dict[str, Any]] = ()) -> list[dict[str, Any]]:  # fmt: skip
     """PLB-40/41: what needs attention, gating first, each saying who acts, what to do and what it blocks."""
     out: list[dict[str, Any]] = []
     if waiting is not None:
@@ -432,6 +502,17 @@ def _attention(ev: dict[str, Any] | None, blockers: list[dict[str, Any]], site: 
             out.append({"severity": "GATING", "kind": "SNAG", "title": f"Snag {n['snag_no']}: {n['customer_title']}",
                         "who": n["responsible_party"], "action": "Fix and recheck", "blocks": "READY_FOR_HANDOVER",
                         "entity": {"type": "snag", "id": n["id"]}})  # fmt: skip
+    for w in work_rows:
+        if w["state"] in ("BLOCKED", "CORRECTION_REQUIRED"):
+            out.append({"severity": "GATING", "kind": "WORK", "title": f"WP-{w['package_no']}: {w['title']}",
+                        "who": "VEDA", "action": "Clear its blocker" if w["state"] == "BLOCKED"
+                        else "Correct it and recheck", "blocks": w["stage_code"],
+                        "entity": {"type": "work_package", "id": w["id"]}})  # fmt: skip
+    for r in report_rows:
+        if r["status"] == "SUBMITTED":
+            out.append({"severity": "ACTION", "kind": "CUSTOMER_REPORT", "title": f"Customer report {r['report_no']} "
+                        "is waiting for review", "who": "VEDA", "action": "Raise a snag, link one, or reply",
+                        "blocks": "READY_FOR_HANDOVER", "entity": {"type": "customer_report", "id": r["id"]}})  # fmt: skip
     for m in milestones:
         if m["overdue"]:
             out.append({"severity": "INFORMATIONAL", "kind": "MILESTONE", "title": f"{m['label']} is past its planned "
@@ -476,7 +557,9 @@ def _actions(s: Session, ctx, p: Project, waiting) -> dict[str, bool]:
             "manage_milestone": can("project.manage_milestone"), "raise_blocker": can("project.raise_blocker"),
             "resolve_blocker": can("project.resolve_blocker"),
             "manage_site_readiness": can("project.manage_site_readiness"), "manage_qc": can("project.manage_qc"),
-            "manage_snag": can("project.manage_snag"),
+            "manage_snag": can("project.manage_snag"), "manage_work": can("project.manage_work"),
+            "verify_snag": can("project.verify_snag"),
+            "prepare_handover_package": can("project.complete_handover") and p.stage_code == "READY_FOR_HANDOVER",
             "record_promised_date": _owner_can(s, ctx, p, "PLB-OD-13", "capability"),
             "reclassify_snag": _owner_can(s, ctx, p, "PLB-OD-06", "snag_reclassification_capability"),
             "qc_required_not_applicable": _owner_can(s, ctx, p, "PLB-OD-08", "not_applicable_capability"),
@@ -485,7 +568,7 @@ def _actions(s: Session, ctx, p: Project, waiting) -> dict[str, bool]:
 
 
 EVIDENCE_CODES = ("project.complete_checklist", "project.manage_milestone", "project.manage_site_readiness",
-                  "project.manage_qc", "project.manage_snag", "project.complete_handover")  # fmt: skip
+                  "project.manage_qc", "project.manage_snag", "project.complete_handover", "project.manage_work")  # fmt: skip
 
 
 def evidence_options(s: Session, ctx, p: Project) -> list[dict[str, Any]]:
@@ -538,6 +621,8 @@ def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
                             .order_by(ProjectTransition.created_on.desc())).scalars().all()  # fmt: skip
     members_all = service.members(s, p, active=None)
     unsatisfied = [r for r in site if not r["satisfied"]]
+    work_rows = _work(s, p, people, spaces, today)
+    report_rows = _reports(s, p, people)
     return {
         "id": p.id, "version": p.version, "project_number": p.project_number, "status": p.status,
         "source": p.source, "property": _property(s, p), "quotation_number": p.quotation_number,
@@ -555,7 +640,7 @@ def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
         "handover_readiness": gates.handover_readiness(s, p),
         "site_readiness_state": "NOT_ASSESSED" if not site else ("READY" if not unsatisfied else "BLOCKED"
                                 if any(r["status"] != "TO_BE_CONFIRMED" for r in unsatisfied) else "TO_BE_CONFIRMED"),
-        "attention": _attention(ev, blockers, site, snags, milestones, waiting),
+        "attention": _attention(ev, blockers, site, snags, milestones, waiting, work_rows, report_rows),
         "next_actions": _next_actions(ev),
         "team": [{"id": m.id, "version": m.version, "user": people(m.user_id), "responsibility": m.responsibility,
                   "active": m.is_active, "eligible": m.is_active and gates.owner_eligible(s, m),
@@ -566,6 +651,8 @@ def detail(s: Session, ctx, p: Project) -> dict[str, Any]:
         "needs_reassignment": sorted(m.responsibility for m in members_all if m.is_active
                                      and m.responsibility != "MEMBER" and not gates.owner_eligible(s, m)),
         "milestones": milestones, "site_readiness": site, "qc": _qc(s, p, people, spaces), "snags": snags,
+        "work_packages": work_rows, "customer_reports": report_rows, "handover_packages": _packages(s, p, people),
+        "delivery_policy": delivery_policy.public_view(),
         "baseline": _baseline(s, ctx, p),
         "transitions": [_transition(t, people, audit) for t in transitions],
         "timeline": _timeline(s, p, people),
@@ -587,6 +674,8 @@ def vocabulary() -> dict[str, Any]:
             "readiness_kinds": V.READINESS_KINDS, "readiness_categories": V.READINESS_CATEGORIES,
             "readiness_statuses": V.READINESS_STATUSES, "qc_categories": V.QC_CATEGORIES, "qc_results": V.QC_RESULTS,
             "snag_categories": V.SNAG_CATEGORIES, "snag_statuses": V.SNAG_STATUSES,
+            "snag_priorities": V.SNAG_PRIORITIES, "snag_closure_codes": V.SNAG_CLOSED_WITHOUT_FIX,
+            "work_package_states": V.WORK_PACKAGE_STATES, "report_decline_codes": V.REPORT_DECLINE_CODES,
             "gates": [{"code": k, "label": v, "structural": k in lifecycle.STRUCTURAL_GATES}
                       for k, v in lifecycle.GATES.items()],
             "lifecycle": d.document() | {"sha256": d.sha256, "status": d.status}}  # fmt: skip

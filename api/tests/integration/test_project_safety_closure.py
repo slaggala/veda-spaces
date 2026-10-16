@@ -102,6 +102,7 @@ def test_m1_once_decided_only_the_named_capability_records_changes_or_clears_a_p
 
 # --- M2 ----------------------------------------------------------------------------------------------------------------
 def _snag(t: Projects, p: dict, **body) -> dict:
+    body = {"owner_user_id": t.ops.id, **body}  # PEX: a Veda snag is assigned before work starts on it
     d = ok(t.as_(t.ops).post(f"{BASE}/{p['id']}/snags", {"category": "FINISH", "customer_title": "Synthetic snag", **body}),
            201)  # fmt: skip
     return d["snags"][-1]
@@ -295,8 +296,8 @@ def test_d_a_required_qc_not_applicable_racing_the_handover_readiness_move_is_de
     p = advance_to(t, p, "QUALITY_CHECK", qc=())
     api = t.as_(t.ops)
     ok(api.post(f"{BASE}/{p['id']}/qc-checks", {"category": "DIMENSIONS_AND_ALIGNMENT", "result": "PASS"}), 201)
-    ok(api.post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES", "result": "FAIL",
-                                               "observation": "Gap at the hinge"}), 201)  # fmt: skip
+    failed = ok(api.post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES", "result": "FAIL",
+                                                        "observation": "Gap at the hinge"}), 201)["qc"]["history"][0]  # fmt: skip
     p = t.advance(p, "SNAGGING")
     t.checklist(p)
     _policy(PLB_OD_08={"required_categories": ["DIMENSIONS_AND_ALIGNMENT", "FINISH_AND_SURFACES"],
@@ -310,7 +311,8 @@ def test_d_a_required_qc_not_applicable_racing_the_handover_readiness_move_is_de
                          lambda c: c.post(f"{BASE}/{p['id']}/transitions", {"to_stage": "READY_FOR_HANDOVER"},
                                           if_match=cur["version"]),
                          lambda: b.post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES",
-                                        "result": "NOT_APPLICABLE", "observation": "Finish replaced by customer supply"}))  # fmt: skip
+                                        "result": "NOT_APPLICABLE", "observation": "Finish replaced by customer supply",
+                                        "recheck_of_id": failed["id"]}))  # fmt: skip
     assert second.status == 201
     if first.status == 201:  # evaluated before the override committed: refused on the failure, never passed
         assert first.data["outcome"] == "REFUSED" and {b["code"] for b in first.data["transition"]["blockers"]} == {

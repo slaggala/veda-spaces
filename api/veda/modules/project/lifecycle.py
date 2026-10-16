@@ -31,7 +31,14 @@ STRUCTURAL_GATES = {
     "BASELINE_VALID": "The project's commercial baseline verifies and records every accepted variation",
     "NO_GATING_BLOCKERS": "No open gating blocker stops this stage or an earlier one",
     "POLICY_RECORDED": "A HIGH-risk transition needs the owner's lifecycle, gate and approval decisions recorded",
+    # PEX (execution): invariants of honest progress, never dropped by an owner's gate list. They are not part of a
+    # definition's document, so adding them changes no definition digest.
+    "WORK_COMPLETE": "Every work package of this stage and the earlier ones is closed, and none failed its quality check",
+    "CUSTOMER_REPORTS_TRIAGED": "Every issue the customer reported has been reviewed",
+    "COMMERCIAL_CONDITION": "The commercial position meets the owner's condition for handover (PEX-D02)",
+    "HANDOVER_PACKAGE": "The handover is bound to the current handover package, unchanged since it was prepared",
 }
+HANDOVER_MOVES = ("READY_FOR_HANDOVER", "HANDED_OVER")  # the moves the handover-only structural gates apply to
 # Configurable gates: the owner decides which apply to each transition (PLB-OD-02); until then the defaults below.
 CONFIGURABLE_GATES = {
     "CHECKLIST_COMPLETE": "Every required checklist item of the current stage is done or marked not applicable",
@@ -39,8 +46,9 @@ CONFIGURABLE_GATES = {
     "SITE_READY": "Every site-readiness item is ready or not applicable",
     "VARIATIONS_CLOSED": "No variation (change order) on the quotation is still open",
     "MILESTONES_COMPLETE": "Every milestone of the current stage is completed, cancelled or not applicable",
-    "QC_RECORDED": "Every required quality-check category has a result",
-    "QC_PASSED": "Every required quality-check category's latest result is PASS or NOT_APPLICABLE",
+    "QC_RECORDED": "Every required quality-check category, and every planned check, has a result",
+    "QC_PASSED": "No quality-check chain ends in a failure, every required category has a pass (or an authorised not "
+    "applicable) and every planned check has a pass",
     "SNAGS_RESOLVED": "No blocking snag is open",
     "HANDOVER_EVIDENCE": "The handover acknowledgement and evidence the policy requires are given",
 }
