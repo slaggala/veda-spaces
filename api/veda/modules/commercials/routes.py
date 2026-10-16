@@ -113,6 +113,7 @@ def request_instalment(req: Req, account_id: str, instalment_id: str):
     if inst is None or inst.is_deleted or inst.account_id != account.id:
         raise not_found()
     access.for_write(req.session, req.ctx, account, "commercials.schedule.manage", inst, if_match=req.if_match)
+    baseline.sync(req.session, account)
     schedule.request(req.session, req.ctx, account, inst, req.body.due_on)
     access.touch(req.session, account)
     return _detail(req, account)
@@ -182,6 +183,7 @@ def _invoice_view(req: Req, account: CommercialAccount, inv: CommercialInvoice) 
 def draft_invoice(req: Req, account_id: str):
     account = _account(req, account_id)
     access.for_write(req.session, req.ctx, account, "commercials.invoice.issue", precondition=False)
+    baseline.sync(req.session, account)
     inv = invoices.draft(req.session, req.ctx, account, req.body)
     access.touch(req.session, account)
     return ok(_invoice_view(req, account, inv), status=201)

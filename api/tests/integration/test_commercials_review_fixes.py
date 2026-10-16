@@ -50,6 +50,8 @@ def test_m2_nothing_is_asked_or_invoiced_while_the_schedule_needs_revision(api, 
     assert not [a for a in view["attention"] if a["kind"] == "PAYMENT_DUE"]
     assert view["commercials"]["summary"]["next_payment"] is None
     assert [n["code"] for n in view["commercials"]["notices"]] == ["SCHEDULE_UPDATING"]
+    rows = view["commercials"]["schedule"]  # re-review LOW-A: no stale balance or Due state is shown
+    assert {r["state"] for r in rows} == {"UPDATING"} and all(r["remaining"] is None for r in rows)
     assert t.pay(acc, 1000)["position"]["paid_minor"] == 1000  # money received is still recorded
 
 

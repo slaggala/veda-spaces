@@ -83,6 +83,9 @@ No merge blocker or HIGH finding. Every finding and how it was handled (regressi
 | LOW 5: an accepted variation not yet in the baseline hid every staff control | Fixed: that problem no longer locks the page; the next write records the variation (`sync`). |
 | LOW 6: request and draft did not check integrity | Fixed: both fail closed like payment, issue and revision. Reversal deliberately stays available as a correction. |
 | LOW 7: erasure kept a plain digest over the erased text | Fixed: erasure replaces the request digest. Tested. |
+| Re-review LOW-A: the customer's schedule rows kept stale balances while the schedule needs revision | Fixed: rows other than paid ones show "Being updated" with no balance; an issued invoice shows "Issued". Tested. |
+| Re-review LOW-B: request and draft checked integrity before recording a missed variation | Fixed: both sync the baseline first, like revise and payment. |
+| Re-review LOW-C: a property's record cannot be closed or replaced | Accepted as a limitation (below); a close or replace path is a later change. |
 | Info: the commercials policy override was not reset between tests | Fixed in `tests/conftest.py`. |
 | Info: every portal relationship sees payments (emails go only to the primary customer) | Accepted: it follows the portal's access model (who is given access is CPP-D03). |
 | Info: allocation is a waterfall; an invoice row's instalment pointer moves when carried; `commercial_payment` has no database trigger | Accepted by design (design §2.3, §2.2); payments are sealed by `record_sha256`, and erasure needs to redact their text. |
@@ -93,6 +96,7 @@ No merge blocker or HIGH finding. Every finding and how it was handled (regressi
 - Invoices cannot be issued until PCM-D01; the series resets by calendar year (`VS-I-2026-00001`), unique as a string;
   a financial-year series is part of PCM-D01.
 - Payment-due reminders are not sent (no scheduler is enabled and none was invented).
+- One commercial record per property, and it cannot yet be closed or replaced (opening the wrong chain needs a later admin path).
 - A schedule revision cannot drop an instalment that carries an issued invoice; cancel the invoice first.
 
 ## Found during this work (outside this change)

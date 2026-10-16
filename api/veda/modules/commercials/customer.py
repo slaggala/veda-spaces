@@ -60,8 +60,15 @@ def _receipts(s: Session, account_id: str) -> dict[str, CommercialReceipt]:
     return {r.payment_id: r for r in rows}
 
 
-def _line(x: position.Line) -> dict[str, Any]:
+UPDATING = ("UPDATING", "Being updated")
+
+
+def _line(x: position.Line, in_balance: bool = True) -> dict[str, Any]:
     i = x.instalment
+    if not in_balance and x.state != V.PAID:  # the schedule no longer adds up to the value: no balance is shown (M2)
+        return {"label": i.label, "when": i.when_text, "amount": text(i.amount_minor), "gst_included": text(i.tax_minor),
+                "paid": text(x.applied_minor), "remaining": None, "state": UPDATING[0], "state_label": UPDATING[1],
+                "requested": False, "due_on": None}  # fmt: skip
     return {"label": i.label, "when": i.when_text, "amount": text(i.amount_minor), "gst_included": text(i.tax_minor),
             "paid": text(x.applied_minor), "remaining": text(x.remaining_minor), "state": x.state,
             "state_label": V.INSTALMENT_LABELS[x.state], "requested": x.requested,
@@ -71,6 +78,8 @@ def _line(x: position.Line) -> dict[str, Any]:
 def invoice_state(pos: position.Position, inv: CommercialInvoice) -> tuple[str, str]:
     if inv.status == "CANCELLED":
         return "CANCELLED", "Cancelled"
+    if pos.schedule_state != "IN_BALANCE":
+        return "ISSUED", "Issued"
     line = pos.line_of(inv.instalment_id)
     if line is None:
         return "ISSUED", "Issued"
@@ -149,7 +158,7 @@ def for_property(s: Session, prop) -> dict[str, Any] | None:
             ),
             "as_of": pos.today.isoformat(),
         },  # fmt: skip
-        "schedule": [_line(x) for x in pos.lines],
+        "schedule": [_line(x, pos.schedule_state == "IN_BALANCE") for x in pos.lines],
         "payments": history,
         "invoices": invoices,
         "receipts": receipt_list,

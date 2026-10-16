@@ -21,13 +21,13 @@ export interface Contact { source: 'QUOTATION' | 'CONSULTANT'; name: string | nu
 export interface Attention { kind: 'QUOTATION_DECISION' | 'PROJECT_ACTION' | 'SITE_READINESS' | 'SITE_VISIT' | 'PAYMENT_DUE'; status: StepState;
   title: string; text: string; due: string | null; quotation_id?: string; amount?: string; invoice_id?: string | null }
 /** Project Commercials, customer-safe (PCM): every figure formatted by the server from its one calculation. */
-export type PaymentState = 'PAID' | 'OVERDUE' | 'PARTIALLY_PAID' | 'DUE' | 'UPCOMING';
+export type PaymentState = 'PAID' | 'OVERDUE' | 'PARTIALLY_PAID' | 'DUE' | 'UPCOMING' | 'UPDATING';
 export interface NextPayment { label: string; amount: string; when: string; state: PaymentState; state_label: string; due_on: string | null }
 export interface Commercials {
   available: boolean; message?: string;
   summary?: { currency: string; total_value: string; includes_gst: string | null; paid: string; outstanding: string; credit: string | null;
     next_payment: NextPayment | null; as_of: string };
-  schedule?: { label: string; when: string; amount: string; gst_included: string | null; paid: string; remaining: string; state: PaymentState;
+  schedule?: { label: string; when: string; amount: string; gst_included: string | null; paid: string; remaining: string | null; state: PaymentState;
     state_label: string; requested: boolean; due_on: string | null }[];
   payments?: { amount: string; received_on: string; method: string; reference: string | null; note: string | null; status: 'RECORDED' | 'CORRECTED';
     status_label: string; correction: string | null; receipt: { id: string; number: string; status: 'VALID' | 'CANCELLED' } | null }[];
