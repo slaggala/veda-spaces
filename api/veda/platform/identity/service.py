@@ -102,6 +102,7 @@ def me_payload(s: Session, ctx) -> dict:
             "customer_proposal_interaction": bool(settings().customer_proposal_interaction_enabled),
             "customer_quotation_acceptance": bool(settings().customer_quotation_acceptance_enabled),
             "customer_promise_admin": bool(settings().customer_promise_admin_enabled),
+            "project_lifecycle": bool(settings().project_lifecycle_enabled),
         },
         "version": user.version,
     }

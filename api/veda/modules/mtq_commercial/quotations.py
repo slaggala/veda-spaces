@@ -48,8 +48,19 @@ from .models import (
 )
 
 TERMINAL = ("ACCEPTED", "REJECTED", "EXPIRED", "SUPERSEDED")
+# Modules told, in the decision's transaction, that a quotation was accepted; named by dotted path and imported when
+# called, so this module depends on none of them (the project lifecycle records an accepted variation as the project's
+# next effective baseline).
+ACCEPTANCE_HOOKS: tuple[str, ...] = ("veda.modules.project.baseline:on_quotation_accepted",)
 FINISH_TEXT = {"LAMINATE": "Laminate finish", "ACRYLIC": "Acrylic finish", "VENEER": "Veneer finish",
                "PU": "PU finish", "GLASS": "Glass finish", "MEMBRANE": "Membrane finish", "CUSTOM": "Custom finish"}  # fmt: skip
+
+
+def _hook(path: str):
+    import importlib
+
+    module, _, name = path.partition(":")
+    return getattr(importlib.import_module(module), name)
 
 
 def number_label(q: Quotation) -> str:
@@ -561,6 +572,8 @@ def record_decision(s: Session, q: Quotation, *, decision: str, method: str, cho
               accepted_total_minor=q.accepted_total_minor, accepted_baseline_sha256=q.accepted_baseline_sha256)  # fmt: skip
         if q.quotation_kind == "VARIATION":
             variations.on_accepted(s, q)
+        for hook in ACCEPTANCE_HOOKS:  # in this transaction: a listener's failure refuses the acceptance
+            _hook(hook)(s, q)
     else:
         q.status = "REJECTED"
         event(s, q, "REJECTED", frm, "REJECTED", method=method)

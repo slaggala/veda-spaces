@@ -261,6 +261,77 @@ register(
 register(AuditPolicy("customer_promise_pack", FULL, excluded=frozenset({"published_content"})))
 register(AuditPolicy("customer_promise_review", FULL, parent=("customer_promise_pack", "pack_id")))
 register(AuditPolicy("customer_promise_event", FULL, parent=("customer_promise_pack", "pack_id")))
+# --- Project lifecycle (0208): FULL, every row linked to its project (the project to its property). Personal data: the
+# free text staff write (titles, descriptions, notes, reasons, customer actions, observations, references), erased with
+# the lead. The timeline holds codes and ids only; gate evaluations carry no staff text.
+register(AuditPolicy("project", FULL, parent=("property", "property_id")))
+register(AuditPolicy("project_baseline", FULL, parent=("project", "project_id")))
+register(AuditPolicy("project_stage", FULL, parent=("project", "project_id")))
+register(AuditPolicy("project_member", FULL, parent=("project", "project_id"), pii=frozenset({"removal_reason"})))
+register(
+    AuditPolicy(
+        "project_transition",
+        FULL,
+        parent=("project", "project_id"),
+        excluded=frozenset({"evaluation"}),
+        pii=frozenset({"reason", "decision_reason", "acknowledgement_reference", "observations"}),
+    )
+)
+register(
+    AuditPolicy(
+        "project_checklist_item",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset({"note", "not_applicable_reason", "reopen_reason", "evidence_reference"}),
+    )
+)
+register(
+    AuditPolicy(
+        "project_milestone",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset({"label", "customer_label", "description", "status_reason", "evidence_reference"}),
+    )
+)
+register(
+    AuditPolicy(
+        "project_site_readiness",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset({"label", "action", "customer_action", "note", "evidence_reference"}),
+    )
+)
+register(
+    AuditPolicy(
+        "project_blocker",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset({"title", "description", "customer_action", "resolution"}),
+    )
+)
+register(
+    AuditPolicy(
+        "project_qc_check", FULL, parent=("project", "project_id"), pii=frozenset({"observation", "evidence_reference"})
+    )
+)
+register(
+    AuditPolicy(
+        "project_snag",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset(
+            {
+                "customer_title",
+                "description",
+                "item_reference",
+                "resolution_note",
+                "classification_reason",
+                "evidence_reference",
+            }
+        ),
+    )
+)
+register(AuditPolicy("project_event", FULL, parent=("project", "project_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

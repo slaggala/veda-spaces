@@ -24,6 +24,7 @@ const siteModule = () => import('../../modules/site/index.js');
 const commercialModule = () => import('../../modules/commercial/index.js');
 const proposalModule = () => import('../../modules/proposal/index.js');
 const promiseModule = () => import('../../modules/promise/index.js');
+const projectModule = () => import('../../modules/project/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -70,6 +71,9 @@ export const ROUTES: Def[] = [
   { path: '/site/sets/:id/review', title: 'Measurement review', component: 'vs-review-page', access: 'auth', chrome: true, anyOf: ['measurement.read'], load: siteModule },
   // Commercial › Customer Promise (every API call answers 404 while VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED is off).
   { path: '/commercial/customer-promise', title: 'Customer Promise', component: 'vs-promise-page', access: 'auth', chrome: true, anyOf: ['customer_promise.view'], load: promiseModule },
+  // Operations › Projects (every API call answers 404 while VEDA_PROJECT_LIFECYCLE_ENABLED is off).
+  { path: '/projects', title: 'Projects', component: 'vs-project-list-page', access: 'auth', chrome: true, anyOf: ['project.view'], load: projectModule },
+  { path: '/projects/:id', title: 'Project', component: 'vs-project-page', access: 'auth', chrome: true, anyOf: ['project.view'], load: projectModule },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 

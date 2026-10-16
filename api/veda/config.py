@@ -218,6 +218,10 @@ class Settings:
     # Customer Promise administration (decision log 37): the staff portal that authors, reviews and publishes the
     # customer information pack. Off by default everywhere (every route answers 404) and refused in production.
     customer_promise_admin_enabled: bool = False
+    # Project Lifecycle Backbone (PLB-44): the internal project lifecycle from an accepted quotation to handover. Off by
+    # default everywhere (every route answers 404) and refused in production. Coupled to no other flag: projects read
+    # accepted quotations, which exist only where quotations were enabled, and turning this off hides projects only.
+    project_lifecycle_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -373,6 +377,7 @@ def load_settings(**overrides) -> Settings:
         customer_proposal_interaction_enabled=_bool("VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED", False),
         customer_quotation_acceptance_enabled=_bool("VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED", False),
         customer_promise_admin_enabled=_bool("VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED", False),
+        project_lifecycle_enabled=_bool("VEDA_PROJECT_LIFECYCLE_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -603,6 +608,8 @@ def validate_environment(settings: Settings) -> list[str]:
                 problems.append(f"{flag} is not authorised in production (customer quotation experience)")
         if settings.customer_promise_admin_enabled:  # no production decision exists (decision log 37)
             problems.append("VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED is not authorised in production (Customer Promise)")
+        if settings.project_lifecycle_enabled:  # no production decision exists (decision log 39)
+            problems.append("VEDA_PROJECT_LIFECYCLE_ENABLED is not authorised in production (Project Lifecycle)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

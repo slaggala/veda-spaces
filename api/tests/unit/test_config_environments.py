@@ -366,3 +366,28 @@ def test_customer_promise_admin_is_off_by_default_and_production_refuses_it(monk
     )
     staging = deployed_env(monkeypatch, "staging", VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED="true")
     assert not [p for p in config.validate_environment(staging) if "CUSTOMER_PROMISE" in p]
+
+
+def test_project_lifecycle_is_off_by_default_and_production_refuses_it(monkeypatch):
+    """PR #101 S4 (decision log 40): the Project Lifecycle flag is off by default; production with it requested on is
+    refused at configuration, so the API never starts and no project route (or mutation) exists; the refusal adds
+    exactly its own problem and leaves the MTQ/CQX/Customer Promise checks unchanged."""
+    from veda.app import create_app
+
+    assert config.Settings().project_lifecycle_enabled is False
+    off = config.validate_environment(deployed_env(monkeypatch, "production"))
+    on = config.validate_environment(deployed_env(monkeypatch, "production", VEDA_PROJECT_LIFECYCLE_ENABLED="true"))
+    message = "VEDA_PROJECT_LIFECYCLE_ENABLED is not authorised in production (Project Lifecycle)"
+    assert message in on and message not in off
+    assert sorted(set(on) - set(off)) == [message] and set(off) <= set(on)
+    with pytest.raises(RuntimeError, match="unsafe production configuration") as refused:
+        create_app(deployed_env(monkeypatch, "production", VEDA_PROJECT_LIFECYCLE_ENABLED="true"))
+    assert message in str(refused.value)
+    upstream = {"VEDA_MTQ_ESTIMATION_ENABLED": "true", "VEDA_CUSTOMER_PROPOSAL_ENABLED": "true",
+                "VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED": "true"}  # fmt: skip
+    without = config.validate_environment(deployed_env(monkeypatch, "production", **upstream))
+    both = config.validate_environment(deployed_env(monkeypatch, "production", VEDA_PROJECT_LIFECYCLE_ENABLED="true",
+                                                    **upstream))  # fmt: skip
+    assert sorted(set(both) - set(without)) == [message]  # MTQ/CQX/CPA refusals unaffected by the project flag
+    staging = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_PROJECT_LIFECYCLE_ENABLED="true"))
+    assert not [p for p in staging if "PROJECT_LIFECYCLE" in p]  # staging admits it (wiring is a separate change)
