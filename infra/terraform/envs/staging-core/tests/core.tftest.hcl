@@ -826,3 +826,73 @@ run "a_bound_customer_promise_digest_without_the_flag_refused" {
   }
   expect_failures = [output.customer_promise]
 }
+
+# Customer Project Portal (decision log 41): one customer-facing flag planned false; it turns on only with an
+# owner-APPROVED, staging-only, synthetic-content-only record bound by its SHA-256 whose approver is not its author.
+run "the_customer_portal_flag_is_planned_false" {
+  command = plan
+
+  assert {
+    condition     = local.app_config["VEDA_CUSTOMER_PORTAL_ENABLED"] == "false" && output.customer_portal.enablement_record == null && length(local.cpp_config) == 1
+    error_message = "one parameter, false, no record bound (also the rollback state)"
+  }
+
+  assert {
+    condition     = jsondecode(file("../../../config/customer-portal-enablement-record.json")).status == "DRAFT" && contains(local.cpp_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+  }
+
+  assert {
+    condition     = !contains(keys(local.app_config), "VEDA_PROJECT_LIFECYCLE_ENABLED") && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal flag is separate: the Project Lifecycle is never set and customer-proposal viewing is untouched"
+  }
+}
+
+run "an_approved_record_turns_the_customer_portal_on" {
+  command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-on.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-approved.json"
+  }
+
+  assert {
+    condition     = output.customer_portal.enabled == "true" && local.cpp_record_problems == [] && !contains(keys(local.app_config), "VEDA_PROJECT_LIFECYCLE_ENABLED")
+    error_message = "the portal on, bound to an approved record; the Project Lifecycle untouched"
+  }
+}
+
+run "the_customer_portal_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-on-draft.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-draft.json"
+  }
+  expect_failures = [output.customer_portal]
+}
+
+run "a_self_approved_customer_portal_record_refused" {
+  command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-on-self.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-self-approved.json"
+  }
+  expect_failures = [output.customer_portal]
+}
+
+run "a_customer_portal_record_for_production_refused" {
+  command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-on-production.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-production.json"
+  }
+  expect_failures = [output.customer_portal]
+}
+
+run "a_bound_customer_portal_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-digest-without-flag.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-approved.json"
+  }
+  expect_failures = [output.customer_portal]
+}

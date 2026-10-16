@@ -1,0 +1,41 @@
+{
+  "record": "CUSTOMER-PROJECT-PORTAL-STAGING-ENABLEMENT",
+  "status": "DRAFT",
+  "environment": "staging",
+  "production": false,
+  "flags": [
+    "VEDA_CUSTOMER_PORTAL_ENABLED"
+  ],
+  "author": "Customer Project Portal staging session (VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING)",
+  "approved_by": "OWNER TO FILL",
+  "approved_on": "OWNER TO FILL",
+  "scope": {
+    "protected_staging_only": true,
+    "synthetic_content_only": true,
+    "real_customers": false,
+    "customer_facing": true,
+    "not_authorised": [
+      "production",
+      "real customers or real customer data (portal access is given only to email addresses the validation team controls)",
+      "turning on VEDA_PROJECT_LIFECYCLE_ENABLED or recording any PLB-OD decision",
+      "turning on any customer-proposal flag (separate record)",
+      "recording any CPP owner decision other than CPP-D01 (staging enablement)"
+    ]
+  },
+  "prerequisites": {
+    "migration": "Migration 0209_customer_portal applied on staging (portal_account, portal_access, portal_sign_in, portal_session, portal_event) by a 12-deploy of main with this flag off.",
+    "email": "Sign-in and invitation links are emailed through the outbox worker and the staging sender; invite only addresses the validation team can read.",
+    "access": "Staging is behind Cloudflare Access: a validator needs Access to open /portal as well as the emailed link."
+  },
+  "evidence": {
+    "independent_review": "OWNER TO FILL",
+    "ci_run_id": "OWNER TO FILL",
+    "deploy_flags_off_run_id": "OWNER TO FILL",
+    "migration_verification_run_id": "OWNER TO FILL",
+    "infra_apply_run_id": "OWNER TO FILL",
+    "drift_run_id": "OWNER TO FILL",
+    "smoke_test": "OWNER TO FILL",
+    "production_isolation": "OWNER TO FILL"
+  },
+  "rollback": "A reviewed change sets customer_portal.enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameter in place; the next 12-deploy renders it. Every portal route (customer and staff) then answers 404; accounts, access, sessions and events stay stored and no quotation or project record changes."
+}

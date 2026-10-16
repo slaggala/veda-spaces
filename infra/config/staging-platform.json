@@ -146,5 +146,11 @@
     "decision": "Owner instruction VEDA-SPACES-PROTECTED-STAGING-CUSTOMER-PROMISE-TO-PROPOSAL-VALIDATION (2026-10-15), recorded as given: the Customer Promise administration portal (decision log 37) is wired to staging with one flag, VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED, false by default, separate from the three customer-proposal flags. It is staff-only (no customer route) and the API refuses it in production. It may turn on only by a reviewed change that sets admin_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-promise-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, synthetic content only, with every evidence field filled. staging-core refuses anything else. Turning it on publishes nothing to customers: quotations use a published pack only once the owner records OI-MTQ-18 as delegated to the portal. Rollback: admin_enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-15 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 39).",
     "admin_enabled": true,
     "enablement_record_sha256": "8e88e934002e5cd3a589f72cea285ba62d63344da231e6202e91650722b936e9"
+  },
+  "customer_portal": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING (2026-10-16), recorded as given: the Customer Project Portal (decision log 41) is wired to staging with one flag, VEDA_CUSTOMER_PORTAL_ENABLED, false by default, separate from every other flag (it never turns the Project Lifecycle or a customer-proposal flag on). It is customer-facing and the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-portal-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. Rollback: enabled false and enablement_record_sha256 null.",
+    "enabled": false,
+    "enablement_record_sha256": null
   }
 }
