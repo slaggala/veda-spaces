@@ -755,6 +755,18 @@
             "default": null,
             "title": "Customer Action"
           },
+          "customer_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Summary"
+          },
           "description": {
             "anyOf": [
               {
@@ -823,6 +835,18 @@
             "default": null,
             "title": "Related Site Readiness Id"
           },
+          "related_work_package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Work Package Id"
+          },
           "responsible_party": {
             "enum": [
               "CUSTOMER",
@@ -886,6 +910,18 @@
             ],
             "default": null,
             "title": "Customer Action"
+          },
+          "customer_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Summary"
           },
           "description": {
             "anyOf": [
@@ -2323,6 +2359,25 @@
           "permission_code"
         ],
         "title": "GrantItem",
+        "type": "object"
+      },
+      "HandoverAcknowledgementIn": {
+        "additionalProperties": false,
+        "properties": {
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "package_id": {
+            "title": "Package Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "package_id",
+          "content_sha256"
+        ],
+        "title": "HandoverAcknowledgementIn",
         "type": "object"
       },
       "HandoverIn": {
@@ -4309,6 +4364,33 @@
         "title": "ProfilePatch",
         "type": "object"
       },
+      "ProjectReportIn": {
+        "additionalProperties": false,
+        "description": "An issue in the customer's own words (the portal, or staff recording it on the customer's behalf).",
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Area"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "ProjectReportIn",
+        "type": "object"
+      },
       "PropertyCaptureIn": {
         "additionalProperties": false,
         "description": "measurement_set.property_capture (PR #84 02 \u00a70; Lite subset per B1-SCOPE \u00a72.3). Free-text keys are erased\nwith the lead (mtq/erasure.py CAPTURE_TEXT_KEYS).",
@@ -5326,6 +5408,18 @@
             "default": null,
             "title": "Observation"
           },
+          "qc_point_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Qc Point Id"
+          },
           "recheck_of_id": {
             "anyOf": [
               {
@@ -5359,6 +5453,18 @@
             ],
             "default": null,
             "title": "Space Id"
+          },
+          "work_package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Work Package Id"
           }
         },
         "required": [
@@ -5366,6 +5472,62 @@
           "result"
         ],
         "title": "QcIn",
+        "type": "object"
+      },
+      "QcPointIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "DIMENSIONS_AND_ALIGNMENT",
+              "FINISH_AND_SURFACES",
+              "HARDWARE_AND_OPERATION",
+              "SERVICES_FITMENT",
+              "CLEANLINESS_AND_PROTECTION",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "evidence_required": {
+            "default": false,
+            "title": "Evidence Required",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          },
+          "work_package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Work Package Id"
+          }
+        },
+        "required": [
+          "category",
+          "label"
+        ],
+        "title": "QcPointIn",
         "type": "object"
       },
       "QuotationCreateIn": {
@@ -6924,6 +7086,11 @@
             "title": "Customer Title",
             "type": "string"
           },
+          "customer_visible": {
+            "default": false,
+            "title": "Customer Visible",
+            "type": "boolean"
+          },
           "description": {
             "anyOf": [
               {
@@ -6989,6 +7156,16 @@
             "default": null,
             "title": "Owner User Id"
           },
+          "priority": {
+            "default": "NORMAL",
+            "enum": [
+              "HIGH",
+              "NORMAL",
+              "LOW"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
           "qc_check_id": {
             "anyOf": [
               {
@@ -7036,6 +7213,18 @@
             ],
             "default": null,
             "title": "Target Date"
+          },
+          "work_package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Work Package Id"
           }
         },
         "required": [
@@ -7048,6 +7237,18 @@
       "SnagPatch": {
         "additionalProperties": false,
         "properties": {
+          "customer_visible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Visible"
+          },
           "description": {
             "anyOf": [
               {
@@ -7096,6 +7297,23 @@
             "default": null,
             "title": "Owner User Id"
           },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "NORMAL",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Priority"
+          },
           "responsible_party": {
             "anyOf": [
               {
@@ -7126,6 +7344,18 @@
             ],
             "default": null,
             "title": "Target Date"
+          },
+          "work_package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Work Package Id"
           }
         },
         "title": "SnagPatch",
@@ -7134,6 +7364,35 @@
       "SnagStatusIn": {
         "additionalProperties": false,
         "properties": {
+          "closure_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DUPLICATE",
+                  "NOT_A_DEFECT",
+                  "RAISED_IN_ERROR"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Closure Code"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
           "note": {
             "anyOf": [
               {
@@ -8156,6 +8415,77 @@
         "title": "TransitionIn",
         "type": "object"
       },
+      "TriageIn": {
+        "additionalProperties": false,
+        "properties": {
+          "decline_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DUPLICATE",
+                  "NOT_A_DEFECT",
+                  "NOT_IN_SCOPE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decline Code"
+          },
+          "outcome": {
+            "enum": [
+              "NEW_SNAG",
+              "EXISTING_SNAG",
+              "DECLINED"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Response"
+          },
+          "snag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnagIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "snag_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Snag Id"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "TriageIn",
+        "type": "object"
+      },
       "UserProfilePatch": {
         "additionalProperties": false,
         "properties": {
@@ -8761,6 +9091,325 @@
           "length_mm"
         ],
         "title": "WallIn",
+        "type": "object"
+      },
+      "WorkCompleteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_finish": {
+            "format": "date",
+            "title": "Actual Finish",
+            "type": "string"
+          },
+          "evidence_attachment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Attachment Id"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "actual_finish"
+        ],
+        "title": "WorkCompleteIn",
+        "type": "object"
+      },
+      "WorkPackageIn": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Label"
+          },
+          "customer_visible": {
+            "default": false,
+            "title": "Customer Visible",
+            "type": "boolean"
+          },
+          "depends_on_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depends On Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner User Id"
+          },
+          "planned_finish": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Finish"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Start"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          },
+          "stage_code": {
+            "enum": [
+              "BOOKED",
+              "DESIGN_FINALISATION",
+              "SCOPE_FROZEN",
+              "SITE_READINESS",
+              "PRODUCTION_READINESS",
+              "IN_PRODUCTION",
+              "READY_FOR_INSTALLATION",
+              "INSTALLATION",
+              "QUALITY_CHECK",
+              "SNAGGING",
+              "READY_FOR_HANDOVER",
+              "HANDED_OVER"
+            ],
+            "title": "Stage Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage_code",
+          "title"
+        ],
+        "title": "WorkPackageIn",
+        "type": "object"
+      },
+      "WorkPackagePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Label"
+          },
+          "customer_visible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Visible"
+          },
+          "depends_on_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depends On Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Owner User Id"
+          },
+          "planned_finish": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Finish"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Planned Start"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "title": "WorkPackagePatch",
+        "type": "object"
+      },
+      "WorkStartIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_start": {
+            "format": "date",
+            "title": "Actual Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actual_start"
+        ],
+        "title": "WorkStartIn",
         "type": "object"
       }
     },
@@ -19560,6 +20209,127 @@
         "x-requirement": "PLB-015"
       }
     },
+    "/api/v1/projects/{project_id}/customer-reports": {
+      "post": {
+        "operationId": "project_record_report",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record an issue the customer reported by phone or on site, in their words",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-036"
+      }
+    },
+    "/api/v1/projects/{project_id}/customer-reports/{report_id}/triage": {
+      "post": {
+        "operationId": "project_triage_report",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Review a customer's report: raise a snag, link an existing one, or decline it with a reply",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_snag"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-037"
+      }
+    },
     "/api/v1/projects/{project_id}/handover": {
       "post": {
         "operationId": "project_handover",
@@ -19618,6 +20388,56 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "PLB-029"
+      }
+    },
+    "/api/v1/projects/{project_id}/handover-package": {
+      "post": {
+        "operationId": "project_prepare_package",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Prepare (or refresh) the handover package once every handover gate but the evidence is met",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.complete_handover"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-040"
       }
     },
     "/api/v1/projects/{project_id}/history": {
@@ -19902,6 +20722,127 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "PLB-026"
+      }
+    },
+    "/api/v1/projects/{project_id}/qc-points": {
+      "post": {
+        "operationId": "project_add_qc_point",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QcPointIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan a quality check (what, where, evidence needed)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_qc"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-020"
+      }
+    },
+    "/api/v1/projects/{project_id}/qc-points/{point_id}/withdraw": {
+      "post": {
+        "operationId": "project_withdraw_qc_point",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "point_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a planned check before it has any result, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_qc"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-020"
       }
     },
     "/api/v1/projects/{project_id}/readiness": {
@@ -20345,16 +21286,17 @@
             "bearer": []
           }
         ],
-        "summary": "Move a snag: in progress, ready for recheck, resolved (recheck passed), closed",
+        "summary": "Move a snag: in progress, fixed (ready for recheck), verified by someone else (resolved), closed",
         "tags": [
           "project"
         ],
-        "x-permission": [
-          "project.manage_snag"
+        "x-permission": null,
+        "x-permission-any-of": [
+          "project.manage_snag",
+          "project.verify_snag"
         ],
-        "x-permission-any-of": null,
         "x-rbac-exception": null,
-        "x-requirement": "PLB-027"
+        "x-requirement": "PEX-031"
       }
     },
     "/api/v1/projects/{project_id}/team": {
@@ -20794,6 +21736,403 @@
         ],
         "x-rbac-exception": null,
         "x-requirement": "PLB-006"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages": {
+      "post": {
+        "operationId": "project_add_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkPackageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a work package to a stage (dates only if genuinely planned)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-010"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages/{wp_id}": {
+      "patch": {
+        "operationId": "project_update_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkPackagePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan or change a work package (changing a planned date already set needs a reason)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-011"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages/{wp_id}/cancel": {
+      "post": {
+        "operationId": "project_cancel_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel work that will not be done, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-015"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages/{wp_id}/complete": {
+      "post": {
+        "operationId": "project_complete_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkCompleteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete a work package with its actual finish date (never inferred)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-013"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages/{wp_id}/reopen": {
+      "post": {
+        "operationId": "project_reopen_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reopen completed work, with a reason",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-014"
+      }
+    },
+    "/api/v1/projects/{project_id}/work-packages/{wp_id}/start": {
+      "post": {
+        "operationId": "project_start_work",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wp_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a work package (in its own stage)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.manage_work"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PEX-012"
       }
     },
     "/api/v1/properties": {
@@ -22193,6 +23532,114 @@
         "x-permission-any-of": null,
         "x-rbac-exception": "RBX-010",
         "x-requirement": "CPP-005"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/projects/{project_id}/handover/acknowledge": {
+      "post": {
+        "operationId": "portal_customer_acknowledge_handover",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverAcknowledgementIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Confirm you have received the handover summary (by its digest; owner decision PEX-D01)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "PEX-043"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/projects/{project_id}/reports": {
+      "post": {
+        "operationId": "portal_customer_report_issue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Report an issue on your project (reviewed by Veda Spaces; owner decision PEX-D01)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "PEX-035"
       }
     },
     "/api/v1/public/portal/quotations/{quotation_id}": {

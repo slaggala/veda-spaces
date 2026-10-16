@@ -115,6 +115,25 @@ SNAG_CATEGORIES = (
 SNAG_STATUSES = ("OPEN", "IN_PROGRESS", "READY_FOR_RECHECK", "RESOLVED", "CLOSED")
 SNAG_OPEN = ("OPEN", "IN_PROGRESS", "READY_FOR_RECHECK")
 
+# PEX: work packages (a body of work in one stage). BLOCKED is never stored: it is derived from open gating blockers.
+WORK_PACKAGE_STATES = ("NOT_STARTED", "IN_PROGRESS", "COMPLETED", "CANCELLED")
+WORK_PACKAGE_CLOSED = ("COMPLETED", "CANCELLED")
+
+# PEX: the QC plan (what must be checked) and snag triage.
+QC_POINT_STATES = ("ACTIVE", "WITHDRAWN")
+SNAG_SOURCES = ("STAFF", "QUALITY_CHECK", "CUSTOMER")
+SNAG_PRIORITIES = ("HIGH", "NORMAL", "LOW")  # a triage aid only; whether a snag blocks handover is is_blocking
+SNAG_CLOSURE_CODES = ("FIXED", "DUPLICATE", "NOT_A_DEFECT", "RAISED_IN_ERROR")
+SNAG_CLOSED_WITHOUT_FIX = ("DUPLICATE", "NOT_A_DEFECT", "RAISED_IN_ERROR")
+
+# PEX: customer reports (the customer's words; never a defect until staff triage it).
+REPORT_CHANNELS = ("PORTAL", "STAFF")
+REPORT_STATES = ("SUBMITTED", "ACCEPTED", "DECLINED")
+REPORT_DECLINE_CODES = ("DUPLICATE", "NOT_A_DEFECT", "NOT_IN_SCOPE")
+
+# PEX: the handover package.
+PACKAGE_STATES = ("PREPARED", "SUPERSEDED", "COMPLETED")
+
 # PLB-12: the timeline. Codes, ids and states only: an event never carries free text, so it never needs erasing.
 EVENTS = (
     "PROJECT_CREATED",
@@ -148,7 +167,27 @@ EVENTS = (
     "SNAG_CLOSED",
     "HANDOVER_READY",
     "HANDED_OVER",
+    # PEX (0212_project_execution)
+    "WORK_PACKAGE_ADDED",
+    "WORK_PACKAGE_CHANGED",
+    "WORK_PACKAGE_REPLANNED",
+    "WORK_PACKAGE_STARTED",
+    "WORK_PACKAGE_COMPLETED",
+    "WORK_PACKAGE_REOPENED",
+    "WORK_PACKAGE_CANCELLED",
+    "QC_POINT_ADDED",
+    "QC_POINT_WITHDRAWN",
+    "SNAG_FIXED",
+    "SNAG_RECHECK_FAILED",
+    "CUSTOMER_REPORT_SUBMITTED",
+    "CUSTOMER_REPORT_ACCEPTED",
+    "CUSTOMER_REPORT_DECLINED",
+    "HANDOVER_PACKAGE_PREPARED",
+    "HANDOVER_PACKAGE_SUPERSEDED",
+    "HANDOVER_ACKNOWLEDGED",
+    "HANDOVER_PACKAGE_REDACTED",
 )
+EVENTS_0208 = EVENTS[: EVENTS.index("WORK_PACKAGE_ADDED")]  # the CHECK of migration 0208, widened by 0212
 # PLB-10 "last material change": what moves a project's situation (not every note or reassignment).
 MATERIAL_EVENTS = (
     "PROJECT_CREATED",
@@ -164,4 +203,7 @@ MATERIAL_EVENTS = (
     "SNAG_RESOLVED",
     "HANDOVER_READY",
     "HANDED_OVER",
+    "WORK_PACKAGE_COMPLETED",
+    "CUSTOMER_REPORT_SUBMITTED",
+    "HANDOVER_PACKAGE_PREPARED",
 )

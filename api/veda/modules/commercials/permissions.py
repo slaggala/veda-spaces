@@ -3,16 +3,20 @@
 Every code supports scope through the account's lead (``mtq.scope``): ALL reaches every account; OWN reaches an account
 whose lead the actor owns (assigned to or created by them) or has a measurement visit on.
 
-Default grants, and why they are the minimum safe mapping:
+Default grants (owner decision PCM-D01, 2026-10-16; migration ``0211_accountant_role``):
 
-- FOUNDER (the business owner): every code.
-- SALES_MANAGER (commercial approvals and quotation release; MFA required): every code. It already approves
-  discounts and issues the quotations these records start from, and is the only working role that signs in with MFA.
-  Reversal is four-eyes: never by the person who recorded the payment.
-- ADMIN, SALES, ESTIMATOR, DESIGNER, SURVEYOR: nothing. No role is given money it does not handle. ADMIN administers
-  accounts; the escalation guard needs ADMIN to hold whatever the working roles it manages hold, and none of them holds
-  a ``commercials.*`` code. A consultant (SALES) or an accounts person who needs a capability is granted that code
-  individually (``user.permission.manage``), at OWN or ALL scope.
+- ACCOUNTANT (the operational financial role; MFA required): every code, ALL. It opens commercial records, manages
+  payment schedules and requests, records payments (issuing their receipts), reverses payments recorded in error,
+  issues invoices and reads the commercial history. Reversal stays four-eyes: never by the person who recorded the
+  payment, so a reversal needs a second accountant or the founder.
+- FOUNDER (the business owner): every code, for oversight.
+- SALES_MANAGER: ``commercials.view`` only. Its earlier grant of every code was a temporary mapping (decision log 44);
+  the five mutation codes are withdrawn by ``0211``. It still sees the position of the projects it sells.
+- ADMIN, SALES, ESTIMATOR, DESIGNER, SURVEYOR: nothing. ADMIN administers accounts; the escalation guard refuses an
+  administrator who lacks a code the managed account holds, so an accountant's account is managed by the founder. A
+  person outside these roles who needs a capability is granted that code individually (``user.permission.manage``).
+- No role holds a ``project.*`` code because it holds a commercial one: the ACCOUNTANT role has no execution, quality
+  or handover capability.
 """
 
 from veda.platform.rbac.registry_types import PermissionDef
@@ -38,4 +42,9 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
 )  # fmt: skip
 
 CODES = tuple(p.code for p in PERMISSIONS)
-MATRIX: dict[str, dict[str, str]] = {code: {"FOUNDER": "A", "SALES_MANAGER": "A"} for code in CODES}
+MATRIX: dict[str, dict[str, str]] = {
+    code: {"FOUNDER": "A", "ACCOUNTANT": "A", **({"SALES_MANAGER": "A"} if code == "commercials.view" else {})}
+    for code in CODES
+}
+# What 0211 withdrew from SALES_MANAGER (the temporary mapping of decision log 44).
+WITHDRAWN_FROM_SALES_MANAGER = tuple(code for code in CODES if code != "commercials.view")

@@ -83,7 +83,7 @@ def test_a_synthetic_policy_is_refused_outside_tests(monkeypatch):
     assert settings  # the real settings object is untouched
 
 
-def test_every_column_of_every_project_table_is_classified_and_nothing_is_published():
+def test_every_column_of_every_project_table_is_classified_and_published_only_through_the_delivery_flag():
     assert set(classification.tables()) == set(TABLES)
     for table in TABLES:
         cols = [c.name for c in models.metadata.tables[table].columns]
@@ -101,7 +101,13 @@ def test_every_column_of_every_project_table_is_classified_and_nothing_is_publis
                      ("project_transition", "evaluation"), ("project_baseline", "accepted_total_minor"),
                      ("project_site_readiness", "note"), ("project_qc_check", "observation")):  # fmt: skip
         assert classification.column_class(*internal) == classification.INTERNAL
-    assert classification.public_view()["published"] is False
+    for internal in (("project_work_package", "title"), ("project_work_package", "description"),
+                     ("project_work_package", "planned_start"), ("project_work_package", "owner_user_id"),
+                     ("project_snag", "fix_note"), ("project_snag", "fixed_by"), ("project_snag", "priority"),
+                     ("project_qc_point", "label"), ("project_customer_report", "account_id"),
+                     ("project_handover_package", "acknowledged_account_id"), ("project_milestone", "planned_date")):  # fmt: skip
+        assert classification.column_class(*internal) == classification.INTERNAL
+    assert classification.public_view()["published_through"] == "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"
 
 
 @pytest.mark.parametrize("value", ["Mrs Rao called", "a" * 81, "x;DROP", {"nested": "x"}, ["ok", "not ok"]])

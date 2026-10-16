@@ -19,6 +19,10 @@ quality personas have no repository role: their holders are granted the codes in
 - ESTIMATOR: on projects they are a member of: view, with the commercial baseline.
 - ADMIN: what the working roles hold, ALL (so it can still administer their accounts; never booking, stage moves,
   approvals, team assignment or handover).
+
+Execution (PEX, 0212): ``project.manage_work`` (work packages) and ``project.verify_snag`` (independent verification of a
+snag fix, and closing a snag without a fix) are FOUNDER's only by default; the operations and quality personas are
+granted them individually. ACCOUNTANT holds no ``project.*`` code.
 """
 
 from veda.platform.rbac.registry_types import PermissionDef
@@ -51,6 +55,10 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     _p("project.complete_handover", "Complete handovers", "Complete a project's handover", "PLB-029"),
     _p("project.view_commercial_baseline", "View project commercial baselines", "See the accepted baseline lineage "
        "with amounts, digests and variations", "PLB-003"),
+    _p("project.manage_work", "Manage work packages", "Plan, start, complete, reopen and cancel a project's work "
+       "packages", "PEX-010"),
+    _p("project.verify_snag", "Verify snags", "Verify a snag's fix (never your own) and close a snag without a fix, "
+       "with a reason", "PEX-031"),
     _p("project.view_audit", "View project history", "See the full transition and audit history of a project",
        "PLB-035"),
 )  # fmt: skip

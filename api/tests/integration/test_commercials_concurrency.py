@@ -28,7 +28,7 @@ def test_the_same_payment_submitted_twice_at_once_is_recorded_once(api, app, fac
     k = key()
     path = f"{BASE}/{acc['id']}/payments"
     other = ApiClient(app.test_client())
-    tok = t.tok(t.manager)
+    tok = t.tok(t.accountant)
     first, second = race(app, monkeypatch, tok, lambda c: c.post(path, _body(7000), headers={"Idempotency-Key": k}),
                          lambda: other.post(path, _body(7000), token=tok, headers={"Idempotency-Key": k}),
                          module=access, name="require")  # fmt: skip
@@ -44,7 +44,7 @@ def test_two_payments_that_together_exceed_the_balance_cannot_both_be_recorded(a
     share = acc["position"]["outstanding_minor"] * 6 // 10
     path = f"{BASE}/{acc['id']}/payments"
     other = ApiClient(app.test_client())
-    tok, tok2 = t.tok(t.manager), t.tok(t.second_manager)
+    tok, tok2 = t.tok(t.accountant), t.tok(t.second_accountant)
     first, second = race(app, monkeypatch, tok, lambda c: c.post(path, _body(share), headers={"Idempotency-Key": key()}),
                          lambda: other.post(path, _body(share), token=tok2, headers={"Idempotency-Key": key()}),
                          module=access, name="require")  # fmt: skip
@@ -60,7 +60,7 @@ def test_two_invoices_issued_at_once_get_distinct_consecutive_numbers(api, app, 
     l1, l2 = acc["schedule"]["lines"][:2]
     d1, d2 = t.draft(acc, l1["id"]), t.draft(acc, l2["id"])
     other = ApiClient(app.test_client())
-    tok = t.tok(t.manager)
+    tok = t.tok(t.accountant)
     first, second = race(
         app, monkeypatch, tok,
         lambda c: c.post(f"/api/v1/commercial-invoices/{d1['id']}/issue", {}, if_match=d1["version"]),
@@ -77,7 +77,7 @@ def test_one_invoice_issued_twice_at_once_is_issued_once(api, app, factory, monk
     _, _, acc = t.opened()
     d = t.draft(acc, acc["schedule"]["lines"][0]["id"])
     other = ApiClient(app.test_client())
-    tok = t.tok(t.manager)
+    tok = t.tok(t.accountant)
     path = f"/api/v1/commercial-invoices/{d['id']}/issue"
     first, second = race(app, monkeypatch, tok, lambda c: c.post(path, {}, if_match=d["version"]),
                          lambda: other.post(path, {}, token=tok, if_match=d["version"]),

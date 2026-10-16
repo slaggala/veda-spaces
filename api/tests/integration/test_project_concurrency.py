@@ -191,6 +191,7 @@ def test_a_duplicate_handover_succeeds_once_and_a_snag_racing_it_is_not_lost(tea
                 ok(t.as_(t.ops).post(f"{BASE}/{p['id']}/qc-checks", {"category": cat, "result": "PASS"}), 201)
         p = t.advance(p, to)
     t.checklist(p)
+    t.package(p)
     att = photo(t.as_(t.founder), "property", t.prop["id"])
     body = {"handover_on": "2026-10-15", "acknowledgement_reference": "HS-77", "evidence_attachment_id": att["id"]}
     cur = t.get(p)
@@ -216,6 +217,7 @@ def test_a_snag_raised_while_the_handover_runs_either_stops_it_or_is_refused(tea
                 ok(t.as_(t.ops).post(f"{BASE}/{p['id']}/qc-checks", {"category": cat, "result": "PASS"}), 201)
         p = t.advance(p, to)
     t.checklist(p)
+    t.package(p)
     att = photo(t.as_(t.founder), "property", t.prop["id"])
     body = {"handover_on": "2026-10-15", "acknowledgement_reference": "HS-78", "evidence_attachment_id": att["id"]}
     cur = t.get(p)

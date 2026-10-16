@@ -1,11 +1,14 @@
 import { LitElement, css, html, nothing } from 'lit';
-import { forgetSession, portalApi, sessionToken, transient, type Commercials, type Contact, type DocumentEntry, type Entry, type PropertyView } from './api.js';
+import { newIdempotencyKey } from '../../core/api/client.js';
+import {
+  forgetSession, portalApi, sessionToken, transient, type Commercials, type Contact, type DeliveryProject, type DocumentEntry, type Entry, type PropertyView,
+} from './api.js';
 import { portalStyles, stateBadge, when } from './portal-ui.js';
 
 type Load = 'loading' | 'ready' | 'signed-out' | 'not-found' | 'offline' | 'unavailable';
 
 const SECTIONS = [
-  ['attention', 'Needs you'], ['journey', 'Your journey'], ['payments', 'Payments'], ['quotation', 'Quotation'], ['included', "What's included"],
+  ['attention', 'Needs you'], ['journey', 'Your journey'], ['delivery', 'Work on your home'], ['payments', 'Payments'], ['quotation', 'Quotation'], ['included', "What's included"],
   ['commitments', 'Our commitments'], ['your-part', 'Your part'], ['documents', 'Documents'], ['contact', 'Contact'],
 ] as const;
 
@@ -16,10 +19,18 @@ const SECTIONS = [
  * server has no authoritative data for is shown as not yet available, never filled in here.
  */
 export class VsPortalProjectPage extends LitElement {
-  static override properties = { location: { attribute: false }, load: { state: true }, view: { state: true } };
+  static override properties = { location: { attribute: false }, load: { state: true }, view: { state: true }, reporting: { state: true },
+    sending: { state: true }, formError: { state: true }, announcement: { state: true } };
   declare location: { params: Record<string, string> } | undefined;
   declare load: Load;
   declare view: PropertyView | null;
+  /** The project whose report form is open (one at a time). */
+  declare reporting: string | null;
+  declare sending: boolean;
+  declare formError: string;
+  declare announcement: string;
+  /** One key per report being written: a retry after a lost answer is the same report, never a second one. */
+  private reportKey = '';
 
   static override styles = [...portalStyles, css`
     .hero { display: flex; flex-direction: column; gap: var(--vs-space-3); }
@@ -65,6 +76,10 @@ export class VsPortalProjectPage extends LitElement {
     super();
     this.load = 'loading';
     this.view = null;
+    this.reporting = null;
+    this.sending = false;
+    this.formError = '';
+    this.announcement = '';
   }
 
   private get routeId(): string { return this.location?.params?.id ?? window.location.pathname.split('/').pop() ?? ''; }
@@ -151,6 +166,11 @@ export class VsPortalProjectPage extends LitElement {
               <div class="step"><div class="step-head"><h3>${s.label}</h3>${stateBadge(s.state)}</div>
                 <p>${s.detail}${s.date ? html` <span class="muted">${when(s.date)}</span>` : nothing}</p></div>
             </li>`)}</ol>
+          </section>
+
+          <section class="section" id="delivery" aria-labelledby="h-delivery">
+            <h2 id="h-delivery" tabindex="-1">Work on your home</h2>
+            ${this.delivery(v)}
           </section>
 
           <section class="section" id="payments" aria-labelledby="h-payments">
@@ -269,6 +289,141 @@ export class VsPortalProjectPage extends LitElement {
     </div>`;
   }
 
+  /** Project delivery, as the server states it: what is done, under way, on hold or next, and the handover. No
+   * percentage is shown: progress is the state of each piece of work Veda Spaces shares with you. */
+  private delivery(v: PropertyView) {
+    if (!v.delivery?.projects.length) {
+      return html`<p class="card muted">Progress on site appears here once your project is under way.</p>`;
+    }
+    return v.delivery.projects.map((d) => this.deliveryProject(v, d));
+  }
+
+  private deliveryProject(v: PropertyView, d: DeliveryProject) {
+    const order = ['ACTION_REQUIRED', 'BLOCKED', 'IN_PROGRESS', 'UPCOMING', 'COMPLETED'] as const;
+    const words: Record<string, string> = { ACTION_REQUIRED: 'Needs you', BLOCKED: 'On hold', IN_PROGRESS: 'In progress', UPCOMING: 'Coming up', COMPLETED: 'Completed' };
+    const pkg = d.package;
+    return html`<div class="stack">
+      <article class="card stack" aria-labelledby=${`phase-${d.id}`}>
+        <div class="step-head"><h3 id=${`phase-${d.id}`}>Now: ${d.phase.label}</h3>${stateBadge(d.status === 'HANDED_OVER' ? 'COMPLETED' : 'IN_PROGRESS', d.status === 'HANDED_OVER' ? 'Handed over' : 'Under way')}</div>
+        ${d.next_date ? html`<p><span class="strong">Next date agreed with you:</span> ${d.next_date.label}, ${when(d.next_date.date)}</p>`
+          : html`<p class="small muted">No date has been agreed with you for the next step yet. Your Veda Spaces contact will confirm it.</p>`}
+        ${d.paused.map((x) => html`<p class="notice">${stateBadge(x.state)} ${x.text}${x.who === 'VEDA_SPACES' ? html` <span class="small muted">(Veda Spaces is working on this)</span>` : nothing}</p>`)}
+      </article>
+      ${d.work.items.length ? html`<article class="card stack" aria-labelledby=${`work-${d.id}`}><h3 id=${`work-${d.id}`}>The work</h3>
+        <p class="small muted">${order.filter((k) => d.work.counts[k]).map((k) => `${d.work.counts[k]} ${words[k].toLowerCase()}`).join(' · ')}</p>
+        <ul class="plain">${order.flatMap((k) => d.work.items.filter((w) => w.state === k)).map((w) => html`<li class="item">
+          <div class="step-head"><span class="strong">${w.label}</span>${stateBadge(w.state)}</div>
+          <span class="small muted">${w.detail}${w.completed_on ? ` · ${when(w.completed_on)}` : ''}</span></li>`)}</ul></article>` : nothing}
+      <article class="card stack" aria-labelledby=${`quality-${d.id}`}><h3 id=${`quality-${d.id}`}>Quality checks and snags</h3>
+        <p>${d.quality.checks_passed} quality check${d.quality.checks_passed === 1 ? '' : 's'} passed${d.quality.being_corrected ? `, ${d.quality.being_corrected} being corrected` : ''}.</p>
+        ${d.snags.length ? html`<ul class="plain">${d.snags.map((n) => html`<li class="item"><div class="step-head"><span>Snag ${n.number}: ${n.title}</span>${stateBadge(n.state, n.status)}</div></li>`)}</ul>`
+          : html`<p class="small muted">No snags are listed for you.</p>`}
+      </article>
+      ${this.reports(v, d)}
+      ${this.handover(v, d, pkg)}
+    </div>`;
+  }
+
+  private reports(v: PropertyView, d: DeliveryProject) {
+    const open = this.reporting === d.id;
+    return html`<article class="card stack" aria-labelledby=${`reports-${d.id}`}>
+      <div class="step-head"><h3 id=${`reports-${d.id}`}>Something not right?</h3></div>
+      ${d.reports.length ? html`<ul class="plain">${d.reports.map((r) => html`<li class="item">
+        <div class="step-head"><span class="strong">Report ${r.number}${r.area ? `: ${r.area}` : ''}</span>${stateBadge(r.status === 'Reviewed' ? 'INFORMATION' : r.status.startsWith('Accepted') ? 'IN_PROGRESS' : 'UPCOMING', r.status)}</div>
+        <span>${r.description}</span>
+        ${r.outcome ? html`<span class="small"><span class="strong">${r.outcome}.</span> ${r.response ?? ''}</span>` : r.response ? html`<span class="small">${r.response}</span>` : nothing}
+        ${r.snag_number ? html`<span class="small muted">Followed as snag ${r.snag_number}.</span>` : nothing}</li>`)}</ul>` : nothing}
+      ${!d.can_report ? html`<p class="small muted">${d.status === 'HANDED_OVER' ? 'Your home has been handed over. For anything you notice now, please contact Veda Spaces.'
+        : 'To report something you have noticed, please speak to your Veda Spaces contact.'}</p>`
+        : open ? html`<form class="stack" novalidate @submit=${(e: Event) => this.sendReport(e, v, d)}>
+            ${this.formError ? html`<p class="notice" role="alert" id="report-error">${this.formError}</p>` : nothing}
+            <label class="field"><span class="label">What have you noticed? (required)</span>
+              <textarea name="description" minlength="10" maxlength="2000" required aria-describedby="report-hint ${this.formError ? 'report-error' : ''}"></textarea>
+              <span class="hint small muted" id="report-hint">Describe it in your own words. Veda Spaces reviews every report and replies here.</span></label>
+            <label class="field"><span class="label">Where is it? (optional)</span><input name="area" maxlength="120" autocomplete="off" /></label>
+            <div class="row"><button class="btn primary" type="submit" ?disabled=${this.sending}>${this.sending ? 'Sending…' : 'Send report'}</button>
+              <button class="btn ghost" type="button" @click=${() => { this.reporting = null; this.formError = ''; }}>Cancel</button></div>
+          </form>`
+          : html`<div><button class="btn" @click=${() => this.startReport(d)}>Report something</button></div>`}
+    </article>`;
+  }
+
+  private async startReport(d: DeliveryProject) {
+    this.reporting = d.id;
+    this.formError = '';
+    this.reportKey = newIdempotencyKey();
+    await this.updateComplete;
+    this.renderRoot.querySelector<HTMLTextAreaElement>('textarea[name=description]')?.focus();
+  }
+
+  private async sendReport(e: Event, v: PropertyView, d: DeliveryProject) {
+    e.preventDefault();
+    if (this.sending) return;
+    const form = e.target as HTMLFormElement;
+    const description = (form.elements.namedItem('description') as HTMLTextAreaElement).value.trim();
+    const area = (form.elements.namedItem('area') as HTMLInputElement).value.trim();
+    if (description.length < 10) {
+      this.formError = 'Please describe what you have noticed (at least 10 characters).';
+      await this.updateComplete;
+      this.renderRoot.querySelector<HTMLTextAreaElement>('textarea[name=description]')?.focus();
+      return;
+    }
+    this.sending = true;
+    try {
+      const r = (await portalApi.report(v.id, d.id, { description, ...(area ? { area } : {}) }, this.reportKey)).data;
+      this.replace(d.id, r.delivery);
+      this.reporting = null;
+      this.formError = '';
+      this.announcement = `Thank you. ${r.reference} has been received; Veda Spaces will review it.`;
+    } catch (err) {
+      const p = err as { status: number; code?: string; detail?: string };
+      this.formError = transient(p) ? 'We could not send your report. Check your connection and try again; it will not be sent twice.'
+        : p.detail ?? 'Your report could not be sent. Please speak to your Veda Spaces contact.';
+    } finally { this.sending = false; }
+  }
+
+  private handover(v: PropertyView, d: DeliveryProject, pkg: DeliveryProject['package']) {
+    const h = d.handover;
+    return html`<article class="card stack" aria-labelledby=${`handover-${d.id}`}>
+      <div class="step-head"><h3 id=${`handover-${d.id}`}>Handover</h3>${stateBadge(h.state, h.label)}</div>
+      ${h.date ? html`<p>Handed over ${when(h.date)}.</p>` : nothing}
+      ${h.remaining.length ? html`<p>Before your handover:</p><ul class="bullets">${h.remaining.map((x) => html`<li>${x.label} (${x.count})</li>`)}</ul>` : nothing}
+      ${pkg ? html`<div class="stack">
+        <h4>Your handover summary</h4>
+        ${pkg.status === 'BEING_UPDATED' ? html`<p class="notice" role="status">Veda Spaces is updating your handover summary.</p>` : nothing}
+        ${pkg.work_completed.length ? html`<p><span class="strong">Work completed:</span> ${pkg.work_completed.map((w) => w.label).join(', ')}</p>` : nothing}
+        <p>${pkg.quality.checks_passed} quality checks passed${pkg.quality.corrected_after_failure ? `, ${pkg.quality.corrected_after_failure} after a correction` : ''}; ${pkg.snags.fixed_and_verified} snags fixed and checked.</p>
+        ${pkg.snags.open_minor.length ? html`<p>Still to finish (does not hold the handover): ${pkg.snags.open_minor.map((n) => `snag ${n.number}, ${n.title}`).join('; ')}.</p>` : nothing}
+        <p class="small muted">${pkg.documents_note}</p>
+        <p class="small muted">${pkg.warranty_note}</p>
+        ${pkg.acknowledged_on ? html`<p>${stateBadge('COMPLETED', 'Received')} You confirmed receiving this summary on ${when(pkg.acknowledged_on)}.</p>`
+          : pkg.can_acknowledge ? html`<div><button class="btn primary" ?disabled=${this.sending} @click=${() => this.acknowledge(v, d, pkg)}>I have received this summary</button></div>`
+            : nothing}
+      </div>` : nothing}
+    </article>`;
+  }
+
+  private async acknowledge(v: PropertyView, d: DeliveryProject, pkg: NonNullable<DeliveryProject['package']>) {
+    if (this.sending) return;
+    this.sending = true;
+    try {
+      const r = (await portalApi.acknowledge(v.id, d.id, pkg.id, pkg.content_sha256)).data;
+      this.replace(d.id, r.delivery);
+      this.view = { ...this.view!, attention: this.view!.attention.filter((a) => a.kind !== 'HANDOVER_ACKNOWLEDGEMENT') };
+      this.announcement = 'Thank you. Your confirmation has been recorded.';
+    } catch (err) {
+      const p = err as { status: number; detail?: string };
+      this.announcement = transient(p) ? 'We could not record your confirmation. Please try again.' : p.detail ?? 'Your confirmation could not be recorded.';
+      if (!transient(p)) void this.fetch();
+    } finally { this.sending = false; }
+  }
+
+  private replace(id: string, next: DeliveryProject) {
+    const v = this.view;
+    if (!v?.delivery) return;
+    this.view = { ...v, delivery: { ...v.delivery, projects: v.delivery.projects.map((x) => (x.id === id ? next : x)) } };
+  }
+
   /** In-page navigation: scroll to the section and move focus to its heading (screen readers follow). */
   private jump(e: Event, id: string) {
     e.preventDefault();
@@ -297,7 +452,8 @@ export class VsPortalProjectPage extends LitElement {
   }
 
   override render() {
-    return html`<vs-portal-header ?signed-in=${this.load !== 'signed-out'}></vs-portal-header><main class="wrap" id="main">${this.content()}</main>`;
+    return html`<vs-portal-header ?signed-in=${this.load !== 'signed-out'}></vs-portal-header><main class="wrap" id="main">${this.content()}</main>
+      <div class="sr-only" role="status" aria-live="polite">${this.announcement}</div>`;
   }
 }
 customElements.define('vs-portal-project-page', VsPortalProjectPage);

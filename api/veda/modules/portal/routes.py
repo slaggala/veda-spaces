@@ -21,6 +21,7 @@ from veda.kernel.errors import ApiError, not_found
 from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, request_reaches
 from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq import scope as lead_scope
+from veda.modules.project import schemas as PS
 from veda.platform.identity.models import User
 
 from . import identity, projection
@@ -84,6 +85,10 @@ SIGN_IN_LIMITS = [("5 per minute", _ip("portal-sign-in")), ("30 per hour", _ip("
 SESSION_LIMITS = [("10 per minute", _ip("portal-session")), ("60 per hour", _ip("portal-session"))]
 READ_LIMITS = [("120 per minute", _ip("portal-read")), ("60 per minute", _session("portal-read")),
                ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
+# PEX: customer writes (reports, acknowledgements). Per session and per network here; per account in the database
+# (at most reports.MAX_OPEN reports waiting for review per account and project).
+WRITE_LIMITS = [("10 per hour", _session("portal-write")), ("30 per day", _session("portal-write")),
+                ("60 per hour", _ip("portal-write")), ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
 
 
 def private(result):
@@ -233,3 +238,56 @@ def revoke(req: Req, access_id: str):
     identity.revoke(req.session, req.ctx, a)
     req.session.flush()
     return ok(_listing(req.session, a.lead_id))
+
+
+# --- customer: project delivery (PEX) ----------------------------------------------------------------------------------
+def _delivery_project(req: Req, property_id: str, project_id: str):
+    """The project, only through the account's authorised property, and only while delivery is shown (else 404)."""
+    from veda.modules.project import delivery
+
+    p = principal(req)
+    prop, _lead = projection.property_for(req.session, p.account.id, property_id)
+    proj = delivery.project_for(req.session, prop.id, project_id) if delivery.enabled() else None
+    if proj is None:
+        raise not_found()
+    return p, proj
+
+
+def _customer_may(action: str) -> None:
+    from veda.modules.project import delivery_policy
+
+    if not delivery_policy.customer_may(action):
+        raise ApiError(409, "OWNER_DECISION_REQUIRED", "This is not available in your portal yet. Please speak to your "
+                       "Veda Spaces contact.", extra={"decision": "PEX-D01"})  # fmt: skip
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/projects/<project_id>/reports", rbx="RBX-010",
+                    auth="public", body=PS.ProjectReportIn, status=201, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS,
+                    requirement="PEX-035", summary="Report an issue on your project (reviewed by Veda Spaces; owner "
+                    "decision PEX-D01)")  # fmt: skip
+def report_issue(req: Req, property_id: str, project_id: str):
+    from veda.modules.project import delivery, reports
+
+    p, proj = _delivery_project(req, property_id, project_id)
+    _customer_may("issue_reports")
+    key = req.headers.get("Idempotency-Key") if req.headers is not None else None
+    r, created = reports.submit(req.session, p.account.id, proj, req.body, key)
+    req.session.flush()
+    return private(ok({"reference": f"Report {r.report_no}", "received": True,
+                       "delivery": delivery.project_view(req.session, p.account.id, proj)},
+                      status=201 if created else 200))  # fmt: skip
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge",
+                    rbx="RBX-010", auth="public", body=PS.HandoverAcknowledgementIn, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS,
+                    requirement="PEX-043", summary="Confirm you have received the handover summary (by its digest; "
+                    "owner decision PEX-D01)")  # fmt: skip
+def acknowledge_handover(req: Req, property_id: str, project_id: str):
+    from veda.modules.project import delivery, handover
+
+    p, proj = _delivery_project(req, property_id, project_id)
+    _customer_may("handover_acknowledgement")
+    pkg, _created = handover.acknowledge(req.session, p.account.id, proj, req.body.package_id, req.body.content_sha256)
+    req.session.flush()
+    return private(ok({"acknowledged_on": clock.to_rfc3339(pkg.acknowledged_on),
+                       "delivery": delivery.project_view(req.session, p.account.id, proj)}))  # fmt: skip

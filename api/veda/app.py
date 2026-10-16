@@ -43,6 +43,7 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.portal.routes import customer_api as portal_customer_api
     from veda.modules.portal.routes import staff_api as portal_staff_api
     from veda.modules.project import events as _project_events  # noqa: F401  (registers handlers)
+    from veda.modules.project import notices as _project_notices  # noqa: F401  (registers the delivery handlers)
     from veda.modules.project.routes import api as project_api
     from veda.platform.audit.routes import api as audit_api
     from veda.platform.auth.routes import api as auth_api
@@ -151,6 +152,11 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             # access rows; 404 unless VEDA_PROJECT_COMMERCIALS_ENABLED is also on.
             ("GET", "/api/v1/public/portal/invoices/<invoice_id>"),
             ("GET", "/api/v1/public/portal/receipts/<receipt_id>"),
+            # Project delivery (decision log 45): the customer's two writes, through the same session and access rows;
+            # 404 unless VEDA_PROJECT_DELIVERY_PORTAL_ENABLED (and the lifecycle flag) is on, refused while owner
+            # decision PEX-D01 does not allow them, rate limited, idempotent.
+            ("POST", "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/reports"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge"),
         }
     ),
     "RBX-006": frozenset(

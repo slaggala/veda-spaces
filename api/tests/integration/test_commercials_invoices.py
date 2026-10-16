@@ -1,7 +1,7 @@
 """Project Commercials: invoices (PCM-012). SYNTHETIC data only.
 
 Draft (staff only) → issued (numbered, frozen, the instalment requested) → cancelled (the document stays). Issuing waits
-for owner decision PCM-D01; one live invoice per instalment; an issued invoice never changes, and a schedule revision
+until the invoice particulars are configured (PCM-D01); one live invoice per instalment; an issued invoice never changes, and a schedule revision
 cannot drop the instalment it requests.
 """
 
@@ -22,7 +22,7 @@ pytestmark = ON
 YEAR = clock.now().astimezone(ZoneInfo("Asia/Kolkata")).year
 
 
-def test_without_the_owner_decision_an_invoice_is_drafted_and_previewed_but_never_issued(api, factory):
+def test_without_configured_particulars_an_invoice_is_drafted_and_previewed_but_never_issued(api, factory):
     t = Commercials(api, factory)
     _, _, acc = t.opened()
     line = acc["schedule"]["lines"][0]
@@ -31,7 +31,11 @@ def test_without_the_owner_decision_an_invoice_is_drafted_and_previewed_but_neve
     assert inv["status"] == "DRAFT" and inv["number"] is None and inv["preview"]["available"] is True
     assert inv["preview"]["document"]["issuer"] is None and inv["preview"]["document"]["number"] is None
     r = t.invoice_action(inv["id"], "issue", status=409)
-    assert r.code == "OWNER_DECISION_REQUIRED" and r.json["decision"] == "PCM-D01"
+    # PCM-D01: the particulars come from the business configuration; none is configured, so issuing fails closed with
+    # a message that says exactly what is missing and what to do (never a fabricated issuer)
+    assert r.code == "INVOICE_PARTICULARS_NOT_CONFIGURED" and r.json["configuration"] == "PCM-D01"
+    assert r.json["missing"] == ["legal_name", "address_lines"]
+    assert "legal name and address" in r.json["detail"] and "business configuration" in r.json["detail"]
     assert dbh.get(CommercialInvoice, inv["id"]).status == "DRAFT"
 
 

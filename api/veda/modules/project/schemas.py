@@ -123,6 +123,8 @@ class BlockerIn(Closed):
     related_checklist_item_id: Id | None = None
     related_site_readiness_id: Id | None = None
     related_quotation_id: Id | None = None
+    related_work_package_id: Id | None = None
+    customer_summary: Annotated[str | None, optional_text(300)] = None
 
 
 class BlockerPatch(Closed):
@@ -132,6 +134,7 @@ class BlockerPatch(Closed):
     responsible_party: Party | None = None
     assigned_to: Id | None = None
     target_date: CalendarDate | None = None
+    customer_summary: Annotated[str | None, optional_text(300)] = None
 
 
 class ResolutionIn(Closed):
@@ -163,6 +166,8 @@ class QcIn(Closed):
     evidence_attachment_id: Id | None = None
     evidence_reference: Ref = None
     recheck_of_id: Id | None = None
+    qc_point_id: Id | None = None
+    work_package_id: Id | None = None
 
 
 class SnagIn(Closed):
@@ -178,6 +183,9 @@ class SnagIn(Closed):
     qc_check_id: Id | None = None
     evidence_attachment_id: Id | None = None
     evidence_reference: Ref = None
+    work_package_id: Id | None = None
+    priority: Annotated[str, one_of(V.SNAG_PRIORITIES), enum(V.SNAG_PRIORITIES)] = "NORMAL"
+    customer_visible: bool = False
 
 
 class SnagPatch(Closed):
@@ -187,6 +195,9 @@ class SnagPatch(Closed):
     target_date: CalendarDate | None = None
     evidence_attachment_id: Id | None = None
     evidence_reference: Ref = None
+    work_package_id: Id | None = None
+    priority: Annotated[str, one_of(V.SNAG_PRIORITIES), enum(V.SNAG_PRIORITIES)] | None = None
+    customer_visible: bool | None = None
 
 
 class SnagClassificationIn(Closed):
@@ -197,6 +208,74 @@ class SnagClassificationIn(Closed):
 class SnagStatusIn(Closed):
     status: Literal["IN_PROGRESS", "READY_FOR_RECHECK", "RESOLVED", "CLOSED"]
     note: Note = None
+    closure_code: Annotated[str, one_of(V.SNAG_CLOSED_WITHOUT_FIX), enum(V.SNAG_CLOSED_WITHOUT_FIX)] | None = None
+    evidence_attachment_id: Id | None = None  # the fix's evidence (READY_FOR_RECHECK)
+
+
+# --- PEX: work packages, the QC plan, customer reports, the handover package ------------------------------------------
+class WorkPackageIn(Closed):
+    stage_code: Stage
+    title: Annotated[str, text(160, min_len=3)]
+    description: Annotated[str | None, optional_text(2000)] = None
+    customer_label: Annotated[str | None, optional_text(120)] = None
+    customer_visible: bool = False
+    space_id: Id | None = None
+    owner_user_id: Id | None = None
+    depends_on_id: Id | None = None
+    planned_start: CalendarDate | None = None
+    planned_finish: CalendarDate | None = None
+
+
+class WorkPackagePatch(Closed):
+    title: Annotated[str | None, optional_text(160)] = None
+    description: Annotated[str | None, optional_text(2000)] = None
+    customer_label: Annotated[str | None, optional_text(120)] = None
+    customer_visible: bool | None = None
+    space_id: Id | None = None
+    owner_user_id: Id | None = None
+    depends_on_id: Id | None = None
+    planned_start: CalendarDate | None = None
+    planned_finish: CalendarDate | None = None
+    reason: Note = None  # required when a planned date already set changes (a replan)
+
+
+class WorkStartIn(Closed):
+    actual_start: CalendarDate
+
+
+class WorkCompleteIn(Closed):
+    actual_finish: CalendarDate
+    note: Note = None
+    evidence_attachment_id: Id | None = None
+    evidence_reference: Ref = None
+
+
+class QcPointIn(Closed):
+    category: Annotated[str, one_of(V.QC_CATEGORIES), enum(V.QC_CATEGORIES)]
+    label: Annotated[str, text(160, min_len=3)]
+    space_id: Id | None = None
+    work_package_id: Id | None = None
+    evidence_required: bool = False
+
+
+class ProjectReportIn(Closed):
+    """An issue in the customer's own words (the portal, or staff recording it on the customer's behalf)."""
+
+    description: Annotated[str, text(2000, min_len=10)]
+    area: Annotated[str | None, optional_text(120)] = None
+
+
+class TriageIn(Closed):
+    outcome: Literal["NEW_SNAG", "EXISTING_SNAG", "DECLINED"]
+    snag: SnagIn | None = None
+    snag_id: Id | None = None
+    decline_code: Annotated[str, one_of(V.REPORT_DECLINE_CODES), enum(V.REPORT_DECLINE_CODES)] | None = None
+    response: Annotated[str | None, optional_text(500)] = None  # customer-safe words
+
+
+class HandoverAcknowledgementIn(Closed):
+    package_id: Id
+    content_sha256: Annotated[str, text(64, min_len=64)]
 
 
 VIEWS = ("all", "mine", "blocked", "action_required", "site_readiness", "installation", "handover")

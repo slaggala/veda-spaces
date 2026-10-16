@@ -9,7 +9,7 @@ import type { Page } from '../proposal/api.js';
  * a server; `takeLinkToken` reads it and scrubs the address bar at once.
  */
 
-export type StepState = 'COMPLETED' | 'IN_PROGRESS' | 'ACTION_REQUIRED' | 'UPCOMING' | 'NOT_YET_AVAILABLE' | 'INFORMATION';
+export type StepState = 'COMPLETED' | 'IN_PROGRESS' | 'ACTION_REQUIRED' | 'UPCOMING' | 'NOT_YET_AVAILABLE' | 'INFORMATION' | 'BLOCKED';
 export interface Step { key: string; label: string; state: StepState; detail: string; date: string | null }
 export interface QuotationSummary {
   id: string; reference: string; title: string; kind: 'QUOTATION' | 'VARIATION'; version_no: number;
@@ -18,7 +18,7 @@ export interface QuotationSummary {
 }
 export interface Contact { source: 'QUOTATION' | 'CONSULTANT'; name: string | null; role: string | null; phone: string | null;
   email: string | null; hours: string | null }
-export interface Attention { kind: 'QUOTATION_DECISION' | 'PROJECT_ACTION' | 'SITE_READINESS' | 'SITE_VISIT' | 'PAYMENT_DUE'; status: StepState;
+export interface Attention { kind: 'QUOTATION_DECISION' | 'PROJECT_ACTION' | 'SITE_READINESS' | 'SITE_VISIT' | 'PAYMENT_DUE' | 'HANDOVER_ACKNOWLEDGEMENT'; status: StepState;
   title: string; text: string; due: string | null; quotation_id?: string; amount?: string; invoice_id?: string | null }
 /** Project Commercials, customer-safe (PCM): every figure formatted by the server from its one calculation. */
 export type PaymentState = 'PAID' | 'OVERDUE' | 'PARTIALLY_PAID' | 'DUE' | 'UPCOMING' | 'UPDATING';
@@ -48,6 +48,22 @@ export interface PropertyCard {
   quotation: QuotationSummary | null; contact: Contact | null; project_tracking: boolean;
   payments: { available: boolean; outstanding?: string; next_payment?: NextPayment | null } | null;
 }
+/** Project delivery (PEX), customer-safe: built by the server from records staff marked visible, in customer words. */
+export interface DeliveryProject {
+  id: string; status: 'ACTIVE' | 'HANDED_OVER'; phase: { code: string; label: string };
+  work: { items: { label: string; state: StepState; detail: string; completed_on: string | null }[]; counts: Record<string, number> };
+  paused: { text: string; state: StepState; who: 'YOU' | 'VEDA_SPACES' }[];
+  next_date: { label: string; date: string } | null;
+  quality: { checks_passed: number; being_corrected: number };
+  snags: { number: number; title: string; status: string; state: StepState }[];
+  reports: { number: number; description: string; area: string | null; status: string; outcome: string | null; response: string | null; snag_number: number | null }[];
+  can_report: boolean;
+  handover: { state: StepState; label: string; date: string | null; remaining: { label: string; count: number }[] };
+  package: null | { id: string; number: number; content_sha256: string; status: 'READY_TO_REVIEW' | 'BEING_UPDATED' | 'HANDED_OVER';
+    work_completed: { label: string; finished_on: string | null }[]; quality: { checks_passed: number; corrected_after_failure: number };
+    snags: { fixed_and_verified: number; open_minor: { number: number; title: string }[] }; documents: unknown[]; documents_note: string;
+    warranty_note: string; acknowledged_on: string | null; can_acknowledge: boolean };
+}
 export interface Included { title: string; kind: string; included_count: number; optional_count: number;
   items: { description: string; detail: string | null; status: string; dimensions?: { label: string; value: string }[] }[] }
 export interface PropertyView extends PropertyCard {
@@ -58,9 +74,10 @@ export interface PropertyView extends PropertyCard {
     payment_schedule: { label: string; share: string; trigger: string; amount?: string | null }[] | null; payment_safety: string | null };
   responsibilities: null | { client: Entry[] | null; site_readiness: Entry[] | null };
   support: null | { contacts: Omit<Contact, 'source'>[]; escalation: string | null };
+  delivery: { available: boolean; projects: DeliveryProject[] } | null;
 }
 export interface Home { customer: { name: string }; enquiries: { reference: string; relationship: string; closed: boolean; properties: PropertyCard[] }[];
-  project_tracking_available: boolean }
+  project_tracking_available: boolean; delivery_available?: boolean }
 export interface QuotationPage extends Omit<Page, 'link'> { summary: QuotationSummary }
 
 const BASE = '/api/v1/public/portal';
@@ -105,6 +122,16 @@ export const portalApi = {
   quotation: (id: string) => api.request<QuotationPage>(`${BASE}/quotations/${encodeURIComponent(id)}`, { anonymous: true, headers: headers() }),
   document: (kind: 'invoices' | 'receipts', id: string) =>
     api.request<CommercialDocument>(`${BASE}/${kind}/${encodeURIComponent(id)}`, { anonymous: true, headers: headers() }),
+  /** Report an issue (PEX-D01). The key makes a retry the same report, never a second one. */
+  report: (propertyId: string, projectId: string, body: { description: string; area?: string }, key: string) =>
+    api.request<{ reference: string; received: boolean; delivery: DeliveryProject }>(
+      `${BASE}/properties/${encodeURIComponent(propertyId)}/projects/${encodeURIComponent(projectId)}/reports`,
+      { method: 'POST', anonymous: true, headers: headers(), body, idempotencyKey: key }),
+  /** Confirm receipt of exactly this handover summary (by its digest); repeating it changes nothing. */
+  acknowledge: (propertyId: string, projectId: string, packageId: string, sha: string) =>
+    api.request<{ acknowledged_on: string; delivery: DeliveryProject }>(
+      `${BASE}/properties/${encodeURIComponent(propertyId)}/projects/${encodeURIComponent(projectId)}/handover/acknowledge`,
+      { method: 'POST', anonymous: true, headers: headers(), body: { package_id: packageId, content_sha256: sha } }),
 };
 
 // --- staff (bearer session; portal.access.* permissions) ---------------------------------------------------------------
@@ -130,7 +157,7 @@ export function transient(p: { status: number; code?: string }): boolean {
 
 export const STATE_LABELS: Record<StepState, string> = {
   COMPLETED: 'Completed', IN_PROGRESS: 'In progress', ACTION_REQUIRED: 'Action required', UPCOMING: 'Upcoming',
-  NOT_YET_AVAILABLE: 'Not yet available', INFORMATION: 'For your information',
+  NOT_YET_AVAILABLE: 'Not yet available', INFORMATION: 'For your information', BLOCKED: 'On hold',
 };
 
 export const RELATIONSHIPS: Record<string, string> = {

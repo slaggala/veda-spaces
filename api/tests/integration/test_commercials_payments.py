@@ -110,7 +110,7 @@ def test_one_transfer_recorded_twice_by_two_people_is_refused(api, factory):
     t = Commercials(api, factory)
     _, _, acc = t.opened()
     t.pay(acc, 1000, external_reference="UTR 7788 99")
-    r = t.pay(acc, 1000, external_reference="utr778899", user=t.second_manager, status=409)
+    r = t.pay(acc, 1000, external_reference="utr778899", user=t.second_accountant, status=409)
     assert r.code == "DUPLICATE_PAYMENT_REFERENCE"
 
 
@@ -134,7 +134,7 @@ def test_a_reversal_corrects_without_rewriting_and_needs_a_second_person(api, fa
     pid = out["payment_id"]
     before = dbh.get(CommercialPayment, pid)
     snap = (before.amount_minor, before.received_on, before.method_code, before.version, before.record_sha256)
-    r = t.reverse(acc, pid, user=t.manager, status=409)
+    r = t.reverse(acc, pid, user=t.accountant, status=409)
     assert r.code == "FOUR_EYES_REQUIRED"
     assert t.reverse(acc, pid, "OTHER", status=422).code == "VALIDATION_FAILED"  # OTHER needs a note
     after = t.reverse(acc, pid, "DUPLICATE")

@@ -6,7 +6,7 @@ import { sessionContext } from '../src/core/authz/context.js';
 import { ROUTES } from '../src/core/router/routes.js';
 import { keepSession, forgetSession, sessionToken } from '../src/modules/portal/api.js';
 import '../src/modules/portal/index.js';
-import { access, home, quotationPage, view } from './support/portal-sample.js';
+import { access, deliveryProject, home, quotationPage, view } from './support/portal-sample.js';
 
 /** Customer Project Portal pages (CPP). The API is mocked with SYNTHETIC models; the server decides everything. */
 
@@ -35,6 +35,7 @@ async function mount(tag: string, id?: string) {
 }
 
 const text = (root: ShadowRoot) => root.textContent?.replace(/\s+/g, ' ') ?? '';
+const button = (root: ParentNode, name: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === name);
 const P = '/api/v1/public/portal';
 
 describe('Customer Project Portal', () => {
@@ -238,5 +239,81 @@ describe('Lead page: customer portal access (staff)', () => {
     [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'End access')!.click();
     await waitUntil(() => calls.some((c) => c.path.endsWith('/revoke')), 'revoke');
     expect(calls.find((c) => c.path.endsWith('/revoke'))!.headers['If-Match']).to.equal('"1"');
+  });
+});
+
+describe('Customer Project Portal: work on your home (PEX)', () => {
+  const originalFetch = window.fetch;
+  afterEach(() => { window.fetch = originalFetch; forgetSession(); });
+
+  it('says honestly what is done, in progress, on hold and next, with no percentage', async () => {
+    keepSession('vpp_SESSION');
+    serve({ [`GET ${P}/properties/p1`]: () => json(view({ delivery: { available: true, projects: [deliveryProject()] } })) }, []);
+    const { root } = await mount('vs-portal-project-page', 'p1');
+    await waitUntil(() => root.getElementById('h-delivery'), 'delivery');
+    const t = text(root);
+    expect(t).to.contain('Now: Installing your interiors').and.to.contain('No date has been agreed with you for the next step yet');
+    expect(t).to.contain('We are waiting for a material delivery').and.to.contain('Veda Spaces is working on this');
+    expect(t).to.contain('3 quality checks passed, 1 being corrected').and.to.contain('Snag 1: Touch-up on the skirting');
+    expect(t).to.contain('Not ready for handover yet').and.to.contain('Work still to finish (3)');
+    expect(root.getElementById('delivery')!.textContent).not.to.match(/\d+ ?%/);  // progress is never a percentage
+    const states = [...root.querySelectorAll('#delivery li.item .badge')].map((b) => b.textContent?.trim());
+    expect(states.slice(0, 4)).to.deep.equal(['Action required', 'On hold', 'Upcoming', 'Completed']);  // what needs the customer first
+    expect(root.querySelector('nav.jump a[href="#delivery"]')).to.exist;
+    expect(button(root, 'Report something')).to.equal(undefined);  // PEX-D01 not recorded: no form
+    expect(t).to.contain('please speak to your Veda Spaces contact');
+  });
+
+  it('sends a report once, with one key reused on a retry, and shows the reference', async () => {
+    keepSession('vpp_SESSION');
+    const calls: Call[] = [];
+    let attempts = 0;
+    const after = deliveryProject({ can_report: true, reports: [{ number: 1, description: 'The drawer does not close fully', area: 'Kitchen',
+      status: 'Received, being reviewed', outcome: null, response: null, snag_number: null }] });
+    serve({
+      [`GET ${P}/properties/p1`]: () => json(view({ delivery: { available: true, projects: [deliveryProject({ can_report: true })] } })),
+      [`POST ${P}/properties/p1/projects/pj1/reports`]: () => (++attempts === 1 ? new Response('', { status: 503 })
+        : json({ reference: 'Report 1', received: true, delivery: after }, 201)),
+    }, calls);
+    const { el, root } = await mount('vs-portal-project-page', 'p1');
+    await waitUntil(() => button(root, 'Report something'), 'form offered');
+    button(root, 'Report something')!.click();
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    button(root, 'Send report')!.click();
+    await waitUntil(() => root.querySelector('[role=alert]'), 'too short');
+    expect(calls.filter((c) => c.method === 'POST')).to.have.length(0);
+    (root.querySelector('textarea[name=description]') as HTMLTextAreaElement).value = 'The drawer does not close fully';
+    button(root, 'Send report')!.click();
+    await waitUntil(() => text(root).includes('it will not be sent twice'), 'retry offered');
+    button(root, 'Send report')!.click();
+    await waitUntil(() => text(root).includes('Received, being reviewed'), 'sent');
+    const posts = calls.filter((c) => c.method === 'POST');
+    expect(posts).to.have.length(2);
+    expect(posts[0].headers['Idempotency-Key']).to.equal(posts[1].headers['Idempotency-Key']);
+    expect(posts[1].headers['X-Veda-Portal']).to.equal('vpp_SESSION');
+    expect(posts[1].body).to.deep.equal({ description: 'The drawer does not close fully' });
+    expect(text(root)).to.contain('Report 1 has been received');
+  });
+
+  it('confirms the handover summary by its digest and then shows it as received', async () => {
+    keepSession('vpp_SESSION');
+    const calls: Call[] = [];
+    const pkg = { id: 'hp1', number: 1, content_sha256: 'c'.repeat(64), status: 'READY_TO_REVIEW' as const,
+      work_completed: [{ label: 'Kitchen cabinets', finished_on: '2026-10-14' }], quality: { checks_passed: 4, corrected_after_failure: 1 },
+      snags: { fixed_and_verified: 2, open_minor: [] }, documents: [], documents_note: 'Handover documents are not shown in your portal yet.',
+      warranty_note: 'Warranty is as set out in your accepted quotation.', acknowledged_on: null, can_acknowledge: true };
+    const ready = deliveryProject({ handover: { state: 'IN_PROGRESS', label: 'Ready for handover', date: null, remaining: [] }, package: pkg });
+    serve({
+      [`GET ${P}/properties/p1`]: () => json(view({ delivery: { available: true, projects: [ready] } })),
+      [`POST ${P}/properties/p1/projects/pj1/handover/acknowledge`]: () => json({ acknowledged_on: '2026-10-16T10:00:00Z',
+        delivery: { ...ready, package: { ...pkg, acknowledged_on: '2026-10-16T10:00:00Z', can_acknowledge: false } } }),
+    }, calls);
+    const { root } = await mount('vs-portal-project-page', 'p1');
+    await waitUntil(() => button(root, 'I have received this summary'), 'acknowledge offered');
+    expect(text(root)).to.contain('Warranty is as set out in your accepted quotation.').and.to.contain('Kitchen cabinets');
+    button(root, 'I have received this summary')!.click();
+    await waitUntil(() => text(root).includes('You confirmed receiving this summary'), 'received');
+    expect(calls.find((c) => c.method === 'POST')!.body).to.deep.equal({ package_id: 'hp1', content_sha256: 'c'.repeat(64) });
+    expect(button(root, 'I have received this summary')).to.equal(undefined);
   });
 });

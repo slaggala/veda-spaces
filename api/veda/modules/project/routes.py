@@ -18,16 +18,20 @@ from veda.kernel.errors import ApiError
 from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 from veda.platform.audit.models import AuditLog
 
-from . import access, creation, gates, present, service
+from . import access, creation, gates, present, reports, service, work
+from . import handover as packages
 from . import schemas as S
 from .models import (
     ProjectBlocker,
     ProjectChecklistItem,
+    ProjectCustomerReport,
     ProjectMember,
     ProjectMilestone,
+    ProjectQcPoint,
     ProjectSiteReadiness,
     ProjectSnag,
     ProjectTransition,
+    ProjectWorkPackage,
 )
 
 api = Api("project", "/api/v1", tags=("project",))
@@ -339,10 +343,116 @@ def reclassify_snag(req: Req, project_id: str, snag_id: str):
     return _detail(req, p)
 
 
-@api.route("POST", "/projects/<project_id>/snags/<snag_id>/status", permission="project.manage_snag",
-           body=S.SnagStatusIn, if_match=True, requirement="PLB-027",
-           summary="Move a snag: in progress, ready for recheck, resolved (recheck passed), closed")  # fmt: skip
+@api.route("POST", "/projects/<project_id>/snags/<snag_id>/status", any_of=("project.manage_snag", "project.verify_snag"),
+           body=S.SnagStatusIn, if_match=True, requirement="PEX-031",
+           summary="Move a snag: in progress, fixed (ready for recheck), verified by someone else (resolved), closed")  # fmt: skip
 def snag_status(req: Req, project_id: str, snag_id: str):
     p, sn = _snag(req, project_id, snag_id)
     service.snag_status(req.session, req.ctx, p, sn, req.body, req.if_match)
     return _detail(req, p)
+
+
+# --- work packages (PEX-010 … PEX-016) ---------------------------------------------------------------------------------
+@api.route("POST", "/projects/<project_id>/work-packages", permission="project.manage_work", body=S.WorkPackageIn,
+           status=201, idempotent_create=True, requirement="PEX-010",
+           summary="Add a work package to a stage (dates only if genuinely planned)")  # fmt: skip
+def add_work(req: Req, project_id: str):
+    p = _project(req, project_id)
+    work.add(req.session, req.ctx, p, req.body)
+    return _detail(req, p, status=201)
+
+
+def _work(req: Req, project_id: str, wp_id: str):
+    p = _project(req, project_id)
+    return p, service.child(req.session, ProjectWorkPackage, p, wp_id)
+
+
+@api.route("PATCH", "/projects/<project_id>/work-packages/<wp_id>", permission="project.manage_work",
+           body=S.WorkPackagePatch, if_match=True, requirement="PEX-011",
+           summary="Plan or change a work package (changing a planned date already set needs a reason)")  # fmt: skip
+def update_work(req: Req, project_id: str, wp_id: str):
+    p, wp = _work(req, project_id, wp_id)
+    work.update(req.session, req.ctx, p, wp, req.body, req.if_match)
+    return _detail(req, p)
+
+
+@api.route("POST", "/projects/<project_id>/work-packages/<wp_id>/start", permission="project.manage_work",
+           body=S.WorkStartIn, if_match=True, requirement="PEX-012", summary="Start a work package (in its own stage)")  # fmt: skip
+def start_work(req: Req, project_id: str, wp_id: str):
+    p, wp = _work(req, project_id, wp_id)
+    work.start(req.session, req.ctx, p, wp, req.body, req.if_match)
+    return _detail(req, p)
+
+
+@api.route("POST", "/projects/<project_id>/work-packages/<wp_id>/complete", permission="project.manage_work",
+           body=S.WorkCompleteIn, if_match=True, requirement="PEX-013",
+           summary="Complete a work package with its actual finish date (never inferred)")  # fmt: skip
+def complete_work(req: Req, project_id: str, wp_id: str):
+    p, wp = _work(req, project_id, wp_id)
+    work.complete(req.session, req.ctx, p, wp, req.body, req.if_match)
+    return _detail(req, p)
+
+
+@api.route("POST", "/projects/<project_id>/work-packages/<wp_id>/reopen", permission="project.manage_work",
+           body=S.ReasonIn, if_match=True, requirement="PEX-014", summary="Reopen completed work, with a reason")  # fmt: skip
+def reopen_work(req: Req, project_id: str, wp_id: str):
+    p, wp = _work(req, project_id, wp_id)
+    work.reopen(req.session, req.ctx, p, wp, req.body.reason, req.if_match)
+    return _detail(req, p)
+
+
+@api.route("POST", "/projects/<project_id>/work-packages/<wp_id>/cancel", permission="project.manage_work",
+           body=S.ReasonIn, if_match=True, requirement="PEX-015", summary="Cancel work that will not be done, with a reason")  # fmt: skip
+def cancel_work(req: Req, project_id: str, wp_id: str):
+    p, wp = _work(req, project_id, wp_id)
+    work.cancel(req.session, req.ctx, p, wp, req.body.reason, req.if_match)
+    return _detail(req, p)
+
+
+# --- QC plan (PEX-020) -------------------------------------------------------------------------------------------------
+@api.route("POST", "/projects/<project_id>/qc-points", permission="project.manage_qc", body=S.QcPointIn, status=201,
+           idempotent_create=True, requirement="PEX-020", summary="Plan a quality check (what, where, evidence needed)")  # fmt: skip
+def add_qc_point(req: Req, project_id: str):
+    p = _project(req, project_id)
+    service.add_qc_point(req.session, req.ctx, p, req.body)
+    return _detail(req, p, status=201)
+
+
+@api.route("POST", "/projects/<project_id>/qc-points/<point_id>/withdraw", permission="project.manage_qc",
+           body=S.ReasonIn, if_match=True, requirement="PEX-020",
+           summary="Withdraw a planned check before it has any result, with a reason")  # fmt: skip
+def withdraw_qc_point(req: Req, project_id: str, point_id: str):
+    p = _project(req, project_id)
+    pt = service.child(req.session, ProjectQcPoint, p, point_id)
+    service.withdraw_qc_point(req.session, req.ctx, p, pt, req.body.reason, req.if_match)
+    return _detail(req, p)
+
+
+# --- customer reports (PEX-035 … PEX-037) ------------------------------------------------------------------------------
+@api.route("POST", "/projects/<project_id>/customer-reports", permission="project.manage_snag", body=S.ProjectReportIn,
+           status=201, idempotent_create=True, requirement="PEX-036",
+           summary="Record an issue the customer reported by phone or on site, in their words")  # fmt: skip
+def record_report(req: Req, project_id: str):
+    p = _project(req, project_id)
+    reports.record(req.session, req.ctx, p, req.body)
+    return _detail(req, p, status=201)
+
+
+@api.route("POST", "/projects/<project_id>/customer-reports/<report_id>/triage", permission="project.manage_snag",
+           body=S.TriageIn, if_match=True, requirement="PEX-037",
+           summary="Review a customer's report: raise a snag, link an existing one, or decline it with a reply")  # fmt: skip
+def triage_report(req: Req, project_id: str, report_id: str):
+    p = _project(req, project_id)
+    r = service.child(req.session, ProjectCustomerReport, p, report_id)
+    reports.triage(req.session, req.ctx, p, r, req.body, req.if_match)
+    return _detail(req, p)
+
+
+# --- handover package (PEX-040) ----------------------------------------------------------------------------------------
+@api.route("POST", "/projects/<project_id>/handover-package", permission="project.complete_handover", if_match=True,
+           status=201, requirement="PEX-040",
+           summary="Prepare (or refresh) the handover package once every handover gate but the evidence is met")  # fmt: skip
+def prepare_package(req: Req, project_id: str):
+    p = _project(req, project_id)
+    _, created = packages.prepare(req.session, req.ctx, p, req.if_match)
+    return _detail(req, p, status=201 if created else 200)

@@ -19,7 +19,8 @@ export interface Evaluation {
   lifecycle: { version: string; sha256: string; status: string }; policy: { version: string; sha256: string };
   independent_approval: boolean; gates: Gate[]; blockers: GateBlocker[]; allowed: boolean;
 }
-export interface HandoverReadiness { ready: boolean; handed_over: boolean; stage_reached?: boolean; blockers: GateBlocker[] }
+export interface CommercialPosition { account_id: string; value: string; paid: string; outstanding: string; schedule_state: string; lines_due: number }
+export interface HandoverReadiness { ready: boolean; handed_over: boolean; stage_reached?: boolean; blockers: GateBlocker[]; commercial_position?: CommercialPosition | null }
 
 export interface ProjectRow {
   id: string; version: number; project_number: string; status: string; property: PropertyRef; quotation_number: string;
@@ -57,7 +58,9 @@ export interface Blocker {
   customer_action: string | null; responsible_party: string; assigned_to: Person | null; target_date: string | null; status: string;
   blocks: { code: string; label: string } | null; resolution: string | null; resolved_on: string | null; resolved_by: Person | null;
   raised_on: string | null; raised_by: Person | null;
-  related: { milestone_id: string | null; checklist_item_id: string | null; site_readiness_id: string | null; quotation_id: string | null };
+  related: { milestone_id: string | null; checklist_item_id: string | null; site_readiness_id: string | null; quotation_id: string | null;
+    work_package_id: string | null };
+  customer_summary: string | null;
 }
 export interface Milestone {
   id: string; version: number; code: string; label: string; customer_label: string | null; description: string | null; stage_code: string;
@@ -72,13 +75,48 @@ export interface ReadinessItem {
 }
 export interface QcRow {
   id: string; category: string; result: string; space: string | null; space_id: string | null; observation: string | null; evidence: Evidence | null;
-  recheck_of_id: string | null; checked_by: Person | null; checked_on: string | null;
+  recheck_of_id: string | null; qc_point_id: string | null; work_package_id: string | null; checked_by: Person | null; checked_on: string | null;
+}
+export interface QcPoint {
+  id: string; version: number; point_no: number; category: string; label: string; space: string | null; space_id: string | null;
+  work_package_id: string | null; evidence_required: boolean; status: 'ACTIVE' | 'WITHDRAWN'; withdrawn_reason: string | null;
+  result: string | null; head_id: string | null;
+}
+export interface QcChain { head: QcRow; length: number; ever_failed: boolean; root_id: string }
+/** A body of work in one stage. `state` is derived by the server (BLOCKED from open gating blockers; CORRECTION_REQUIRED
+ * when completed work failed its check or has an open snag): it is never chosen. */
+export interface WorkPackage {
+  id: string; version: number; package_no: number; stage_code: string; space: string | null; space_id: string | null; title: string;
+  description: string | null; customer_label: string | null; customer_visible: boolean; owner: Person | null; depends_on_id: string | null;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  state: 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CORRECTION_REQUIRED' | 'CANCELLED';
+  scheduled: boolean; planned_start: string | null; planned_finish: string | null; plan_revision: number; replan_reason: string | null;
+  past_planned_finish: boolean; actual_start: string | null; actual_finish: string | null; started_by: Person | null; completed_by: Person | null;
+  completion_note: string | null; reopen_reason: string | null; cancel_reason: string | null; evidence: Evidence | null;
+}
+export interface CustomerReport {
+  id: string; version: number; report_no: number; channel: 'PORTAL' | 'STAFF'; description: string; area: string | null;
+  status: 'SUBMITTED' | 'ACCEPTED' | 'DECLINED'; snag_id: string | null; decline_code: string | null; response: string | null;
+  reported_on: string | null; recorded_by: Person | null; triaged_by: Person | null; triaged_on: string | null;
+}
+export interface HandoverPackage {
+  id: string; version: number; package_no: number; status: 'PREPARED' | 'SUPERSEDED' | 'COMPLETED'; content_sha256: string; redacted: boolean;
+  content: {
+    work: { completed: { label: string; finished_on: string | null }[]; completed_count: number; cancelled_count: number };
+    quality: { checks_passed: number; checks_not_applicable: number; corrected_after_failure: number; failed: number };
+    snags: { fixed_and_verified: number; closed_without_fix: number; open_non_blocking: { number: number; title: string }[]; open_non_blocking_count: number };
+    documents: unknown[]; warranty: { source: string; quotation_id: string; quotation_number: string };
+  };
+  prepared_on: string | null; prepared_by: Person | null; acknowledged_on: string | null; completed_on: string | null;
+  superseded_on: string | null; superseded_by: Person | null; stale: string | null;
 }
 export interface Snag {
   id: string; version: number; snag_no: number; category: string; customer_title: string; description: string | null; space: string | null;
   space_id: string | null; item_reference: string | null; is_blocking: boolean; classification_reason: string | null; owner: Person | null; responsible_party: string; status: string;
   allowed_next: string[]; target_date: string | null; evidence: Evidence | null; resolution_note: string | null; resolved_on: string | null;
   resolved_by: Person | null; closed_on: string | null; closed_by: Person | null; qc_check_id: string | null; raised_on: string | null; raised_by: Person | null;
+  work_package_id: string | null; source: 'STAFF' | 'QUALITY_CHECK' | 'CUSTOMER'; priority: 'HIGH' | 'NORMAL' | 'LOW'; customer_visible: boolean;
+  fixed_by: Person | null; fixed_on: string | null; fix_note: string | null; closure_code: string | null;
 }
 export interface BaselineRow {
   id: string; sequence_no: number; kind: 'ORIGINAL' | 'VARIATION'; current: boolean; quotation_id: string; label: string | null; variation_no: number;
@@ -113,6 +151,8 @@ export interface Actions {
   manage_qc: boolean; manage_snag: boolean; view_commercial_baseline: boolean; view_audit: boolean;
   /** Owner decisions PLB-OD-13, PLB-OD-06, PLB-OD-08 recorded and naming a capability this person holds here. */
   record_promised_date: boolean; reclassify_snag: boolean; qc_required_not_applicable: boolean;
+  /** PEX: work packages, independent snag verification, the handover package (READY_FOR_HANDOVER only). */
+  manage_work: boolean; verify_snag: boolean; prepare_handover_package: boolean;
 }
 export interface ProjectDetail {
   id: string; version: number; project_number: string; status: string; source: string; property: PropertyRef; quotation_number: string;
@@ -124,10 +164,13 @@ export interface ProjectDetail {
   handover_readiness: HandoverReadiness; site_readiness_state: 'NOT_ASSESSED' | 'READY' | 'BLOCKED' | 'TO_BE_CONFIRMED';
   attention: Attention[]; next_actions: { gate: string; code: string; who: string; message: string; entity: EntityRef | null }[];
   team: TeamMember[]; needs_reassignment: string[]; stages: Stage[]; checklist: ChecklistGroup[]; blockers: Blocker[]; milestones: Milestone[]; site_readiness: ReadinessItem[];
-  qc: { required_categories: string[]; categories: { category: string; required: boolean; latest: QcRow | null }[]; history: QcRow[] };
+  qc: { required_categories: string[]; categories: { category: string; required: boolean; latest: QcRow | null }[]; points: QcPoint[];
+    chains: QcChain[]; history: QcRow[] };
+  work_packages: WorkPackage[]; customer_reports: CustomerReport[]; handover_packages: HandoverPackage[];
+  delivery_policy: { version: string; status: string; decisions: Record<string, { label: string; decided: boolean }> };
   snags: Snag[]; baseline: BaselineView; transitions: Transition[]; timeline: TimelineEvent[]; spaces: { id: string; label: string }[];
   evidence_options: { id: string; category: string; attached_to: string; uploaded_on: string | null }[];
-  actions: Actions; policy: PolicyView; classification: { classes: string[]; default: string; fields: Record<string, Record<string, string>>; published: boolean };
+  actions: Actions; policy: PolicyView; classification: { classes: string[]; default: string; fields: Record<string, Record<string, string>>; published_through: string };
   last_material_change: string | null;
 }
 export interface TransitionResult { transition: Transition; outcome: Transition['outcome']; project: ProjectDetail }
@@ -136,6 +179,7 @@ export interface Vocabulary {
   milestone_states: string[]; blocker_categories: string[]; blocker_impacts: string[]; blocker_statuses: string[]; readiness_kinds: string[];
   readiness_categories: string[]; readiness_statuses: string[]; qc_categories: string[]; qc_results: string[]; snag_categories: string[];
   snag_statuses: string[]; gates: { code: string; label: string; structural: boolean }[];
+  snag_priorities: string[]; snag_closure_codes: string[]; work_package_states: string[]; report_decline_codes: string[];
 }
 export interface Candidate { id: string; display_name: string | null; responsibilities: string[] }
 export interface HistoryRow { entity_type: string; entity_id: string; action: string; changed_fields: string[]; by: Person | null; on: string | null; via: string }
@@ -178,4 +222,16 @@ export const projectApi = {
   snagStatus: (p: ProjectDetail, s: Snag, body: Body) => api.post<ProjectDetail>(`${at(p)}/snags/${s.id}/status`, body, { ifMatch: s.version }),
   reclassifySnag: (p: ProjectDetail, s: Snag, body: Body) =>
     api.post<ProjectDetail>(`${at(p)}/snags/${s.id}/classification`, body, { ifMatch: s.version }),
+  updateSnag: (p: ProjectDetail, s: Snag, body: Body) => api.patch<ProjectDetail>(`${at(p)}/snags/${s.id}`, body, { ifMatch: s.version }),
+  // PEX: work packages, the QC plan, customer reports and the handover package.
+  addWork: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/work-packages`, body, { idempotencyKey: newIdempotencyKey() }),
+  updateWork: (p: ProjectDetail, w: WorkPackage, body: Body) => api.patch<ProjectDetail>(`${at(p)}/work-packages/${w.id}`, body, { ifMatch: w.version }),
+  workCommand: (p: ProjectDetail, w: WorkPackage, command: 'start' | 'complete' | 'reopen' | 'cancel', body: Body) =>
+    api.post<ProjectDetail>(`${at(p)}/work-packages/${w.id}/${command}`, body, { ifMatch: w.version }),
+  addQcPoint: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/qc-points`, body, { idempotencyKey: newIdempotencyKey() }),
+  withdrawQcPoint: (p: ProjectDetail, q: QcPoint, body: Body) => api.post<ProjectDetail>(`${at(p)}/qc-points/${q.id}/withdraw`, body, { ifMatch: q.version }),
+  recordReport: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/customer-reports`, body, { idempotencyKey: newIdempotencyKey() }),
+  triageReport: (p: ProjectDetail, r: CustomerReport, body: Body) =>
+    api.post<ProjectDetail>(`${at(p)}/customer-reports/${r.id}/triage`, body, { ifMatch: r.version }),
+  preparePackage: (p: ProjectDetail) => api.post<ProjectDetail>(`${at(p)}/handover-package`, {}, { ifMatch: p.version }),
 };
