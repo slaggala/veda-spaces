@@ -8,6 +8,7 @@ maintenance jobs, break-glass and conformance.
     python -m veda.cli maintenance purge|erasure-audit|lead-retention|verify-chain|anchor-chain|invariants|archive-security-events
     python -m veda.cli break-glass request|approve|execute ...
     python -m veda.cli conformance
+    python -m veda.cli portal-rehash-emails   (after rotating VEDA_EMAIL_HASH_HMAC_KEY)
 """
 
 from __future__ import annotations
@@ -188,6 +189,18 @@ def cmd_sync_permissions(args) -> int:
     with db.engine().begin() as conn:
         # Run by an operator, not by a migration: the audit rows say so (IR-A19).
         print(json.dumps(migration_support.sync_permissions(conn, audit=True, via="CLI")))
+    return 0
+
+
+def cmd_portal_rehash_emails(args) -> int:
+    """After rotating VEDA_EMAIL_HASH_HMAC_KEY: recompute the customer portal's email lookup hashes (decision log 41)."""
+    from veda.kernel import db
+    from veda.kernel.context import actor, system_context
+    from veda.modules.portal import identity
+
+    _settings()
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        print(json.dumps({"portal_accounts_rehashed": identity.rehash_emails(s)}))
     return 0
 
 
@@ -657,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--reason", default=None)
     p.set_defaults(fn=cmd_outbox)
     sub.add_parser("sync-permissions").set_defaults(fn=cmd_sync_permissions)
+    sub.add_parser("portal-rehash-emails").set_defaults(fn=cmd_portal_rehash_emails)
     p = sub.add_parser("worker")
     p.add_argument("--once", action="store_true")
     p.set_defaults(fn=cmd_worker)

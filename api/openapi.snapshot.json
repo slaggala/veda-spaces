@@ -6460,6 +6460,20 @@
         "title": "SelectionIn",
         "type": "object"
       },
+      "SessionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "SessionIn",
+        "type": "object"
+      },
       "SetCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -6597,6 +6611,20 @@
           "expires_in_days"
         ],
         "title": "ShareIn",
+        "type": "object"
+      },
+      "SignInIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "SignInIn",
         "type": "object"
       },
       "SnagClassificationIn": {
@@ -15743,6 +15771,98 @@
         "x-requirement": "NOTE-002"
       }
     },
+    "/api/v1/leads/{lead_id}/portal-access": {
+      "get": {
+        "operationId": "portal_staff_list_access",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lead_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who has customer portal access to this enquiry",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": [
+          "portal.access.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPP-002"
+      },
+      "post": {
+        "operationId": "portal_staff_grant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lead_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give a customer portal access to this enquiry and email them a sign-in link",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": [
+          "portal.access.grant"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPP-002"
+      }
+    },
     "/api/v1/leads/{lead_id}/restore": {
       "post": {
         "operationId": "leads_restore_lead",
@@ -17688,6 +17808,56 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-016"
+      }
+    },
+    "/api/v1/portal-access/{access_id}/revoke": {
+      "post": {
+        "operationId": "portal_staff_revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End a customer's portal access to this enquiry at once",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": [
+          "portal.access.revoke"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPP-002"
       }
     },
     "/api/v1/projects": {
@@ -20942,6 +21112,192 @@
         "x-permission-any-of": null,
         "x-rbac-exception": "RBX-005",
         "x-requirement": "LEAD-001"
+      }
+    },
+    "/api/v1/public/portal/home": {
+      "get": {
+        "operationId": "portal_customer_home",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "The customer's portal home: their enquiries and properties",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-004"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}": {
+      "get": {
+        "operationId": "portal_customer_property_detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "One property's project: status, journey, attention, quotation, commitments, documents",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-005"
+      }
+    },
+    "/api/v1/public/portal/quotations/{quotation_id}": {
+      "get": {
+        "operationId": "portal_customer_quotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotation_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "One issued quotation version, customer-safe and read-only (the CQX projection)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-007"
+      }
+    },
+    "/api/v1/public/portal/session": {
+      "post": {
+        "operationId": "portal_customer_start_session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Exchange a sign-in link for a portal session (the token is returned once)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-001"
+      }
+    },
+    "/api/v1/public/portal/sign-in": {
+      "post": {
+        "operationId": "portal_customer_sign_in",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Email a sign-in link to a customer with portal access (the answer never says whether)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-001"
+      }
+    },
+    "/api/v1/public/portal/sign-out": {
+      "post": {
+        "operationId": "portal_customer_sign_out",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "End this portal session",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-001"
       }
     },
     "/api/v1/public/proposal": {

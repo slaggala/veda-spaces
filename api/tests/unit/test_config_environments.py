@@ -391,3 +391,22 @@ def test_project_lifecycle_is_off_by_default_and_production_refuses_it(monkeypat
     assert sorted(set(both) - set(without)) == [message]  # MTQ/CQX/CPA refusals unaffected by the project flag
     staging = config.validate_environment(deployed_env(monkeypatch, "staging", VEDA_PROJECT_LIFECYCLE_ENABLED="true"))
     assert not [p for p in staging if "PROJECT_LIFECYCLE" in p]  # staging admits it (wiring is a separate change)
+
+
+def test_customer_portal_is_off_by_default_and_production_refuses_it(monkeypatch):
+    """CPP (decision log 41): the Customer Project Portal flag is off by default; production with it requested on is
+    refused at configuration, so the API never starts; the refusal adds exactly its own problem, and turning the portal
+    on never turns the Project Lifecycle on (each is refused on its own)."""
+    from veda.app import create_app
+
+    assert config.Settings().customer_portal_enabled is False
+    off = config.validate_environment(deployed_env(monkeypatch, "production"))
+    on = config.validate_environment(deployed_env(monkeypatch, "production", VEDA_CUSTOMER_PORTAL_ENABLED="true"))
+    message = "VEDA_CUSTOMER_PORTAL_ENABLED is not authorised in production (Customer Project Portal)"
+    assert sorted(set(on) - set(off)) == [message] and set(off) <= set(on)
+    with pytest.raises(RuntimeError, match="unsafe production configuration") as refused:
+        create_app(deployed_env(monkeypatch, "production", VEDA_CUSTOMER_PORTAL_ENABLED="true"))
+    assert message in str(refused.value)
+    staging = deployed_env(monkeypatch, "staging", VEDA_CUSTOMER_PORTAL_ENABLED="true")
+    assert not [p for p in config.validate_environment(staging) if "CUSTOMER_PORTAL" in p]
+    assert staging.customer_portal_enabled is True and staging.project_lifecycle_enabled is False

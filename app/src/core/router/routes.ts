@@ -25,6 +25,7 @@ const commercialModule = () => import('../../modules/commercial/index.js');
 const proposalModule = () => import('../../modules/proposal/index.js');
 const promiseModule = () => import('../../modules/promise/index.js');
 const projectModule = () => import('../../modules/project/index.js');
+const portalModule = () => import('../../modules/portal/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -43,6 +44,12 @@ export const ROUTES: Def[] = [
   // CQX: the customer's proposal, opened by its secure link (the token is in the fragment; every API call answers 404
   // while VEDA_CUSTOMER_PROPOSAL_ENABLED is off). No sign-in and no workspace chrome.
   { path: '/proposal', title: 'Your proposal', fullTitle: 'Your proposal · Veda Spaces', component: 'vs-proposal-page', access: 'public', load: proposalModule },
+  // CPP: the customer's project portal (signed in by an emailed link; the session is sent only in X-Veda-Portal; every API
+  // call answers 404 while VEDA_CUSTOMER_PORTAL_ENABLED is off). No workspace sign-in and no workspace chrome.
+  { path: '/portal', title: 'Your project portal', fullTitle: 'Your project portal · Veda Spaces', component: 'vs-portal-home-page', access: 'public', load: portalModule },
+  { path: '/portal/sign-in', title: 'Sign in to your project portal', fullTitle: 'Sign in · Your project portal · Veda Spaces', component: 'vs-portal-sign-in-page', access: 'public', load: portalModule },
+  { path: '/portal/properties/:id', title: 'Your project', fullTitle: 'Your project · Veda Spaces', component: 'vs-portal-project-page', access: 'public', load: portalModule },
+  { path: '/portal/quotations/:id', title: 'Your quotation', fullTitle: 'Your quotation · Veda Spaces', component: 'vs-portal-quotation-page', access: 'public', load: portalModule },
   { path: '/recovery-mode', title: 'Account recovery', component: 'vs-recovery-mode-page', access: 'auth', recovery: true, load: auth },
   { path: '/change-password', title: 'Change password', component: 'vs-change-password-page', access: 'auth', passwordChange: true, load: auth },
   { path: '/no-access', title: 'No access', component: 'vs-no-access-page', access: 'auth', chrome: true, load: auth },

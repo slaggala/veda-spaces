@@ -49,5 +49,6 @@ run estimator-v3.e2e.mjs
 run proposal.e2e.mjs
 run promise.e2e.mjs
 run project.e2e.mjs
+run portal.e2e.mjs
 run axe.e2e.mjs
 exit $status
