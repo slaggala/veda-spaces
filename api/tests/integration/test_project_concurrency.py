@@ -19,25 +19,24 @@ from tests.support.api import ApiClient
 from tests.support.commercial import ok, step
 from tests.support.mtq import photo
 from tests.support.project import BASE, ON, Projects, install, synthetic_policy
+from tests.support.race import Hold
 from veda.modules.project import access, creation
 from veda.modules.project.models import Project, ProjectBaseline, ProjectTransition
 
 pytestmark = ON
-PAUSE = 2.0
 
 
 def _race(app, monkeypatch, first_user, second_user, first, second, *, module=access, name="require"):
     a, b = ApiClient(app.test_client()), ApiClient(app.test_client())
     a.token, b.token = first_user.token, second_user.token
-    paused, done = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = getattr(module, name)
 
     def wrapped(*args, **kw):
         result = original(*args, **kw)
-        if threading.current_thread() is threads.get("first") and not paused.is_set():
-            paused.set()
-            done.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("first") and not hold.reached.is_set():
+            hold.wait()
         return result
 
     monkeypatch.setattr(module, name, wrapped)
@@ -47,15 +46,16 @@ def _race(app, monkeypatch, first_user, second_user, first, second, *, module=ac
         out["first"] = first(a)
 
     def run_second():
-        assert paused.wait(timeout=20), "the first request never reached its pause"
+        assert hold.reached.wait(timeout=20), "the first request never reached its pause"
         out["second"] = second(b)
-        done.set()
+        hold.done()
 
     threads["first"], threads["second"] = threading.Thread(target=run_first), threading.Thread(target=run_second)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=60)
+    with hold.racing(held=threads["first"], other=threads["second"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=60)
     monkeypatch.setattr(module, name, original)
     assert "first" in out and "second" in out, out
     for r in out.values():

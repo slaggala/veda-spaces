@@ -246,26 +246,27 @@ def no_four_eyes() -> dict:
     return synthetic_policy(PLB_OD_03={"lifecycle_version": lifecycle.current().version, "transitions": []})
 
 
-def race(app, monkeypatch, first_token: str, first, second, *, module=None, name: str = "require", pause: float = 2.0):
-    """Run ``first(client)`` paused right after its permission check (before the project lock) while ``second()`` runs
-    and commits; then the first resumes. Returns (first's response, second's result)."""
+def race(app, monkeypatch, first_token: str, first, second, *, module=None, name: str = "require"):
+    """Run ``first(client)`` paused right after its permission check (before the project lock) while ``second()`` runs;
+    the first resumes once the second has returned or is waiting for a lock the first owns (``tests.support.race``).
+    Returns (first's response, second's result)."""
     import threading
 
     from tests.support.api import ApiClient
+    from tests.support.race import Hold
     from veda.modules.project import access
 
     module = module or access
     a = ApiClient(app.test_client())
     a.token = first_token
-    paused, done = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = getattr(module, name)
 
     def wrapped(*args, **kw):
         result = original(*args, **kw)
-        if threading.current_thread() is threads.get("first") and not paused.is_set():
-            paused.set()
-            done.wait(timeout=pause)
+        if threading.current_thread() is threads.get("first") and not hold.reached.is_set():
+            hold.wait()
         return result
 
     monkeypatch.setattr(module, name, wrapped)
@@ -275,15 +276,16 @@ def race(app, monkeypatch, first_token: str, first, second, *, module=None, name
         out["first"] = first(a)
 
     def run_second():
-        assert paused.wait(timeout=20), "the first request never reached its pause"
+        assert hold.reached.wait(timeout=20), "the first request never reached its pause"
         out["second"] = second()
-        done.set()
+        hold.done()
 
     threads["first"], threads["second"] = threading.Thread(target=run_first), threading.Thread(target=run_second)
-    for th in threads.values():
-        th.start()
-    for th in threads.values():
-        th.join(timeout=60)
+    with hold.racing(held=threads["first"], other=threads["second"]):
+        for th in threads.values():
+            th.start()
+        for th in threads.values():
+            th.join(timeout=60)
     monkeypatch.setattr(module, name, original)
     assert "first" in out and "second" in out, out
     for r in out.values():
