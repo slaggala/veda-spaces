@@ -210,7 +210,9 @@ def test_handover_needs_its_evidence_closes_the_project_and_emits_the_domain_eve
     }
     pkg = t.package(p)["handover_packages"][-1]
     assert pkg["status"] == "PREPARED" and pkg["content"]["documents"] == [] and pkg["stale"] is None
-    assert t.package(p)["handover_packages"] == [pkg | {}] or len(t.get(p)["handover_packages"]) == 1  # unchanged: same
+    assert [x["id"] for x in t.package(p, status=200)["handover_packages"]] == [
+        pkg["id"]
+    ]  # unchanged: the same package
     api = t.as_(t.ops)
     cur = t.get(p)
     assert api.post(f"{BASE}/{p['id']}/handover", {**body, "handover_on": "2999-01-01"},

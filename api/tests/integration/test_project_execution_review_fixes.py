@@ -129,9 +129,11 @@ def test_m3_the_commercial_condition_reads_the_projects_own_record_and_fails_clo
     delivery(pex_d02="NO_AMOUNT_DUE")
     assert _commercial(t, p["id"]) == set()  # a schedule in balance and nothing requested: nothing is due
     first = acc["schedule"]["lines"][0]
+    t.pay(acc, 1)  # a part payment towards an instalment never requested is not an amount due (D3)
+    assert _commercial(t, p["id"]) == set()
     t.request(acc, first["id"])
     assert _commercial(t, p["id"]) == {"AMOUNT_DUE"}
-    t.pay(acc, first["amount_minor"] - 1)
+    t.pay(acc, first["amount_minor"] - 2)
     assert _commercial(t, p["id"]) == {"AMOUNT_DUE"}  # requested and part paid: still due
     t.pay(acc, 1)
     assert _commercial(t, p["id"]) == set()

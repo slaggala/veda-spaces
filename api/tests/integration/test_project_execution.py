@@ -381,7 +381,7 @@ def test_the_handover_package_is_prepared_only_when_ready_frozen_and_rechecked_a
     assert [w["label"] for w in c["work"]["completed"]] == ["Kitchen"] and c["work"]["completed_count"] == 2
     assert c["documents"] == [] and set(c["warranty"]) == {"source", "quotation_id", "quotation_number"}
     assert "Internal electrical rework" not in str(c)
-    assert len(t.package(p)["handover_packages"]) == 1  # nothing changed: the same package
+    assert len(t.package(p, status=200)["handover_packages"]) == 1  # nothing changed: the same package
     # D5: four-eyes on the handover; the package changes before the approval, so the approval is refused
     install(synthetic_policy(PLB_OD_03={"lifecycle_version": lifecycle.current().version,
                                         "transitions": ["READY_FOR_HANDOVER>HANDED_OVER"]}))  # fmt: skip

@@ -233,9 +233,10 @@ class Projects:
         return r["project"]
 
     def package(self, p: dict, user=None, status: int = 201):
-        """Prepare the handover package (READY_FOR_HANDOVER, every gate but the evidence met)."""
+        """Prepare the handover package (READY_FOR_HANDOVER, every gate but the evidence met). Pass status=200 for a
+        repeat that changes nothing."""
         r = self.as_(user or self.ops).post(f"{BASE}/{p['id']}/handover-package", {}, if_match=self.get(p)["version"])
-        assert r.status == status or (status == 201 and r.status == 200), r  # 200: nothing changed, the same package
+        assert r.status == status, r  # 201: a new package; 200: nothing changed, the same package
         return r.data if r.status in (200, 201) else r
 
     def snag_through(self, p: dict, snag_id: str, to: str = "RESOLVED") -> dict:
