@@ -8,8 +8,8 @@ with ``project.view_audit``. ``actions`` are hints for the page; the server chec
 
 from __future__ import annotations
 
-from datetime import date
 from collections.abc import Sequence
+from datetime import date
 from typing import Any
 
 import sqlalchemy as sa
