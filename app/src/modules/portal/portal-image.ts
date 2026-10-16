@@ -20,9 +20,9 @@ export class VsPortalImage extends LitElement {
 
   static override styles = css`
     :host { display: block; }
-    img { display: block; width: 100%; height: auto; border-radius: var(--vs-radius, 8px); background: var(--vs-paper, #f5f2ed); }
-    .ph { display: flex; align-items: center; justify-content: center; min-height: 96px; border-radius: var(--vs-radius, 8px);
-      background: var(--vs-paper, #f5f2ed); color: var(--vs-muted, #5c5750); font-size: 14px; padding: 8px; text-align: center; }
+    img { display: block; width: 100%; height: auto; border-radius: var(--vs-radius); background: var(--vs-paper); }
+    .ph { display: flex; align-items: center; justify-content: center; min-height: 96px; border-radius: var(--vs-radius);
+      background: var(--vs-paper); color: var(--vs-muted); font-size: 14px; padding: 8px; text-align: center; }
   `;
 
   constructor() {
