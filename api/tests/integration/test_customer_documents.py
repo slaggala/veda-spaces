@@ -123,3 +123,39 @@ def test_nothing_is_served_while_the_delivery_view_is_off(team):
     doc = doc["customer_documents"]["documents"][0]
     assert _content(me, prop, doc["id"]).status == 404
     assert not [d for d in ok(me.property(prop["id"]))["documents"] if d["kind"] == "PROJECT_DOCUMENT"]
+
+
+# --- independent review (decision log 46): M-4, L-5 ---------------------------------------------------------------------
+def test_only_site_photographs_can_be_shared_and_no_class_claims_approval(team):
+    t = team
+    _prop, p, _me = _project(t, "2BHK", "docs-h@example.test")
+    sketch = photo(t.as_(t.founder), "property", p["property"]["id"], category="SKETCH")
+    assert _publish(t, p, sketch).code == "DOCUMENT_CLASS_NOT_ALLOWED"  # survey working material, never a document
+    assert sketch["id"] not in {o["id"] for o in t.get(p)["customer_documents"]["options"]}
+    site = photo(t.as_(t.founder), "property", p["property"]["id"])
+    assert _publish(t, p, site, document_class="APPROVED_DRAWING").status == 422  # no approval record exists
+    assert {c["code"] for c in t.get(p)["customer_documents"]["classes"]} == {"PROGRESS_PHOTO", "HANDOVER_PHOTO"}
+
+
+def test_a_file_withdrawn_after_publication_or_access_revoked_is_never_served(team):
+    t = team
+    prop, p, me = _project(t, "2BHK", "docs-i@example.test")
+    att = photo(t.as_(t.founder), "property", p["property"]["id"])
+    doc = ok(_publish(t, p, att), 201)["customer_documents"]["documents"][0]
+    assert _content(me, prop, doc["id"]).status == 200
+    cur = ok(t.as_(t.founder).get(f"/api/v1/attachments/{att['id']}"))
+    ok(
+        t.as_(t.founder).post(
+            f"/api/v1/attachments/{att['id']}/withdraw", {"reason": "Wrong photo"}, if_match=cur["version"]
+        )
+    )
+    assert _content(me, prop, doc["id"]).status == 404  # the publication alone never serves an unavailable file
+    assert not [d for d in ok(me.property(prop["id"]))["documents"] if d["kind"] == "PROJECT_DOCUMENT"]
+    staff_row = t.get(p)["customer_documents"]["documents"][0]
+    assert staff_row["status"] == "PUBLISHED" and staff_row["available"] is False  # staff see why
+    att2 = photo(t.as_(t.founder), "property", p["property"]["id"])
+    doc2 = ok(_publish(t, p, att2), 201)["customer_documents"]["documents"][0]
+    assert _content(me, prop, doc2["id"]).status == 200
+    access = ok(t.as_(t.founder).get(f"/api/v1/leads/{prop['lead_id']}/portal-access"))[0]
+    ok(t.as_(t.founder).post(f"/api/v1/portal-access/{access['id']}/revoke", {}, if_match=access["version"]))
+    assert _content(me, prop, doc2["id"]).status in (401, 404)  # access ended: nothing is served

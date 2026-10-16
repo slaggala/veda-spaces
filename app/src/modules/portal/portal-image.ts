@@ -1,10 +1,12 @@
-import { LitElement, css, html, nothing } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { documentImage } from './api.js';
 
 /**
  * A document Veda Spaces shared on the customer's project (CPP-D04), loaded through the portal session. An <img> cannot
  * carry the X-Veda-Portal header and the site CSP allows images only from 'self' and data:, so the bytes are fetched
- * with the header and inlined. Nothing is cached beyond this element; a refusal shows a plain "not available".
+ * with the header and inlined. Nothing is cached beyond this element; a refusal shows a plain "not available". The bytes
+ * are fetched only once the element is near the viewport (a long list never loads every image at once), and again
+ * whenever its document changes (an element reused for another document never shows the previous image).
  */
 export class VsPortalImage extends LitElement {
   static override properties = { propertyId: { attribute: false }, documentId: { attribute: false }, label: { attribute: false },
@@ -30,14 +32,36 @@ export class VsPortalImage extends LitElement {
     this.variant = 'mobile';
   }
 
+  private observer: IntersectionObserver | null = null;
+  private visible = false;
+  private request = 0;
+
   override connectedCallback(): void {
     super.connectedCallback();
-    void this.fetch();
+    if (typeof IntersectionObserver === 'undefined') { this.visible = true; return; }
+    this.observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && !this.visible) { this.visible = true; void this.fetch(); }
+    }, { rootMargin: '200px' });
+    this.observer.observe(this);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.observer?.disconnect();
+    this.observer = null;
+    this.request += 1; // a response arriving after removal is dropped
+  }
+
+  protected override updated(changed: PropertyValues): void {
+    if ((changed.has('propertyId') || changed.has('documentId') || changed.has('variant')) && this.visible) void this.fetch();
   }
 
   private async fetch(): Promise<void> {
+    const mine = ++this.request;
+    this.src = null;
     this.failed = false;
     const url = await documentImage(this.propertyId, this.documentId, this.variant);
+    if (mine !== this.request) return; // a newer document (or removal) superseded this request
     if (url) this.src = url; else this.failed = true;
   }
 

@@ -85,6 +85,9 @@ SIGN_IN_LIMITS = [("5 per minute", _ip("portal-sign-in")), ("30 per hour", _ip("
 SESSION_LIMITS = [("10 per minute", _ip("portal-session")), ("60 per hour", _ip("portal-session"))]
 READ_LIMITS = [("120 per minute", _ip("portal-read")), ("60 per minute", _session("portal-read")),
                ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
+# CPP-D04: images of shared documents, in their own bucket so a page of thumbnails never throttles the property page.
+DOCUMENT_LIMITS = [("240 per minute", _session("portal-document")), ("600 per minute", _ip("portal-document")),
+                   ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
 # PEX: customer writes (reports, acknowledgements). Per session and per network here; per account in the database
 # (at most reports.MAX_OPEN reports waiting for review per account and project).
 WRITE_LIMITS = [("10 per hour", _session("portal-write")), ("30 per day", _session("portal-write")),
@@ -295,7 +298,7 @@ def acknowledge_handover(req: Req, property_id: str, project_id: str):
 
 # --- customer: project documents (CPP-D04) -----------------------------------------------------------------------------
 @customer_api.route("GET", "/portal/properties/<property_id>/documents/<document_id>/content", rbx="RBX-010",
-                    auth="public", write=False, query=PS.DocumentContentQuery, limits=READ_LIMITS,
+                    auth="public", write=False, query=PS.DocumentContentQuery, limits=DOCUMENT_LIMITS,
                     requirement="CPP-D04", summary="One document Veda Spaces shared on your project (an image; only "
                     "through your authorised property)")  # fmt: skip
 def document_content(req: Req, property_id: str, document_id: str):

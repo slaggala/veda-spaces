@@ -1504,8 +1504,7 @@
           "document_class": {
             "enum": [
               "PROGRESS_PHOTO",
-              "HANDOVER_PHOTO",
-              "APPROVED_DRAWING"
+              "HANDOVER_PHOTO"
             ],
             "title": "Document Class",
             "type": "string"

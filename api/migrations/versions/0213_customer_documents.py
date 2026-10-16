@@ -1,8 +1,7 @@
 """0213_customer_documents: customer-visible project documents (CPP-D04, decision log 46).
 
 One new table, ``project_customer_document``: an explicit staff publication of an attachment of the project's customer
-record to the customer's portal, as one customer-visible class (progress photograph, handover photograph, approved
-drawing), with a customer title; withdrawal keeps the row. A file is never customer-visible because it belongs to a
+record to the customer's portal, as one customer-visible class (progress photograph, handover photograph), with a customer title; withdrawal keeps the row. A file is never customer-visible because it belongs to a
 project: only a PUBLISHED row makes it so, and only while the attachment stays scanned clean and available. The new
 staff code ``project.publish_document`` is FOUNDER's.
 
@@ -93,7 +92,7 @@ def upgrade() -> None:
             name="ck_project_customer_document__deleted_by_format",
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
-            "document_class IN ('PROGRESS_PHOTO', 'HANDOVER_PHOTO', 'APPROVED_DRAWING')",
+            "document_class IN ('PROGRESS_PHOTO', 'HANDOVER_PHOTO')",
             name="ck_project_customer_document__document_class",
         ),
         sa.CheckConstraint(

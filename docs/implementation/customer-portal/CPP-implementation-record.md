@@ -146,9 +146,11 @@ number (the VS-P overlap above) reach the customer. With the flag off, the earli
 The owner decided that the portal may show customer-visible project documents. Visibility is explicit, never inferred
 from "the file belongs to the project":
 
-- **Publication** (`project.publish_document`, FOUNDER by default; others individually): one attachment of the
-  project's own customer record that is scanned clean, available and not INTERNAL (floor plans stay internal), as one
-  class (progress photograph, handover photograph, approved drawing) with a title in customer words. Repeating the same
+- **Publication** (`project.publish_document`, FOUNDER by default; others individually): one site photograph of the
+  project's own property (attached to the property or one of its spaces) that is scanned clean, available and not
+  INTERNAL, as one class (progress photograph or handover photograph) with a title in customer words. Sketches, laser
+  readings and floor plans are survey working material and are refused; no "approved drawing" class exists because no
+  approval record exists for a drawing (it would present a draft as approved). Repeating the same
   publication changes nothing; the same file in another class must be withdrawn first. Withdrawal needs a reason and
   keeps the row (`project_customer_document`, migration `0213_customer_documents`); erasure redacts the title.
 - **Customer view:** `documents` on the property page lists published, still available documents (class, title, date,

@@ -68,6 +68,10 @@ class Policy(_Closed):
         for code, value in self.decisions.items():
             if value is not None:
                 SHAPES[code].model_validate(value)
+        d02 = self.decisions.get("PEX-D02")
+        if self.status != SYNTHETIC and d02 is not None and d02.get("condition") != "COMMERCIAL_OBLIGATION_SATISFIED":
+            # decision log 46: the other conditions exist for tests only; a real record never relaxes the gate
+            raise ValueError("PEX-D02 is the commercial obligation gate (COMMERCIAL_OBLIGATION_SATISFIED)")
         return self
 
     def get(self, code: str) -> Any:

@@ -94,3 +94,24 @@ def test_without_project_commercials_the_obligation_cannot_be_confirmed(api, fac
     delivery(pex_d02="COMMERCIAL_OBLIGATION_SATISFIED")
     codes = {b["code"] for b in t.get(p)["handover_readiness"]["blockers"] if b["gate"] == GATE}
     assert codes == {"COMMERCIAL_POSITION_UNAVAILABLE"}
+
+
+def test_a_real_record_never_relaxes_the_commercial_gate():
+    """Review L-1: NONE, NO_AMOUNT_DUE and FULLY_PAID exist for tests only; a non-synthetic record refuses them."""
+    from pydantic import ValidationError
+
+    from veda.modules.project import delivery_policy
+
+    doc = json.loads(delivery_policy.FIXTURE.read_text())
+    for relaxed in ("NONE", "NO_AMOUNT_DUE", "FULLY_PAID"):
+        doc["decisions"]["PEX-D02"]["condition"] = relaxed
+        with pytest.raises(ValidationError):
+            delivery_policy.Policy.model_validate(doc)
+
+
+def test_the_customer_is_told_payment_is_what_remains():
+    """Review M-1: the decided gate's code reads as "Payment due" in the customer's delivery view."""
+    from veda.modules.project import delivery
+
+    remaining = delivery._remaining([{"gate": GATE, "code": "COMMERCIAL_OBLIGATION_OUTSTANDING"}])
+    assert remaining == [{"label": "Payment due", "count": 1}]

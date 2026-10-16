@@ -2,7 +2,7 @@
 
 The owner decided that the Customer Project Portal may show customer-visible project documents. Visibility is always
 explicit: an attachment never becomes visible because it belongs to the project. A person with
-``project.publish_document`` on the project publishes one attachment of the project's customer record as one class
+``project.publish_document`` on the project publishes one site photograph of the project's own property as one class
 (``vocab.CUSTOMER_DOCUMENT_CLASSES``) with a title in customer wording; withdrawing keeps the row and its history.
 
 Refused at publication: an attachment of another customer record, one that is not scanned clean and available, and one
@@ -47,11 +47,41 @@ def _attachment(s: Session, attachment_id: str):
     return s.get(Attachment, attachment_id)
 
 
+def _of_property(s: Session, a, property_id: str) -> bool:
+    """The attachment is a photograph of this property (attached to it, or to one of its spaces)."""
+    if a.entity_type == "property":
+        return a.entity_id == property_id
+    if a.entity_type == "property_space":
+        from veda.modules.mtq.models import PropertySpace
+
+        sp = s.get(PropertySpace, a.entity_id)
+        return sp is not None and sp.property_id == property_id
+    return False
+
+
+def _options_query(p: Project):
+    """Shareable attachments: site photographs of this property, live, scanned clean, not internal, not shown now."""
+    from veda.modules.attachments.models import Attachment
+    from veda.modules.mtq.models import PropertySpace
+
+    shown = sa.select(ProjectCustomerDocument.attachment_id).where(ProjectCustomerDocument.project_id == p.id,
+                                                                   ProjectCustomerDocument.status == "PUBLISHED",
+                                                                   ProjectCustomerDocument.is_deleted == sa.false())  # fmt: skip
+    spaces = sa.select(PropertySpace.id).where(PropertySpace.property_id == p.property_id)
+    return (sa.select(Attachment).where(
+        Attachment.lead_id == p.lead_id, Attachment.is_deleted == sa.false(), Attachment.retention_state == "ACTIVE",
+        Attachment.scan_status == "CLEAN", Attachment.visibility_code == "STANDARD",
+        Attachment.category_code.in_(V.CUSTOMER_DOCUMENT_CATEGORIES), Attachment.id.not_in(shown),
+        sa.or_(sa.and_(Attachment.entity_type == "property", Attachment.entity_id == p.property_id),
+               sa.and_(Attachment.entity_type == "property_space", Attachment.entity_id.in_(spaces))),
+    ).order_by(Attachment.created_on.desc()).limit(100))  # fmt: skip
+
+
 def _publishable(s: Session, p: Project, attachment_id: str):
     from veda.modules.attachments import service as att
 
     a = _attachment(s, attachment_id)
-    if a is None or a.lead_id != p.lead_id or a.is_deleted:
+    if a is None or a.lead_id != p.lead_id or a.is_deleted or not _of_property(s, a, p.property_id):
         raise ApiError(422, "VALIDATION_FAILED", "Choose an attachment of this project's property.",
                        errors=[field_error("attachment_id", "UNKNOWN_ATTACHMENT", "Not an attachment of this "
                                            "project.")])  # fmt: skip
@@ -62,6 +92,10 @@ def _publishable(s: Session, p: Project, attachment_id: str):
     if a.visibility_code != "STANDARD":
         raise ApiError(422, "DOCUMENT_INTERNAL", "This attachment is internal and cannot be shown to the customer.",
                        errors=[field_error("attachment_id", "INTERNAL", "Internal attachments stay staff-only.")])  # fmt: skip
+    if a.category_code not in V.CUSTOMER_DOCUMENT_CATEGORIES:
+        raise ApiError(422, "DOCUMENT_CLASS_NOT_ALLOWED", "Only site photographs can be shown to the customer; sketches, "
+                       "laser readings and floor plans are survey working material.",
+                       errors=[field_error("attachment_id", "NOT_A_PHOTOGRAPH", "Not a site photograph.")])  # fmt: skip
     return a
 
 
@@ -117,7 +151,6 @@ def withdraw(s: Session, ctx, p: Project, d: ProjectCustomerDocument, reason: st
 def staff_view(s: Session, ctx, p: Project, people) -> dict[str, Any]:
     """The staff list (with history) and, for a publisher, the attachments that could be published."""
     from veda.modules.attachments import service as att
-    from veda.modules.attachments.models import Attachment
 
     out = []
     for d in rows(s, p):
@@ -132,13 +165,9 @@ def staff_view(s: Session, ctx, p: Project, people) -> dict[str, Any]:
     can = access.can(s, ctx, p, CODE)
     options: list[dict[str, Any]] = []
     if can:
-        shown = {d.attachment_id for d in rows(s, p, published_only=True)}
-        found = s.execute(sa.select(Attachment).where(Attachment.lead_id == p.lead_id, Attachment.scan_status == "CLEAN",
-                                                      Attachment.visibility_code == "STANDARD")
-                          .order_by(Attachment.created_on.desc()).limit(100)).scalars()  # fmt: skip
         options = [{"id": a.id, "category": a.category_code, "attached_to": a.entity_type,
-                    "uploaded_on": clock.to_rfc3339(a.created_on)} for a in found
-                   if att.is_available(a) and a.id not in shown]  # fmt: skip
+                    "uploaded_on": clock.to_rfc3339(a.created_on)}
+                   for a in s.execute(_options_query(p)).scalars() if att.is_available(a)]  # fmt: skip
     return {"documents": out, "can_publish": can, "options": options,
             "classes": [{"code": k, "label": v} for k, v in V.CUSTOMER_DOCUMENT_CLASSES.items()]}  # fmt: skip
 
@@ -172,6 +201,7 @@ def content_for(s: Session, property_id: str, document_id: str):
     if p is None or p.property_id != property_id:
         raise not_found()
     a = _attachment(s, d.attachment_id)
-    if a is None or a.lead_id != p.lead_id or not att.is_available(a) or a.visibility_code != "STANDARD":
+    if (a is None or a.lead_id != p.lead_id or not att.is_available(a) or a.visibility_code != "STANDARD"
+            or a.category_code not in V.CUSTOMER_DOCUMENT_CATEGORIES):  # fmt: skip
         raise not_found()
     return d, a

@@ -983,8 +983,8 @@ export class VsProjectPage extends SessionElement {
     const c = p.customer_documents;
     return html`<div class="row"><h2 id="documents-h" tabindex="-1">Customer documents</h2><span class="spacer"></span>
         ${c.can_publish && c.options.length ? html`<button class="btn" @click=${() => this.publishDocument(p)}>Share a document</button>` : nothing}</div>
-      <p class="small muted">Only what is shared here appears in the customer's portal. A photo or drawing never becomes visible just because it belongs to the project;
-        internal attachments (such as floor plans kept internal) cannot be shared.${c.can_publish && !c.options.length ? ' No scanned, shareable attachment is available yet.' : ''}</p>
+      <p class="small muted">Only what is shared here appears in the customer's portal. A photograph never becomes visible just because it belongs to the project.
+        Only site photographs of this property can be shared; sketches, laser readings, floor plans and internal attachments stay staff-only.${c.can_publish && !c.options.length ? ' No scanned, shareable attachment is available yet.' : ''}</p>
       ${c.documents.length ? html`<ul class="attention" aria-label="Customer documents">${c.documents.map((d) => html`<li class=${d.status === 'PUBLISHED' ? 'INFORMATIONAL' : 'RESOLVED'}>
         <div class="row"><span class="badge ${d.status === 'PUBLISHED' ? 'ok' : 'info'}">${d.status === 'PUBLISHED' ? 'Shared with the customer' : 'Withdrawn'}</span>
           <span class="small muted">${d.class_label}, shared by ${who(d.published_by)}, ${when(d.published_on)}</span></div>

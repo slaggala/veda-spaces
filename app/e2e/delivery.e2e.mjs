@@ -66,7 +66,7 @@ function detail(state) {
     qc: { required_categories: ['FINISH_AND_SURFACES'], categories: [{ category: 'FINISH_AND_SURFACES', required: true, latest: null }], points: [], chains: [], history: [] },
     snags: state.snags, work_packages: state.work, customer_reports: state.reports, handover_packages: state.packages,
     customer_documents: { documents: state.docs ?? [], can_publish: true,
-      classes: [{ code: 'PROGRESS_PHOTO', label: 'Progress photograph' }, { code: 'HANDOVER_PHOTO', label: 'Handover photograph' }, { code: 'APPROVED_DRAWING', label: 'Approved drawing' }],
+      classes: [{ code: 'PROGRESS_PHOTO', label: 'Progress photograph' }, { code: 'HANDOVER_PHOTO', label: 'Handover photograph' }],
       options: (state.docs ?? []).some((d) => d.status === 'PUBLISHED') ? [] : [{ id: 'att1', category: 'SITE_PHOTO', attached_to: 'property', uploaded_on: '2026-10-15T10:00:00Z' }] },
     delivery_policy: { version: 'PEX-POLICY-0', status: 'UNDECIDED', decisions: { 'PEX-D01': { label: 'customer actions', decided: false }, 'PEX-D02': { label: 'commercial condition', decided: false } } },
     baseline: { full: false, verified: true, problems: [], current_seq: 1, open_variations: [], variations: [], lineage: [] },
@@ -389,6 +389,7 @@ try {
     await c.goto(`${BASE}/portal/properties/p1`);
     await c.locator('vs-portal-project-page #h-delivery').waitFor();
     await c.locator('vs-portal-project-page').getByRole('button', { name: 'Report something' }).click();
+    await c.locator('vs-portal-project-page #documents').scrollIntoViewIfNeeded(); // images load lazily, near the viewport
     await c.locator('vs-portal-project-page #documents vs-portal-image img').first().waitFor();
     await layout(c, 'vs-portal-project-page', `${name} portal delivery`);
     await axe(c, `${name} portal delivery`);

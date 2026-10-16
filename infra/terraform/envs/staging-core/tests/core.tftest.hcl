@@ -858,8 +858,8 @@ run "the_committed_customer_portal_record_is_approved_and_turns_the_portal_on" {
   }
 
   assert {
-    condition     = local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == local.pdl_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
-    error_message = "the portal is separate: the Project Lifecycle is set only by project_delivery and customer-proposal viewing is untouched"
+    condition     = local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal is separate: the Project Lifecycle stays off (set only by project_delivery) and customer-proposal viewing is untouched"
   }
 }
 

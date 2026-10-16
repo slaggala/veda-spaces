@@ -255,8 +255,8 @@ export class VsPortalProjectPage extends LitElement {
       const e = d as ProjectDocument;
       return html`<li class="doc shared"><vs-portal-image class="thumb" .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'thumb'}></vs-portal-image>
         <span class="grow"><span class="strong">${e.title}</span><br /><span class="small muted">${e.label} · shared ${when(e.published_on)}</span></span>
-        <button class="btn" aria-expanded=${this.enlarged === e.id ? 'true' : 'false'} @click=${() => { this.enlarged = this.enlarged === e.id ? null : e.id; }}>${this.enlarged === e.id ? 'Hide' : 'View'}<span class="sr-only"> ${e.title}</span></button>
-        ${this.enlarged === e.id ? html`<vs-portal-image class="large" .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'desktop'}></vs-portal-image>` : nothing}</li>`;
+        <button class="btn" aria-controls=${`doc-large-${e.id}`} aria-expanded=${this.enlarged === e.id ? 'true' : 'false'} @click=${() => { this.enlarged = this.enlarged === e.id ? null : e.id; }}>${this.enlarged === e.id ? 'Hide' : 'View'}<span class="sr-only"> ${e.title}</span></button>
+        ${this.enlarged === e.id ? html`<vs-portal-image class="large" id=${`doc-large-${e.id}`} .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'desktop'}></vs-portal-image>` : nothing}</li>`;
     }
     if (d.kind === 'INVOICE' || d.kind === 'RECEIPT') {
       const e = d as Extract<DocumentEntry, { number: string }>;

@@ -161,7 +161,11 @@ def _reports(s: Session, p: Project, account_id: str) -> list[dict[str, Any]]:
 def _remaining(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     counts: dict[str, int] = {}
     for b in blockers:
-        if b["gate"] == "COMMERCIAL_CONDITION" and b["code"] in ("AMOUNT_DUE", "AMOUNT_OUTSTANDING"):
+        if b["gate"] == "COMMERCIAL_CONDITION" and b["code"] in (
+            "AMOUNT_DUE",
+            "AMOUNT_OUTSTANDING",
+            "COMMERCIAL_OBLIGATION_OUTSTANDING",
+        ):
             words = "Payment due"
         else:
             words = READINESS_WORDS.get(b["gate"], FINAL_CHECKS)
@@ -188,7 +192,7 @@ def _package(s: Session, p: Project) -> dict[str, Any] | None:
                   "open_minor": [{"number": x.get("number"), "title": x.get("title")}
                                  for x in (c.get("snags") or {}).get("open_non_blocking") or []]},
         "documents": (handover_docs := [x for x in documents.customer_list(s, p)
-                                        if x["document_class"] in ("HANDOVER_PHOTO", "APPROVED_DRAWING")]),
+                                        if x["document_class"] == "HANDOVER_PHOTO"]),
         "documents_note": None if handover_docs else "No handover documents have been shared in your portal yet. "
         "Your Veda Spaces contact will give them to you.",
         "warranty_note": "Warranty is as set out in your accepted quotation.",

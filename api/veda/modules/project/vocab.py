@@ -135,12 +135,14 @@ REPORT_DECLINE_CODES = ("DUPLICATE", "NOT_A_DEFECT", "NOT_IN_SCOPE")
 PACKAGE_STATES = ("PREPARED", "SUPERSEDED", "COMPLETED")
 
 # CPP-D04 (decision log 46): the customer-visible document classes a project attachment may be published as. Only what
-# the repository's attachments can hold (scanned, re-encoded images); publication is always an explicit staff act.
+# the repository's attachments can hold and truthfully be called: site photographs (scanned, re-encoded images).
+# Sketches, laser readings and floor plans are survey working material, and no approval record exists for a drawing,
+# so no "approved drawing" class is offered (it would present a draft as approved). Publication is always explicit.
 CUSTOMER_DOCUMENT_CLASSES = {
     "PROGRESS_PHOTO": "Progress photograph",
     "HANDOVER_PHOTO": "Handover photograph",
-    "APPROVED_DRAWING": "Approved drawing",
 }
+CUSTOMER_DOCUMENT_CATEGORIES = ("SITE_PHOTO",)  # the attachment categories a customer document may come from
 CUSTOMER_DOCUMENT_STATES = ("PUBLISHED", "WITHDRAWN")
 
 # PLB-12: the timeline. Codes, ids and states only: an event never carries free text, so it never needs erasing.
