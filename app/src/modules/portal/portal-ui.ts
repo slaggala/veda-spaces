@@ -34,6 +34,13 @@ export const portalStyles = [...shared, css`
   .badge.IN_PROGRESS::before { background: var(--vs-copper-strong); }
   .badge.UPCOMING::before { background: transparent; border: 2px solid var(--vs-ink-muted); width: 6px; height: 6px; }
   .badge.NOT_YET_AVAILABLE { color: var(--vs-ink-muted); }
+  /* payment states (PCM): each has its own marker shape as well as its word */
+  .badge.PAID::before, .badge.VALID::before { background: var(--vs-success); }
+  .badge.OVERDUE, .badge.DUE, .badge.PARTIALLY_PAID { border-color: var(--vs-copper); color: var(--vs-copper-text); }
+  .badge.OVERDUE::before { border-radius: 1px; transform: rotate(45deg); background: var(--vs-copper); }
+  .badge.DUE::before { background: var(--vs-copper); }
+  .badge.PARTIALLY_PAID::before { background: linear-gradient(90deg, var(--vs-copper) 50%, transparent 50%); border: 1px solid var(--vs-copper); }
+  .badge.CANCELLED, .badge.CORRECTED { color: var(--vs-ink-muted); }
   .muted { color: var(--vs-ink-muted); }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--vs-space-3); margin: 0; }
   .facts div { display: flex; flex-direction: column; gap: 2px; }
@@ -45,8 +52,9 @@ export const portalStyles = [...shared, css`
   .notice { border-left: 3px solid var(--vs-copper); padding: var(--vs-space-3) var(--vs-space-4); background: var(--vs-surface); border-radius: var(--vs-radius-card); }
 `];
 
-export function stateBadge(state: StepState, label?: string) {
-  return html`<span class="badge ${state}">${label ?? STATE_LABELS[state]}</span>`;
+/** A state badge; ``state`` is a journey state, or a payment state (with its server-provided label). */
+export function stateBadge(state: StepState | string, label?: string) {
+  return html`<span class="badge ${state}">${label ?? STATE_LABELS[state as StepState] ?? state}</span>`;
 }
 
 /** A date (YYYY-MM-DD) or an instant, in the customer's words. */

@@ -26,6 +26,7 @@ const proposalModule = () => import('../../modules/proposal/index.js');
 const promiseModule = () => import('../../modules/promise/index.js');
 const projectModule = () => import('../../modules/project/index.js');
 const portalModule = () => import('../../modules/portal/index.js');
+const commercialsModule = () => import('../../modules/commercials/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -50,6 +51,9 @@ export const ROUTES: Def[] = [
   { path: '/portal/sign-in', title: 'Sign in to your project portal', fullTitle: 'Sign in · Your project portal · Veda Spaces', component: 'vs-portal-sign-in-page', access: 'public', load: portalModule },
   { path: '/portal/properties/:id', title: 'Your project', fullTitle: 'Your project · Veda Spaces', component: 'vs-portal-project-page', access: 'public', load: portalModule },
   { path: '/portal/quotations/:id', title: 'Your quotation', fullTitle: 'Your quotation · Veda Spaces', component: 'vs-portal-quotation-page', access: 'public', load: portalModule },
+  // PCM: the customer's invoices and receipts in the portal (same session; 404 while VEDA_PROJECT_COMMERCIALS_ENABLED is off).
+  { path: '/portal/invoices/:id', title: 'Your invoice', fullTitle: 'Your invoice · Veda Spaces', component: 'vs-portal-document-page', access: 'public', load: portalModule },
+  { path: '/portal/receipts/:id', title: 'Your receipt', fullTitle: 'Your receipt · Veda Spaces', component: 'vs-portal-document-page', access: 'public', load: portalModule },
   { path: '/recovery-mode', title: 'Account recovery', component: 'vs-recovery-mode-page', access: 'auth', recovery: true, load: auth },
   { path: '/change-password', title: 'Change password', component: 'vs-change-password-page', access: 'auth', passwordChange: true, load: auth },
   { path: '/no-access', title: 'No access', component: 'vs-no-access-page', access: 'auth', chrome: true, load: auth },
@@ -81,6 +85,9 @@ export const ROUTES: Def[] = [
   // Operations › Projects (every API call answers 404 while VEDA_PROJECT_LIFECYCLE_ENABLED is off).
   { path: '/projects', title: 'Projects', component: 'vs-project-list-page', access: 'auth', chrome: true, anyOf: ['project.view'], load: projectModule },
   { path: '/projects/:id', title: 'Project', component: 'vs-project-page', access: 'auth', chrome: true, anyOf: ['project.view'], load: projectModule },
+  // Commercial › Payments (every API call answers 404 while VEDA_PROJECT_COMMERCIALS_ENABLED is off).
+  { path: '/commercials', title: 'Payments', component: 'vs-commercials-list-page', access: 'auth', chrome: true, anyOf: ['commercials.view'], load: commercialsModule },
+  { path: '/commercials/:id', title: 'Project commercials', component: 'vs-commercials-page', access: 'auth', chrome: true, anyOf: ['commercials.view'], load: commercialsModule },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 

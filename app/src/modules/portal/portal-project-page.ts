@@ -1,11 +1,11 @@
 import { LitElement, css, html, nothing } from 'lit';
-import { forgetSession, portalApi, sessionToken, transient, type Contact, type Entry, type PropertyView } from './api.js';
+import { forgetSession, portalApi, sessionToken, transient, type Commercials, type Contact, type DocumentEntry, type Entry, type PropertyView } from './api.js';
 import { portalStyles, stateBadge, when } from './portal-ui.js';
 
 type Load = 'loading' | 'ready' | 'signed-out' | 'not-found' | 'offline' | 'unavailable';
 
 const SECTIONS = [
-  ['attention', 'Needs you'], ['journey', 'Your journey'], ['quotation', 'Quotation'], ['included', "What's included"],
+  ['attention', 'Needs you'], ['journey', 'Your journey'], ['payments', 'Payments'], ['quotation', 'Quotation'], ['included', "What's included"],
   ['commitments', 'Our commitments'], ['your-part', 'Your part'], ['documents', 'Documents'], ['contact', 'Contact'],
 ] as const;
 
@@ -50,6 +50,15 @@ export class VsPortalProjectPage extends LitElement {
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: var(--vs-space-2); border-bottom: 1px solid var(--vs-line); vertical-align: top; overflow-wrap: anywhere; }
     th { font-size: 13px; color: var(--vs-ink-muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .money { display: grid; gap: var(--vs-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); margin: 0; }
+    .money div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .money dt { font-size: 13px; color: var(--vs-ink-muted); }
+    .money dd { margin: 0; font-family: var(--vs-font-serif); font-size: 24px; line-height: 30px; font-variant-numeric: lining-nums tabular-nums; overflow-wrap: anywhere; }
+    .instalments { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+    .instalments li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--vs-space-1) var(--vs-space-3); padding: var(--vs-space-3) 0; border-bottom: 1px solid var(--vs-line); }
+    .instalments li:last-child { border-bottom: 0; }
+    .instalments .figures { text-align: right; font-variant-numeric: tabular-nums; }
   `];
 
   constructor() {
@@ -129,6 +138,7 @@ export class VsPortalProjectPage extends LitElement {
                 <p>${a.text}</p>
                 ${a.due ? html`<p class="muted">${a.kind === 'QUOTATION_DECISION' ? 'Valid until' : 'By'} ${when(a.due)}</p>` : nothing}
                 ${a.quotation_id ? html`<a class="btn primary" href="/portal/quotations/${a.quotation_id}">View your quotation</a>` : nothing}
+                ${a.invoice_id ? html`<a class="btn" href="/portal/invoices/${a.invoice_id}">View the invoice</a>` : nothing}
               </article>`) : html`<p class="card">Nothing needs you right now.</p>`}
             ${upcoming.map((a) => html`<article class="card stack"><div class="step-head">${stateBadge(a.status)}<h3>${a.title}</h3></div>
               <p>${a.text}${a.due ? html` <span class="strong">${when(a.due)}</span>` : nothing}</p></article>`)}
@@ -141,6 +151,11 @@ export class VsPortalProjectPage extends LitElement {
               <div class="step"><div class="step-head"><h3>${s.label}</h3>${stateBadge(s.state)}</div>
                 <p>${s.detail}${s.date ? html` <span class="muted">${when(s.date)}</span>` : nothing}</p></div>
             </li>`)}</ol>
+          </section>
+
+          <section class="section" id="payments" aria-labelledby="h-payments">
+            <h2 id="h-payments" tabindex="-1">Payments</h2>
+            ${this.payments(v.commercials)}
           </section>
 
           <section class="section" id="quotation" aria-labelledby="h-quotation">
@@ -196,10 +211,8 @@ export class VsPortalProjectPage extends LitElement {
         <aside class="side" aria-label="Documents and contact">
           <section class="section" id="documents" aria-labelledby="h-documents">
             <h2 id="h-documents" tabindex="-1">Documents</h2>
-            <div class="card">${v.documents.length ? html`<ul class="plain">${v.documents.map((d) => html`<li class="doc">
-                <span><span class="strong">${d.title} ${d.reference}</span><br /><span class="small muted">${d.issued_on ? `Issued ${when(d.issued_on)} · ` : ''}${d.status_label}</span></span>
-                ${d.state !== 'UNAVAILABLE' ? html`<a class="btn" href="/portal/quotations/${d.id}">Open<span class="sr-only"> ${d.title} ${d.reference}</span></a>` : nothing}
-              </li>`)}</ul>` : html`<p class="muted">No documents yet. Your quotation will be listed here once issued.</p>`}</div>
+            <div class="card">${v.documents.length ? html`<ul class="plain">${v.documents.map((d) => this.document(d))}</ul>`
+              : html`<p class="muted">No documents yet. Your quotation will be listed here once issued.</p>`}</div>
           </section>
           <section class="section" id="contact" aria-labelledby="h-contact">
             <h2 id="h-contact" tabindex="-1">Your Veda Spaces contact</h2>
@@ -208,6 +221,52 @@ export class VsPortalProjectPage extends LitElement {
           </section>
         </aside>
       </div>`;
+  }
+
+  private document(d: DocumentEntry) {
+    if (d.kind === 'INVOICE' || d.kind === 'RECEIPT') {
+      const e = d as Extract<DocumentEntry, { number: string }>;
+      const name = `${d.kind === 'INVOICE' ? 'Invoice' : 'Receipt'} ${e.number}`;
+      return html`<li class="doc"><span><span class="strong">${name}</span><br /><span class="small muted">${e.issued_on ? `${when(e.issued_on)} · ` : ''}₹ ${e.amount} · ${e.status_label}</span></span>
+        <a class="btn" href="/portal/${d.kind === 'INVOICE' ? 'invoices' : 'receipts'}/${e.id}">Open<span class="sr-only"> ${name}</span></a></li>`;
+    }
+    const q = d as Extract<DocumentEntry, { reference: string }>;
+    return html`<li class="doc"><span><span class="strong">${q.title} ${q.reference}</span><br /><span class="small muted">${q.issued_on ? `Issued ${when(q.issued_on)} · ` : ''}${q.status_label}</span></span>
+      ${q.state !== 'UNAVAILABLE' ? html`<a class="btn" href="/portal/quotations/${q.id}">Open<span class="sr-only"> ${q.title} ${q.reference}</span></a>` : nothing}</li>`;
+  }
+
+  /** What the customer has agreed, paid and still owes, from the server's one calculation. No way to pay here. */
+  private payments(c: Commercials | null) {
+    if (!c) return html`<p class="card muted">Your payment details appear here once Veda Spaces has set up your project's payment schedule.</p>`;
+    if (!c.available || !c.summary) return html`<p class="card" role="status">${c.message ?? 'Your payment details are not available right now.'}</p>`;
+    const s = c.summary;
+    return html`<div class="card stack">
+      <dl class="money">
+        <div><dt>Total project value</dt><dd>₹ ${s.total_value}</dd></div>
+        <div><dt>Paid</dt><dd>₹ ${s.paid}</dd></div>
+        <div><dt>Outstanding</dt><dd>₹ ${s.outstanding}</dd></div>
+      </dl>
+      ${s.includes_gst ? html`<p class="small muted">The project value includes GST of ₹ ${s.includes_gst}, as in your accepted quotation.</p>` : nothing}
+      ${s.next_payment ? html`<div class="notice"><p><span class="strong">Next payment:</span> ${s.next_payment.label}, ₹ ${s.next_payment.amount}
+        ${stateBadge(s.next_payment.state, s.next_payment.state_label)}</p>
+        <p class="small">${s.next_payment.due_on ? `Due by ${when(s.next_payment.due_on)}.` : `When: ${s.next_payment.when}.`}</p></div>`
+        : html`<p class="notice">Nothing is outstanding. Thank you.</p>`}
+      ${(c.notices ?? []).map((n) => html`<p class="notice" role="status">${n.message}</p>`)}
+      <p class="small muted">${c.how_to_pay} Veda Spaces does not collect payments through this portal.</p>
+      ${c.schedule?.length ? html`<h3>Payment schedule</h3><ul class="instalments">${c.schedule.map((x) => html`<li>
+          <span><span class="strong">${x.label}</span><br /><span class="small muted">${x.due_on ? `Due by ${when(x.due_on)}` : x.when}</span></span>
+          <span class="figures"><span class="strong">₹ ${x.amount}</span><br />${stateBadge(x.state, x.state_label)}
+            ${x.state === 'PARTIALLY_PAID' || x.state === 'OVERDUE' ? html`<br /><span class="small muted">Paid ₹ ${x.paid}, ₹ ${x.remaining} to go</span>` : nothing}</span>
+        </li>`)}</ul>` : nothing}
+      <h3>Payments recorded</h3>
+      ${c.payments?.length ? html`<ul class="instalments">${c.payments.map((p) => html`<li>
+          <span><span class="strong">₹ ${p.amount}</span> <span class="badge ${p.status}">${p.status_label}</span><br />
+            <span class="small muted">${when(p.received_on)} · ${p.method}${p.reference ? ` · ${p.reference}` : ''}</span>
+            ${p.note ? html`<br /><span class="small">${p.note}</span>` : nothing}
+            ${p.correction ? html`<br /><span class="small">${p.correction}</span>` : nothing}</span>
+          <span>${p.receipt ? html`<a class="btn" href="/portal/receipts/${p.receipt.id}">Receipt<span class="sr-only"> ${p.receipt.number}</span></a>` : nothing}</span>
+        </li>`)}</ul>` : html`<p class="muted">No payments recorded yet.</p>`}
+    </div>`;
   }
 
   /** In-page navigation: scroll to the section and move focus to its heading (screen readers follow). */
