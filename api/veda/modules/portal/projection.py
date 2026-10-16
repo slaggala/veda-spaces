@@ -17,8 +17,9 @@ Nothing here invents information. Each value comes from the module that owns it:
   classification allow-list (stage, its Customer Promise stage, customer actions). Otherwise those steps are "not yet
   available"; the portal never reads, sets or bypasses that flag.
 
-Estimates, BOQs, rates, margins, staff notes, internal states, digests and staff identities beyond the assigned
-consultant's name are never read into a customer view.
+Estimates, BOQs, rates, margins, staff notes, internal states and staff identities beyond the assigned consultant's
+name are never read into a customer view. The only digest a customer sees is the one the CQX projection itself carries
+(the frozen document's, which the secure link uses to bind a decision to what was shown).
 """
 
 from __future__ import annotations
@@ -122,19 +123,27 @@ def visible_quotations(s: Session, prop: Property) -> list[Quotation]:
     return [q for q in rows if _visible(q)]
 
 
+def _cache(s: Session) -> dict[tuple[str, str], Any]:
+    """One request's memo of quotation states and projections (each is computed once, however many views use it)."""
+    return s.info.setdefault("portal_projection_cache", {})
+
+
 def _state(s: Session, q: Quotation) -> str:
-    try:
-        return cqx_grants.proposal_state(s, q)
-    except Exception:  # pragma: no cover - a chain without a head cannot be shown, but must not break the page
-        return "UNAVAILABLE"
+    key = ("state", q.id)
+    if key not in _cache(s):
+        _cache(s)[key] = cqx_grants.proposal_state(s, q)
+    return _cache(s)[key]
 
 
 def _proposal(s: Session, q: Quotation) -> dict[str, Any] | None:
     """The CQX customer-safe projection of the frozen document, or None when it does not verify (never shown then)."""
-    try:
-        return cqx.build(s, q)
-    except ApiError:
-        return None
+    key = ("proposal", q.id)
+    if key not in _cache(s):
+        try:
+            _cache(s)[key] = cqx.build(s, q)
+        except ApiError:
+            _cache(s)[key] = None
+    return _cache(s)[key]
 
 
 def quotation_summary(s: Session, q: Quotation, proposal: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -295,14 +304,17 @@ def project_actions(s: Session, project) -> list[dict[str, Any]]:
     assert classification.column_class("project_blocker", "customer_action") == classification.CUSTOMER_ACTION
     assert classification.column_class("project_site_readiness", "customer_action") == classification.CUSTOMER_ACTION
     out = []
+    waiting_on_customer = tuple(x for x in PV.BLOCKER_OPEN if x != "WAITING_VEDA")
     for b in s.execute(sa.select(ProjectBlocker).where(ProjectBlocker.project_id == project.id,
+                                                       ProjectBlocker.is_deleted == sa.false(),
                                                        ProjectBlocker.responsible_party == "CUSTOMER",
-                                                       ProjectBlocker.status.in_(PV.BLOCKER_OPEN))
+                                                       ProjectBlocker.status.in_(waiting_on_customer))
                        .order_by(ProjectBlocker.created_on)).scalars():  # fmt: skip
         if b.customer_action:
             out.append({"kind": "PROJECT_ACTION", "status": V.ACTION_REQUIRED, "title": "Something we need from you",
                         "text": b.customer_action, "due": _day(b.target_date)})  # fmt: skip
     for r in s.execute(sa.select(ProjectSiteReadiness).where(ProjectSiteReadiness.project_id == project.id,
+                                                             ProjectSiteReadiness.is_deleted == sa.false(),
                                                              ProjectSiteReadiness.status == "CUSTOMER_ACTION_REQUIRED")
                        .order_by(ProjectSiteReadiness.item_code)).scalars():  # fmt: skip
         if r.customer_action:
@@ -348,21 +360,26 @@ def _next_step(journey_steps: list[dict[str, Any]]) -> dict[str, Any] | None:
     return None
 
 
+HEADLINES = {
+    "consultation": "Your enquiry is with us.", "site_measurement": "Your site is being measured.",
+    "design_scope": "We are preparing your scope of work.", "quotation": "Your quotation is ready.",
+    "approval": "You have approved your quotation.", "execution": "Your project is under way.",
+    "quality": "We are checking the quality of the work.", "handover": "Your home is ready for handover.",
+}  # fmt: skip
+
+
 def _headline(lead: Lead, journey_steps: list[dict[str, Any]]) -> str:
     if lead.status == "LOST":
         return "This enquiry is closed."
-    last = [x for x in journey_steps if x["state"] in (V.COMPLETED, V.IN_PROGRESS, V.ACTION_REQUIRED)]
-    if not last:
-        return "Your enquiry has been received."
-    step = last[-1]
-    if step["state"] == V.ACTION_REQUIRED:
+    steps = {x["key"]: x for x in journey_steps}
+    if any(x["state"] == V.ACTION_REQUIRED for x in journey_steps):
         return "We are waiting for your decision."
-    return {"consultation": "Your enquiry is with us.", "site_measurement": "Your site is being measured.",
-            "design_scope": "We are preparing your scope of work.", "quotation": "Your quotation is ready.",
-            "approval": "You have approved your quotation.", "execution": "Your project is under way.",
-            "quality": "We are checking the quality of the work.", "handover": "Your home is ready for handover."
-            }[step["key"]] if step["state"] != V.COMPLETED or step["key"] != "handover" else \
-        "Your home has been handed over."  # fmt: skip
+    if steps["approval"]["state"] == V.INFORMATION:  # declined, or no longer open: say exactly that
+        return steps["approval"]["detail"]
+    if steps["handover"]["state"] == V.COMPLETED:
+        return "Your home has been handed over."
+    reached = [x for x in journey_steps if x["state"] in (V.COMPLETED, V.IN_PROGRESS)]
+    return HEADLINES[reached[-1]["key"]] if reached else "Your enquiry has been received."
 
 
 def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, full: bool) -> dict[str, Any]:

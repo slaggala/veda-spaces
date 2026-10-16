@@ -94,6 +94,21 @@ fields only). Otherwise those three steps say "not yet available". The portal ne
 | CPP-D05 | Session lifetimes and sign-in link lifetimes | 30 min idle / 12 h absolute; 15 min link, 72 h invitation |
 | CPP-D06 | Showing the assigned consultant's name when the issued quotation names no business contact | The consultant's name only, no contact channel |
 
+## Independent review (before merge)
+
+A fresh reviewer certified the branch with one merge condition. The findings and how each was handled:
+
+| Finding | Handling |
+|---|---|
+| F1 (Medium, merge condition): after a lead erasure, the erased enquiry's access list still showed the name and email of a customer who kept access to another enquiry, and the account could keep a name copied from the erased enquiry | Fixed. An erased enquiry's access list shows no account identity. A surviving shared account takes its name from an enquiry it still has, and joins the erasure set so its audit history loses the earlier name. Tested. |
+| F2: anyone who knew the email could void the 72-hour invitation, and the email rate limits were per network | Fixed. A sign-in request never cancels an invitation. Each account gets at most 10 sign-in links per 24 hours from any network (DB-backed). Tested. |
+| F3: a known email's sign-in request takes measurably longer than an unknown one | Accepted residual while the flag is off. The answer and rate-limit keys are identical. Closing the gap needs the issuing moved out of the request (post-request writes run before the response is sent). Listed for the enablement review (CPP-D01). |
+| F4: a declined or expired quotation got the headline "Your quotation is ready"; blockers waiting on Veda showed as customer actions; deleted rows were not filtered; a catch-all exception handler | Fixed. Tested. |
+| F5: each quotation was verified several times per page | Fixed with a per-request cache. |
+| F6: a docstring claimed no digest reaches customers; unused definitions | Fixed. The CQX projection's frozen-document digest is named. Unused definitions removed. |
+| F7: access on a soft-deleted lead could not be revoked (it would return on restore) | Fixed. Revocation works within scope while the lead is soft-deleted. Tested. |
+| Missing test: a link redeemed twice at once | Added on both engines (one session, one refusal). |
+
 ## Found during this work (outside this change)
 
 The PROPERTY and PROJECT number sequences share the prefix `VS-P-` (migrations 0200 and 0208). A property and a project

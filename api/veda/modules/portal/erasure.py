@@ -2,8 +2,9 @@
 
 Erasing a lead revokes every ACTIVE portal access to it (LEAD_ERASED). An account left with no ACTIVE access is
 erased too: its email and name are replaced, it is disabled and its sessions end. An account that still has access to
-another enquiry (another person's, or another of the same person's) keeps its identity; only this enquiry's access
-ends. The event record holds codes and ids only and needs no change.
+another enquiry keeps its email, takes its name from that live enquiry (it may have been named from the erased one),
+and the erased enquiry's access list no longer shows who it was (``routes._present``). Either way the account joins
+the erasure set, so its audit history loses the earlier name too. The event record holds codes and ids only.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from veda.kernel import db
+from veda.modules.crm.leads.models import Lead
 
 from . import events, identity
 from .models import PortalAccess, PortalAccount
@@ -31,7 +33,16 @@ def erase_for_lead(s: Session, lead) -> int:
             touched += 1
     for account_id in {a.account_id for a in rows}:
         account = s.get(PortalAccount, account_id)
-        if account is None or account.erased_on is not None or identity.active_access(s, account_id):
+        if account is None or account.erased_on is not None:
+            continue
+        remaining = identity.active_access(s, account_id)
+        if remaining:
+            # The account may have been named from the erased enquiry: keep no trace of it. Its name now comes from
+            # an enquiry it still has (that customer's own record), and the erased enquiry hides the account (routes).
+            live = s.get(Lead, remaining[0].lead_id)
+            account.display_name = (live.name if live is not None else ERASED_NAME)[:150]
+            erasure.add(account.id)
+            touched += 1
             continue
         account.email_normalized = f"erased+{account.id}@invalid"
         account.display_name = ERASED_NAME
@@ -47,9 +58,4 @@ def erase_for_lead(s: Session, lead) -> int:
 def audit_ids_for_lead(s: Session, lead_id: str) -> list[str]:
     rows = s.execute(sa.select(PortalAccess).where(PortalAccess.lead_id == lead_id)
                      .execution_options(include_deleted=True)).scalars().all()  # fmt: skip
-    ids = [a.id for a in rows]
-    for account_id in {a.account_id for a in rows}:
-        account = s.get(PortalAccount, account_id)
-        if account is not None and account.erased_on is not None:
-            ids.append(account.id)
-    return ids
+    return [a.id for a in rows] + sorted({a.account_id for a in rows})

@@ -43,6 +43,7 @@ LINK_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 INVITATION_TTL = timedelta(hours=72)
 SIGN_IN_TTL = timedelta(minutes=15)
 RESEND_GAP = timedelta(seconds=60)  # one sign-in email per account per minute, whatever is asked
+DAILY_SIGN_IN_LINKS = 10  # and at most this many sign-in emails per account per 24 hours, from any network
 IDLE_TTL = timedelta(minutes=30)
 ABSOLUTE_TTL = timedelta(hours=12)
 TOUCH_GAP = timedelta(minutes=1)
@@ -154,10 +155,15 @@ def end_sessions(s: Session, account_id: str, reason: str) -> int:
 
 # --- sign-in links -----------------------------------------------------------------------------------------------------
 def _issue(s: Session, account: PortalAccount, purpose: str) -> PortalSignIn:
+    """A new link invalidates the account's earlier unused links of the same purpose. A sign-in request never cancels
+    an invitation (someone who knows the email must not be able to void the link staff sent); a new invitation
+    supersedes every earlier unused link."""
     now = db.tx_time(s)
-    for old in s.execute(sa.select(PortalSignIn).where(PortalSignIn.account_id == account.id,
-                                                       PortalSignIn.used_on.is_(None),
-                                                       PortalSignIn.invalidated_on.is_(None))).scalars():  # fmt: skip
+    earlier = sa.select(PortalSignIn).where(PortalSignIn.account_id == account.id, PortalSignIn.used_on.is_(None),
+                                            PortalSignIn.invalidated_on.is_(None))  # fmt: skip
+    if purpose == "SIGN_IN":
+        earlier = earlier.where(PortalSignIn.purpose == "SIGN_IN")
+    for old in s.execute(earlier).scalars():
         old.invalidated_on = now
     row = PortalSignIn(account_id=account.id, purpose=purpose, token_sha256="0" * 64,
                        expires_on=now + (INVITATION_TTL if purpose == "INVITATION" else SIGN_IN_TTL))  # fmt: skip
@@ -178,9 +184,15 @@ def request_sign_in(s: Session, email: str) -> None:
         return
     if s.get_bind().dialect.name == "postgresql":
         s.execute(sa.select(PortalAccount.id).where(PortalAccount.id == account.id).with_for_update())
+    now = db.tx_time(s)
     recent = s.execute(sa.select(sa.func.max(PortalSignIn.created_on)).where(
         PortalSignIn.account_id == account.id)).scalar()  # fmt: skip
-    if recent is not None and db.tx_time(s) - recent < RESEND_GAP:
+    if recent is not None and now - recent < RESEND_GAP:
+        return
+    today = s.execute(sa.select(sa.func.count()).select_from(PortalSignIn).where(
+        PortalSignIn.account_id == account.id, PortalSignIn.purpose == "SIGN_IN",
+        PortalSignIn.created_on > now - timedelta(hours=24))).scalar() or 0  # fmt: skip
+    if today >= DAILY_SIGN_IN_LINKS:
         return
     row = _issue(s, account, "SIGN_IN")
     events.record(s, account.id, "SIGN_IN_LINK_SENT", sign_in_id=row.id, purpose=row.purpose)

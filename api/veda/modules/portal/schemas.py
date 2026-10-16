@@ -35,7 +35,3 @@ class GrantIn(Closed):
     email: Annotated[str | None, optional_text(254)] = None  # default: the enquiry's email
     display_name: Annotated[str | None, optional_text(150)] = None  # default: the enquiry's name
     relationship: Relationship = "PRIMARY_CUSTOMER"
-
-
-class RevokeIn(Closed):
-    pass

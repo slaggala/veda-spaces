@@ -1,6 +1,6 @@
 # Customer Project Portal: implementation map (discovery, 2026-10-16)
 
-Baseline: main `24f705d` (PR #101 and PR #103 merged; deployed to staging; Project Lifecycle off; PLB-OD-01…13 null).
+Baseline: main after PR #101 and PR #103 (deployed to staging; Project Lifecycle off; PLB-OD-01…13 null).
 
 The portal is a **customer-authorised projection** over existing sources of truth. It adds one thing the repository
 does not have: an authenticated customer identity. Everything it shows is read from the modules that own it, through

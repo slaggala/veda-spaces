@@ -324,7 +324,7 @@ def upgrade() -> None:
             name="ck_portal_session__deleted_by_format",
         ).ddl_if(dialect="sqlite"),
         sa.CheckConstraint(
-            "end_reason_code IS NULL OR end_reason_code IN ('SIGNED_OUT', 'ACCESS_REVOKED', 'ACCOUNT_DISABLED', 'LEAD_ERASED')",
+            "end_reason_code IS NULL OR end_reason_code IN ('SIGNED_OUT', 'ACCESS_REVOKED', 'LEAD_ERASED')",
             name="ck_portal_session__end_reason_code",
         ),
         sa.CheckConstraint("length(end_reason_code) <= 16", name="ck_portal_session__end_reason_code_len").ddl_if(

@@ -189,3 +189,71 @@ def test_erasing_the_enquiry_ends_access_and_erases_an_account_left_without_any(
     assert "solo@example.test" not in accounts and "both@example.test" in accounts
     erased = [a for a in accounts.values() if a.erased_on is not None]
     assert len(erased) == 1 and erased[0].status == "DISABLED" and erased[0].display_name == "[erased]"
+
+
+def test_a_sign_in_request_never_voids_the_invitation_staff_sent(api, factory, monkeypatch):
+    """Review F2: someone who knows a customer's email cannot cancel the invitation by asking for a sign-in link."""
+    t = Portal(api, factory)
+    prop, _, _ = t.issued()
+    t.grant(prop["lead_id"], "invited@example.test")
+    invitation = t.link_token("invited@example.test")
+    monkeypatch.setattr(identity, "RESEND_GAP", timedelta(0))
+    api.post(f"{PUBLIC}/sign-in", {"email": "invited@example.test"}, anonymous=True)
+    assert t.emails_to("invited@example.test") == 2
+    me = t.sign_in("invited@example.test", invitation)  # the invitation still works
+    assert me.home().status == 200
+
+
+def test_sign_in_links_are_capped_per_account_per_day_from_any_network(api, factory, monkeypatch):
+    """Review F2: the per-email rate limits are per network; the account's own daily cap holds across networks."""
+    t = Portal(api, factory)
+    prop, _, _ = t.issued()
+    t.grant(prop["lead_id"], "capped@example.test")
+    monkeypatch.setattr(identity, "RESEND_GAP", timedelta(0))
+    monkeypatch.setattr(identity, "DAILY_SIGN_IN_LINKS", 2)
+    for _ in range(4):
+        r = api.post(f"{PUBLIC}/sign-in", {"email": "capped@example.test"}, anonymous=True)
+        assert r.status == 202  # the answer never changes
+    links = dbh.rows(sa.select(PortalSignIn).where(PortalSignIn.purpose == "SIGN_IN"))
+    assert len(links) == 2  # capped; each superseded the one before, so only the newest is emailed
+    assert t.emails_to("capped@example.test") == 2  # the invitation, then the newest sign-in link
+
+
+def test_an_erased_enquiry_no_longer_names_a_customer_who_keeps_another(api, factory):
+    """Review F1: erasing enquiry A leaves no trace of who had access to it, even when that person keeps access to B."""
+    from veda.modules.crm.leads import service as lead_service
+    from veda.modules.crm.leads.models import Lead
+
+    t = Portal(api, factory)
+    prop_a, _, _ = t.issued("2BHK")
+    prop_b, _, _ = t.issued("3BHK")
+    t.grant(prop_a["lead_id"], "shared@example.test")  # named from enquiry A (the default)
+    t.grant(prop_b["lead_id"], "shared@example.test")
+    with db.unit_of_work(write=False) as s:
+        name_a, name_b = s.get(Lead, prop_a["lead_id"]).name, s.get(Lead, prop_b["lead_id"]).name
+    assert t.access(prop_a["lead_id"])[0]["account"]["display_name"] == name_a
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        lead_service.anonymize(s, s.get(Lead, prop_a["lead_id"]), legal_basis="SYNTHETIC erasure test",
+                               request_ref=None)  # fmt: skip
+    row = t.access(prop_a["lead_id"])[0]
+    assert row["status"] == "REVOKED" and row["revoke_reason_code"] == "LEAD_ERASED"
+    assert row["account"] == {"display_name": "[erased]", "email": None, "status": None, "last_signed_in_on": None}
+    assert "shared@example.test" not in str(row) and name_a not in str(row)
+    kept = t.access(prop_b["lead_id"])[0]["account"]
+    assert kept["email"] == "shared@example.test" and kept["display_name"] == name_b != name_a
+    me = t.sign_in("shared@example.test")
+    assert me.home().data["customer"]["name"] == name_b
+
+
+def test_access_can_be_revoked_while_the_enquiry_is_soft_deleted(api, factory):
+    """Review F7: a soft-deleted enquiry's access is still revocable, so it cannot come back when the lead is restored."""
+    t = Portal(api, factory)
+    prop, _, _ = t.issued()
+    t.grant(prop["lead_id"], "deleted@example.test")
+    row = t.access(prop["lead_id"])[0]
+    lead = t.as_(t.founder).get(f"/api/v1/leads/{prop['lead_id']}").data
+    r = t.as_(t.founder).call("DELETE", f"/api/v1/leads/{prop['lead_id']}", {"reason": "Synthetic duplicate"},
+                              if_match=lead["version"])  # fmt: skip
+    assert r.status in (200, 204), r
+    r = t.as_(t.manager).post(f"/api/v1/portal-access/{row['id']}/revoke", {}, if_match=row["version"])
+    assert r.status == 200 and r.data[0]["status"] == "REVOKED"

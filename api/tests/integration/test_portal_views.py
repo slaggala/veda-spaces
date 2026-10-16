@@ -130,3 +130,36 @@ def test_the_portal_never_changes_the_project_lifecycle_or_its_owner_policy(api,
     assert me.get("/api/v1/projects").status == 404
     assert me.call("POST", "/api/v1/projects", {"quotation_id": q["id"], "property_id": prop["id"]}).status == 404
     assert synthetic_policy is not None and step is not None  # harness imports used by sibling tests
+
+
+def test_a_declined_quotation_says_so_and_asks_nothing(api, factory):
+    """Review F4: the headline names a declined quotation instead of "Your quotation is ready"."""
+    t = Portal(api, factory)
+    prop, _, q = t.issued()
+    ok(step(t.c, q, "decision", t.c.sales, {"decision": "REJECTED", "method": "SIGNED_COPY"}))
+    me = t.invite(prop["lead_id"], "declined@example.test")
+    view = ok(me.property(prop["id"]))
+    assert view["headline"] == "You declined the quotation." and view["attention"] == []
+    assert _steps(view)["approval"] == "INFORMATION" and view["quotation"]["status_label"] == "Declined"
+
+
+@pytest.mark.settings(mtq_site_enabled=True, mtq_estimation_enabled=True, mtq_quotation_enabled=True,
+                      customer_portal_enabled=True, project_lifecycle_enabled=True)  # fmt: skip
+def test_a_blocker_waiting_on_veda_is_not_shown_as_the_customers_action(api, factory):
+    """Review F4: only actions actually waiting on the customer reach the portal."""
+    t = Portal(api, factory)
+    prop, _, q = t.accepted()
+    me = t.invite(prop["lead_id"], "waiting@example.test")
+    p = t.book(q, prop)
+    t.staff(p)
+    d = ok(t.as_(t.ops).post(f"{PROJECTS}/{p['id']}/blockers", {"category": "CUSTOMER_DECISION", "impact": "GATING",
+                             "title": "Appliance models", "customer_action": "Please share your appliance models",
+                             "responsible_party": "CUSTOMER", "blocks_stage_code": "DESIGN_FINALISATION"}), 201)  # fmt: skip
+    b = d["blockers"][0]
+    assert [a["kind"] for a in ok(me.property(prop["id"]))["attention"]] == ["PROJECT_ACTION"]
+    ok(
+        t.as_(t.ops).patch(
+            f"{PROJECTS}/{p['id']}/blockers/{b['id']}", {"status": "WAITING_VEDA"}, if_match=b["version"]
+        )
+    )
+    assert ok(me.property(prop["id"]))["attention"] == []

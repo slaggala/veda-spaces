@@ -19,6 +19,7 @@ from veda.config import settings
 from veda.kernel import clock
 from veda.kernel.errors import ApiError, not_found
 from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, request_reaches
+from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq import scope as lead_scope
 from veda.platform.identity.models import User
 
@@ -150,7 +151,7 @@ def quotation(req: Req, quotation_id: str):
 
 
 # --- staff: access -----------------------------------------------------------------------------------------------------
-def _present(s, a: PortalAccess) -> dict:
+def _present(s, a: PortalAccess, *, erased: bool = False) -> dict:
     acc = s.get(PortalAccount, a.account_id)
 
     def name(uid):
@@ -158,17 +159,21 @@ def _present(s, a: PortalAccess) -> dict:
         return {"id": uid, "display_name": (u.display_name or u.full_name) if u else None} if uid else None
 
     return {"id": a.id, "version": a.version, "relationship": a.relationship, "status": a.status,
-            "account": {"display_name": acc.display_name, "email": acc.email_normalized, "status": acc.status,
-                        "last_signed_in_on": clock.to_rfc3339(acc.last_signed_in_on) if acc.last_signed_in_on else None},
+            # an erased enquiry never shows who had access to it (the account may still exist for another enquiry)
+            "account": {"display_name": "[erased]", "email": None, "status": None, "last_signed_in_on": None} if erased
+            else {"display_name": acc.display_name, "email": acc.email_normalized, "status": acc.status,
+                  "last_signed_in_on": clock.to_rfc3339(acc.last_signed_in_on) if acc.last_signed_in_on else None},
             "granted_on": clock.to_rfc3339(a.created_on), "granted_by": name(a.created_by),
             "revoked_on": clock.to_rfc3339(a.revoked_on) if a.revoked_on else None, "revoked_by": name(a.revoked_by),
             "revoke_reason_code": a.revoke_reason_code}  # fmt: skip
 
 
 def _listing(s, lead_id: str) -> list[dict]:
+    lead = s.get(Lead, lead_id, execution_options={"include_deleted": True})
+    erased = lead is None or lead.anonymized_on is not None
     rows = s.execute(sa.select(PortalAccess).where(PortalAccess.lead_id == lead_id)
                      .order_by(PortalAccess.status, PortalAccess.created_on.desc())).scalars()  # fmt: skip
-    return [_present(s, a) for a in rows]
+    return [_present(s, a, erased=erased) for a in rows]
 
 
 @staff_api.route("GET", "/leads/<lead_id>/portal-access", permission="portal.access.view", write=False,
@@ -196,7 +201,11 @@ def revoke(req: Req, access_id: str):
     a = req.session.get(PortalAccess, access_id)
     if a is None or a.is_deleted:
         raise not_found()
-    lead_scope.require_lead(req.session, req.ctx, a.lead_id, "portal.access.revoke", write=False)
+    # Within the lead's scope, even while the lead is soft-deleted (its access would otherwise return on restore).
+    scope = req.ctx.scope("portal.access.revoke")
+    owned = req.session.execute(lead_scope.owned_lead_ids(req.ctx.user.id).where(Lead.id == a.lead_id)).first()
+    if scope is None or (scope == "OWN" and owned is None):
+        raise not_found()
     check_version(req.if_match, a.version)
     identity.revoke(req.session, req.ctx, a)
     req.session.flush()
