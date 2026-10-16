@@ -50,8 +50,11 @@ from .models import (
 TERMINAL = ("ACCEPTED", "REJECTED", "EXPIRED", "SUPERSEDED")
 # Modules told, in the decision's transaction, that a quotation was accepted; named by dotted path and imported when
 # called, so this module depends on none of them (the project lifecycle records an accepted variation as the project's
-# next effective baseline).
-ACCEPTANCE_HOOKS: tuple[str, ...] = ("veda.modules.project.baseline:on_quotation_accepted",)
+# next effective baseline; project commercials record it as the commercial record's next baseline).
+ACCEPTANCE_HOOKS: tuple[str, ...] = (
+    "veda.modules.project.baseline:on_quotation_accepted",
+    "veda.modules.commercials.baseline:on_quotation_accepted",
+)
 FINISH_TEXT = {"LAMINATE": "Laminate finish", "ACRYLIC": "Acrylic finish", "VENEER": "Veneer finish",
                "PU": "PU finish", "GLASS": "Glass finish", "MEMBRANE": "Membrane finish", "CUSTOM": "Custom finish"}  # fmt: skip
 

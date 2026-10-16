@@ -15,7 +15,9 @@ Nothing here invents information. Each value comes from the module that owns it:
 - commitments, responsibilities and contacts: the Customer Promise information frozen in that issued quotation;
 - progress after approval: the Project Lifecycle, only while its own flag is on and a project exists, through the
   classification allow-list (stage, its Customer Promise stage, customer actions). Otherwise those steps are "not yet
-  available"; the portal never reads, sets or bypasses that flag.
+  available"; the portal never reads, sets or bypasses that flag;
+- payments, invoices and receipts: Project Commercials' customer projection (``commercials.customer``), only while its
+  own flag is on and the property has a commercial record; its Action Required items join this page's.
 
 Estimates, BOQs, rates, margins, staff notes, internal states and staff identities beyond the assigned consultant's
 name are never read into a customer view. The only digest a customer sees is the one the CQX projection itself carries
@@ -390,12 +392,20 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
     project = _project(s, prop)
     steps = journey(s, lead, prop, rows, project, proposal)
     attention = _attention(s, rows, relevant, project, steps, lead, proposal)
+    from veda.modules.commercials import customer as commercials
+
+    money = commercials.for_property(s, prop)
+    if money and money.get("available"):
+        attention = money["attention"] + attention
     out: dict[str, Any] = {
         "id": prop.id, "property": _property_brief(prop), "enquiry": {"reference": lead.public_reference},
         "headline": _headline(lead, steps), "next_step": _next_step(steps),
         "attention_count": sum(1 for a in attention if a["status"] == V.ACTION_REQUIRED),
         "quotation": relevant, "contact": contact(s, lead, proposal),
         "project_tracking": project is not None,
+        "payments": ({"available": True, "outstanding": money["summary"]["outstanding"],
+                      "next_payment": money["summary"]["next_payment"]} if money and money.get("available")
+                     else ({"available": False} if money else None)),
     }  # fmt: skip
     if not full:
         return out
@@ -422,7 +432,11 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
         if proposal else None,
         "support": {"contacts": (info.get("contacts") or {}).get("support") or [],
                     "escalation": info.get("support_escalation")} if proposal else None,
+        "commercials": ({k: v for k, v in money.items() if k != "attention"} if money else None),
     })  # fmt: skip
+    if money and money.get("available"):
+        out["documents"] = ([{"kind": "INVOICE", **i} for i in money["invoices"]]
+                            + [{"kind": "RECEIPT", **r} for r in money["receipts"]] + out["documents"])  # fmt: skip
     return out
 
 

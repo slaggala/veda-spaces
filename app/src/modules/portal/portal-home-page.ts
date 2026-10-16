@@ -68,6 +68,11 @@ export class VsPortalHomePage extends LitElement {
         <div><dt>Status</dt><dd>${stateBadge(p.quotation.status, p.quotation.status_label)}</dd></div>
         ${p.quotation.total ? html`<div><dt>Total</dt><dd>${p.quotation.total}</dd></div>` : nothing}
       </dl>` : nothing}
+      ${p.payments?.available && p.payments.outstanding ? html`<dl class="facts">
+        <div><dt>Outstanding</dt><dd>₹ ${p.payments.outstanding}</dd></div>
+        ${p.payments.next_payment ? html`<div><dt>Next payment</dt><dd>${p.payments.next_payment.label}, ₹ ${p.payments.next_payment.amount}
+          ${stateBadge(p.payments.next_payment.state, p.payments.next_payment.state_label)}</dd></div>` : nothing}
+      </dl>` : nothing}
       ${p.contact?.name ? html`<p class="muted">Your Veda Spaces contact: ${p.contact.name}${p.contact.role ? `, ${p.contact.role}` : ''}</p>` : nothing}
       <a class="btn primary" href="/portal/properties/${p.id}">Open your project<span class="sr-only">: ${title}</span></a>
     </article>`;

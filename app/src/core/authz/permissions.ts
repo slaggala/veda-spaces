@@ -55,7 +55,8 @@ export interface NavItem {
   mobile?: boolean;
 }
 
-export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin' | 'project_lifecycle' | 'customer_portal';
+export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin' | 'project_lifecycle' | 'customer_portal'
+  | 'project_commercials';
 export type FeatureMap = Partial<Record<FeatureCode, boolean>>;
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -65,6 +66,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/site', label: 'Site visits', icon: 'calendar', group: 'main', anyOf: ['measurement.visit.read', 'property.read'], feature: 'mtq_site', mobile: true },
   // Operations › Projects (PLB-10): behind VEDA_PROJECT_LIFECYCLE_ENABLED and project.view.
   { path: '/projects', label: 'Projects', icon: 'list', group: 'main', anyOf: ['project.view'], feature: 'project_lifecycle', mobile: true },
+  // Commercial › Payments (PCM): behind VEDA_PROJECT_COMMERCIALS_ENABLED and commercials.view.
+  { path: '/commercials', label: 'Payments', icon: 'list', group: 'main', anyOf: ['commercials.view'], feature: 'project_commercials' },
   { path: '/approvals', label: 'Approvals', icon: 'check', group: 'admin', anyOf: ['user.mfa.reset', 'user.email.change', 'user.founder.manage'] },
   { path: '/admin/users', label: 'Users', icon: 'user', group: 'admin', anyOf: ['user.read'] },
   { path: '/admin/roles', label: 'Roles', icon: 'shield', group: 'admin', anyOf: ['role.read'] },

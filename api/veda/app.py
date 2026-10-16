@@ -26,6 +26,8 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.attachments.routes import api as attachments_api
     from veda.modules.catalog.routes import api as catalog_api
     from veda.modules.catalog.routes import public_api as catalog_public_api
+    from veda.modules.commercials import events as _commercial_events  # noqa: F401  (registers the email handlers)
+    from veda.modules.commercials.routes import api as commercials_api
     from veda.modules.crm.leads import events as _lead_events  # noqa: F401  (registers handlers/resolvers)
     from veda.modules.crm.leads.routes import api as leads_api
     from veda.modules.customer_promise.routes import api as customer_promise_api
@@ -73,6 +75,7 @@ def _register_modules(app: Flask) -> None:
         project_api,
         portal_customer_api,
         portal_staff_api,
+        commercials_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -144,6 +147,10 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ("GET", "/api/v1/public/portal/home"),
             ("GET", "/api/v1/public/portal/properties/<property_id>"),
             ("GET", "/api/v1/public/portal/quotations/<quotation_id>"),
+            # Project Commercials (decision log 44): the customer's invoices and receipts, through the same session and
+            # access rows; 404 unless VEDA_PROJECT_COMMERCIALS_ENABLED is also on.
+            ("GET", "/api/v1/public/portal/invoices/<invoice_id>"),
+            ("GET", "/api/v1/public/portal/receipts/<receipt_id>"),
         }
     ),
     "RBX-006": frozenset(

@@ -1,0 +1,17 @@
+{% extends "_layout.v1.jinja" %}
+{% block subject %}{% if kind == "invoice" %}A new invoice is in your Veda Spaces project portal{% else %}Your payment receipt is in your Veda Spaces project portal{% endif %}{% endblock %}
+{% block headline %}{% if kind == "invoice" %}A new invoice for your project{% else %}We have recorded your payment{% endif %}{% endblock %}
+{% block text %}
+Hello {{ name }},
+
+{% if kind == "invoice" %}Veda Spaces has issued invoice {{ number }} for your project. You can see it, with what is due and when, in your project portal.
+{% else %}Veda Spaces has recorded a payment for your project. Receipt {{ number }} is in your project portal.
+{% endif %}
+Open your project portal:
+{{ link }}
+
+This email never asks you to pay and never contains payment details. If anything about a payment request looks unusual, speak to your Veda Spaces contact before paying.
+{% endblock %}
+{% block content %}
+<p>Hello {{ name }},</p>{% if kind == "invoice" %}<p>Veda Spaces has issued invoice {{ number }} for your project. You can see it, with what is due and when, in your project portal.</p>{% else %}<p>Veda Spaces has recorded a payment for your project. Receipt {{ number }} is in your project portal.</p>{% endif %}<p style="margin:24px 0"><a href="{{ link }}" style="background:#7A4E2E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:2px;display:inline-block;font-weight:600">Open your project portal</a></p><p style="color:#5D574F;font-size:13px">This email never asks you to pay and never contains payment details. If anything about a payment request looks unusual, speak to your Veda Spaces contact before paying.</p>
+{% endblock %}

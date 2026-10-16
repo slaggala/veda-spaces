@@ -104,6 +104,7 @@ def me_payload(s: Session, ctx) -> dict:
             "customer_promise_admin": bool(settings().customer_promise_admin_enabled),
             "project_lifecycle": bool(settings().project_lifecycle_enabled),
             "customer_portal": bool(settings().customer_portal_enabled),
+            "project_commercials": bool(settings().project_commercials_enabled),
         },
         "version": user.version,
     }

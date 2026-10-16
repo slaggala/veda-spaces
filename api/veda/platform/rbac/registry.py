@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from veda.modules.attachments import permissions as attachment_permissions
 from veda.modules.catalog import permissions as catalog_permissions
+from veda.modules.commercials import permissions as commercials_permissions
 from veda.modules.crm.leads import permissions as lead_permissions
 from veda.modules.customer_promise import permissions as promise_permissions
 from veda.modules.customer_proposal import permissions as proposal_permissions
@@ -264,6 +265,7 @@ def _entries() -> tuple[RegistryEntry, ...]:
         ("customer_promise", promise_permissions.PERMISSIONS),
         ("project", project_permissions.PERMISSIONS),
         ("portal", portal_permissions.PERMISSIONS),
+        ("commercials", commercials_permissions.PERMISSIONS),
     ):
         for d in defs:
             resource, _, action = d.code.partition(".")
@@ -285,6 +287,7 @@ MATRIX: dict[str, dict[str, str]] = {
     **promise_permissions.MATRIX,
     **project_permissions.MATRIX,
     **portal_permissions.MATRIX,
+    **commercials_permissions.MATRIX,
 }
 
 SENSITIVE_CODES = frozenset(e.code for e in REGISTRY if e.definition.is_sensitive)

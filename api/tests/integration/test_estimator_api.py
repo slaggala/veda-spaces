@@ -417,7 +417,8 @@ def test_no_route_exposes_a_rate_card(app):
     # ADR-013 adds the catalog estimator's four flagged routes (RBX-008); none of them carries a rate. CQX adds the
     # customer proposal's flagged routes (RBX-009): the customer-safe projection, never a rate (test_cqx_projection).
     # The Customer Project Portal adds its flagged routes (RBX-010): sign-in and the customer-authorised projection,
-    # which reads issued quotations only through the CQX projection (test_portal_views: no internal field).
+    # which reads issued quotations only through the CQX projection (test_portal_views: no internal field). Project
+    # Commercials adds the customer's invoices and receipts to it (RBX-010; test_commercials_portal: no internal field).
     assert public == [
         "/api/v1/public/catalog",
         "/api/v1/public/catalog/estimates",
@@ -427,8 +428,10 @@ def test_no_route_exposes_a_rate_card(app):
         "/api/v1/public/estimates",
         "/api/v1/public/leads",
         "/api/v1/public/portal/home",
+        "/api/v1/public/portal/invoices/<invoice_id>",
         "/api/v1/public/portal/properties/<property_id>",
         "/api/v1/public/portal/quotations/<quotation_id>",
+        "/api/v1/public/portal/receipts/<receipt_id>",
         "/api/v1/public/portal/session",
         "/api/v1/public/portal/sign-in",
         "/api/v1/public/portal/sign-out",
