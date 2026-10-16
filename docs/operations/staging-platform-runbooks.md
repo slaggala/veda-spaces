@@ -299,8 +299,12 @@ the page or bundle, rewrites the CSP `connect-src` to it, and **refuses**:
        all origins": credentials need explicit origins).
      - Methods: `GET, POST, PUT, PATCH, DELETE` (OPTIONS is not in the list: it is the preflight itself).
      - Headers: `Content-Type, Idempotency-Key, If-Match, X-Request-ID, X-Requested-With, Authorization,
-       X-Veda-Client` (the estimator wizard's browser token; without it the browser refuses the estimate request and
-       the wizard says "You appear to be offline").
+       X-Veda-Client, X-Veda-Proposal, X-Veda-Portal`: the same list the API answers in its own preflight
+       (`veda/app.py`). `X-Veda-Client` is the estimator wizard's browser token; without it the browser refuses the
+       estimate request and the wizard says "You appear to be offline". `X-Veda-Proposal` carries a customer
+       quotation link's token (CQX) and `X-Veda-Portal` a customer portal session (Customer Project Portal); without
+       them the browser refuses those calls as a CORS error before they reach the API, and the portal says "We could
+       not load your portal" right after a successful sign-in. A new header in the API's list must be added here too.
      - **Bypass options requests to origin: off.** Access answers the preflight itself; `cloudflared` would refuse an
        `OPTIONS` without an Access token.
    - **The browser needs the API host's own Access cookie.** After signing in, open
