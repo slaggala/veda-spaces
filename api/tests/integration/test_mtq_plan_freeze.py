@@ -15,12 +15,12 @@ import sqlalchemy as sa
 
 from tests.support.api import ApiClient
 from tests.support.mtq import Site
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.modules.mtq import sets
 from veda.modules.mtq.models import MeasurementSet, Property, PropertySpace
 
 ON = pytest.mark.settings(mtq_site_enabled=True)
-PAUSE = 2.0  # seconds the paused writer waits for the submit (on SQLite the submit waits on the writer's lock instead)
 
 
 def _submitted(api, factory) -> Site:
@@ -160,14 +160,13 @@ def _race(app, api, factory, monkeypatch, kind: str):
     sales.token = factory.login(api, site.sales)
     version = api.get(f"/api/v1/measurement-sets/{set_id}").data["version"]
     kitchen = sales.get(f"/api/v1/properties/{site.property['id']}/spaces").data[0]
-    paused, submitted = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = P.lock_plan
 
     def pause_then_lock(*a, **kw):
-        if threading.current_thread() is threads.get("writer") and not paused.is_set():
-            paused.set()
-            submitted.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("writer") and not hold.reached.is_set():
+            hold.wait()
         return original(*a, **kw)
 
     monkeypatch.setattr(P, "lock_plan", pause_then_lock)
@@ -182,15 +181,16 @@ def _race(app, api, factory, monkeypatch, kind: str):
                                        if_match=kitchen["version"])  # fmt: skip
 
     def submit():
-        assert paused.wait(timeout=10), "the plan writer never reached its pause"
+        assert hold.reached.wait(timeout=10), "the plan writer never reached its pause"
         out["submit"] = surveyor.post(f"/api/v1/measurement-sets/{set_id}/submit", if_match=version)
-        submitted.set()
+        hold.done()
 
     threads["writer"], threads["submitter"] = threading.Thread(target=write), threading.Thread(target=submit)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["writer"], other=threads["submitter"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     return site, out
 
 

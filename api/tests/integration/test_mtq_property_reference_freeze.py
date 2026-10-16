@@ -14,12 +14,12 @@ import pytest
 
 from tests.support.api import ApiClient
 from tests.support.mtq import Site
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.modules.mtq import sets
 from veda.modules.mtq.models import MeasurementSet, Property
 
 ON = pytest.mark.settings(mtq_site_enabled=True)
-PAUSE = 2.0
 FAR_OFF = 1000_00  # sq ft (centi): far outside ±25 % of the Site's measured total
 
 
@@ -117,14 +117,13 @@ def test_a_stated_area_patch_racing_submit_lands_before_it_or_is_refused(app, ap
     sales.token = factory.login(api, site.sales)
     set_version = api.get(f"/api/v1/measurement-sets/{set_id}").data["version"]
     prop = sales.get(f"/api/v1/properties/{site.property['id']}").data
-    paused, submitted = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = sets.lock_property
 
     def pause_then_lock(*a, **kw):
-        if threading.current_thread() is threads.get("writer") and not paused.is_set():
-            paused.set()
-            submitted.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("writer") and not hold.reached.is_set():
+            hold.wait()
         return original(*a, **kw)
 
     monkeypatch.setattr(sets, "lock_property", pause_then_lock)
@@ -135,15 +134,16 @@ def test_a_stated_area_patch_racing_submit_lands_before_it_or_is_refused(app, ap
                                    if_match=prop["version"])  # fmt: skip
 
     def submit():
-        assert paused.wait(timeout=10), "the PATCH never reached its pause"
+        assert hold.reached.wait(timeout=10), "the PATCH never reached its pause"
         out["submit"] = surveyor.post(f"/api/v1/measurement-sets/{set_id}/submit", if_match=set_version)
-        submitted.set()
+        hold.done()
 
     threads["writer"], threads["submitter"] = threading.Thread(target=write), threading.Thread(target=submit)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["writer"], other=threads["submitter"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     assert set(out) == {"write", "submit"} and all(r.status != 500 for r in out.values()), out
     assert out["submit"].status == 200, out["submit"]
     with db.unit_of_work(write=False) as s:
