@@ -151,6 +151,7 @@ def withdraw(s: Session, ctx, p: Project, d: ProjectCustomerDocument, reason: st
 def staff_view(s: Session, ctx, p: Project, people) -> dict[str, Any]:
     """The staff list (with history) and, for a publisher, the attachments that could be published."""
     from veda.modules.attachments import service as att
+    from veda.modules.attachments.models import Attachment
 
     out = []
     for d in rows(s, p):
@@ -165,9 +166,9 @@ def staff_view(s: Session, ctx, p: Project, people) -> dict[str, Any]:
     can = access.can(s, ctx, p, CODE)
     options: list[dict[str, Any]] = []
     if can:
-        options = [{"id": a.id, "category": a.category_code, "attached_to": a.entity_type,
-                    "uploaded_on": clock.to_rfc3339(a.created_on)}
-                   for a in s.execute(_options_query(p)).scalars() if att.is_available(a)]  # fmt: skip
+        found: list[Attachment] = list(s.execute(_options_query(p)).scalars())
+        options = [{"id": x.id, "category": x.category_code, "attached_to": x.entity_type,
+                    "uploaded_on": clock.to_rfc3339(x.created_on)} for x in found if att.is_available(x)]  # fmt: skip
     return {"documents": out, "can_publish": can, "options": options,
             "classes": [{"code": k, "label": v} for k, v in V.CUSTOMER_DOCUMENT_CLASSES.items()]}  # fmt: skip
 
