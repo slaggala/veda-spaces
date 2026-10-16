@@ -109,8 +109,18 @@ A fresh reviewer certified the branch with one merge condition. The findings and
 | F7: access on a soft-deleted lead could not be revoked (it would return on restore) | Fixed. Revocation works within scope while the lead is soft-deleted. Tested. |
 | Missing test: a link redeemed twice at once | Added on both engines (one session, one refusal). |
 | Re-review N1 (Medium, merge condition): the F1 fix renamed a surviving shared account to the name of another enquiry it held, possibly someone else's | Fixed. The account records which enquiry its name was copied from (`name_source_lead_id`; null when staff chose the name). Only an account named from the erased enquiry is renamed: to the name of an enquiry it holds as primary customer, else the neutral "Customer". A chosen name is never touched. Tested. |
+| Final review (Low): rotating `VEDA_EMAIL_HASH_HMAC_KEY` would silently stop sign-in emails for existing accounts | Fixed. `python -m veda.cli portal-rehash-emails` recomputes every account's lookup hash from its stored address (idempotent). Run it right after a rotation; see "Operations". Tested. |
+| Final review (Low): the daily-cap test checked the email count loosely | Fixed. Exact again: the worker decides requests in order, and superseded links are never emailed. |
+| Final review (Low, accepted): the outbox holds a keyed hash of every requested address, including ones with no account | Accepted. It is not reversible without the key, is bounded by the rate limits, and follows the security-event practice. |
 | Final review nit: a fully erased account kept a pointer to the erased enquiry its name came from | Fixed. Erasure clears it, and replaces the email hash with the hash of the placeholder address. |
 | Re-review N2: the enquiry's own consultant (OWN scope) still could not revoke on a soft-deleted lead | Fixed. The scope check sees soft-deleted leads. Tested with the consultant. |
+
+## Operations
+
+- **Rotating `VEDA_EMAIL_HASH_HMAC_KEY`:** run `python -m veda.cli portal-rehash-emails` once the new key is deployed.
+  Until then, sign-in requests for existing portal accounts still answer 202, but no email is sent.
+- **The outbox worker** sends every sign-in email and also decides each sign-in request. If it is down, customers get
+  no email until it recovers. Nothing is lost: requests and links wait in the outbox.
 
 ## Found during this work (outside this change)
 

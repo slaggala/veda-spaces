@@ -214,7 +214,9 @@ def test_sign_in_links_are_capped_per_account_per_day_from_any_network(api, fact
     for _ in range(4):
         r = api.post(f"{PUBLIC}/sign-in", {"email": "capped@example.test"}, anonymous=True)
         assert r.status == 202  # the answer never changes
-    assert t.emails_to("capped@example.test") >= 2  # drains the worker, which decides each request in order
+    # The worker decides the requests in order, then sends their link emails; each link superseded the one before,
+    # so only the newest is emailed: the invitation plus one sign-in link.
+    assert t.emails_to("capped@example.test") == 2
     links = dbh.rows(sa.select(PortalSignIn).where(PortalSignIn.purpose == "SIGN_IN"))
     assert len(links) == 2  # capped at two, from four requests
 
@@ -307,3 +309,23 @@ def test_a_sign_in_request_does_the_same_work_whether_or_not_the_email_has_acces
     assert all(set(e.payload) <= {"email_hash", "request_id"} and len(e.payload["email_hash"]) == 64 for e in new)
     assert "known2@example.test" not in str([e.payload for e in new]) and "nobody" not in str([e.payload for e in new])
     assert dbh.rows(sa.select(PortalSignIn).where(PortalSignIn.purpose == "SIGN_IN")) == []  # nothing issued yet
+
+
+def test_after_the_email_hash_key_is_rotated_the_rehash_command_restores_sign_in(api, factory, monkeypatch):
+    """Final review: rotating VEDA_EMAIL_HASH_HMAC_KEY orphans the lookup hashes; portal-rehash-emails restores them."""
+    from veda.cli.main import main
+    from veda.config import settings
+
+    t = Portal(api, factory)
+    prop, _, _ = t.issued()
+    t.grant(prop["lead_id"], "rotate@example.test")
+    t.link_token("rotate@example.test")
+    monkeypatch.setattr(identity, "RESEND_GAP", timedelta(0))
+    monkeypatch.setattr(settings(), "email_hash_hmac_key", b"rotated-synthetic-key-0123456789abcdef")
+    api.post(f"{PUBLIC}/sign-in", {"email": "rotate@example.test"}, anonymous=True)
+    assert t.emails_to("rotate@example.test") == 1  # the stored hash no longer matches: nothing is sent
+    assert main(["portal-rehash-emails"]) == 0
+    api.post(f"{PUBLIC}/sign-in", {"email": "rotate@example.test"}, anonymous=True)
+    assert t.emails_to("rotate@example.test") == 2
+    with actor(system_context("SYSTEM_JOB")), db.unit_of_work(write=True) as s:
+        assert identity.rehash_emails(s) == 0  # idempotent

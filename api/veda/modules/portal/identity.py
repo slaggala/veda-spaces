@@ -184,6 +184,20 @@ def email_hash(email: str) -> str:
     return email_attempt_hash(normalize_email(email or ""))
 
 
+def rehash_emails(s: Session) -> int:
+    """Recompute every account's ``email_hash`` from its stored address, after VEDA_EMAIL_HASH_HMAC_KEY is rotated
+    (``python -m veda.cli portal-rehash-emails``). Without it, sign-in requests for existing accounts find nothing:
+    the request still answers 202 and no email is sent. Idempotent; returns the number of accounts changed."""
+    changed = 0
+    for account in s.execute(sa.select(PortalAccount).execution_options(include_deleted=True)).scalars():
+        fresh = email_hash(account.email_normalized)
+        if account.email_hash != fresh:
+            account.email_hash = fresh
+            changed += 1
+    s.flush()
+    return changed
+
+
 def request_sign_in(s: Session, email: str) -> None:
     """Queue the request, and nothing else: one keyed hash and one outbox row, the same work for every address, so
     neither the answer nor its timing says whether the email has access (review F3). The outbox carries the hash, never
