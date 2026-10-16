@@ -47,8 +47,8 @@ Customer (RBX-010, portal session): `GET /public/portal/invoices/{id}`, `GET /pu
 
 ## RBAC
 
-FOUNDER and SALES_MANAGER: all six codes (SALES_MANAGER already releases the quotations these records start from and
-is the only working role with mandatory MFA). No other role holds any. A consultant or an accounts person is granted a
+Since PCM-D01 (decision log 45, migration `0211_accountant_role`): ACCOUNTANT (MFA) and FOUNDER hold all six codes;
+SALES_MANAGER holds `commercials.view` only. No other role holds any. A consultant or an accounts person is granted a
 code individually at OWN or ALL scope. Reversal is never by the recorder.
 
 ## Concurrency and idempotency

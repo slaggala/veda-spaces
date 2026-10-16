@@ -17,7 +17,10 @@ Nothing here invents information. Each value comes from the module that owns it:
   classification allow-list (stage, its Customer Promise stage, customer actions). Otherwise those steps are "not yet
   available"; the portal never reads, sets or bypasses that flag;
 - payments, invoices and receipts: Project Commercials' customer projection (``commercials.customer``), only while its
-  own flag is on and the property has a commercial record; its Action Required items join this page's.
+  own flag is on and the property has a commercial record; its Action Required items join this page's;
+- delivery (work, quality checks, snags, the customer's own reports, handover): the Project Lifecycle's customer-safe
+  delivery view (``project.delivery``), only while VEDA_PROJECT_DELIVERY_PORTAL_ENABLED and the lifecycle's flag are
+  on; a handover summary waiting for the customer joins Action Required.
 
 Estimates, BOQs, rates, margins, staff notes, internal states and staff identities beyond the assigned consultant's
 name are never read into a customer view. The only digest a customer sees is the one the CQX projection itself carries
@@ -397,6 +400,16 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
     money = commercials.for_property(s, prop)
     if money and money.get("available"):
         attention = money["attention"] + attention
+    from veda.modules.project import delivery as project_delivery
+
+    delivery = project_delivery.view(s, account_id, prop.id)
+    for dp in (delivery or {}).get("projects", []):
+        pkg = dp.get("package") or {}
+        if pkg.get("can_acknowledge"):
+            attention = [{"kind": "HANDOVER_ACKNOWLEDGEMENT", "status": V.ACTION_REQUIRED,
+                          "title": "Review your handover summary", "text": "Veda Spaces has prepared the summary of "
+                          "what is being handed over. Please review it and confirm you have received it.",
+                          "due": None}] + attention  # fmt: skip
     out: dict[str, Any] = {
         "id": prop.id, "property": _property_brief(prop), "enquiry": {"reference": lead.public_reference},
         "headline": _headline(lead, steps), "next_step": _next_step(steps),
@@ -433,6 +446,7 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
         "support": {"contacts": (info.get("contacts") or {}).get("support") or [],
                     "escalation": info.get("support_escalation")} if proposal else None,
         "commercials": ({k: v for k, v in money.items() if k != "attention"} if money else None),
+        "delivery": delivery,
     })  # fmt: skip
     if money and money.get("available"):
         out["documents"] = ([{"kind": "INVOICE", **i} for i in money["invoices"]]
@@ -450,8 +464,11 @@ def home(s: Session, account) -> dict[str, Any]:
             "closed": lead.status == "LOST",
             "properties": [property_view(s, account.id, p, lead, full=False) for p in props],
         })  # fmt: skip
+    from veda.modules.project import delivery as project_delivery
+
     return {"customer": {"name": account.display_name}, "enquiries": enquiries,
-            "project_tracking_available": bool(settings().project_lifecycle_enabled)}  # fmt: skip
+            "project_tracking_available": bool(settings().project_lifecycle_enabled),
+            "delivery_available": project_delivery.enabled()}  # fmt: skip
 
 
 def quotation_page(s: Session, q: Quotation) -> dict[str, Any]:

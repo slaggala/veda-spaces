@@ -1,4 +1,4 @@
-import type { AccessRow, Commercials, Home, PropertyCard, PropertyView, QuotationPage, QuotationSummary, Step } from '../../src/modules/portal/api.js';
+import type { AccessRow, Commercials, DeliveryProject, Home, PropertyCard, PropertyView, QuotationPage, QuotationSummary, Step } from '../../src/modules/portal/api.js';
 import { samplePage } from './proposal-sample.js';
 
 /** SYNTHETIC portal models (not Veda Spaces content), shaped exactly as the API returns them. */
@@ -48,8 +48,27 @@ export function view(over: Partial<PropertyView> = {}): PropertyView {
       care: null, next_steps: [{ code: 'N1', stage: 'VEDA_CONFIRMATION', label: 'Confirmation', text: 'We confirm your order.', duration: '2 days' }],
       payment_schedule: [{ label: 'Booking', share: '10%', trigger: 'On acceptance' }], payment_safety: 'Pay only to the Veda Spaces account.' },
     responsibilities: { client: [{ code: 'C1', text: 'Society permission for work hours' }], site_readiness: [{ code: 'R1', text: 'Flooring complete' }] },
-    support: { contacts: [], escalation: null }, commercials: null,
+    support: { contacts: [], escalation: null }, commercials: null, delivery: null,
     ...over,
+  };
+}
+
+/** A SYNTHETIC delivery view (PEX), shaped as ``project.delivery.project_view`` returns it. */
+export function deliveryProject(over: Partial<DeliveryProject> = {}): DeliveryProject {
+  return {
+    id: 'pj1', status: 'ACTIVE', phase: { code: 'INSTALLATION', label: 'Installing your interiors' },
+    work: { items: [
+      { label: 'Kitchen cabinets with a long SYNTHETIC name for the tall units and the loft above the fridge', state: 'COMPLETED', detail: 'Completed', completed_on: '2026-10-14' },
+      { label: 'Wardrobes', state: 'BLOCKED', detail: 'On hold', completed_on: null },
+      { label: 'Lofts', state: 'ACTION_REQUIRED', detail: 'Waiting for something from you', completed_on: null },
+      { label: 'TV unit', state: 'UPCOMING', detail: 'Not started yet', completed_on: null }],
+      counts: { COMPLETED: 1, IN_PROGRESS: 0, ACTION_REQUIRED: 1, BLOCKED: 1, UPCOMING: 1 } },
+    paused: [{ text: 'We are waiting for a material delivery', state: 'BLOCKED', who: 'VEDA_SPACES' }],
+    next_date: null, quality: { checks_passed: 3, being_corrected: 1 },
+    snags: [{ number: 1, title: 'Touch-up on the skirting', status: 'Being fixed', state: 'IN_PROGRESS' }],
+    reports: [], can_report: false,
+    handover: { state: 'UPCOMING', label: 'Not ready for handover yet', date: null, remaining: [{ label: 'Work still to finish', count: 3 }] },
+    package: null, ...over,
   };
 }
 

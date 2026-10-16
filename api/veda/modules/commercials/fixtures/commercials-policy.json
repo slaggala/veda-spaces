@@ -1,8 +1,8 @@
 {
   "schema": "veda.commercials.policy/1",
   "version": "PCM-POLICY-0",
-  "status": "UNDECIDED",
-  "note": "No Project Commercials owner decision is recorded. PCM-D01 (invoice issuer particulars) is null: invoices can be drafted and previewed but not issued. See docs/implementation/project-commercials/PCM-owner-decisions.md.",
+  "status": "PARTICULARS_NOT_CONFIGURED",
+  "note": "PCM-D01 decided 2026-10-16 (decision log 45): invoice particulars come from this business configuration. None is configured yet: the issuer's legal name and address (and the GSTIN and SAC code where they apply) have not been supplied, so invoices can be drafted and previewed but issuing fails closed. See docs/implementation/project-commercials/PCM-owner-decisions.md.",
   "decisions": {
     "PCM-D01": null
   }

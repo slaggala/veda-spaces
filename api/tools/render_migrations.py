@@ -96,6 +96,12 @@ REVISIONS: dict[str, list[str]] = {
         "commercial_invoice",
         "commercial_event",
     ],
+    "0212_project_execution": [
+        "project_work_package",
+        "project_qc_point",
+        "project_customer_report",
+        "project_handover_package",
+    ],
     "0209_customer_portal": ["portal_account", "portal_access", "portal_sign_in", "portal_session", "portal_event"],
     "0208_project_lifecycle": [
         "project",
@@ -140,6 +146,22 @@ DEFERRED_COLUMNS = {
     "catalog_configuration": {"idempotency_key", "request_fingerprint"},
     # 0206_customer_completeness adds staff's per-version customer information choices to quotation.
     "quotation": {"customer_inputs"},
+    # 0212_project_execution extends four 0208 tables (PEX): work-package links, snag triage and verification, the
+    # blocker's customer summary and the handover's package binding.
+    "project_snag": {
+        "work_package_id",
+        "source",
+        "priority",
+        "customer_visible",
+        "fixed_by",
+        "fixed_on",
+        "fix_note",
+        "resolution_evidence_attachment_id",
+        "closure_code",
+    },
+    "project_qc_check": {"qc_point_id", "work_package_id"},
+    "project_blocker": {"related_work_package_id", "customer_summary"},
+    "project_transition": {"handover_package_id", "handover_package_sha256"},
 }
 
 

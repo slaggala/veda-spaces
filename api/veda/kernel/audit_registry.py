@@ -306,7 +306,7 @@ register(
         "project_blocker",
         FULL,
         parent=("project", "project_id"),
-        pii=frozenset({"title", "description", "customer_action", "resolution"}),
+        pii=frozenset({"title", "description", "customer_action", "resolution", "customer_summary"}),
     )
 )
 register(
@@ -327,11 +327,30 @@ register(
                 "resolution_note",
                 "classification_reason",
                 "evidence_reference",
+                "fix_note",
             }
         ),
     )
 )
 register(AuditPolicy("project_event", FULL, parent=("project", "project_id")))
+# --- Project execution (0212, PEX): FULL, linked to the project. Personal data: staff free text and the customer's own
+# words in a report, erased with the lead; the handover package's content (customer labels and titles) is redacted.
+register(
+    AuditPolicy(
+        "project_work_package",
+        FULL,
+        parent=("project", "project_id"),
+        pii=frozenset({"title", "description", "customer_label", "completion_note", "reopen_reason", "cancel_reason",
+                       "evidence_reference", "replan_reason"}),
+    )
+)  # fmt: skip
+register(AuditPolicy("project_qc_point", FULL, parent=("project", "project_id"),
+                     pii=frozenset({"label", "withdrawn_reason"})))  # fmt: skip
+register(AuditPolicy("project_customer_report", FULL, parent=("project", "project_id"),
+                     pii=frozenset({"description", "area", "response"})))  # fmt: skip
+register(
+    AuditPolicy("project_handover_package", FULL, parent=("project", "project_id"), excluded=frozenset({"content"}))
+)
 # --- Customer Project Portal (0209): FULL. Personal data: the account's email and name (erased with the account when
 # its last enquiry is erased). Session and sign-in rows hold digests only, never a token; events hold codes and ids.
 register(AuditPolicy("portal_account", FULL, pii=frozenset({"email_normalized", "email_hash", "display_name"})))

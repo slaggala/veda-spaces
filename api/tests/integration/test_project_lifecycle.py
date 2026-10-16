@@ -251,8 +251,15 @@ def test_a_high_risk_move_waits_for_an_independent_approval_and_is_re_evaluated(
     )
     snag = t.get(p)["snags"][0]
     surl = f"{BASE}/{p['id']}/snags/{snag['id']}"
-    for status, note in (("CLOSED", "Logged twice by mistake"),):
-        ok(t.as_(t.ops).post(f"{surl}/status", {"status": status, "note": note}, if_match=snag["version"]))
+    # closing a snag without a fix is a verification: a reason code, a note, and the verify capability (PEX)
+    r = t.as_(t.ops).post(f"{surl}/status", {"status": "CLOSED", "note": "Logged twice by mistake"},
+                          if_match=snag["version"])  # fmt: skip
+    assert r.status == 403
+    r = t.as_(t.quality).post(f"{surl}/status", {"status": "CLOSED", "note": "Logged twice by mistake"},
+                              if_match=snag["version"])  # fmt: skip
+    assert r.status == 422 and r.json["errors"][0]["field"] == "closure_code"
+    ok(t.as_(t.quality).post(f"{surl}/status", {"status": "CLOSED", "note": "Logged twice by mistake",
+                                                "closure_code": "DUPLICATE"}, if_match=snag["version"]))  # fmt: skip
     r = ok(t.as_(t.approver).post(f"{url}/approve", {"reason": "Checked on site"}, if_match=tr["version"]))
     assert r["outcome"] == "COMPLETED" and r["project"]["stage"]["code"] == "READY_FOR_HANDOVER"
     assert r["transition"]["decided_by"]["id"] == t.approver.id and r["transition"]["requested_by"]["id"] == t.ops.id

@@ -1,11 +1,15 @@
-"""The owner's Project Commercials decisions, as one versioned record (register PCM-D01; PCM-D02, staging enablement,
-is a deployment record, not a policy slot).
+"""Veda Spaces' Project Commercials business configuration, as one versioned, reviewed record
+(``fixtures/commercials-policy.json``).
 
-``fixtures/commercials-policy.json`` holds a slot per decision; a null slot never becomes a default:
+Owner decision PCM-D01 (2026-10-16, decision log 45) settled two things: the ACCOUNTANT role operates commercials
+(``permissions.py``), and invoice particulars come from this authoritative business configuration, never from code
+defaults or a person's entry. The slot keeps its register code:
 
-| Slot | What it governs | While null |
+| Slot | What it holds | While null |
 |---|---|---|
-| PCM-D01 | Invoice issuer particulars: whether an invoice is a GST tax invoice, the issuer's legal name, address, GSTIN, the SAC code and the invoice series | Invoices can be drafted and previewed; issuing one is refused (OWNER_DECISION_REQUIRED). Schedules, payments, receipts and the portal are unaffected |
+| PCM-D01 | Invoice issuer particulars: the issuer's legal name and address, the GSTIN and SAC code where they apply, the footer | Invoices can be drafted and previewed; issuing one fails closed (INVOICE_PARTICULARS_NOT_CONFIGURED). Schedules, payments, receipts and the portal are unaffected |
+
+No particulars are configured: the repository holds no legal entity, address or GSTIN, and none is invented.
 
 Tests may install a policy marked SYNTHETIC (``install_for_tests``); the loader refuses that marker anywhere but the
 test environment, so a synthetic decision can never reach staging or production.
@@ -25,7 +29,9 @@ from veda.config import settings
 
 FIXTURE = Path(__file__).with_name("fixtures") / "commercials-policy.json"
 SYNTHETIC = "SYNTHETIC_TEST_ONLY"
-LABELS = {"PCM-D01": "invoice issuer particulars (legal name, address, GSTIN, SAC)"}
+LABELS = {"PCM-D01": "invoice issuer particulars (business configuration: legal name, address, GSTIN, SAC)"}
+PARTICULARS = "PCM-D01"  # the configuration slot an invoice's issuer particulars are read from
+REQUIRED_PARTICULARS = ("legal_name", "address_lines")  # the fields an issued invoice cannot go without
 Line = Annotated[str, Field(min_length=1, max_length=200)]
 
 

@@ -1,6 +1,7 @@
 """Project Commercials: staff authorisation, scope and the feature flag (PCM-020 … PCM-025). SYNTHETIC data only.
 
-Only FOUNDER and SALES_MANAGER hold the ``commercials.*`` codes by default; every other role is refused every route.
+PCM-D01: ACCOUNTANT and FOUNDER hold every ``commercials.*`` code; SALES_MANAGER holds ``commercials.view`` only; every
+other role is refused every route.
 An individually granted OWN-scope holder reaches only accounts on leads they own; any other account answers 404 (its
 existence is not disclosed). With the flag off every route answers 404 before authentication.
 """
@@ -19,9 +20,34 @@ pytestmark = ON
 
 def test_the_default_grants_are_the_minimum_mapping():
     for code in P.CODES:
-        assert registry.MATRIX[code] == {"FOUNDER": "A", "SALES_MANAGER": "A"}, code
+        expected = {"FOUNDER": "A", "ACCOUNTANT": "A", **({"SALES_MANAGER": "A"} if code == "commercials.view" else {})}
+        assert registry.MATRIX[code] == expected, code
         assert registry.BY_CODE[code].definition.supports_scope
+    accountant = next(r for r in registry.ROLES if r.code == "ACCOUNTANT")
+    assert accountant.mfa_required and accountant.is_assignable
+    # the accountant holds no execution, quality, handover, quotation or customer-data code
+    held = {code for code, grants in registry.MATRIX.items() if "ACCOUNTANT" in grants}
+    assert held == {*P.CODES, "profile.read", "notification.read", "lookup.read"}
+    assert set(P.WITHDRAWN_FROM_SALES_MANAGER) == set(P.CODES) - {"commercials.view"}
     assert registry.validate_registry() == []
+
+
+def test_the_sales_manager_sees_the_position_but_changes_no_money(api, factory):
+    t = Commercials(api, factory)
+    _, q, acc = t.opened()
+    line = acc["schedule"]["lines"][0]
+    tok = t.tok(t.manager)
+    view = api.get(f"{BASE}/{acc['id']}", token=tok)
+    assert view.status == 200
+    caps = view.data["capabilities"]
+    assert not (caps["manage_schedule"] or caps["record_payment"] or caps["reverse_payment"] or caps["issue_invoice"])
+    body = {"amount_minor": 100, "received_on": clock.now().date().isoformat(), "method_code": "CASH"}
+    for method, path, b in (("POST", f"{BASE}/{acc['id']}/payments", body), ("GET", f"{BASE}/candidates", None),
+                            ("POST", f"{BASE}/{acc['id']}/invoices", {"instalment_id": line["id"]}),
+                            ("GET", f"{BASE}/{acc['id']}/history", None),
+                            ("POST", f"{BASE}/{acc['id']}/instalments/{line['id']}/request", {})):  # fmt: skip
+        r = api.call(method, path, b, token=tok, headers={"Idempotency-Key": key()}, if_match=acc["version"])
+        assert r.status == 403 and r.code == "PERMISSION_DENIED", (method, path, r)
 
 
 def test_roles_without_a_commercial_code_are_refused_everything(api, factory):
@@ -41,16 +67,20 @@ def test_roles_without_a_commercial_code_are_refused_everything(api, factory):
             assert r.status == 403 and r.code == "PERMISSION_DENIED", (role, method, path, r)
 
 
-def test_founder_and_sales_manager_hold_every_capability(api, factory):
+def test_founder_and_accountant_hold_every_capability(api, factory):
     t = Commercials(api, factory)
     _, _, acc = t.opened()
-    for user in (t.founder, t.manager):
+    for user in (t.founder, t.accountant):
         caps = t.get(acc, user=user)["capabilities"]
         assert caps["manage_schedule"] and caps["record_payment"] and caps["reverse_payment"] and caps["issue_invoice"]
         assert caps["view_audit"]
     history = t.call("GET", f"{BASE}/{acc['id']}/history").data
     assert [e["code"] for e in history][-3:] == ["SCHEDULE_CREATED", "BASELINE_RECORDED", "ACCOUNT_OPENED"]
-    assert history[-1]["by"]["id"] == t.manager.id
+    assert history[-1]["by"]["id"] == t.accountant.id
+    # reversal stays four-eyes for the accountant too: never the person who recorded the payment
+    pid = t.pay(acc, 500)["payments"][0]["id"]
+    assert t.reverse(acc, pid, user=t.accountant, status=409).code == "FOUR_EYES_REQUIRED"
+    assert t.reverse(acc, pid)["payments"][0]["status"] == "REVERSED"
 
 
 def test_an_own_scope_holder_reaches_only_their_leads(api, factory):

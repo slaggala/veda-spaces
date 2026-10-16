@@ -132,3 +132,11 @@ A fresh reviewer certified the branch with one merge condition. The findings and
 The PROPERTY and PROJECT number sequences share the prefix `VS-P-` (migrations 0200 and 0208). A property and a project
 can therefore both be `VS-P-2026-000001`. The portal does not show project numbers, so it is unaffected, but staff
 screens can show both. A separate change should give one of the two sequences its own prefix.
+
+## Project delivery (decision log 45)
+
+With `VEDA_PROJECT_DELIVERY_PORTAL_ENABLED` on, the property page gains a `delivery` block (`project.delivery`). It
+carries exactly two internal identifiers, the customer's own project id and handover-package id, because the
+customer's two writes (report an issue; acknowledge a handover summary, both owner decision PEX-D01) are addressed by
+them; both are reached only through the account's authorised property. No other internal id and never the project
+number (the VS-P overlap above) reach the customer. With the flag off, the earlier rule (no project id at all) holds.

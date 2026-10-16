@@ -7,8 +7,17 @@ export const PARTY: Record<string, string> = { CUSTOMER: 'Customer', VEDA: 'Veda
 export const SEVERITY: Record<string, string> = { ACTION: 'Your action', GATING: 'Blocks progress', SITE: 'Site readiness', INFORMATIONAL: 'For information' };
 export const OUTCOME: Record<string, string> = { REFUSED: 'Refused', AWAITING_APPROVAL: 'Awaiting approval', COMPLETED: 'Completed',
   REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn' };
-export const CLASS_LABEL: Record<string, string> = { INTERNAL_ONLY: 'Internal only', POTENTIALLY_CUSTOMER_SAFE: 'May be shown to the customer later',
+export const CLASS_LABEL: Record<string, string> = { INTERNAL_ONLY: 'Internal only', POTENTIALLY_CUSTOMER_SAFE: 'Customer-safe wording (shown in the portal when visible)',
   CUSTOMER_ACTION: 'Customer-safe wording' };
+/** Work-package states (server-derived; BLOCKED and CORRECTION_REQUIRED are never chosen). */
+export const WORK_STATE: Record<string, [string, string]> = {
+  NOT_STARTED: ['Not started', 'info'], IN_PROGRESS: ['In progress', 'action'], BLOCKED: ['Blocked', 'gating'], COMPLETED: ['Completed', 'ok'],
+  CORRECTION_REQUIRED: ['Correction required', 'gating'], CANCELLED: ['Cancelled', 'info'] };
+/** Snag statuses in the words of the verification flow (the server's codes are unchanged). */
+export const SNAG_STATUS: Record<string, string> = { OPEN: 'Identified', IN_PROGRESS: 'Being fixed', READY_FOR_RECHECK: 'Fixed, awaiting verification',
+  RESOLVED: 'Verified', CLOSED: 'Closed' };
+export const SNAG_ACTION: Record<string, string> = { IN_PROGRESS: 'Start fixing', READY_FOR_RECHECK: 'Record the fix', RESOLVED: 'Verify the fix',
+  CLOSED: 'Close' };
 
 export const who = (p: Person | null | undefined, empty = '—') => p?.display_name ?? (p ? 'Unknown user' : empty);
 export const when = (iso: string | null | undefined) => (iso ? formatFull(iso) : '—');

@@ -137,12 +137,10 @@ def _scenario(t: Projects) -> None:
     snag = d["snags"][0]
     assert {b["code"] for b in t.transition(p, "READY_FOR_HANDOVER")["transition"]["blockers"]} == {"QC_FAILED",
                                                                                                   "SNAG_OPEN"}  # fmt: skip
-    url = f"{BASE}/{p['id']}/snags/{snag['id']}"
-    for status, note in (("IN_PROGRESS", None), ("READY_FOR_RECHECK", None), ("RESOLVED", "Panel replaced; rechecked")):
-        cur = next(x for x in t.get(p)["snags"] if x["id"] == snag["id"])
-        ok(api.post(f"{url}/status", {"status": status, **({"note": note} if note else {})}, if_match=cur["version"]))
-    ok(api.post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES", "result": "PASS",
-                                               "recheck_of_id": failed["id"]}), 201)  # fmt: skip
+    # ops fixes it; the quality persona verifies the fix and rechecks the failure (never the fixer, PEX)
+    assert t.snag_through(p, snag["id"], to="RESOLVED")["resolved_by"]["id"] == t.quality.id
+    ok(t.as_(t.quality).post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES", "result": "PASS",
+                                                            "recheck_of_id": failed["id"]}), 201)  # fmt: skip
     r = t.transition(p, "READY_FOR_HANDOVER")  # HIGH risk with four-eyes in the synthetic policy
     assert r["outcome"] == "AWAITING_APPROVAL"
     tr = r["transition"]
@@ -152,10 +150,13 @@ def _scenario(t: Projects) -> None:
     p = ok(t.as_(t.approver).post(f"{BASE}/{p['id']}/transitions/{tr['id']}/approve", {}, if_match=tr["version"]))[
         "project"
     ]
-    assert p["stage"]["code"] == "READY_FOR_HANDOVER" and p["handover_readiness"]["ready"] is True
+    assert p["stage"]["code"] == "READY_FOR_HANDOVER"
+    assert {x["code"] for x in p["handover_readiness"]["blockers"]} == {"CHECKLIST_ITEM_OPEN"}
 
     # --- duplicate / concurrent handover: only one succeeds ----------------------------------------------------------------
     t.checklist(p)
+    assert t.get(p)["handover_readiness"]["ready"] is True
+    t.package(p)
     att = photo(t.as_(t.founder), "property", prop["id"])
     body = {"handover_on": "2026-10-15", "acknowledgement_reference": "SYNTHETIC-HS-1", "evidence_attachment_id": att["id"],
             "observations": "Customer noted a spare hinge to be delivered"}  # fmt: skip

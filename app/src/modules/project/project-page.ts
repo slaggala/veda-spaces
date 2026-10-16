@@ -6,12 +6,14 @@ import { navigate } from '../../core/router/next.js';
 import '../../design-system/components.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import {
-  projectApi, type Attention, type Blocker, type Candidate, type ChecklistItem, type GateBlocker, type HistoryRow, type Milestone,
-  type ProjectDetail, type ReadinessItem, type Snag, type TeamMember, type Transition, type TransitionResult, type Vocabulary,
+  projectApi, type Attention, type Blocker, type Candidate, type ChecklistItem, type CustomerReport, type GateBlocker, type HistoryRow,
+  type Milestone, type ProjectDetail, type QcPoint, type ReadinessItem, type Snag, type TeamMember, type Transition, type TransitionResult,
+  type Vocabulary, type WorkPackage,
 } from './api.js';
-import { badgeStyles, CLASS_LABEL, OUTCOME, party, SEVERITY, when, who } from './labels.js';
+import { badgeStyles, CLASS_LABEL, OUTCOME, party, SEVERITY, SNAG_ACTION, SNAG_STATUS, when, who, WORK_STATE } from './labels.js';
 
-type Tab = 'overview' | 'timeline' | 'stage' | 'checklist' | 'blockers' | 'milestones' | 'baseline' | 'site' | 'quality' | 'handover' | 'history';
+type Tab = 'overview' | 'timeline' | 'stage' | 'checklist' | 'work' | 'blockers' | 'milestones' | 'baseline' | 'site' | 'quality' | 'reports'
+  | 'handover' | 'history';
 type Value = string | boolean | null;
 interface Field {
   name: string; label: string; kind: 'text' | 'textarea' | 'select' | 'date' | 'checkbox'; required?: boolean; minLength?: number;
@@ -23,8 +25,9 @@ interface Form {
 }
 
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['timeline', 'Timeline'], ['stage', 'Stage and readiness'], ['checklist', 'Checklist'],
-  ['blockers', 'Blockers'], ['milestones', 'Milestones'], ['baseline', 'Commercial baseline'], ['site', 'Site readiness'],
-  ['quality', 'Quality and snags'], ['handover', 'Handover'], ['history', 'Audit and history']];
+  ['work', 'Work plan'], ['blockers', 'Blockers'], ['milestones', 'Milestones'], ['baseline', 'Commercial baseline'], ['site', 'Site readiness'],
+  ['quality', 'Quality and snags'], ['reports', 'Customer reports'], ['handover', 'Handover'], ['history', 'Audit and history']];
+const TODAY = () => new Date().toISOString().slice(0, 10);
 const REASON = { minLength: 5, hint: 'Required: at least 5 characters.' };
 const opt = (codes: readonly string[]): [string, string][] => codes.map((c) => [c, humanize(c)]);
 const money = (minor: number | null | undefined) => (minor == null ? '—' : formatINR(minor / 100));
@@ -273,7 +276,8 @@ export class VsProjectPage extends SessionElement {
       fields: [
         { name: 'handover_on', label: 'Handover date', kind: 'date', required: true, value: new Date().toISOString().slice(0, 10) },
         { name: 'acknowledgement_reference', label: 'Customer acknowledgement reference', kind: 'text', maxLength: 200,
-          hint: 'For example the number of the signed handover sheet.' },
+          hint: p.handover_packages.some((x) => x.status === 'PREPARED' && x.acknowledged_on) ? 'Not needed: the customer acknowledged the current handover package in the portal.'
+            : 'For example the number of the signed handover sheet.' },
         { name: 'evidence_attachment_id', label: 'Handover evidence', kind: 'select', hint: 'A scanned photo already attached to this property.',
           options: p.evidence_options.map((o) => [o.id, `${humanize(o.category)} · ${humanize(o.attached_to)} · ${o.uploaded_on ? formatRelative(o.uploaded_on) : ''}`]) },
         { name: 'observations', label: 'Non-blocking observations', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
@@ -347,6 +351,9 @@ export class VsProjectPage extends SessionElement {
         { name: 'responsible_party', label: 'Who needs to act', kind: 'select', required: true, options: (v?.responsible_parties ?? []).map((c) => [c, party(c)]) },
         { name: 'customer_action', label: 'What the customer needs to do (when the customer acts)', kind: 'textarea', maxLength: 300,
           classification: 'CUSTOMER_ACTION', hint: 'Customer-safe words: it may be shown to the customer in a future portal.' },
+        { name: 'customer_summary', label: 'What the customer is told while this pauses their work (optional)', kind: 'textarea', maxLength: 300,
+          classification: 'POTENTIALLY_CUSTOMER_SAFE', hint: 'Shown in the customer portal only when written. Never internal detail or blame.' },
+        { name: 'related_work_package_id', label: 'Work it holds up', kind: 'select', options: this.workOptions(p) },
         { name: 'description', label: 'Details', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
         { name: 'assigned_to', label: 'Assigned to', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, `${who(m.user)} (${humanize(m.responsibility)})`]) },
         { name: 'target_date', label: 'Target resolution date', kind: 'date' },
@@ -362,6 +369,8 @@ export class VsProjectPage extends SessionElement {
         { name: 'responsible_party', label: 'Who needs to act', kind: 'select', required: true, value: b.responsible_party,
           options: (this.vocab?.responsible_parties ?? []).map((c) => [c, party(c)]) },
         { name: 'customer_action', label: 'What the customer needs to do', kind: 'textarea', maxLength: 300, value: b.customer_action, classification: 'CUSTOMER_ACTION' },
+        { name: 'customer_summary', label: 'What the customer is told while this pauses their work', kind: 'textarea', maxLength: 300,
+          value: b.customer_summary, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
         { name: 'assigned_to', label: 'Assigned to', kind: 'select', value: b.assigned_to?.id ?? null,
           options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, `${who(m.user)} (${humanize(m.responsibility)})`]) },
         { name: 'target_date', label: 'Target resolution date', kind: 'date', value: b.target_date },
@@ -440,19 +449,46 @@ export class VsProjectPage extends SessionElement {
       run: (b) => projectApi.addReadiness(p, b) });
   }
 
-  private recordQc(p: ProjectDetail, category?: string, recheckOf?: string) {
-    this.open({ title: recheckOf ? `Recheck: ${humanize(category)}` : 'Record a quality-check result', submit: 'Record', done: 'Quality check recorded.',
+  private recordQc(p: ProjectDetail, category?: string, recheckOf?: string, point?: QcPoint) {
+    const scoped = !!recheckOf || !!point;  // a recheck keeps its chain's scope; a planned check fixes its own
+    this.open({ title: recheckOf ? `Recheck: ${humanize(category)}` : point ? `Result of QC-${point.point_no}: ${point.label}` : 'Record a quality-check result',
+      submit: 'Record', done: 'Quality check recorded.',
+      intro: recheckOf ? 'A recheck records a result. After a failure it is recorded once the remediation snags are verified, by someone who did not fix them.'
+        : point?.evidence_required ? 'This planned check needs evidence of a pass.' : undefined,
       fields: [
-        { name: 'category', label: 'Category', kind: 'select', required: true, value: category ?? null, options: opt(this.vocab?.qc_categories ?? []) },
-        { name: 'result', label: 'Result', kind: 'select', required: true, options: opt(this.vocab?.qc_results ?? []) },
+        { name: 'category', label: 'Category', kind: 'select', required: true, value: category ?? point?.category ?? null, options: opt(this.vocab?.qc_categories ?? []) },
+        { name: 'result', label: 'Result', kind: 'select', required: true,
+          options: opt((this.vocab?.qc_results ?? []).filter((r) => !(recheckOf && r === 'TO_BE_CONFIRMED') && !(point && r === 'NOT_APPLICABLE'))) },
         { name: 'observation', label: 'Observation (required for a failure)', kind: 'textarea', classification: 'INTERNAL_ONLY',
           hint: p.actions.qc_required_not_applicable ? 'Not applicable on a required category needs a reason here.'
             : 'Not applicable on a required category needs owner decision PLB-OD-08.' },
-        { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((s) => [s.id, s.label]) },
+        ...(scoped ? [] : [{ name: 'space_id', label: 'Space', kind: 'select' as const, options: p.spaces.map((x) => [x.id, x.label] as [string, string]) },
+          { name: 'work_package_id', label: 'Work checked (completed work only)', kind: 'select' as const,
+            options: this.workOptions(p, (w) => w.status === 'COMPLETED') }]),
         ...this.evidenceFields(p),
-        ...(recheckOf ? [{ name: 'recheck_of_id', label: 'Recheck of', kind: 'select' as const, required: true, value: recheckOf, options: [[recheckOf, 'The failed check']] as [string, string][] }] : []),
+        ...(recheckOf ? [{ name: 'recheck_of_id', label: 'Recheck of', kind: 'select' as const, required: true, value: recheckOf, options: [[recheckOf, 'The latest result of this check']] as [string, string][] }] : []),
+        ...(point ? [{ name: 'qc_point_id', label: 'Planned check', kind: 'select' as const, required: true, value: point.id, options: [[point.id, `QC-${point.point_no}`]] as [string, string][] }] : []),
       ],
       run: (b) => projectApi.recordQc(p, b) });
+  }
+
+  private addQcPoint(p: ProjectDetail) {
+    this.open({ title: 'Plan a quality check', submit: 'Add to the QC plan', done: 'Quality check planned.',
+      intro: 'A planned check is satisfied only by a pass (with evidence when required). If it no longer applies, withdraw it before any result.',
+      fields: [
+        { name: 'category', label: 'Category', kind: 'select', required: true, options: opt(this.vocab?.qc_categories ?? []) },
+        { name: 'label', label: 'What is checked', kind: 'text', required: true, minLength: 3, maxLength: 160, classification: 'INTERNAL_ONLY' },
+        { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((x) => [x.id, x.label]) },
+        { name: 'work_package_id', label: 'Work it checks', kind: 'select', options: this.workOptions(p) },
+        { name: 'evidence_required', label: 'A pass needs evidence (a scanned photo)', kind: 'checkbox', value: false },
+      ],
+      run: (b) => projectApi.addQcPoint(p, b) });
+  }
+
+  private withdrawQcPoint(p: ProjectDetail, q: QcPoint) {
+    this.open({ title: `Withdraw QC-${q.point_no}: ${q.label}`, submit: 'Withdraw', danger: true, done: 'Planned check withdrawn.',
+      fields: [{ name: 'reason', label: 'Why it no longer applies', kind: 'textarea', required: true, ...REASON }],
+      run: (b) => projectApi.withdrawQcPoint(p, q, b) });
   }
 
   private raiseSnag(p: ProjectDetail, qcCheckId?: string) {
@@ -462,16 +498,26 @@ export class VsProjectPage extends SessionElement {
         { name: 'customer_title', label: 'Title (customer-safe words)', kind: 'text', required: true, minLength: 3, maxLength: 160,
           classification: 'POTENTIALLY_CUSTOMER_SAFE' },
         { name: 'description', label: 'Details', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
-        { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((s) => [s.id, s.label]) },
+        { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((x) => [x.id, x.label]) },
+        { name: 'work_package_id', label: 'Work it concerns', kind: 'select', options: this.workOptions(p) },
         { name: 'item_reference', label: 'Item or unit (optional)', kind: 'text', maxLength: 200 },
         { name: 'is_blocking', label: 'Blocks the handover until resolved', kind: 'checkbox', value: true },
-        { name: 'owner_user_id', label: 'Owner', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, who(m.user)]) },
+        { name: 'customer_visible', label: 'Show it to the customer in the portal (title only)', kind: 'checkbox', value: false },
+        { name: 'priority', label: 'Priority', kind: 'select', required: true, value: 'NORMAL', options: opt(this.vocab?.snag_priorities ?? ['HIGH', 'NORMAL', 'LOW']) },
+        { name: 'owner_user_id', label: 'Owner (the person fixing it)', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, who(m.user)]) },
         { name: 'responsible_party', label: 'Who needs to act', kind: 'select', value: 'VEDA', options: (this.vocab?.responsible_parties ?? []).map((c) => [c, party(c)]) },
         { name: 'target_date', label: 'Target date', kind: 'date' },
         ...(qcCheckId ? [{ name: 'qc_check_id', label: 'From quality check', kind: 'select' as const, required: true, value: qcCheckId, options: [[qcCheckId, 'The failed check']] as [string, string][] }] : []),
         ...this.evidenceFields(p),
       ],
       run: (b) => projectApi.raiseSnag(p, b) });
+  }
+
+  private assignSnag(p: ProjectDetail, sn: Snag) {
+    this.open({ title: `Snag ${sn.snag_no}: assign`, submit: 'Assign', done: `Snag ${sn.snag_no} assigned.`,
+      fields: [{ name: 'owner_user_id', label: 'Owner (the person fixing it)', kind: 'select', required: true, value: sn.owner?.id ?? null,
+        options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, who(m.user)]) }],
+      run: (b) => projectApi.updateSnag(p, sn, b) });
   }
 
   private reclassify(p: ProjectDetail, s: Snag) {
@@ -482,11 +528,131 @@ export class VsProjectPage extends SessionElement {
       run: (b) => projectApi.reclassifySnag(p, s, { is_blocking: to, ...b }) });
   }
 
-  private snagStatus(p: ProjectDetail, s: Snag, status: string) {
-    const needsNote = status === 'RESOLVED' || (status === 'CLOSED' && s.status !== 'RESOLVED');
-    this.open({ title: `Snag ${s.snag_no}: ${humanize(status)}`, submit: humanize(status), done: `Snag ${s.snag_no}: ${humanize(status).toLowerCase()}.`,
-      fields: [{ name: 'note', label: status === 'RESOLVED' ? 'What the recheck found' : 'Note', kind: 'textarea', ...(needsNote ? { required: true, ...REASON } : {}) }],
-      run: (b) => projectApi.snagStatus(p, s, { status, ...b }) });
+  private snagStatus(p: ProjectDetail, sn: Snag, status: string) {
+    const fix = status === 'READY_FOR_RECHECK';
+    const verdict = sn.status === 'READY_FOR_RECHECK' && (status === 'RESOLVED' || status === 'IN_PROGRESS');
+    const withoutFix = status === 'CLOSED' && sn.status !== 'RESOLVED';
+    const title = verdict && status === 'IN_PROGRESS' ? 'Recheck failed: back to fixing' : withoutFix ? 'Close without a fix' : SNAG_ACTION[status] ?? humanize(status);
+    this.open({ title: `Snag ${sn.snag_no}: ${title}`, submit: title, done: `Snag ${sn.snag_no}: ${(SNAG_STATUS[status] ?? humanize(status)).toLowerCase()}.`,
+      intro: verdict ? 'Verification is independent: you cannot verify a fix you made, or a snag you own.'
+        : withoutFix ? 'Only for a snag that is a duplicate, not a defect, or raised in error. It stays in the history.' : undefined,
+      fields: [
+        ...(withoutFix ? [{ name: 'closure_code', label: 'Why', kind: 'select' as const, required: true,
+          options: [['DUPLICATE', 'Duplicate'], ['NOT_A_DEFECT', 'Not a defect'], ['RAISED_IN_ERROR', 'Raised in error']] as [string, string][] }] : []),
+        { name: 'note', label: fix ? 'What was fixed' : verdict ? 'What the recheck found' : 'Note', kind: 'textarea',
+          ...(fix || verdict || withoutFix ? { required: true, ...REASON } : {}) },
+        ...(fix ? [this.evidenceFields(p)[0]] : []),
+      ],
+      run: (b) => projectApi.snagStatus(p, sn, { status, ...b }) });
+  }
+
+  /** Who may take a snag to ``status`` (the server checks again; this only hides what the person cannot do). */
+  private snagMoves(p: ProjectDetail, sn: Snag): string[] {
+    const a = p.actions;
+    const me = this.me?.id;
+    const conflicted = me && (sn.owner?.id === me || sn.fixed_by?.id === me);
+    return sn.allowed_next.filter((st) => {
+      const verifying = (sn.status === 'READY_FOR_RECHECK' && (st === 'RESOLVED' || st === 'IN_PROGRESS')) || (st === 'CLOSED' && sn.status !== 'RESOLVED');
+      return verifying ? a.verify_snag && !conflicted : a.manage_snag;
+    });
+  }
+
+  // --- work packages --------------------------------------------------------------------------------------------------
+  private workOptions(p: ProjectDetail, keep: (w: WorkPackage) => boolean = (w) => w.status !== 'CANCELLED'): [string, string][] {
+    return p.work_packages.filter(keep).map((w) => [w.id, `WP-${w.package_no}: ${w.title}`]);
+  }
+
+  private addWork(p: ProjectDetail) {
+    this.open({ title: 'Add work to the plan', submit: 'Add', done: 'Work added.',
+      intro: 'Planned dates are an internal plan, never a promise to the customer; leave them empty if they are not known (the work is unscheduled). Work moves only by start and complete.',
+      fields: [
+        { name: 'title', label: 'Work (internal title)', kind: 'text', required: true, minLength: 3, maxLength: 160, classification: 'INTERNAL_ONLY' },
+        { name: 'stage_code', label: 'Stage it belongs to', kind: 'select', required: true, value: p.stage.code,
+          options: p.stages.filter((x) => !x.terminal && x.status !== 'COMPLETED').map((x) => [x.code, x.label]) },
+        { name: 'space_id', label: 'Space', kind: 'select', options: p.spaces.map((x) => [x.id, x.label]) },
+        { name: 'customer_label', label: 'Customer label (customer-safe words)', kind: 'text', maxLength: 120, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
+        { name: 'customer_visible', label: 'Show this work in the customer portal (needs a customer label)', kind: 'checkbox', value: false },
+        { name: 'owner_user_id', label: 'Owner', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, who(m.user)]) },
+        { name: 'depends_on_id', label: 'Starts after', kind: 'select', options: this.workOptions(p) },
+        { name: 'planned_start', label: 'Planned start (internal)', kind: 'date' },
+        { name: 'planned_finish', label: 'Planned finish (internal)', kind: 'date' },
+        { name: 'description', label: 'Details', kind: 'textarea', maxLength: 2000, classification: 'INTERNAL_ONLY' },
+      ],
+      run: (b) => projectApi.addWork(p, b) });
+  }
+
+  private planWork(p: ProjectDetail, w: WorkPackage) {
+    this.open({ title: `Plan WP-${w.package_no}: ${w.title}`, submit: 'Save', done: 'Work updated.',
+      intro: 'Changing a planned date that was already set is a replan: say why. The previous dates stay on the timeline.',
+      fields: [
+        { name: 'customer_label', label: 'Customer label', kind: 'text', maxLength: 120, value: w.customer_label, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
+        { name: 'customer_visible', label: 'Show this work in the customer portal', kind: 'checkbox', value: w.customer_visible },
+        { name: 'planned_start', label: 'Planned start (internal)', kind: 'date', value: w.planned_start },
+        { name: 'planned_finish', label: 'Planned finish (internal)', kind: 'date', value: w.planned_finish },
+        { name: 'reason', label: 'Reason for a replan', kind: 'textarea', maxLength: 1000 },
+      ],
+      run: (b) => projectApi.updateWork(p, w, b) });
+  }
+
+  private workCommand(p: ProjectDetail, w: WorkPackage, command: 'start' | 'complete' | 'reopen' | 'cancel') {
+    const words = { start: 'Start', complete: 'Complete', reopen: 'Reopen', cancel: 'Cancel the work' }[command];
+    const fields: Field[] = command === 'start' ? [{ name: 'actual_start', label: 'Started on', kind: 'date', required: true, value: TODAY() }]
+      : command === 'complete' ? [{ name: 'actual_finish', label: 'Finished on', kind: 'date', required: true, value: TODAY() },
+        { name: 'note', label: 'Note', kind: 'textarea', classification: 'INTERNAL_ONLY' }, ...this.evidenceFields(p)]
+        : [{ name: 'reason', label: 'Reason', kind: 'textarea', required: true, ...REASON }];
+    this.open({ title: `${words}: WP-${w.package_no} ${w.title}`, submit: words, danger: command === 'cancel' || command === 'reopen',
+      done: `WP-${w.package_no}: ${command === 'cancel' ? 'cancelled' : command === 'reopen' ? 'reopened' : command === 'start' ? 'started' : 'completed'}.`,
+      intro: command === 'complete' ? 'Completion is explicit and dated; a planned date passing never completes work.' : undefined,
+      fields, run: (b) => projectApi.workCommand(p, w, command, b) });
+  }
+
+  // --- customer reports -----------------------------------------------------------------------------------------------
+  private recordReport(p: ProjectDetail) {
+    this.open({ title: 'Record an issue the customer reported', submit: 'Record', done: 'Report recorded.',
+      intro: 'In the customer\'s own words, as they told you by phone or on site. It is reviewed like a portal report; it is not a defect until reviewed.',
+      fields: [
+        { name: 'description', label: 'What the customer reported', kind: 'textarea', required: true, minLength: 10, maxLength: 2000 },
+        { name: 'area', label: 'Where (customer\'s words)', kind: 'text', maxLength: 120 },
+      ],
+      run: (b) => projectApi.recordReport(p, b) });
+  }
+
+  private triageReport(p: ProjectDetail, r: CustomerReport, outcome: 'NEW_SNAG' | 'EXISTING_SNAG' | 'DECLINED') {
+    const words = { NEW_SNAG: 'Raise a snag from it', EXISTING_SNAG: 'Link to an existing snag', DECLINED: 'Decline with a reply' }[outcome];
+    const fields: Field[] = outcome === 'NEW_SNAG' ? [
+      { name: 'category', label: 'Snag category', kind: 'select', required: true, options: opt(this.vocab?.snag_categories ?? []) },
+      { name: 'customer_title', label: 'Snag title (customer-safe words)', kind: 'text', required: true, minLength: 3, maxLength: 160, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
+      { name: 'owner_user_id', label: 'Owner', kind: 'select', options: p.team.filter((m) => m.active && m.user).map((m) => [m.user!.id, who(m.user)]) },
+    ] : outcome === 'EXISTING_SNAG' ? [
+      { name: 'snag_id', label: 'Snag', kind: 'select', required: true, options: p.snags.map((x) => [x.id, `Snag ${x.snag_no}: ${x.customer_title}`]) },
+    ] : [
+      { name: 'decline_code', label: 'Why', kind: 'select', required: true, options: [['DUPLICATE', 'Already recorded'], ['NOT_A_DEFECT', 'Checked: no fix needed'], ['NOT_IN_SCOPE', 'Not part of the agreed work']] },
+    ];
+    fields.push({ name: 'response', label: outcome === 'DECLINED' ? 'Reply to the customer' : 'Reply to the customer (optional)', kind: 'textarea', maxLength: 500,
+      classification: 'POTENTIALLY_CUSTOMER_SAFE', ...(outcome === 'DECLINED' ? { required: true, minLength: 10 } : {}) });
+    this.open({ title: `Report ${r.report_no}: ${words}`, submit: words, done: `Report ${r.report_no} reviewed.`,
+      intro: outcome === 'NEW_SNAG' ? 'The snag is shown to the customer, who reported it.' : undefined,
+      fields,
+      run: (b) => {
+        const body: Record<string, unknown> = { outcome, response: b.response };
+        if (outcome === 'NEW_SNAG') body.snag = { category: b.category, customer_title: b.customer_title, ...(b.owner_user_id ? { owner_user_id: b.owner_user_id } : {}) };
+        if (outcome === 'EXISTING_SNAG') body.snag_id = b.snag_id;
+        if (outcome === 'DECLINED') body.decline_code = b.decline_code;
+        return projectApi.triageReport(p, r, body);
+      } });
+  }
+
+  private async preparePackage(p: ProjectDetail) {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      this.project = (await projectApi.preparePackage(p)).data;
+      this.announcement = 'Handover package prepared.';
+    } catch (e) {
+      const problem = e as ApiProblem;
+      if (problem.code === 'VERSION_CONFLICT') this.conflict = true;
+      else this.problem = problem;
+    } finally { this.busy = false; }
   }
 
   // --- sections -------------------------------------------------------------------------------------------------------
@@ -690,32 +856,126 @@ export class VsProjectPage extends SessionElement {
 
   private renderQuality(p: ProjectDetail): TemplateResult {
     const a = p.actions;
+    const failed = p.qc.chains.filter((c) => c.head.result === 'FAIL');
+    const badge = (r: string | null) => html`<span class="badge ${r === 'PASS' ? 'ok' : r === 'FAIL' ? 'gating' : 'info'}">${r ? humanize(r) : 'No result'}</span>`;
     return html`<div class="row"><h2 id="quality-h" tabindex="-1">Quality check</h2><span class="spacer"></span>
-        ${a.manage_qc ? html`<button class="btn" @click=${() => this.recordQc(p)}>Record a result</button>` : nothing}</div>
-      <div class="table-wrap" tabindex="0" role="region" aria-label="Quality checks, scrolls sideways on small screens"><table class="cards">
+        ${a.manage_qc ? html`<button class="btn" @click=${() => this.addQcPoint(p)}>Plan a check</button>
+          <button class="btn" @click=${() => this.recordQc(p)}>Record a result</button>` : nothing}</div>
+      <p class="small muted">Each result starts a check; a recheck continues it. A check counts by its latest result, so a pass elsewhere never hides a failure.</p>
+      ${failed.length ? html`<section class="stack" aria-labelledby="qc-failed-h"><h3 id="qc-failed-h">Failed checks to correct (${failed.length})</h3>
+        <ul class="attention">${failed.map((c) => html`<li class="GATING"><div class="row">${badge('FAIL')}<strong>${humanize(c.head.category)}</strong>
+          ${c.head.space ? html`<span class="small muted">${c.head.space}</span>` : nothing}</div>
+          <p>${c.head.observation ?? ''}</p><span class="small muted">${who(c.head.checked_by)}, ${when(c.head.checked_on)}</span>
+          ${a.manage_qc || a.manage_snag ? html`<div class="actions">
+            ${a.manage_snag ? html`<button class="btn small" @click=${() => this.raiseSnag(p, c.head.id)} aria-label=${`Raise a snag for the ${humanize(c.head.category)} failure`}>Raise a snag</button>` : nothing}
+            ${a.manage_qc ? html`<button class="btn small" @click=${() => this.recordQc(p, c.head.category, c.head.id)} aria-label=${`Recheck ${humanize(c.head.category)}`}>Recheck</button>` : nothing}
+          </div>` : nothing}</li>`)}</ul></section>` : nothing}
+      <h3>QC plan</h3>
+      ${p.qc.points.length ? html`<div class="table-wrap" tabindex="0" role="region" aria-label="QC plan, scrolls sideways on small screens"><table class="cards">
+        <caption class="sr-only">Planned quality checks</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">Category</th><th scope="col">Where</th><th scope="col">Result</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>${p.qc.points.map((q) => html`<tr><td data-label="Check">QC-${q.point_no}: ${q.label}${q.evidence_required ? html` <span class="badge info">Evidence needed</span>` : nothing}</td>
+          <td data-label="Category">${humanize(q.category)}</td><td data-label="Where">${q.space ?? '—'}${q.work_package_id ? ` · ${this.workName(p, q.work_package_id)}` : ''}</td>
+          <td data-label="Result">${q.status === 'WITHDRAWN' ? html`<span class="badge info">Withdrawn</span> <span class="small muted">${q.withdrawn_reason ?? ''}</span>` : badge(q.result)}</td>
+          <td data-label="Actions">${a.manage_qc && q.status === 'ACTIVE' ? html`<div class="actions">
+            ${q.result === null ? html`<button class="btn small" @click=${() => this.recordQc(p, q.category, undefined, q)} aria-label=${`Record the result of QC-${q.point_no}`}>Record</button>
+              <button class="btn small ghost" @click=${() => this.withdrawQcPoint(p, q)} aria-label=${`Withdraw QC-${q.point_no}`}>Withdraw</button>` : '—'}</div>` : '—'}</td></tr>`)}</tbody></table></div>`
+        : html`<p class="muted">No quality check is planned. Required categories still need a result before handover.</p>`}
+      <h3>By category</h3>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Quality checks by category, scrolls sideways on small screens"><table class="cards">
         <caption class="sr-only">Latest result per quality-check category</caption>
-        <thead><tr><th scope="col">Category</th><th scope="col">Required</th><th scope="col">Latest result</th><th scope="col">Observation</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <thead><tr><th scope="col">Category</th><th scope="col">Required</th><th scope="col">Most recent result</th><th scope="col">Observation</th></tr></thead>
         <tbody>${p.qc.categories.map((c) => html`<tr><td data-label="Category">${humanize(c.category)}</td><td data-label="Required">${c.required ? 'Yes' : 'No'}</td>
-          <td data-label="Latest result">${c.latest ? html`<span class="badge ${c.latest.result === 'PASS' ? 'ok' : c.latest.result === 'FAIL' ? 'gating' : 'info'}">${humanize(c.latest.result)}</span>
-            <span class="small muted">${who(c.latest.checked_by)}, ${when(c.latest.checked_on)}</span>` : html`<span class="muted">No result</span>`}</td>
-          <td data-label="Observation">${c.latest?.observation ?? '—'}</td>
-          <td data-label="Actions">${c.latest?.result === 'FAIL' && a.manage_qc ? html`<div class="actions">
-            <button class="btn small" @click=${() => this.recordQc(p, c.category, c.latest!.id)} aria-label=${`Recheck ${humanize(c.category)}`}>Recheck</button>
-            ${a.manage_snag ? html`<button class="btn small" @click=${() => this.raiseSnag(p, c.latest!.id)} aria-label=${`Raise a snag for ${humanize(c.category)}`}>Raise a snag</button>` : nothing}</div>` : '—'}</td></tr>`)}</tbody></table></div>
+          <td data-label="Most recent result">${c.latest ? html`${badge(c.latest.result)} <span class="small muted">${who(c.latest.checked_by)}, ${when(c.latest.checked_on)}</span>` : html`<span class="muted">No result</span>`}</td>
+          <td data-label="Observation">${c.latest?.observation ?? '—'}</td></tr>`)}</tbody></table></div>
       <div class="row"><h2 id="snags-h">Snags</h2><span class="spacer"></span>${a.manage_snag ? html`<button class="btn" @click=${() => this.raiseSnag(p)}>Raise a snag</button>` : nothing}</div>
-      ${p.snags.length ? html`<ul class="attention" aria-label="Snags">${p.snags.map((s) => html`<li class=${s.is_blocking && ['OPEN', 'IN_PROGRESS', 'READY_FOR_RECHECK'].includes(s.status) ? 'GATING' : 'INFORMATIONAL'}>
-        <div class="row"><span class="badge ${['RESOLVED', 'CLOSED'].includes(s.status) ? 'ok' : s.is_blocking ? 'gating' : 'info'}">${humanize(s.status)}</span>
-          ${s.is_blocking ? html`<span class="small">Blocks the handover</span>` : html`<span class="small muted">Does not block the handover</span>`}</div>
-        <h3>Snag ${s.snag_no}: ${s.customer_title}</h3>
-        <dl class="meta"><dt>Category</dt><dd>${humanize(s.category)}</dd>${s.space ? html`<dt>Space</dt><dd>${s.space}</dd>` : nothing}
-          <dt>Owner</dt><dd>${who(s.owner, 'Not assigned')} · ${party(s.responsible_party)}</dd>
-          ${s.description ? html`<dt>Details</dt><dd>${s.description}</dd>` : nothing}
-          ${s.resolution_note ? html`<dt>Resolution</dt><dd>${s.resolution_note}</dd>` : nothing}</dl>
-        ${s.classification_reason ? html`<p class="small muted">Classification changed: ${s.classification_reason}</p>` : nothing}
-        ${a.manage_snag && s.allowed_next.length ? html`<div class="actions">${s.allowed_next.map((st) => html`<button class="btn small" @click=${() => this.snagStatus(p, s, st)}
-          aria-label=${`Snag ${s.snag_no}: ${humanize(st)}`}>${humanize(st)}</button>`)}
-          ${a.reclassify_snag && !['RESOLVED', 'CLOSED'].includes(s.status) ? html`<button class="btn small ghost" @click=${() => this.reclassify(p, s)}
-            aria-label=${`Snag ${s.snag_no}: change whether it blocks the handover`}>Change blocking</button>` : nothing}</div>` : nothing}</li>`)}</ul>` : html`<p class="muted">No snags.</p>`}`;
+      <p class="small muted">The person who fixes a snag records the fix; someone else verifies it. Closing without a fix needs a reason.</p>
+      ${p.snags.length ? html`<ul class="attention" aria-label="Snags">${p.snags.map((sn) => {
+        const moves = this.snagMoves(p, sn);
+        return html`<li class=${sn.is_blocking && ['OPEN', 'IN_PROGRESS', 'READY_FOR_RECHECK'].includes(sn.status) ? 'GATING' : 'INFORMATIONAL'}>
+        <div class="row"><span class="badge ${['RESOLVED', 'CLOSED'].includes(sn.status) ? 'ok' : sn.is_blocking ? 'gating' : 'info'}">${SNAG_STATUS[sn.status] ?? humanize(sn.status)}</span>
+          ${sn.is_blocking ? html`<span class="small">Blocks the handover</span>` : html`<span class="small muted">Does not block the handover</span>`}
+          ${sn.source === 'CUSTOMER' ? html`<span class="badge action">Reported by the customer</span>` : nothing}
+          ${sn.customer_visible ? html`<span class="badge info">Visible to the customer</span>` : nothing}
+          ${sn.priority !== 'NORMAL' ? html`<span class="badge ${sn.priority === 'HIGH' ? 'warn' : 'info'}">${humanize(sn.priority)} priority</span>` : nothing}</div>
+        <h3>Snag ${sn.snag_no}: ${sn.customer_title}</h3>
+        <dl class="meta"><dt>Category</dt><dd>${humanize(sn.category)}</dd>${sn.space ? html`<dt>Space</dt><dd>${sn.space}</dd>` : nothing}
+          ${sn.work_package_id ? html`<dt>Work</dt><dd>${this.workName(p, sn.work_package_id)}</dd>` : nothing}
+          <dt>Owner</dt><dd>${who(sn.owner, 'Not assigned')} · ${party(sn.responsible_party)}</dd>
+          ${sn.description ? html`<dt>Details</dt><dd>${sn.description}</dd>` : nothing}
+          ${sn.fix_note ? html`<dt>Fix</dt><dd>${sn.fix_note} (${who(sn.fixed_by)}, ${when(sn.fixed_on)})</dd>` : nothing}
+          ${sn.resolution_note ? html`<dt>${sn.status === 'RESOLVED' || sn.closure_code === 'FIXED' ? 'Verification' : 'Resolution'}</dt><dd>${sn.resolution_note}${sn.resolved_by ? ` (${who(sn.resolved_by)})` : ''}</dd>` : nothing}
+          ${sn.closure_code ? html`<dt>Closed as</dt><dd>${humanize(sn.closure_code)}</dd>` : nothing}</dl>
+        ${sn.classification_reason ? html`<p class="small muted">Classification changed: ${sn.classification_reason}</p>` : nothing}
+        ${moves.length || (a.manage_snag && sn.status === 'OPEN') ? html`<div class="actions">
+          ${a.manage_snag && ['OPEN', 'IN_PROGRESS'].includes(sn.status) ? html`<button class="btn small ghost" @click=${() => this.assignSnag(p, sn)} aria-label=${`Snag ${sn.snag_no}: assign`}>Assign</button>` : nothing}
+          ${moves.map((st) => {
+            const label = sn.status === 'READY_FOR_RECHECK' && st === 'IN_PROGRESS' ? 'Recheck failed' : st === 'CLOSED' && sn.status !== 'RESOLVED' ? 'Close without a fix' : SNAG_ACTION[st] ?? humanize(st);
+            return html`<button class="btn small" @click=${() => this.snagStatus(p, sn, st)} aria-label=${`Snag ${sn.snag_no}: ${label}`}>${label}</button>`;
+          })}
+          ${a.reclassify_snag && !['RESOLVED', 'CLOSED'].includes(sn.status) ? html`<button class="btn small ghost" @click=${() => this.reclassify(p, sn)}
+            aria-label=${`Snag ${sn.snag_no}: change whether it blocks the handover`}>Change blocking</button>` : nothing}</div>` : nothing}</li>`;
+      })}</ul>` : html`<p class="muted">No snags.</p>`}`;
+  }
+
+  private workName(p: ProjectDetail, id: string): string {
+    const w = p.work_packages.find((x) => x.id === id);
+    return w ? `WP-${w.package_no}: ${w.title}` : '—';
+  }
+
+  private renderWork(p: ProjectDetail): TemplateResult {
+    const a = p.actions;
+    const byStage = p.stages.filter((st) => p.work_packages.some((w) => w.stage_code === st.code));
+    return html`<div class="row"><h2 id="work-h" tabindex="-1">Work plan</h2><span class="spacer"></span>
+        ${a.manage_work ? html`<button class="btn" @click=${() => this.addWork(p)}>Add work</button>` : nothing}</div>
+      <p class="small muted">Work starts and completes in its own stage, after the work it follows. Blocked and correction-required are worked out from blockers and quality checks; they are never set by hand. A stage cannot complete while its work is open.</p>
+      ${byStage.length ? byStage.map((st) => html`<section class="group stack" aria-labelledby=${`wp-${st.code}`}>
+        <div class="row"><h3 id=${`wp-${st.code}`}>${st.label}</h3>${st.code === p.stage.code ? html`<span class="badge action">Current stage</span>` : nothing}</div>
+        <ul class="attention">${p.work_packages.filter((w) => w.stage_code === st.code).map((w) => {
+          const [label, tone] = WORK_STATE[w.state] ?? [humanize(w.state), 'info'];
+          const live = w.stage_code === p.stage.code && a.manage_work;
+          return html`<li class=${w.state === 'BLOCKED' || w.state === 'CORRECTION_REQUIRED' ? 'GATING' : 'INFORMATIONAL'}>
+          <div class="row"><span class="badge ${tone}">${label}</span>${w.customer_visible ? html`<span class="badge info">Visible to the customer</span>` : nothing}
+            ${!w.scheduled ? html`<span class="small muted">Unscheduled</span>` : nothing}${w.past_planned_finish ? html`<span class="badge warn">Past its planned finish</span>` : nothing}</div>
+          <h3>WP-${w.package_no}: ${w.title}</h3>
+          <dl class="meta">${w.customer_label ? html`<dt>Customer label</dt><dd>${w.customer_label}</dd>` : nothing}
+            ${w.space ? html`<dt>Space</dt><dd>${w.space}</dd>` : nothing}<dt>Owner</dt><dd>${who(w.owner, 'Not assigned')}</dd>
+            ${w.depends_on_id ? html`<dt>Starts after</dt><dd>${this.workName(p, w.depends_on_id)}</dd>` : nothing}
+            ${w.scheduled ? html`<dt>Planned</dt><dd>${w.planned_start ? formatDate(w.planned_start) : '—'} to ${w.planned_finish ? formatDate(w.planned_finish) : '—'}${w.plan_revision ? ` (replanned ${w.plan_revision}×${w.replan_reason ? `: ${w.replan_reason}` : ''})` : ''}</dd>` : nothing}
+            ${w.actual_start ? html`<dt>Actual</dt><dd>${formatDate(w.actual_start)} to ${w.actual_finish ? formatDate(w.actual_finish) : 'in progress'}</dd>` : nothing}
+            ${w.cancel_reason ? html`<dt>Cancelled</dt><dd>${w.cancel_reason}</dd>` : nothing}
+            ${w.reopen_reason && w.status === 'IN_PROGRESS' ? html`<dt>Reopened</dt><dd>${w.reopen_reason}</dd>` : nothing}</dl>
+          ${live && w.status !== 'CANCELLED' ? html`<div class="actions">
+            ${w.status === 'NOT_STARTED' ? html`<button class="btn small" @click=${() => this.workCommand(p, w, 'start')} aria-label=${`Start WP-${w.package_no}`}>Start</button>` : nothing}
+            ${w.status === 'IN_PROGRESS' ? html`<button class="btn small" @click=${() => this.workCommand(p, w, 'complete')} aria-label=${`Complete WP-${w.package_no}`}>Complete</button>` : nothing}
+            ${w.status === 'COMPLETED' ? html`<button class="btn small ghost" @click=${() => this.workCommand(p, w, 'reopen')} aria-label=${`Reopen WP-${w.package_no}`}>Reopen</button>` : nothing}
+            ${w.status !== 'COMPLETED' ? html`<button class="btn small ghost" @click=${() => this.planWork(p, w)} aria-label=${`Plan WP-${w.package_no}`}>Plan</button>
+              <button class="btn small ghost" @click=${() => this.workCommand(p, w, 'cancel')} aria-label=${`Cancel WP-${w.package_no}`}>Cancel</button>` : nothing}
+          </div>` : nothing}</li>`;
+        })}</ul></section>`) : html`<p class="muted">No work is planned yet.</p>`}`;
+  }
+
+  private renderReports(p: ProjectDetail): TemplateResult {
+    const a = p.actions;
+    const d01 = p.delivery_policy.decisions['PEX-D01'];
+    return html`<div class="row"><h2 id="reports-h" tabindex="-1">Customer reports</h2><span class="spacer"></span>
+        ${a.manage_snag ? html`<button class="btn" @click=${() => this.recordReport(p)}>Record a customer report</button>` : nothing}</div>
+      <p class="small muted">Issues in the customer's own words. Each is reviewed: raised as a snag, linked to one, or declined with a reply the customer reads.
+        A report waiting for review holds the handover.${d01 && !d01.decided ? ' Customers cannot report in the portal until owner decision PEX-D01 is recorded.' : ''}</p>
+      ${p.customer_reports.length ? html`<ul class="attention" aria-label="Customer reports">${p.customer_reports.map((r) => html`<li class=${r.status === 'SUBMITTED' ? 'ACTION' : 'INFORMATIONAL'}>
+        <div class="row"><span class="badge ${r.status === 'SUBMITTED' ? 'action' : r.status === 'ACCEPTED' ? 'ok' : 'info'}">${r.status === 'SUBMITTED' ? 'Waiting for review' : humanize(r.status)}</span>
+          <span class="small muted">${r.channel === 'PORTAL' ? 'From the portal' : `Recorded by ${who(r.recorded_by)}`}, ${when(r.reported_on)}</span></div>
+        <h3>Report ${r.report_no}${r.area ? `: ${r.area}` : ''}</h3>
+        <p>${r.description}</p>
+        ${r.status !== 'SUBMITTED' ? html`<dl class="meta"><dt>Reviewed</dt><dd>${who(r.triaged_by)}, ${when(r.triaged_on)}</dd>
+          ${r.snag_id ? html`<dt>Snag</dt><dd>${(() => { const sn = p.snags.find((x) => x.id === r.snag_id); return sn ? `Snag ${sn.snag_no}: ${sn.customer_title}` : '—'; })()}</dd>` : nothing}
+          ${r.decline_code ? html`<dt>Declined</dt><dd>${humanize(r.decline_code)}</dd>` : nothing}
+          ${r.response ? html`<dt>Reply to the customer</dt><dd>${r.response}</dd>` : nothing}</dl>` : nothing}
+        ${r.status === 'SUBMITTED' && a.manage_snag ? html`<div class="actions">
+          <button class="btn small" @click=${() => this.triageReport(p, r, 'NEW_SNAG')} aria-label=${`Report ${r.report_no}: raise a snag`}>Raise a snag</button>
+          ${p.snags.length ? html`<button class="btn small" @click=${() => this.triageReport(p, r, 'EXISTING_SNAG')} aria-label=${`Report ${r.report_no}: link to a snag`}>Link to a snag</button>` : nothing}
+          <button class="btn small ghost" @click=${() => this.triageReport(p, r, 'DECLINED')} aria-label=${`Report ${r.report_no}: decline with a reply`}>Decline</button></div>` : nothing}</li>`)}</ul>`
+        : html`<p class="muted">No customer report.</p>`}`;
   }
 
   private renderHandover(p: ProjectDetail): TemplateResult {
@@ -730,8 +990,29 @@ export class VsProjectPage extends SessionElement {
         <dt>Acknowledgement</dt><dd>${done.handover.acknowledgement_reference ?? '—'}</dd>
         <dt>Evidence</dt><dd>${done.handover.evidence_attachment_id ? 'Attached' : '—'}</dd>
         <dt>Observations</dt><dd>${done.handover.observations ?? '—'}</dd></dl>` : nothing}
+      ${h.commercial_position ? html`<p class="small muted">Commercial position (for information): value ${h.commercial_position.value}, paid ${h.commercial_position.paid},
+        outstanding ${h.commercial_position.outstanding}${h.commercial_position.lines_due ? `, ${h.commercial_position.lines_due} requested payment(s) unpaid` : ''}.</p>` : nothing}
+      ${this.renderPackage(p)}
       ${p.readiness?.command === 'HANDOVER' && p.actions.complete_handover && !p.awaiting_approval ? html`<div><button class="btn primary" @click=${() => this.handover(p)}>Complete the handover</button></div>` : nothing}
-      <p class="small muted">Warranty, service and final payment are separate workstreams; the handover creates none of them.</p>`;
+      <p class="small muted">Warranty, service and final payment are separate workstreams; the handover creates none of them. Warranty terms are those of the accepted quotation.</p>`;
+  }
+
+  private renderPackage(p: ProjectDetail): TemplateResult {
+    const pkg = [...p.handover_packages].reverse().find((x) => x.status !== 'SUPERSEDED');
+    const c = pkg?.content;
+    return html`<section class="stack" aria-labelledby="package-h"><div class="row"><h3 id="package-h">Handover package</h3><span class="spacer"></span>
+        ${p.actions.prepare_handover_package && !p.awaiting_approval ? html`<button class="btn" ?disabled=${this.busy} @click=${() => this.preparePackage(p)}>${pkg ? 'Prepare again' : 'Prepare the package'}</button>` : nothing}</div>
+      ${!pkg || !c ? html`<p class="muted">Not prepared. It is prepared in Ready for handover once every gate but the handover evidence is satisfied.</p>` : html`
+        ${pkg.stale ? html`<vs-banner kind="warning">This package no longer matches the records (${humanize(pkg.stale)}). Prepare it again; the customer acknowledges the new one.</vs-banner>` : nothing}
+        <dl class="meta"><dt>Package</dt><dd>${pkg.package_no} · ${humanize(pkg.status)} · prepared ${when(pkg.prepared_on)} by ${who(pkg.prepared_by)}</dd>
+          <dt>Customer acknowledgement</dt><dd>${pkg.acknowledged_on ? `Acknowledged in the portal ${when(pkg.acknowledged_on)}` : 'Not acknowledged in the portal'}</dd>
+          <dt>Work completed</dt><dd>${c.work.completed_count} (customer-visible: ${c.work.completed.map((w) => w.label).join(', ') || 'none'})</dd>
+          <dt>Quality</dt><dd>${c.quality.checks_passed} passed, ${c.quality.corrected_after_failure} corrected after a failure, ${c.quality.failed} failed</dd>
+          <dt>Snags</dt><dd>${c.snags.fixed_and_verified} fixed and verified, ${c.snags.closed_without_fix} closed without a fix, ${c.snags.open_non_blocking_count} open (non-blocking)</dd>
+          <dt>Documents</dt><dd>None in the portal (no customer-visible document class is approved, CPP-D04)</dd>
+          <dt>Warranty</dt><dd>As stated in accepted quotation ${c.warranty.quotation_number}</dd>
+          <dt>Digest</dt><dd class="mono">${pkg.content_sha256}</dd></dl>`}
+    </section>`;
   }
 
   private eventText(e: ProjectDetail['timeline'][number]): string {
@@ -780,6 +1061,8 @@ export class VsProjectPage extends SessionElement {
       case 'timeline': return this.renderTimeline(p);
       case 'stage': return this.renderStage(p);
       case 'checklist': return this.renderChecklist(p);
+      case 'work': return this.renderWork(p);
+      case 'reports': return this.renderReports(p);
       case 'blockers': return this.renderBlockers(p);
       case 'milestones': return this.renderMilestones(p);
       case 'baseline': return this.renderBaseline(p);

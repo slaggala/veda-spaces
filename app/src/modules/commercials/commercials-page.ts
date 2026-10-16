@@ -426,7 +426,7 @@ export class VsCommercialsPage extends SessionElement {
           ${m.payment ? html`<dt>Amount</dt><dd class="strong">${m.payment.amount}</dd><dt>Received</dt><dd>${day(m.payment.received_on)}</dd>
             <dt>Method</dt><dd>${m.payment.method}</dd><dt>Reference</dt><dd>${m.payment.reference ?? '—'}</dd>` : nothing}
           <dt>Project value</dt><dd>${m.position?.value}</dd><dt>Paid</dt><dd>${m.position?.paid}</dd><dt>Outstanding</dt><dd>${m.position?.outstanding}</dd>
-          ${m.issuer ? html`<dt>Issued by</dt><dd>${m.issuer.legal_name}${m.issuer.gstin ? `, GSTIN ${m.issuer.gstin}` : ''}</dd>` : html`<dt>Issuer</dt><dd>Not recorded (owner decision PCM-D01)</dd>`}
+          ${m.issuer ? html`<dt>Issued by</dt><dd>${m.issuer.legal_name}${m.issuer.gstin ? `, GSTIN ${m.issuer.gstin}` : ''}</dd>` : html`<dt>Issuer</dt><dd>Invoice particulars not configured yet</dd>`}
         </dl>
         <p class="small muted">${m.statement}</p>
       </div>` : nothing}
@@ -510,8 +510,9 @@ export class VsCommercialsPage extends SessionElement {
   private renderInvoices(a: Detail): TemplateResult {
     const issuable = a.capabilities.invoice_issuable;
     return html`<section class="stack" aria-labelledby="h-invoices"><h2 id="h-invoices" class="section-title">Invoices</h2>
-      ${!issuable ? html`<vs-banner kind="info">Invoices can be drafted and previewed, but not issued, until the invoice issuer particulars are recorded
-        (owner decision PCM-D01: legal name, address, GSTIN, SAC, whether it is a tax invoice).</vs-banner>` : nothing}
+      ${!issuable ? html`<vs-banner kind="info">Invoices can be drafted and previewed, but not issued yet: Veda Spaces' invoice particulars
+        (the issuer's legal name and address, and the GSTIN and SAC code where they apply) are not configured. Ask the founder to have
+        them recorded in the business configuration (PCM-D01).</vs-banner>` : nothing}
       ${!a.invoices.length ? html`<vs-empty-state heading="No invoices yet"><p>Create one from an instalment in the payment schedule.</p></vs-empty-state>`
         : html`<div class="table-wrap" tabindex="0" role="region" aria-label="Invoices"><table><thead><tr><th scope="col">Invoice</th><th scope="col">Instalment</th><th scope="col">Amount (₹)</th>
           <th scope="col">Due</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>

@@ -153,17 +153,36 @@ def test_quality_failures_and_open_snags_stop_handover_readiness_until_fixed_and
     url = f"{BASE}/{p['id']}/snags/{snag['id']}"
     r = api.post(f"{url}/status", {"status": "RESOLVED", "note": "Fixed"}, if_match=snag["version"])
     assert r.status == 409 and r.json["allowed"] == ["IN_PROGRESS", "CLOSED"]
-    for status in ("IN_PROGRESS", "READY_FOR_RECHECK"):
-        snag = next(x for x in ok(api.post(f"{url}/status", {"status": status}, if_match=snag["version"]))["snags"])
-    r = api.post(f"{url}/status", {"status": "RESOLVED"}, if_match=snag["version"])
+    snag = next(x for x in ok(api.post(f"{url}/status", {"status": "IN_PROGRESS"}, if_match=snag["version"]))["snags"])
+    qa = t.as_(t.quality)
+    recheck = {"category": "FINISH_AND_SURFACES", "result": "PASS", "recheck_of_id": failed["id"]}
+    r = qa.post(f"{BASE}/{p['id']}/qc-checks", recheck)
+    assert r.status == 409 and r.code == "REMEDIATION_OPEN"  # the failure is rechecked after its remediation
+    api = t.as_(t.ops)
+    r = api.post(f"{url}/status", {"status": "READY_FOR_RECHECK"}, if_match=snag["version"])
+    assert r.status == 422  # the fixer says what was fixed
+    snag = next(x for x in ok(api.post(f"{url}/status", {"status": "READY_FOR_RECHECK", "note": "Edge rebanded"},
+                                       if_match=snag["version"]))["snags"])  # fmt: skip
+    assert snag["fixed_by"]["id"] == t.ops.id and snag["fix_note"] == "Edge rebanded"
+    r = api.post(f"{url}/status", {"status": "RESOLVED", "note": "Looks fine to me"}, if_match=snag["version"])
+    assert r.status == 403  # the fixer holds no verify capability
+    qa = t.as_(t.quality)
+    r = qa.post(f"{url}/status", {"status": "RESOLVED"}, if_match=snag["version"])
     assert r.status == 422  # a recheck says what was found
-    d = ok(api.post(f"{url}/status", {"status": "RESOLVED", "note": "Rechecked: edge rebanded"},
-                    if_match=snag["version"]))  # fmt: skip
-    assert d["snags"][0]["status"] == "RESOLVED" and d["snags"][0]["resolved_by"]["id"] == t.ops.id
-    d = ok(api.post(f"{BASE}/{p['id']}/qc-checks", {"category": "FINISH_AND_SURFACES", "result": "PASS",
-                                                   "recheck_of_id": failed["id"]}), 201)  # fmt: skip
+    d = ok(qa.post(f"{url}/status", {"status": "RESOLVED", "note": "Rechecked: edge rebanded"},
+                   if_match=snag["version"]))  # fmt: skip
+    assert d["snags"][0]["status"] == "RESOLVED" and d["snags"][0]["resolved_by"]["id"] == t.quality.id
+    r = t.as_(t.ops).post(f"{BASE}/{p['id']}/qc-checks", recheck)
+    assert r.status == 409 and r.code == "SEGREGATION_REQUIRED"  # the fixer never rechecks their own fix
+    d = ok(t.as_(t.quality).post(f"{BASE}/{p['id']}/qc-checks", recheck), 201)
+    r = t.as_(t.quality).post(f"{BASE}/{p['id']}/qc-checks", recheck)
+    assert r.status == 409 and r.code == "RECHECK_NOT_LATEST"  # one recheck per check
     assert d["handover_readiness"]["blockers"] == [] and d["handover_readiness"]["stage_reached"] is False
     assert t.transition(p, "READY_FOR_HANDOVER")["outcome"] == "COMPLETED"
+    # one computation: in READY_FOR_HANDOVER readiness is the handover's own evaluation (its checklist included)
+    readiness = t.get(p)["handover_readiness"]
+    assert readiness["stage_reached"] and {b["code"] for b in readiness["blockers"]} == {"CHECKLIST_ITEM_OPEN"}
+    t.checklist(p)
     assert t.get(p)["handover_readiness"]["ready"] is True
 
 
@@ -184,6 +203,16 @@ def test_handover_needs_its_evidence_closes_the_project_and_emits_the_domain_eve
     r = t.transition(p, "HANDED_OVER")  # the handover is not a plain stage move
     assert {b["code"] for b in r["transition"]["blockers"]} == {"USE_HANDOVER"}
     body = _handover_body(t, p)
+    api = t.as_(t.ops)
+    r = ok(api.post(f"{BASE}/{p['id']}/handover", body, if_match=t.get(p)["version"]), 201)
+    assert r["outcome"] == "REFUSED" and {b["code"] for b in r["transition"]["blockers"]} == {
+        "HANDOVER_PACKAGE_MISSING"
+    }
+    pkg = t.package(p)["handover_packages"][-1]
+    assert pkg["status"] == "PREPARED" and pkg["content"]["documents"] == [] and pkg["stale"] is None
+    assert [x["id"] for x in t.package(p, status=200)["handover_packages"]] == [
+        pkg["id"]
+    ]  # unchanged: the same package
     api = t.as_(t.ops)
     cur = t.get(p)
     assert api.post(f"{BASE}/{p['id']}/handover", {**body, "handover_on": "2999-01-01"},
@@ -210,7 +239,10 @@ def test_handover_needs_its_evidence_closes_the_project_and_emits_the_domain_eve
     assert len(handed) == 1 and handed[0]["detail"]["baseline_seq"] == 1
     events = [e for e in dbh.rows(sa.select(OutboxEvent)) if e.event_type == "project.handed_over"]
     assert len(events) == 1 and set(events[0].payload) >= {"project_id", "baseline_id", "lead_id", "property_id",
-                                                           "source_quotation_id", "transition_id"}  # fmt: skip
+                                                           "source_quotation_id", "transition_id", "handover_package_id",
+                                                           "handover_package_sha256"}  # fmt: skip
+    assert events[0].payload["handover_package_id"] == pkg["id"]
+    assert [x["status"] for x in d["handover_packages"]] == ["COMPLETED"]
     assert not any(isinstance(v, str) and " " in v for v in events[0].payload.values())  # ids only
     # the history is closed: no further change, no second handover
     r = api.post(f"{BASE}/{p['id']}/blockers", {"category": "OTHER", "impact": "INFORMATIONAL", "title": "Late note",

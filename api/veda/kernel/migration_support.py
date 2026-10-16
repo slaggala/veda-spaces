@@ -544,6 +544,62 @@ def grant_new_codes(conn, codes: tuple[str, ...], *, audit: bool) -> int:
     return inserted
 
 
+def withdraw_role_grants(conn, role_code: str, codes: tuple[str, ...], *, audit: bool) -> int:
+    """A later module migration: soft-delete the live grants of ``codes`` to the system role ``role_code`` that the role
+    matrix no longer lists (each withdrawal audited), then bump every human's authz_version (as ``grant_new_codes`` does) so
+    every session re-reads its grants at once. A code the matrix still grants to the role is refused (nothing changes)."""
+    from veda.platform.rbac.registry import MATRIX
+
+    kept = [c for c in codes if role_code in MATRIX.get(c, {})]
+    if kept:
+        raise RuntimeError(f"refusing to withdraw {kept} from {role_code}: the role matrix still grants them")
+    role = conn.execute(
+        sa.select(ROLE.c.id).where(
+            ROLE.c.code == role_code, ROLE.c.is_system == sa.true(), ROLE.c.is_deleted == sa.false()
+        )
+    ).scalar()
+    if role is None:
+        return 0
+    rows = conn.execute(
+        sa.select(ROLE_PERMISSION.c.id, ROLE_PERMISSION.c.version, PERMISSION.c.code)
+        .join(PERMISSION, PERMISSION.c.id == ROLE_PERMISSION.c.permission_id)
+        .where(
+            ROLE_PERMISSION.c.role_id == role, ROLE_PERMISSION.c.is_deleted == sa.false(), PERMISSION.c.code.in_(codes)
+        )
+    ).all()
+    now = clock.now()
+    tx = new_id()
+    for row in rows:
+        conn.execute(
+            ROLE_PERMISSION.update()
+            .where(ROLE_PERMISSION.c.id == row.id)
+            .values(
+                is_deleted=True,
+                deleted_on=now,
+                deleted_by=SYSTEM_USER_ID,
+                updated_on=now,
+                updated_by=SYSTEM_USER_ID,
+                version=row.version + 1,
+            )  # fmt: skip
+        )
+        if audit:
+            write_audit(conn, entity_type="role_permission", entity_id=row.id, action="DELETE",
+                        old_value={"is_deleted": False, "permission_code": row.code},
+                        new_value={"is_deleted": True}, changed_fields=["is_deleted", "deleted_on", "deleted_by"],
+                        parent=("role", role), transaction_id=tx, now=now,
+                        reason=f"{row.code} withdrawn from {role_code} by the role matrix")  # fmt: skip
+    if rows:
+        u = APP_USER_0002
+        conn.execute(
+            u.update()
+            .where(u.c.user_type == "HUMAN")
+            .values(
+                authz_version=u.c.authz_version + 1, version=u.c.version + 1, updated_on=now, updated_by=SYSTEM_USER_ID
+            )
+        )
+    return len(rows)
+
+
 def assert_rbac_seed(conn) -> None:
     """06 §3.1 rules 3 and 5, asserted in the seed migration (RBAC-018)."""
     rows = (

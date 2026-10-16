@@ -127,11 +127,11 @@ describe('Project page (vs-project-page)', () => {
       'What it blocks': 'Production readiness', 'When resolved': 'The move to Production readiness can be requested.' });
   });
 
-  it('has the eleven sections, reachable as tabs', async () => {
+  it('has the thirteen sections, reachable as tabs', async () => {
     const { root } = await ready();
     const tabs = root.querySelector('vs-tabs')!.shadowRoot!.querySelectorAll('[role=tab]');
-    expect([...tabs].map((t) => t.textContent)).to.deep.equal(['Overview', 'Timeline', 'Stage and readiness', 'Checklist', 'Blockers', 'Milestones',
-      'Commercial baseline', 'Site readiness', 'Quality and snags', 'Handover', 'Audit and history']);
+    expect([...tabs].map((t) => t.textContent)).to.deep.equal(['Overview', 'Timeline', 'Stage and readiness', 'Checklist', 'Work plan', 'Blockers',
+      'Milestones', 'Commercial baseline', 'Site readiness', 'Quality and snags', 'Customer reports', 'Handover', 'Audit and history']);
   });
 
   it('requests a move with the version shown and keeps a refusal visible with its exact blockers', async () => {
@@ -241,7 +241,8 @@ describe('Project page: final safety closure (M1, M2, S1)', () => {
     const snag = { id: 'n1', version: 3, snag_no: 1, category: 'FINISH', customer_title: 'Synthetic snag', description: null, space: null, space_id: null,
       item_reference: null, is_blocking: true, classification_reason: null, owner: null, responsible_party: 'VEDA', status: 'OPEN',
       allowed_next: ['IN_PROGRESS', 'CLOSED'], target_date: null, evidence: null, resolution_note: null, resolved_on: null, resolved_by: null,
-      closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null };
+      closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null, work_package_id: null, source: 'STAFF' as const,
+      priority: 'NORMAL' as const, customer_visible: false, fixed_by: null, fixed_on: null, fix_note: null, closure_code: null };
     const plain = project({ snags: [snag] });
     const first = await openTab({ detail: plain }, 'quality');
     expect([...first.root.querySelectorAll('button')].some((b) => b.textContent?.includes('Change blocking'))).to.equal(false);
@@ -267,6 +268,71 @@ describe('Project page: final safety closure (M1, M2, S1)', () => {
     p.team = p.team.map((m) => (m.responsibility === 'DESIGN' ? { ...m, eligible: false } : m));
     const { root } = await openTab({ detail: p }, 'overview');
     expect(text(root)).to.contain('Needs reassignment: Design').and.to.contain('SYNTHETIC Designer');
+  });
+
+  // --- PEX: work plan, verified snags, customer reports, handover package -------------------------------------------------
+  const wp = (over: Record<string, unknown> = {}) => ({ id: 'w1', version: 2, package_no: 1, stage_code: 'SITE_READINESS', space: 'Kitchen', space_id: 's1',
+    title: 'Kitchen carcass with a long SYNTHETIC internal title for the tall units', description: null, customer_label: 'Kitchen', customer_visible: true,
+    owner: null, depends_on_id: null, status: 'NOT_STARTED', state: 'NOT_STARTED', scheduled: false, planned_start: null, planned_finish: null,
+    plan_revision: 0, replan_reason: null, past_planned_finish: false, actual_start: null, actual_finish: null, started_by: null, completed_by: null,
+    completion_note: null, reopen_reason: null, cancel_reason: null, evidence: null, ...over });
+
+  it('shows derived work states, never a status picker, and starts work with the version the user saw', async () => {
+    const p = project({ work_packages: [wp(), wp({ id: 'w2', package_no: 2, title: 'Wardrobes', state: 'BLOCKED' }) ] as never });
+    const { el, root, calls } = await openTab({ detail: p }, 'work');
+    const t = text(root);
+    expect(t).to.contain('WP-1').and.to.contain('Unscheduled').and.to.contain('Blocked').and.to.contain('Visible to the customer');
+    expect(root.querySelector('select[name=status]')).to.equal(null);
+    button(root, 'Start').click();
+    await el.updateComplete;
+    expect((root.querySelector('#project-form [name=actual_start]') as HTMLInputElement).value).to.match(/^\d{4}-\d{2}-\d{2}$/);
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => calls.some((c) => c.method === 'POST'), 'sent');
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.path).to.equal('/api/v1/projects/p1/work-packages/w1/start');
+    expect(post.ifMatch).to.equal('"2"');
+  });
+
+  it('offers verification only to a verifier who neither fixed nor owns the snag', async () => {
+    const snag = { id: 'n1', version: 5, snag_no: 1, category: 'FINISH', customer_title: 'Chipped edge', description: null, space: null, space_id: null,
+      item_reference: null, is_blocking: true, classification_reason: null, owner: { id: 'u-ops', display_name: 'SYNTHETIC Ops' }, responsible_party: 'VEDA',
+      status: 'READY_FOR_RECHECK', allowed_next: ['IN_PROGRESS', 'RESOLVED', 'CLOSED'], target_date: null, evidence: null, resolution_note: null,
+      resolved_on: null, resolved_by: null, closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null, work_package_id: null,
+      source: 'CUSTOMER' as const, priority: 'NORMAL' as const, customer_visible: true, fixed_by: { id: 'u-ops', display_name: 'SYNTHETIC Ops' },
+      fixed_on: null, fix_note: 'Edge filled', closure_code: null };
+    const p = project({ snags: [snag] });
+    p.actions = { ...p.actions, verify_snag: true };
+    const mine = await openTab({ detail: p }, 'quality');
+    expect(text(mine.root)).to.contain('Reported by the customer').and.to.contain('Fixed, awaiting verification');
+    expect(button(mine.root, 'Verify the fix')).to.equal(undefined);  // the signed-in person fixed and owns it
+    const other = project({ snags: [{ ...snag, owner: null, fixed_by: { id: 'u-x', display_name: 'Someone else' } }] });
+    other.actions = { ...other.actions, verify_snag: true };
+    const { el, root, calls } = await openTab({ detail: other }, 'quality');
+    button(root, 'Verify the fix').click();
+    await el.updateComplete;
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-dialog textarea[aria-invalid=true]'), 'what the recheck found is required');
+    (root.querySelector('#project-form textarea[name=note]') as HTMLTextAreaElement).value = 'Rechecked: smooth';
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => calls.some((c) => c.method === 'POST'), 'sent');
+    expect(calls.find((c) => c.method === 'POST')!.body).to.deep.equal({ status: 'RESOLVED', note: 'Rechecked: smooth' });
+  });
+
+  it('reviews a customer report by raising a snag the customer then follows', async () => {
+    const report = { id: 'r1', version: 1, report_no: 1, channel: 'PORTAL' as const, description: 'The drawer does not close fully', area: 'Kitchen',
+      status: 'SUBMITTED' as const, snag_id: null, decline_code: null, response: null, reported_on: '2026-10-16T09:00:00Z', recorded_by: null,
+      triaged_by: null, triaged_on: null };
+    const { el, root, calls } = await openTab({ detail: project({ customer_reports: [report] }) }, 'reports');
+    expect(text(root)).to.contain('Waiting for review').and.to.contain('The drawer does not close fully');
+    button(root, 'Raise a snag').click();
+    await el.updateComplete;
+    (root.querySelector('#project-form select[name=category]') as HTMLSelectElement).value = 'FINISH';
+    (root.querySelector('#project-form input[name=customer_title]') as HTMLInputElement).value = 'Kitchen drawer to be adjusted';
+    (root.querySelector('vs-dialog button[type=submit]') as HTMLButtonElement).click();
+    await waitUntil(() => calls.some((c) => c.method === 'POST'), 'sent');
+    const post = calls.find((c) => c.method === 'POST')!;
+    expect(post.path).to.equal('/api/v1/projects/p1/customer-reports/r1/triage');
+    expect(post.body).to.deep.equal({ outcome: 'NEW_SNAG', snag: { category: 'FINISH', customer_title: 'Kitchen drawer to be adjusted' } });
   });
 });
 

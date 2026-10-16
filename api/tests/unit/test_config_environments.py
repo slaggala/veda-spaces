@@ -430,3 +430,26 @@ def test_project_commercials_are_off_by_default_and_production_refuses_them(monk
     assert not [p for p in config.validate_environment(staging) if "PROJECT_COMMERCIALS" in p]
     assert staging.project_commercials_enabled is True
     assert staging.customer_portal_enabled is False and staging.project_lifecycle_enabled is False
+
+
+def test_project_delivery_in_the_portal_is_off_by_default_and_production_refuses_it(monkeypatch):
+    """PEX (decision log 45): the project-delivery portal flag is off by default; production with it requested on is
+    refused at configuration, the refusal adds exactly its own problem, staging admits it, and it turns neither the
+    portal, the Project Lifecycle nor Project Commercials on."""
+    from veda.app import create_app
+
+    assert config.Settings().project_delivery_portal_enabled is False
+    flag = "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"
+    off = config.validate_environment(deployed_env(monkeypatch, "production"))
+    on = config.validate_environment(deployed_env(monkeypatch, "production", **{flag: "true"}))
+    message = f"{flag} is not authorised in production (project delivery in the portal)"
+    assert sorted(set(on) - set(off)) == [message] and set(off) <= set(on)
+    with pytest.raises(RuntimeError, match="unsafe production configuration") as refused:
+        create_app(deployed_env(monkeypatch, "production", **{flag: "true"}))
+    assert message in str(refused.value)
+    staging = deployed_env(monkeypatch, "staging", **{flag: "true"})
+    assert not [p for p in config.validate_environment(staging) if "DELIVERY_PORTAL" in p]
+    assert staging.project_delivery_portal_enabled is True
+    assert not (
+        staging.customer_portal_enabled or staging.project_lifecycle_enabled or staging.project_commercials_enabled
+    )

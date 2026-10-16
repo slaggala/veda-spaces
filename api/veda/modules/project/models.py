@@ -18,6 +18,14 @@ A project references the commercial records it was built from; it copies none of
 - ``project_qc_check``: quality-check results, append-only (a recheck is a new row).
 - ``project_snag``: snags (punch list) to resolution.
 - ``project_event``: the immutable timeline: codes, ids and states only (database triggers refuse update and delete).
+
+Execution, quality control, snags and handover (migration 0212_project_execution, PEX):
+
+- ``project_work_package``: a body of work in one stage (optionally one space): owner, planned and actual dates kept
+  apart, explicit start and completion; BLOCKED is derived from open gating blockers, never stored.
+- ``project_qc_point``: the QC plan: what must be checked (category, space, work package, evidence requirement).
+- ``project_customer_report``: an issue in the customer's own words, triaged by staff into a snag or declined.
+- ``project_handover_package``: what is handed over, frozen with a SHA-256, and the customer's acknowledgement of it.
 """
 
 from __future__ import annotations
@@ -208,6 +216,9 @@ class ProjectTransition(_ProjectRow, AuditedBase):
     acknowledgement_reference: Mapped[str | None] = mapped_column(sa.String(200))
     evidence_attachment_id: Mapped[str | None] = mapped_column(GUID(), _fk("attachment.id"))
     observations: Mapped[str | None] = mapped_column(sa.String(2000))  # non-blocking observations (internal)
+    # PEX D5: the handover package this handover (and its approval) is bound to, with the digest that was current.
+    handover_package_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_handover_package.id"))
+    handover_package_sha256: Mapped[str | None] = mapped_column(sa.String(64))
 
     __table_args__ = (
         in_check("project_transition", "kind", V.TRANSITION_KINDS),
@@ -221,6 +232,11 @@ class ProjectTransition(_ProjectRow, AuditedBase):
                         "evidence_attachment_id IS NULL AND observations IS NULL)",
                         name="ck_project_transition__handover_only"),
         CheckConstraint("kind <> 'HANDOVER' OR handover_on IS NOT NULL", name="ck_project_transition__handover_on"),
+        CheckConstraint("kind = 'HANDOVER' OR (handover_package_id IS NULL AND handover_package_sha256 IS NULL)",
+                        name="ck_project_transition__package_handover_only"),
+        CheckConstraint("(handover_package_id IS NULL) = (handover_package_sha256 IS NULL)",
+                        name="ck_project_transition__package_pair"),
+        _sha("project_transition", "handover_package_sha256"),
         # one transition awaiting approval at a time: a second request cannot race the first
         Index("ux_project_transition__one_pending", "project_id", unique=True,
               **where("outcome = 'AWAITING_APPROVAL' AND is_deleted = 0",
@@ -228,6 +244,7 @@ class ProjectTransition(_ProjectRow, AuditedBase):
         Index("ix_project_transition__project", "project_id", "created_on"),
         Index("ix_project_transition__lead_id", "lead_id"),
         Index("ix_project_transition__evidence", "evidence_attachment_id"),
+        Index("ix_project_transition__package", "handover_package_id"),
     )  # fmt: skip
 
 
@@ -349,6 +366,9 @@ class ProjectBlocker(_ProjectRow, AuditedBase):
     related_checklist_item_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_checklist_item.id"))
     related_site_readiness_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_site_readiness.id"))
     related_quotation_id: Mapped[str | None] = mapped_column(GUID(), _fk("quotation.id"))  # a variation
+    related_work_package_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_work_package.id"))  # PEX
+    # PEX: what the customer is told while this pauses their work, in customer-safe words (shown only when set)
+    customer_summary: Mapped[str | None] = mapped_column(sa.String(300))
 
     __table_args__ = (
         in_check("project_blocker", "category", V.BLOCKER_CATEGORIES),
@@ -368,6 +388,7 @@ class ProjectBlocker(_ProjectRow, AuditedBase):
         Index("ix_project_blocker__checklist", "related_checklist_item_id"),
         Index("ix_project_blocker__site_readiness", "related_site_readiness_id"),
         Index("ix_project_blocker__quotation", "related_quotation_id"),
+        Index("ix_project_blocker__work_package", "related_work_package_id"),
     )  # fmt: skip
 
 
@@ -379,6 +400,8 @@ class ProjectQcCheck(_ProjectRow, _Evidence, AuditedBase):
     space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
     observation: Mapped[str | None] = mapped_column(sa.String(1000))  # internal
     recheck_of_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_qc_check.id"))
+    qc_point_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_qc_point.id"))  # PEX: the planned check
+    work_package_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_work_package.id"))  # PEX: the work checked
 
     __table_args__ = (
         in_check("project_qc_check", "category", V.QC_CATEGORIES),
@@ -389,7 +412,13 @@ class ProjectQcCheck(_ProjectRow, _Evidence, AuditedBase):
         Index("ix_project_qc_check__space_id", "space_id"),
         Index("ix_project_qc_check__recheck_of", "recheck_of_id"),
         Index("ix_project_qc_check__evidence", "evidence_attachment_id"),
-    )
+        # PEX: a check is rechecked at most once, so a chain is a line and two simultaneous rechecks cannot both land
+        Index("ux_project_qc_check__one_recheck", "recheck_of_id", unique=True,
+              **where("recheck_of_id IS NOT NULL AND is_deleted = 0",
+                      "recheck_of_id IS NOT NULL AND is_deleted = false")),
+        Index("ix_project_qc_check__point", "qc_point_id"),
+        Index("ix_project_qc_check__work_package", "work_package_id"),
+    )  # fmt: skip
 
 
 class ProjectSnag(_ProjectRow, _Evidence, AuditedBase):
@@ -414,9 +443,23 @@ class ProjectSnag(_ProjectRow, _Evidence, AuditedBase):
     closed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
     closed_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
     qc_check_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_qc_check.id"))
+    # PEX: triage, the fix (the fixer is never the verifier; every fix is also a SNAG_FIXED event) and closure.
+    work_package_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_work_package.id"))
+    source: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="STAFF", server_default="STAFF")
+    priority: Mapped[str] = mapped_column(sa.String(8), nullable=False, default="NORMAL", server_default="NORMAL")
+    customer_visible: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    fixed_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))  # the latest fix
+    fixed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    fix_note: Mapped[str | None] = mapped_column(sa.String(1000))  # internal
+    resolution_evidence_attachment_id: Mapped[str | None] = mapped_column(GUID(), _fk("attachment.id"))
+    closure_code: Mapped[str | None] = mapped_column(sa.String(16))
 
     __table_args__ = (
         in_check("project_snag", "category", V.SNAG_CATEGORIES),
+        in_check("project_snag", "source", V.SNAG_SOURCES),
+        in_check("project_snag", "priority", V.SNAG_PRIORITIES),
+        in_check("project_snag", "closure_code", V.SNAG_CLOSURE_CODES, nullable=True),
+        CheckConstraint("(fixed_on IS NULL) = (fixed_by IS NULL)", name="ck_project_snag__fixed"),
         in_check("project_snag", "status", V.SNAG_STATUSES),
         in_check("project_snag", "responsible_party", V.RESPONSIBLE_PARTIES),
         CheckConstraint("snag_no >= 1", name="ck_project_snag__snag_no"),
@@ -430,6 +473,182 @@ class ProjectSnag(_ProjectRow, _Evidence, AuditedBase):
         Index("ix_project_snag__owner", "owner_user_id"),
         Index("ix_project_snag__qc_check", "qc_check_id"),
         Index("ix_project_snag__evidence", "evidence_attachment_id"),
+        Index("ix_project_snag__work_package", "work_package_id"),
+        Index("ix_project_snag__fixed_by", "fixed_by"),
+        Index("ix_project_snag__resolution_evidence", "resolution_evidence_attachment_id"),
+    )  # fmt: skip
+
+
+class ProjectWorkPackage(_ProjectRow, _Evidence, AuditedBase):
+    """PEX: a body of work in one stage. Dates are only what was genuinely given: no planned date is unscheduled."""
+
+    __tablename__ = "project_work_package"
+
+    package_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    stage_code: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
+    title: Mapped[str] = mapped_column(sa.String(160), nullable=False)  # internal
+    description: Mapped[str | None] = mapped_column(sa.String(2000))  # internal
+    customer_label: Mapped[str | None] = mapped_column(sa.String(120))  # customer-safe words
+    customer_visible: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    owner_user_id: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    depends_on_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_work_package.id"))  # finish-to-start
+    status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="NOT_STARTED")
+    planned_start: Mapped[date | None] = mapped_column(sa.Date)  # an internal plan, never a commitment
+    planned_finish: Mapped[date | None] = mapped_column(sa.Date)
+    plan_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default=sa.text("0"))
+    replan_reason: Mapped[str | None] = mapped_column(sa.String(1000))  # why the plan last changed (internal)
+    actual_start: Mapped[date | None] = mapped_column(sa.Date)  # set only by the start command
+    actual_finish: Mapped[date | None] = mapped_column(sa.Date)  # set only by the completion command
+    started_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    completed_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    completion_note: Mapped[str | None] = mapped_column(sa.String(1000))  # internal
+    reopen_reason: Mapped[str | None] = mapped_column(sa.String(1000))  # why completed work was reopened (last)
+    cancel_reason: Mapped[str | None] = mapped_column(sa.String(1000))
+
+    __table_args__ = (
+        in_check("project_work_package", "stage_code", V.STAGES),
+        in_check("project_work_package", "status", V.WORK_PACKAGE_STATES),
+        CheckConstraint("package_no >= 1", name="ck_project_work_package__package_no"),
+        CheckConstraint("planned_start IS NULL OR planned_finish IS NULL OR planned_finish >= planned_start",
+                        name="ck_project_work_package__planned_order"),
+        CheckConstraint("status NOT IN ('IN_PROGRESS', 'COMPLETED') OR (actual_start IS NOT NULL AND started_by IS "
+                        "NOT NULL)", name="ck_project_work_package__started"),
+        CheckConstraint("(status = 'COMPLETED') = (actual_finish IS NOT NULL AND completed_by IS NOT NULL)",
+                        name="ck_project_work_package__completed"),
+        CheckConstraint("actual_finish IS NULL OR actual_finish >= actual_start",
+                        name="ck_project_work_package__actual_order"),
+        CheckConstraint("(status = 'CANCELLED') = (cancel_reason IS NOT NULL)",
+                        name="ck_project_work_package__cancelled"),
+        CheckConstraint("customer_visible = false OR customer_label IS NOT NULL",
+                        name="ck_project_work_package__customer_label"),
+        CheckConstraint("depends_on_id IS NULL OR depends_on_id <> id", name="ck_project_work_package__not_self"),
+        Index("ux_project_work_package__number", "project_id", "package_no", unique=True, **live_where()),
+        Index("ix_project_work_package__project", "project_id", "stage_code"),
+        Index("ix_project_work_package__lead_id", "lead_id"),
+        Index("ix_project_work_package__space_id", "space_id"),
+        Index("ix_project_work_package__owner", "owner_user_id"),
+        Index("ix_project_work_package__depends_on", "depends_on_id"),
+        Index("ix_project_work_package__evidence", "evidence_attachment_id"),
+        Index("ix_project_work_package__started_by", "started_by"),
+        Index("ix_project_work_package__completed_by", "completed_by"),
+    )  # fmt: skip
+
+
+class ProjectQcPoint(_ProjectRow, AuditedBase):
+    """PEX: one planned check. Satisfied only by a PASS chain head (with evidence when required); withdrawn only before
+    any result, with a reason. Never NOT_APPLICABLE (review D2)."""
+
+    __tablename__ = "project_qc_point"
+
+    point_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    category: Mapped[str] = mapped_column(sa.String(28), nullable=False)
+    space_id: Mapped[str | None] = mapped_column(GUID(), _fk("property_space.id"))
+    work_package_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_work_package.id"))
+    label: Mapped[str] = mapped_column(sa.String(160), nullable=False)  # internal
+    evidence_required: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="ACTIVE")
+    withdrawn_reason: Mapped[str | None] = mapped_column(sa.String(1000))
+    withdrawn_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    withdrawn_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        in_check("project_qc_point", "category", V.QC_CATEGORIES),
+        in_check("project_qc_point", "status", V.QC_POINT_STATES),
+        CheckConstraint("point_no >= 1", name="ck_project_qc_point__point_no"),
+        CheckConstraint("(status = 'WITHDRAWN') = (withdrawn_reason IS NOT NULL AND withdrawn_by IS NOT NULL AND "
+                        "withdrawn_on IS NOT NULL)", name="ck_project_qc_point__withdrawn"),
+        Index("ux_project_qc_point__number", "project_id", "point_no", unique=True, **live_where()),
+        Index("ix_project_qc_point__lead_id", "lead_id"),
+        Index("ix_project_qc_point__space_id", "space_id"),
+        Index("ix_project_qc_point__work_package", "work_package_id"),
+        Index("ix_project_qc_point__withdrawn_by", "withdrawn_by"),
+    )  # fmt: skip
+
+
+class ProjectCustomerReport(_ProjectRow, AuditedBase):
+    """PEX: an issue reported by the customer (in the portal, or recorded by staff on their behalf), in the customer's
+    own words. It is never a defect by itself: staff triage it into a snag (ACCEPTED) or decline it with a reason the
+    customer reads."""
+
+    __tablename__ = "project_customer_report"
+
+    report_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    channel: Mapped[str] = mapped_column(sa.String(8), nullable=False)
+    account_id: Mapped[str | None] = mapped_column(GUID(), _fk("portal_account.id"))  # the reporting customer
+    description: Mapped[str] = mapped_column(sa.String(2000), nullable=False)  # the customer's words
+    area: Mapped[str | None] = mapped_column(sa.String(120))  # where, in the customer's words
+    status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="SUBMITTED")
+    client_key_sha256: Mapped[str | None] = mapped_column(sa.String(64))  # portal idempotency (never the key)
+    request_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    triaged_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    triaged_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    snag_id: Mapped[str | None] = mapped_column(GUID(), _fk("project_snag.id"))
+    decline_code: Mapped[str | None] = mapped_column(sa.String(16))
+    response: Mapped[str | None] = mapped_column(sa.String(500))  # customer-safe reply
+
+    __table_args__ = (
+        in_check("project_customer_report", "channel", V.REPORT_CHANNELS),
+        in_check("project_customer_report", "status", V.REPORT_STATES),
+        in_check("project_customer_report", "decline_code", V.REPORT_DECLINE_CODES, nullable=True),
+        CheckConstraint("report_no >= 1", name="ck_project_customer_report__report_no"),
+        CheckConstraint("(channel = 'PORTAL') = (account_id IS NOT NULL)", name="ck_project_customer_report__account"),
+        CheckConstraint("(status = 'SUBMITTED') = (triaged_on IS NULL) AND (triaged_on IS NULL) = (triaged_by IS NULL)",
+                        name="ck_project_customer_report__triaged"),
+        CheckConstraint("(status = 'ACCEPTED') = (snag_id IS NOT NULL)", name="ck_project_customer_report__snag"),
+        CheckConstraint("(status = 'DECLINED') = (decline_code IS NOT NULL) AND (status <> 'DECLINED' OR response IS "
+                        "NOT NULL)", name="ck_project_customer_report__declined"),
+        CheckConstraint("(client_key_sha256 IS NULL) = (request_sha256 IS NULL)",
+                        name="ck_project_customer_report__key_pair"),
+        _sha("project_customer_report", "client_key_sha256"),
+        _sha("project_customer_report", "request_sha256"),
+        Index("ux_project_customer_report__number", "project_id", "report_no", unique=True, **live_where()),
+        Index("ux_project_customer_report__client_key", "account_id", "client_key_sha256", unique=True,
+              **where("client_key_sha256 IS NOT NULL AND is_deleted = 0",
+                      "client_key_sha256 IS NOT NULL AND is_deleted = false")),
+        Index("ix_project_customer_report__lead_id", "lead_id"),
+        Index("ix_project_customer_report__project", "project_id", "status"),
+        Index("ix_project_customer_report__snag", "snag_id"),
+        Index("ix_project_customer_report__triaged_by", "triaged_by"),
+    )  # fmt: skip
+
+
+class ProjectHandoverPackage(_ProjectRow, AuditedBase):
+    """PEX: what is handed over, frozen with its SHA-256 when prepared. The content never changes except by lead erasure,
+    which redacts it, records ``redacted_sha256`` and keeps the original digest (review D10)."""
+
+    __tablename__ = "project_handover_package"
+
+    package_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(12), nullable=False, default="PREPARED")
+    content: Mapped[dict] = mapped_column(JSONType(), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    redacted: Mapped[bool] = mapped_column(Bool(), nullable=False, default=False, server_default=sa.false())
+    redacted_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    superseded_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    superseded_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    acknowledged_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    acknowledged_account_id: Mapped[str | None] = mapped_column(GUID(), _fk("portal_account.id"))
+    completed_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        in_check("project_handover_package", "status", V.PACKAGE_STATES),
+        CheckConstraint("package_no >= 1", name="ck_project_handover_package__package_no"),
+        CheckConstraint("length(content_sha256) = 64", name="ck_project_handover_package__content_sha256_len"),
+        _sha("project_handover_package", "redacted_sha256"),
+        CheckConstraint("redacted = (redacted_sha256 IS NOT NULL)", name="ck_project_handover_package__redacted"),
+        CheckConstraint("(status = 'SUPERSEDED') = (superseded_on IS NOT NULL AND superseded_by IS NOT NULL)",
+                        name="ck_project_handover_package__superseded"),
+        CheckConstraint("(status = 'COMPLETED') = (completed_on IS NOT NULL)",
+                        name="ck_project_handover_package__completed"),
+        CheckConstraint("(acknowledged_on IS NULL) = (acknowledged_account_id IS NULL)",
+                        name="ck_project_handover_package__acknowledged"),
+        Index("ux_project_handover_package__number", "project_id", "package_no", unique=True, **live_where()),
+        Index("ux_project_handover_package__one_current", "project_id", unique=True,
+              **where("status = 'PREPARED' AND is_deleted = 0", "status = 'PREPARED' AND is_deleted = false")),
+        Index("ix_project_handover_package__lead_id", "lead_id"),
+        Index("ix_project_handover_package__superseded_by", "superseded_by"),
+        Index("ix_project_handover_package__account", "acknowledged_account_id"),
     )  # fmt: skip
 
 
@@ -455,4 +674,5 @@ class ProjectEvent(_ProjectRow, AuditedBase):
 
 TABLES = ("project", "project_baseline", "project_stage", "project_member", "project_transition",
           "project_checklist_item", "project_milestone", "project_site_readiness", "project_blocker",
-          "project_qc_check", "project_snag", "project_event")  # fmt: skip
+          "project_qc_check", "project_snag", "project_event", "project_work_package", "project_qc_point",
+          "project_customer_report", "project_handover_package")  # fmt: skip

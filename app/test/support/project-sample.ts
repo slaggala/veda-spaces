@@ -22,6 +22,8 @@ export const vocabulary: Vocabulary = {
   qc_categories: ['DIMENSIONS_AND_ALIGNMENT', 'FINISH_AND_SURFACES', 'OTHER'], qc_results: ['PASS', 'FAIL', 'NOT_APPLICABLE', 'TO_BE_CONFIRMED'],
   snag_categories: ['FINISH', 'OTHER'], snag_statuses: ['OPEN', 'IN_PROGRESS', 'READY_FOR_RECHECK', 'RESOLVED', 'CLOSED'],
   gates: [{ code: 'CHECKLIST_COMPLETE', label: 'Checklist', structural: false }],
+  snag_priorities: ['HIGH', 'NORMAL', 'LOW'], snag_closure_codes: ['DUPLICATE', 'NOT_A_DEFECT', 'RAISED_IN_ERROR'],
+  work_package_states: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], report_decline_codes: ['DUPLICATE', 'NOT_A_DEFECT', 'NOT_IN_SCOPE'],
 };
 
 export function row(over: Partial<ProjectRow> = {}): ProjectRow {
@@ -86,13 +88,17 @@ export function project(over: Partial<ProjectDetail> = {}): ProjectDetail {
       description: 'Internal detail', customer_action: 'Share the hob and chimney models', responsible_party: 'CUSTOMER', assigned_to: OPS,
       target_date: null, status: 'OPEN', blocks: { code: 'PRODUCTION_READINESS', label: 'Production readiness' }, resolution: null, resolved_on: null,
       resolved_by: null, raised_on: '2026-10-14T11:00:00Z', raised_by: OPS,
-      related: { milestone_id: null, checklist_item_id: null, site_readiness_id: null, quotation_id: null } }],
+      related: { milestone_id: null, checklist_item_id: null, site_readiness_id: null, quotation_id: null, work_package_id: null },
+      customer_summary: null }],
     milestones: [], site_readiness: [{ id: 'r1', version: 3, kind: 'READINESS', source: 'CUSTOMER_PROMISE', item_code: 'SYN_FLOOR', category: 'FLOORING',
       label: 'SYNTHETIC: flooring complete.', promise: { content_version: 'CPP-1', text: 'SYNTHETIC: flooring complete.', quoted_status: 'TO_BE_CONFIRMED' },
       status: 'CUSTOMER_ACTION_REQUIRED', satisfied: false, responsible_party: 'CUSTOMER', action: 'Flooring not laid', customer_action: 'Please complete the flooring',
       due_date: null, note: null, evidence: null, resolved_on: null, resolved_by: null, updated_on: null }],
-    qc: { required_categories: ['DIMENSIONS_AND_ALIGNMENT'], categories: [{ category: 'DIMENSIONS_AND_ALIGNMENT', required: true, latest: null }], history: [] },
-    snags: [],
+    qc: { required_categories: ['DIMENSIONS_AND_ALIGNMENT'], categories: [{ category: 'DIMENSIONS_AND_ALIGNMENT', required: true, latest: null }],
+      points: [], chains: [], history: [] },
+    snags: [], work_packages: [], customer_reports: [], handover_packages: [],
+    delivery_policy: { version: 'PEX-POLICY-0', status: 'UNDECIDED', decisions: { 'PEX-D01': { label: 'customer actions in the portal', decided: false },
+      'PEX-D02': { label: 'the commercial condition for handover', decided: false } } },
     baseline: { full: true, verified: true, problems: [], current_seq: 1, open_variations: [], variations: [],
       lineage: [{ id: 'bl1', sequence_no: 1, kind: 'ORIGINAL', current: true, quotation_id: 'q1', label: 'VS-Q-2026-000001 v1', variation_no: 0,
         decided_on: '2026-10-13T10:00:00Z', decision_method: 'SIGNED_COPY', recorded_on: '2026-10-14T10:00:00Z', accepted_total_minor: 123456700,
@@ -102,8 +108,8 @@ export function project(over: Partial<ProjectDetail> = {}): ProjectDetail {
     actions: { request_transition: true, complete_handover: true, approve_transition: false, assign_team: true, complete_checklist: true,
       checklist_not_applicable: false, manage_milestone: true, raise_blocker: true, resolve_blocker: true, manage_site_readiness: true, manage_qc: true,
       manage_snag: true, view_commercial_baseline: true, view_audit: true, record_promised_date: false, reclassify_snag: false,
-      qc_required_not_applicable: false },
-    policy: POLICY, classification: { classes: ['INTERNAL_ONLY'], default: 'INTERNAL_ONLY', fields: {}, published: false },
+      qc_required_not_applicable: false, manage_work: true, verify_snag: false, prepare_handover_package: false },
+    policy: POLICY, classification: { classes: ['INTERNAL_ONLY'], default: 'INTERNAL_ONLY', fields: {}, published_through: 'VEDA_PROJECT_DELIVERY_PORTAL_ENABLED' },
     last_material_change: '2026-10-15T09:00:00Z', ...over,
   };
 }
