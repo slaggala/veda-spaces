@@ -43,6 +43,7 @@ def upgrade() -> None:
         sa.Column("deleted_by", GUID(), nullable=True),
         sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("1")),
         sa.Column("email_normalized", sa.String(254), nullable=False),
+        sa.Column("email_hash", sa.String(64), nullable=False),
         sa.Column("display_name", sa.String(150), nullable=False),
         sa.Column("name_source_lead_id", GUID(), nullable=True),
         sa.Column("status", sa.String(10), nullable=False),
@@ -72,6 +73,7 @@ def upgrade() -> None:
         sa.CheckConstraint("length(display_name) <= 150", name="ck_portal_account__display_name_len").ddl_if(
             dialect="sqlite"
         ),
+        sa.CheckConstraint("length(email_hash) = 64", name="ck_portal_account__email_hash_len"),
         sa.CheckConstraint("length(email_normalized) <= 254", name="ck_portal_account__email_normalized_len").ddl_if(
             dialect="sqlite"
         ),
@@ -103,6 +105,14 @@ def upgrade() -> None:
         "ux_portal_account__email",
         "portal_account",
         ["email_normalized"],
+        unique=True,
+        sqlite_where=sa.text("is_deleted = 0"),
+        postgresql_where=sa.text("is_deleted = false"),
+    )
+    op.create_index(
+        "ux_portal_account__email_hash",
+        "portal_account",
+        ["email_hash"],
         unique=True,
         sqlite_where=sa.text("is_deleted = 0"),
         postgresql_where=sa.text("is_deleted = false"),

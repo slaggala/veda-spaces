@@ -214,9 +214,9 @@ def test_sign_in_links_are_capped_per_account_per_day_from_any_network(api, fact
     for _ in range(4):
         r = api.post(f"{PUBLIC}/sign-in", {"email": "capped@example.test"}, anonymous=True)
         assert r.status == 202  # the answer never changes
+    assert t.emails_to("capped@example.test") >= 2  # drains the worker, which decides each request in order
     links = dbh.rows(sa.select(PortalSignIn).where(PortalSignIn.purpose == "SIGN_IN"))
-    assert len(links) == 2  # capped; each superseded the one before, so only the newest is emailed
-    assert t.emails_to("capped@example.test") == 2  # the invitation, then the newest sign-in link
+    assert len(links) == 2  # capped at two, from four requests
 
 
 def test_an_erased_enquiry_no_longer_names_a_customer_who_keeps_another(api, factory):
@@ -288,3 +288,22 @@ def test_erasure_never_renames_a_customer_to_another_persons_name(api, factory):
     assert names["chosen@example.test"] == "Asha (synthetic)"
     assert names["family@example.test"] == "Customer" != name_b
     assert t.sign_in("family@example.test").home().data["customer"]["name"] == "Customer"
+
+
+def test_a_sign_in_request_does_the_same_work_whether_or_not_the_email_has_access(api, factory):
+    """Review F3: the request itself only queues the keyed hash (one outbox row, no address); the worker decides."""
+    from veda.platform.notifications.models import OutboxEvent
+
+    t = Portal(api, factory)
+    prop, _, _ = t.issued()
+    t.grant(prop["lead_id"], "known2@example.test")
+    t.link_token("known2@example.test")  # drain the invitation
+    before = {e.id for e in dbh.rows(sa.select(OutboxEvent))}
+    for email in ("known2@example.test", "nobody@example.test"):
+        r = api.post(f"{PUBLIC}/sign-in", {"email": email}, anonymous=True)
+        assert r.status == 202
+    new = [e for e in dbh.rows(sa.select(OutboxEvent)) if e.id not in before]
+    assert [e.event_type for e in new] == ["portal.sign_in_requested"] * 2
+    assert all(set(e.payload) <= {"email_hash", "request_id"} and len(e.payload["email_hash"]) == 64 for e in new)
+    assert "known2@example.test" not in str([e.payload for e in new]) and "nobody" not in str([e.payload for e in new])
+    assert dbh.rows(sa.select(PortalSignIn).where(PortalSignIn.purpose == "SIGN_IN")) == []  # nothing issued yet

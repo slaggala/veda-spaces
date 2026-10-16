@@ -94,8 +94,8 @@ def _account(s: Session, email: str, display_name: str, name_source_lead_id: str
     found = s.execute(sa.select(PortalAccount).where(PortalAccount.email_normalized == email)).scalar_one_or_none()
     if found is not None:
         return found  # an existing account keeps its name: a second enquiry never renames anyone
-    account = PortalAccount(email_normalized=email, display_name=display_name, status="ACTIVE",
-                            name_source_lead_id=name_source_lead_id)  # fmt: skip
+    account = PortalAccount(email_normalized=email, email_hash=email_hash(email), display_name=display_name,
+                            status="ACTIVE", name_source_lead_id=name_source_lead_id)  # fmt: skip
     try:
         with s.begin_nested():  # two invitations of one new email at once: the second finds the first's row
             s.add(account)
@@ -177,11 +177,27 @@ def _issue(s: Session, account: PortalAccount, purpose: str) -> PortalSignIn:
     return row
 
 
+def email_hash(email: str) -> str:
+    """The keyed hash of a normalised email (the security-event email HMAC): finds an account without the address."""
+    from veda.platform.auth.security_events import email_attempt_hash
+
+    return email_attempt_hash(normalize_email(email or ""))
+
+
 def request_sign_in(s: Session, email: str) -> None:
-    """Send a sign-in link if, and only if, the email has an ACTIVE account with ACTIVE access. Answers nothing."""
-    normalized = normalize_email(email or "")
-    account = s.execute(sa.select(PortalAccount).where(PortalAccount.email_normalized == normalized)
-                        ).scalar_one_or_none()  # fmt: skip
+    """Queue the request, and nothing else: one keyed hash and one outbox row, the same work for every address, so
+    neither the answer nor its timing says whether the email has access (review F3). The outbox carries the hash, never
+    the address; ``issue_requested`` decides in the worker."""
+    from veda.kernel import outbox
+
+    outbox.enqueue(s, events.SIGN_IN_REQUESTED, "portal_sign_in_request", new_id(), email_hash=email_hash(email))
+
+
+def issue_requested(s: Session, hashed: str | None) -> None:
+    """In the outbox worker: send a sign-in link if, and only if, the email has an ACTIVE account with ACTIVE access,
+    at most one a minute and ``DAILY_SIGN_IN_LINKS`` a day per account."""
+    account = s.execute(sa.select(PortalAccount).where(PortalAccount.email_hash == hashed)
+                        ).scalar_one_or_none() if hashed else None  # fmt: skip
     if account is None or account.status != "ACTIVE" or not active_access(s, account.id):
         return
     if s.get_bind().dialect.name == "postgresql":

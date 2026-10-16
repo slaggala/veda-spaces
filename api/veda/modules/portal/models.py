@@ -35,6 +35,7 @@ class PortalAccount(AuditedBase):
     __tablename__ = "portal_account"
 
     email_normalized: Mapped[str] = mapped_column(sa.String(254), nullable=False)
+    email_hash: Mapped[str] = mapped_column(sa.String(64), nullable=False)  # keyed HMAC: sign-in requests find it
     display_name: Mapped[str] = mapped_column(sa.String(150), nullable=False)
     # The enquiry the display name was copied from (staff gave no name), so erasing that enquiry renames the account;
     # null when staff chose the name. Never another person's name: see erasure.erase_for_lead.
@@ -47,6 +48,8 @@ class PortalAccount(AuditedBase):
         in_check("portal_account", "status", V.ACCOUNT_STATUSES),
         CheckConstraint("erased_on IS NULL OR status = 'DISABLED'", name="ck_portal_account__erased"),
         Index("ux_portal_account__email", "email_normalized", unique=True, **live_where()),
+        Index("ux_portal_account__email_hash", "email_hash", unique=True, **live_where()),
+        CheckConstraint("length(email_hash) = 64", name="ck_portal_account__email_hash_len"),
         Index("ix_portal_account__name_source", "name_source_lead_id"),
     )
 

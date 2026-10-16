@@ -21,7 +21,7 @@ Customer routes, RBX-010, `auth="public"`, all `no-store`:
 
 | Route | Behaviour |
 |---|---|
-| `POST /api/v1/public/portal/sign-in` | 202, the same answer whether or not the email has access. Sends a link only to an ACTIVE account with ACTIVE access to a live enquiry, at most one a minute. |
+| `POST /api/v1/public/portal/sign-in` | 202, the same answer and the same work whether or not the email has access: it queues the keyed email hash. The outbox worker sends a link only to an ACTIVE account with ACTIVE access to a live enquiry, at most one a minute and 10 a day. |
 | `POST /api/v1/public/portal/session` | Exchanges a link (single use, 15 minutes; an invitation 72 hours) for a session token returned once. |
 | `POST /api/v1/public/portal/sign-out` | Ends the session. |
 | `GET /api/v1/public/portal/home`, `/properties/{id}`, `/quotations/{id}` | The customer-authorised projection (`veda.modules.portal.projection`). |
@@ -102,13 +102,14 @@ A fresh reviewer certified the branch with one merge condition. The findings and
 |---|---|
 | F1 (Medium, merge condition): after a lead erasure, the erased enquiry's access list still showed the name and email of a customer who kept access to another enquiry, and the account could keep a name copied from the erased enquiry | Fixed. An erased enquiry's access list shows no account identity. A surviving shared account takes its name from an enquiry it still has, and joins the erasure set so its audit history loses the earlier name. Tested. |
 | F2: anyone who knew the email could void the 72-hour invitation, and the email rate limits were per network | Fixed. A sign-in request never cancels an invitation. Each account gets at most 10 sign-in links per 24 hours from any network (DB-backed). Tested. |
-| F3: a known email's sign-in request takes measurably longer than an unknown one | Accepted residual while the flag is off. The answer and rate-limit keys are identical. Closing the gap needs the issuing moved out of the request (post-request writes run before the response is sent). Listed for the enablement review (CPP-D01). |
+| F3: a known email's sign-in request takes measurably longer than an unknown one | Fixed. The request only computes the keyed email hash (the security-event HMAC) and queues one outbox row: the same work for every address, and the outbox holds the hash, never the address. The worker finds the account by `portal_account.email_hash` and applies every check, the one-a-minute gap and the daily cap. Tested. |
 | F4: a declined or expired quotation got the headline "Your quotation is ready"; blockers waiting on Veda showed as customer actions; deleted rows were not filtered; a catch-all exception handler | Fixed. Tested. |
 | F5: each quotation was verified several times per page | Fixed with a per-request cache. |
 | F6: a docstring claimed no digest reaches customers; unused definitions | Fixed. The CQX projection's frozen-document digest is named. Unused definitions removed. |
 | F7: access on a soft-deleted lead could not be revoked (it would return on restore) | Fixed. Revocation works within scope while the lead is soft-deleted. Tested. |
 | Missing test: a link redeemed twice at once | Added on both engines (one session, one refusal). |
 | Re-review N1 (Medium, merge condition): the F1 fix renamed a surviving shared account to the name of another enquiry it held, possibly someone else's | Fixed. The account records which enquiry its name was copied from (`name_source_lead_id`; null when staff chose the name). Only an account named from the erased enquiry is renamed: to the name of an enquiry it holds as primary customer, else the neutral "Customer". A chosen name is never touched. Tested. |
+| Final review nit: a fully erased account kept a pointer to the erased enquiry its name came from | Fixed. Erasure clears it, and replaces the email hash with the hash of the placeholder address. |
 | Re-review N2: the enquiry's own consultant (OWN scope) still could not revoke on a soft-deleted lead | Fixed. The scope check sees soft-deleted leads. Tested with the consultant. |
 
 ## Found during this work (outside this change)

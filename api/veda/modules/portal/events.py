@@ -23,7 +23,8 @@ from .models import PortalAccount, PortalEvent, PortalSignIn
 
 _SAFE = re.compile(r"^[A-Za-z0-9_.:+-]{0,80}$")
 SIGN_IN_LINK = "portal.sign_in_link"
-EVENT_TYPES = (SIGN_IN_LINK,)
+SIGN_IN_REQUESTED = "portal.sign_in_requested"  # a customer asked for a link: decided in the worker (review F3)
+EVENT_TYPES = (SIGN_IN_REQUESTED, SIGN_IN_LINK)
 LINK_PATH = "/portal/sign-in"
 
 
@@ -54,6 +55,13 @@ def link_for(row: PortalSignIn) -> str:
 
 def notify_sign_in(s: Session, row: PortalSignIn) -> None:
     outbox.enqueue(s, SIGN_IN_LINK, "portal_account", row.account_id, sign_in_id=row.id)
+
+
+@handler(SIGN_IN_REQUESTED)
+def _sign_in_requested(s: Session, event: OutboxEvent) -> None:
+    from . import identity
+
+    identity.issue_requested(s, event.payload.get("email_hash"))
 
 
 @handler(SIGN_IN_LINK)

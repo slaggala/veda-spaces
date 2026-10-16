@@ -44,7 +44,8 @@ def erase_for_lead(s: Session, lead) -> int:
                 touched += 1
             continue
         account.email_normalized = f"erased+{account.id}@invalid"
-        account.display_name = ERASED_NAME
+        account.email_hash = identity.email_hash(account.email_normalized)
+        account.display_name, account.name_source_lead_id = ERASED_NAME, None
         account.status, account.erased_on = "DISABLED", db.tx_time(s)
         identity.end_sessions(s, account.id, "LEAD_ERASED")
         events.record(s, account.id, "ACCOUNT_ERASED", lead_id=lead.id)
