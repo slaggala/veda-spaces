@@ -73,7 +73,8 @@ class Position:
         """The payment that matters next: a requested instalment with a balance, else the first with a balance."""
         open_ = [x for x in self.lines if x.remaining_minor > 0]
         requested = [x for x in open_ if x.requested]
-        return (requested or open_ or [None])[0]
+        found = requested or open_
+        return found[0] if found else None
 
     def line_of(self, instalment_id: str) -> Line | None:
         return next((x for x in self.lines if x.instalment.id == instalment_id), None)

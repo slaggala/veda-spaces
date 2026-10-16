@@ -115,10 +115,11 @@ def revise(s: Session, ctx, account: CommercialAccount, body) -> PaymentSchedule
         row: dict[str, Any] = {"label": x.label, "when": x.when, "amount_minor": int(x.amount_minor),
                                "share_bp": before.share_bp if before else None,
                                "carried_from_id": before.id if before else None}  # fmt: skip
-        if x.requested or x.due_on is not None or requested:
-            row["requested_on"] = before.requested_on if requested else db.tx_time(s)
-            row["requested_by"] = before.requested_by if requested else ctx.user.id
-            row["due_on"] = x.due_on if x.due_on is not None else (before.due_on if requested else None)
+        if requested and before is not None:  # carried with its request
+            row["requested_on"], row["requested_by"] = before.requested_on, before.requested_by
+            row["due_on"] = x.due_on if x.due_on is not None else before.due_on
+        elif x.requested or x.due_on is not None:
+            row["requested_on"], row["requested_by"], row["due_on"] = db.tx_time(s), ctx.user.id, x.due_on
         out.append(row)
     if current is not None:
         dropped = {i.id for rest in previous.values() for i in rest}

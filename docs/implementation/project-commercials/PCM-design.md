@@ -1,6 +1,6 @@
 # Project Commercials: implementation map, design and design review (discovery 2026-10-16)
 
-Baseline: main `217cb2c` (after PR #101, #103 and #104). Project Lifecycle off; PLB-OD-01…13 null; Customer Project
+Baseline: main after PR #101, #103 and #104 (the PR #104 merge). Project Lifecycle off; PLB-OD-01…13 null; Customer Project
 Portal off and being deployed separately. The workstream adds the commercial source of truth that starts at an accepted
 quotation: the baseline, the payment schedule, payments, receipts, invoices, the outstanding balance, and their
 customer-safe projection in the existing portal.

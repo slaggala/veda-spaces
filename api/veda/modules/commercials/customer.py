@@ -90,7 +90,7 @@ def for_property(s: Session, prop) -> dict[str, Any] | None:
     pos = position.compute(s, account)
     receipts = _receipts(s, account.id)
     nxt = pos.next_line
-    history = []
+    history: list[dict[str, Any]] = []
     for p, r in reversed(pos.payments):
         rc = receipts.get(p.id)
         history.append({

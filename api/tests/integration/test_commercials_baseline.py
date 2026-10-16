@@ -96,10 +96,14 @@ def test_an_accepted_variation_becomes_the_next_baseline_and_the_schedule_must_b
     delta = v["decision"]["accepted_total_minor"]
     assert [b["kind"] for b in after["baseline"]] == ["ORIGINAL", "VARIATION"]
     assert after["position"]["value_minor"] == acc["position"]["value_minor"] + delta
-    assert after["position"]["schedule_state"] == "REVISION_REQUIRED" and after["position"]["unscheduled_minor"] == delta
+    assert (
+        after["position"]["schedule_state"] == "REVISION_REQUIRED" and after["position"]["unscheduled_minor"] == delta
+    )
     assert after["problems"] == []
     # a revision must add up exactly to the new value
-    lines = [{"label": x["label"], "when": x["when"], "amount_minor": x["amount_minor"]} for x in after["schedule"]["lines"]]
+    lines = [
+        {"label": x["label"], "when": x["when"], "amount_minor": x["amount_minor"]} for x in after["schedule"]["lines"]
+    ]
     r = t.revise(acc, lines, status=422)
     assert r.code == "VALIDATION_FAILED" and r.json["errors"][0]["code"] == "TOTAL_MISMATCH"
     revised = t.revise(acc, lines + [{"label": "Variation 1", "when": "On approval of the variation (synthetic)",
@@ -107,7 +111,10 @@ def test_an_accepted_variation_becomes_the_next_baseline_and_the_schedule_must_b
     assert revised["position"]["schedule_state"] == "IN_BALANCE"
     assert sum(amounts(revised)) == revised["position"]["value_minor"]
     assert [r_["revision_no"] for r_ in revised["revisions"]] == [2, 1]
-    assert dbh.rows(sa.select(PaymentSchedule.status).order_by(PaymentSchedule.revision_no)) == ["SUPERSEDED", "CURRENT"]
+    assert dbh.rows(sa.select(PaymentSchedule.status).order_by(PaymentSchedule.revision_no)) == [
+        "SUPERSEDED",
+        "CURRENT",
+    ]
 
 
 def test_a_schedule_revision_needs_a_reason_the_current_version_and_whole_paise(api, factory):
@@ -115,8 +122,13 @@ def test_a_schedule_revision_needs_a_reason_the_current_version_and_whole_paise(
     _, _, acc = t.opened()
     total = acc["position"]["value_minor"]
     cur = t.get(acc)
-    body = {"reason": "Two equal parts", "instalments": [{"label": "A", "when": "Now", "amount_minor": total - total // 2},
-                                                          {"label": "B", "when": "Later", "amount_minor": total // 2}]}
+    body = {
+        "reason": "Two equal parts",
+        "instalments": [
+            {"label": "A", "when": "Now", "amount_minor": total - total // 2},
+            {"label": "B", "when": "Later", "amount_minor": total // 2},
+        ],
+    }
     assert t.call("POST", f"{BASE}/{acc['id']}/schedule", body).status == 428  # no If-Match
     assert t.call("POST", f"{BASE}/{acc['id']}/schedule", body, if_match=cur["version"] + 7).status == 409
     for bad in (1.5, "100", True, 0, -5):

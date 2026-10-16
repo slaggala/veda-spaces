@@ -105,7 +105,7 @@ def revise_schedule(req: Req, account_id: str):
 
 
 @api.route("POST", "/commercials/<account_id>/instalments/<instalment_id>/request",
-           permission="commercials.schedule.manage", body=S.RequestIn, if_match=True, requirement="PCM-007",
+           permission="commercials.schedule.manage", body=S.PaymentRequestIn, if_match=True, requirement="PCM-007",
            summary="Ask the customer for an instalment, optionally by a due date")  # fmt: skip
 def request_instalment(req: Req, account_id: str, instalment_id: str):
     account = _account(req, account_id)
@@ -215,7 +215,7 @@ def cancel_invoice(req: Req, invoice_id: str):
     return ok(_invoice_view(req, account, inv))
 
 
-@api.route("POST", "/commercial-invoices/<invoice_id>/discard", permission="commercials.invoice.issue", if_match=True,
+@api.route("POST", "/commercial-invoices/<invoice_id>/abandon", permission="commercials.invoice.issue", if_match=True,
            requirement="PCM-012", summary="Discard a draft invoice (never an issued one)")  # fmt: skip
 def discard_invoice(req: Req, invoice_id: str):
     account, inv = _invoice(req, invoice_id)

@@ -973,6 +973,20 @@
         "title": "BoqOverrideIn",
         "type": "object"
       },
+      "CancelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CancelIn",
+        "type": "object"
+      },
       "CancelLinkIn": {
         "additionalProperties": false,
         "properties": {
@@ -2374,6 +2388,50 @@
         "title": "HandoverIn",
         "type": "object"
       },
+      "InstalmentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "maximum": 10000000000000,
+            "minimum": 1,
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due On"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "requested": {
+            "default": false,
+            "title": "Requested",
+            "type": "boolean"
+          },
+          "when": {
+            "title": "When",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "when",
+          "amount_minor"
+        ],
+        "title": "InstalmentIn",
+        "type": "object"
+      },
       "InviteIn": {
         "additionalProperties": false,
         "properties": {
@@ -2435,6 +2493,45 @@
           "full_name"
         ],
         "title": "InviteIn",
+        "type": "object"
+      },
+      "InvoiceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Note"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due On"
+          },
+          "instalment_id": {
+            "title": "Instalment Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instalment_id"
+        ],
+        "title": "InvoiceIn",
         "type": "object"
       },
       "LShapeIn": {
@@ -3761,6 +3858,20 @@
         "title": "Obstruction",
         "type": "object"
       },
+      "OpenIn": {
+        "additionalProperties": false,
+        "properties": {
+          "quotation_id": {
+            "title": "Quotation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quotation_id"
+        ],
+        "title": "OpenIn",
+        "type": "object"
+      },
       "OpeningIn": {
         "additionalProperties": false,
         "properties": {
@@ -3896,6 +4007,96 @@
           "height_mm"
         ],
         "title": "OpeningIn",
+        "type": "object"
+      },
+      "PaymentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "maximum": 10000000000000,
+            "minimum": 1,
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "customer_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Note"
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "External Reference"
+          },
+          "internal_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Internal Note"
+          },
+          "method_code": {
+            "enum": [
+              "BANK_TRANSFER",
+              "UPI",
+              "CHEQUE",
+              "CASH",
+              "OTHER"
+            ],
+            "title": "Method Code",
+            "type": "string"
+          },
+          "received_on": {
+            "format": "date",
+            "title": "Received On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_minor",
+          "received_on",
+          "method_code"
+        ],
+        "title": "PaymentIn",
+        "type": "object"
+      },
+      "PaymentRequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due On"
+          }
+        },
+        "title": "PaymentRequestIn",
         "type": "object"
       },
       "PermissionPatch": {
@@ -5886,6 +6087,38 @@
         "title": "ReturnIn",
         "type": "object"
       },
+      "ReverseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "reason_code": {
+            "enum": [
+              "RECORDED_IN_ERROR",
+              "DUPLICATE",
+              "PAYMENT_RETURNED",
+              "OTHER"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason_code"
+        ],
+        "title": "ReverseIn",
+        "type": "object"
+      },
       "ReviewIn": {
         "additionalProperties": false,
         "properties": {
@@ -6111,6 +6344,29 @@
           "reason"
         ],
         "title": "RolesIn",
+        "type": "object"
+      },
+      "ScheduleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "instalments": {
+            "items": {
+              "$ref": "#/components/schemas/InstalmentIn"
+            },
+            "maxItems": 24,
+            "title": "Instalments",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "instalments"
+        ],
+        "title": "ScheduleIn",
         "type": "object"
       },
       "ScopeCreateIn": {
@@ -12398,6 +12654,737 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "CAT-008"
+      }
+    },
+    "/api/v1/commercial-invoices/{invoice_id}": {
+      "get": {
+        "operationId": "commercials_get_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One invoice: a draft's preview, or the issued frozen document",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-012"
+      }
+    },
+    "/api/v1/commercial-invoices/{invoice_id}/abandon": {
+      "post": {
+        "operationId": "commercials_discard_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discard a draft invoice (never an issued one)",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.invoice.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-012"
+      }
+    },
+    "/api/v1/commercial-invoices/{invoice_id}/cancel": {
+      "post": {
+        "operationId": "commercials_cancel_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel an issued invoice with a reason (the document stays)",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.invoice.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-012"
+      }
+    },
+    "/api/v1/commercial-invoices/{invoice_id}/issue": {
+      "post": {
+        "operationId": "commercials_issue_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue a draft invoice: number, frozen document, customer notified",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.invoice.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-012"
+      }
+    },
+    "/api/v1/commercial-receipts/{receipt_id}": {
+      "get": {
+        "operationId": "commercials_get_receipt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One receipt: the frozen document, and whether its payment was reversed",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-013"
+      }
+    },
+    "/api/v1/commercials": {
+      "get": {
+        "operationId": "commercials_list_accounts",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commercial records within scope, with their position",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-020"
+      },
+      "post": {
+        "operationId": "commercials_open_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the commercial record of an accepted quotation (its baseline and first payment schedule)",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.schedule.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-001"
+      }
+    },
+    "/api/v1/commercials/candidates": {
+      "get": {
+        "operationId": "commercials_candidates",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accepted quotations within scope that have no commercial record yet",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.schedule.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-001"
+      }
+    },
+    "/api/v1/commercials/{account_id}": {
+      "get": {
+        "operationId": "commercials_get_account",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One commercial record: baseline, position, schedule, payments, invoices and receipts",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-020"
+      }
+    },
+    "/api/v1/commercials/{account_id}/history": {
+      "get": {
+        "operationId": "commercials_get_history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The commercial history: who did what, when",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.audit.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-025"
+      }
+    },
+    "/api/v1/commercials/{account_id}/instalments/{instalment_id}/request": {
+      "post": {
+        "operationId": "commercials_request_instalment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "instalment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the customer for an instalment, optionally by a due date",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.schedule.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-007"
+      }
+    },
+    "/api/v1/commercials/{account_id}/invoices": {
+      "post": {
+        "operationId": "commercials_draft_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Draft an invoice for an instalment of the current schedule (staff only until issued)",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.invoice.issue"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-012"
+      }
+    },
+    "/api/v1/commercials/{account_id}/payments": {
+      "post": {
+        "operationId": "commercials_record_payment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a payment received outside the system (needs Idempotency-Key); issues its receipt",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.payment.record"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-009"
+      }
+    },
+    "/api/v1/commercials/{account_id}/payments/{payment_id}/reverse": {
+      "post": {
+        "operationId": "commercials_reverse_payment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reverse a recorded payment with a reason (never one you recorded)",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.payment.reverse"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-011"
+      }
+    },
+    "/api/v1/commercials/{account_id}/schedule": {
+      "post": {
+        "operationId": "commercials_revise_schedule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revise (or create) the payment schedule; instalments must add up to the project value",
+        "tags": [
+          "project-commercials"
+        ],
+        "x-permission": [
+          "commercials.schedule.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "PCM-006"
       }
     },
     "/api/v1/cost-estimates/{estimate_id}": {
@@ -21138,6 +22125,41 @@
         "x-requirement": "CPP-004"
       }
     },
+    "/api/v1/public/portal/invoices/{invoice_id}": {
+      "get": {
+        "operationId": "portal_customer_invoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "One issued invoice of the customer's project: the frozen document (Project Commercials)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "PCM-015"
+      }
+    },
     "/api/v1/public/portal/properties/{property_id}": {
       "get": {
         "operationId": "portal_customer_property_detail",
@@ -21206,6 +22228,41 @@
         "x-permission-any-of": null,
         "x-rbac-exception": "RBX-010",
         "x-requirement": "CPP-007"
+      }
+    },
+    "/api/v1/public/portal/receipts/{receipt_id}": {
+      "get": {
+        "operationId": "portal_customer_receipt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "One receipt of the customer's project: the frozen document (Project Commercials)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "PCM-015"
       }
     },
     "/api/v1/public/portal/session": {

@@ -46,7 +46,7 @@ class ScheduleIn(Closed):
     instalments: list[InstalmentIn] = Field(max_length=V.MAX_INSTALMENTS)
 
 
-class RequestIn(Closed):
+class PaymentRequestIn(Closed):
     due_on: CalendarDate | None = None
 
 

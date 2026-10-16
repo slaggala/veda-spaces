@@ -86,13 +86,14 @@ def issue(s: Session, ctx, account: CommercialAccount, inv: CommercialInvoice) -
     now = db.tx_time(s)
     number = sequences.next_number(s, "INVOICE")
     inst = line.instalment
+    inv.amount_minor, inv.tax_minor = int(inst.amount_minor), inst.tax_minor
+    doc = documents.invoice_model(s, account, inv, line, pos, particulars, number, now)  # before any change below
     if inst.requested_on is None:
         inst.requested_on, inst.requested_by = now, ctx.user.id
     if inv.due_on is not None:
         inst.due_on = inv.due_on
-    inv.amount_minor, inv.tax_minor = int(inst.amount_minor), inst.tax_minor
     inv.invoice_number, inv.issued_on, inv.issued_by, inv.status = number, now, ctx.user.id, "ISSUED"
-    documents.seal(inv, documents.invoice_model(s, account, inv, line, pos, particulars, number, now))
+    documents.seal(inv, doc)
     s.flush()
     events.record(s, account, "INVOICE_ISSUED", inv.id, invoice_number=number, instalment_id=inst.id,
                   amount_minor=inv.amount_minor, due_minor=line.remaining_minor, due_on=inv.due_on,

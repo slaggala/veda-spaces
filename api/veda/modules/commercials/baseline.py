@@ -117,8 +117,8 @@ def append(
     value = (previous.value_minor if previous else 0) + int(q.accepted_total_minor or 0)
     if value < 0:
         raise ApiError(409, "INVALID_STATE", "An accepted variation would make the project value negative.")
-    total_tax = None if tax is None or (previous is not None and previous.tax_minor is None) else (
-        (previous.tax_minor if previous else 0) + tax)  # fmt: skip
+    before_tax: int | None = 0 if previous is None else previous.tax_minor
+    total_tax = None if tax is None or before_tax is None else before_tax + tax
     row = CommercialBaseline(
         account_id=account.id, lead_id=account.lead_id, sequence_no=(previous.sequence_no + 1) if previous else 1,
         kind="ORIGINAL" if previous is None else "VARIATION", previous_baseline_id=previous.id if previous else None,
