@@ -22,7 +22,10 @@ export const portalStyles = [...shared, css`
   .section { display: flex; flex-direction: column; gap: var(--vs-space-3); scroll-margin-top: var(--vs-space-6); }
   .btn, button, a.btn { min-height: var(--vs-target); }
   a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-  :is(a, button, h1, h2, [tabindex]):focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
+  a.back { display: inline-flex; align-items: center; min-height: var(--vs-target); }
+  :is(a, button, input, select, summary):focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
+  /* Headings take focus only to orient screen-reader users after a change; they are not controls. */
+  :is(h1, h2, h3)[tabindex='-1']:focus { outline: none; }
   .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--vs-radius-pill); font-size: 13px; line-height: 22px; font-weight: 600; border: 1px solid var(--vs-line); background: var(--vs-surface); white-space: nowrap; }
   .badge::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--vs-ink-muted); }
   .badge.COMPLETED::before { background: var(--vs-success); }

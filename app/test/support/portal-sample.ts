@@ -41,8 +41,8 @@ export function view(over: Partial<PropertyView> = {}): PropertyView {
       due: '2026-11-11', quotation_id: 'q1' }],
     quotations: [quotation()], documents: [{ ...quotation(), kind: 'QUOTATION' }],
     included: [{ title: 'Kitchen', kind: 'ROOM', included_count: 2, optional_count: 1, items: [
-      { description: 'Base cabinets with a long SYNTHETIC description of the carcass and shutter finish', detail: 'BWP plywood', status: 'INCLUDED' },
-      { description: 'Tall unit', detail: null, status: 'OPTIONAL' }] }],
+      { description: 'Base cabinets with a long SYNTHETIC description of the carcass and shutter finish', detail: 'BWP plywood', status: 'Included' },
+      { description: 'Tall unit', detail: null, status: 'Optional' }] }],
     commitments: { source: 'VS-Q-2026-000001 v1', inclusions: [{ code: 'I1', text: 'Design, manufacture and installation' }],
       warranty: ['10 years on carcass (SYNTHETIC)'], manufacturer_warranty_note: null, handover: [{ code: 'H1', text: 'Joint walkthrough' }],
       care: null, next_steps: [{ code: 'N1', stage: 'VEDA_CONFIRMATION', label: 'Confirmation', text: 'We confirm your order.', duration: '2 days' }],

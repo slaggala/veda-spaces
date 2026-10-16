@@ -75,7 +75,7 @@ export class VsPortalQuotationPage extends LitElement {
     }
     const page = this.page!;
     const s = page.summary;
-    return html`<p><a href="/portal">← Your portal</a></p>
+    return html`<p><a class="back" href="/portal">← Your portal</a></p>
       <div class="head"><p class="eyebrow">${s.title} ${s.reference}</p>${stateBadge(s.status, s.status_label)}</div>
       <vs-proposal-view portal .page=${{ ...page, link: { expires_on: '', status: 'PORTAL' } } as Page}></vs-proposal-view>`;
   }

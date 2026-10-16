@@ -111,7 +111,7 @@ export class VsPortalProjectPage extends LitElement {
     const upcoming = v.attention.filter((a) => a.status !== 'ACTION_REQUIRED');
     const c = v.commitments;
     return html`
-      <p><a href="/portal">← All your homes</a></p>
+      <p><a class="back" href="/portal">← All your homes</a></p>
       <section class="hero" aria-labelledby="title">
         <p class="eyebrow">${v.property.reference} · Enquiry ${v.enquiry.reference}</p>
         <h1 id="title" tabindex="-1">${title}</h1>
@@ -163,7 +163,7 @@ export class VsPortalProjectPage extends LitElement {
                 <summary><span>${r.title}</span><span class="muted small">${r.included_count} included${r.optional_count ? `, ${r.optional_count} optional` : ''}</span></summary>
                 ${r.items.map((it) => html`<div class="item"><span>${it.description}</span>
                   ${it.detail ? html`<span class="small muted">${it.detail}</span>` : nothing}
-                  ${it.status === 'OPTIONAL' ? html`<span class="small">Optional</span>` : nothing}
+                  ${it.status && it.status !== 'Included' ? html`<span class="small">${it.status}</span>` : nothing}
                   ${it.dimensions?.length ? html`<span class="small muted">${it.dimensions.map((d) => `${d.label} ${d.value}`).join(' · ')}</span>` : nothing}</div>`)}
               </details>`)}</div>` : html`<p class="card muted">The rooms and items of your project appear here once your quotation is issued.</p>`}
           </section>
@@ -198,7 +198,7 @@ export class VsPortalProjectPage extends LitElement {
             <h2 id="h-documents" tabindex="-1">Documents</h2>
             <div class="card">${v.documents.length ? html`<ul class="plain">${v.documents.map((d) => html`<li class="doc">
                 <span><span class="strong">${d.title} ${d.reference}</span><br /><span class="small muted">${d.issued_on ? `Issued ${when(d.issued_on)} · ` : ''}${d.status_label}</span></span>
-                ${d.state !== 'UNAVAILABLE' ? html`<a class="btn small" href="/portal/quotations/${d.id}">Open<span class="sr-only"> ${d.title} ${d.reference}</span></a>` : nothing}
+                ${d.state !== 'UNAVAILABLE' ? html`<a class="btn" href="/portal/quotations/${d.id}">Open<span class="sr-only"> ${d.title} ${d.reference}</span></a>` : nothing}
               </li>`)}</ul>` : html`<p class="muted">No documents yet. Your quotation will be listed here once issued.</p>`}</div>
           </section>
           <section class="section" id="contact" aria-labelledby="h-contact">
