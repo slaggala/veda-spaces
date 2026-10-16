@@ -9,6 +9,7 @@ with ``project.view_audit``. ``actions`` are hints for the page; the server chec
 from __future__ import annotations
 
 from datetime import date
+from collections.abc import Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -478,7 +479,7 @@ def _timeline(s: Session, p: Project, people: People) -> list[dict[str, Any]]:
 
 def _attention(ev: dict[str, Any] | None, blockers: list[dict[str, Any]], site: list[dict[str, Any]],
                snags: list[dict[str, Any]], milestones: list[dict[str, Any]], waiting,
-               work_rows: list[dict[str, Any]] = (), report_rows: list[dict[str, Any]] = ()) -> list[dict[str, Any]]:  # fmt: skip
+               work_rows: Sequence[dict[str, Any]] = (), report_rows: Sequence[dict[str, Any]] = ()) -> list[dict[str, Any]]:  # fmt: skip
     """PLB-40/41: what needs attention, gating first, each saying who acts, what to do and what it blocks."""
     out: list[dict[str, Any]] = []
     if waiting is not None:

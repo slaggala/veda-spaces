@@ -241,7 +241,8 @@ describe('Project page: final safety closure (M1, M2, S1)', () => {
     const snag = { id: 'n1', version: 3, snag_no: 1, category: 'FINISH', customer_title: 'Synthetic snag', description: null, space: null, space_id: null,
       item_reference: null, is_blocking: true, classification_reason: null, owner: null, responsible_party: 'VEDA', status: 'OPEN',
       allowed_next: ['IN_PROGRESS', 'CLOSED'], target_date: null, evidence: null, resolution_note: null, resolved_on: null, resolved_by: null,
-      closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null };
+      closed_on: null, closed_by: null, qc_check_id: null, raised_on: null, raised_by: null, work_package_id: null, source: 'STAFF' as const,
+      priority: 'NORMAL' as const, customer_visible: false, fixed_by: null, fixed_on: null, fix_note: null, closure_code: null };
     const plain = project({ snags: [snag] });
     const first = await openTab({ detail: plain }, 'quality');
     expect([...first.root.querySelectorAll('button')].some((b) => b.textContent?.includes('Change blocking'))).to.equal(false);

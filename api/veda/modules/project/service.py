@@ -325,7 +325,8 @@ def _apply(s: Session, ctx, p: Project, t: ProjectTransition) -> None:
         current = baseline.current(s, p)
         if t.handover_package_id:
             pkg = s.get(ProjectHandoverPackage, t.handover_package_id)
-            pkg.status, pkg.completed_on = "COMPLETED", now
+            if pkg is not None:  # verified current by the HANDOVER_PACKAGE gate in this transaction
+                pkg.status, pkg.completed_on = "COMPLETED", now
         events.record(s, p, "HANDED_OVER", stage=t.to_stage, transition_id=t.id, baseline_id=current.id,
                       baseline_seq=current.sequence_no, baseline_sha256=current.baseline_sha256,
                       handover_on=t.handover_on.isoformat() if t.handover_on else None,

@@ -34,6 +34,10 @@ def _cfg(url: str):
     return cfg
 
 
+def _hex(value) -> str:
+    return value.hex if hasattr(value, "hex") and not isinstance(value, str) else value  # PostgreSQL returns UUIDs
+
+
 def _codes(conn, role: str) -> list[str]:
     return [c for (c,) in conn.execute(sa.text(GRANTS), {"role": role, "f": False})]
 
@@ -53,9 +57,9 @@ def test_upgrading_withdraws_the_temporary_mapping_and_grants_the_accountant(tmp
         eng = db.create_engine(url)
         now = clock.now()
         with eng.begin() as conn:  # what a database migrated before 0211 holds
-            role = {r: i for r, i in conn.execute(sa.text("SELECT code, id FROM role"))}
+            role = {r: _hex(i) for r, i in conn.execute(sa.text("SELECT code, id FROM role"))}
             perms = {
-                c: i
+                c: _hex(i)
                 for c, i in conn.execute(sa.text("SELECT code, id FROM permission WHERE code LIKE 'commercials.%'"))
             }
             conn.execute(sa.text("DELETE FROM role_permission WHERE role_id = :r"), {"r": role["ACCOUNTANT"]})

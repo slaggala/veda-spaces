@@ -205,7 +205,9 @@ def test_handover_needs_its_evidence_closes_the_project_and_emits_the_domain_eve
     body = _handover_body(t, p)
     api = t.as_(t.ops)
     r = ok(api.post(f"{BASE}/{p['id']}/handover", body, if_match=t.get(p)["version"]), 201)
-    assert r["outcome"] == "REFUSED" and {b["code"] for b in r["transition"]["blockers"]} == {"HANDOVER_PACKAGE_MISSING"}
+    assert r["outcome"] == "REFUSED" and {b["code"] for b in r["transition"]["blockers"]} == {
+        "HANDOVER_PACKAGE_MISSING"
+    }
     pkg = t.package(p)["handover_packages"][-1]
     assert pkg["status"] == "PREPARED" and pkg["content"]["documents"] == [] and pkg["stale"] is None
     assert t.package(p)["handover_packages"] == [pkg | {}] or len(t.get(p)["handover_packages"]) == 1  # unchanged: same

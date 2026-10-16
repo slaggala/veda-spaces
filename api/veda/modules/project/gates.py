@@ -372,7 +372,7 @@ def handover_readiness(s: Session, p: Project) -> dict[str, Any]:
         found = [b for b in ev["blockers"] if b["gate"] not in ("HANDOVER_EVIDENCE", "HANDOVER_PACKAGE")]
         return {"ready": not found, "handed_over": False, "stage_reached": True, "blockers": found,
                 "commercial_position": commercial.position(s, p)}  # fmt: skip
-    found: list[dict[str, Any]] = []
+    found = []
     seen: set[tuple] = set()
 
     def add(items: list[dict[str, Any]]) -> None:

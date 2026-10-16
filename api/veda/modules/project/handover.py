@@ -172,6 +172,9 @@ def acknowledge(
     if pkg.content_sha256 != sha:
         raise ApiError(409, "HANDOVER_PACKAGE_CHANGED", "This handover summary has changed since you opened it. Please "
                        "review the current one.")  # fmt: skip
+    if pkg.status == "SUPERSEDED":  # an earlier acknowledgement never answers for a package that was replaced
+        raise ApiError(409, "HANDOVER_PACKAGE_CHANGED", "This handover summary has been replaced. Please review the "
+                       "current one.")  # fmt: skip
     if pkg.acknowledged_on is not None:
         return pkg, False
     if pkg.status != "PREPARED" or staleness(s, p, pkg) is not None:

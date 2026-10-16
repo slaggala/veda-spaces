@@ -206,6 +206,7 @@ def project_view(s: Session, account_id: str, p: Project) -> dict[str, Any]:
     counts = {k: sum(1 for w in items if w["state"] == k) for k in (PV.COMPLETED, PV.IN_PROGRESS, PV.ACTION_REQUIRED,
                                                                     BLOCKED, PV.UPCOMING)}  # fmt: skip
     readiness = gates.handover_readiness(s, p)
+    handover_state: dict[str, Any]
     if p.status == "HANDED_OVER":
         handover_state = {"state": PV.COMPLETED, "label": "Handed over",
                           "date": _day(p.handed_over_on.date()) if p.handed_over_on else None, "remaining": []}  # fmt: skip

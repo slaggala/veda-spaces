@@ -51,7 +51,9 @@ def derived_state(s: Session, wp: ProjectWorkPackage, checks=None) -> str:
     if wp.status == "CANCELLED":
         return "CANCELLED"
     if wp.status == "COMPLETED":
-        checks = checks if checks is not None else quality.checks(s, s.get(Project, wp.project_id))
+        if checks is None:
+            project = s.get(Project, wp.project_id)
+            checks = quality.checks(s, project) if project is not None else []
         if quality.failed_heads_of(checks, wp.id) or open_snags(s, wp):
             return "CORRECTION_REQUIRED"
         return "COMPLETED"
