@@ -117,8 +117,13 @@ A fresh reviewer certified the branch with one merge condition. The findings and
 
 ## Operations
 
-- **Rotating `VEDA_EMAIL_HASH_HMAC_KEY`:** run `python -m veda.cli portal-rehash-emails` once the new key is deployed.
-  Until then, sign-in requests for existing portal accounts still answer 202, but no email is sent.
+- **Rotating `VEDA_EMAIL_HASH_HMAC_KEY`:** deploy the new key to every process (API, worker, scheduler) first, then
+  run `python -m veda.cli portal-rehash-emails`. Until then, sign-in requests for existing portal accounts still
+  answer 202, but no email is sent.
+  - A process still on the old key during a rolling restart can create an account with an old-key hash. Running the
+    command again after the rollout corrects it; the command is idempotent.
+  - Sign-in requests already queued in the outbox carry old-key hashes and match nothing. Those customers simply ask
+    again.
 - **The outbox worker** sends every sign-in email and also decides each sign-in request. If it is down, customers get
   no email until it recovers. Nothing is lost: requests and links wait in the outbox.
 
