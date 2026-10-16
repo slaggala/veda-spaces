@@ -546,8 +546,8 @@ def grant_new_codes(conn, codes: tuple[str, ...], *, audit: bool) -> int:
 
 def withdraw_role_grants(conn, role_code: str, codes: tuple[str, ...], *, audit: bool) -> int:
     """A later module migration: soft-delete the live grants of ``codes`` to the system role ``role_code`` that the role
-    matrix no longer lists (each withdrawal audited), then bump every holder's authz_version so their sessions lose the
-    capability at once. A code the matrix still grants to the role is refused (nothing changes)."""
+    matrix no longer lists (each withdrawal audited), then bump every human's authz_version (as ``grant_new_codes`` does) so
+    every session re-reads its grants at once. A code the matrix still grants to the role is refused (nothing changes)."""
     from veda.platform.rbac.registry import MATRIX
 
     kept = [c for c in codes if role_code in MATRIX.get(c, {})]

@@ -75,6 +75,23 @@ acknowledgement, a retried report.
 
 The full CI result is on the PR.
 
+## Independent review (fresh context, before merge)
+
+No merge blocker or HIGH finding. Regression tests: `test_project_execution_review_fixes.py` (both engines).
+
+| Finding | Handling |
+|---|---|
+| M1 (Medium): a snag accepted from a customer report through "existing snag" could be hidden again (only `source = CUSTOMER` was protected) | Fixed: a snag any customer report points at cannot be hidden (`CUSTOMER_REPORTED`). Tested |
+| M2 (Medium): a report could be accepted against a closed snag, telling the customer "being fixed" | Fixed: refused (`SNAG_CLOSED`); raise a new snag or decline with a reply. Tested |
+| M3 (Medium): the commercial condition's money branches were untested, and D3 said PARTIALLY_PAID where the code says "after a request" | Fixed: D3 amended to the implemented, stricter-meaning rule (a part payment towards an unrequested instalment is not due); tests for FULLY_PAID, NO_AMOUNT_DUE (request, part payment, payment), the project's own chain versus a second project with no record, an unsound record and an unbalanced schedule |
+| L1 (Low): work could be added to the terminal stage and escape the gates | Fixed: refused (`TERMINAL_STAGE`). Tested |
+| L2 (Low): the CPP rule "no project id reaches the customer" now holds only with the delivery flag off | Accepted and recorded: the delivery view carries exactly the customer's own project id and package id (the addresses of their two writes, reached only through their authorised property); no other internal id and never the project number. Tested with the flag on; CPP record updated |
+| L3 (Low): an unchanged package preparation answered 201 | Fixed: 200 with the same package. Tested |
+| I1: the 0211 withdrawal bumps every human's authorisation version | Accepted (same as `grant_new_codes`); docstring corrected |
+| I2: a failure with no snag raised from it may be rechecked by the person who recorded the failure | Accepted as designed: segregation is between fixing and verifying; requiring a different inspector is an owner rule, not invented here |
+| I3: with PEX-D02 null no project can reach handover readiness | Intended (fail closed); staging handover validation needs PEX-D02 recorded |
+| Note: the delivery view (and its readiness computation) runs on every portal property read | Accepted: bounded per project; only with the delivery flag on |
+
 ## Limitations
 
 - Customer-visible documents and photographs (handover documents, QC evidence) wait on CPP-D04; the package lists none.

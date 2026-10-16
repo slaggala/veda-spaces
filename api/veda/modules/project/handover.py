@@ -121,7 +121,7 @@ def staleness(s: Session, p: Project, pkg: ProjectHandoverPackage) -> str | None
 ALLOWED_WHILE_PREPARING = ("POLICY_RECORDED", "HANDOVER_EVIDENCE", "HANDOVER_PACKAGE")
 
 
-def prepare(s: Session, ctx, p: Project, if_match: int | None) -> ProjectHandoverPackage:
+def prepare(s: Session, ctx, p: Project, if_match: int | None) -> tuple[ProjectHandoverPackage, bool]:
     access.for_write(s, ctx, p, "project.complete_handover", if_match=if_match)
     if p.stage_code != "READY_FOR_HANDOVER":
         raise ApiError(409, "INVALID_STATE", "The handover package is prepared once the project is ready for handover.")
@@ -137,7 +137,7 @@ def prepare(s: Session, ctx, p: Project, if_match: int | None) -> ProjectHandove
     sha = digest(content)
     cur = current(s, p)
     if cur is not None and cur.content_sha256 == sha and not cur.redacted:
-        return cur  # nothing changed: the same package (a repeated request is safe)
+        return cur, False  # nothing changed: the same package (a repeated request is safe)
     now = db.tx_time(s)
     if cur is not None:
         cur.status, cur.superseded_on, cur.superseded_by = "SUPERSEDED", now, ctx.user.id
@@ -156,7 +156,7 @@ def prepare(s: Session, ctx, p: Project, if_match: int | None) -> ProjectHandove
 
     notices.customer(s, p, notices.HANDOVER_PACKAGE_READY, package_id=pkg.id)
     service.done(p, s)
-    return pkg
+    return pkg, True
 
 
 def acknowledge(

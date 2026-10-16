@@ -106,7 +106,9 @@ def _iso(d: date | None) -> str | None:
 
 def add(s: Session, ctx, p: Project, body) -> ProjectWorkPackage:
     access.for_write(s, ctx, p, "project.manage_work", precondition=False)
-    lifecycle.get(p.lifecycle_version).stage(body.stage_code)
+    if lifecycle.get(p.lifecycle_version).stage(body.stage_code).terminal:
+        raise ApiError(422, "VALIDATION_FAILED", "Handed over is not a stage that work is done in.",
+                       errors=[field_error("stage_code", "TERMINAL_STAGE", "A stage before the handover.")])  # fmt: skip
     service.stage_open(p, body.stage_code)
     _dates(body.planned_start, body.planned_finish)
     _visible(body.customer_label, body.customer_visible)

@@ -124,6 +124,9 @@ def triage(s: Session, ctx, p: Project, r: ProjectCustomerReport, body, if_match
             raise ApiError(422, "VALIDATION_FAILED", "Say which snag this report is.",
                            errors=[field_error("snag_id", "REQUIRED", "Required.")])  # fmt: skip
         sn = service.child(s, ProjectSnag, p, body.snag_id)
+        if sn.status == "CLOSED":  # the customer would read "being fixed" about something already closed
+            raise ApiError(409, "SNAG_CLOSED", f"Snag {sn.snag_no} is closed; raise a new snag, or decline the report with "
+                           "a reply.")  # fmt: skip
         sn.customer_visible = True  # the customer reported it: they follow it
         r.snag_id, r.status = sn.id, "ACCEPTED"
     else:

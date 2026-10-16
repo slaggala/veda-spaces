@@ -815,7 +815,11 @@ def update_snag(s: Session, ctx, p: Project, sn: ProjectSnag, body, if_match: in
     if "work_package_id" in given:
         sn.work_package_id = child(s, ProjectWorkPackage, p, body.work_package_id).id if body.work_package_id else None
     if "customer_visible" in given and body.customer_visible is not None:
-        if sn.source == "CUSTOMER" and not body.customer_visible:
+        from .models import ProjectCustomerReport
+
+        reported = sn.source == "CUSTOMER" or s.execute(sa.select(ProjectCustomerReport.id).where(
+            ProjectCustomerReport.snag_id == sn.id, ProjectCustomerReport.is_deleted == sa.false())).first() is not None  # fmt: skip
+        if reported and not body.customer_visible:
             raise ApiError(409, "CUSTOMER_REPORTED", f"Snag {sn.snag_no} was reported by the customer; it stays "
                            "visible to them.")  # fmt: skip
         sn.customer_visible = body.customer_visible

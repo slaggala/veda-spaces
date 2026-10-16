@@ -454,5 +454,5 @@ def triage_report(req: Req, project_id: str, report_id: str):
            summary="Prepare (or refresh) the handover package once every handover gate but the evidence is met")  # fmt: skip
 def prepare_package(req: Req, project_id: str):
     p = _project(req, project_id)
-    packages.prepare(req.session, req.ctx, p, req.if_match)
-    return _detail(req, p, status=201)
+    _, created = packages.prepare(req.session, req.ctx, p, req.if_match)
+    return _detail(req, p, status=201 if created else 200)

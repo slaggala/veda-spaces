@@ -235,8 +235,8 @@ class Projects:
     def package(self, p: dict, user=None, status: int = 201):
         """Prepare the handover package (READY_FOR_HANDOVER, every gate but the evidence met)."""
         r = self.as_(user or self.ops).post(f"{BASE}/{p['id']}/handover-package", {}, if_match=self.get(p)["version"])
-        assert r.status == status, r
-        return r.data if status == 201 else r
+        assert r.status == status or (status == 201 and r.status == 200), r  # 200: nothing changed, the same package
+        return r.data if r.status in (200, 201) else r
 
     def snag_through(self, p: dict, snag_id: str, to: str = "RESOLVED") -> dict:
         """Take a snag through its flow: ops owns and fixes it, the quality persona verifies (and closes)."""
