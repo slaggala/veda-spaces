@@ -1,7 +1,7 @@
 # Project execution, quality control, snags and handover: discovery, design and design review
 
 Instruction `VEDA-SPACES-PROJECT-EXECUTION-QC-SNAGS-HANDOVER` (2026-10-16), branch `feature/project-execution-delivery`,
-based on main `9fa2c22` (the merge of PR #107, Project Commercials). Prefix **PEX**.
+based on main at the merge of PR #107 (Project Commercials). Prefix **PEX**.
 
 ## 1. What already exists (proved by reading the code)
 

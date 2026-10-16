@@ -1,6 +1,6 @@
 # Project Lifecycle: capability map (PLB-32, PLB-33)
 
-There are sixteen `project.*` capabilities, all scoped:
+There are eighteen `project.*` capabilities, all scoped (two added by project execution, PEX):
 
 - **ALL** reaches every project.
 - **OWN** reaches a project only while the person is an active member of its team.
@@ -26,6 +26,8 @@ checks both on every request. Team membership grants nothing by itself, and no c
 | `project.complete_handover` | Handover | ALL | | | | | | |
 | `project.view_commercial_baseline` | Baseline amounts and digests | ALL | ALL | ALL | | | | OWN |
 | `project.view_audit` | Full transition evaluations and audit history | ALL | ALL | | | | | |
+| `project.manage_work` | Work packages: add, plan, start, complete, reopen, cancel (PEX) | ALL | | | | | | |
+| `project.verify_snag` | Verify a snag's fix, never your own or one you own; close a snag without a fix (PEX) | ALL | | | | | | |
 
 ADMIN holds exactly what the working roles hold. The account-management escalation guard refuses to let an
 administrator manage an account that holds a code the administrator lacks, so without these codes ADMIN could no longer
@@ -37,7 +39,10 @@ Operations and project leads, installation and quality staff have no repository 
 - `project.manage_stage`, `project.complete_checklist`, `project.checklist.not_applicable` and
   `project.manage_milestone`;
 - `project.raise_blocker`, `project.resolve_blocker` and `project.manage_site_readiness`;
-- `project.manage_qc`, `project.manage_snag` and `project.complete_handover`.
+- `project.manage_qc`, `project.manage_snag` and `project.complete_handover`;
+- `project.manage_work` (operations) and `project.verify_snag` (quality: someone other than the person fixing).
+
+ACCOUNTANT (PCM-D01) holds no `project.*` code.
 
 The independent approver is granted `project.approve_transition`.
 
