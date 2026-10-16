@@ -149,6 +149,24 @@ def test_SEC_002_estimator_preflight_allows_the_wizard_headers(client):
         assert r.status_code == 204 and {"content-type", "idempotency-key", "x-veda-client"} <= allowed, path
 
 
+def test_SEC_002_access_cors_runbook_lists_every_preflight_header(client):
+    """On staging, Cloudflare Access answers the browser's preflight itself from the header list the runbook sets, not
+    from the API's answer. A header the API accepts but the runbook omits fails as a CORS error before the request
+    reaches the API (seen on staging: the customer portal's X-Veda-Portal, "We could not load your portal")."""
+    import re
+    from pathlib import Path
+
+    r = client.options(
+        "/api/v1/public/estimates", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "GET"}
+    )
+    api_headers = {h.strip().lower() for h in r.headers["Access-Control-Allow-Headers"].split(",")}
+    runbook = (Path(__file__).resolve().parents[3] / "docs/operations/staging-platform-runbooks.md").read_text("utf-8")
+    line = re.search(r"- Headers: `([^`]+)`", runbook, re.DOTALL)
+    assert line, "the Access CORS Headers line is missing from the staging runbook"
+    documented = {h.strip().lower() for h in re.sub(r"\s+", " ", line.group(1)).split(",")}
+    assert api_headers <= documented, f"add to the runbook's Access CORS headers: {sorted(api_headers - documented)}"
+
+
 def _cors_headers(client, method, path, origin, **kw):
     if method == "OPTIONS":
         r = client.options(path, headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
