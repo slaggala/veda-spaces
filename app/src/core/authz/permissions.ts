@@ -55,7 +55,7 @@ export interface NavItem {
   mobile?: boolean;
 }
 
-export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin' | 'project_lifecycle';
+export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin' | 'project_lifecycle' | 'customer_portal';
 export type FeatureMap = Partial<Record<FeatureCode, boolean>>;
 
 export const NAV_ITEMS: readonly NavItem[] = [

@@ -34,14 +34,15 @@ const TERM_HOME: Record<string, string> = {
 /**
  * <vs-proposal-view>: renders one customer proposal page model (CQX-03 onwards). Pure: it shows exactly what the
  * server sent (the frozen, customer-safe projection and its live state) and raises events for customer actions; it
- * never computes a price. Staff preview reuses it with `preview` set (no actions).
+ * never computes a price. Staff preview reuses it with `preview` set (no actions), and the customer portal with `portal`
+ * set (read-only: no actions, no staff mark; decisions stay on the secure link).
  *
  * Mobile first (360 px upwards): one column, a sticky total bar at the bottom; from 960 px a summary column beside the
  * rooms. Rooms are native <details> (keyboard and screen-reader accessible), opened for printing.
  */
 export class VsProposalView extends LitElement {
   static override properties = {
-    page: { attribute: false }, preview: { type: Boolean }, gallery: { state: true }, failed: { state: true },
+    page: { attribute: false }, preview: { type: Boolean }, portal: { type: Boolean }, gallery: { state: true }, failed: { state: true },
     announcement: { type: String }, busy: { type: Boolean }, errors: { attribute: false }, askCategory: { state: true },
     comparison: { attribute: false }, confirmed: { state: true }, declining: { state: true }, retryable: { type: Boolean },
     corrected: { state: true },
@@ -69,6 +70,9 @@ export class VsProposalView extends LitElement {
   declare errors: { field: string; message: string }[];
   declare page: Page | null;
   declare preview: boolean;
+  declare portal: boolean;
+  /** No customer action is offered: the staff preview, or the read-only view in the customer portal. */
+  private get readOnly(): boolean { return this.preview || this.portal; }
   declare gallery: { title: string; images: MediaImage[]; index: number } | null;
   /** Rooms whose image failed to load: they show the named placeholder instead. */
   declare failed: ReadonlySet<string>;
@@ -187,6 +191,7 @@ export class VsProposalView extends LitElement {
     super();
     this.page = null;
     this.preview = false;
+    this.portal = false;
     this.gallery = null;
     this.failed = new Set();
     this.announcement = '';
@@ -353,7 +358,7 @@ export class VsProposalView extends LitElement {
   }
 
   protected actionsPanel(page: Page): TemplateResult | typeof nothing {
-    if (this.preview || !page.actions.length) return nothing;
+    if (this.readOnly || !page.actions.length) return nothing;
     return html`<section class="card stack" aria-labelledby="todo"><h2 tabindex="-1" id="todo">Your next steps</h2>
       <ol class="actions-list">${page.actions.map((a) => {
         // the acknowledgements sit beside their content now: "the terms" goes to the first one still to read
@@ -478,7 +483,7 @@ export class VsProposalView extends LitElement {
   // --- CQX-10 decision -----------------------------------------------------------------------------------------------
   protected decisionPanel(page: Page): TemplateResult | typeof nothing {
     const d = page.decision;
-    if (!d || this.preview) return nothing;
+    if (!d || this.readOnly) return nothing;
     if (d.decided) {
       return html`<section class="card stack" aria-labelledby="dc" id="decision"><h2 tabindex="-1" id="dc">${d.decided === 'ACCEPTED' ? 'You accepted this proposal' : 'You declined this proposal'}</h2>
         ${d.by_this_link ? html`<p>Recorded on ${d.decided_on?.slice(0, 10)}${d.total ? html` for ${rupees(d.total)}` : nothing}.
@@ -514,7 +519,7 @@ export class VsProposalView extends LitElement {
   // --- CQX-09 terms and acknowledgements -----------------------------------------------------------------------------
   /** One acknowledgeable section (CQX-09): its approved text, and the acknowledgement while interaction is open. */
   protected termItem(page: Page, x: TermsSection): TemplateResult {
-    const can = page.capabilities.interaction && !this.preview;
+    const can = page.capabilities.interaction && !this.readOnly;
     return html`<details class="room term" id=${`term-${x.code}`}><summary><h3>${x.title}</h3>
         ${x.required ? html`<span class="tag">Required</span>` : nothing}${x.acknowledged_on ? html`<span class="tag ok">Acknowledged</span>` : nothing}</summary>
       <div class="termbody">${x.available
@@ -537,7 +542,7 @@ export class VsProposalView extends LitElement {
   protected termsPanel(page: Page): TemplateResult | typeof nothing {
     const t = page.terms;
     if (!t) return nothing;
-    const can = page.capabilities.interaction && !this.preview;
+    const can = page.capabilities.interaction && !this.readOnly;
     return html`<section class="card stack" aria-labelledby="tm" id="terms"><h2 tabindex="-1" id="tm">Terms</h2>
       ${t.policy_decided && t.pending.length && can ? html`<p class="small">Before you can accept, please read and acknowledge every section marked "required" on this page.</p>` : nothing}
       ${this.termsIn(page, 'terms')}
@@ -655,7 +660,7 @@ export class VsProposalView extends LitElement {
 
   // --- CQX-08 comparison with the previous version -------------------------------------------------------------------
   protected comparePanel(page: Page): TemplateResult | typeof nothing {
-    if (!page.comparison_available || this.preview) return nothing;
+    if (!page.comparison_available || this.readOnly) return nothing;
     const c = this.comparison;
     const word = { ADDED: 'Added', CHANGED: 'Changed', REMOVED: 'Removed' } as const;
     return html`<section class="card stack" aria-labelledby="cmp" id="compare"><h2 tabindex="-1" id="cmp">What changed from the previous version</h2>
@@ -674,7 +679,7 @@ export class VsProposalView extends LitElement {
   // --- CQX-07 questions and change requests -------------------------------------------------------------------------
   protected questionsPanel(page: Page): TemplateResult | typeof nothing {
     const r = page.requests;
-    if (!r || this.preview) return nothing;
+    if (!r || this.readOnly) return nothing;
     const cats: [string, string][] = [['GENERAL_QUESTION', 'A question about the proposal'], ['LINE_QUESTION', 'A question about an item'],
       ['ADD_ITEM', 'Add an item'], ['REMOVE_ITEM', 'Remove an item'], ['CHANGE_QUANTITY', 'Change a quantity'],
       ['CHANGE_MATERIAL', 'Change a material'], ['CHANGE_FINISH', 'Change a finish'], ['DISCUSS_PRICE', 'Discuss the price']];
@@ -730,7 +735,7 @@ export class VsProposalView extends LitElement {
     const items = page.proposal.optional_items;
     if (!items.length) return nothing;
     const states = new Map((page.selections?.items ?? []).map((i) => [i.ref, i.state]));
-    const can = page.capabilities.interaction && !this.preview && page.selections?.can_choose !== false;
+    const can = page.capabilities.interaction && !this.readOnly && page.selections?.can_choose !== false;
     const sel = page.selections;
     const choices: [string, string][] = [['SELECTED', 'Add to my proposal'], ['DESELECTED', 'Not for me'], ['REQUESTED_FOR_DISCUSSION', 'I would like to discuss it']];
     return html`<section class="card stack" aria-labelledby="opt" id="optional"><h2 tabindex="-1" id="opt">Optional items</h2>
@@ -804,7 +809,7 @@ export class VsProposalView extends LitElement {
   }
 
   protected bar(page: Page): TemplateResult | typeof nothing {
-    if (this.preview) return nothing;
+    if (this.readOnly) return nothing;
     const s = page.proposal.summary;
     return html`<div class="bar no-print" role="region" aria-label="Proposal total"><div class="bartotal"><span class="eyebrow">Total</span>
       <span class="n">${rupees(s.total) ?? 'To be confirmed'}</span></div><span class="spacer"></span>

@@ -48,7 +48,8 @@ export interface Me {
   must_change_password?: boolean;
   /** MC-3: deployment features that are switched on (absent on older APIs: everything off). */
   features?: Partial<Record<'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_proposal' | 'customer_proposal_interaction'
-    | 'customer_quotation_acceptance' | 'customer_promise_admin' | 'project_lifecycle', boolean>>;
+    | 'customer_quotation_acceptance' | 'customer_promise_admin' | 'project_lifecycle'
+    | 'customer_portal', boolean>>;
   version: number;
 }
 
