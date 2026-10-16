@@ -85,6 +85,17 @@ REVISIONS: dict[str, list[str]] = {
     ],
     "0202_mtq_commercial": ["quotation", "quotation_section", "quotation_line", "quotation_event"],
     "0207_customer_promise": ["customer_promise_pack", "customer_promise_review", "customer_promise_event"],
+    "0210_project_commercials": [
+        "commercial_account",
+        "commercial_baseline",
+        "payment_schedule",
+        "payment_instalment",
+        "commercial_payment",
+        "commercial_payment_reversal",
+        "commercial_receipt",
+        "commercial_invoice",
+        "commercial_event",
+    ],
     "0209_customer_portal": ["portal_account", "portal_access", "portal_sign_in", "portal_session", "portal_event"],
     "0208_project_lifecycle": [
         "project",

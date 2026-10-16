@@ -226,6 +226,11 @@ class Settings:
     # to it. Off by default everywhere (every route answers 404) and refused in production. It never turns another
     # feature on: project progress appears only where the Project Lifecycle's own flag is already on.
     customer_portal_enabled: bool = False
+    # Project Commercials (decision log 42): commercial records of accepted quotations (baseline, payment schedule,
+    # recorded payments, receipts, invoices, balance) and their customer view in the portal. Off by default everywhere
+    # (every staff route answers 404, the portal shows no commercial data) and refused in production. It turns no other
+    # feature on: the customer view appears only where the portal's own flag is also on.
+    project_commercials_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -383,6 +388,7 @@ def load_settings(**overrides) -> Settings:
         customer_promise_admin_enabled=_bool("VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED", False),
         project_lifecycle_enabled=_bool("VEDA_PROJECT_LIFECYCLE_ENABLED", False),
         customer_portal_enabled=_bool("VEDA_CUSTOMER_PORTAL_ENABLED", False),
+        project_commercials_enabled=_bool("VEDA_PROJECT_COMMERCIALS_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -617,6 +623,8 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append("VEDA_PROJECT_LIFECYCLE_ENABLED is not authorised in production (Project Lifecycle)")
         if settings.customer_portal_enabled:  # no production decision exists (decision log 41)
             problems.append("VEDA_CUSTOMER_PORTAL_ENABLED is not authorised in production (Customer Project Portal)")
+        if settings.project_commercials_enabled:  # no production decision exists (decision log 42)
+            problems.append("VEDA_PROJECT_COMMERCIALS_ENABLED is not authorised in production (Project Commercials)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

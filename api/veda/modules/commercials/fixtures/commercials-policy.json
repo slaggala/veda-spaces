@@ -1,0 +1,9 @@
+{
+  "schema": "veda.commercials.policy/1",
+  "version": "PCM-POLICY-0",
+  "status": "UNDECIDED",
+  "note": "No Project Commercials owner decision is recorded. PCM-D01 (invoice issuer particulars) is null: invoices can be drafted and previewed but not issued. See docs/implementation/project-commercials/PCM-owner-decisions.md.",
+  "decisions": {
+    "PCM-D01": null
+  }
+}

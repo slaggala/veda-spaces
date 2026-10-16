@@ -343,6 +343,44 @@ register(
     AuditPolicy("portal_session", FULL, parent=("portal_account", "account_id"), excluded=frozenset({"token_sha256"}))
 )
 register(AuditPolicy("portal_event", FULL, parent=("portal_account", "account_id")))
+# --- Project Commercials (0210): FULL. Personal data: free text staff or the customer may have written (payment
+# references, notes, reasons) and the customer's name in frozen documents; erased with the lead (commercials.erasure),
+# the amounts, dates, numbers and digests retained. Baseline and event rows hold codes, ids, amounts and digests only.
+register(AuditPolicy("commercial_account", FULL, parent=("lead", "lead_id")))
+register(AuditPolicy("commercial_baseline", FULL, parent=("commercial_account", "account_id")))
+register(AuditPolicy("payment_schedule", FULL, parent=("commercial_account", "account_id"), pii=frozenset({"reason"})))
+register(AuditPolicy("payment_instalment", FULL, parent=("commercial_account", "account_id")))
+register(
+    AuditPolicy(
+        "commercial_payment",
+        FULL,
+        parent=("commercial_account", "account_id"),
+        pii=frozenset({"external_reference", "reference_norm", "customer_note", "internal_note"}),
+    )
+)
+register(
+    AuditPolicy(
+        "commercial_payment_reversal", FULL, parent=("commercial_account", "account_id"), pii=frozenset({"note"})
+    )
+)
+register(
+    AuditPolicy(
+        "commercial_receipt",
+        FULL,
+        parent=("commercial_account", "account_id"),
+        excluded=frozenset({"snapshot", "document_html"}),
+    )
+)
+register(
+    AuditPolicy(
+        "commercial_invoice",
+        FULL,
+        parent=("commercial_account", "account_id"),
+        excluded=frozenset({"snapshot", "document_html"}),
+        pii=frozenset({"customer_note", "cancel_reason"}),
+    )
+)
+register(AuditPolicy("commercial_event", FULL, parent=("commercial_account", "account_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))

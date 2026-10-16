@@ -150,6 +150,28 @@ def quotation(req: Req, quotation_id: str):
     return private(ok(projection.quotation_page(req.session, q)))
 
 
+@customer_api.route("GET", "/portal/invoices/<invoice_id>", rbx="RBX-010", auth="public", write=False,
+                    limits=READ_LIMITS, requirement="PCM-015",
+                    summary="One issued invoice of the customer's project: the frozen document (Project Commercials)")  # fmt: skip
+def invoice(req: Req, invoice_id: str):
+    from veda.modules.commercials import customer as commercials
+
+    p = principal(req)
+    account, inv = commercials.invoice_for(req.session, p.account.id, invoice_id)
+    return private(ok(commercials.invoice_page(req.session, account, inv, with_html=True)))
+
+
+@customer_api.route("GET", "/portal/receipts/<receipt_id>", rbx="RBX-010", auth="public", write=False,
+                    limits=READ_LIMITS, requirement="PCM-015",
+                    summary="One receipt of the customer's project: the frozen document (Project Commercials)")  # fmt: skip
+def receipt(req: Req, receipt_id: str):
+    from veda.modules.commercials import customer as commercials
+
+    p = principal(req)
+    account, r = commercials.receipt_for(req.session, p.account.id, receipt_id)
+    return private(ok(commercials.receipt_page(req.session, account, r, with_html=True)))
+
+
 # --- staff: access -----------------------------------------------------------------------------------------------------
 def _present(s, a: PortalAccess, *, erased: bool = False) -> dict:
     acc = s.get(PortalAccount, a.account_id)

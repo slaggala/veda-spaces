@@ -410,3 +410,23 @@ def test_customer_portal_is_off_by_default_and_production_refuses_it(monkeypatch
     staging = deployed_env(monkeypatch, "staging", VEDA_CUSTOMER_PORTAL_ENABLED="true")
     assert not [p for p in config.validate_environment(staging) if "CUSTOMER_PORTAL" in p]
     assert staging.customer_portal_enabled is True and staging.project_lifecycle_enabled is False
+
+
+def test_project_commercials_are_off_by_default_and_production_refuses_them(monkeypatch):
+    """PCM (decision log 42): the Project Commercials flag is off by default; production with it requested on is
+    refused at configuration (the API never starts), the refusal adds exactly its own problem, staging admits it, and
+    it turns neither the portal nor the Project Lifecycle on."""
+    from veda.app import create_app
+
+    assert config.Settings().project_commercials_enabled is False
+    off = config.validate_environment(deployed_env(monkeypatch, "production"))
+    on = config.validate_environment(deployed_env(monkeypatch, "production", VEDA_PROJECT_COMMERCIALS_ENABLED="true"))
+    message = "VEDA_PROJECT_COMMERCIALS_ENABLED is not authorised in production (Project Commercials)"
+    assert sorted(set(on) - set(off)) == [message] and set(off) <= set(on)
+    with pytest.raises(RuntimeError, match="unsafe production configuration") as refused:
+        create_app(deployed_env(monkeypatch, "production", VEDA_PROJECT_COMMERCIALS_ENABLED="true"))
+    assert message in str(refused.value)
+    staging = deployed_env(monkeypatch, "staging", VEDA_PROJECT_COMMERCIALS_ENABLED="true")
+    assert not [p for p in config.validate_environment(staging) if "PROJECT_COMMERCIALS" in p]
+    assert staging.project_commercials_enabled is True
+    assert staging.customer_portal_enabled is False and staging.project_lifecycle_enabled is False

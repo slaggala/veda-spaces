@@ -15,6 +15,17 @@ from veda.modules.catalog.models import (
     CatalogRecord,
     CatalogRelease,
 )
+from veda.modules.commercials.models import (
+    CommercialAccount,
+    CommercialBaseline,
+    CommercialEvent,
+    CommercialInvoice,
+    CommercialPayment,
+    CommercialPaymentReversal,
+    CommercialReceipt,
+    PaymentInstalment,
+    PaymentSchedule,
+)
 from veda.modules.crm.leads.models import Lead, LeadActivity, LeadNote
 from veda.modules.customer_promise.models import CustomerPromiseEvent, CustomerPromisePack, CustomerPromiseReview
 from veda.modules.customer_proposal.models import (
@@ -97,6 +108,15 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "CommercialAccount",
+    "CommercialBaseline",
+    "CommercialEvent",
+    "CommercialInvoice",
+    "CommercialPayment",
+    "CommercialPaymentReversal",
+    "CommercialReceipt",
+    "PaymentInstalment",
+    "PaymentSchedule",
     "PortalAccess",
     "PortalAccount",
     "PortalEvent",
