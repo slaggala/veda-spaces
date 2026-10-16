@@ -79,7 +79,7 @@ def receipt_model(s: Session, account, payment, number: str, before: position.Po
                for x in after.lines if x.applied_minor - applied_before.get(x.instalment.id, 0) > 0]  # fmt: skip
     doc = {
         "document_version": RECEIPT_VERSION, "kind": "RECEIPT", "title": "Payment receipt", "number": number,
-        "date": issued_on.date().isoformat(),
+        "date": position.local_date(issued_on).isoformat(),
         **_common(s, account, after),
         "payment": {"amount": text(payment.amount_minor), "received_on": payment.received_on.isoformat(),
                     "method": V.METHOD_LABELS[payment.method_code], "reference": payment.external_reference,
@@ -98,7 +98,7 @@ def invoice_model(s: Session, account, invoice, line: position.Line, pos: positi
     doc = {
         "document_version": INVOICE_VERSION, "kind": "INVOICE",
         "title": particulars.document_title if particulars else "Invoice", "number": number,
-        "date": issued_on.date().isoformat() if issued_on else None,
+        "date": position.local_date(issued_on).isoformat() if issued_on else None,
         "due_on": invoice.due_on.isoformat() if invoice.due_on else None,
         "issuer": ({"legal_name": particulars.legal_name, "address_lines": list(particulars.address_lines),
                     "gstin": particulars.gstin, "sac_code": particulars.sac_code, "footer": list(particulars.footer)}

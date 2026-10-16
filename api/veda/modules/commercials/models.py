@@ -68,7 +68,8 @@ class CommercialAccount(AuditedBase):
         Index("ux_commercial_account__quotation_number", "quotation_number", unique=True, **live_where()),
         Index("ux_commercial_account__base_quotation", "base_quotation_id", unique=True, **live_where()),
         Index("ix_commercial_account__lead_id", "lead_id"),
-        Index("ix_commercial_account__property_id", "property_id"),
+        # one commercial record per property (review M1): the portal shows one property's payments as one account
+        Index("ux_commercial_account__property", "property_id", unique=True, **live_where()),
     )
 
 

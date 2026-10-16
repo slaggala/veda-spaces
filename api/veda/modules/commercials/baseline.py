@@ -189,9 +189,10 @@ def problems(s: Session, account: CommercialAccount) -> list[dict[str, Any]]:
 def candidates(s: Session, lead_condition) -> list[Quotation]:
     """Accepted base quotations (within scope) that have no commercial record yet."""
     opened = sa.select(CommercialAccount.quotation_number).where(CommercialAccount.is_deleted == sa.false())
+    held = sa.select(CommercialAccount.property_id).where(CommercialAccount.is_deleted == sa.false())
     return list(s.execute(sa.select(Quotation).join(Lead, Lead.id == Quotation.lead_id).where(
         Quotation.status == "ACCEPTED", Quotation.variation_no == 0, Quotation.is_deleted == sa.false(),
-        Quotation.quotation_number.not_in(opened), Lead.is_deleted == sa.false(), Lead.anonymized_on.is_(None),
+        Quotation.quotation_number.not_in(opened), Quotation.property_id.not_in(held), Lead.is_deleted == sa.false(), Lead.anonymized_on.is_(None),
         lead_condition,
     ).order_by(Quotation.decided_on.desc())).scalars())  # fmt: skip
 
@@ -215,6 +216,12 @@ def open_account(s: Session, q: Quotation) -> CommercialAccount:
     if existing is not None:
         raise ApiError(409, "ALREADY_OPEN", f"{q.quotation_number} already has a commercial record.",
                        extra={"account_id": existing.id})  # fmt: skip
+    other = s.execute(sa.select(CommercialAccount).where(CommercialAccount.property_id == q.property_id,
+                                                         CommercialAccount.is_deleted == sa.false())).scalar_one_or_none()  # fmt: skip
+    if other is not None:
+        raise ApiError(409, "PROPERTY_HAS_COMMERCIAL_RECORD", f"{other.quotation_number} is already this property's "
+                       "commercial record; a change to the agreed work is a variation of it.",
+                       extra={"account_id": other.id})  # fmt: skip
     account = CommercialAccount(lead_id=q.lead_id, property_id=q.property_id, quotation_number=q.quotation_number,
                                 base_quotation_id=q.id, currency=q.currency, baseline_seq=1)  # fmt: skip
     s.add(account)

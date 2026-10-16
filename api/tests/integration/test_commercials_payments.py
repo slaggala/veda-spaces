@@ -112,7 +112,6 @@ def test_one_transfer_recorded_twice_by_two_people_is_refused(api, factory):
     t.pay(acc, 1000, external_reference="UTR 7788 99")
     r = t.pay(acc, 1000, external_reference="utr778899", user=t.second_manager, status=409)
     assert r.code == "DUPLICATE_PAYMENT_REFERENCE"
-    t.pay(acc, 1000, external_reference="UTR 7788 99", method_code="CHEQUE")  # another method: another payment
 
 
 def test_bad_amounts_and_dates_are_refused(api, factory):

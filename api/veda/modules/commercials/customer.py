@@ -223,7 +223,7 @@ def invoice_page(s: Session, account: CommercialAccount, inv: CommercialInvoice,
     notices = []
     if inv.status == "CANCELLED":
         notices.append({"code": "CANCELLED", "message": f"Veda Spaces cancelled this invoice on "
-                        f"{inv.cancelled_on.date().isoformat() if inv.cancelled_on else ''}. Nothing is due on it."})  # fmt: skip
+                        f"{position.local_date(inv.cancelled_on).isoformat() if inv.cancelled_on else ''}. Nothing is due on it."})  # fmt: skip
     out = {"kind": "INVOICE", "id": inv.id, "number": inv.invoice_number, "status": st, "status_label": label,
            "property_id": account.property_id, "document": doc, "notices": notices}  # fmt: skip
     if with_html:

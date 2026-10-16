@@ -105,7 +105,10 @@ def revise(s: Session, ctx, account: CommercialAccount, body) -> PaymentSchedule
         raise ApiError(422, "VALIDATION_FAILED", "The schedule does not add up to the project value.", errors=errors)
     current = pos.schedule
     previous: dict[tuple[str, int], list[PaymentInstalment]] = {}
-    for i in position.instalments(s, current.id) if current else []:
+    invoiced = {inv.instalment_id for inv in (_issued_invoices(s, current.id) if current else [])}
+    for i in sorted(
+        position.instalments(s, current.id) if current else [], key=lambda i: (i.id not in invoiced, i.position)
+    ):
         previous.setdefault((i.label, int(i.amount_minor)), []).append(i)
     out: list[dict[str, Any]] = []
     for x in items:
@@ -151,7 +154,11 @@ def revise(s: Session, ctx, account: CommercialAccount, body) -> PaymentSchedule
 
 def request(s: Session, ctx, account: CommercialAccount, inst: PaymentInstalment, due_on: date | None) -> None:
     """Ask the customer for ``inst`` (of the current schedule, with a balance), optionally by ``due_on``."""
+    from . import payments
+
+    payments.require_sound(s, account)
     pos = position.compute(s, account)
+    position.require_in_balance(pos)
     line = pos.line_of(inst.id)
     if line is None or pos.schedule is None or inst.schedule_id != pos.schedule.id:
         raise ApiError(409, "INSTALMENT_NOT_CURRENT", "This instalment belongs to an earlier schedule.")
@@ -160,6 +167,12 @@ def request(s: Session, ctx, account: CommercialAccount, inst: PaymentInstalment
     if due_on is not None and due_on < pos.today:
         raise ApiError(422, "VALIDATION_FAILED", "A due date cannot be in the past.",
                        errors=[field_error("due_on", "IN_THE_PAST", "A due date cannot be in the past.")])  # fmt: skip
+    fixed = s.execute(sa.select(CommercialInvoice.due_on).where(CommercialInvoice.instalment_id == inst.id,
+                                                                CommercialInvoice.status == "ISSUED",
+                                                                CommercialInvoice.is_deleted == sa.false())).first()  # fmt: skip
+    if fixed is not None and fixed[0] is not None and due_on != fixed[0]:
+        raise ApiError(409, "INVOICE_FIXES_DUE_DATE", f"Issued invoice for {inst.label} is due by "
+                       f"{fixed[0].isoformat()}; cancel it to change the date.")  # fmt: skip
     first = inst.requested_on is None
     if first:
         inst.requested_on, inst.requested_by = db.tx_time(s), ctx.user.id

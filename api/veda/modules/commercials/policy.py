@@ -25,7 +25,7 @@ from veda.config import settings
 
 FIXTURE = Path(__file__).with_name("fixtures") / "commercials-policy.json"
 SYNTHETIC = "SYNTHETIC_TEST_ONLY"
-LABELS = {"PCM-D01": "invoice issuer particulars (tax invoice, legal name, address, GSTIN, SAC, series)"}
+LABELS = {"PCM-D01": "invoice issuer particulars (legal name, address, GSTIN, SAC)"}
 Line = Annotated[str, Field(min_length=1, max_length=200)]
 
 
@@ -34,7 +34,10 @@ class _Closed(BaseModel):
 
 
 class InvoiceParticulars(_Closed):  # PCM-D01
-    document_title: Literal["Tax invoice", "Invoice"]
+    # Only "Invoice": the document does not carry what a GST tax invoice needs (the customer's address and GSTIN,
+    # place of supply, taxable value, rate and the CGST/SGST/IGST split). Allowing "Tax invoice" is a code change
+    # that adds those fields with the owner's decision (review M4).
+    document_title: Literal["Invoice"]
     legal_name: Line
     address_lines: tuple[Line, ...] = Field(min_length=1, max_length=6)
     gstin: Annotated[str | None, Field(pattern=r"^[0-9]{2}[A-Z0-9]{13}$")] = None

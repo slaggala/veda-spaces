@@ -102,16 +102,18 @@ def record(s: Session, ctx, account: CommercialAccount, body, key: str) -> tuple
         raise ApiError(422, "IDEMPOTENCY_KEY_REUSED", "This request key was already used for a different payment.")
     baseline.sync(s, account)
     require_sound(s, account)
-    today = db.tx_time(s).date()
+    today = position.local_today(s)
     if body.received_on > today or body.received_on < EARLIEST:
         raise ApiError(422, "VALIDATION_FAILED", "The date received cannot be in the future.",
                        errors=[field_error("received_on", "OUT_OF_RANGE", "Not a past date.")])  # fmt: skip
     ref = normalise_reference(body.external_reference)
     if ref is not None:
         for p, r in position.payments(s, account.id):
-            if r is None and p.method_code == body.method_code and p.reference_norm == ref:
-                raise ApiError(409, "DUPLICATE_PAYMENT_REFERENCE", "A payment with this method and reference is "
-                               "already recorded.", extra={"payment_id": p.id})  # fmt: skip
+            if (
+                r is None and p.reference_norm == ref
+            ):  # any method: one UTR recorded as UPI and as a transfer is one payment
+                raise ApiError(409, "DUPLICATE_PAYMENT_REFERENCE", "A payment with this reference is already "
+                               "recorded.", extra={"payment_id": p.id})  # fmt: skip
     before = position.compute(s, account)
     if int(body.amount_minor) > before.outstanding_minor:
         raise ApiError(409, "OVERPAYMENT", f"The outstanding balance is {documents.text(before.outstanding_minor)}; a "

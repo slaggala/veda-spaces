@@ -51,6 +51,16 @@ class Line:
         return self.instalment.requested_on is not None
 
 
+def require_in_balance(p: Position) -> None:
+    from veda.kernel.errors import ApiError
+
+    if p.schedule_state == "REVISION_REQUIRED":
+        from .money import text
+
+        raise ApiError(409, "SCHEDULE_REVISION_REQUIRED", f"The project value changed; the schedule differs by "
+                       f"{text(p.unscheduled_minor)}. Revise the schedule before asking for or invoicing a payment.")  # fmt: skip
+
+
 @dataclass
 class Position:
     account: CommercialAccount
@@ -71,6 +81,10 @@ class Position:
     @property
     def next_line(self) -> Line | None:
         """The payment that matters next: a requested instalment with a balance, else the first with a balance."""
+        if self.outstanding_minor <= 0:
+            return None
+        if self.schedule_state == "REVISION_REQUIRED":
+            return None  # the schedule no longer adds up to the value: nothing is asked until it is revised
         open_ = [x for x in self.lines if x.remaining_minor > 0]
         requested = [x for x in open_ if x.requested]
         found = requested or open_
@@ -84,7 +98,27 @@ class Position:
         return [p for p, r in self.payments if r is None]
 
     def due_lines(self) -> list[Line]:
+        """Instalments asked of the customer now. None while the schedule does not add up to the value (a variation
+        changed it): its balances would not be what is owed (review M2)."""
+        if self.schedule_state != "IN_BALANCE" or self.outstanding_minor <= 0:
+            return []
         return [x for x in self.lines if x.state in (V.DUE, V.OVERDUE) or (x.state == V.PARTIALLY_PAID and x.requested)]
+
+
+BUSINESS_TZ = "Asia/Kolkata"  # the business's calendar, as the number sequences use
+
+
+def local_today(s: Session) -> date:
+    """Today in India: what "received today", "due today" and "overdue" mean to staff and customers."""
+    from zoneinfo import ZoneInfo
+
+    return db.tx_time(s).astimezone(ZoneInfo(BUSINESS_TZ)).date()
+
+
+def local_date(instant) -> date:
+    from zoneinfo import ZoneInfo
+
+    return instant.astimezone(ZoneInfo(BUSINESS_TZ)).date()
 
 
 def state(inst: PaymentInstalment, applied: int, today: date) -> str:
@@ -134,7 +168,7 @@ def allocate(amounts: list[int], paid: int) -> list[int]:
 
 
 def compute(s: Session, account: CommercialAccount, *, today: date | None = None) -> Position:
-    today = today or db.tx_time(s).date()
+    today = today or local_today(s)
     base = baseline.current(s, account)
     pays = payments(s, account.id)
     paid = sum(int(p.amount_minor) for p, r in pays if r is None)

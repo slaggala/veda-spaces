@@ -44,7 +44,7 @@ def test_issuing_numbers_freezes_and_requests_the_instalment(api, factory, invoi
     issued = t.invoice_action(inv["id"], "issue")
     assert issued["status"] == "ISSUED" and issued["number"] == f"VS-I-{YEAR}-00001"
     doc = issued["document"]
-    assert doc["title"] == "Tax invoice" and doc["issuer"]["gstin"] == "00AAAAA0000A0Z0"
+    assert doc["title"] == "Invoice" and doc["issuer"]["gstin"] == "00AAAAA0000A0Z0"
     assert doc["instalment"] == {"label": "Booking", "when": line["when"], "position": 1, "of": 3}
     assert doc["amounts"]["instalment"] == line["amount"] and doc["amounts"]["gst_included"] == line["gst_included"]
     assert doc["amounts"]["paid_towards"] == documents.text(1000)

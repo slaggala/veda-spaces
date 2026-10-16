@@ -24,7 +24,7 @@ BASE = "/api/v1/commercials"
 SYNTHETIC_POLICY: dict[str, Any] = {
     "schema": "veda.commercials.policy/1", "version": "PCM-SYNTHETIC-1", "status": "SYNTHETIC_TEST_ONLY",
     "note": "Synthetic test policy; never a Veda decision.",
-    "decisions": {"PCM-D01": {"document_title": "Tax invoice", "legal_name": "Synthetic Interiors (test only)",
+    "decisions": {"PCM-D01": {"document_title": "Invoice", "legal_name": "Synthetic Interiors (test only)",
                               "address_lines": ["1 Test Street", "Test City 000000"], "gstin": "00AAAAA0000A0Z0",
                               "sac_code": "995411", "footer": ["Synthetic footer (test only)."]}},
 }  # fmt: skip

@@ -29,6 +29,7 @@ from .models import CommercialAccount, CommercialInvoice, PaymentInstalment
 
 def _line(s: Session, account: CommercialAccount, instalment_id: str) -> tuple[position.Position, position.Line]:
     pos = position.compute(s, account)
+    position.require_in_balance(pos)
     line = pos.line_of(instalment_id)
     if line is None:
         raise ApiError(409, "INSTALMENT_NOT_CURRENT", "This instalment is not part of the current payment schedule.")
@@ -42,6 +43,7 @@ def draft(s: Session, ctx, account: CommercialAccount, body) -> CommercialInvoic
     if inst is None or inst.is_deleted or inst.account_id != account.id:
         raise ApiError(422, "VALIDATION_FAILED", "Choose an instalment of this payment schedule.",
                        errors=[field_error("instalment_id", "UNKNOWN_INSTALMENT", "Not an instalment here.")])  # fmt: skip
+    payments.require_sound(s, account)
     pos, line = _line(s, account, inst.id)
     if body.due_on is not None and body.due_on < pos.today:
         raise ApiError(422, "VALIDATION_FAILED", "A due date cannot be in the past.",
@@ -107,6 +109,9 @@ def cancel(s: Session, ctx, account: CommercialAccount, inv: CommercialInvoice, 
         raise ApiError(409, "INVALID_STATE", f"This invoice is {inv.status.lower()}; only an issued invoice is "
                        "cancelled.", extra={"status": inv.status})  # fmt: skip
     inv.status, inv.cancelled_on, inv.cancelled_by, inv.cancel_reason = "CANCELLED", db.tx_time(s), ctx.user.id, reason
+    inst = s.get(PaymentInstalment, inv.instalment_id)
+    if inst is not None and inv.due_on is not None and inst.due_on == inv.due_on:
+        inst.due_on = None  # the date came from the cancelled invoice; the instalment stays requested, without a date
     events.record(s, account, "INVOICE_CANCELLED", inv.id, invoice_number=inv.invoice_number)
     return inv
 

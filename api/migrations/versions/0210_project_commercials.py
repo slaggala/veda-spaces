@@ -125,11 +125,18 @@ def upgrade() -> None:
         sa.CheckConstraint("version >= 1", name="ck_commercial_account__version_positive"),
     )
     op.create_index("ix_commercial_account__lead_id", "commercial_account", ["lead_id"])
-    op.create_index("ix_commercial_account__property_id", "commercial_account", ["property_id"])
     op.create_index(
         "ux_commercial_account__base_quotation",
         "commercial_account",
         ["base_quotation_id"],
+        unique=True,
+        sqlite_where=sa.text("is_deleted = 0"),
+        postgresql_where=sa.text("is_deleted = false"),
+    )
+    op.create_index(
+        "ux_commercial_account__property",
+        "commercial_account",
+        ["property_id"],
         unique=True,
         sqlite_where=sa.text("is_deleted = 0"),
         postgresql_where=sa.text("is_deleted = false"),

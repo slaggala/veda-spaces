@@ -130,6 +130,9 @@ def reset_process_state() -> None:
     use_provider(None)
     mtq_policy.install_for_tests(None)  # a SYNTHETIC commercial policy never outlives its test
     proposal_policy.install_for_tests(None)  # nor a SYNTHETIC customer-proposal policy
+    from veda.modules.commercials import policy as commercials_policy
+
+    commercials_policy.install_for_tests(None)  # nor a SYNTHETIC commercials policy
 
 
 @pytest.fixture

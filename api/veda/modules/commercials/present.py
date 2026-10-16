@@ -153,7 +153,8 @@ def detail(s: Session, ctx, account: CommercialAccount) -> dict[str, Any]:
         "problems": problems,
         "policy": policy.view(),
         "capabilities": {
-            "writable": writable and not problems,
+            # an accepted variation not yet in the baseline is recorded by the next write (sync), so it never locks the page
+            "writable": writable and not [p for p in problems if p["code"] != "VARIATION_NOT_RECORDED"],
             "manage_schedule": can("commercials.schedule.manage"),
             "record_payment": can("commercials.payment.record"),
             "reverse_payment": can("commercials.payment.reverse"),

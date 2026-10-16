@@ -15,6 +15,8 @@ is closed to writes (``access.writable``).
 
 from __future__ import annotations
 
+import hashlib
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
@@ -59,6 +61,8 @@ def erase_for_lead(s: Session, lead) -> int:
             for f in fields:
                 if getattr(row, f):
                     setattr(row, f, ERASED)
+            if isinstance(row, CommercialPayment):  # its request digest covered the erased text: replace it
+                row.request_sha256 = hashlib.sha256(f"erased:{row.id}".encode()).hexdigest()
             if isinstance(row, CommercialInvoice | CommercialReceipt) and row.snapshot is not None:
                 documents.redact(s, accounts[row.account_id], row)
             touched += 1
