@@ -147,7 +147,7 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ("GET", "/api/v1/public/portal/home"),
             ("GET", "/api/v1/public/portal/properties/<property_id>"),
             ("GET", "/api/v1/public/portal/quotations/<quotation_id>"),
-            # Project Commercials (decision log 42): the customer's invoices and receipts, through the same session and
+            # Project Commercials (decision log 43): the customer's invoices and receipts, through the same session and
             # access rows; 404 unless VEDA_PROJECT_COMMERCIALS_ENABLED is also on.
             ("GET", "/api/v1/public/portal/invoices/<invoice_id>"),
             ("GET", "/api/v1/public/portal/receipts/<receipt_id>"),

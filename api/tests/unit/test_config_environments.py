@@ -413,7 +413,7 @@ def test_customer_portal_is_off_by_default_and_production_refuses_it(monkeypatch
 
 
 def test_project_commercials_are_off_by_default_and_production_refuses_them(monkeypatch):
-    """PCM (decision log 42): the Project Commercials flag is off by default; production with it requested on is
+    """PCM (decision log 43): the Project Commercials flag is off by default; production with it requested on is
     refused at configuration (the API never starts), the refusal adds exactly its own problem, staging admits it, and
     it turns neither the portal nor the Project Lifecycle on."""
     from veda.app import create_app

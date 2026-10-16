@@ -1,4 +1,4 @@
-"""0210_project_commercials: Project Commercials (decision log 42).
+"""0210_project_commercials: Project Commercials (decision log 43).
 
 Nine tables (``veda.modules.commercials.models``): ``commercial_account`` (the commercial record of one accepted
 quotation chain), ``commercial_baseline`` (the accepted base and each accepted variation, with digests; immutable:

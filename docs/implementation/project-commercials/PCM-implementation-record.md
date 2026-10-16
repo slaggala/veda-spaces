@@ -1,4 +1,4 @@
-# Project Commercials: implementation record (decision log 42)
+# Project Commercials: implementation record (decision log 43)
 
 Branch `feature/project-commercials`, built on main after PR #104. Design, implementation map and the pre-implementation
 design review: [PCM-design.md](PCM-design.md). Owner decisions: [PCM-owner-decisions.md](PCM-owner-decisions.md).
