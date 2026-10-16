@@ -19,7 +19,7 @@ const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ?
 
 const PERMS = ['project.view', 'project.manage_stage', 'project.complete_checklist', 'project.manage_milestone', 'project.raise_blocker',
   'project.resolve_blocker', 'project.manage_site_readiness', 'project.manage_qc', 'project.manage_snag', 'project.complete_handover',
-  'project.view_commercial_baseline', 'project.view_audit', 'project.assign_team', 'profile.read'];
+  'project.view_commercial_baseline', 'project.view_audit', 'project.assign_team', 'project.manage_work', 'profile.read'];
 const ME = { id: 'u-ops', email: 'ops@synthetic.example', full_name: 'SYNTHETIC Ops', display_name: 'SYNTHETIC', phone: null,
   timezone: 'Asia/Kolkata', locale: 'en-IN', status: 'ACTIVE', roles: [], authz_version: 1,
   permissions: Object.fromEntries(PERMS.map((p) => [p, 'OWN'])), suspended_permissions: [],
@@ -28,6 +28,9 @@ const ME = { id: 'u-ops', email: 'ops@synthetic.example', full_name: 'SYNTHETIC 
 
 // SYNTHETIC content: invented for the browser journey, not Veda Spaces content.
 const OPS = { id: 'u-ops', display_name: 'SYNTHETIC Ops' };
+// The independent quality persona (PEX): verifies what ops fixed, never their own fix.
+const QA_ME = { ...ME, id: 'u-qa', email: 'qa@synthetic.example', full_name: 'SYNTHETIC Quality',
+  permissions: Object.fromEntries(['project.view', 'project.manage_qc', 'project.verify_snag', 'profile.read'].map((p) => [p, 'OWN'])) };
 const STAGES = ['BOOKED', 'DESIGN_FINALISATION', 'SCOPE_FROZEN', 'SITE_READINESS', 'PRODUCTION_READINESS', 'IN_PRODUCTION',
   'READY_FOR_INSTALLATION', 'INSTALLATION', 'QUALITY_CHECK', 'SNAGGING', 'READY_FOR_HANDOVER', 'HANDED_OVER'];
 const label = (c) => c.charAt(0) + c.slice(1).toLowerCase().replace(/_/g, ' ');
@@ -99,7 +102,8 @@ function detail(state) {
       description: 'Internal: the hob model decides the cut-out.', customer_action: 'Please share the hob and chimney models', responsible_party: 'CUSTOMER', assigned_to: OPS,
       target_date: '2026-10-20', status: state.blockerOpen ? 'OPEN' : 'RESOLVED', blocks: { code: 'PRODUCTION_READINESS', label: 'Production readiness' },
       resolution: state.blockerOpen ? null : state.resolution, resolved_on: state.blockerOpen ? null : '2026-10-15T11:00:00Z', resolved_by: state.blockerOpen ? null : OPS,
-      raised_on: '2026-10-14T11:00:00Z', raised_by: OPS, related: { milestone_id: null, checklist_item_id: null, site_readiness_id: null, quotation_id: null } }],
+      raised_on: '2026-10-14T11:00:00Z', raised_by: OPS, related: { milestone_id: null, checklist_item_id: null, site_readiness_id: null, quotation_id: null,
+        work_package_id: null }, customer_summary: null }],
     milestones: [{ id: 'm1', version: 1, code: 'SITE_READY', label: 'Site ready', customer_label: null, description: null, stage_code: 'SITE_READINESS', status: 'PLANNED',
       status_reason: null, planned_date: '2026-10-01', actual_date: null, customer_promised_date: null, overdue: true, depends_on_milestone_id: null,
       owner_responsibility: 'SITE', evidence: null }],
@@ -111,20 +115,30 @@ function detail(state) {
       categories: [{ category: 'DIMENSIONS_AND_ALIGNMENT', required: true, latest: null },
         { category: 'FINISH_AND_SURFACES', required: true, latest: state.qc ? { id: 'qc1', category: 'FINISH_AND_SURFACES', result: state.qc, space: 'Kitchen', space_id: 's1',
           observation: state.qc === 'FAIL' ? 'Edge banding lifting on the tall unit' : null, evidence: null, recheck_of_id: null, checked_by: OPS, checked_on: '2026-10-15T12:00:00Z' } : null },
-        { category: 'OTHER', required: false, latest: null }] },
+        { category: 'OTHER', required: false, latest: null }],
+      points: [], chains: state.qc ? [{ root_id: 'qc1', length: 1, ever_failed: state.qc === 'FAIL', head: { id: 'qc1', category: 'FINISH_AND_SURFACES',
+        result: state.qc, space: 'Kitchen', space_id: 's1', observation: state.qc === 'FAIL' ? 'Edge banding lifting on the tall unit' : null, evidence: null,
+        recheck_of_id: null, qc_point_id: null, work_package_id: null, checked_by: OPS, checked_on: '2026-10-15T12:00:00Z' } }] : [] },
     snags: state.snag ? [{ id: 'n1', version: state.snagVersion, snag_no: 1, category: 'FINISH', customer_title: 'Shutter edge to be refinished',
       description: 'Edge banding lifting', space: 'Kitchen', space_id: 's1', item_reference: null, is_blocking: true, owner: OPS, responsible_party: 'VEDA',
       status: state.snag, allowed_next: { OPEN: ['IN_PROGRESS', 'CLOSED'], IN_PROGRESS: ['READY_FOR_RECHECK', 'CLOSED'], READY_FOR_RECHECK: ['IN_PROGRESS', 'RESOLVED', 'CLOSED'],
         RESOLVED: ['CLOSED'], CLOSED: [] }[state.snag], target_date: null, evidence: null, resolution_note: state.snag === 'RESOLVED' ? 'Rechecked' : null,
-      resolved_on: null, resolved_by: null, closed_on: null, closed_by: null, qc_check_id: 'qc1', raised_on: '2026-10-15T12:10:00Z', raised_by: OPS }] : [],
+      resolved_on: null, resolved_by: state.snag === 'RESOLVED' ? QA : null, closed_on: null, closed_by: null, qc_check_id: 'qc1', raised_on: '2026-10-15T12:10:00Z',
+      raised_by: OPS, work_package_id: null, source: 'QUALITY_CHECK', priority: 'NORMAL', customer_visible: false,
+      fixed_by: ['READY_FOR_RECHECK', 'RESOLVED'].includes(state.snag) ? OPS : null, fixed_on: null, fix_note: state.fixNote ?? null, closure_code: null }] : [],
+    work_packages: [], customer_reports: [], handover_packages: [],
+    delivery_policy: { version: 'PEX-POLICY-0', status: 'UNDECIDED', decisions: { 'PEX-D01': { label: 'customer actions in the portal', decided: false },
+      'PEX-D02': { label: 'the commercial condition for handover', decided: false } } },
     baseline: { full: true, verified: true, problems: [], current_seq: 1, open_variations: [], variations: [],
       lineage: [{ id: 'bl1', sequence_no: 1, kind: 'ORIGINAL', current: true, quotation_id: 'q1', label: 'VS-Q-2026-000001 v1', variation_no: 0, decided_on: '2026-10-13T10:00:00Z',
         decision_method: 'SIGNED_COPY', recorded_on: '2026-10-14T10:00:00Z', accepted_total_minor: 123456700, cumulative_value_minor: 123456700, baseline_sha256: 'd'.repeat(64) }] },
     transitions: state.transitions, timeline: state.timeline, spaces: [{ id: 's1', label: 'Kitchen' }], evidence_options: [],
     actions: { request_transition: true, complete_handover: true, approve_transition: false, assign_team: true, complete_checklist: true, checklist_not_applicable: false,
       manage_milestone: true, raise_blocker: true, resolve_blocker: true, manage_site_readiness: true, manage_qc: true, manage_snag: true,
-      view_commercial_baseline: true, view_audit: true, record_promised_date: false, reclassify_snag: false, qc_required_not_applicable: false },
-    policy: POLICY, classification: { classes: ['INTERNAL_ONLY', 'POTENTIALLY_CUSTOMER_SAFE', 'CUSTOMER_ACTION'], default: 'INTERNAL_ONLY', fields: {}, published: false },
+      view_commercial_baseline: true, view_audit: true, record_promised_date: false, reclassify_snag: false, qc_required_not_applicable: false,
+      manage_work: true, verify_snag: true, prepare_handover_package: false },
+    policy: POLICY, classification: { classes: ['INTERNAL_ONLY', 'POTENTIALLY_CUSTOMER_SAFE', 'CUSTOMER_ACTION'], default: 'INTERNAL_ONLY', fields: {},
+      published_through: 'VEDA_PROJECT_DELIVERY_PORTAL_ENABLED' },
     last_material_change: '2026-10-15T09:00:00Z',
   };
 }
@@ -140,10 +154,11 @@ function row(state) {
     site_actions: state.site === 'READY' ? 0 : 1, handover_ready: false, target_date: '2026-12-15', last_material_change: '2026-10-15T09:00:00Z', member: true };
 }
 
+const QA = { id: 'u-qa', display_name: 'SYNTHETIC Quality' };
 const event = (state, code, extra = {}) => state.timeline.push({ id: `e${state.timeline.length + 1}`, code, stage_code: state.stage, from: null, to: null, detail: {},
   by: OPS, on: '2026-10-15T12:00:00Z', ...extra });
 
-async function serve(p, state) {
+async function serve(p, state, me = ME) {
   state.posts = [];
   await p.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const req = route.request();
@@ -152,7 +167,7 @@ async function serve(p, state) {
     const json = (status, body) => route.fulfill({ status, contentType: status < 400 ? 'application/json' : 'application/problem+json', body: JSON.stringify(body) });
     const ok = (data, status = 200) => json(status, { data });
     if (path === '/api/v1/auth/refresh') return ok({ access_token: 'synthetic-token' });
-    if (path === '/api/v1/auth/me') return ok(ME);
+    if (path === '/api/v1/auth/me') return ok(me);
     if (path === '/api/v1/projects' && req.method() === 'GET') {
       return ok({ projects: [row(state)], counts: { all: 1, mine: 1, blocked: state.blockerOpen ? 1 : 0, action_required: 1, site_readiness: 1, installation: 0, handover: 0 },
         bookable: [], lifecycle: { version: 'PLB-2026.10.1', status: 'PROPOSED' }, policy: POLICY });
@@ -184,7 +199,11 @@ async function serve(p, state) {
       if (path === '/api/v1/projects/p1/site-readiness/r1') { state.site = body.status ?? state.site; state.siteVersion += 1; event(state, 'SITE_READINESS_UPDATED'); bump(); return ok(detail(state)); }
       if (path === '/api/v1/projects/p1/qc-checks') { state.qc = body.result; event(state, 'QC_RECORDED'); bump(); return ok(detail(state), 201); }
       if (path === '/api/v1/projects/p1/snags') { state.snag = 'OPEN'; event(state, 'SNAG_RAISED'); bump(); return ok(detail(state), 201); }
-      if (path === '/api/v1/projects/p1/snags/n1/status') { state.snag = body.status; state.snagVersion += 1; event(state, body.status === 'RESOLVED' ? 'SNAG_RESOLVED' : 'SNAG_UPDATED'); bump(); return ok(detail(state)); }
+      if (path === '/api/v1/projects/p1/snags/n1/status') {
+        if (body.status === 'READY_FOR_RECHECK') state.fixNote = body.note;
+        state.snag = body.status; state.snagVersion += 1; event(state, body.status === 'RESOLVED' ? 'SNAG_RESOLVED' : body.status === 'READY_FOR_RECHECK' ? 'SNAG_FIXED' : 'SNAG_UPDATED'); bump();
+        return ok(detail(state));
+      }
     }
     if (req.method() === 'GET') return ok([]);
     return json(404, { status: 404, code: 'NOT_FOUND', title: 'Not found' });
@@ -312,22 +331,39 @@ try {
     await submitDialog(p);
     await dialogClosed(p);
     check('quality: the failure is recorded', state.qc === 'FAIL');
-    await page(p).getByRole('button', { name: 'Raise a snag for Finish and surfaces' }).click();
+    await page(p).getByRole('button', { name: 'Raise a snag for the Finish and surfaces failure' }).click();
     await page(p).locator('vs-dialog select[name=category]').selectOption('FINISH');
     await page(p).locator('vs-dialog input[name=customer_title]').fill('Shutter edge to be refinished');
     await submitDialog(p);
     await dialogClosed(p);
-    for (const [name, status] of [['Snag 1: In progress', 'IN_PROGRESS'], ['Snag 1: Ready for recheck', 'READY_FOR_RECHECK']]) {
-      await page(p).getByRole('button', { name }).click();
-      await submitDialog(p);
-      await dialogClosed(p);
-      check(`snag: ${status.toLowerCase()}`, state.snag === status);
-    }
-    await page(p).getByRole('button', { name: 'Snag 1: Resolved' }).click();
-    await page(p).locator('vs-dialog textarea').fill('Rechecked: edge rebanded');
+    await page(p).getByRole('button', { name: 'Snag 1: Start fixing' }).click();
     await submitDialog(p);
     await dialogClosed(p);
-    check('snag: resolved after the recheck', state.snag === 'RESOLVED');
+    check('snag: being fixed', state.snag === 'IN_PROGRESS');
+    await page(p).getByRole('button', { name: 'Snag 1: Record the fix' }).click();
+    await submitDialog(p);
+    await page(p).locator('vs-dialog textarea[aria-invalid=true]').waitFor();
+    check('snag: the fixer must say what was fixed', state.snag === 'IN_PROGRESS');
+    await page(p).locator('vs-dialog textarea[name=note]').fill('Edge banding replaced');
+    await submitDialog(p);
+    await dialogClosed(p);
+    check('snag: fixed, awaiting verification', state.snag === 'READY_FOR_RECHECK');
+    check('snag: the fixer is never offered the verification', (await page(p).getByRole('button', { name: 'Snag 1: Verify the fix' }).count()) === 0);
+    // The quality persona verifies in their own session.
+    {
+      const qctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      const q = await qctx.newPage();
+      await serve(q, state, QA_ME);
+      await q.goto(`${BASE}/projects/p1`);
+      await page(q).locator('dl.hero').waitFor();
+      await tab(q, 'Quality and snags').click();
+      await page(q).getByRole('button', { name: 'Snag 1: Verify the fix' }).click();
+      await page(q).locator('vs-dialog textarea[name=note]').fill('Rechecked: edge rebanded');
+      await submitDialog(q);
+      await dialogClosed(q);
+      check('snag: verified by someone independent', state.snag === 'RESOLVED');
+      await qctx.close();
+    }
     await tab(p, 'Handover').click();
     check('handover: not ready, with why', await page(p).getByText('Not ready for handover.').isVisible());
     await tab(p, 'Timeline').click();

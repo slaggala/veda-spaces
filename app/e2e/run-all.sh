@@ -51,5 +51,6 @@ run promise.e2e.mjs
 run project.e2e.mjs
 run portal.e2e.mjs
 run commercials.e2e.mjs
+run delivery.e2e.mjs
 run axe.e2e.mjs
 exit $status

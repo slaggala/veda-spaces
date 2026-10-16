@@ -34,6 +34,8 @@ export const portalStyles = [...shared, css`
   .badge.IN_PROGRESS::before { background: var(--vs-copper-strong); }
   .badge.UPCOMING::before { background: transparent; border: 2px solid var(--vs-ink-muted); width: 6px; height: 6px; }
   .badge.NOT_YET_AVAILABLE { color: var(--vs-ink-muted); }
+  .badge.BLOCKED { border-color: var(--vs-warning); color: var(--vs-warning); }
+  .badge.BLOCKED::before { border-radius: 1px; background: var(--vs-warning); }
   /* payment states (PCM): each has its own marker shape as well as its word */
   .badge.PAID::before, .badge.VALID::before { background: var(--vs-success); }
   .badge.OVERDUE, .badge.DUE, .badge.PARTIALLY_PAID { border-color: var(--vs-copper); color: var(--vs-copper-text); }
