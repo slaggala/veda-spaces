@@ -107,6 +107,23 @@ describe('Customer Project Portal', () => {
     expect(calls[0].headers.Authorization).to.equal(undefined);
   });
 
+  it('signing out on the home page ends the session and clears the page (staging finding)', async () => {
+    keepSession('vpp_SESSION');
+    const calls: Call[] = [];
+    serve({ [`GET ${P}/home`]: () => json(home()), [`POST ${P}/sign-out`]: () => new Response(null, { status: 204 }) }, calls);
+    const { root } = await mount('vs-portal-home-page');
+    await waitUntil(() => root.querySelector('article'), 'card');
+    const header = root.querySelector('vs-portal-header')!.shadowRoot!;
+    (header.querySelector('button') as HTMLButtonElement).click();
+    await waitUntil(() => root.querySelector('vs-portal-sign-in'), 'sign-in');
+    expect(calls.some((c) => c.method === 'POST' && c.path === `${P}/sign-out` && c.headers['X-Veda-Portal'] === 'vpp_SESSION')).to.equal(true);
+    expect(sessionToken()).to.equal(null);
+    expect(text(root)).to.not.contain('SYNTHETIC Customer');
+    expect(root.querySelector('article')).to.equal(null);
+    await (root.querySelector('vs-portal-header') as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    expect(root.querySelector('vs-portal-header')!.shadowRoot!.querySelector('button')).to.equal(null);
+  });
+
   it('an ended session returns to sign-in and forgets the token', async () => {
     keepSession('vpp_OLD');
     serve({ [`GET ${P}/home`]: () => problem(401, 'PORTAL_SESSION_INVALID') }, []);

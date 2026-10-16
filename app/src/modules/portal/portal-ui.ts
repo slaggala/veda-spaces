@@ -88,6 +88,9 @@ export class VsPortalHeader extends LitElement {
     try { await portalApi.signOut(); } catch { /* the session ends here whatever the server says */ }
     forgetSession();
     this.busy = false;
+    // The page showing this header clears what it shows: on /portal itself, navigating to /portal changes no route,
+    // so without this the signed-out home would keep the customer's details (and this button) on screen.
+    this.dispatchEvent(new CustomEvent('portal-signed-out', { bubbles: true, composed: true }));
     navigate('/portal');
   }
 

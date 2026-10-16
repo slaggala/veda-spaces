@@ -36,6 +36,11 @@ export class VsPortalHomePage extends LitElement {
     void this.fetch();
   }
 
+  private signedOut = () => {
+    this.home = null;
+    this.load = 'signed-out';
+  };
+
   private async fetch() {
     this.load = 'loading';
     try {
@@ -110,7 +115,7 @@ export class VsPortalHomePage extends LitElement {
   }
 
   override render() {
-    return html`<vs-portal-header ?signed-in=${this.load === 'ready'}></vs-portal-header><main class="wrap" id="main">${this.content()}</main>`;
+    return html`<vs-portal-header ?signed-in=${this.load === 'ready'} @portal-signed-out=${this.signedOut}></vs-portal-header><main class="wrap" id="main">${this.content()}</main>`;
   }
 }
 customElements.define('vs-portal-home-page', VsPortalHomePage);
