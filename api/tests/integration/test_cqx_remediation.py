@@ -18,11 +18,11 @@ import sqlalchemy as sa
 from tests.integration.test_cqx_acceptance import _ack_required, _body, _ready
 from tests.support.api import ApiClient
 from tests.support.proposal import ACCEPTANCE_ON, Customer, customer, ok
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.kernel.context import actor, system_context
 
 pytestmark = ACCEPTANCE_ON
-PAUSE = 2.0
 
 
 def _engine() -> str:
@@ -172,14 +172,13 @@ def _race(app, monkeypatch, first, second):
     from veda.modules.customer_proposal import grants
 
     original = grants.resolve
-    paused, done = threading.Event(), threading.Event()
+    hold = Hold()
     holder: dict = {}
 
     def resolve_then_pause(s, token):
         found = original(s, token)
         if threading.current_thread() is holder.get("first"):
-            paused.set()
-            done.wait(timeout=PAUSE)
+            hold.wait()
         return found
 
     monkeypatch.setattr(grants, "resolve", resolve_then_pause)
@@ -189,16 +188,17 @@ def _race(app, monkeypatch, first, second):
         out["first"] = first(ApiClient(app.test_client()))
 
     def run_second():
-        assert paused.wait(timeout=20), "the first request never reached its pause"
+        assert hold.reached.wait(timeout=20), "the first request never reached its pause"
         out["second"] = second(ApiClient(app.test_client()))
-        done.set()
+        hold.done()
 
     holder["first"] = threading.Thread(target=run_first)
     t2 = threading.Thread(target=run_second)
-    holder["first"].start()
-    t2.start()
-    holder["first"].join(timeout=60)
-    t2.join(timeout=60)
+    with hold.racing(held=holder["first"], other=t2):
+        holder["first"].start()
+        t2.start()
+        holder["first"].join(timeout=60)
+        t2.join(timeout=60)
     assert "first" in out and "second" in out, out
     assert out["first"].status < 500 and out["second"].status < 500, out
     return out["first"], out["second"]

@@ -15,27 +15,26 @@ import sqlalchemy as sa
 
 from tests.support.api import ApiClient
 from tests.support.promise import BASE, ON, SENSITIVE, Team
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.modules.customer_promise import service
 from veda.modules.customer_promise.models import OPEN_STATUSES, CustomerPromisePack, CustomerPromiseReview
 
 pytestmark = ON
-PAUSE = 2.0
 
 
 def _race(app, monkeypatch, first_token: str, second_token: str, first, second, *, pause_on: str = "_need"):
     """Run ``first(client)`` and ``second(client)`` with the first paused after its permission check."""
     a, b = ApiClient(app.test_client()), ApiClient(app.test_client())
     a.token, b.token = first_token, second_token
-    paused, done = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = getattr(service, pause_on)
 
     def wrapped(*args, **kw):
         result = original(*args, **kw)
-        if threading.current_thread() is threads.get("first") and not paused.is_set():
-            paused.set()
-            done.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("first") and not hold.reached.is_set():
+            hold.wait()
         return result
 
     monkeypatch.setattr(service, pause_on, wrapped)
@@ -45,16 +44,17 @@ def _race(app, monkeypatch, first_token: str, second_token: str, first, second, 
         out["first"] = first(a)
 
     def run_second():
-        assert paused.wait(timeout=10), "the first request never reached its pause"
+        assert hold.reached.wait(timeout=10), "the first request never reached its pause"
         out["second"] = second(b)
-        done.set()
+        hold.done()
 
     threads["first"] = threading.Thread(target=run_first)
     threads["second"] = threading.Thread(target=run_second)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["first"], other=threads["second"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     assert "first" in out and "second" in out, out
     return out["first"], out["second"]
 

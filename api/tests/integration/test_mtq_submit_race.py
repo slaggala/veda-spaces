@@ -17,6 +17,7 @@ import sqlalchemy as sa
 
 from tests.support.api import ApiClient
 from tests.support.mtq import Site, jpeg, kitchen_payload, photo
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.modules.attachments import service as att_service
 from veda.modules.attachments.models import Attachment
@@ -24,7 +25,6 @@ from veda.modules.mtq import sets
 from veda.modules.mtq.models import MeasurementNote, MeasurementSet, SpaceMeasurement
 
 ON = pytest.mark.settings(mtq_site_enabled=True)
-PAUSE = 2.0  # seconds the writer waits for the submit; on SQLite the submit waits on the writer's write lock instead
 
 
 def _ready_site(api, factory) -> tuple[Site, dict]:
@@ -84,13 +84,12 @@ def test_a_write_racing_submit_lands_before_it_or_is_refused(app, api, factory, 
     writer.token = submitter.token = token
     version = api.get(f"/api/v1/measurement-sets/{set_id}").data["version"]
 
-    paused, submitted = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
 
     def pause_writer():
         if threading.current_thread() is threads.get("writer"):
-            paused.set()
-            submitted.wait(timeout=PAUSE)
+            hold.wait()
 
     if kind == "attachment":  # ATT: after the entity was resolved (writable) and the caller's scope checked
         original_scope = att_service.require_lead_scope
@@ -115,16 +114,17 @@ def test_a_write_racing_submit_lands_before_it_or_is_refused(app, api, factory, 
         outcome["write"] = _write(kind, writer, set_id, extra)
 
     def submit():
-        assert paused.wait(timeout=10), "the writer never reached its pause"
+        assert hold.reached.wait(timeout=10), "the writer never reached its pause"
         outcome["submit"] = submitter.post(f"/api/v1/measurement-sets/{set_id}/submit", if_match=version)
-        submitted.set()
+        hold.done()
 
     threads["writer"] = threading.Thread(target=write)
     threads["submitter"] = threading.Thread(target=submit)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["writer"], other=threads["submitter"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     assert "write" in outcome and "submit" in outcome, outcome
     assert outcome["submit"].status == 200, outcome["submit"]
     accepted, refusal = outcome["write"]
@@ -200,15 +200,14 @@ def test_a_draft_rule_withdrawal_racing_submit_lands_before_it_or_is_refused(app
     writer, submitter = ApiClient(app.test_client()), ApiClient(app.test_client())
     writer.token = submitter.token = token
     version = api.get(f"/api/v1/measurement-sets/{set_id}").data["version"]
-    paused, submitted = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original_resolve = att_service._resolve
 
     def resolve_then_pause(*a, **kw):  # the first resolve is the pre-lock read of the withdrawal rule
         out = original_resolve(*a, **kw)
-        if threading.current_thread() is threads.get("writer") and not paused.is_set():
-            paused.set()
-            submitted.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("writer") and not hold.reached.is_set():
+            hold.wait()
         return out
 
     monkeypatch.setattr(att_service, "_resolve", resolve_then_pause)
@@ -218,16 +217,17 @@ def test_a_draft_rule_withdrawal_racing_submit_lands_before_it_or_is_refused(app
         outcome["write"] = writer.post(f"/api/v1/attachments/{shot['id']}/withdraw", {}, if_match=shot["version"])
 
     def submit():
-        assert paused.wait(timeout=10), "the writer never reached its pause"
+        assert hold.reached.wait(timeout=10), "the writer never reached its pause"
         outcome["submit"] = submitter.post(f"/api/v1/measurement-sets/{set_id}/submit", if_match=version)
-        submitted.set()
+        hold.done()
 
     threads["writer"] = threading.Thread(target=write)
     threads["submitter"] = threading.Thread(target=submit)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["writer"], other=threads["submitter"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     assert outcome["submit"].status == 200, outcome["submit"]
     r = outcome["write"]
     with db.unit_of_work(write=False) as s:

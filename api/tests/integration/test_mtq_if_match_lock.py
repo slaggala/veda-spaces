@@ -7,8 +7,9 @@ and the current version) — not admitted on the version it read before the lock
 later state check that only happened to catch it.
 
 On PostgreSQL the interleaving is real: A commits while B is paused, so B is the loser. SQLite write units of work start
-under BEGIN IMMEDIATE, so B already holds the database write lock when it pauses: A waits, B commits first and A is the
-loser. Either way exactly one request succeeds, the other gets the stale-version response, and no request returns 500.
+under BEGIN IMMEDIATE, so B already holds the database write lock when it pauses: A waits for it, B resumes as soon as A
+is waiting (``tests.support.race``), commits first and A is the loser. Either way exactly one request succeeds, the
+other gets the stale-version response, and no request returns 500.
 """
 
 from __future__ import annotations
@@ -19,12 +20,12 @@ import pytest
 
 from tests.support.api import ApiClient
 from tests.support.mtq import FULL_CAPTURE, Site
+from tests.support.race import Hold
 from veda.kernel import db
 from veda.modules.mtq import sets
 from veda.modules.mtq.models import MeasurementNote, MeasurementSet, PropertySpace
 
 ON = pytest.mark.settings(mtq_site_enabled=True)
-PAUSE = 2.0
 
 
 def _site(api, factory, *, submitted: bool) -> Site:
@@ -96,14 +97,13 @@ KINDS = ["patch", "submit", "note_delete", "verify", "reject", "space_patch"]
 @pytest.mark.parametrize("kind", KINDS)
 def test_a_stale_if_match_is_refused_after_the_lock(app, api, factory, monkeypatch, kind):
     site, client_a, client_b, call, version = _scenario(kind, app, api, factory)
-    paused, a_done = threading.Event(), threading.Event()
+    hold = Hold()
     threads: dict[str, threading.Thread] = {}
     original = sets.lock_property
 
     def pause_before_lock(*args, **kw):  # B has read the record (version n) and is about to take the lock
-        if threading.current_thread() is threads.get("B") and not paused.is_set():
-            paused.set()
-            a_done.wait(timeout=PAUSE)
+        if threading.current_thread() is threads.get("B") and not hold.reached.is_set():
+            hold.wait()
         return original(*args, **kw)
 
     monkeypatch.setattr(sets, "lock_property", pause_before_lock)
@@ -113,15 +113,16 @@ def test_a_stale_if_match_is_refused_after_the_lock(app, api, factory, monkeypat
         out["B"] = call(client_b, "B")
 
     def run_a():
-        assert paused.wait(timeout=10), "B never reached the lock"
+        assert hold.reached.wait(timeout=10), "B never reached the lock"
         out["A"] = call(client_a, "A")
-        a_done.set()
+        hold.done()
 
     threads["B"], threads["A"] = threading.Thread(target=run_b), threading.Thread(target=run_a)
-    for t in threads.values():
-        t.start()
-    for t in threads.values():
-        t.join(timeout=30)
+    with hold.racing(held=threads["B"], other=threads["A"]):
+        for t in threads.values():
+            t.start()
+        for t in threads.values():
+            t.join(timeout=30)
     assert set(out) == {"A", "B"}, out
     assert all(r.status != 500 for r in out.values()), out
     won = [tag for tag, r in out.items() if r.status in (200, 204)]
