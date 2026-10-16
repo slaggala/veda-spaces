@@ -1,9 +1,7 @@
 """API contract (12 §4.6), TD-F optimistic-concurrency conflict, notifications and the outbox (12 §4.10)."""
 
-import re
 import threading
 from datetime import timedelta
-from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
@@ -155,6 +153,9 @@ def test_SEC_002_access_cors_runbook_lists_every_preflight_header(client):
     """On staging, Cloudflare Access answers the browser's preflight itself from the header list the runbook sets, not
     from the API's answer. A header the API accepts but the runbook omits fails as a CORS error before the request
     reaches the API (seen on staging: the customer portal's X-Veda-Portal, "We could not load your portal")."""
+    import re
+    from pathlib import Path
+
     r = client.options(
         "/api/v1/public/estimates", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "GET"}
     )
