@@ -1,14 +1,14 @@
 {
   "record": "CUSTOMER-PROJECT-PORTAL-STAGING-ENABLEMENT",
-  "status": "DRAFT",
+  "status": "APPROVED",
   "environment": "staging",
   "production": false,
   "flags": [
     "VEDA_CUSTOMER_PORTAL_ENABLED"
   ],
   "author": "Customer Project Portal staging session (VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING)",
-  "approved_by": "OWNER TO FILL",
-  "approved_on": "OWNER TO FILL",
+  "approved_by": "Srinivasulu Laggala (owner)",
+  "approved_on": "2026-10-16",
   "scope": {
     "protected_staging_only": true,
     "synthetic_content_only": true,
@@ -28,14 +28,14 @@
     "access": "Staging is behind Cloudflare Access: a validator needs Access to open /portal as well as the emailed link."
   },
   "evidence": {
-    "independent_review": "OWNER TO FILL",
-    "ci_run_id": "OWNER TO FILL",
-    "deploy_flags_off_run_id": "OWNER TO FILL",
-    "migration_verification_run_id": "OWNER TO FILL",
-    "infra_apply_run_id": "OWNER TO FILL",
-    "drift_run_id": "OWNER TO FILL",
-    "smoke_test": "OWNER TO FILL",
-    "production_isolation": "OWNER TO FILL"
+    "independent_review": "PR #104 (Customer Project Portal) independent review: CERTIFIED FOR MERGE (flag off) after the review-fix commits (F1-F7, N1, N2, F3 and the Low items closed); merged as the PR #104 merge commit. PR #105 (this flag's wiring) reviewed by the owner and merged.",
+    "ci_run_id": "38867240392",
+    "deploy_flags_off_run_id": "38867625037",
+    "migration_verification_run_id": "38869048580",
+    "infra_apply_run_id": "38876741055",
+    "drift_run_id": "38877023785",
+    "smoke_test": "2026-10-16 staging, owner browser session, portal flag off: /health/ready ok; the workspace dashboard loads; GET /api/v1/public/portal/home answers 404 (the portal gate); /portal renders its sign-in page. The 12-deploy completes only once the API reports its schema at the image head (0209_customer_portal). Evidence cpp-flags-off-20261016T084832Z.tgz (sha256 40c6fe49e2cb6273f25d4dcfaf43c63d33f8a7d63637991711a820c8edbe3578).",
+    "production_isolation": "The API refuses VEDA_CUSTOMER_PORTAL_ENABLED in production (api/tests/unit/test_config_environments.py::test_customer_portal_is_off_by_default_and_production_refuses_it); this record is staging-only; no production change."
   },
   "rollback": "A reviewed change sets customer_portal.enabled false and enablement_record_sha256 null in infra/config/staging-platform.json; an approved 11-infra-apply changes the parameter in place; the next 12-deploy renders it. Every portal route (customer and staff) then answers 404; accounts, access, sessions and events stay stored and no quotation or project record changes."
 }

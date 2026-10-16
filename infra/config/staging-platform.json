@@ -149,8 +149,8 @@
   },
   "customer_portal": {
     "status": "DECIDED",
-    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING (2026-10-16), recorded as given: the Customer Project Portal (decision log 41) is wired to staging with one flag, VEDA_CUSTOMER_PORTAL_ENABLED, false by default, separate from every other flag (it never turns the Project Lifecycle or a customer-proposal flag on). It is customer-facing and the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-portal-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. Rollback: enabled false and enablement_record_sha256 null.",
-    "enabled": false,
-    "enablement_record_sha256": null
+    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING (2026-10-16), recorded as given: the Customer Project Portal (decision log 41) is wired to staging with one flag, VEDA_CUSTOMER_PORTAL_ENABLED, false by default, separate from every other flag (it never turns the Project Lifecycle or a customer-proposal flag on). It is customer-facing and the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-portal-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. Rollback: enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-16 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 43).",
+    "enabled": true,
+    "enablement_record_sha256": "d3004a780a04fd640d738c4f37f9b6ea5b67326e20ab28f4898609056a14499f"
   }
 }

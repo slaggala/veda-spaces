@@ -1,0 +1,156 @@
+{
+  "description": "Staging platform decisions (AUT-102 to AUT-111), planned by infra/terraform/envs/staging-core. Changed only through a reviewed pull request. An entry whose status is PROPOSED has not been decided by the owner: plans run with the proposed value, and stack.sh apply refuses while any PROPOSED entry remains. Secrets and personal addresses are never stored here.",
+  "kms": {
+    "status": "DECIDED",
+    "decision": "Integrated workstream 2026-10-05: two customer-managed keys (data, audit) instead of three, for cost (cost report); yearly rotation; 30-day deletion window.",
+    "deletion_window_days": 30,
+    "rotation_period_days": 365
+  },
+  "storage": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Lifecycle values are reversible; Object Lock retention is not.",
+    "litestream_noncurrent_days": 7,
+    "snapshots_expire_days": 42,
+    "artifacts_expire_days": 90,
+    "artifacts_noncurrent_days": 30,
+    "logs_cloudtrail_expire_days": 90,
+    "logs_flow_expire_days": 30,
+    "evidence_lock_mode": "COMPLIANCE",
+    "evidence_lock_days": 30
+  },
+  "anchor_retention": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D6 option B. The anchor retention is configurable in the application (VEDA_ANCHOR_RETENTION_DAYS, whole days; required in staging, at least 3650 in production) and staging uses 30 days: staging-core plans /veda/staging/config/VEDA_ANCHOR_RETENTION_DAYS from application_retention_days, and the S3 anchor store locks every object in COMPLIANCE mode until now plus that retention. infra/tests/run.sh refuses deploy.enabled true unless the application change, the mapping and the planned parameter are all in place. The bucket has Object Lock enabled with no default retention.",
+    "application_retention_days": 30
+  },
+  "cloudtrail": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. One multi-region trail of management events, log-file validation, audit key, copy in CloudWatch Logs kept 30 days (the S3 copy follows storage.logs_cloudtrail_expire_days). veda-boundary denies every role cloudtrail:Put*Selectors and UpdateTrail, so the S3 data events on the anchor and evidence buckets (FC-01, RR-09 attribution) are added once by the owner session after the first apply (runbook).",
+    "log_group_retention_days": 30,
+    "owner_session_data_event_buckets": [
+      "anchor",
+      "evidence"
+    ]
+  },
+  "ecr": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. One repository veda-api (the bootstrap deploy role pushes only there), immutable tags, basic scan on push, data key; keep the last 30 tagged images, expire untagged images after 7 days. Litestream and cloudflared keep coming from Docker Hub, pinned by digest (the deploy role cannot push other repositories).",
+    "keep_tagged_images": 30,
+    "expire_untagged_days": 7
+  },
+  "ssm": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): D7 accepted; the rest accepted as proposed. D7 staging host names; the trusted proxy is the Compose network gateway 172.30.0.1 (Docker address pool 172.30.0.0/16, AUT-001 host design): the peer the API sees for every request published on 127.0.0.1:8000; Litestream keeps 7 days of WAL; session transcripts 90 days; sessions end after 20 idle minutes and 60 minutes in all. Secrets are seeded by the owner under /veda/staging/app (AUT-302). 2026-10-07 (owner, AUT-202 to AUT-204): public_site_credentials true, because the staging site is behind Cloudflare Access and its intake call must carry the Access cookie of the API host; the API refuses this setting in production. 2026-10-08 (owner, VEDA-SPACES-ESTIMATOR-STAGING-VALIDATION; ADR-012 decision log 20): estimator_enabled true for staging only, behind Cloudflare Access, for protected validation; the Warranty, Service & Customer Care Policy link comes from the WARRANTY_POLICY_URL variable of the staging-plan environment and the plan refuses an enabled estimator without it; the API refuses the estimator in production.",
+    "app_origin": "https://app-staging.vedaspaces.com",
+    "api_base_url": "https://api-staging.vedaspaces.com",
+    "public_site_origins": "https://staging.vedaspaces.com",
+    "public_site_credentials": true,
+    "estimator_enabled": true,
+    "trusted_proxy_cidrs": "172.30.0.1/32",
+    "litestream_retention": "168h",
+    "session_log_retention_days": 90,
+    "idle_session_timeout_minutes": 20,
+    "max_session_duration_minutes": 60
+  },
+  "monitoring": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Application and host logs kept 30 days; a fixed set of 7 log metric filters instead of EMF (cost); alarm thresholds below; alarms email the owner (BUDGET_ALERT_EMAIL secret) and feed the drill queue. Implementation note 2026-10-10 (targeted media enablement, not a change of this decision): the monitoring module now plans 15 log metric filters (these 7 plus 8 catalog-media signals) and one more host metric (scanner restarts): 16 custom metrics without the host, 21 with it. Implementation note 2026-10-12 (scanner implementation, not a change of this decision): one more host metric, the scanner health (Veda/Host ScannerHealthy, alarm scanner-unhealthy), reported only while the scanner container exists: 16 custom metrics without the host, 22 with it.",
+    "log_retention_days": 30,
+    "thresholds": {
+      "server_errors_per_5min": 5,
+      "cpu_percent": 80,
+      "memory_percent": 85,
+      "data_disk_percent": 80,
+      "root_disk_percent": 85
+    }
+  },
+  "compute": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. T4g.small (N2, decided) with burst credits capped (standard); 12 GB root and 20 GB data volumes (gp3, data key); 7 daily snapshots of the data volume; the AMI is the latest Amazon Linux 2023 arm64 at the first plan and is then pinned here (ami_id). AD-2, 2026-10-12 (owner direction VEDA-SPACES-PR77-REBASE-AND-PLAN-CERTIFICATION, recorded as given in docs/implementation/catalog/CATALOG-V3-activation-owner-decisions.md): scanner path option B; host t4g.large (8 GiB) for the clamd sidecar; reserve policy (a), 25 % of memory, the documented scanner reserve policy of the media enablement record §4, met with margin by the measured clamd figures (phase-1 record §4) and the 2048 MiB Compose limit validated by the scanner implementation. Every other setting of the host is unchanged. On-demand price verified from the public AWS Price List (offer 20261009203134, ap-south-1, Linux, shared tenancy): t4g.large 0.0448 USD/h, t4g.small 0.0112 USD/h; 32.70 USD per 730 h, +24.53 USD per month; the budget is revised by AD-3 (staging-budget.json). This entry changes nothing by itself: the resize is applied only by an approved 11-infra-apply of a plan run on main that shows the in-place instance_type update of aws_instance.host and nothing else (no destroy, no replacement; az_id is pinned). media_scanner stays none: the scanner is enabled only by AD-1 in a later reviewed change. Rollback: t4g.small again, the same in-place update, after media_scanner.mode is none.",
+    "instance_type": "t4g.large",
+    "root_volume_gb": 12,
+    "data_volume_gb": 20,
+    "snapshot_retain_count": 7,
+    "ami_id": null
+  },
+  "ses": {
+    "status": "DECIDED",
+    "decision": "Owner decision 2026-10-05 (docs/implementation/staging/STAGING-PLATFORM-owner-decisions.md): accepted as proposed. Sender no-reply@staging.vedaspaces.com (a subdomain, so the apex records never change; DKIM CNAMEs published by AUT-202); sandbox, with the owner's address verified as recipient (more rehearsal recipients: O11); alarm when the bounce rate exceeds 5 %.",
+    "sender_domain": "staging.vedaspaces.com",
+    "sender_local_part": "no-reply",
+    "bounce_rate_threshold": 0.05
+  },
+  "deploy": {
+    "status": "DECIDED",
+    "decision": "2026-10-06 (owner, deploy-enable phase): deploy.enabled true, so 12-deploy may run and the deployment alarms notify (review R4). Merged only after the D6 change, the CloudTrail data events and the eight AUT-302 secrets; applied (1 parameter added, 11 alarm actions on) immediately before the first 12-deploy. Public lead intake stays disabled: no tunnel, DNS or Turnstile widget (AUT-201 to AUT-204), and the test Turnstile secret (D8) is not for public use.",
+    "enabled": true,
+    "public_intake": "disabled"
+  },
+  "media": {
+    "status": "DECIDED",
+    "decision": "Owner defaults of VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT (2026-10-10), recorded as given: one private media bucket veda-stg-media-<account> from the existing storage module (the plan-guard naming convention); the existing data key by alias (no third key); no Object Lock, so a withdrawal removes the current object version at once (a delete marker; nothing is served); prior noncurrent versions remain, unreadable to anyone but the account, until the 30-day lifecycle window expires them; noncurrent versions expire after noncurrent_days (30, configurable 1 to 90); delivery only through the existing api-staging route behind Cloudflare Access (no CloudFront, no new hostname); media governance is catalog governance with four-eyes approval; 3D, video and public intake stay disabled. Nothing is served until media_scanner and media_rights are decided and catalog_v3 is approved.",
+    "noncurrent_days": 30
+  },
+  "catalog_v3": {
+    "status": "DECIDED",
+    "decision": "VEDA-SPACES-V3-TARGETED-MEDIA-ENABLEMENT: every V3 catalog flag stays off in staging. A flag may be turned on only together, by a reviewed change that sets approval_record_sha256 to the SHA-256 of the file api/veda/modules/catalog/approved/v3-staging-approval.json once it passes every rule of api/veda/modules/catalog/v3_approval_policy.json; staging-core refuses any flag on without that binding, and refuses a partial activation. Rollback: every flag false and approval_record_sha256 null. Production refuses V3 in the API whatever this says.",
+    "catalog_estimator_enabled": false,
+    "catalog_admin_enabled": false,
+    "media_delivery_enabled": false,
+    "approval_record_sha256": null
+  },
+  "media_scanner": {
+    "status": "DECIDED",
+    "decision": "AD-1, 2026-10-12 (owner direction VEDA-SPACES-ACTIVATION-GOVERNANCE-EXECUTION, recorded as given in docs/implementation/catalog/CATALOG-V3-activation-owner-decisions.md): scanner path option B, the clamd sidecar on the t4g.large host of AD-2 (applied by 11-infra-apply run 38236441086). Image pinned by digest (clamd_image): the arm64 LTS image validated by workflow 14 run 38199283652 at the 2048 MiB Compose limit and implemented by pull request #76. Capacity evidence (capacity_evidence_sha256): 13-evidence run 38164988919, scanner-capacity-20261011T184622Z.tgz, the record's scanner_capacity evidence. Approved scanner mode clamd. mode was none in the recording change (pull request #78: a governance record deploys no scanner) and is clamd since the scanner deployment change of 2026-10-12 (owner direction VEDA-SPACES-SCANNER-DEPLOYMENT-EXECUTION, recorded as given; pull request #80): one SSM parameter, VEDA_CATALOG_MEDIA_SCANNER, in place; at the next 12-deploy, deploy.sh step 4c starts the scanner Compose profile with the pinned image and waits for PONG before the API restarts. Then a soak and the 13-evidence scanner-validation collection that becomes the record's scanner_decision evidence. The recording change planned the SSM parameter VEDA_CATALOG_CLAMD_IMAGE from none-selected to the pin (inert while the mode was none); every parameter change is applied only by an approved 11-infra-apply. Option A stays refused by staging-core; option C stays unimplemented. Rollback of this record: clamd_image null, option null, status UNDECIDED, the same parameter in place. Rollback of a deployed scanner: mode none, one parameter in place, no destroy. Earlier text (2026-10-10): the owner chooses B or C after the capacity evidence; until then mode none, uploads stay PENDING and nothing is served; clamd needs the image pinned by digest; UNDECIDED blocks V3 activation only (output catalog_v3).",
+    "option": "B",
+    "mode": "clamd",
+    "clamd_image": "clamav/clamav:1.4.6-debian13-slim@sha256:fe182632e3f8de585c539fb22d84144dd6a7e2bf7d9470607b86ad8c368d1e3b",
+    "capacity_evidence_sha256": "ab25630c5f0e8b2934a8181acd9b55dc5a59de21e05c778d8cefc1da05058517"
+  },
+  "media_rights": {
+    "status": "UNDECIDED",
+    "decision": "Not decided: the owner names the accountable media-rights approver (a person or role they choose; never invented). Until then media activation is blocked (output catalog_v3, release validation).",
+    "approver": "[OWNER TO FILL]"
+  },
+  "attachments": {
+    "status": "DECIDED",
+    "decision": "MTQ B1 attachment policy, frozen in docs/proposals/measurement-to-quotation/MTQ-B1-blocker-closure.md section 6.4 (merged by the owner with pull request #86): one private bucket veda-stg-attachments-<account> from the existing storage module, the existing data key by alias, no Object Lock, versioning with noncurrent versions expiring after noncurrent_days (30), current objects to Intelligent-Tiering after tiering_days (90), TLS only, bucket-owner-enforced, no public access. Implementation detail of B1-T11 (docs/implementation/mtq/B1-implementation-record.md): uploads that are never completed expire under upload/ after upload_expire_days (2); a pre-signed POST lives upload_ttl_seconds (300). The scanner is the media scanner (media_scanner.mode). The site measurement flag VEDA_MTQ_SITE_ENABLED stays false: these settings are inert until a reviewed enablement change.",
+    "noncurrent_days": 30,
+    "tiering_days": 90,
+    "upload_expire_days": 2,
+    "upload_ttl_seconds": 300
+  },
+  "mtq_site": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-MTQ-B1-END-TO-END-IMPLEMENTATION (2026-10-13), recorded as given: VEDA_MTQ_SITE_ENABLED stays false on staging until explicit owner approval, and it is never enabled in production (the API refuses it there). It may turn on only by a reviewed change that sets site_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/mtq-site-enablement-record.json once that record is APPROVED by the owner with every evidence field filled (independent review, CI, the attachment-storage apply, a clean drift run, migration and rollback verification). staging-core refuses anything else. Rollback: site_enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-13 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 30).",
+    "site_enabled": true,
+    "enablement_record_sha256": "017f44d1869f8ba9c0d4956513e9751d4b33e1d3ce7b9df1dccdbfc9ac407cdc"
+  },
+  "mtq_commercial": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-MTQ-B2-B4-PROTECTED-STAGING-ENABLEMENT (2026-10-14), recorded as given: VEDA_MTQ_ESTIMATION_ENABLED (B2 scope and BOQ, B3 estimate) and VEDA_MTQ_QUOTATION_ENABLED (B4 quotation) are wired to staging false by default and are never enabled in production (the API refuses both there). Quotation needs estimation; estimation may be on without quotation, and needs the B1 site flag. Estimation may turn on only by a reviewed change that sets estimation_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/mtq-commercial-enablement-record.json once that record is APPROVED by the owner, staging-only, limited to internal protected-staging validation without customer issuance, with every evidence field filled. staging-core refuses anything else. Rollback: both flags false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-14 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 34).",
+    "estimation_enabled": true,
+    "quotation_enabled": true,
+    "enablement_record_sha256": "c14a904d8be4c7a4c3cfa76fbca4870d571f22d0d69509b2a59cb13a8cd12926"
+  },
+  "customer_proposal": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-QUOTATION-EXPERIENCE-END-TO-END (2026-10-14), recorded as given: the customer quotation experience is wired to staging with three independent flags, all false: VEDA_CUSTOMER_PROPOSAL_ENABLED (viewing a shared, issued quotation), VEDA_CUSTOMER_PROPOSAL_INTERACTION_ENABLED (optional-item choices, questions, change requests, acknowledgements; needs viewing) and VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED (digital acceptance; needs interaction). Viewing needs the B4 quotation flag. Production refuses all three (the API refuses them at start). A flag may turn on only by a reviewed change that sets it true and enablement_record_sha256 to the SHA-256 of infra/config/customer-proposal-enablement-record.json once that record is APPROVED by the owner, staging-only, synthetic customers only, with every evidence field filled and its scope naming each flag turned on; acceptance is never enabled merely to test viewing. staging-core refuses anything else. Rollback: every flag false and enablement_record_sha256 null.",
+    "proposal_enabled": false,
+    "interaction_enabled": false,
+    "acceptance_enabled": false,
+    "enablement_record_sha256": null
+  },
+  "customer_promise": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-PROTECTED-STAGING-CUSTOMER-PROMISE-TO-PROPOSAL-VALIDATION (2026-10-15), recorded as given: the Customer Promise administration portal (decision log 37) is wired to staging with one flag, VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED, false by default, separate from the three customer-proposal flags. It is staff-only (no customer route) and the API refuses it in production. It may turn on only by a reviewed change that sets admin_enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-promise-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, synthetic content only, with every evidence field filled. staging-core refuses anything else. Turning it on publishes nothing to customers: quotations use a published pack only once the owner records OI-MTQ-18 as delegated to the portal. Rollback: admin_enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-15 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 39).",
+    "admin_enabled": true,
+    "enablement_record_sha256": "8e88e934002e5cd3a589f72cea285ba62d63344da231e6202e91650722b936e9"
+  },
+  "customer_portal": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING (2026-10-16), recorded as given: the Customer Project Portal (decision log 41) is wired to staging with one flag, VEDA_CUSTOMER_PORTAL_ENABLED, false by default, separate from every other flag (it never turns the Project Lifecycle or a customer-proposal flag on). It is customer-facing and the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-portal-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. Rollback: enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-16 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 43).",
+    "enabled": false,
+    "enablement_record_sha256": null
+  }
+}
