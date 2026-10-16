@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { newIdempotencyKey } from '../../core/api/client.js';
 import {
-  forgetSession, portalApi, sessionToken, transient, type Commercials, type Contact, type DeliveryProject, type DocumentEntry, type Entry, type PropertyView,
+  forgetSession, portalApi, sessionToken, transient, type Commercials, type Contact, type DeliveryProject, type DocumentEntry, type Entry, type ProjectDocument,
+  type PropertyView,
 } from './api.js';
 import { portalStyles, stateBadge, when } from './portal-ui.js';
 
@@ -20,7 +21,7 @@ const SECTIONS = [
  */
 export class VsPortalProjectPage extends LitElement {
   static override properties = { location: { attribute: false }, load: { state: true }, view: { state: true }, reporting: { state: true },
-    sending: { state: true }, formError: { state: true }, announcement: { state: true } };
+    sending: { state: true }, formError: { state: true }, announcement: { state: true }, enlarged: { state: true } };
   declare location: { params: Record<string, string> } | undefined;
   declare load: Load;
   declare view: PropertyView | null;
@@ -29,6 +30,8 @@ export class VsPortalProjectPage extends LitElement {
   declare sending: boolean;
   declare formError: string;
   declare announcement: string;
+  /** The shared document shown large (one at a time). */
+  declare enlarged: string | null;
   /** One key per report being written: a retry after a lost answer is the same report, never a second one. */
   private reportKey = '';
 
@@ -58,6 +61,9 @@ export class VsPortalProjectPage extends LitElement {
     .item { display: flex; flex-direction: column; gap: 2px; padding: var(--vs-space-2) 0; border-bottom: 1px dashed var(--vs-line); }
     .item:last-child { border-bottom: 0; }
     .doc { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--vs-space-2); }
+    .doc.shared vs-portal-image.thumb { width: 72px; flex: none; }
+    .doc.shared .grow { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+    .doc.shared vs-portal-image.large { flex: 1 1 100%; max-width: 100%; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: var(--vs-space-2); border-bottom: 1px solid var(--vs-line); vertical-align: top; overflow-wrap: anywhere; }
     th { font-size: 13px; color: var(--vs-ink-muted); font-weight: 600; }
@@ -80,6 +86,7 @@ export class VsPortalProjectPage extends LitElement {
     this.sending = false;
     this.formError = '';
     this.announcement = '';
+    this.enlarged = null;
   }
 
   private get routeId(): string { return this.location?.params?.id ?? window.location.pathname.split('/').pop() ?? ''; }
@@ -232,7 +239,7 @@ export class VsPortalProjectPage extends LitElement {
           <section class="section" id="documents" aria-labelledby="h-documents">
             <h2 id="h-documents" tabindex="-1">Documents</h2>
             <div class="card">${v.documents.length ? html`<ul class="plain">${v.documents.map((d) => this.document(d))}</ul>`
-              : html`<p class="muted">No documents yet. Your quotation will be listed here once issued.</p>`}</div>
+              : html`<p class="muted">No documents yet. Your quotation, and anything Veda Spaces shares about your project, will be listed here.</p>`}</div>
           </section>
           <section class="section" id="contact" aria-labelledby="h-contact">
             <h2 id="h-contact" tabindex="-1">Your Veda Spaces contact</h2>
@@ -244,6 +251,13 @@ export class VsPortalProjectPage extends LitElement {
   }
 
   private document(d: DocumentEntry) {
+    if (d.kind === 'PROJECT_DOCUMENT') {
+      const e = d as ProjectDocument;
+      return html`<li class="doc shared"><vs-portal-image class="thumb" .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'thumb'}></vs-portal-image>
+        <span class="grow"><span class="strong">${e.title}</span><br /><span class="small muted">${e.label} · shared ${when(e.published_on)}</span></span>
+        <button class="btn" aria-controls=${`doc-large-${e.id}`} aria-expanded=${this.enlarged === e.id ? 'true' : 'false'} @click=${() => { this.enlarged = this.enlarged === e.id ? null : e.id; }}>${this.enlarged === e.id ? 'Hide' : 'View'}<span class="sr-only"> ${e.title}</span></button>
+        ${this.enlarged === e.id ? html`<vs-portal-image class="large" id=${`doc-large-${e.id}`} .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'desktop'}></vs-portal-image>` : nothing}</li>`;
+    }
     if (d.kind === 'INVOICE' || d.kind === 'RECEIPT') {
       const e = d as Extract<DocumentEntry, { number: string }>;
       const name = `${d.kind === 'INVOICE' ? 'Invoice' : 'Receipt'} ${e.number}`;
@@ -394,7 +408,8 @@ export class VsPortalProjectPage extends LitElement {
         ${pkg.work_completed.length ? html`<p><span class="strong">Work completed:</span> ${pkg.work_completed.map((w) => w.label).join(', ')}</p>` : nothing}
         <p>${pkg.quality.checks_passed} quality checks passed${pkg.quality.corrected_after_failure ? `, ${pkg.quality.corrected_after_failure} after a correction` : ''}; ${pkg.snags.fixed_and_verified} snags fixed and checked.</p>
         ${pkg.snags.open_minor.length ? html`<p>Still to finish (does not hold the handover): ${pkg.snags.open_minor.map((n) => `snag ${n.number}, ${n.title}`).join('; ')}.</p>` : nothing}
-        <p class="small muted">${pkg.documents_note}</p>
+        ${pkg.documents.length ? html`<p><span class="strong">Handover documents:</span> ${pkg.documents.map((x) => x.title).join(', ')} (see Documents).</p>`
+          : pkg.documents_note ? html`<p class="small muted">${pkg.documents_note}</p>` : nothing}
         <p class="small muted">${pkg.warranty_note}</p>
         ${pkg.acknowledged_on ? html`<p>${stateBadge('COMPLETED', 'Received')} You confirmed receiving this summary on ${when(pkg.acknowledged_on)}.</p>`
           : pkg.can_acknowledge ? html`<div><button class="btn primary" ?disabled=${this.sending} @click=${() => this.acknowledge(v, d, pkg)}>I have received this summary</button></div>`

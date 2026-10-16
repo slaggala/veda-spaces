@@ -152,5 +152,13 @@
     "decision": "Owner instruction VEDA-SPACES-CUSTOMER-PROJECT-PORTAL-STAGING (2026-10-16), recorded as given: the Customer Project Portal (decision log 41) is wired to staging with one flag, VEDA_CUSTOMER_PORTAL_ENABLED, false by default, separate from every other flag (it never turns the Project Lifecycle or a customer-proposal flag on). It is customer-facing and the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/customer-portal-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. Rollback: enabled false and enablement_record_sha256 null. Enabled on staging by owner approval of 2026-10-16 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled and is bound here by its SHA-256 (decision log entry 43).",
     "enabled": true,
     "enablement_record_sha256": "d3004a780a04fd640d738c4f37f9b6ea5b67326e20ab28f4898609056a14499f"
+  },
+  "project_delivery": {
+    "status": "DECIDED",
+    "decision": "Owner instruction VEDA-SPACES-STAGING-ACTIVATION-AND-WARRANTY-SERVICE (2026-10-16), recorded as given (decision log 46): Project Commercials (PCM-D02, staging only), the Project Lifecycle with project execution, and the customer's delivery view (PEX-D01, CPP-D04) are wired to staging with three flags, VEDA_PROJECT_LIFECYCLE_ENABLED, VEDA_PROJECT_COMMERCIALS_ENABLED and VEDA_PROJECT_DELIVERY_PORTAL_ENABLED, each false by default and separate from every other flag. The delivery view needs the lifecycle and the customer portal. The lifecycle runs with its committed strict defaults: PLB-OD-01..13 stay null and are not recorded here, so every HIGH-risk move stays refused. They may turn on only by a reviewed change that sets the flags true and enablement_record_sha256 to the SHA-256 of infra/config/project-delivery-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, naming every flag it enables, with every evidence field filled. staging-core refuses anything else; the API refuses each flag in production. Rollback: every flag false and the digest null.",
+    "lifecycle_enabled": false,
+    "commercials_enabled": false,
+    "delivery_portal_enabled": false,
+    "enablement_record_sha256": null
   }
 }

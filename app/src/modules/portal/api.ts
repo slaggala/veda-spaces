@@ -39,8 +39,11 @@ export interface CommercialDocument {
   kind: 'INVOICE' | 'RECEIPT'; id: string; number: string; status: string; status_label: string; property_id: string;
   document: Record<string, any>; notices: { code: string; message: string }[]; html: string; filename: string; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
+/** A document staff explicitly shared on the project (CPP-D04): an image, served only through the portal session. */
+export interface ProjectDocument { kind: 'PROJECT_DOCUMENT'; id: string; document_class: string; label: string; title: string; published_on: string;
+  width: number | null; height: number | null; project_id?: string }
 export type DocumentEntry = (QuotationSummary & { kind: string }) | { kind: 'INVOICE' | 'RECEIPT'; id: string; number: string; issued_on: string | null;
-  amount: string; status: string; status_label: string; label?: string | null; due_on?: string | null };
+  amount: string; status: string; status_label: string; label?: string | null; due_on?: string | null } | ProjectDocument;
 export interface Entry { code: string; text: string; category?: string; status?: string; stage?: string; label?: string; duration?: string | null }
 export interface PropertyCard {
   id: string; property: { reference: string; configuration: string | null; locality: string | null; city: string | null };
@@ -59,9 +62,10 @@ export interface DeliveryProject {
   reports: { number: number; description: string; area: string | null; status: string; outcome: string | null; response: string | null; snag_number: number | null }[];
   can_report: boolean;
   handover: { state: StepState; label: string; date: string | null; remaining: { label: string; count: number }[] };
+  documents?: ProjectDocument[];
   package: null | { id: string; number: number; content_sha256: string; status: 'READY_TO_REVIEW' | 'BEING_UPDATED' | 'HANDED_OVER';
     work_completed: { label: string; finished_on: string | null }[]; quality: { checks_passed: number; corrected_after_failure: number };
-    snags: { fixed_and_verified: number; open_minor: { number: number; title: string }[] }; documents: unknown[]; documents_note: string;
+    snags: { fixed_and_verified: number; open_minor: { number: number; title: string }[] }; documents: ProjectDocument[]; documents_note: string | null;
     warranty_note: string; acknowledged_on: string | null; can_acknowledge: boolean };
 }
 export interface Included { title: string; kind: string; included_count: number; optional_count: number;
@@ -133,6 +137,24 @@ export const portalApi = {
       `${BASE}/properties/${encodeURIComponent(propertyId)}/projects/${encodeURIComponent(projectId)}/handover/acknowledge`,
       { method: 'POST', anonymous: true, headers: headers(), body: { package_id: packageId, content_sha256: sha } }),
 };
+
+/** A shared project document's image as a data: URL (the session travels in the header, never in a URL). */
+export async function documentImage(propertyId: string, documentId: string, variant: 'thumb' | 'mobile' | 'desktop' = 'mobile'): Promise<string | null> {
+  try {
+    const r = await fetch(`${api.baseUrl}${BASE}/properties/${encodeURIComponent(propertyId)}/documents/${encodeURIComponent(documentId)}/content?variant=${variant}`,
+      { headers: headers(), credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 // --- staff (bearer session; portal.access.* permissions) ---------------------------------------------------------------
 export interface AccessRow {

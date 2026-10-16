@@ -7,7 +7,8 @@ acknowledgement of exactly that.
 - ``work``: the customer-visible work packages completed (their customer labels and dates), and counts of all work;
 - ``quality``: counts of quality-check chains passed, and confirmation that none ends in a failure;
 - ``snags``: counts by outcome; open non-blocking snags listed only when customer-visible (review D9);
-- ``documents``: none. No customer-visible document class is approved (CPP-D04); nothing is published here;
+- ``documents``: none frozen here. Customer documents are shared explicitly and separately (CPP-D04, ``documents``),
+  shown live beside the package in the portal; the package digest never depends on them;
 - ``warranty``: a pointer to the accepted quotation's own warranty section. No warranty term is written here.
 
 Preparing needs READY_FOR_HANDOVER and a handover evaluation with no blocker other than the owner's policy gate and

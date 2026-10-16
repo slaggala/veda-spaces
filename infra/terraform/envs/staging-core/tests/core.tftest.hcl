@@ -858,8 +858,8 @@ run "the_committed_customer_portal_record_is_approved_and_turns_the_portal_on" {
   }
 
   assert {
-    condition     = !contains(keys(local.app_config), "VEDA_PROJECT_LIFECYCLE_ENABLED") && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
-    error_message = "the portal is separate: the Project Lifecycle is never set and customer-proposal viewing is untouched"
+    condition     = local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal is separate: the Project Lifecycle stays off (set only by project_delivery) and customer-proposal viewing is untouched"
   }
 }
 
@@ -871,7 +871,7 @@ run "an_approved_record_turns_the_customer_portal_on" {
   }
 
   assert {
-    condition     = output.customer_portal.enabled == "true" && local.cpp_record_problems == [] && !contains(keys(local.app_config), "VEDA_PROJECT_LIFECYCLE_ENABLED")
+    condition     = output.customer_portal.enabled == "true" && local.cpp_record_problems == [] && local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false"
     error_message = "the portal on, bound to an approved record; the Project Lifecycle untouched"
   }
 }
@@ -910,4 +910,123 @@ run "a_bound_customer_portal_digest_without_the_flag_refused" {
     customer_portal_record_path = "tests/fixtures/cpp-record-approved.json"
   }
   expect_failures = [output.customer_portal]
+}
+
+# Project delivery (decision log 46): the Project Lifecycle, Project Commercials and the customer's delivery view, three
+# flags planned false; they turn on only with an owner-APPROVED, staging-only, synthetic-content-only record that names
+# each flag, bound by its SHA-256, whose approver is not its author; the delivery view needs the lifecycle and the portal.
+run "the_project_delivery_flags_are_planned_false_when_off" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-off.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-draft.json"
+  }
+
+  assert {
+    condition = (local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_PROJECT_COMMERCIALS_ENABLED"] == "false" &&
+    local.app_config["VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"] == "false" && output.project_delivery.enablement_record == null && length(local.pdl_config) == 3)
+    error_message = "three parameters, false, no record bound (also the rollback state)"
+  }
+
+  assert {
+    condition     = jsondecode(file("tests/fixtures/pdl-record-draft.json")).status == "DRAFT" && contains(local.pdl_record_problems, "the record is not APPROVED")
+    error_message = "a DRAFT record is never enough"
+  }
+}
+
+run "the_committed_project_delivery_wiring_is_off_with_a_draft_record" {
+  command = plan
+
+  assert {
+    condition = (jsondecode(file("../../../config/project-delivery-enablement-record.json")).status == "DRAFT" &&
+      local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_PROJECT_COMMERCIALS_ENABLED"] == "false" &&
+    local.app_config["VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"] == "false" && output.project_delivery.enablement_record == null)
+    error_message = "wired off with a DRAFT record until the owner approves it (decision log 46)"
+  }
+}
+
+run "an_approved_record_turns_project_delivery_on" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-on.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-approved.json"
+  }
+
+  assert {
+    condition = (output.project_delivery.VEDA_PROJECT_LIFECYCLE_ENABLED == "true" && output.project_delivery.VEDA_PROJECT_COMMERCIALS_ENABLED == "true" &&
+    output.project_delivery.VEDA_PROJECT_DELIVERY_PORTAL_ENABLED == "true" && local.pdl_record_problems == [] && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false")
+    error_message = "the three flags on, bound to an approved record; customer-proposal flags untouched"
+  }
+}
+
+run "the_project_delivery_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-on-draft.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-draft.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "a_self_approved_project_delivery_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-on-self.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-self-approved.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "a_project_delivery_record_for_production_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-on-production.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-production.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "a_flag_the_record_does_not_name_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-on-unnamed-flag.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-lifecycle-only.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "a_record_bound_by_another_digest_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-wrong-digest.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-approved.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "a_bound_project_delivery_digest_without_a_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-digest-without-flag.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-approved.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "the_delivery_view_without_the_lifecycle_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-delivery-without-lifecycle.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-approved.json"
+  }
+  expect_failures = [output.project_delivery]
+}
+
+run "the_delivery_view_without_the_customer_portal_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-pdl-delivery-without-portal.json"
+    project_delivery_record_path = "tests/fixtures/pdl-record-approved.json"
+  }
+  expect_failures = [output.project_delivery]
 }

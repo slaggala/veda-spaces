@@ -65,6 +65,9 @@ function detail(state) {
     checklist: [], blockers: [], milestones: [], site_readiness: [],
     qc: { required_categories: ['FINISH_AND_SURFACES'], categories: [{ category: 'FINISH_AND_SURFACES', required: true, latest: null }], points: [], chains: [], history: [] },
     snags: state.snags, work_packages: state.work, customer_reports: state.reports, handover_packages: state.packages,
+    customer_documents: { documents: state.docs ?? [], can_publish: true,
+      classes: [{ code: 'PROGRESS_PHOTO', label: 'Progress photograph' }, { code: 'HANDOVER_PHOTO', label: 'Handover photograph' }],
+      options: (state.docs ?? []).some((d) => d.status === 'PUBLISHED') ? [] : [{ id: 'att1', category: 'SITE_PHOTO', attached_to: 'property', uploaded_on: '2026-10-15T10:00:00Z' }] },
     delivery_policy: { version: 'PEX-POLICY-0', status: 'UNDECIDED', decisions: { 'PEX-D01': { label: 'customer actions', decided: false }, 'PEX-D02': { label: 'commercial condition', decided: false } } },
     baseline: { full: false, verified: true, problems: [], current_seq: 1, open_variations: [], variations: [], lineage: [] },
     transitions: [], timeline: [], spaces: [{ id: 's1', label: 'Kitchen' }], evidence_options: [],
@@ -117,6 +120,15 @@ async function serveStaff(p, state) {
         return ok(detail(state));
       }
       if (path === '/api/v1/projects/p1/handover-package') { state.packages = [PACKAGE(1)]; return ok(detail(state), 201); }
+      if (path === '/api/v1/projects/p1/customer-documents') {
+        state.docs = [{ id: 'd1', version: 1, attachment_id: body.attachment_id, document_class: body.document_class, class_label: 'Handover photograph', title: body.title,
+          status: 'PUBLISHED', published_on: '2026-10-16T12:00:00Z', published_by: OPS, withdrawn_on: null, withdrawn_by: null, withdrawn_reason: null, available: true }];
+        return ok(detail(state), 201);
+      }
+      if (path === '/api/v1/projects/p1/customer-documents/d1/withdraw') {
+        state.docs = [{ ...state.docs[0], version: 2, status: 'WITHDRAWN', withdrawn_on: '2026-10-16T12:30:00Z', withdrawn_by: OPS, withdrawn_reason: body.reason }];
+        return ok(detail(state));
+      }
     }
     if (req.method() === 'GET') return ok([]);
     return json(404, { status: 404, code: 'NOT_FOUND', title: 'Not found' });
@@ -148,7 +160,9 @@ const delivery = (state) => ({
 });
 const view = (state) => ({ id: 'p1', property: { reference: 'VS-P-2026-000001', configuration: '3 BHK apartment', locality: 'Synthetic Nagar', city: 'Hyderabad' },
   enquiry: { reference: '81DG-6BJR' }, headline: 'Your project is under way.', next_step: null, attention_count: state.ack ? 0 : 1, quotation: null, contact: null,
-  project_tracking: true, payments: null, journey: [], quotations: [], documents: [], included: null, commitments: null, responsibilities: null, support: null,
+  project_tracking: true, payments: null, journey: [], quotations: [], included: null,
+  documents: [{ kind: 'PROJECT_DOCUMENT', id: 'd1', document_class: 'HANDOVER_PHOTO', label: 'Handover photograph', title: 'Finished kitchen with the SYNTHETIC tall units and loft',
+    published_on: '2026-10-16T12:00:00Z', width: 1600, height: 1200, project_id: 'pj1' }], commitments: null, responsibilities: null, support: null,
   commercials: null, attention: state.ack ? [] : [{ kind: 'HANDOVER_ACKNOWLEDGEMENT', status: 'ACTION_REQUIRED', title: 'Review your handover summary',
     text: 'Veda Spaces has prepared the summary of what is being handed over. Please review it and confirm you have received it.', due: null }],
   delivery: { available: true, projects: [delivery(state)] } });
@@ -164,6 +178,10 @@ async function servePortal(p, state) {
     if (path === '/api/v1/auth/refresh') return json(401, { status: 401, code: 'AUTH_REQUIRED', title: 'Sign in' });
     if (headers['x-veda-portal'] !== 'vpp_SYNTHETIC' || headers.authorization) return json(401, { status: 401, code: 'PORTAL_SESSION_INVALID', title: 'Sign in' });
     if (path === '/api/v1/public/portal/properties/p1') return ok(view(state));
+    if (path === '/api/v1/public/portal/properties/p1/documents/d1/content') {
+      state.images = (state.images ?? 0) + 1;
+      return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'cache-control': 'no-store' }, body: PNG });
+    }
     if (path === '/api/v1/public/portal/properties/p1/projects/pj1/reports') {
       state.reportKeys.push(headers['idempotency-key']);
       if (state.failNext) { state.failNext = false; return route.fulfill({ status: 503, body: '' }); }
@@ -179,6 +197,7 @@ async function servePortal(p, state) {
     return json(404, { status: 404, code: 'NOT_FOUND', title: 'Not found' });
   });
 }
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const freshPortal = () => ({ reports: [], reportKeys: [], acks: [], ack: null, failNext: true });
 
 async function axe(p, name) {
@@ -271,7 +290,31 @@ try {
     await staff(p).getByRole('button', { name: 'Prepare the package' }).click();
     await staff(p).getByText('Not acknowledged in the portal').waitFor();
     check('package: prepared, with no documents and the warranty as the accepted quotation states',
-      await staff(p).getByText(/no customer-visible document class is approved/i).isVisible() && await staff(p).getByText('As stated in accepted quotation VS-Q-2026-000001').isVisible());
+      await staff(p).getByText(/Shared separately, in Customer documents/).isVisible() && await staff(p).getByText('As stated in accepted quotation VS-Q-2026-000001').isVisible());
+    // Customer documents (CPP-D04): sharing is explicit, titled in customer words, and withdrawing keeps the record.
+    await tab(p, 'Customer documents').click();
+    await staff(p).locator('#documents-h').waitFor();
+    check('documents: nothing shared until staff share it', await staff(p).getByText('Nothing is shared with the customer yet.').isVisible());
+    await staff(p).getByRole('button', { name: 'Share a document' }).click();
+    await staff(p).locator('vs-dialog select[name=document_class]').selectOption('HANDOVER_PHOTO');
+    await staff(p).locator('vs-dialog button[type=submit]').click();
+    await staff(p).locator('vs-dialog input[aria-invalid=true]').first().waitFor();
+    check('share: the customer title is required, nothing sent', !state.posts.some((x) => x.path.endsWith('/customer-documents')));
+    await staff(p).locator('vs-dialog input[name=title]').fill('Finished kitchen');
+    await staff(p).locator('vs-dialog button[type=submit]').click();
+    await dialogDone(p);
+    const share = state.posts.find((x) => x.path.endsWith('/customer-documents'));
+    check('share: sent once with an idempotency key, the chosen file, class and title',
+      !!share?.key && share.body.attachment_id === 'att1' && share.body.document_class === 'HANDOVER_PHOTO' && share.body.title === 'Finished kitchen');
+    await staff(p).getByRole('button', { name: 'Stop sharing: Finished kitchen' }).click();
+    await staff(p).locator('vs-dialog button[type=submit]').click();
+    await staff(p).locator('vs-dialog textarea[aria-invalid=true]').waitFor();
+    await staff(p).locator('vs-dialog textarea[name=reason]').fill('Wrong photograph');
+    await staff(p).locator('vs-dialog button[type=submit]').click();
+    await dialogDone(p);
+    const wd = state.posts.find((x) => x.path.endsWith('/withdraw'));
+    check('stop sharing: needs a reason, sent with the row version, the record kept',
+      wd?.ifMatch !== null && wd?.body.reason === 'Wrong photograph' && await staff(p).locator('span.badge', { hasText: 'Withdrawn' }).isVisible() && await staff(p).getByText('Wrong photograph').isVisible());
     check('staff journey: no page errors', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
@@ -310,6 +353,14 @@ try {
     await proj.getByText(/You confirmed receiving this summary/).waitFor();
     check('handover: acknowledged by its digest, once', state.acks.length === 1 && state.acks[0].content_sha256 === '1'.repeat(64)
       && (await proj.getByRole('button', { name: 'I have received this summary' }).count()) === 0);
+    await proj.locator('nav.jump').getByRole('link', { name: 'Documents' }).click();
+    await proj.locator('#documents vs-portal-image img').first().waitFor();
+    check('documents: the shared photo loads through the portal session, titled in customer words',
+      state.images >= 1 && await proj.locator('#documents span.strong', { hasText: 'Finished kitchen with the SYNTHETIC tall units and loft' }).isVisible());
+    await proj.getByRole('button', { name: 'View Finished kitchen with the SYNTHETIC tall units and loft' }).click();
+    await proj.locator('#documents vs-portal-image.large img').waitFor();
+    check('documents: View shows it larger and says so to assistive technology',
+      (await proj.getByRole('button', { name: 'Hide Finished kitchen with the SYNTHETIC tall units and loft' }).getAttribute('aria-expanded')) === 'true');
     check('portal journey: no page errors', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
@@ -324,7 +375,9 @@ try {
     await serveStaff(s, st);
     await s.goto(`${BASE}/projects/p1`);
     await staff(s).locator('dl.hero').waitFor();
-    for (const t of ['Work plan', 'Quality and snags', 'Customer reports', 'Handover']) {
+    st.docs = [{ id: 'd1', version: 1, attachment_id: 'att1', document_class: 'HANDOVER_PHOTO', class_label: 'Handover photograph', title: 'Finished kitchen',
+      status: 'PUBLISHED', published_on: '2026-10-16T12:00:00Z', published_by: OPS, withdrawn_on: null, withdrawn_by: null, withdrawn_reason: null, available: true }];
+    for (const t of ['Work plan', 'Quality and snags', 'Customer reports', 'Customer documents', 'Handover']) {
       await tab(s, t).click();
       await staff(s).locator('vs-tabs h2').first().waitFor();
       await layout(s, 'vs-project-page', `${name} staff ${t}`);
@@ -336,6 +389,8 @@ try {
     await c.goto(`${BASE}/portal/properties/p1`);
     await c.locator('vs-portal-project-page #h-delivery').waitFor();
     await c.locator('vs-portal-project-page').getByRole('button', { name: 'Report something' }).click();
+    await c.locator('vs-portal-project-page #documents').scrollIntoViewIfNeeded(); // images load lazily, near the viewport
+    await c.locator('vs-portal-project-page #documents vs-portal-image img').first().waitFor();
     await layout(c, 'vs-portal-project-page', `${name} portal delivery`);
     await axe(c, `${name} portal delivery`);
     await c.screenshot({ path: `${OUT}/delivery-portal-${viewport.width}.png`, fullPage: true });

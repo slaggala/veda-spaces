@@ -157,6 +157,9 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             # decision PEX-D01 does not allow them, rate limited, idempotent.
             ("POST", "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/reports"),
             ("POST", "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge"),
+            # Customer documents (decision log 46, CPP-D04): an image staff explicitly published, only through the
+            # account's authorised property; 404 unless the delivery view is on.
+            ("GET", "/api/v1/public/portal/properties/<property_id>/documents/<document_id>/content"),
         }
     ),
     "RBX-006": frozenset(

@@ -162,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config, local.cpp_config
+    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config, local.cpp_config, local.pdl_config
   )
 }
 
@@ -382,6 +382,45 @@ locals {
   cpp_config = {
     VEDA_CUSTOMER_PORTAL_ENABLED = local.cpp.enabled ? "true" : "false"
   }
+}
+
+# Project delivery (decision log 46, infra/config/staging-platform.json "project_delivery"): the Project Lifecycle with
+# project execution, Project Commercials (PCM-D02) and the customer's delivery view (PEX-D01, CPP-D04). Three flags,
+# always planned and false by default, separate from every other flag. They turn on only with an owner-APPROVED,
+# staging-only, synthetic-content-only infra/config/project-delivery-enablement-record.json that names every flag it
+# enables, bound by its SHA-256 with every evidence field filled. The delivery view also needs the lifecycle and the
+# customer portal. Output "project_delivery" refuses anything else; the API refuses each flag in production.
+locals {
+  pdl = try(local.platform.project_delivery, {
+    status = "DECIDED", lifecycle_enabled = false, commercials_enabled = false, delivery_portal_enabled = false, enablement_record_sha256 = null
+  })
+  pdl_flags = {
+    VEDA_PROJECT_LIFECYCLE_ENABLED       = try(local.pdl.lifecycle_enabled, false)
+    VEDA_PROJECT_COMMERCIALS_ENABLED     = try(local.pdl.commercials_enabled, false)
+    VEDA_PROJECT_DELIVERY_PORTAL_ENABLED = try(local.pdl.delivery_portal_enabled, false)
+  }
+  pdl_any         = anytrue(values(local.pdl_flags))
+  pdl_record_path = var.project_delivery_record_path != "" ? var.project_delivery_record_path : "${path.module}/../../../config/project-delivery-enablement-record.json"
+  pdl_record      = try(jsondecode(file(local.pdl_record_path)), {})
+  pdl_evidence    = try(local.pdl_record.evidence, {})
+  pdl_scope       = try(local.pdl_record.scope, {})
+  pdl_run_ids     = ["ci_run_id", "deploy_flags_off_run_id", "migration_verification_run_id", "infra_apply_run_id", "drift_run_id"]
+  # Every reason the record cannot enable the flags; empty means it can (read only when a flag is on).
+  pdl_record_problems = concat(
+    fileexists(local.pdl_record_path) ? [] : ["the record file is missing"],
+    try(local.pdl_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.pdl_record.environment, "") == "staging" && try(local.pdl_record.production, true) == false ? [] : ["the record is not staging-only"],
+    try(local.pdl_scope.protected_staging_only, false) == true && try(local.pdl_scope.synthetic_content_only, false) == true && try(local.pdl_scope.real_customers, true) == false ? [] : ["the record does not limit itself to protected staging with synthetic content"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.pdl_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.pdl_record.approved_by, "")) != "" && !strcontains(upper(try(local.pdl_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.pdl_record.approved_by, "") != try(local.pdl_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k, on in local.pdl_flags : "the record does not name ${k}" if on && !contains(try(local.pdl_record.flags, []), k)],
+    [for k in concat(["independent_review", "smoke_test", "production_isolation"], local.pdl_run_ids) :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.pdl_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.pdl_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in local.pdl_run_ids : "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.pdl_evidence[k], ""))))],
+    fileexists(local.pdl_record_path) && try(local.pdl.enablement_record_sha256, null) == (fileexists(local.pdl_record_path) ? filesha256(local.pdl_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  pdl_config = { for k, on in local.pdl_flags : k => on ? "true" : "false" }
 }
 
 locals {

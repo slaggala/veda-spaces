@@ -1493,6 +1493,35 @@
         "title": "CreateIn",
         "type": "object"
       },
+      "CustomerDocumentIn": {
+        "additionalProperties": false,
+        "description": "CPP-D04: publish one attachment of the project's customer record to the customer, as one class.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "document_class": {
+            "enum": [
+              "PROGRESS_PHOTO",
+              "HANDOVER_PHOTO"
+            ],
+            "title": "Document Class",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachment_id",
+          "document_class",
+          "title"
+        ],
+        "title": "CustomerDocumentIn",
+        "type": "object"
+      },
       "CustomerInputsIn": {
         "additionalProperties": false,
         "description": "Staff's choices for one draft version against its customer information pack (OI-MTQ-18): codes only.",
@@ -9091,6 +9120,20 @@
           "length_mm"
         ],
         "title": "WallIn",
+        "type": "object"
+      },
+      "WithdrawDocumentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "WithdrawDocumentIn",
         "type": "object"
       },
       "WorkCompleteIn": {
@@ -20209,6 +20252,127 @@
         "x-requirement": "PLB-015"
       }
     },
+    "/api/v1/projects/{project_id}/customer-documents": {
+      "post": {
+        "operationId": "project_publish_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerDocumentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Show one scanned attachment of this project to the customer, as a customer document (explicit)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.publish_document"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPP-D04"
+      }
+    },
+    "/api/v1/projects/{project_id}/customer-documents/{document_id}/withdraw": {
+      "post": {
+        "operationId": "project_withdraw_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawDocumentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stop showing a document to the customer (the record and its history stay)",
+        "tags": [
+          "project"
+        ],
+        "x-permission": [
+          "project.publish_document"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "CPP-D04"
+      }
+    },
     "/api/v1/projects/{project_id}/customer-reports": {
       "post": {
         "operationId": "project_record_report",
@@ -23532,6 +23696,65 @@
         "x-permission-any-of": null,
         "x-rbac-exception": "RBX-010",
         "x-requirement": "CPP-005"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/documents/{document_id}/content": {
+      "get": {
+        "operationId": "portal_customer_document_content",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "default": "mobile",
+              "enum": [
+                "thumb",
+                "mobile",
+                "desktop"
+              ],
+              "title": "Variant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "One document Veda Spaces shared on your project (an image; only through your authorised property)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "CPP-D04"
       }
     },
     "/api/v1/public/portal/properties/{property_id}/projects/{project_id}/handover/acknowledge": {

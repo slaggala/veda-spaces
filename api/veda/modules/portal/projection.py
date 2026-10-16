@@ -451,6 +451,9 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
     if money and money.get("available"):
         out["documents"] = ([{"kind": "INVOICE", **i} for i in money["invoices"]]
                             + [{"kind": "RECEIPT", **r} for r in money["receipts"]] + out["documents"])  # fmt: skip
+    # CPP-D04: documents staff explicitly published on this property's projects (served only by the portal route)
+    out["documents"] = [{**d, "project_id": dp["id"]} for dp in (delivery or {}).get("projects", [])
+                        for d in dp.get("documents") or []] + out["documents"]  # fmt: skip
     return out
 
 

@@ -6,14 +6,14 @@ import { navigate } from '../../core/router/next.js';
 import '../../design-system/components.js';
 import { pageStyles, shared, tableStyles } from '../../design-system/styles.js';
 import {
-  projectApi, type Attention, type Blocker, type Candidate, type ChecklistItem, type CustomerReport, type GateBlocker, type HistoryRow,
+  projectApi, type Attention, type Blocker, type Candidate, type ChecklistItem, type CustomerDocument, type CustomerReport, type GateBlocker, type HistoryRow,
   type Milestone, type ProjectDetail, type QcPoint, type ReadinessItem, type Snag, type TeamMember, type Transition, type TransitionResult,
   type Vocabulary, type WorkPackage,
 } from './api.js';
 import { badgeStyles, CLASS_LABEL, OUTCOME, party, SEVERITY, SNAG_ACTION, SNAG_STATUS, when, who, WORK_STATE } from './labels.js';
 
 type Tab = 'overview' | 'timeline' | 'stage' | 'checklist' | 'work' | 'blockers' | 'milestones' | 'baseline' | 'site' | 'quality' | 'reports'
-  | 'handover' | 'history';
+  | 'documents' | 'handover' | 'history';
 type Value = string | boolean | null;
 interface Field {
   name: string; label: string; kind: 'text' | 'textarea' | 'select' | 'date' | 'checkbox'; required?: boolean; minLength?: number;
@@ -26,7 +26,7 @@ interface Form {
 
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['timeline', 'Timeline'], ['stage', 'Stage and readiness'], ['checklist', 'Checklist'],
   ['work', 'Work plan'], ['blockers', 'Blockers'], ['milestones', 'Milestones'], ['baseline', 'Commercial baseline'], ['site', 'Site readiness'],
-  ['quality', 'Quality and snags'], ['reports', 'Customer reports'], ['handover', 'Handover'], ['history', 'Audit and history']];
+  ['quality', 'Quality and snags'], ['reports', 'Customer reports'], ['documents', 'Customer documents'], ['handover', 'Handover'], ['history', 'Audit and history']];
 const TODAY = () => new Date().toISOString().slice(0, 10);
 const REASON = { minLength: 5, hint: 'Required: at least 5 characters.' };
 const opt = (codes: readonly string[]): [string, string][] => codes.map((c) => [c, humanize(c)]);
@@ -978,6 +978,43 @@ export class VsProjectPage extends SessionElement {
         : html`<p class="muted">No customer report.</p>`}`;
   }
 
+  /** CPP-D04: documents shared with the customer. Visibility is explicit; withdrawing keeps the record. */
+  private renderDocuments(p: ProjectDetail): TemplateResult {
+    const c = p.customer_documents;
+    return html`<div class="row"><h2 id="documents-h" tabindex="-1">Customer documents</h2><span class="spacer"></span>
+        ${c.can_publish && c.options.length ? html`<button class="btn" @click=${() => this.publishDocument(p)}>Share a document</button>` : nothing}</div>
+      <p class="small muted">Only what is shared here appears in the customer's portal. A photograph never becomes visible just because it belongs to the project.
+        Only site photographs of this property can be shared; sketches, laser readings, floor plans and internal attachments stay staff-only.${c.can_publish && !c.options.length ? ' No scanned, shareable attachment is available yet.' : ''}</p>
+      ${c.documents.length ? html`<ul class="attention" aria-label="Customer documents">${c.documents.map((d) => html`<li class=${d.status === 'PUBLISHED' ? 'INFORMATIONAL' : 'RESOLVED'}>
+        <div class="row"><span class="badge ${d.status === 'PUBLISHED' ? 'ok' : 'info'}">${d.status === 'PUBLISHED' ? 'Shared with the customer' : 'Withdrawn'}</span>
+          <span class="small muted">${d.class_label}, shared by ${who(d.published_by)}, ${when(d.published_on)}</span></div>
+        <h3>${d.title}</h3>
+        ${!d.available && d.status === 'PUBLISHED' ? html`<p class="small">The file is not available (withdrawn or not scanned clean), so the customer does not see it.</p>` : nothing}
+        ${d.status === 'WITHDRAWN' ? html`<dl class="meta"><dt>Withdrawn</dt><dd>${who(d.withdrawn_by)}, ${when(d.withdrawn_on)}</dd><dt>Why</dt><dd>${d.withdrawn_reason}</dd></dl>` : nothing}
+        ${d.status === 'PUBLISHED' && c.can_publish ? html`<div class="actions"><button class="btn small ghost" @click=${() => this.withdrawDocument(p, d)}
+          aria-label=${`Stop sharing: ${d.title}`}>Stop sharing</button></div>` : nothing}</li>`)}</ul>`
+        : html`<p class="muted">Nothing is shared with the customer yet.</p>`}`;
+  }
+
+  private publishDocument(p: ProjectDetail) {
+    const c = p.customer_documents;
+    this.open({ title: 'Share a document with the customer', submit: 'Share', done: 'Shared with the customer.',
+      intro: 'The customer sees the title and the image in their portal. Choose words they will understand.',
+      fields: [
+        { name: 'attachment_id', label: 'Attachment', kind: 'select', required: true,
+          options: c.options.map((o) => [o.id, `${humanize(o.category)} on ${humanize(o.attached_to)}${o.uploaded_on ? `, ${when(o.uploaded_on)}` : ''}`]) },
+        { name: 'document_class', label: 'Shown as', kind: 'select', required: true, options: c.classes.map((x) => [x.code, x.label]) },
+        { name: 'title', label: 'Title (customer-safe words)', kind: 'text', required: true, minLength: 3, maxLength: 120, classification: 'POTENTIALLY_CUSTOMER_SAFE' },
+      ],
+      run: (b) => projectApi.publishDocument(p, b) });
+  }
+
+  private withdrawDocument(p: ProjectDetail, d: CustomerDocument) {
+    this.open({ title: `Stop sharing: ${d.title}`, submit: 'Stop sharing', danger: true, done: 'No longer shared with the customer.',
+      fields: [{ name: 'reason', label: 'Why', kind: 'textarea', required: true, ...REASON, maxLength: 300 }],
+      run: (b) => projectApi.withdrawDocument(p, d, String(b.reason ?? '')) });
+  }
+
   private renderHandover(p: ProjectDetail): TemplateResult {
     const h = p.handover_readiness;
     const done = p.transitions.find((t) => t.kind === 'HANDOVER' && t.outcome === 'COMPLETED');
@@ -1009,7 +1046,7 @@ export class VsProjectPage extends SessionElement {
           <dt>Work completed</dt><dd>${c.work.completed_count} (customer-visible: ${c.work.completed.map((w) => w.label).join(', ') || 'none'})</dd>
           <dt>Quality</dt><dd>${c.quality.checks_passed} passed, ${c.quality.corrected_after_failure} corrected after a failure, ${c.quality.failed} failed</dd>
           <dt>Snags</dt><dd>${c.snags.fixed_and_verified} fixed and verified, ${c.snags.closed_without_fix} closed without a fix, ${c.snags.open_non_blocking_count} open (non-blocking)</dd>
-          <dt>Documents</dt><dd>None in the portal (no customer-visible document class is approved, CPP-D04)</dd>
+          <dt>Documents</dt><dd>Shared separately, in Customer documents (${p.customer_documents.documents.filter((d) => d.status === 'PUBLISHED').length} shared now)</dd>
           <dt>Warranty</dt><dd>As stated in accepted quotation ${c.warranty.quotation_number}</dd>
           <dt>Digest</dt><dd class="mono">${pkg.content_sha256}</dd></dl>`}
     </section>`;
@@ -1063,6 +1100,7 @@ export class VsProjectPage extends SessionElement {
       case 'checklist': return this.renderChecklist(p);
       case 'work': return this.renderWork(p);
       case 'reports': return this.renderReports(p);
+      case 'documents': return this.renderDocuments(p);
       case 'blockers': return this.renderBlockers(p);
       case 'milestones': return this.renderMilestones(p);
       case 'baseline': return this.renderBaseline(p);

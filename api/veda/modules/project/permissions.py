@@ -23,6 +23,9 @@ quality personas have no repository role: their holders are granted the codes in
 Execution (PEX, 0212): ``project.manage_work`` (work packages) and ``project.verify_snag`` (independent verification of a
 snag fix, and closing a snag without a fix) are FOUNDER's only by default; the operations and quality personas are
 granted them individually. ACCOUNTANT holds no ``project.*`` code.
+
+Customer documents (CPP-D04, 0213): ``project.publish_document`` (publish a project attachment to the customer, and
+withdraw it) is FOUNDER's only by default; whoever handles customer communication is granted it individually.
 """
 
 from veda.platform.rbac.registry_types import PermissionDef
@@ -59,6 +62,8 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
        "packages", "PEX-010"),
     _p("project.verify_snag", "Verify snags", "Verify a snag's fix (never your own) and close a snag without a fix, "
        "with a reason", "PEX-031"),
+    _p("project.publish_document", "Publish customer documents", "Publish a project photograph or approved drawing "
+       "to the customer's portal as a customer-visible document, and withdraw it (CPP-D04)", "CPP-D04"),
     _p("project.view_audit", "View project history", "See the full transition and audit history of a project",
        "PLB-035"),
 )  # fmt: skip
