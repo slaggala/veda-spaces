@@ -829,8 +829,12 @@ run "a_bound_customer_promise_digest_without_the_flag_refused" {
 
 # Customer Project Portal (decision log 41): one customer-facing flag planned false; it turns on only with an
 # owner-APPROVED, staging-only, synthetic-content-only record bound by its SHA-256 whose approver is not its author.
-run "the_customer_portal_flag_is_planned_false" {
+run "the_customer_portal_flag_is_planned_false_when_off" {
   command = plan
+  variables {
+    platform_config_path        = "tests/fixtures/platform-cpp-off.json"
+    customer_portal_record_path = "tests/fixtures/cpp-record-draft.json"
+  }
 
   assert {
     condition     = local.app_config["VEDA_CUSTOMER_PORTAL_ENABLED"] == "false" && output.customer_portal.enablement_record == null && length(local.cpp_config) == 1
@@ -838,13 +842,24 @@ run "the_customer_portal_flag_is_planned_false" {
   }
 
   assert {
-    condition     = jsondecode(file("../../../config/customer-portal-enablement-record.json")).status == "DRAFT" && contains(local.cpp_record_problems, "the record is not APPROVED")
-    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+    condition     = jsondecode(file("tests/fixtures/cpp-record-draft.json")).status == "DRAFT" && contains(local.cpp_record_problems, "the record is not APPROVED")
+    error_message = "a DRAFT record is never enough"
+  }
+}
+
+run "the_committed_customer_portal_record_is_approved_and_turns_the_portal_on" {
+  command = plan
+
+  assert {
+    condition = (jsondecode(file("../../../config/customer-portal-enablement-record.json")).status == "APPROVED" && local.cpp_record_problems == [] &&
+      local.app_config["VEDA_ENV"] == "staging" && local.app_config["VEDA_CUSTOMER_PORTAL_ENABLED"] == "true" &&
+    output.customer_portal.enablement_record == filesha256("../../../config/customer-portal-enablement-record.json"))
+    error_message = "owner approval of 2026-10-16 (decision log 43): APPROVED, every evidence field filled, synthetic content only, bound, staging only"
   }
 
   assert {
     condition     = !contains(keys(local.app_config), "VEDA_PROJECT_LIFECYCLE_ENABLED") && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
-    error_message = "the portal flag is separate: the Project Lifecycle is never set and customer-proposal viewing is untouched"
+    error_message = "the portal is separate: the Project Lifecycle is never set and customer-proposal viewing is untouched"
   }
 }
 
