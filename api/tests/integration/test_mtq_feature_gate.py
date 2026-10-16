@@ -47,7 +47,7 @@ def test_flag_off_every_role_sees_the_feature_off_and_every_method_is_404(api, f
     assert me.data["features"] == {"mtq_site": False, "mtq_estimation": False, "mtq_quotation": False,
                                    "customer_proposal": False, "customer_proposal_interaction": False,
                                    "customer_quotation_acceptance": False, "customer_promise_admin": False,
-                                   "project_lifecycle": False}  # fmt: skip
+                                   "project_lifecycle": False, "customer_portal": False}  # fmt: skip
     for path in GATED:
         for method in METHODS:
             r = api.call(method, path, {} if method in ("POST", "PUT", "PATCH") else None)
@@ -147,6 +147,7 @@ def test_flag_on_reports_the_feature_and_opens_the_routes(api, factory):
         "customer_quotation_acceptance": False,
         "customer_promise_admin": False,
         "project_lifecycle": False,
+        "customer_portal": False,
     }
     assert api.get("/api/v1/mtq/templates").status == 200
     assert api.call("PATCH", "/api/v1/mtq/templates", {}).status == 405  # with the flag on, normal routing applies

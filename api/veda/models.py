@@ -63,6 +63,7 @@ from veda.modules.mtq_commercial.models import (
     Scope,
     ScopeItem,
 )
+from veda.modules.portal.models import PortalAccess, PortalAccount, PortalEvent, PortalSession, PortalSignIn
 from veda.modules.project.models import (
     Project,
     ProjectBaseline,
@@ -96,6 +97,11 @@ metadata = Base.metadata
 finalize_metadata(metadata)
 
 __all__ = [
+    "PortalAccess",
+    "PortalAccount",
+    "PortalEvent",
+    "PortalSession",
+    "PortalSignIn",
     "Project",
     "ProjectBaseline",
     "ProjectBlocker",

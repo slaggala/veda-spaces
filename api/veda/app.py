@@ -37,6 +37,9 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.mtq.routes import api as mtq_api
     from veda.modules.mtq_commercial.routes_estimation import api as mtq_estimation_api
     from veda.modules.mtq_commercial.routes_quotation import api as mtq_quotation_api
+    from veda.modules.portal import events as _portal_events  # noqa: F401  (registers the email handler)
+    from veda.modules.portal.routes import customer_api as portal_customer_api
+    from veda.modules.portal.routes import staff_api as portal_staff_api
     from veda.modules.project import events as _project_events  # noqa: F401  (registers handlers)
     from veda.modules.project.routes import api as project_api
     from veda.platform.audit.routes import api as audit_api
@@ -68,6 +71,8 @@ def _register_modules(app: Flask) -> None:
         *cqx_apis,
         customer_promise_api,
         project_api,
+        portal_customer_api,
+        portal_staff_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -127,6 +132,18 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ("GET", "/api/v1/public/proposal/requests"),
             ("POST", "/api/v1/public/proposal/acknowledgements"),
             ("POST", "/api/v1/public/proposal/decision"),
+        }
+    ),
+    # CPP (decision log 41): the Customer Project Portal. Sign-in and the session exchange are anonymous; every other
+    # route resolves the customer's portal session from the X-Veda-Portal header. Flagged off and refused in production.
+    "RBX-010": frozenset(
+        {
+            ("POST", "/api/v1/public/portal/sign-in"),
+            ("POST", "/api/v1/public/portal/session"),
+            ("POST", "/api/v1/public/portal/sign-out"),
+            ("GET", "/api/v1/public/portal/home"),
+            ("GET", "/api/v1/public/portal/properties/<property_id>"),
+            ("GET", "/api/v1/public/portal/quotations/<quotation_id>"),
         }
     ),
     "RBX-006": frozenset(
@@ -300,10 +317,11 @@ def _preflight():
     if origin is not None:
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         # X-Veda-Client: the estimator wizard's per-browser token (rate-limit key, ADR-012). X-Veda-Proposal: a
-        # customer proposal link's token (CQX-01), sent as a header so it never appears in a URL.
+        # customer proposal link's token (CQX-01), sent as a header so it never appears in a URL. X-Veda-Portal: a
+        # customer's portal session token (CPP-001), likewise.
         resp.headers["Access-Control-Allow-Headers"] = (
             "Authorization, Content-Type, If-Match, Idempotency-Key, X-Request-ID, X-Requested-With, X-Veda-Client, "
-            "X-Veda-Proposal"
+            "X-Veda-Proposal, X-Veda-Portal"
         )
         resp.headers["Access-Control-Max-Age"] = "600"
     return resp

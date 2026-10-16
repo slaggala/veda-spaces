@@ -19,6 +19,7 @@ CASCADES: tuple[str, ...] = (
     "veda.modules.mtq_commercial.erasure:erase_for_lead",
     "veda.modules.customer_proposal.erasure:erase_for_lead",
     "veda.modules.project.erasure:erase_for_lead",
+    "veda.modules.portal.erasure:erase_for_lead",
 )
 
 
@@ -30,6 +31,7 @@ DESCENDANTS: tuple[str, ...] = (
     "veda.modules.mtq_commercial.erasure:audit_ids_for_lead",
     "veda.modules.customer_proposal.erasure:audit_ids_for_lead",
     "veda.modules.project.erasure:audit_ids_for_lead",
+    "veda.modules.portal.erasure:audit_ids_for_lead",
 )
 
 

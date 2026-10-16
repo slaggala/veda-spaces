@@ -332,6 +332,17 @@ register(
     )
 )
 register(AuditPolicy("project_event", FULL, parent=("project", "project_id")))
+# --- Customer Project Portal (0209): FULL. Personal data: the account's email and name (erased with the account when
+# its last enquiry is erased). Session and sign-in rows hold digests only, never a token; events hold codes and ids.
+register(AuditPolicy("portal_account", FULL, pii=frozenset({"email_normalized", "display_name"})))
+register(AuditPolicy("portal_access", FULL, parent=("lead", "lead_id")))
+register(
+    AuditPolicy("portal_sign_in", FULL, parent=("portal_account", "account_id"), excluded=frozenset({"token_sha256"}))
+)
+register(
+    AuditPolicy("portal_session", FULL, parent=("portal_account", "account_id"), excluded=frozenset({"token_sha256"}))
+)
+register(AuditPolicy("portal_event", FULL, parent=("portal_account", "account_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))
