@@ -4,6 +4,9 @@ import type { InstalmentState } from './api.js';
 /** Shared look of the staff commercial pages: figures easy to scan (tabular numerals, right-aligned), states always named
  * in text with a shape marker (never colour alone). */
 export const commercialStyles = css`
+  /* positioned, so the visually hidden labels inside a cell stay within the table's own scroll area */
+  .table-wrap { position: relative; }
+  .table-wrap:focus-visible { outline: 2px solid var(--vs-focus-ring); outline-offset: 2px; }
   .figures { display: grid; gap: var(--vs-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
   .figure { display: flex; flex-direction: column; gap: 4px; background: var(--vs-surface); border: 1px solid var(--vs-line);
     border-radius: var(--vs-radius-card); padding: var(--vs-space-3) var(--vs-space-4); min-width: 0; }

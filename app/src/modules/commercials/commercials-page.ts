@@ -456,7 +456,7 @@ export class VsCommercialsPage extends SessionElement {
           ? html`<button class="btn small" @click=${() => this.editSchedule(a)}>Revise the schedule</button>` : nothing}</vs-banner>` : nothing}
       <section class="card stack" aria-labelledby="h-baseline"><h2 id="h-baseline" class="section-title">Agreed value</h2>
         <p class="muted small">From the accepted quotation and each accepted variation. These never change when prices change.</p>
-        <div class="table-wrap"><table><thead><tr><th scope="col">#</th><th scope="col">Quotation</th><th scope="col">Accepted</th>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Agreed value"><table><thead><tr><th scope="col">#</th><th scope="col">Quotation</th><th scope="col">Accepted</th>
           <th scope="col">Accepted total (₹)</th><th scope="col">Value after (₹)</th></tr></thead>
           <tbody>${a.baseline.map((b) => html`<tr><td>${b.sequence_no}</td><td>${b.reference}<span class="sub">${b.kind === 'ORIGINAL' ? 'Original' : 'Variation'}</span></td>
             <td>${formatAbsolute(b.decided_on)}</td><td class="num">${b.accepted_total}</td><td class="num">${b.value}</td></tr>`)}</tbody></table></div>
@@ -470,7 +470,7 @@ export class VsCommercialsPage extends SessionElement {
       <div class="row"><h2 id="h-schedule" class="section-title">Payment schedule${s ? ` · revision ${s.revision_no}` : ''}</h2>
         ${a.capabilities.manage_schedule && can ? html`<button class="btn small" @click=${() => this.editSchedule(a)}>${s ? 'Revise the schedule' : 'Create the schedule'}</button>` : nothing}</div>
       ${!s ? html`<vs-empty-state heading="No payment schedule yet"><p>The accepted quotation had no payment milestones. Create one that adds up to ₹ ${a.position.value}.</p></vs-empty-state>`
-        : html`<div class="table-wrap"><table><thead><tr><th scope="col">#</th><th scope="col">Instalment</th><th scope="col">Amount (₹)</th>
+        : html`<div class="table-wrap" tabindex="0" role="region" aria-label="Payment schedule"><table><thead><tr><th scope="col">#</th><th scope="col">Instalment</th><th scope="col">Amount (₹)</th>
           <th scope="col">Paid (₹)</th><th scope="col">Remaining (₹)</th><th scope="col">Status</th><th scope="col">Due</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody>${s.lines.map((l) => html`<tr><td>${l.position}</td><td>${l.label}<span class="sub">${l.when}</span></td>
             <td class="num">${l.amount}${l.gst_included ? html`<span class="sub">GST ${l.gst_included}</span>` : nothing}</td>
@@ -492,7 +492,7 @@ export class VsCommercialsPage extends SessionElement {
         ${a.capabilities.record_payment && a.capabilities.writable && a.position.outstanding_minor > 0
           ? html`<button class="btn primary small" @click=${() => this.recordPayment(a)}>Record a payment</button>` : nothing}</div>
       <p class="small muted">Payments recorded by Veda Spaces staff when money reached Veda Spaces. Veda Spaces collects nothing online.</p>
-      ${!a.payments.length ? html`<vs-empty-state heading="No payments recorded yet"></vs-empty-state>` : html`<div class="table-wrap"><table>
+      ${!a.payments.length ? html`<vs-empty-state heading="No payments recorded yet"></vs-empty-state>` : html`<div class="table-wrap" tabindex="0" role="region" aria-label="Payments"><table>
         <thead><tr><th scope="col">Received</th><th scope="col">Amount (₹)</th><th scope="col">Method and reference</th><th scope="col">Status</th>
           <th scope="col">Recorded by</th><th scope="col">Receipt</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
         <tbody>${a.payments.map((p) => html`<tr><td>${day(p.received_on)}</td><td class="num">${p.amount}</td>
@@ -513,7 +513,7 @@ export class VsCommercialsPage extends SessionElement {
       ${!issuable ? html`<vs-banner kind="info">Invoices can be drafted and previewed, but not issued, until the invoice issuer particulars are recorded
         (owner decision PCM-D01: legal name, address, GSTIN, SAC, whether it is a tax invoice).</vs-banner>` : nothing}
       ${!a.invoices.length ? html`<vs-empty-state heading="No invoices yet"><p>Create one from an instalment in the payment schedule.</p></vs-empty-state>`
-        : html`<div class="table-wrap"><table><thead><tr><th scope="col">Invoice</th><th scope="col">Instalment</th><th scope="col">Amount (₹)</th>
+        : html`<div class="table-wrap" tabindex="0" role="region" aria-label="Invoices"><table><thead><tr><th scope="col">Invoice</th><th scope="col">Instalment</th><th scope="col">Amount (₹)</th>
           <th scope="col">Due</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody>${a.invoices.map((i) => html`<tr><td>${i.number ?? 'Draft'}<span class="sub">${i.issued_on ? `Issued ${formatAbsolute(i.issued_on)} · ${who(i.issued_by)}` : `Drafted by ${who(i.drafted_by)}`}</span></td>
             <td>${i.label ?? '—'}</td><td class="num">${i.amount}</td><td>${day(i.due_on)}</td>

@@ -77,7 +77,7 @@ export class VsCommercialsListPage extends SessionElement {
       <vs-problem-banner .problem=${this.problem}></vs-problem-banner>
       ${rows === null ? html`<vs-skeleton rows="6"></vs-skeleton>` : !rows.length
         ? html`<vs-empty-state heading="No commercial records yet"><p>Open one from an accepted quotation below.</p></vs-empty-state>`
-        : html`<div class="table-wrap"><table><caption class="sr-only">Commercial records</caption>
+        : html`<div class="table-wrap" tabindex="0" role="region" aria-label="Commercial records"><table><caption class="sr-only">Commercial records</caption>
           <thead><tr><th scope="col">Customer and quotation</th><th scope="col" class="num">Value (₹)</th><th scope="col" class="num">Paid (₹)</th>
             <th scope="col" class="num">Outstanding (₹)</th><th scope="col">Next payment</th><th scope="col">Schedule</th></tr></thead>
           <tbody>${rows.map((r) => html`<tr>
@@ -89,7 +89,7 @@ export class VsCommercialsListPage extends SessionElement {
             <td>${r.position.schedule_state === 'IN_BALANCE' ? 'Up to date' : r.position.schedule_state === 'NONE' ? 'Not set' : html`<span class="badge OVERDUE">Revise</span>`}</td>
           </tr>`)}</tbody></table></div>`}
       ${this.candidates?.length ? html`<section class="stack" aria-labelledby="h-candidates"><h2 id="h-candidates" class="section-title">Accepted quotations without a commercial record</h2>
-        <div class="table-wrap"><table><thead><tr><th scope="col">Quotation</th><th scope="col">Customer</th><th scope="col" class="num">Accepted total (₹)</th>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Accepted quotations without a commercial record"><table><thead><tr><th scope="col">Quotation</th><th scope="col">Customer</th><th scope="col" class="num">Accepted total (₹)</th>
           <th scope="col">Accepted</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody>${this.candidates.map((c) => html`<tr><td>${c.reference}<span class="sub">${c.property.reference ?? ''}</span></td><td>${c.lead.name ?? '—'}</td>
             <td class="num">${c.accepted_total ?? '—'}</td><td>${c.decided_on ? formatAbsolute(c.decided_on) : '—'}</td>

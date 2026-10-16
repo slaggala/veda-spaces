@@ -166,12 +166,23 @@ def detail(s: Session, ctx, account: CommercialAccount) -> dict[str, Any]:
     }
 
 
+def _readable(detail: dict[str, Any]) -> dict[str, Any]:
+    """Amounts (``*_minor``) as the quotation prints them, so the page shows money, never paise."""
+    out: dict[str, Any] = {}
+    for k, v in (detail or {}).items():
+        if k.endswith("_minor") and isinstance(v, int) and not isinstance(v, bool):
+            out[k[: -len("_minor")]] = text(v)
+        else:
+            out[k] = v
+    return out
+
+
 def history(s: Session, account: CommercialAccount) -> list[dict[str, Any]]:
     people = People(s)
     rows = s.execute(sa.select(CommercialEvent).where(CommercialEvent.account_id == account.id)
                      .order_by(CommercialEvent.created_on.desc(), CommercialEvent.id.desc())).scalars()  # fmt: skip
-    return [{"id": e.id, "code": e.event_code, "entity_id": (e.detail or {}).get("entity"), "detail": e.detail, "at": _when(e.created_on),
-             "by": people(e.created_by)} for e in rows]  # fmt: skip
+    return [{"id": e.id, "code": e.event_code, "entity_id": (e.detail or {}).get("entity"), "detail": _readable(e.detail),
+             "at": _when(e.created_on), "by": people(e.created_by)} for e in rows]  # fmt: skip
 
 
 def candidate(s: Session, q: Quotation) -> dict[str, Any]:
