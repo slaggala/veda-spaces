@@ -22,6 +22,7 @@ SEED_FILES = {
     "veda/modules/project/permissions.py",
     "veda/modules/portal/permissions.py",
     "veda/modules/commercials/permissions.py",
+    "veda/modules/warranty/permissions.py",
     "veda/kernel/migration_support.py",
 }
 DATA_ATTRIBUTE_CONTEXT = ("protection_level", "PROTECTION_LEVELS", "action_class", "APPROVAL_CLASSES")
@@ -224,6 +225,7 @@ def test_PLAT_011_module_boundaries():
                             "veda.modules.project",
                             "veda.modules.portal",
                             "veda.modules.commercials",
+                            "veda.modules.warranty",
                         ), "only the modules' permission registries"
 
 

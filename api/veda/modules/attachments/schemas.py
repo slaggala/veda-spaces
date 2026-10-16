@@ -20,6 +20,7 @@ EntityType = Literal[
     "space_opening",
     "space_electrical_point",
     "measurement_note",
+    "service_request",  # WSV (0214): staff evidence on a service request; customers add photos only through the portal
 ]
 Category = Literal["SITE_PHOTO", "LASER_READING", "SKETCH", "FLOOR_PLAN", "OTHER"]
 ImageMime = Literal["image/jpeg", "image/png", "image/webp"]  # images only in B1; PDF floor plans deferred

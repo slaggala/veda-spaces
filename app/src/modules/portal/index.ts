@@ -1,5 +1,6 @@
 import './portal-ui.js';
 import './portal-image.js';
+import './portal-service.js';
 import './portal-sign-in-page.js';
 import './portal-home-page.js';
 import './portal-project-page.js';

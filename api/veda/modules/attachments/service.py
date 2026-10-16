@@ -352,6 +352,51 @@ def create(s: Session, ctx, body) -> tuple[Attachment, bool, list[dict]]:
     return att, True, warnings_
 
 
+def create_for_portal(
+    s: Session, *, entity_type: str, entity_id: str, body, client_ref: str
+) -> tuple[Attachment, bool]:
+    """A customer's photo through a portal route (WSV: ``service_request`` only). The calling route has authorised the
+    portal session and the record; no permission is granted to any principal for this, and the staff attachment
+    routes still refuse the public principal. ``uploaded_by`` is the principal the request runs as (the public one,
+    as every portal write); the account is recorded by the caller on its own link row in the same transaction.
+    A repeated ``client_ref`` with the same content returns the original."""
+    from veda.kernel.context import require_actor
+
+    if entity_type != "service_request":
+        raise ApiError(422, "VALIDATION_FAILED", "Customers attach photos to service requests only.")
+    target = _resolve(s, entity_type, entity_id)
+    existing = s.execute(
+        sa.select(Attachment).where(Attachment.lead_id == target.lead_id, Attachment.client_ref == client_ref)
+    ).scalar_one_or_none()
+    if existing is not None:
+        if (existing.sha256, existing.entity_type, existing.entity_id) != (body.sha256, entity_type, entity_id):
+            raise ApiError(409, "CLIENT_REF_REUSED", "This request key was used for a different photo.")
+        return existing, False
+    if not target.writable:
+        raise ApiError(409, "ENTITY_FROZEN", "This request no longer accepts photos.")
+    cfg = settings()
+    att = Attachment(
+        lead_id=target.lead_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        category_code="SITE_PHOTO",
+        caption=None,
+        original_filename=safe_filename(body.filename),
+        declared_mime_type=body.mime_type,
+        byte_size=body.byte_size,
+        sha256=body.sha256,
+        storage_backend=cfg.attachment_backend,
+        upload_key=km.content_key(UPLOAD_PREFIX, body.sha256),
+        uploaded_by=require_actor().actor_id,
+        visibility_code="STANDARD",
+        client_ref=client_ref,
+    )
+    s.add(att)
+    s.flush()
+    metrics.emit("AttachmentCreated", 1)
+    return att, True
+
+
 # --- bytes (local backend only) -------------------------------------------------------------------------------------
 def receive_local(s: Session, att: Attachment, data_b64: str) -> None:
     if att.storage_backend != "local" or settings().attachment_backend != "local":

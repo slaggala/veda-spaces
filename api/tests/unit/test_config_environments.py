@@ -453,3 +453,25 @@ def test_project_delivery_in_the_portal_is_off_by_default_and_production_refuses
     assert not (
         staging.customer_portal_enabled or staging.project_lifecycle_enabled or staging.project_commercials_enabled
     )
+
+
+def test_warranty_and_service_is_off_by_default_and_production_refuses_it(monkeypatch):
+    """WSV (decision log 47): the warranty and service flag is off by default; production with it requested on is
+    refused at configuration, the refusal adds exactly its own problem, staging admits it, and it turns no other
+    feature on (it is effective only where the lifecycle's, and for customers the portal's, own flags are on)."""
+    from veda.app import create_app
+
+    assert config.Settings().warranty_service_enabled is False
+    flag = "VEDA_WARRANTY_SERVICE_ENABLED"
+    off = config.validate_environment(deployed_env(monkeypatch, "production"))
+    on = config.validate_environment(deployed_env(monkeypatch, "production", **{flag: "true"}))
+    message = f"{flag} is not authorised in production (warranty and service)"
+    assert sorted(set(on) - set(off)) == [message] and set(off) <= set(on)
+    with pytest.raises(RuntimeError, match="unsafe production configuration") as refused:
+        create_app(deployed_env(monkeypatch, "production", **{flag: "true"}))
+    assert message in str(refused.value)
+    staging = deployed_env(monkeypatch, "staging", **{flag: "true"})
+    assert not [p for p in config.validate_environment(staging) if "WARRANTY_SERVICE" in p]
+    assert staging.warranty_service_enabled is True
+    assert not (staging.customer_portal_enabled or staging.project_lifecycle_enabled
+                or staging.project_delivery_portal_enabled or staging.project_commercials_enabled)  # fmt: skip

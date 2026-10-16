@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
-import { documentImage } from './api.js';
+import { documentImage, portalImage } from './api.js';
 
 /**
  * A document Veda Spaces shared on the customer's project (CPP-D04), loaded through the portal session. An <img> cannot
@@ -9,10 +9,12 @@ import { documentImage } from './api.js';
  * whenever its document changes (an element reused for another document never shows the previous image).
  */
 export class VsPortalImage extends LitElement {
-  static override properties = { propertyId: { attribute: false }, documentId: { attribute: false }, label: { attribute: false },
+  static override properties = { propertyId: { attribute: false }, documentId: { attribute: false }, path: { attribute: false }, label: { attribute: false },
     variant: { attribute: false }, src: { state: true }, failed: { state: true } };
   declare propertyId: string;
   declare documentId: string;
+  /** An image path under the portal API (request photos, shared evidence); used instead of a document id when set. */
+  declare path: string | undefined;
   declare label: string;
   declare variant: 'thumb' | 'mobile' | 'desktop';
   declare src: string | null;
@@ -53,14 +55,14 @@ export class VsPortalImage extends LitElement {
   }
 
   protected override updated(changed: PropertyValues): void {
-    if ((changed.has('propertyId') || changed.has('documentId') || changed.has('variant')) && this.visible) void this.fetch();
+    if ((changed.has('propertyId') || changed.has('documentId') || changed.has('path') || changed.has('variant')) && this.visible) void this.fetch();
   }
 
   private async fetch(): Promise<void> {
     const mine = ++this.request;
     this.src = null;
     this.failed = false;
-    const url = await documentImage(this.propertyId, this.documentId, this.variant);
+    const url = this.path ? await portalImage(this.path, this.variant) : await documentImage(this.propertyId, this.documentId, this.variant);
     if (mine !== this.request) return; // a newer document (or removal) superseded this request
     if (url) this.src = url; else this.failed = true;
   }

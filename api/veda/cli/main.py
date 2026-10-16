@@ -64,6 +64,8 @@ HANDLER_MODULES = (
     "veda.modules.portal.events",
     "veda.modules.project.events",
     "veda.modules.project.notices",
+    "veda.modules.warranty.events",
+    "veda.modules.warranty.photos",
 )
 
 

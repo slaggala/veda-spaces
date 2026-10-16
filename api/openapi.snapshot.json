@@ -617,7 +617,8 @@
               "space_wall",
               "space_opening",
               "space_electrical_point",
-              "measurement_note"
+              "measurement_note",
+              "service_request"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -6907,6 +6908,682 @@
         "title": "SelectionIn",
         "type": "object"
       },
+      "ServiceAssessIn": {
+        "additionalProperties": false,
+        "properties": {
+          "basis_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Basis Path"
+          },
+          "coverage_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Coverage Class"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "internal_reason": {
+            "title": "Internal Reason",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "COVERED",
+              "NOT_COVERED",
+              "OUTSIDE_WARRANTY_PERIOD",
+              "MANUFACTURER_WARRANTY",
+              "INSPECTION_REQUIRED",
+              "INSUFFICIENT_INFORMATION"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "period_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Period Basis"
+          },
+          "service_class": {
+            "anyOf": [
+              {
+                "enum": [
+                  "CHARGEABLE",
+                  "NOT_SERVICEABLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Service Class"
+          }
+        },
+        "required": [
+          "outcome",
+          "explanation",
+          "internal_reason"
+        ],
+        "title": "ServiceAssessIn",
+        "type": "object"
+      },
+      "ServiceAssignIn": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_user_id": {
+            "title": "Owner User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_user_id"
+        ],
+        "title": "ServiceAssignIn",
+        "type": "object"
+      },
+      "ServiceCloseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "closure_code": {
+            "enum": [
+              "DUPLICATE",
+              "NOT_COVERED",
+              "REFERRED_TO_MANUFACTURER",
+              "CHARGEABLE_NOT_AGREED",
+              "CANNOT_SERVICE"
+            ],
+            "title": "Closure Code",
+            "type": "string"
+          },
+          "duplicate_of_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Duplicate Of Id"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "internal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Internal Reason"
+          }
+        },
+        "required": [
+          "closure_code",
+          "explanation"
+        ],
+        "title": "ServiceCloseIn",
+        "type": "object"
+      },
+      "ServiceEvidenceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Caption"
+          },
+          "customer_visible": {
+            "default": false,
+            "title": "Customer Visible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "attachment_id"
+        ],
+        "title": "ServiceEvidenceIn",
+        "type": "object"
+      },
+      "ServiceInformationIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ServiceInformationIn",
+        "type": "object"
+      },
+      "ServiceInformationRequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "ServiceInformationRequestIn",
+        "type": "object"
+      },
+      "ServicePhotoContentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "data_base64": {
+            "minLength": 1,
+            "title": "Data Base64",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_base64"
+        ],
+        "title": "ServicePhotoContentIn",
+        "type": "object"
+      },
+      "ServicePhotoIn": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_size": {
+            "maximum": 15728640,
+            "minimum": 1,
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Filename"
+          },
+          "mime_type": {
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mime_type",
+          "byte_size",
+          "sha256"
+        ],
+        "title": "ServicePhotoIn",
+        "type": "object"
+      },
+      "ServiceReasonIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ServiceReasonIn",
+        "type": "object"
+      },
+      "ServiceRejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ServiceRejectIn",
+        "type": "object"
+      },
+      "ServiceRequestIn": {
+        "additionalProperties": false,
+        "description": "A problem the customer noticed after handover, in their words (portal, or staff on their behalf).",
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Area"
+          },
+          "category": {
+            "enum": [
+              "DOOR_OR_DRAWER",
+              "HARDWARE",
+              "SURFACE_OR_FINISH",
+              "ALIGNMENT_OR_GAP",
+              "WATER_OR_DAMP",
+              "LIGHT_OR_ELECTRICAL_FITTING",
+              "APPLIANCE",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "noticed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Noticed On"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "related_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Request Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "project_id",
+          "category",
+          "description"
+        ],
+        "title": "ServiceRequestIn",
+        "type": "object"
+      },
+      "ServiceResolveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceEvidenceIn"
+            },
+            "maxItems": 12,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "internal_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Internal Note"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "ServiceResolveIn",
+        "type": "object"
+      },
+      "ServiceStaffRequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Area"
+          },
+          "category": {
+            "enum": [
+              "DOOR_OR_DRAWER",
+              "HARDWARE",
+              "SURFACE_OR_FINISH",
+              "ALIGNMENT_OR_GAP",
+              "WATER_OR_DAMP",
+              "LIGHT_OR_ELECTRICAL_FITTING",
+              "APPLIANCE",
+              "OTHER"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "noticed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Noticed On"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "property_id": {
+            "title": "Property Id",
+            "type": "string"
+          },
+          "related_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Request Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "project_id",
+          "category",
+          "description",
+          "property_id"
+        ],
+        "title": "ServiceStaffRequestIn",
+        "type": "object"
+      },
+      "ServiceTriageIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DOOR_OR_DRAWER",
+                  "HARDWARE",
+                  "SURFACE_OR_FINISH",
+                  "ALIGNMENT_OR_GAP",
+                  "WATER_OR_DAMP",
+                  "LIGHT_OR_ELECTRICAL_FITTING",
+                  "APPLIANCE",
+                  "OTHER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "priority": {
+            "default": "NORMAL",
+            "enum": [
+              "HIGH",
+              "NORMAL",
+              "LOW"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Space Id"
+          }
+        },
+        "title": "ServiceTriageIn",
+        "type": "object"
+      },
+      "ServiceVisitDoneIn": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Note"
+          },
+          "done_on": {
+            "format": "date",
+            "title": "Done On",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceEvidenceIn"
+            },
+            "maxItems": 12,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "internal_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Internal Note"
+          }
+        },
+        "required": [
+          "done_on"
+        ],
+        "title": "ServiceVisitDoneIn",
+        "type": "object"
+      },
+      "ServiceVisitIn": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Note"
+          },
+          "internal_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Internal Note"
+          },
+          "kind": {
+            "enum": [
+              "INSPECTION",
+              "SERVICE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "planned_on": {
+            "format": "date",
+            "title": "Planned On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "planned_on"
+        ],
+        "title": "ServiceVisitIn",
+        "type": "object"
+      },
+      "ServiceWithdrawIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "title": "ServiceWithdrawIn",
+        "type": "object"
+      },
       "SessionIn": {
         "additionalProperties": false,
         "properties": {
@@ -9122,6 +9799,20 @@
         "title": "WallIn",
         "type": "object"
       },
+      "WarrantyRegisterIn": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "title": "WarrantyRegisterIn",
+        "type": "object"
+      },
       "WithdrawDocumentIn": {
         "additionalProperties": false,
         "properties": {
@@ -9939,7 +10630,8 @@
                 "space_wall",
                 "space_opening",
                 "space_electrical_point",
-                "measurement_note"
+                "measurement_note",
+                "service_request"
               ],
               "title": "Entity Type",
               "type": "string"
@@ -23865,6 +24557,561 @@
         "x-requirement": "PEX-035"
       }
     },
+    "/api/v1/public/portal/properties/{property_id}/service-requests": {
+      "post": {
+        "operationId": "portal_customer_service_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Report a problem noticed after handover (reviewed by Veda Spaces; nothing is assumed)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/confirm": {
+      "post": {
+        "operationId": "portal_customer_service_confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Confirm the problem is resolved (repeating it changes nothing)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-015"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/evidence/{evidence_id}/content": {
+      "get": {
+        "operationId": "portal_customer_service_evidence_image",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evidence_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "default": "mobile",
+              "enum": [
+                "thumb",
+                "mobile",
+                "desktop"
+              ],
+              "title": "Variant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "A photo Veda Spaces shared on your request",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-018"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/information": {
+      "post": {
+        "operationId": "portal_customer_service_information",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceInformationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Answer what Veda Spaces asked about your request",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/photos": {
+      "post": {
+        "operationId": "portal_customer_service_photo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePhotoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Declare a photo of your request, then upload it as instructed",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-018"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/photos/{photo_id}/complete": {
+      "post": {
+        "operationId": "portal_customer_service_photo_complete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Finish a photo upload: it is checked, scanned and prepared before anyone sees it",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-018"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/photos/{photo_id}/content": {
+      "get": {
+        "operationId": "portal_customer_service_photo_image",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "default": "mobile",
+              "enum": [
+                "thumb",
+                "mobile",
+                "desktop"
+              ],
+              "title": "Variant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "A photo of your request (only through your authorised home)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-018"
+      },
+      "put": {
+        "operationId": "portal_customer_service_photo_content",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePhotoContentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Local storage only: send the photo's bytes (base64)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-018"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/reject": {
+      "post": {
+        "operationId": "portal_customer_service_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceRejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Tell Veda Spaces the problem is still not right",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-015"
+      }
+    },
+    "/api/v1/public/portal/properties/{property_id}/service-requests/{request_id}/withdraw": {
+      "post": {
+        "operationId": "portal_customer_service_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "property_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceWithdrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "Withdraw your request (repeating it changes nothing)",
+        "tags": [
+          "customer-portal"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-010",
+        "x-requirement": "WSV-011"
+      }
+    },
     "/api/v1/public/portal/quotations/{quotation_id}": {
       "get": {
         "operationId": "portal_customer_quotation",
@@ -26186,6 +27433,1035 @@
         "x-requirement": "SEVT-005"
       }
     },
+    "/api/v1/service-requests": {
+      "get": {
+        "operationId": "warranty_list_requests",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "OPEN",
+              "enum": [
+                "OPEN",
+                "CLOSED",
+                "ALL",
+                "MINE",
+                "WAITING_FOR_CUSTOMER",
+                "AWAITING_VERIFICATION",
+                "AWAITING_COMMERCIAL_AGREEMENT"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Service requests in scope (open, mine, waiting, closed)",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-010"
+      },
+      "post": {
+        "operationId": "warranty_create_request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceStaffRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a problem a customer reported by phone or in person, in their words",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.triage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/service-requests/vocabulary": {
+      "get": {
+        "operationId": "warranty_vocabulary",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The codes the service pages offer",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-010"
+      }
+    },
+    "/api/v1/service-requests/{request_id}": {
+      "get": {
+        "operationId": "warranty_get_request",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One service request: the customer's words, decisions, visits, history",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-010"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/assessments": {
+      "post": {
+        "operationId": "warranty_assess",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceAssessIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Decide coverage with its basis, a customer explanation and an internal reason",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.assess"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-012"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/assign": {
+      "post": {
+        "operationId": "warranty_assign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceAssignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign the request's owner",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.assign"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-013"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/close": {
+      "post": {
+        "operationId": "warranty_close",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceCloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a request without service, with its reason",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.assess"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-012"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/evidence": {
+      "post": {
+        "operationId": "warranty_evidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceEvidenceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cite an available attachment as evidence (shown to the customer only when marked so)",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.resolve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-014"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/information": {
+      "post": {
+        "operationId": "warranty_answer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceInformationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the customer's answer given by phone or in person",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.triage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/information-requests": {
+      "post": {
+        "operationId": "warranty_ask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceInformationRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the customer for information (they read the question)",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.triage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/reopen": {
+      "post": {
+        "operationId": "warranty_reopen",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reopen a closed request, with a reason (new cycle)",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.verify"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-015"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/resolve": {
+      "post": {
+        "operationId": "warranty_resolve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceResolveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the resolution of a covered request",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.resolve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-014"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/triage": {
+      "post": {
+        "operationId": "warranty_triage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceTriageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Triage a reported request",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.triage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-011"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/verify": {
+      "post": {
+        "operationId": "warranty_verify",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify a resolution (never your own) and close the request",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.verify"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-015"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/visits": {
+      "post": {
+        "operationId": "warranty_plan_visit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceVisitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan an inspection or service visit",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.resolve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-014"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/visits/{visit_id}/cancel": {
+      "post": {
+        "operationId": "warranty_visit_cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "visit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a planned visit, with a reason",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.resolve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-014"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/visits/{visit_id}/done": {
+      "post": {
+        "operationId": "warranty_visit_done",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "visit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceVisitDoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a visit as done, with evidence",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.resolve"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-014"
+      }
+    },
+    "/api/v1/service-requests/{request_id}/withdraw": {
+      "post": {
+        "operationId": "warranty_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceWithdrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a request at the customer's wish",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.service.triage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-011"
+      }
+    },
     "/api/v1/spaces/{space_id}": {
       "delete": {
         "operationId": "mtq_delete_space",
@@ -27455,6 +29731,131 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "AUTH-010"
+      }
+    },
+    "/api/v1/warranty/entitlements": {
+      "post": {
+        "operationId": "warranty_register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarrantyRegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register a handed-over project's warranty from its handover record (idempotent)",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.manage"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-002"
+      }
+    },
+    "/api/v1/warranty/entitlements/{entitlement_id}": {
+      "get": {
+        "operationId": "warranty_get_entitlement_by_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entitlement_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One warranty entitlement",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-001"
+      }
+    },
+    "/api/v1/warranty/projects/{project_id}": {
+      "get": {
+        "operationId": "warranty_get_entitlement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A project's warranty entitlement (frozen at handover) and its coverage status today",
+        "tags": [
+          "warranty"
+        ],
+        "x-permission": [
+          "warranty.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "WSV-001"
       }
     },
     "/health/live": {
