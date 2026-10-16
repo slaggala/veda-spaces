@@ -47,10 +47,30 @@ def _settings():
     except RuntimeError:
         db.configure(s.database_url)
     import veda.models  # noqa: F401
-    from veda.modules.crm.leads import events  # noqa: F401  (handlers)
-    from veda.modules.estimator import events as _estimate_events  # noqa: F401
 
+    load_event_handlers()
     return s
+
+
+# Every module whose outbox handlers (``@handler``) or resolvers must exist in a process that is not the API: the outbox
+# worker, the scheduler and the CLI. The API registers them while building the app; these processes never build it, so
+# a module missing here has its events dead-lettered by the worker ("no handler"). tests/unit/test_worker_handlers.py
+# refuses a module that registers a handler and is not listed.
+HANDLER_MODULES = (
+    "veda.modules.commercials.events",
+    "veda.modules.crm.leads.events",
+    "veda.modules.customer_proposal.events",
+    "veda.modules.estimator.events",
+    "veda.modules.portal.events",
+    "veda.modules.project.events",
+)
+
+
+def load_event_handlers() -> None:
+    import importlib
+
+    for name in HANDLER_MODULES:
+        importlib.import_module(name)
 
 
 def cmd_migrate(args) -> int:
