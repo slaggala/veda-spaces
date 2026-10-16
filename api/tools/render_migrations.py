@@ -102,6 +102,7 @@ REVISIONS: dict[str, list[str]] = {
         "project_customer_report",
         "project_handover_package",
     ],
+    "0213_customer_documents": ["project_customer_document"],
     "0209_customer_portal": ["portal_account", "portal_access", "portal_sign_in", "portal_session", "portal_event"],
     "0208_project_lifecycle": [
         "project",

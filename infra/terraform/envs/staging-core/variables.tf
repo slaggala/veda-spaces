@@ -93,6 +93,12 @@ variable "customer_portal_record_path" {
   default     = ""
 }
 
+variable "project_delivery_record_path" {
+  description = "The project-delivery staging enablement record (tests only; empty means infra/config/project-delivery-enablement-record.json)."
+  type        = string
+  default     = ""
+}
+
 variable "mtq_commercial_record_path" {
   description = "The MTQ B2-B4 staging enablement record (tests only; empty means infra/config/mtq-commercial-enablement-record.json)."
   type        = string

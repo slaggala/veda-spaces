@@ -6,7 +6,7 @@ becomes a default; while one is null the code fails closed for exactly the opera
 | Slot | Governs | While null |
 |---|---|---|
 | PEX-D01 | Whether customers may, in the portal, (a) report an issue on their project and (b) acknowledge a handover package | Both portal writes are refused (OWNER_DECISION_REQUIRED) and the portal offers neither. Staff record a customer's report on their behalf, and the signed handover form's reference at the handover |
-| PEX-D02 | The commercial condition a handover needs: NONE, NO_AMOUNT_DUE (a schedule exists and nothing requested is unpaid) or FULLY_PAID (nothing outstanding) | The COMMERCIAL_CONDITION gate refuses READY_FOR_HANDOVER and the handover; the position is shown for information |
+| PEX-D02 | The commercial condition a handover needs: COMMERCIAL_OBLIGATION_SATISFIED (decided: Project Commercials says the obligation is satisfied), or for tests NONE, NO_AMOUNT_DUE, FULLY_PAID | The COMMERCIAL_CONDITION gate refuses READY_FOR_HANDOVER and the handover; the position is shown for information |
 
 Tests may install a record marked SYNTHETIC (``install_for_tests``); the loader refuses that marker anywhere but the
 test environment.
@@ -30,7 +30,7 @@ LABELS = {
     "PEX-D01": "customer actions in the portal (report an issue; acknowledge a handover)",
     "PEX-D02": "the commercial condition for handover",
 }
-CONDITIONS = ("NONE", "NO_AMOUNT_DUE", "FULLY_PAID")
+CONDITIONS = ("NONE", "NO_AMOUNT_DUE", "FULLY_PAID", "COMMERCIAL_OBLIGATION_SATISFIED")
 Reference = Annotated[str, Field(min_length=1, max_length=200)]
 
 
@@ -45,7 +45,7 @@ class CustomerActions(_Closed):  # PEX-D01
 
 
 class CommercialCondition(_Closed):  # PEX-D02
-    condition: Literal["NONE", "NO_AMOUNT_DUE", "FULLY_PAID"]
+    condition: Literal["NONE", "NO_AMOUNT_DUE", "FULLY_PAID", "COMMERCIAL_OBLIGATION_SATISFIED"]
     reference: Reference
 
 

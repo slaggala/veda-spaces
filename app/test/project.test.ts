@@ -127,11 +127,11 @@ describe('Project page (vs-project-page)', () => {
       'What it blocks': 'Production readiness', 'When resolved': 'The move to Production readiness can be requested.' });
   });
 
-  it('has the thirteen sections, reachable as tabs', async () => {
+  it('has the fourteen sections, reachable as tabs', async () => {
     const { root } = await ready();
     const tabs = root.querySelector('vs-tabs')!.shadowRoot!.querySelectorAll('[role=tab]');
     expect([...tabs].map((t) => t.textContent)).to.deep.equal(['Overview', 'Timeline', 'Stage and readiness', 'Checklist', 'Work plan', 'Blockers',
-      'Milestones', 'Commercial baseline', 'Site readiness', 'Quality and snags', 'Customer reports', 'Handover', 'Audit and history']);
+      'Milestones', 'Commercial baseline', 'Site readiness', 'Quality and snags', 'Customer reports', 'Customer documents', 'Handover', 'Audit and history']);
   });
 
   it('requests a move with the version shown and keeps a refusal visible with its exact blockers', async () => {

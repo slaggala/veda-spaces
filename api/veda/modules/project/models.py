@@ -652,6 +652,38 @@ class ProjectHandoverPackage(_ProjectRow, AuditedBase):
     )  # fmt: skip
 
 
+class ProjectCustomerDocument(_ProjectRow, AuditedBase):
+    """CPP-D04: an attachment of the project's customer record that staff explicitly published to the customer, as one
+    customer-visible class, with a customer title. Belonging to the project never makes a file visible: only a
+    PUBLISHED row does, and only while the attachment stays scanned clean and available. Withdrawal keeps the row."""
+
+    __tablename__ = "project_customer_document"
+
+    attachment_id: Mapped[str] = mapped_column(GUID(), _fk("attachment.id"), nullable=False)
+    document_class: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    title: Mapped[str] = mapped_column(sa.String(120), nullable=False)  # customer wording
+    status: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="PUBLISHED")
+    published_by: Mapped[str] = mapped_column(GUID(), _fk("app_user.id"), nullable=False)
+    published_on: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    withdrawn_by: Mapped[str | None] = mapped_column(GUID(), _fk("app_user.id"))
+    withdrawn_on: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    withdrawn_reason: Mapped[str | None] = mapped_column(sa.String(300))
+
+    __table_args__ = (
+        in_check("project_customer_document", "document_class", tuple(V.CUSTOMER_DOCUMENT_CLASSES)),
+        in_check("project_customer_document", "status", V.CUSTOMER_DOCUMENT_STATES),
+        CheckConstraint("(status = 'WITHDRAWN') = (withdrawn_on IS NOT NULL AND withdrawn_by IS NOT NULL AND "
+                        "withdrawn_reason IS NOT NULL)", name="ck_project_customer_document__withdrawn"),
+        Index("ux_project_customer_document__published", "project_id", "attachment_id", unique=True,
+              **where("status = 'PUBLISHED' AND is_deleted = 0", "status = 'PUBLISHED' AND is_deleted = false")),
+        Index("ix_project_customer_document__project", "project_id", "status"),
+        Index("ix_project_customer_document__lead_id", "lead_id"),
+        Index("ix_project_customer_document__attachment", "attachment_id"),
+        Index("ix_project_customer_document__published_by", "published_by"),
+        Index("ix_project_customer_document__withdrawn_by", "withdrawn_by"),
+    )  # fmt: skip
+
+
 class ProjectEvent(_ProjectRow, AuditedBase):
     """The immutable timeline (PLB-12): the actor is ``created_by``, the time ``created_on``."""
 
@@ -675,4 +707,4 @@ class ProjectEvent(_ProjectRow, AuditedBase):
 TABLES = ("project", "project_baseline", "project_stage", "project_member", "project_transition",
           "project_checklist_item", "project_milestone", "project_site_readiness", "project_blocker",
           "project_qc_check", "project_snag", "project_event", "project_work_package", "project_qc_point",
-          "project_customer_report", "project_handover_package")  # fmt: skip
+          "project_customer_report", "project_handover_package", "project_customer_document")  # fmt: skip

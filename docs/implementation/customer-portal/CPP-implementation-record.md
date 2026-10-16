@@ -79,8 +79,8 @@ fields only). Otherwise those three steps say "not yet available". The portal ne
   evidence binds the decision to that link. A portal decision channel needs an evidence change and owner decisions
   (CPP-D02).
 - **Execution, quality and handover** are not shown while the Project Lifecycle is off, which it is everywhere today.
-- **Attachments.** None is customer-visible. The repository has no customer-visible attachment class, and site
-  photographs and sketches are staff evidence (CPP-D04).
+- **Attachments.** None is customer-visible unless staff explicitly publish it (CPP-D04, decided 2026-10-16; see
+  "Customer documents" below). Site photographs and sketches otherwise stay staff evidence.
 - **Payments, invoices, warranty documents and messaging** do not exist in the repository, so the portal has none.
 
 ## Owner decisions (none is assumed; the code fails closed while each is open)
@@ -90,7 +90,7 @@ fields only). Otherwise those three steps say "not yet available". The portal ne
 | CPP-D01 | Staging enablement: an enablement record and the staging wiring for `VEDA_CUSTOMER_PORTAL_ENABLED` | Off; every route 404. Decided for protected staging: owner approval of 2026-10-16 (decision log 43), with the record APPROVED and bound by its SHA-256. Production is not decided. |
 | CPP-D02 | Whether customers may decide on a quotation in the portal, and the evidence that binds it | Decisions only on the CQX secure link |
 | CPP-D03 | Who may be given access (relationships) and by whom (the default grants above) | The CQX sharing roles; staff choose the relationship |
-| CPP-D04 | A customer-visible document class (drawings, design files, handover documents) | No attachment is shown |
+| CPP-D04 | A customer-visible document class (drawings, design files, handover documents) | **Decided YES 2026-10-16 (decision log 46):** explicit publication only, below |
 | CPP-D05 | Session lifetimes and sign-in link lifetimes | 30 min idle / 12 h absolute; 15 min link, 72 h invitation |
 | CPP-D06 | Showing the assigned consultant's name when the issued quotation names no business contact | The consultant's name only, no contact channel |
 
@@ -140,3 +140,25 @@ carries exactly two internal identifiers, the customer's own project id and hand
 customer's two writes (report an issue; acknowledge a handover summary, both owner decision PEX-D01) are addressed by
 them; both are reached only through the account's authorised property. No other internal id and never the project
 number (the VS-P overlap above) reach the customer. With the flag off, the earlier rule (no project id at all) holds.
+
+## Customer documents (CPP-D04, decision log 46)
+
+The owner decided that the portal may show customer-visible project documents. Visibility is explicit, never inferred
+from "the file belongs to the project":
+
+- **Publication** (`project.publish_document`, FOUNDER by default; others individually): one attachment of the
+  project's own customer record that is scanned clean, available and not INTERNAL (floor plans stay internal), as one
+  class (progress photograph, handover photograph, approved drawing) with a title in customer words. Repeating the same
+  publication changes nothing; the same file in another class must be withdrawn first. Withdrawal needs a reason and
+  keeps the row (`project_customer_document`, migration `0213_customer_documents`); erasure redacts the title.
+- **Customer view:** `documents` on the property page lists published, still available documents (class, title, date,
+  size); never a file name, uploader, attachment id or lead. The bytes come only from
+  `GET /public/portal/properties/{id}/documents/{id}/content` (RBX-010, variant `thumb`, `mobile` or `desktop`),
+  which re-checks on every request the session, the account's access to the property, that the publication belongs to
+  a project of that property and is still PUBLISHED, and that the attachment is still clean and available; anything
+  else is 404, the same as an unknown id. Responses are `no-store`, `nosniff`, sandboxed.
+- **Gate:** shown only while the delivery view (`VEDA_PROJECT_DELIVERY_PORTAL_ENABLED`, with the lifecycle) is on.
+- **Other documents** stay their own modules' customer-safe projections: issued quotations (CQX), invoices and receipts
+  (Project Commercials), the handover summary (PEX). Nothing internal (drafts, internal review versions, estimates,
+  costs, supplier material, staff notes, QC discussion, audit exports) has a publication path.
+

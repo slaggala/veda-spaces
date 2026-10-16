@@ -420,7 +420,8 @@ def test_no_route_exposes_a_rate_card(app):
     # which reads issued quotations only through the CQX projection (test_portal_views: no internal field). Project
     # Commercials adds the customer's invoices and receipts to it (RBX-010; test_commercials_portal: no internal field).
     # Project delivery adds the customer's two writes (RBX-010, owner decision PEX-D01): an issue report and a handover
-    # acknowledgement, neither carrying a rate (test_project_delivery_portal: isolation, no internal field).
+    # acknowledgement, neither carrying a rate (test_project_delivery_portal: isolation, no internal field). Customer
+    # documents (CPP-D04) add one image read of an explicitly published document (test_customer_documents).
     assert public == [
         "/api/v1/public/catalog",
         "/api/v1/public/catalog/estimates",
@@ -432,6 +433,7 @@ def test_no_route_exposes_a_rate_card(app):
         "/api/v1/public/portal/home",
         "/api/v1/public/portal/invoices/<invoice_id>",
         "/api/v1/public/portal/properties/<property_id>",
+        "/api/v1/public/portal/properties/<property_id>/documents/<document_id>/content",
         "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge",
         "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/reports",
         "/api/v1/public/portal/quotations/<quotation_id>",

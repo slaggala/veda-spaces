@@ -56,6 +56,7 @@ _SAFE: dict[str, dict[str, str]] = {
                                 "decline_code": SAFE, "response": SAFE, "triaged_on": SAFE},
     "project_handover_package": {"package_no": SAFE, "status": SAFE, "content": SAFE, "content_sha256": SAFE,
                                  "acknowledged_on": SAFE, "completed_on": SAFE},
+    "project_customer_document": {"document_class": SAFE, "title": SAFE, "published_on": SAFE},
 }  # fmt: skip
 
 

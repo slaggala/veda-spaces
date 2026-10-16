@@ -351,6 +351,10 @@ register(AuditPolicy("project_customer_report", FULL, parent=("project", "projec
 register(
     AuditPolicy("project_handover_package", FULL, parent=("project", "project_id"), excluded=frozenset({"content"}))
 )
+# CPP-D04 (decision log 46): an explicit publication of a project attachment to the customer; the title is customer
+# wording about their home (erased with the lead), the attachment row keeps its own policy.
+register(AuditPolicy("project_customer_document", FULL, parent=("project", "project_id"),
+                     pii=frozenset({"title", "withdrawn_reason"})))  # fmt: skip
 # --- Customer Project Portal (0209): FULL. Personal data: the account's email and name (erased with the account when
 # its last enquiry is erased). Session and sign-in rows hold digests only, never a token; events hold codes and ids.
 register(AuditPolicy("portal_account", FULL, pii=frozenset({"email_normalized", "email_hash", "display_name"})))

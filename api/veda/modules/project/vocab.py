@@ -134,6 +134,15 @@ REPORT_DECLINE_CODES = ("DUPLICATE", "NOT_A_DEFECT", "NOT_IN_SCOPE")
 # PEX: the handover package.
 PACKAGE_STATES = ("PREPARED", "SUPERSEDED", "COMPLETED")
 
+# CPP-D04 (decision log 46): the customer-visible document classes a project attachment may be published as. Only what
+# the repository's attachments can hold (scanned, re-encoded images); publication is always an explicit staff act.
+CUSTOMER_DOCUMENT_CLASSES = {
+    "PROGRESS_PHOTO": "Progress photograph",
+    "HANDOVER_PHOTO": "Handover photograph",
+    "APPROVED_DRAWING": "Approved drawing",
+}
+CUSTOMER_DOCUMENT_STATES = ("PUBLISHED", "WITHDRAWN")
+
 # PLB-12: the timeline. Codes, ids and states only: an event never carries free text, so it never needs erasing.
 EVENTS = (
     "PROJECT_CREATED",

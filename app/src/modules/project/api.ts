@@ -154,6 +154,15 @@ export interface Actions {
   /** PEX: work packages, independent snag verification, the handover package (READY_FOR_HANDOVER only). */
   manage_work: boolean; verify_snag: boolean; prepare_handover_package: boolean;
 }
+/** CPP-D04: what staff explicitly shared with the customer (an attachment of the project, never shown just for belonging). */
+export interface CustomerDocument {
+  id: string; version: number; attachment_id: string; document_class: string; class_label: string; title: string; status: 'PUBLISHED' | 'WITHDRAWN';
+  published_on: string; published_by: Person | null; withdrawn_on: string | null; withdrawn_by: Person | null; withdrawn_reason: string | null; available: boolean;
+}
+export interface CustomerDocuments {
+  documents: CustomerDocument[]; can_publish: boolean; classes: { code: string; label: string }[];
+  options: { id: string; category: string; attached_to: string; uploaded_on: string | null }[];
+}
 export interface ProjectDetail {
   id: string; version: number; project_number: string; status: string; source: string; property: PropertyRef; quotation_number: string;
   source_quotation_id: string; created_on: string | null; created_by: Person | null; handed_over_on: string | null; handed_over_by: Person | null;
@@ -167,6 +176,7 @@ export interface ProjectDetail {
   qc: { required_categories: string[]; categories: { category: string; required: boolean; latest: QcRow | null }[]; points: QcPoint[];
     chains: QcChain[]; history: QcRow[] };
   work_packages: WorkPackage[]; customer_reports: CustomerReport[]; handover_packages: HandoverPackage[];
+  customer_documents: CustomerDocuments;
   delivery_policy: { version: string; status: string; decisions: Record<string, { label: string; decided: boolean }> };
   snags: Snag[]; baseline: BaselineView; transitions: Transition[]; timeline: TimelineEvent[]; spaces: { id: string; label: string }[];
   evidence_options: { id: string; category: string; attached_to: string; uploaded_on: string | null }[];
@@ -233,5 +243,9 @@ export const projectApi = {
   recordReport: (p: ProjectDetail, body: Body) => api.post<ProjectDetail>(`${at(p)}/customer-reports`, body, { idempotencyKey: newIdempotencyKey() }),
   triageReport: (p: ProjectDetail, r: CustomerReport, body: Body) =>
     api.post<ProjectDetail>(`${at(p)}/customer-reports/${r.id}/triage`, body, { ifMatch: r.version }),
+  publishDocument: (p: ProjectDetail, body: Body) =>
+    api.post<ProjectDetail>(`${at(p)}/customer-documents`, body, { idempotencyKey: newIdempotencyKey() }),
+  withdrawDocument: (p: ProjectDetail, d: CustomerDocument, reason: string) =>
+    api.post<ProjectDetail>(`${at(p)}/customer-documents/${d.id}/withdraw`, { reason }, { ifMatch: d.version }),
   preparePackage: (p: ProjectDetail) => api.post<ProjectDetail>(`${at(p)}/handover-package`, {}, { ifMatch: p.version }),
 };

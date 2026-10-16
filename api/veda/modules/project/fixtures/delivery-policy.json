@@ -1,10 +1,17 @@
 {
   "schema": "veda.project.delivery-policy/1",
-  "version": "PEX-POLICY-0",
-  "status": "UNDECIDED",
-  "note": "No project-delivery decision has been recorded by the owner. PEX-D01 (customer portal actions) and PEX-D02 (commercial condition for handover) are null: customers cannot report issues or acknowledge a handover in the portal, and the commercial condition fails closed. See docs/implementation/project-execution/PEX-owner-decisions.md.",
+  "version": "PEX-POLICY-1",
+  "status": "DECIDED",
+  "note": "Owner decisions of 2026-10-16 (decision log 46). PEX-D01 YES: authorised customers may report an issue on their project and acknowledge the prepared handover package in the Customer Project Portal; every existing safeguard stays (authentication, isolation, idempotency, rate limits, audit, staff triage of every report, acknowledgement bound to the package digest). PEX-D02: normal handover needs the project's commercial obligation satisfied as Project Commercials states it (no independent calculation, no override). See docs/implementation/project-execution/PEX-owner-decisions.md.",
   "decisions": {
-    "PEX-D01": null,
-    "PEX-D02": null
+    "PEX-D01": {
+      "issue_reports": true,
+      "handover_acknowledgement": true,
+      "reference": "Owner decision PEX-D01 = YES, 2026-10-16 (decision log 46)"
+    },
+    "PEX-D02": {
+      "condition": "COMMERCIAL_OBLIGATION_SATISFIED",
+      "reference": "Owner decision PEX-D02 = commercial obligation gate, 2026-10-16 (decision log 46)"
+    }
   }
 }

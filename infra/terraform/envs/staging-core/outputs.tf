@@ -221,3 +221,24 @@ output "customer_portal" {
     error_message = "VEDA_CUSTOMER_PORTAL_ENABLED turns on only with an owner-APPROVED infra/config/customer-portal-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.cpp_record_problems)}."
   }
 }
+
+# Project delivery (decision log 46): what is planned, and the gates that refuse the rest.
+output "project_delivery" {
+  description = "Project Lifecycle, Project Commercials and the customer's delivery view on staging (false until an owner-approved, digest-bound, synthetic-content-only enablement record naming each flag)."
+  value       = merge(local.pdl_config, { enablement_record = local.pdl.enablement_record_sha256 })
+
+  precondition {
+    condition     = local.pdl.status == "DECIDED" && (local.pdl_any || local.pdl.enablement_record_sha256 == null)
+    error_message = "project_delivery must be DECIDED, and a digest is bound only together with a flag (rollback clears both)."
+  }
+
+  precondition {
+    condition     = !local.pdl_any || length(local.pdl_record_problems) == 0
+    error_message = "The project-delivery flags turn on only with an owner-APPROVED infra/config/project-delivery-enablement-record.json naming each flag, bound by its SHA-256 with every evidence field filled: ${join("; ", local.pdl_record_problems)}."
+  }
+
+  precondition {
+    condition     = !local.pdl_flags.VEDA_PROJECT_DELIVERY_PORTAL_ENABLED || (local.pdl_flags.VEDA_PROJECT_LIFECYCLE_ENABLED && local.cpp.enabled)
+    error_message = "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED needs VEDA_PROJECT_LIFECYCLE_ENABLED and the customer portal on staging."
+  }
+}

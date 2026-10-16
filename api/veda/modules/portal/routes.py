@@ -291,3 +291,30 @@ def acknowledge_handover(req: Req, property_id: str, project_id: str):
     req.session.flush()
     return private(ok({"acknowledged_on": clock.to_rfc3339(pkg.acknowledged_on),
                        "delivery": delivery.project_view(req.session, p.account.id, proj)}))  # fmt: skip
+
+
+# --- customer: project documents (CPP-D04) -----------------------------------------------------------------------------
+@customer_api.route("GET", "/portal/properties/<property_id>/documents/<document_id>/content", rbx="RBX-010",
+                    auth="public", write=False, query=PS.DocumentContentQuery, limits=READ_LIMITS,
+                    requirement="CPP-D04", summary="One document Veda Spaces shared on your project (an image; only "
+                    "through your authorised property)")  # fmt: skip
+def document_content(req: Req, property_id: str, document_id: str):
+    from flask import Response
+
+    from veda.modules.attachments import service as attachments
+    from veda.modules.project import delivery, documents
+
+    p = principal(req)
+    prop, _lead = projection.property_for(req.session, p.account.id, property_id)
+    if not delivery.enabled():
+        raise not_found()
+    _doc, att = documents.content_for(req.session, prop.id, document_id)
+    try:
+        data = attachments.variant_bytes(att, req.query.variant)
+    except ApiError as err:  # never say more than "not found" to a customer
+        raise not_found() from err
+    resp = Response(data, status=200, mimetype="image/webp")
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Disposition"] = f'inline; filename="document-{req.query.variant}.webp"'
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return private(resp)

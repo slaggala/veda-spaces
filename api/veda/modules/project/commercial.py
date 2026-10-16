@@ -5,6 +5,9 @@ position calculation (``commercials.position.compute``) of the commercial record
 (``quotation_number``; never "the latest record of the property", review D3).
 
 - PEX-D02 unrecorded: fails closed (OWNER_DECISION_REQUIRED). The position is still shown for information.
+- COMMERCIAL_OBLIGATION_SATISFIED (the owner's decision, decision log 46): Project Commercials says the obligation is
+  satisfied (``commercials.obligation``: the record verifies and nothing is outstanding after accepted variations,
+  reversals and any credit). No override exists; nothing else counts.
 - NONE: no condition.
 - NO_AMOUNT_DUE: a schedule exists and is in balance, and no instalment requested from the customer is unpaid (DUE,
   OVERDUE, or PARTIALLY_PAID after a request).
@@ -79,6 +82,15 @@ def blockers(s: Session, p: Project) -> list[dict[str, Any]]:
     if acc is None:
         return [_b("COMMERCIAL_RECORD_MISSING", "This project's quotation has no commercial record, so the commercial "
                    "condition for handover cannot be confirmed.")]  # fmt: skip
+    if od.condition == "COMMERCIAL_OBLIGATION_SATISFIED":
+        from veda.modules.commercials import obligation
+
+        ob = obligation.evaluate(s, acc)
+        if ob.satisfied:
+            return []
+        party = "VEDA" if ob.code == "COMMERCIAL_RECORD_UNSOUND" else "CUSTOMER"
+        return [_b(ob.code or "COMMERCIAL_OBLIGATION_OUTSTANDING", ob.message or "", party,
+                   entity={"type": "commercial_account", "id": acc.id})]  # fmt: skip
     from veda.modules.commercials import baseline as cbase
     from veda.modules.commercials import payments as cpay
     from veda.modules.commercials import position as pos

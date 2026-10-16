@@ -18,12 +18,13 @@ from veda.kernel.errors import ApiError
 from veda.kernel.http import Api, Req, ok, problem_response, request_reaches
 from veda.platform.audit.models import AuditLog
 
-from . import access, creation, gates, present, reports, service, work
+from . import access, creation, documents, gates, present, reports, service, work
 from . import handover as packages
 from . import schemas as S
 from .models import (
     ProjectBlocker,
     ProjectChecklistItem,
+    ProjectCustomerDocument,
     ProjectCustomerReport,
     ProjectMember,
     ProjectMilestone,
@@ -445,6 +446,26 @@ def triage_report(req: Req, project_id: str, report_id: str):
     p = _project(req, project_id)
     r = service.child(req.session, ProjectCustomerReport, p, report_id)
     reports.triage(req.session, req.ctx, p, r, req.body, req.if_match)
+    return _detail(req, p)
+
+
+# --- customer documents (CPP-D04) ---------------------------------------------------------------------------------------
+@api.route("POST", "/projects/<project_id>/customer-documents", permission="project.publish_document",
+           body=S.CustomerDocumentIn, status=201, idempotent_create=True, requirement="CPP-D04",
+           summary="Show one scanned attachment of this project to the customer, as a customer document (explicit)")  # fmt: skip
+def publish_document(req: Req, project_id: str):
+    p = _project(req, project_id)
+    documents.publish(req.session, req.ctx, p, req.body)
+    return _detail(req, p, status=201)
+
+
+@api.route("POST", "/projects/<project_id>/customer-documents/<document_id>/withdraw",
+           permission="project.publish_document", body=S.WithdrawDocumentIn, if_match=True, requirement="CPP-D04",
+           summary="Stop showing a document to the customer (the record and its history stay)")  # fmt: skip
+def withdraw_document(req: Req, project_id: str, document_id: str):
+    p = _project(req, project_id)
+    d = service.child(req.session, ProjectCustomerDocument, p, document_id)
+    documents.withdraw(req.session, req.ctx, p, d, req.body.reason, req.if_match)
     return _detail(req, p)
 
 

@@ -31,7 +31,7 @@ from veda.kernel import clock, db
 from veda.modules.portal import vocab as PV
 
 from . import classification as C
-from . import delivery_policy, gates, handover, lifecycle, notices, quality, reports, work
+from . import delivery_policy, documents, gates, handover, lifecycle, notices, quality, reports, work
 from .models import Project, ProjectBlocker, ProjectMilestone, ProjectSnag
 
 BLOCKED = "BLOCKED"
@@ -59,7 +59,8 @@ READS = (("project_work_package", ("customer_label", "customer_visible", "status
          ("project_customer_report", ("report_no", "description", "area", "status", "decline_code", "response")),
          ("project_handover_package", ("package_no", "status", "content", "content_sha256", "acknowledged_on")),
          ("project_milestone", ("customer_label", "customer_promised_date", "status")),
-         ("project_qc_check", ("result",)))  # fmt: skip
+         ("project_qc_check", ("result",)),
+         ("project_customer_document", ("document_class", "title", "published_on")))  # fmt: skip
 
 
 def enabled() -> bool:
@@ -186,8 +187,10 @@ def _package(s: Session, p: Project) -> dict[str, Any] | None:
         "snags": {"fixed_and_verified": (c.get("snags") or {}).get("fixed_and_verified"),
                   "open_minor": [{"number": x.get("number"), "title": x.get("title")}
                                  for x in (c.get("snags") or {}).get("open_non_blocking") or []]},
-        "documents": [], "documents_note": "Handover documents are not shown in your portal yet. Your Veda Spaces "
-        "contact will give them to you.",
+        "documents": (handover_docs := [x for x in documents.customer_list(s, p)
+                                        if x["document_class"] in ("HANDOVER_PHOTO", "APPROVED_DRAWING")]),
+        "documents_note": None if handover_docs else "No handover documents have been shared in your portal yet. "
+        "Your Veda Spaces contact will give them to you.",
         "warranty_note": "Warranty is as set out in your accepted quotation.",
         "acknowledged_on": clock.to_rfc3339(pkg.acknowledged_on) if pkg.acknowledged_on else None,
         "can_acknowledge": bool(can_ack),
@@ -228,6 +231,7 @@ def project_view(s: Session, account_id: str, p: Project) -> dict[str, Any]:
         "can_report": p.status == "ACTIVE" and delivery_policy.customer_may("issue_reports"),
         "handover": handover_state,
         "package": _package(s, p),
+        "documents": documents.customer_list(s, p),
     }  # fmt: skip
 
 

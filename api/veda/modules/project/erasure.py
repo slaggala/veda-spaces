@@ -27,6 +27,7 @@ from .models import (
     Project,
     ProjectBlocker,
     ProjectChecklistItem,
+    ProjectCustomerDocument,
     ProjectCustomerReport,
     ProjectHandoverPackage,
     ProjectMember,
@@ -75,6 +76,7 @@ TEXT_FIELDS: list[tuple] = [
     ),
     (ProjectQcPoint, ("label", "withdrawn_reason")),
     (ProjectCustomerReport, ("description", "area", "response")),
+    (ProjectCustomerDocument, ("title", "withdrawn_reason")),
 ]
 
 

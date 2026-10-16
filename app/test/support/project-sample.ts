@@ -97,6 +97,7 @@ export function project(over: Partial<ProjectDetail> = {}): ProjectDetail {
     qc: { required_categories: ['DIMENSIONS_AND_ALIGNMENT'], categories: [{ category: 'DIMENSIONS_AND_ALIGNMENT', required: true, latest: null }],
       points: [], chains: [], history: [] },
     snags: [], work_packages: [], customer_reports: [], handover_packages: [],
+    customer_documents: { documents: [], can_publish: false, classes: [], options: [] },
     delivery_policy: { version: 'PEX-POLICY-0', status: 'UNDECIDED', decisions: { 'PEX-D01': { label: 'customer actions in the portal', decided: false },
       'PEX-D02': { label: 'the commercial condition for handover', decided: false } } },
     baseline: { full: true, verified: true, problems: [], current_seq: 1, open_variations: [], variations: [],

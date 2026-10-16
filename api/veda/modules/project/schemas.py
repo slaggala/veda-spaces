@@ -294,3 +294,19 @@ class ListQuery(Query):
 
 class EvaluateQuery(Query):
     to_stage: Stage | None = None
+
+
+class CustomerDocumentIn(Closed):
+    """CPP-D04: publish one attachment of the project's customer record to the customer, as one class."""
+
+    attachment_id: Id
+    document_class: Annotated[str, one_of(tuple(V.CUSTOMER_DOCUMENT_CLASSES)), enum(tuple(V.CUSTOMER_DOCUMENT_CLASSES))]
+    title: Annotated[str, text(120, min_len=3)]  # customer wording
+
+
+class WithdrawDocumentIn(Closed):
+    reason: Annotated[str, text(300, min_len=5)]
+
+
+class DocumentContentQuery(Query):
+    variant: Literal["thumb", "mobile", "desktop"] = "mobile"
