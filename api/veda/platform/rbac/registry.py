@@ -166,6 +166,7 @@ PLATFORM_MATRIX: dict[str, dict[str, str]] = {
         "SURVEYOR": "✓",
         "ESTIMATOR": "✓",
         "SALES_MANAGER": "✓",
+        "ACCOUNTANT": "✓",
     },  # fmt: skip
     "profile.update": {"FOUNDER": "✓", "ADMIN": "✓", "SALES": "✓"},
     "session.read": {"FOUNDER": "O", "ADMIN": "O", "SALES": "O"},
@@ -178,6 +179,7 @@ PLATFORM_MATRIX: dict[str, dict[str, str]] = {
         "SURVEYOR": "O",
         "ESTIMATOR": "O",
         "SALES_MANAGER": "O",
+        "ACCOUNTANT": "O",
     },  # fmt: skip
     "lookup.read": {
         "FOUNDER": "✓",
@@ -187,6 +189,7 @@ PLATFORM_MATRIX: dict[str, dict[str, str]] = {
         "SURVEYOR": "✓",
         "ESTIMATOR": "✓",
         "SALES_MANAGER": "✓",
+        "ACCOUNTANT": "✓",
     },  # fmt: skip
     "user.read": {"FOUNDER": "✓", "ADMIN": "✓"},
     "user.create": {"FOUNDER": "✓", "ADMIN": "✓"},
@@ -236,6 +239,15 @@ ROLES: tuple[RoleDef, ...] = (
         mfa_required=True,
         sort_order=70,
     ),  # fmt: skip
+    # PCM-D01 (0211_accountant_role): the operational financial role of Project Commercials. It records money and issues
+    # financial documents, so it signs in with MFA. It holds no project, quotation or customer-data code.
+    RoleDef(
+        "ACCOUNTANT",
+        "Accountant",
+        "Payment schedules, recorded payments, receipts, invoices and corrections",
+        mfa_required=True,
+        sort_order=80,
+    ),
 )
 
 

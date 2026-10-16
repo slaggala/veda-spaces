@@ -11,8 +11,9 @@ from the INVOICE sequence under its row lock, freezes the customer document with
 the instalment as requested (with the invoice's due date). One live invoice per instalment (a unique index). An issued
 invoice never changes; cancelling it records who, when and why, and the frozen document stays, shown as cancelled.
 
-Issuing needs owner decision PCM-D01 (the issuer particulars a customer invoice must carry): until it is recorded,
-invoices can be drafted and previewed but not issued (OWNER_DECISION_REQUIRED). Nothing else waits for it.
+Issuing needs Veda Spaces' invoice particulars (owner decision PCM-D01: they come from the reviewed business
+configuration, never from code or a person's entry). Until they are configured, invoices can be drafted and previewed
+but issuing fails closed (INVOICE_PARTICULARS_NOT_CONFIGURED, naming what is missing). Nothing else waits for them.
 """
 
 from __future__ import annotations
@@ -79,8 +80,11 @@ def issue(s: Session, ctx, account: CommercialAccount, inv: CommercialInvoice) -
                        extra={"status": inv.status})  # fmt: skip
     particulars = policy.decision("PCM-D01")
     if particulars is None:
-        raise ApiError(409, "OWNER_DECISION_REQUIRED", "Invoices cannot be issued until the invoice issuer particulars "
-                       "are recorded (owner decision PCM-D01).", extra={"decision": "PCM-D01"})  # fmt: skip
+        raise ApiError(409, "INVOICE_PARTICULARS_NOT_CONFIGURED", "This invoice cannot be issued yet: Veda Spaces' "
+                       "invoice particulars (the issuer's legal name and address, and the GSTIN and SAC code where they "
+                       "apply) are not configured. Ask the founder to have them recorded in the business configuration; "
+                       "you can keep preparing and previewing drafts meanwhile.",
+                       extra={"configuration": policy.PARTICULARS, "missing": list(policy.REQUIRED_PARTICULARS)})  # fmt: skip
     payments.require_sound(s, account)
     pos, line = _line(s, account, inv.instalment_id)
     if inv.due_on is not None and inv.due_on < pos.today:

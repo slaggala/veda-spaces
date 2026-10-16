@@ -166,7 +166,7 @@ describe('Project commercials (vs-commercials-page)', () => {
     expect(posted!.external_reference).to.equal('UTR-SYN-77');
   });
 
-  it('offers reversal only of someone else\'s payment, and invoices are not issuable before PCM-D01', async () => {
+  it('offers reversal only of someone else\'s payment, and invoices are not issuable until the particulars are configured (PCM-D01)', async () => {
     const calls: Call[] = [];
     serve({ 'GET /api/v1/commercials/a1': () => json(detail()) }, calls);
     const host = await fixture<HTMLDivElement>(html`<div></div>`);
@@ -186,6 +186,8 @@ describe('Project commercials (vs-commercials-page)', () => {
     await tab(root, 'Invoices');
     await waitUntil(() => root.querySelector('#h-invoices'), 'invoices');
     expect(text(root)).to.contain('PCM-D01');
+    expect(text(root)).to.contain('invoice particulars');
+    expect(text(root)).to.contain('are not configured');
     expect(button(root, 'Issue').disabled).to.equal(true);
   });
 

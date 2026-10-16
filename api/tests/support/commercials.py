@@ -2,9 +2,10 @@
 (``tests.support.portal.Portal``), the commercial team, and a SYNTHETIC PCM-D01 decision (refused outside tests).
 Nothing here is a real customer, amount, GSTIN or Veda Spaces decision.
 
-Personas: ``manager`` and ``second_manager`` (SALES_MANAGER: every ``commercials.*`` code), ``founder``, ``sales`` (no
-commercial code), ``accounts`` (an ESTIMATOR granted ``commercials.view`` and ``commercials.payment.record`` at OWN
-scope: the individually-granted persona).
+Personas (PCM-D01): ``accountant`` and ``second_accountant`` (ACCOUNTANT: every ``commercials.*`` code; the default
+actor of every commercial call), ``founder`` (every code), ``manager`` (SALES_MANAGER: ``commercials.view`` only; it
+still issues quotations and grants portal access), ``sales`` (no commercial code), ``accounts`` (an ESTIMATOR granted
+``commercials.view`` and ``commercials.payment.record`` at OWN scope: the individually-granted persona).
 """
 
 from __future__ import annotations
@@ -54,6 +55,8 @@ class Commercials(Portal):
     def __init__(self, api, factory):
         super().__init__(api, factory)
         self.second_manager = self.c.second_manager
+        self.accountant = factory.user("ACCOUNTANT", mfa=True)
+        self.second_accountant = factory.user("ACCOUNTANT", mfa=True)
         self.sales = self.c.sales
         self.accounts = factory.user("ESTIMATOR")
         for code in ("commercials.view", "commercials.payment.record"):
@@ -63,7 +66,7 @@ class Commercials(Portal):
         return self.token(user)
 
     def call(self, method: str, path: str, body=None, user=None, **kw):
-        return self.api.call(method, path, body, token=self.tok(user or self.manager), **kw)
+        return self.api.call(method, path, body, token=self.tok(user or self.accountant), **kw)
 
     # --- accounts ----------------------------------------------------------------------------------------------------
     def open(self, q: dict, user=None, status: int = 201):
@@ -110,7 +113,7 @@ class Commercials(Portal):
                 status: int = 200, note: str | None = None):  # fmt: skip
         cur = self.get(account)
         body = {"reason_code": reason_code, **({"note": note} if note else {})}
-        r = self.call("POST", f"{BASE}/{account['id']}/payments/{payment_id}/reverse", body, user or self.second_manager,
+        r = self.call("POST", f"{BASE}/{account['id']}/payments/{payment_id}/reverse", body, user or self.second_accountant,
                       if_match=cur["version"])  # fmt: skip
         assert r.status == status, r
         return r.data if status == 200 else r
