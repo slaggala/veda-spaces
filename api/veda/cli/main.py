@@ -63,6 +63,7 @@ HANDLER_MODULES = (
     "veda.modules.estimator.events",
     "veda.modules.portal.events",
     "veda.modules.project.events",
+    "veda.modules.project.notices",
 )
 
 
