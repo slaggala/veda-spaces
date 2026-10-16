@@ -202,3 +202,22 @@ output "customer_promise" {
     error_message = "VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED turns on only with an owner-APPROVED infra/config/customer-promise-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.cpa_record_problems)}."
   }
 }
+
+# Customer Project Portal (decision log 41): what is planned, and the gates that refuse the rest.
+output "customer_portal" {
+  description = "Customer Project Portal on staging: the customer-facing flag (false until an owner-approved, digest-bound, synthetic-content-only enablement record)."
+  value = {
+    enabled           = local.cpp_config.VEDA_CUSTOMER_PORTAL_ENABLED
+    enablement_record = local.cpp.enablement_record_sha256
+  }
+
+  precondition {
+    condition     = local.cpp.status == "DECIDED" && (local.cpp.enabled || local.cpp.enablement_record_sha256 == null)
+    error_message = "customer_portal must be DECIDED, and a digest is bound only together with enabled (rollback clears both)."
+  }
+
+  precondition {
+    condition     = !local.cpp.enabled || length(local.cpp_record_problems) == 0
+    error_message = "VEDA_CUSTOMER_PORTAL_ENABLED turns on only with an owner-APPROVED infra/config/customer-portal-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.cpp_record_problems)}."
+  }
+}

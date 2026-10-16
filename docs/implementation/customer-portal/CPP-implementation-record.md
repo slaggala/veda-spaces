@@ -87,7 +87,7 @@ fields only). Otherwise those three steps say "not yet available". The portal ne
 
 | Slot | Decision | While undecided |
 |---|---|---|
-| CPP-D01 | Staging enablement: an enablement record and the staging wiring for `VEDA_CUSTOMER_PORTAL_ENABLED` | Off; every route 404 |
+| CPP-D01 | Staging enablement: an enablement record and the staging wiring for `VEDA_CUSTOMER_PORTAL_ENABLED` | Off; every route 404. The owner instructed staging enablement (decision log 42). The wiring is in place (planned false) and the record is a DRAFT awaiting its evidence and the owner's approval. |
 | CPP-D02 | Whether customers may decide on a quotation in the portal, and the evidence that binds it | Decisions only on the CQX secure link |
 | CPP-D03 | Who may be given access (relationships) and by whom (the default grants above) | The CQX sharing roles; staff choose the relationship |
 | CPP-D04 | A customer-visible document class (drawings, design files, handover documents) | No attachment is shown |

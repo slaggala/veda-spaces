@@ -162,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config
+    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config, local.cpp_config
   )
 }
 
@@ -349,6 +349,38 @@ locals {
   )
   cpa_config = {
     VEDA_CUSTOMER_PROMISE_ADMIN_ENABLED = local.cpa.admin_enabled ? "true" : "false"
+  }
+}
+
+# Customer Project Portal (decision log 41, infra/config/staging-platform.json "customer_portal"). One customer-facing
+# flag, always planned and false by default, separate from every other flag. It turns on only with an owner-APPROVED,
+# staging-only, synthetic-content-only infra/config/customer-portal-enablement-record.json bound by its SHA-256 with every
+# evidence field filled. Output "customer_portal" refuses anything else; the API refuses the flag in production.
+locals {
+  cpp = try(local.platform.customer_portal, {
+    status = "DECIDED", enabled = false, enablement_record_sha256 = null
+  })
+  cpp_record_path = var.customer_portal_record_path != "" ? var.customer_portal_record_path : "${path.module}/../../../config/customer-portal-enablement-record.json"
+  cpp_record      = try(jsondecode(file(local.cpp_record_path)), {})
+  cpp_evidence    = try(local.cpp_record.evidence, {})
+  cpp_scope       = try(local.cpp_record.scope, {})
+  cpp_run_ids     = ["ci_run_id", "deploy_flags_off_run_id", "migration_verification_run_id", "infra_apply_run_id", "drift_run_id"]
+  # Every reason the record cannot enable the flag; empty means it can (read only when the flag is on).
+  cpp_record_problems = concat(
+    fileexists(local.cpp_record_path) ? [] : ["the record file is missing"],
+    try(local.cpp_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.cpp_record.environment, "") == "staging" && try(local.cpp_record.production, true) == false ? [] : ["the record is not staging-only"],
+    try(local.cpp_scope.protected_staging_only, false) == true && try(local.cpp_scope.synthetic_content_only, false) == true && try(local.cpp_scope.real_customers, true) == false ? [] : ["the record does not limit itself to protected staging with synthetic content"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.cpp_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.cpp_record.approved_by, "")) != "" && !strcontains(upper(try(local.cpp_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.cpp_record.approved_by, "") != try(local.cpp_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k in concat(["independent_review", "smoke_test", "production_isolation"], local.cpp_run_ids) :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.cpp_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.cpp_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in local.cpp_run_ids : "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.cpp_evidence[k], ""))))],
+    fileexists(local.cpp_record_path) && try(local.cpp.enablement_record_sha256, null) == (fileexists(local.cpp_record_path) ? filesha256(local.cpp_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  cpp_config = {
+    VEDA_CUSTOMER_PORTAL_ENABLED = local.cpp.enabled ? "true" : "false"
   }
 }
 
