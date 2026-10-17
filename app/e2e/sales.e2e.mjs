@@ -204,10 +204,14 @@ try {
     check('pipeline: focus lands on the heading, then the first filter', (await active(p)).id === 'page-title' && (await p.keyboard.press('Tab'), (await active(p)).text === 'Open'));
     const before = state.requests.filter((r) => r.path === '/api/v1/sales/pipeline').length;
     await pipe.locator('select[name=stage]').selectOption('SITE_MEASUREMENT');
-    await pipe.getByRole('link', { name: 'VS-L-SYN-0001' }).waitFor({ state: 'detached' });
-    const last = state.requests.filter((r) => r.path === '/api/v1/sales/pipeline').at(-1);
-    check('pipeline: a stage filter is re-requested from the server and the rows follow', state.requests.filter((r) => r.path === '/api/v1/sales/pipeline').length === before + 1
-      && last.query.stage === 'SITE_MEASUREMENT' && last.query.status === 'open' && (await pipe.getByRole('link', { name: /^VS-L-SYN-/ }).count()) === 1);
+    await pipe.getByRole('link', { name: 'VS-L-SYN-0001' }).waitFor({ state: 'detached' }); // the old rows clear while loading
+    await pipe.getByRole('link', { name: /^VS-L-SYN-/ }).first().waitFor(); // and the filtered rows arrive
+    const pipelineRequests = state.requests.filter((r) => r.path === '/api/v1/sales/pipeline');
+    const last = pipelineRequests.at(-1);
+    const rowsAfter = await pipe.getByRole('link', { name: /^VS-L-SYN-/ }).count();
+    check('pipeline: a stage filter is re-requested from the server and the rows follow', pipelineRequests.length === before + 1
+      && last.query.stage === 'SITE_MEASUREMENT' && last.query.status === 'open' && rowsAfter === 1,
+      `before=${before} after=${pipelineRequests.length} rows=${rowsAfter} queries=${JSON.stringify(pipelineRequests.map((r) => r.query))}`);
     await pipe.getByRole('button', { name: /^Site measurement/ }).first().click(); // the stage chip toggles the same filter off
     await pipe.getByRole('link', { name: 'VS-L-SYN-0001' }).waitFor();
     check('pipeline journey: no page errors', errors.length === 0, errors.join(' | '));
