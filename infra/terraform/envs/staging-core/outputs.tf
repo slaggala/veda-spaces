@@ -242,3 +242,22 @@ output "project_delivery" {
     error_message = "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED needs VEDA_PROJECT_LIFECYCLE_ENABLED and the customer portal on staging."
   }
 }
+
+# Sales & Customer Acquisition Experience (decision log 50): what is planned, and the gates that refuse the rest.
+output "sales_experience" {
+  description = "Sales & Customer Acquisition Experience on staging: the staff-facing flag (false until an owner-approved, digest-bound, synthetic-content-only enablement record)."
+  value = {
+    enabled           = local.sce_config.VEDA_SALES_EXPERIENCE_ENABLED
+    enablement_record = local.sce.enablement_record_sha256
+  }
+
+  precondition {
+    condition     = local.sce.status == "DECIDED" && (local.sce.enabled || local.sce.enablement_record_sha256 == null)
+    error_message = "sales_experience must be DECIDED, and a digest is bound only together with enabled (rollback clears both)."
+  }
+
+  precondition {
+    condition     = !local.sce.enabled || length(local.sce_record_problems) == 0
+    error_message = "VEDA_SALES_EXPERIENCE_ENABLED turns on only with an owner-APPROVED infra/config/sales-experience-enablement-record.json bound by its SHA-256 with every evidence field filled: ${join("; ", local.sce_record_problems)}."
+  }
+}

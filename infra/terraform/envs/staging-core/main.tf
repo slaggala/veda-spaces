@@ -162,7 +162,7 @@ locals {
     VEDA_PUBLIC_SITE_ORIGINS   = local.platform.ssm.public_site_origins
     # The staging site is behind Cloudflare Access, so its intake call carries credentials (production refuses it).
     VEDA_PUBLIC_SITE_CREDENTIALS = local.platform.ssm.public_site_credentials ? "true" : "false"
-    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config, local.cpp_config, local.pdl_config
+    }, local.estimator_config, local.media_config, local.attachment_config, local.commercial_config, local.cqx_config, local.cpa_config, local.cpp_config, local.pdl_config, local.sce_config
   )
 }
 
@@ -523,3 +523,34 @@ module "deploy" {
   data_device      = module.compute.data_device
 }
 
+# Sales & Customer Acquisition Experience (decision logs 48 and 50, infra/config/staging-platform.json "sales_experience"):
+# one staff-facing flag, always planned and false by default, separate from every other flag. It turns on only with an
+# owner-APPROVED, staging-only, synthetic-content-only infra/config/sales-experience-enablement-record.json bound by its
+# SHA-256 whose approver is not its author. The API refuses it in production.
+locals {
+  sce = try(local.platform.sales_experience, {
+    status = "DECIDED", enabled = false, enablement_record_sha256 = null
+  })
+  sce_record_path = var.sales_experience_record_path != "" ? var.sales_experience_record_path : "${path.module}/../../../config/sales-experience-enablement-record.json"
+  sce_record      = try(jsondecode(file(local.sce_record_path)), {})
+  sce_evidence    = try(local.sce_record.evidence, {})
+  sce_scope       = try(local.sce_record.scope, {})
+  sce_run_ids     = ["ci_run_id", "deploy_flags_off_run_id", "migration_verification_run_id", "infra_apply_run_id", "drift_run_id"]
+  # Every reason the record cannot enable the flag; empty means it can (read only when the flag is on).
+  sce_record_problems = concat(
+    fileexists(local.sce_record_path) ? [] : ["the record file is missing"],
+    try(local.sce_record.status, "") == "APPROVED" ? [] : ["the record is not APPROVED"],
+    try(local.sce_record.environment, "") == "staging" && try(local.sce_record.production, true) == false ? [] : ["the record is not staging-only"],
+    try(local.sce_scope.protected_staging_only, false) == true && try(local.sce_scope.synthetic_content_only, false) == true && try(local.sce_scope.real_customers, true) == false ? [] : ["the record does not limit itself to protected staging with synthetic content"],
+    can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(local.sce_record.approved_on, ""))) ? [] : ["approved_on is not a date"],
+    (trimspace(try(local.sce_record.approved_by, "")) != "" && !strcontains(upper(try(local.sce_record.approved_by, "")), "OWNER TO FILL") &&
+    try(local.sce_record.approved_by, "") != try(local.sce_record.author, "")) ? [] : ["approved_by is not an approver other than the author"],
+    [for k in concat(["independent_review", "smoke_test", "production_isolation"], local.sce_run_ids) :
+    "evidence.${k} is not filled" if trimspace(tostring(try(local.sce_evidence[k], ""))) == "" || strcontains(upper(tostring(try(local.sce_evidence[k], ""))), "OWNER TO FILL")],
+    [for k in local.sce_run_ids : "evidence.${k} is not a run id" if !can(regex("^[0-9]{6,}$", tostring(try(local.sce_evidence[k], ""))))],
+    fileexists(local.sce_record_path) && try(local.sce.enablement_record_sha256, null) == (fileexists(local.sce_record_path) ? filesha256(local.sce_record_path) : "-") ? [] : ["enablement_record_sha256 is not the record's SHA-256"],
+  )
+  sce_config = {
+    VEDA_SALES_EXPERIENCE_ENABLED = local.sce.enabled ? "true" : "false"
+  }
+}
