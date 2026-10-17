@@ -47,6 +47,17 @@ def _ip(prefix: str):
     return key
 
 
+def _all(prefix: str):
+    def key():
+        return f"{prefix}:all"
+
+    return key
+
+
+def _counted(response) -> bool:
+    return response.status_code == 204
+
+
 # --- staff -------------------------------------------------------------------------------------------------------------
 @api.route("GET", "/pipeline", permission="sales.pipeline.view", write=False, query=S.PipelineQuery, requirement="SCA-006",
            summary="The sales pipeline: live leads with their evidence-derived stage, facts, follow-up state and channel")  # fmt: skip
@@ -89,7 +100,8 @@ def get_demo(req: Req):
 # --- public (RBX-011) ---------------------------------------------------------------------------------------------------
 @public_api.route("POST", "/acquisition/events", rbx="RBX-011", auth="public", body=S.PublicEventIn, status=204,
                   max_body=1024, requirement="SCA-008",
-                  limits=[("60 per minute", _ip("acquisition-events")), ("600 per hour", _ip("acquisition-events"))],
+                  limits=[("60 per minute", _ip("acquisition-events")), ("600 per hour", _ip("acquisition-events")),
+                          ("6000 per hour", _all("acquisition-events"), {"deduct_when": _counted})],
                   summary="An anonymous funnel beacon: counted once per browser session, event and day (no person)")  # fmt: skip
 def public_event(req: Req):
     analytics.record(req.session, req.body)

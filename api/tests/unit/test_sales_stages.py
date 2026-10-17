@@ -72,6 +72,15 @@ def test_acceptance_and_decline_come_from_the_quotation_record_only():
     assert p.stage == "CUSTOMER_CONSIDERING" and "ACCEPTED_NOT_CLOSED" not in p.attention
 
 
+def test_a_logged_site_visit_is_measurement_evidence_and_withdrawn_consent_needs_no_follow_up():
+    p = derive(lead_status="CONTACTED", site_visit_logged=True)
+    assert (p.stage, p.basis, p.claimed_without_record) == ("SITE_MEASUREMENT", "ACTIVITY", False)
+    p = derive(lead_status="CONTACTED", consent_withdrawn=True, last_activity_on=NOW - timedelta(days=60))
+    assert p.attention == ()
+    p = derive(lead_status="CONTACTED", consent_withdrawn=True, assigned=False)
+    assert p.attention == ("UNASSIGNED",)
+
+
 def test_closed_leads_follow_the_crm_and_carry_no_attention():
     assert derive(lead_status="LOST") == stages.Progression("LOST", "LEAD_STATUS", ())
     won = derive(lead_status="WON", next_follow_up_on=NOW - timedelta(days=3))
@@ -110,7 +119,9 @@ def test_attention_is_deterministic_from_dates_and_records():
         ("WEBSITE", "google", "cpc", None, "PAID"),
         ("WEBSITE", "newsletter", "email", None, "OTHER"),
         ("WEBSITE", "instagram", "social", "https://l.instagram.com/", "SOCIAL"),
-        ("WEBSITE", None, "referral", "https://partner.example/", "REFERRAL"),
+        ("WEBSITE", None, "referral", "https://partner.example/", "OTHER"),  # a web referral is not a personal one
+        ("WEBSITE", None, "organic", None, "ORGANIC_SEARCH"),
+        ("WEBSITE", None, None, "https://api.whatsapp.com/send", "DIRECT"),
         ("WEBSITE", None, None, "https://www.google.co.in/search?q=x", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "bing.com", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "https://m.facebook.com/", "SOCIAL"),

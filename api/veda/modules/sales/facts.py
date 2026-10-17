@@ -25,6 +25,7 @@ from veda.modules.project.models import Project
 from .stages import Facts
 
 CONTACT_TYPES = ("CALL", "WHATSAPP", "EMAIL", "MEETING")
+LOGGED_TYPES = CONTACT_TYPES + ("SITE_VISIT",)
 ISSUED_STATUSES = ("ISSUED", "ACCEPTED", "REJECTED", "EXPIRED", "SUPERSEDED")
 REQUEST_WAITING_ON_STAFF = ("OPEN", "UNDER_REVIEW")
 REQUEST_WAITING_ON_CUSTOMER = ("NEEDS_CLARIFICATION",)
@@ -36,6 +37,8 @@ class LeadRecords:
 
     contacted_on: datetime | None = None
     meeting_on: datetime | None = None
+    site_visit_logged_on: datetime | None = None
+    issued_any: bool = False  # any base version ever issued (ISSUED, ACCEPTED, REJECTED, EXPIRED, SUPERSEDED)
     estimate: dict | None = None  # {reference, created_on, expires_on}
     property_ids: list[str] = field(default_factory=list)
     visits: list[dict] = field(default_factory=list)  # {id, status, scheduled_start_on, completed_on, property_id}
@@ -52,7 +55,7 @@ class LeadRecords:
 
     def facts(self, lead: Lead, *, now: datetime) -> Facts:
         q = self.quotation
-        issued = q is not None and q["status"] in ISSUED_STATUSES
+        issued = self.issued_any
         valid = (
             q is not None and q["status"] == "ISSUED" and (q["valid_until"] is None or q["valid_until"] >= now.date())
         )
@@ -63,6 +66,8 @@ class LeadRecords:
             last_activity_on=lead.last_activity_on,
             contacted_activity=self.contacted_on is not None,
             meeting_done=self.meeting_on is not None,
+            site_visit_logged=self.site_visit_logged_on is not None,
+            consent_withdrawn=lead.consent_withdrawn_on is not None,
             estimate_linked=self.estimate is not None,
             visits=sum(1 for v in self.visits if v["status"] != "CANCELLED"),
             visits_completed=sum(1 for v in self.visits if v["status"] == "COMPLETED"),
@@ -89,12 +94,16 @@ def gather(s: Session, lead_ids: list[str]) -> dict[str, LeadRecords]:
     rows = s.execute(
         sa.select(LeadActivity.lead_id, LeadActivity.activity_type, sa.func.min(LeadActivity.completed_on))
         .where(LeadActivity.lead_id.in_(ids), LeadActivity.activity_status == "COMPLETED",
-               LeadActivity.is_system_generated == sa.false(), LeadActivity.activity_type.in_(CONTACT_TYPES))
+               LeadActivity.is_system_generated == sa.false(), LeadActivity.activity_type.in_(LOGGED_TYPES))
         .group_by(LeadActivity.lead_id, LeadActivity.activity_type)
     ).all()  # fmt: skip
     for lead_id, kind, first in rows:
         r = out[lead_id]
         first = clock.ensure_utc(first) if first else None
+        if kind == "SITE_VISIT":
+            if first and (r.site_visit_logged_on is None or first < r.site_visit_logged_on):
+                r.site_visit_logged_on = first
+            continue
         if first and (r.contacted_on is None or first < r.contacted_on):
             r.contacted_on = first
         if kind == "MEETING" and first and (r.meeting_on is None or first < r.meeting_on):
@@ -133,9 +142,13 @@ def gather(s: Session, lead_ids: list[str]) -> dict[str, LeadRecords]:
         if q.status == "ACCEPTED":
             r.accepted = {"id": q.id, "quotation_number": q.quotation_number, "version_no": q.version_no,
                           "decided_on": clock.to_rfc3339(q.decided_on), "method": q.decision_method}  # fmt: skip
+        if q.status in ISSUED_STATUSES:
+            r.issued_any = True
         current = r.quotation
-        # The latest base version, except that an ISSUED or ACCEPTED version is never displaced by a SUPERSEDED one.
-        if current is None or q.status != "SUPERSEDED" or current["status"] == "SUPERSEDED":
+        # The base version that matters to the customer: an ACCEPTED one, else the ISSUED one, else the latest row
+        # (a newer version in preparation never displaces the issued one the customer holds).
+        rank = {"ACCEPTED": 3, "ISSUED": 2}.get(q.status, 1)
+        if current is None or rank >= {"ACCEPTED": 3, "ISSUED": 2}.get(current["status"], 1):
             r.quotation = {"id": q.id, "quotation_number": q.quotation_number, "version_no": q.version_no,
                            "status": q.status, "issued_on": clock.to_rfc3339(q.issued_on), "valid_until": q.valid_until,
                            "total_minor": q.total_minor, "property_id": q.property_id}  # fmt: skip

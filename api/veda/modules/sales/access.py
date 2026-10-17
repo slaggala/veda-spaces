@@ -25,4 +25,6 @@ def pipeline_predicate(ctx) -> sa.ColumnElement[bool]:
         who = own_predicate(ctx.user.id)
     else:
         who = sa.false()
-    return sa.and_(who, Lead.is_deleted == sa.false(), Lead.spam_status.not_in(HIDDEN_SPAM))
+    return sa.and_(
+        who, Lead.is_deleted == sa.false(), Lead.spam_status.not_in(HIDDEN_SPAM), Lead.anonymized_on.is_(None)
+    )

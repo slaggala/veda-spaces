@@ -51,8 +51,8 @@ def _first_time(d: str, day: date) -> bool:
         bucket = _seen.setdefault(today, set())
         if d in bucket:
             return False
-        if sum(len(b) for b in _seen.values()) >= SEEN_LIMIT:
-            _seen[min(_seen)].clear()
+        if sum(len(b) for b in _seen.values()) >= SEEN_LIMIT:  # a flood: forget yesterday first, else today
+            _seen[yesterday if yesterday in _seen and _seen[yesterday] else today].clear()
         bucket.add(d)
         return True
 

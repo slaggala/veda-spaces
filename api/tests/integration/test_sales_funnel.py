@@ -31,6 +31,8 @@ def test_untracked_beacons_are_reported_as_not_tracked_never_as_zero(api, manage
             "count": None,
             "basis": "CLIENT_EVENT",
             "tracking": "NOT_TRACKED",
+            "tracked_from": None,
+            "partial": False,
             "by_channel": None,
         }
     assert f["ratios"]["site_visit_to_enquiry"] == {"value": None, "reason": "NOT_TRACKED"}
@@ -50,7 +52,11 @@ def test_a_beacon_counts_once_per_session_event_and_day(api, manager):
     visits = f["site"]["site_visit"]
     assert visits["count"] == 2 and visits["tracking"] == "TRACKED"
     assert visits["by_channel"]["UNKNOWN"] == 1 and visits["by_channel"]["PAID"] == 1
-    assert f["site"]["estimator_started"]["count"] == 1
+    assert (
+        f["site"]["estimator_started"]["count"] == 1 and visits["partial"] is True and visits["tracked_from"]
+    )  # beacons began today, inside a 30-day period
+    # before beacons existed, a period reports NOT_TRACKED, never a tracked zero
+    assert _funnel(api, **{"from": "2020-01-01", "to": "2020-01-31"})["site"]["site_visit"]["tracking"] == "NOT_TRACKED"
     assert f["site"]["enquiry_started"]["tracking"] == "NOT_TRACKED"  # a tracked zero and an untracked event differ
     assert f["ratios"]["site_visit_to_enquiry"] == {"value": 0.0, "reason": None}
 
@@ -95,10 +101,14 @@ def test_the_lead_cohort_counts_facts_by_channel_and_lost_reason(api, factory, m
     a = factory.lead(api, sales.token, source_code="INSTAGRAM")
     b = factory.lead(api, sales.token, source_code="PHONE")
     c = factory.lead(api, sales.token, source_code="REFERRAL")
+    d = factory.lead(api, sales.token, source_code="WALK_IN")
     r = api.post(f"/api/v1/leads/{b['id']}/status", {"to_status": "CONTACTED"}, if_match=b["version"])
     assert r.status == 200, r
     r = api.post(f"/api/v1/leads/{c['id']}/status", {"to_status": "LOST", "lost_reason_code": "PROJECT_POSTPONED"},
                  if_match=c["version"])  # fmt: skip
+    assert r.status == 200, r
+    r = api.post(f"/api/v1/leads/{d['id']}/status", {"to_status": "LOST", "lost_reason_code": "DUPLICATE"},
+                 if_match=d["version"])  # fmt: skip
     assert r.status == 200, r
     r = factory.public_lead(
         api, attribution={"utm_source": "google", "utm_medium": "cpc", "landing_page": "/", "referrer_url": None}
@@ -107,19 +117,18 @@ def test_the_lead_cohort_counts_facts_by_channel_and_lost_reason(api, factory, m
     factory.login(api, manager)
     f = _funnel(api)
     steps = {s["code"]: s["count"] for s in f["leads"]}
-    assert steps["leads_created"] == 4 and steps["contacted"] == 1 and steps["lost"] == 1 and steps["won"] == 0
-    assert f["cohort"]["size"] == 4 and f["cohort"]["claimed_stages_without_record"] == 1  # b: CONTACTED by status only
+    assert steps["leads_created"] == 5 and steps["website_enquiries"] == 1 and steps["contacted"] == 1
+    assert steps["lost"] == 1 and steps["won"] == 0  # a DUPLICATE closure is not a lost opportunity
+    assert f["cohort"]["size"] == 5 and f["cohort"]["claimed_stages_without_record"] == 1  # b: CONTACTED by status only
+    assert f["definitions"]["lost"].startswith("Leads closed LOST")
     by = {x["code"]: x for x in f["by_channel"]}
-    assert (
-        by["SOCIAL"]["leads"] == 1
-        and by["DIRECT"]["leads"] == 1
-        and by["REFERRAL"]["lost"] == 1
-        and by["PAID"]["leads"] == 1
-    )
-    assert f["lost_reasons"] == [{"code": "PROJECT_POSTPONED", "label": "Project postponed", "count": 1}]
+    assert by["SOCIAL"]["leads"] == 1 and by["DIRECT"]["leads"] == 2 and by["REFERRAL"]["lost"] == 1
+    assert by["PAID"]["leads"] == 1 and by["DIRECT"]["lost"] == 0
+    assert f["lost_reasons"] == [{"code": "DUPLICATE", "label": "Duplicate", "count": 1},
+                                 {"code": "PROJECT_POSTPONED", "label": "Project postponed", "count": 1}]  # fmt: skip
     assert f["ratios"]["enquiry_to_won"] == {"value": 0.0, "reason": None}
     assert f["ratios"]["decided_to_won"] == {"value": 0.0, "reason": None}
-    assert {s["code"]: s["count"] for s in f["current_stages"]}["LOST"] == 1
+    assert {s["code"]: s["count"] for s in f["current_stages"]}["LOST"] == 2
     assert "name" not in keys(f) and a["name"] not in str(f)
     # the period bounds the cohort; a bad range is refused
     assert _funnel(api, **{"from": "2020-01-01", "to": "2020-01-31"})["cohort"]["size"] == 0

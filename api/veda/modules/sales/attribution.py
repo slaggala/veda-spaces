@@ -3,7 +3,8 @@
 The lead keeps its ``LEAD_SOURCE`` code and the UTM, landing-page and referrer values the public form captured. This
 module reduces them to one reporting channel without a marketing-attribution platform and without pretending to know
 more than the record says: a website lead with neither a campaign nor a referrer is UNKNOWN (a typed address, a
-messaging app, a bookmark and a blocked referrer all look the same), not "direct".
+messaging app, a bookmark and a blocked referrer all look the same), not "direct". A campaign medium of "referral"
+is a web referral (OTHER), never the business's REFERRAL channel, which means a person or an architect partner.
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ PAID_MEDIUMS = frozenset(
     {"cpc", "ppc", "paid", "paidsearch", "paid_search", "paidsocial", "paid_social", "display", "cpm", "ads"}
 )
 SOCIAL_MEDIUMS = frozenset({"social", "social_media", "organic_social"})
-REFERRAL_MEDIUMS = frozenset({"referral", "partner", "affiliate"})
-SOCIAL_HOSTS = ("instagram.com", "facebook.com", "fb.com", "youtube.com", "youtu.be", "linkedin.com", "pinterest.", "x.com", "twitter.com", "t.co", "threads.net", "whatsapp.com")  # fmt: skip
+ORGANIC_MEDIUMS = frozenset({"organic", "organic_search", "seo"})
+SOCIAL_HOSTS = ("instagram.com", "facebook.com", "fb.com", "youtube.com", "youtu.be", "linkedin.com", "pinterest.", "x.com", "twitter.com", "t.co", "threads.net")  # fmt: skip
 SEARCH_HOSTS = ("google.", "bing.com", "duckduckgo.com", "yahoo.", "search.brave.com", "ecosia.org", "yandex.")
 SOCIAL_SOURCES = frozenset({"instagram", "facebook", "ig", "fb", "youtube", "linkedin", "pinterest", "twitter", "x", "threads", "whatsapp"})  # fmt: skip
 SITE_HOSTS = ("vedaspaces.com",)
@@ -71,8 +72,8 @@ def channel(source_code: str | None, utm_source: str | None = None, utm_medium: 
         return Channel("PAID", "campaign medium")
     if medium in SOCIAL_MEDIUMS or source in SOCIAL_SOURCES:
         return Channel("SOCIAL", "campaign source")
-    if medium in REFERRAL_MEDIUMS:
-        return Channel("REFERRAL", "campaign medium")
+    if medium in ORGANIC_MEDIUMS:
+        return Channel("ORGANIC_SEARCH", "campaign medium")
     if medium or source:
         return Channel("OTHER", "campaign")
     host = _host(referrer)
@@ -80,6 +81,8 @@ def channel(source_code: str | None, utm_source: str | None = None, utm_medium: 
         return Channel("UNKNOWN", "no campaign, no referrer")
     if any(host == h.rstrip(".") or host.startswith(h) or host.endswith("." + h.rstrip(".")) or ("." + h) in ("." + host) for h in SEARCH_HOSTS):  # fmt: skip
         return Channel("ORGANIC_SEARCH", "search-engine referrer")
+    if host == "whatsapp.com" or host.endswith(".whatsapp.com"):
+        return Channel("DIRECT", "messaging referrer")  # a link sent in a chat, as a WHATSAPP source is
     if any(host == h.rstrip(".") or host.endswith("." + h.rstrip(".")) or host.startswith(h) for h in SOCIAL_HOSTS):
         return Channel("SOCIAL", "social referrer")
     return Channel("OTHER", "external referrer")

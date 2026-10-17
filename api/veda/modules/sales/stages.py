@@ -26,6 +26,8 @@ class Facts:
     last_activity_on: datetime | None = None
     contacted_activity: bool = False  # a COMPLETED, staff-logged CALL, WHATSAPP, EMAIL or MEETING
     meeting_done: bool = False  # a COMPLETED, staff-logged MEETING (how a consultation is logged today)
+    site_visit_logged: bool = False  # a COMPLETED, staff-logged SITE_VISIT activity (a visit outside MTQ)
+    consent_withdrawn: bool = False  # the lead asked not to be contacted: no follow-up is expected
     estimate_linked: bool = False
     visits: int = 0  # measurement visits not cancelled
     visits_completed: int = 0
@@ -75,6 +77,8 @@ def derive(f: Facts, *, now: datetime) -> Progression:
         candidates.append(("CONTACTED", "ACTIVITY"))
     if f.meeting_done:
         candidates.append(("CONSULTATION", "ACTIVITY"))
+    if f.site_visit_logged:
+        candidates.append(("SITE_MEASUREMENT", "ACTIVITY"))
     if f.visits:
         candidates.append(("SITE_MEASUREMENT", "MEASUREMENT_RECORD"))
     if f.quotations and not f.quotation_issued:
@@ -96,7 +100,7 @@ def _attention(f: Facts, stage: str, now: datetime) -> tuple[str, ...]:
         return ()
     if f.next_follow_up_on is not None and f.next_follow_up_on < now:
         out.append("FOLLOW_UP_OVERDUE")
-    if f.next_follow_up_on is None:
+    if f.next_follow_up_on is None and not f.consent_withdrawn:  # a do-not-contact lead needs no follow-up
         out.append("NO_FOLLOW_UP_PLANNED")
         if f.last_activity_on is None or f.last_activity_on < now - timedelta(days=QUIET_DAYS):
             out.append("QUIET")

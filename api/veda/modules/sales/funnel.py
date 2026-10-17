@@ -36,6 +36,7 @@ COHORT_LIMIT = 5000
 # Funnel steps in order, with the fact that proves a lead reached them.
 LEAD_STEPS: tuple[tuple[str, str], ...] = (
     ("leads_created", "Enquiries received"),
+    ("website_enquiries", "Enquiries from the website"),
     ("leads_with_estimate", "Enquiries with a budgetary estimate"),
     ("contacted", "Contacted"),
     ("consultation", "Consultation held"),
@@ -48,25 +49,41 @@ LEAD_STEPS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _reached(f: stages.Facts, p: stages.Progression) -> set[str]:
+NOT_A_LOSS = ("DUPLICATE", "SPAM")  # a lead closed as a duplicate or spam was never an opportunity lost
+DEFINITIONS = {
+    "cohort": "Leads created in the period (spam, deleted and anonymised leads excluded), judged by their records as of "
+              "today; a step counts a lead once it has reached it, however long after its creation.",
+    "contacted": "A staff-logged call, message or meeting, or any later record; else an open CRM status past NEW "
+                 "(a staff claim, counted in claimed_stages_without_record when nothing proves it).",
+    "measurement": "A measurement visit, a staff-logged site visit, a quotation (which needs a measurement set), or "
+                   "the CRM status SITE_VISIT.",
+    "quotation_issued": "An issued base quotation, or the CRM statuses QUOTATION_SENT and NEGOTIATION.",
+    "quotation_opened": "A proposal link opened (link possession, never a decision).",
+    "accepted": "A base quotation accepted through the quotation module, by any recorded method.",
+    "lost": "Leads closed LOST for a reason other than DUPLICATE or SPAM.",
+    "site": "Browser beacons, counted once per browser session, event and business day; indicative only: a restart "
+            "or a flood can count a session again, and the lead dashboard's figures use closed-in-period cohorts.",
+    "ratios": "Cohort ratios between tracked counts only; null with the reason otherwise. site_visit_to_enquiry uses "
+              "website enquiries; estimator_start_to_estimate compares estimate rows (several per visitor are possible; "
+              "unlinked rows are purged after 90 days) with session-deduplicated starts.",
+}  # fmt: skip
+
+
+def _reached(f: stages.Facts, status: str, lost_reason: str | None, website: bool) -> set[str]:
     """The funnel steps a lead has reached: from records wherever they exist, else from the open CRM statuses, which
     say where the lead was put by staff. A closed status (WON, LOST) says nothing about the steps in between: those
     count only when a record proves them."""
-    status = f.lead_status
     out = {"leads_created"}
+    if website:
+        out.add("website_enquiries")
     if f.estimate_linked:
         out.add("leads_with_estimate")
-    if (
-        f.contacted_activity
-        or f.meeting_done
-        or f.visits
-        or f.quotations
-        or status in ("CONTACTED", "SITE_VISIT", "QUOTATION_SENT", "NEGOTIATION")
-    ):
+    if (f.contacted_activity or f.meeting_done or f.site_visit_logged or f.visits or f.quotations
+            or status in ("CONTACTED", "SITE_VISIT", "QUOTATION_SENT", "NEGOTIATION")):  # fmt: skip
         out.add("contacted")
     if f.meeting_done:
         out.add("consultation")
-    if f.visits or f.quotations or status in ("SITE_VISIT", "QUOTATION_SENT", "NEGOTIATION"):
+    if f.visits or f.site_visit_logged or f.quotations or status == "SITE_VISIT":
         out.add("measurement")
     if f.quotation_issued or f.quotation_accepted or status in ("QUOTATION_SENT", "NEGOTIATION"):
         out.add("quotation_issued")
@@ -76,7 +93,7 @@ def _reached(f: stages.Facts, p: stages.Progression) -> set[str]:
         out.add("accepted")
     if status == "WON":
         out.add("won")
-    if status == "LOST":
+    if status == "LOST" and lost_reason not in NOT_A_LOSS:
         out.add("lost")
     return out
 
@@ -93,7 +110,9 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
     start, end = clock.local_day_range_utc(day_from, day_to, BUSINESS_TZ)
 
     # --- client beacons (counts per event and channel; NOT_TRACKED when the site never sent that event) ---
-    ever = {e for (e,) in s.execute(sa.select(AcquisitionEventDaily.event).distinct()).all()}
+    first_seen = {e: d for e, d in s.execute(
+        sa.select(AcquisitionEventDaily.event, sa.func.min(AcquisitionEventDaily.day)).group_by(AcquisitionEventDaily.event)
+    ).all()}  # fmt: skip
     period_rows = s.execute(
         sa.select(AcquisitionEventDaily.event, AcquisitionEventDaily.channel, sa.func.sum(AcquisitionEventDaily.count))
         .where(AcquisitionEventDaily.day >= day_from.isoformat(), AcquisitionEventDaily.day <= day_to.isoformat())
@@ -107,9 +126,11 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
             if e == event:
                 per_channel[ch] = per_channel.get(ch, 0) + int(n)
                 total += int(n)
-        tracked = event in ever
+        since = first_seen.get(event)
+        tracked = since is not None and since <= day_to.isoformat()
         beacons[event] = {"count": total if tracked else None, "basis": "CLIENT_EVENT",
-                          "tracking": "TRACKED" if tracked else "NOT_TRACKED",
+                          "tracking": "TRACKED" if tracked else "NOT_TRACKED", "tracked_from": since,
+                          "partial": bool(tracked and since is not None and since > day_from.isoformat()),
                           "by_channel": per_channel if tracked else None}  # fmt: skip
 
     estimates = s.execute(
@@ -136,16 +157,29 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
     stage_counts = {code: 0 for code in STAGES}
     claimed = 0
     lost_reasons: dict[str, dict] = {}
+    refs: dict[str | None, dict | None] = {}
+    quiet = 0
+
+    def ref(value_id: str | None) -> dict | None:
+        if value_id not in refs:
+            refs[value_id] = lookups.value_ref(s, value_id)
+        return refs[value_id]
+
     for lead in leads:
         f = records[lead.id].facts(lead, now=now)
         p = stages.derive(f, now=now)
-        reached = _reached(f, p)
+        if "QUIET" in p.attention:
+            quiet += 1
+        source = ref(lead.source_id)
+        reason = ref(lead.lost_reason_id) if lead.status == "LOST" else None
+        reached = _reached(
+            f, lead.status, reason["code"] if reason else None, bool(source and source["code"] == "WEBSITE")
+        )
         for code in reached:
             steps[code] += 1
         stage_counts[p.stage] += 1
         if p.claimed_without_record:
             claimed += 1
-        source = lookups.value_ref(s, lead.source_id)
         ch = attribution.channel(
             source["code"] if source else None, lead.utm_source, lead.utm_medium, lead.referrer_url
         ).code
@@ -162,7 +196,6 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
         if "won" in reached:
             src["won"] += 1
         if lead.status == "LOST":
-            reason = lookups.value_ref(s, lead.lost_reason_id)
             rkey = reason["code"] if reason else "NOT_PROVIDED"
             entry = lost_reasons.setdefault(
                 rkey, {"code": rkey, "label": reason["label"] if reason else "Not provided", "count": 0}
@@ -185,7 +218,9 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
         "current_stages": [{"code": code, "label": STAGE_LABELS[code], "count": stage_counts[code]} for code in STAGES],
         "ratios": {
             "estimator_start_to_estimate": _ratio(estimates, starts["count"], True, starts["tracking"] == "TRACKED"),
-            "site_visit_to_enquiry": _ratio(leads_n, visits["count"], True, visits["tracking"] == "TRACKED"),
+            "site_visit_to_enquiry": _ratio(
+                steps["website_enquiries"], visits["count"], True, visits["tracking"] == "TRACKED"
+            ),
             "enquiry_to_quotation": _ratio(steps["quotation_issued"], leads_n, True, True),
             "quotation_to_acceptance": _ratio(steps["accepted"], steps["quotation_issued"], True, True),
             "enquiry_to_won": _ratio(steps["won"], leads_n, True, True),
@@ -194,11 +229,6 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
         "by_channel": [{"code": c, "label": CHANNEL_LABELS[c], **by_channel[c]} for c in CHANNELS],
         "by_source": sorted(by_source.values(), key=lambda x: (-x["leads"], x["code"])),
         "lost_reasons": sorted(lost_reasons.values(), key=lambda x: (-x["count"], x["code"])),
-        "stalled": {
-            "quiet": sum(
-                1
-                for lead in leads
-                if "QUIET" in stages.derive(records[lead.id].facts(lead, now=now), now=now).attention
-            )
-        },
+        "stalled": {"quiet": quiet},
+        "definitions": DEFINITIONS,
     }
