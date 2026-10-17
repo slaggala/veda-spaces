@@ -48,7 +48,7 @@ export class VsSalesProgressionCard extends SessionElement {
     this.row = null;
     this.off = false;
     this.problem = null;
-    if (this.me && !this.can('sales.pipeline.view')) { this.off = true; return; }
+    if (this.me && (!this.can('sales.pipeline.view') || this.me.features?.sales_experience !== true)) { this.off = true; return; }
     try {
       this.row = (await salesApi.progression(this.leadId)).data;
     } catch (e) {

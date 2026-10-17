@@ -26,7 +26,13 @@
   const params = new URLSearchParams(window.location.search);
   const host = (url) => { try { return url ? new URL(url).hostname.replace(/^www\./, '') : ''; } catch { return ''; } };
   const ownHost = window.location.hostname.replace(/^www\./, '');
-  if (!store.get('veda-first-touch')) {
+  const hasCampaign = ['utm_source', 'utm_medium', 'utm_campaign'].some((k) => params.get(k));
+  let stored = null;
+  try { stored = JSON.parse(store.get('veda-first-touch') || 'null'); } catch { stored = null; }
+  const storedCampaign = Boolean(stored && (stored.utm_source || stored.utm_medium || stored.utm_campaign));
+  // The first page of the session is the touch that counts; it is replaced only when it carried no campaign and a
+  // later page does (a visitor who came back through a campaign link), never field by field.
+  if (!stored || (hasCampaign && !storedCampaign)) {
     const referrerHost = host(document.referrer);
     store.set('veda-first-touch', JSON.stringify({
       utm_source: params.get('utm_source') || null, utm_medium: params.get('utm_medium') || null,

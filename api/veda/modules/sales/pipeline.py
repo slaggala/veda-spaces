@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from veda.kernel import clock
 from veda.kernel.errors import field_error, validation_failed
 from veda.modules.crm.leads.models import Lead
+from veda.modules.crm.leads.repository import search_condition
 from veda.platform.identity.models import User
 from veda.platform.lookups import service as lookups
 
@@ -147,7 +148,7 @@ def listing(s: Session, ctx, query, *, now: datetime) -> tuple[list[dict], dict]
     elif query.owner:
         stmt = stmt.where(Lead.assigned_to == query.owner)
     if query.q:
-        stmt = stmt.where(Lead.search_text.contains(query.q.casefold()))
+        stmt = stmt.where(search_condition(query.q))  # the CRM's own tokenised, escaped search
     leads = list(s.execute(stmt).scalars())
     truncated = len(leads) > SCAN_LIMIT
     leads = leads[:SCAN_LIMIT]

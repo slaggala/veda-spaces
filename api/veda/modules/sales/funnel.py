@@ -142,6 +142,7 @@ def report(s: Session, day_from: date, day_to: date, *, now: datetime) -> dict:
     leads = list(s.execute(
         sa.select(Lead)
         .where(Lead.is_deleted == sa.false(), Lead.spam_status.not_in(HIDDEN_SPAM),
+               Lead.anonymized_on.is_(None),
                Lead.created_on >= start, Lead.created_on < end)
         .order_by(Lead.created_on)
         .limit(COHORT_LIMIT + 1)

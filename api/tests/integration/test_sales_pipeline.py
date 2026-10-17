@@ -226,6 +226,9 @@ def test_filters_and_meta(api, factory):
     assert [x["lead"]["id"] for x in r.data] == [a["id"]]
     r = api.get(f"{SALES}/pipeline?attention=UNASSIGNED")
     assert {x["lead"]["id"] for x in r.data} == set()  # OWN creators are auto-assigned
+    r = api.get(f"{SALES}/pipeline?q=anita+reddy")  # the CRM's tokenised search: every word must match
+    assert {x["lead"]["id"] for x in r.data} == {a["id"], b["id"]}
+    assert api.get(f"{SALES}/pipeline?q=%25").status == 422 and ok(api.get(f"{SALES}/pipeline?q=zzzz")) == []
     assert api.get(f"{SALES}/pipeline?stage=NOPE").status == 422
     assert api.get(f"{SALES}/pipeline?bogus=1").status == 422
     assert set(r.json["meta"]) >= {"page", "limit", "total", "scanned", "truncated", "stage_counts"}

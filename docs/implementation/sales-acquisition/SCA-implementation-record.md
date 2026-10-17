@@ -67,4 +67,19 @@ full API suite on both engines, the app checks, the browser journeys and axe, an
 | Public hardening (17, 18) | Aggregate limit added; Global Privacy Control honoured; staging credentials sent |
 | Path, coupling, performance, a11y, copy (19-24) | Path corrected; coupling and performance addressed (lookup cache, one derivation per lead); mobile and a11y stated and tested; the existing "within one working day" sentence kept; booking-never-closes-the-lead stated |
 
-**Implementation review:** recorded below when complete.
+**Implementation review (fresh context, after implementation):** 12 findings, no merge blocker. Disposition:
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | HIGH | The day's first beacon per (event, channel) created an audited row carrying the request's IP address and user agent, against the privacy notice | Fixed: the row is written as the web-intake actor without IP or user agent; a test asserts no audit row of the table carries either |
+| 2 | MEDIUM | Pipeline search bypassed the CRM's tokenised, escaped search | Fixed: the pipeline reuses the lead repository's search condition; tests for multi-word and wildcard input |
+| 3 | MEDIUM | Counter insert and increment could race across worker threads and answer 409 | Fixed: the database step runs under the module lock with a savepoint and one retry; the session digest is remembered only after a successful flush |
+| 4 | LOW | Privacy notice silent on the catalog estimator's own staging counts | Fixed: a sentence in section 3 |
+| 5 | LOW | A `whatsapp` campaign source was SOCIAL while a WhatsApp referrer or source is DIRECT | Fixed, with a test case |
+| 6 | LOW | First-touch attribution was merged field by field with the current page | Fixed: the stored touch is used whole and replaced only when it had no campaign and a later page has one |
+| 7 | LOW | Funnel definition said anonymised leads are excluded; the query did not | Fixed in the query |
+| 8 | LOW | The lead page requested the progression where the feature is off | Fixed: the card stays silent unless the session's feature map says the feature is on |
+| 9 | LOW | The demo page nests the proposal's and portal's own h1 inside its own | Not changed: the embedded views are the real customer screens rendered unchanged; recorded as a known limitation |
+| 10 | LOW | Two journey sentences described portal-only or staging-only capabilities as universal | Fixed: snags are raised through your contact; payments are invoiced and receipted |
+| 11 | INFO | "No obligation" and the unnamed retention period are owner legal items | Recorded under SCA-OD-01 |
+| 12 | INFO | Memory bound of the de-duplication set | Commented in code |

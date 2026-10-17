@@ -62,6 +62,7 @@ def test_a_beacon_counts_once_per_session_event_and_day(api, manager):
 
 
 def test_the_public_beacon_is_closed_bounded_and_anonymous(api, app):
+    api.client.environ_base["HTTP_USER_AGENT"] = "ScratchBrowser/1.0"
     assert beacon(api, "page_scrolled").status == 422
     assert beacon(api, "site_visit", "short").status == 422
     assert beacon(api, "site_visit", "session-cccccccccccccccc", referrer_host="not a host!").status == 422
@@ -78,6 +79,15 @@ def test_the_public_beacon_is_closed_bounded_and_anonymous(api, app):
     with db.unit_of_work(write=False) as s:
         rows = {(r.event, r.channel, r.count) for r in s.query(AcquisitionEventDaily)}
     assert rows == {("journey_viewed", "ORGANIC_SEARCH", 1)}
+    # the day's first beacon creates the row: its audit row names the web-intake actor and no visitor data
+    from veda.platform.audit.models import AuditLog
+
+    with db.unit_of_work(write=False) as s:
+        audit = [
+            (a.ip_address, a.user_agent)
+            for a in s.query(AuditLog).filter(AuditLog.entity_type == "acquisition_event_daily")
+        ]
+    assert audit and all(ip is None and ua is None for ip, ua in audit), audit
     assert {c.name for c in AcquisitionEventDaily.__table__.columns} <= {
         "id",
         "created_on",

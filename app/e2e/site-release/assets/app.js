@@ -196,12 +196,14 @@ contactForm.addEventListener('submit', async (event) => {
     property_type_code: data.get('property') || null,
     budget_range_code: data.get('budget') || null,
     message: (data.get('brief') || '').trim() || null,
-    attribution: {
-      utm_source: first?.utm_source ?? params.get('utm_source'), utm_medium: first?.utm_medium ?? params.get('utm_medium'),
-      utm_campaign: first?.utm_campaign ?? params.get('utm_campaign'), utm_term: first?.utm_term ?? params.get('utm_term'),
-      utm_content: first?.utm_content ?? params.get('utm_content'),
-      landing_page: first?.landing_page ?? (window.location.pathname + window.location.search),
-      referrer_url: first ? first.referrer_url : (document.referrer || null),
+    attribution: first ? {
+      utm_source: first.utm_source, utm_medium: first.utm_medium, utm_campaign: first.utm_campaign, utm_term: first.utm_term,
+      utm_content: first.utm_content, landing_page: first.landing_page, referrer_url: first.referrer_url,
+      form_page: `${window.location.pathname}#contact`,
+    } : {
+      utm_source: params.get('utm_source'), utm_medium: params.get('utm_medium'), utm_campaign: params.get('utm_campaign'),
+      utm_term: params.get('utm_term'), utm_content: params.get('utm_content'),
+      landing_page: window.location.pathname + window.location.search, referrer_url: document.referrer || null,
       form_page: `${window.location.pathname}#contact`,
     },
     turnstile_token: token,

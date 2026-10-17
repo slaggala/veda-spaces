@@ -122,6 +122,7 @@ def test_attention_is_deterministic_from_dates_and_records():
         ("WEBSITE", None, "referral", "https://partner.example/", "OTHER"),  # a web referral is not a personal one
         ("WEBSITE", None, "organic", None, "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "https://api.whatsapp.com/send", "DIRECT"),
+        ("WEBSITE", "whatsapp", None, None, "DIRECT"),
         ("WEBSITE", None, None, "https://www.google.co.in/search?q=x", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "bing.com", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "https://m.facebook.com/", "SOCIAL"),

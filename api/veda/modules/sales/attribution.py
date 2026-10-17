@@ -31,7 +31,7 @@ SOCIAL_MEDIUMS = frozenset({"social", "social_media", "organic_social"})
 ORGANIC_MEDIUMS = frozenset({"organic", "organic_search", "seo"})
 SOCIAL_HOSTS = ("instagram.com", "facebook.com", "fb.com", "youtube.com", "youtu.be", "linkedin.com", "pinterest.", "x.com", "twitter.com", "t.co", "threads.net")  # fmt: skip
 SEARCH_HOSTS = ("google.", "bing.com", "duckduckgo.com", "yahoo.", "search.brave.com", "ecosia.org", "yandex.")
-SOCIAL_SOURCES = frozenset({"instagram", "facebook", "ig", "fb", "youtube", "linkedin", "pinterest", "twitter", "x", "threads", "whatsapp"})  # fmt: skip
+SOCIAL_SOURCES = frozenset({"instagram", "facebook", "ig", "fb", "youtube", "linkedin", "pinterest", "twitter", "x", "threads"})  # fmt: skip
 SITE_HOSTS = ("vedaspaces.com",)
 
 
@@ -68,6 +68,8 @@ def channel(source_code: str | None, utm_source: str | None = None, utm_medium: 
         return Channel("UNKNOWN", f"source {code}")
     medium = (utm_medium or "").strip().lower()
     source = (utm_source or "").strip().lower()
+    if source == "whatsapp":
+        return Channel("DIRECT", "campaign source")  # a link sent in a chat, as a WHATSAPP source is
     if medium in PAID_MEDIUMS:
         return Channel("PAID", "campaign medium")
     if medium in SOCIAL_MEDIUMS or source in SOCIAL_SOURCES:
