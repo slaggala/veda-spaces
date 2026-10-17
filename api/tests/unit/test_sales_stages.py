@@ -123,6 +123,8 @@ def test_attention_is_deterministic_from_dates_and_records():
         ("WEBSITE", None, "organic", None, "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "https://api.whatsapp.com/send", "DIRECT"),
         ("WEBSITE", "whatsapp", None, None, "DIRECT"),
+        ("WEBSITE", "whatsapp", "social", None, "DIRECT"),
+        ("WEBSITE", "whatsapp", "cpc", None, "PAID"),  # a paid tag the business put on the link outranks the chat
         ("WEBSITE", None, None, "https://www.google.co.in/search?q=x", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "bing.com", "ORGANIC_SEARCH"),
         ("WEBSITE", None, None, "https://m.facebook.com/", "SOCIAL"),

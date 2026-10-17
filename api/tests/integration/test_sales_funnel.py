@@ -170,3 +170,40 @@ def test_the_demo_is_synthetic_read_only_and_holds_no_customer_data(api, factory
         leads = s.query(Lead).count()
         demo_audit = s.query(AuditLog).filter(AuditLog.entity_type.like("%demo%")).count()
     assert leads == 1 and demo_audit == 0  # nothing created, nothing audited
+
+
+def test_a_beacon_that_loses_the_insert_race_adds_to_the_row_and_leaves_the_transaction_usable(api, app, monkeypatch):
+    """Two worker threads can count the same (day, event, channel) at once: the loser's insert hits the unique index
+    inside a savepoint, the retry reads the winner's row and adds to it, and the request still commits with exactly
+    one CREATE audit row (the increment touches only the excluded ``count``)."""
+    import sqlalchemy as sa
+
+    from veda.kernel import db
+    from veda.kernel.context import actor, web_intake_context
+    from veda.modules.sales import analytics
+    from veda.modules.sales.models import AcquisitionEventDaily
+    from veda.platform.audit.models import AuditLog
+
+    day = analytics.business_day()
+    with db.unit_of_work(write=True) as s, actor(web_intake_context("r", None, None)):
+        s.add(AcquisitionEventDaily(day=day.isoformat(), event="site_visit", channel="UNKNOWN", count=5))
+        s.flush()
+        real_execute = s.execute
+        calls = {"n": 0}
+
+        class NotVisibleYet:
+            def scalar_one_or_none(self):
+                return None
+
+        def execute(stmt, *a, **k):
+            calls["n"] += 1
+            return NotVisibleYet() if calls["n"] == 1 else real_execute(stmt, *a, **k)  # the winner's row is not seen
+
+        monkeypatch.setattr(s, "execute", execute)
+        analytics._count(s, day, "site_visit", "UNKNOWN")
+        monkeypatch.undo()
+        assert calls["n"] == 2
+    with db.unit_of_work(write=False) as s:
+        rows = [(r.count, r.version) for r in s.execute(sa.select(AcquisitionEventDaily)).scalars()]
+        audits = [a.action for a in s.query(AuditLog).filter(AuditLog.entity_type == "acquisition_event_daily")]
+    assert rows == [(6, 2)] and audits == ["CREATE"]

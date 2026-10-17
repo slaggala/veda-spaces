@@ -68,10 +68,10 @@ def channel(source_code: str | None, utm_source: str | None = None, utm_medium: 
         return Channel("UNKNOWN", f"source {code}")
     medium = (utm_medium or "").strip().lower()
     source = (utm_source or "").strip().lower()
-    if source == "whatsapp":
-        return Channel("DIRECT", "campaign source")  # a link sent in a chat, as a WHATSAPP source is
     if medium in PAID_MEDIUMS:
         return Channel("PAID", "campaign medium")
+    if source == "whatsapp":
+        return Channel("DIRECT", "campaign source")  # a link sent in a chat, as a WHATSAPP source is; a paid tag wins
     if medium in SOCIAL_MEDIUMS or source in SOCIAL_SOURCES:
         return Channel("SOCIAL", "campaign source")
     if medium in ORGANIC_MEDIUMS:
