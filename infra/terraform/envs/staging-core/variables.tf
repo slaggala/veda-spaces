@@ -93,6 +93,12 @@ variable "customer_portal_record_path" {
   default     = ""
 }
 
+variable "sales_experience_record_path" {
+  description = "The Sales & Customer Acquisition Experience staging enablement record (tests only; empty means infra/config/sales-experience-enablement-record.json)."
+  type        = string
+  default     = ""
+}
+
 variable "project_delivery_record_path" {
   description = "The project-delivery staging enablement record (tests only; empty means infra/config/project-delivery-enablement-record.json)."
   type        = string
