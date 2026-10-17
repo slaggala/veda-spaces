@@ -1,0 +1,14 @@
+/* "What happens after you choose Veda Spaces" (SCA). Builds on policy.css; mobile first; no inline styles. */
+.journey-steps { margin: 0; padding-left: 1.4rem; display: grid; gap: .45rem; columns: auto; }
+.journey-steps a { display: inline-block; min-height: 24px; }
+.journey-page .policy-section h2 span { display: inline-block; min-width: 2rem; color: #8c5b37; font-family: var(--sans); font-size: .9rem; font-weight: 600; letter-spacing: .08em; }
+.journey-ask { margin: .9rem 0 0; padding: .9rem 1rem; background: #fbf9f5; border-left: 3px solid #8c5b37; font-size: .95rem; }
+.journey-tag { display: inline-block; margin-left: .4rem; padding: .15rem .6rem; border: 1px solid #8c5b37; border-radius: 999px; font-family: var(--sans); font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #8c5b37 !important; vertical-align: middle; }
+.journey-portal { background: #fbf9f5; padding-left: 1.2rem; padding-right: 1.2rem; }
+.journey-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin: 1.2rem 0 0; }
+.journey-actions .button { min-height: 44px; display: inline-flex; align-items: center; }
+.journey-actions .button-ghost { border: 1px solid var(--ink); color: var(--ink); }
+.journey-actions [hidden] { display: none !important; }
+@media (min-width: 720px) {
+  .journey-steps { grid-template-columns: 1fr 1fr; }
+}

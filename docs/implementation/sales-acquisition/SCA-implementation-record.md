@@ -1,0 +1,70 @@
+# Sales & Customer Acquisition Experience: implementation record
+
+**Instruction:** `VEDA-SPACES-SALES-AND-CUSTOMER-ACQUISITION-EXPERIENCE` (owner, 2026-10-17). **Decision log:** 48.
+**Branch:** `feature/sales-customer-acquisition` (one PR). **Design:** [SCA-design.md](SCA-design.md). **Owner items:**
+[SCA-owner-decisions.md](SCA-owner-decisions.md).
+
+## 1. What was built
+
+| Area | Change | Where |
+|---|---|---|
+| API module | `veda.modules.sales`: vocabulary, channel attribution, stage derivation (pure), fact gathering (batched reads of lead, estimator, MTQ, quotation, proposal and project records), pipeline projection, funnel report, beacon recorder, synthetic demo, routes | `api/veda/modules/sales/` |
+| Flag | `VEDA_SALES_EXPERIENCE_ENABLED` (`sales_experience_enabled`): off everywhere, 404 before authentication on `/api/v1/sales/*` and `/api/v1/public/acquisition/*`, refused in production, exposed to the workspace as feature `sales_experience` | `api/veda/config.py`, `platform/identity/service.py` |
+| RBAC | `sales.pipeline.view` (FOUNDER, ADMIN, SALES_MANAGER: ALL; SALES: OWN), `sales.funnel.view` (FOUNDER, ADMIN, SALES_MANAGER), `sales.demo.view` (FOUNDER, ADMIN, SALES, SALES_MANAGER); ACCOUNTANT, DESIGNER, SURVEYOR, ESTIMATOR hold none | `modules/sales/permissions.py`, `platform/rbac/registry.py` |
+| Public route | `POST /api/v1/public/acquisition/events` (RBX-011): closed 1 KiB schema, per-IP and aggregate limits, 204, no data | `modules/sales/routes.py`, `app.py` RBX register, `docs/architecture/06-rbac.md` |
+| Migration | `0215_sales_acquisition`: `acquisition_event_daily`; the three codes; lookup `LOST_REASON/NOT_PROVIDED` | `api/migrations/versions/` |
+| Staff app | `/sales` pipeline, `/sales/funnel`, `/sales/demo`; a sales-progression card on the lead page with links to the property and visits; navigation behind the feature | `app/src/modules/sales/`, `core/router/routes.ts`, `core/authz/permissions.ts` |
+| Site | `/journey` ("What happens after you choose Veda Spaces"), `/privacy` (the notice the consent box cites), first-touch attribution and the anonymous beacon (`assets/acquisition.js`), the home page's calls to action and "after you choose" panel, links from the estimator's thank-you screens, sitemap entries | `app/e2e/site-release/` (the production `dist/` is untouched) |
+| Build and local stack | `STAGING_SALES_EXPERIENCE=on` fills the beacon meta; the estimator meta on the home and journey pages follows `STAGING_ESTIMATOR`; the local static server fills them in flag-on mode | `app/scripts/staging-build.mjs`, `app/e2e/static-server.mjs`, `app/e2e/run-all.sh` |
+
+Not changed: the estimator engine and pages' scripts, the quotation and acceptance rules, the lead's status machine,
+the customer portal and proposal behaviour, every production artefact.
+
+## 2. Reuse map
+
+```
+PUBLIC WEBSITE  (site-release: calls to action, journey, privacy, beacons)
+      ↓
+ESTIMATOR       (ADR-012 engine and pages, unchanged; linked only where on)
+      ↓
+LEAD / CRM      (public intake, lead, activities, follow-ups, lost reasons; unchanged; +NOT_PROVIDED)
+      ↓
+CONSULTATION    (a logged MEETING activity)            ┐
+MEASUREMENT     (MTQ measurement visits)               │ read by the sales module,
+QUOTATION       (MTQ quotation issue, decision)        │ never written
+VIEWED / ASKED  (CQX proposal links and requests)      │
+ACCEPTED        (B4 decision, CQX acceptance evidence) ┘
+      ↓
+WON / LOST      (the lead's own status endpoint, offered from the pipeline)
+      ↓
+DELIVERY        (project, commercials, execution, portal, warranty: shown to prospects on /journey and in the demo)
+```
+
+## 3. Evidence
+
+Filled at the end of the workstream (see the PR description for the final run references): targeted suites, the
+full API suite on both engines, the app checks, the browser journeys and axe, and the CI run of the PR.
+
+## 4. Independent review and disposition
+
+**Design review (before implementation):** 24 findings, none a blocker. Disposition:
+
+| Finding | Disposition |
+|---|---|
+| Dedupe table vs in-memory (1, 2) | In-memory de-duplication kept and documented with its weaknesses; counts reported as CLIENT_EVENT, indicative |
+| Beacon duplicates the catalog analytics (3) | The browser reuses the estimator's `veda-client` session token; the catalog's release-scoped analytics stay separate (different scope) |
+| Dashboard vs funnel conversion (4) | Funnel ratios are cohort ratios with definitions in the response; the difference is documented |
+| Misleading ratios (5) | Site-visit ratio uses website enquiries; estimator ratio defined as able to exceed one; DUPLICATE and SPAM closures excluded from lost; tracking starts at the first beacon day, with `partial` |
+| Latest-version selection (6) | `quotation_issued` is true for any base version ever issued; the current quotation is the accepted one, else the issued one, else the latest |
+| Status-vs-record gaps (7) | REQUESTED and NO_SHOW visits stated; a staff-logged SITE_VISIT activity counts as measurement evidence (basis ACTIVITY); the funnel no longer infers a measurement from QUOTATION_SENT |
+| `consultation_requested` (8) | Dropped; the MEETING reading documented as broader than ADR-012 D2 |
+| Consent withdrawal and erasure (9) | No follow-up facts on a do-not-contact lead; anonymised leads excluded from the pipeline |
+| Scan limit (10) | Documented; owner and search filters in SQL |
+| Attribution mis-mappings (11) | `referral` medium → OTHER, `organic` medium → ORGANIC_SEARCH, WhatsApp referrer → DIRECT; first-touch attribution kept per session and sent with beacons and the home-page enquiry |
+| Demo rendering (12) | The portal project page's content is driven by the supplied view; proposal rendered in preview mode; money as labelled text |
+| Governance records (13, 14, 15) | Decision log 48, RBX-011 row, pinned public-route list, feature maps, governance and build tests, reference-content guard (pages link to the contact section) all updated |
+| Pricing leakage (16) | None found; confirmed by tests |
+| Public hardening (17, 18) | Aggregate limit added; Global Privacy Control honoured; staging credentials sent |
+| Path, coupling, performance, a11y, copy (19-24) | Path corrected; coupling and performance addressed (lookup cache, one derivation per lead); mobile and a11y stated and tested; the existing "within one working day" sentence kept; booking-never-closes-the-lead stated |
+
+**Implementation review:** recorded below when complete.

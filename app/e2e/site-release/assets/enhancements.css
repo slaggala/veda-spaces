@@ -168,3 +168,13 @@ footer nav a, footer p a { transition: color .2s ease; }
 /* [hidden] must win over the base .contact-form { display: grid } (IR-17). */
 .contact-form[hidden], .form-panel[hidden], .contact-form [hidden] { display: none !important; }
 .contact-form .form-note { color: #5d574f; }
+
+/* Sales & Customer Acquisition (SCA): the estimator call to action shows only when the deployment offers it; the
+   "after you choose" panel sits between the process and the point of view. */
+.hero-actions [hidden], .journey-actions [hidden] { display: none !important; }
+.after { padding: clamp(3rem, 8vw, 6rem) 4vw; background: var(--cream); }
+.after-panel { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 1.1rem; justify-items: center; }
+.after-panel h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.08; margin: 0; }
+.after-panel p { margin: 0; max-width: 60ch; }
+.after-panel .button { min-height: 44px; display: inline-flex; align-items: center; }
+.contact-copy .text-link { display: inline-block; margin: 0 0 .6rem; min-height: 24px; }

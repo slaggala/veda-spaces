@@ -139,11 +139,11 @@ def test_the_lead_cohort_counts_facts_by_channel_and_lost_reason(api, factory, m
 def test_the_demo_is_synthetic_read_only_and_holds_no_customer_data(api, factory, manager):
     sales = factory.user("SALES")
     factory.login(api, sales)
-    lead = factory.lead(api, sales.token, name="Only Realname", phone="+919000011111")
+    lead = factory.lead(api, sales.token, name="Only Realname")
     before = ok(api.get(f"{SALES}/demo"))
     text = str(before)
     assert before["demo"] is True and before["label"].startswith("DEMO")
-    assert "Only Realname" not in text and lead["lead_number"] not in text and "9000011111" not in text
+    assert "Only Realname" not in text and lead["lead_number"] not in text and lead["phone"][-8:] not in text
     assert before["portal"]["demo"] is True and before["proposal"]["demo"] is True
     assert before["portal"]["contact"]["phone"].startswith("+00") and before["portal"]["contact"]["email"].endswith(
         "@example.com"

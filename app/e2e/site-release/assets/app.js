@@ -184,6 +184,8 @@ contactForm.addEventListener('submit', async (event) => {
   }
   idempotencyKey = idempotencyKey || newKey();
   const params = new URLSearchParams(window.location.search);
+  // First-touch attribution (SCA): where this browser session arrived from, kept by acquisition.js; else this page.
+  const first = (typeof window.vedaFirstTouch === 'function' && window.vedaFirstTouch()) || null;
   const body = {
     name: data.get('name').trim(),
     phone: data.get('phone').trim(),
@@ -195,9 +197,11 @@ contactForm.addEventListener('submit', async (event) => {
     budget_range_code: data.get('budget') || null,
     message: (data.get('brief') || '').trim() || null,
     attribution: {
-      utm_source: params.get('utm_source'), utm_medium: params.get('utm_medium'), utm_campaign: params.get('utm_campaign'),
-      utm_term: params.get('utm_term'), utm_content: params.get('utm_content'),
-      landing_page: window.location.pathname + window.location.search, referrer_url: document.referrer || null,
+      utm_source: first?.utm_source ?? params.get('utm_source'), utm_medium: first?.utm_medium ?? params.get('utm_medium'),
+      utm_campaign: first?.utm_campaign ?? params.get('utm_campaign'), utm_term: first?.utm_term ?? params.get('utm_term'),
+      utm_content: first?.utm_content ?? params.get('utm_content'),
+      landing_page: first?.landing_page ?? (window.location.pathname + window.location.search),
+      referrer_url: first ? first.referrer_url : (document.referrer || null),
       form_page: `${window.location.pathname}#contact`,
     },
     turnstile_token: token,

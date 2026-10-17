@@ -63,9 +63,10 @@ http.createServer((req, res) => {
       .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
       .replace('<meta name="veda-estimator-version" content="">', '<meta name="veda-estimator-version" content="v3">'));
   }
-  if (apiOrigin && (file.endsWith('index.html') || file.endsWith('estimate.html'))) {
+  if (apiOrigin && (file.endsWith('index.html') || file.endsWith('estimate.html') || file.endsWith('journey.html'))) {
     body = Buffer.from(body.toString()
       .replace('<meta name="veda-api-base" content="">', `<meta name="veda-api-base" content="${apiOrigin}">`)
+      .replace('<meta name="veda-acquisition-analytics" content="">', '<meta name="veda-acquisition-analytics" content="on">')
       .replace('<meta name="veda-turnstile-sitekey" content="">', '<meta name="veda-turnstile-sitekey" content="1x00000000000000000000AA">')
       .replace('<meta name="veda-estimator" content="">', '<meta name="veda-estimator" content="on">')
       .replace('<meta name="veda-estimator-home-sizes" content="">', `<meta name="veda-estimator-home-sizes" content="${HOME_SIZES}">`)
