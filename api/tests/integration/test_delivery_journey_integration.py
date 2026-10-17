@@ -47,10 +47,11 @@ class Journey(Service):
 def journey(api, factory):
     from veda.modules.project import delivery_policy
 
+    t = Journey(api, factory)  # built first: a failing setup leaves no lifecycle policy behind
     install(no_four_eyes())
-    t = Journey(api, factory)
     install_policy()
     delivery_policy.install_for_tests(None)  # the committed owner decisions, not the harness's synthetic NONE
+    assert delivery_policy.decision("PEX-D02").condition == "COMMERCIAL_OBLIGATION_SATISFIED"
     yield t
     install(None)
     policy(None)
