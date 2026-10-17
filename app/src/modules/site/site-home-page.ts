@@ -36,7 +36,9 @@ export class VsSiteHomePage extends SessionElement {
   constructor() {
     super();
     this.visits = []; this.properties = []; this.templates = null; this.problem = null; this.disabled = false; this.busy = false;
-    this.form = { lead_id: '', property_type_code: 'APARTMENT', template_key: 'APARTMENT_3BHK', include: [], city: '', built_up: '' };
+    // ?lead=<id> (from a lead's sales progression card) prefills the lead; anything that is not an id is ignored.
+    const lead = new URLSearchParams(window.location.search).get('lead') ?? '';
+    this.form = { lead_id: /^[A-Za-z0-9_-]{1,64}$/.test(lead) ? lead : '', property_type_code: 'APARTMENT', template_key: 'APARTMENT_3BHK', include: [], city: '', built_up: '' };
   }
 
   override connectedCallback() {

@@ -56,7 +56,7 @@ export interface NavItem {
 }
 
 export type FeatureCode = 'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_promise_admin' | 'project_lifecycle' | 'customer_portal'
-  | 'project_commercials' | 'warranty_service';
+  | 'project_commercials' | 'warranty_service' | 'sales_experience';
 export type FeatureMap = Partial<Record<FeatureCode, boolean>>;
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -70,6 +70,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/service', label: 'Service', icon: 'list', group: 'main', anyOf: ['warranty.service.view'], feature: 'warranty_service', mobile: true },
   // Commercial › Payments (PCM): behind VEDA_PROJECT_COMMERCIALS_ENABLED and commercials.view.
   { path: '/commercials', label: 'Payments', icon: 'list', group: 'main', anyOf: ['commercials.view'], feature: 'project_commercials' },
+  // Sales & Customer Acquisition (SCA): behind VEDA_SALES_EXPERIENCE_ENABLED and each page's own view permission.
+  { path: '/sales', label: 'Sales pipeline', icon: 'users', group: 'main', anyOf: ['sales.pipeline.view'], feature: 'sales_experience', mobile: true },
+  { path: '/sales/funnel', label: 'Funnel', icon: 'list', group: 'main', anyOf: ['sales.funnel.view'], feature: 'sales_experience' },
+  { path: '/sales/demo', label: 'Customer journey demo', icon: 'star', group: 'main', anyOf: ['sales.demo.view'], feature: 'sales_experience' },
   { path: '/approvals', label: 'Approvals', icon: 'check', group: 'admin', anyOf: ['user.mfa.reset', 'user.email.change', 'user.founder.manage'] },
   { path: '/admin/users', label: 'Users', icon: 'user', group: 'admin', anyOf: ['user.read'] },
   { path: '/admin/roles', label: 'Roles', icon: 'shield', group: 'admin', anyOf: ['role.read'] },

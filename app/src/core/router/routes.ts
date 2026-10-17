@@ -28,6 +28,7 @@ const projectModule = () => import('../../modules/project/index.js');
 const portalModule = () => import('../../modules/portal/index.js');
 const commercialsModule = () => import('../../modules/commercials/index.js');
 const serviceModule = () => import('../../modules/service/index.js');
+const salesModule = () => import('../../modules/sales/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -92,11 +93,15 @@ export const ROUTES: Def[] = [
   // After handover › Service (every API call answers 404 while VEDA_WARRANTY_SERVICE_ENABLED is off).
   { path: '/service', title: 'Service', component: 'vs-service-list-page', access: 'auth', chrome: true, anyOf: ['warranty.service.view'], load: serviceModule },
   { path: '/service/:id', title: 'Service request', component: 'vs-service-request-page', access: 'auth', chrome: true, anyOf: ['warranty.service.view'], load: serviceModule },
+  // Sales & Customer Acquisition (every API call answers 404 while VEDA_SALES_EXPERIENCE_ENABLED is off).
+  { path: '/sales', title: 'Sales pipeline', component: 'vs-sales-pipeline-page', access: 'auth', chrome: true, anyOf: ['sales.pipeline.view'], load: salesModule },
+  { path: '/sales/funnel', title: 'Funnel', component: 'vs-sales-funnel-page', access: 'auth', chrome: true, anyOf: ['sales.funnel.view'], load: salesModule },
+  { path: '/sales/demo', title: 'Customer journey demo', component: 'vs-sales-demo-page', access: 'auth', chrome: true, anyOf: ['sales.demo.view'], load: salesModule },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 
 /** Landing pages for "/" in order of preference, each with its route's own permissions (the dashboard first). */
-const LANDING_ORDER = ['/', '/site', '/leads', '/follow-ups', '/approvals', '/catalog', '/audit', '/admin/users', '/admin/roles', '/profile'];
+const LANDING_ORDER = ['/', '/site', '/sales', '/leads', '/follow-ups', '/approvals', '/catalog', '/audit', '/admin/users', '/admin/roles', '/profile'];
 export const LANDINGS: Landing[] = LANDING_ORDER.map((path) => {
   const def = ROUTES.find((d) => d.path === path);
   if (!def) throw new Error(`landing page ${path} is not a route`);
