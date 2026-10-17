@@ -32,6 +32,8 @@ async function totp(secret) {
 // The enquiry form and its result panels are in scope for the site gate (AX-08, LEAD-019). Contrast problems in the
 // pre-existing marketing sections outside them are reported and tracked (OI-11), not gated.
 const FORM_SCOPE = ['#contact-form', '#form-success', '#form-fallback'];
+// SCA: what this change added to the home page; the rest of the page keeps its OI-11 tracked findings.
+const SCA_SCOPE = ['.hero-actions', '#after', '.contact-copy .text-link'];
 async function scan(page, name, { gateScope = null } = {}) {
   await page.addScriptTag({ content: AXE });
   const nodes = await page.evaluate(async (scope) => {
@@ -180,7 +182,20 @@ await site.goto(`${OFF}/no-such-page`);
 ok.push(await scan(site, '404 page'));
 await site.goto(`${OFF}/warranty`);
 ok.push(await scan(site, 'warranty policy page'));
+// SCA: the journey and privacy pages, and the home page with the estimator call to action shown (intake on).
+await site.goto(`${OFF}/journey`);
+ok.push(await scan(site, 'journey page'));
+await site.goto(`${OFF}/privacy`);
+ok.push(await scan(site, 'privacy notice'));
+await site.goto(`${SITE}/`);
+ok.push(await scan(site, 'home page with the estimator call to action', { gateScope: SCA_SCOPE }));
 await site.setViewportSize({ width: 360, height: 800 });
+ok.push(await scan(site, 'home page (360 px)', { gateScope: SCA_SCOPE }));
+await site.goto(`${OFF}/journey`);
+ok.push(await scan(site, 'journey page (360 px)'));
+await site.goto(`${OFF}/privacy`);
+ok.push(await scan(site, 'privacy notice (360 px)'));
+await site.goto(`${OFF}/warranty`);
 ok.push(await scan(site, 'warranty policy page (360 px)'));
 await browser.close();
 console.log(`${ok.filter(Boolean).length}/${ok.length} screens without serious/critical violations`);

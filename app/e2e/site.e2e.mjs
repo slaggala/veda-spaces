@@ -105,10 +105,10 @@ let popups = 0;
 page.on('request', (r) => { if (r.url().includes('/api/')) apiCalls += 1; });
 page.on('popup', () => { popups += 1; });
 const offState = await page.evaluate(() => ({
-  consentShown: !document.querySelector('.consent').hidden, privacyLinks: [...document.querySelectorAll('a[href="/privacy"]')]
+  consentShown: !document.querySelector('.consent').hidden, privacyLinks: [...document.querySelectorAll('.consent a[href="/privacy"]')]
     .filter((a) => a.offsetParent !== null).length, turnstile: !!document.querySelector('script[src*="turnstile"]'),
 }));
-check('flag off hides consent, verification and the Privacy Notice link', !offState.consentShown && offState.privacyLinks === 0 &&
+check('flag off hides consent, verification and the consent block\'s Privacy Notice link', !offState.consentShown && offState.privacyLinks === 0 &&
   !offState.turnstile, JSON.stringify(offState));
 const offErrors = () => page.evaluate(() => ({
   invalid: [...document.querySelectorAll('#contact-form [aria-invalid="true"]')].map((el) => el.id).sort(),
@@ -190,7 +190,7 @@ check('flag off: no API call in any case', apiCalls === 0, `${apiCalls} calls`);
 await collectCsp();
 
 // 6b. 404 page under the production headers (RR-01): HTTP 404, styled by /assets/404.css, no inline code, 0 CSP violations.
-for (const path of ['/no-such-page', '/404.html', '/privacy']) {
+for (const path of ['/no-such-page', '/404.html', '/no-such-page-2']) {
   const res = await page.goto(`${OFF}${path}`);
   const info = await page.evaluate(() => ({
     bg: getComputedStyle(document.body).backgroundColor, h1: document.querySelector('h1')?.textContent,
@@ -205,6 +205,79 @@ for (const path of ['/no-such-page', '/404.html', '/privacy']) {
     `status=${res.status()} ${JSON.stringify(info)}`);
   await collectCsp();
 }
+// 7. Sales & Customer Acquisition (SCA): the journey and privacy pages under the production headers, the estimator call
+//    to action only where the estimator is on, and the anonymous beacon: once per session, never when the flag is off.
+for (const [base, mode] of [[OFF, 'off'], [ON, 'on']]) {
+  for (const path of ['/journey', '/privacy']) {
+    const res = await page.goto(`${base}${path}`);
+    const info = await page.evaluate(() => ({
+      h1: document.querySelector('h1')?.textContent || '', inline: document.querySelectorAll('style, script:not([src]), [style]').length,
+      handlers: [...document.querySelectorAll('*')].filter((el) => [...el.attributes].some((a) => a.name.startsWith('on'))).length,
+      contactLinks: document.querySelectorAll('a[href="/#contact"]').length, tel: document.querySelectorAll('a[href^="tel:"]').length,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }));
+    check(`${path} (${mode}): HTTP 200, no inline code, links to contact, no number repeated`, res.status() === 200 && info.inline === 0
+      && info.handlers === 0 && info.contactLinks >= 1 && info.tel === 0 && info.overflow <= 1 && /Veda Spaces|Privacy/.test(info.h1), JSON.stringify(info));
+    await collectCsp();
+  }
+}
+await page.goto(`${OFF}/`);
+const offCta = await page.evaluate(() => [...document.querySelectorAll('[data-estimator-only]')].map((a) => a.hidden));
+check('flag off: no estimator call to action on the home page', offCta.length >= 1 && offCta.every(Boolean), JSON.stringify(offCta));
+await page.goto(`${OFF}/journey`);
+check('flag off: no estimator call to action on the journey page', await page.evaluate(() => document.querySelector('[data-estimator-only]').hidden));
+const beacons = [];
+await page.route('**/api/v1/public/acquisition/events', (route) => { beacons.push(route.request().postDataJSON()); route.fulfill({ status: 204, body: '' }); });
+await page.goto(`${OFF}/?visit=beacon-off`);
+await page.fill('#cf-name', 'A');
+await page.waitForTimeout(300);
+check('flag off: no beacon is sent', beacons.length === 0, `${beacons.length} sent`);
+// A fresh context: sessionStorage starts empty, so the first-touch attribution and the once-per-session rule are observable.
+const beaconCtx = await browser.newContext();
+await beaconCtx.route('https://challenges.cloudflare.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: TURNSTILE_STUB }));
+await beaconCtx.route('**/api/v1/public/acquisition/events', (route) => { beacons.push(route.request().postDataJSON()); route.fulfill({ status: 204, body: '' }); });
+const bp = await beaconCtx.newPage();
+await bp.goto(`${ON}/?utm_source=newsletter&utm_medium=email`, { referer: 'https://search.example/results' });
+await bp.waitForTimeout(400);
+const onCta = await bp.evaluate(() => [...document.querySelectorAll('[data-estimator-only]')].map((a) => ({ hidden: a.hidden, href: a.getAttribute('href') })));
+check('flag on: the estimator call to action appears and points at /estimate', onCta.some((a) => !a.hidden && a.href === '/estimate'), JSON.stringify(onCta));
+check('home visit sends one site_visit beacon with first-touch attribution', beacons.length === 1 && beacons[0].event === 'site_visit'
+  && beacons[0].utm_source === 'newsletter' && beacons[0].utm_medium === 'email' && beacons[0].referrer_host === 'search.example'
+  && /^[A-Za-z0-9_-]{16,64}$/.test(beacons[0].client) && Object.keys(beacons[0]).sort().join() === 'client,event,referrer_host,utm_medium,utm_source', JSON.stringify(beacons));
+await bp.reload();
+await bp.waitForTimeout(400);
+check('a reload sends no second site_visit', beacons.length === 1, `${beacons.length} sent`);
+await bp.fill('#cf-name', 'A');
+await bp.waitForTimeout(300);
+await bp.goto(`${ON}/journey`);
+await bp.waitForTimeout(400);
+check('enquiry start and journey view each send one beacon, with the same session token', beacons.length === 3
+  && beacons.map((b) => b.event).join() === 'site_visit,enquiry_started,journey_viewed' && new Set(beacons.map((b) => b.client)).size === 1, beacons.map((b) => b.event).join());
+await bp.goto(`${ON}/?visit=first-touch#contact`);
+await bp.waitForFunction(() => window.turnstile !== undefined);
+let leadBody = null;
+await bp.route('**/api/v1/public/leads', (route) => { leadBody = route.request().postDataJSON(); route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { reference: 'K7M3-Q9TD', message: 'ok' } }) }); });
+await bp.fill('#cf-name', 'Meera Iyer');
+await bp.fill('#cf-phone', '+00 0000 000000'); // a synthetic number: the API is answered by the route above
+await bp.check('#cf-consent');
+await bp.locator('#contact-form button[type="submit"]').click();
+await bp.locator('#form-success').waitFor({ state: 'visible' });
+check('the enquiry carries the session\'s first-touch attribution, not the current page', leadBody?.attribution?.utm_source === 'newsletter'
+  && leadBody?.attribution?.landing_page === '/?utm_source=newsletter&utm_medium=email' && leadBody?.attribution?.referrer_url === 'https://search.example/results'
+  && leadBody?.attribution?.form_page === '/#contact', JSON.stringify(leadBody?.attribution));
+// Global Privacy Control: nothing is sent.
+const gpcCtx = await browser.newContext();
+await gpcCtx.addInitScript(() => { Object.defineProperty(navigator, 'globalPrivacyControl', { get: () => true }); });
+const gpcBeacons = [];
+await gpcCtx.route('**/api/v1/public/acquisition/events', (route) => { gpcBeacons.push(1); route.fulfill({ status: 204, body: '' }); });
+const gp = await gpcCtx.newPage();
+await gp.goto(`${ON}/journey`);
+await gp.waitForTimeout(400);
+check('Global Privacy Control: no beacon is sent', gpcBeacons.length === 0, `${gpcBeacons.length} sent`);
+await gpcCtx.close();
+await beaconCtx.close();
+await page.unroute('**/api/v1/public/acquisition/events');
+
 await page.setViewportSize({ width: 360, height: 800 });
 await page.goto(`${OFF}/no-such-page`);
 const nf = await page.evaluate(() => ({

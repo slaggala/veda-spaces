@@ -93,6 +93,11 @@ export class VsPortalProjectPage extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
+    this.start();
+  }
+
+  /** Load the customer's property. A view rendered from a model it is given (the sales demo) replaces this with nothing. */
+  protected start() {
     if (!sessionToken()) {
       this.load = 'signed-out';
       return;
@@ -100,7 +105,7 @@ export class VsPortalProjectPage extends LitElement {
     void this.fetch();
   }
 
-  private async fetch() {
+  protected async fetch() {
     this.load = 'loading';
     try {
       this.view = (await portalApi.property(this.routeId)).data;
@@ -123,12 +128,12 @@ export class VsPortalProjectPage extends LitElement {
     try { this.view = (await portalApi.property(this.routeId)).data; } catch { /* the next full load shows the problem */ }
   }
 
-  private entries(items: Entry[] | null | undefined, empty: string) {
+  protected entries(items: Entry[] | null | undefined, empty: string) {
     if (!items?.length) return html`<p class="muted">${empty}</p>`;
     return html`<ul class="bullets">${items.map((i) => html`<li>${i.label ? html`<span class="strong">${i.label}:</span> ` : nothing}${i.text}${i.duration ? html` <span class="muted">(${i.duration})</span>` : nothing}</li>`)}</ul>`;
   }
 
-  private contact(c: Contact | null) {
+  protected contact(c: Contact | null) {
     if (!c?.name) {
       return html`<p class="muted">Contact details are not available in your portal yet. Please use the contact details Veda Spaces gave you.</p>`;
     }
@@ -141,7 +146,7 @@ export class VsPortalProjectPage extends LitElement {
     </div>`;
   }
 
-  private ready(v: PropertyView) {
+  protected ready(v: PropertyView) {
     const title = [v.property.configuration, v.property.locality, v.property.city].filter(Boolean).join(' · ') || 'Your home';
     const actions = v.attention.filter((a) => a.status === 'ACTION_REQUIRED');
     const upcoming = v.attention.filter((a) => a.status !== 'ACTION_REQUIRED');
@@ -261,7 +266,7 @@ export class VsPortalProjectPage extends LitElement {
       </div>`;
   }
 
-  private document(d: DocumentEntry) {
+  protected document(d: DocumentEntry) {
     if (d.kind === 'WARRANTY_SUMMARY') {
       const w = d as Extract<DocumentEntry, { kind: 'WARRANTY_SUMMARY' }>;
       return html`<li class="doc"><span><span class="strong">${w.title}</span><br /><span class="small muted">From your handover, ${when(w.issued_on)}</span></span>
@@ -286,7 +291,7 @@ export class VsPortalProjectPage extends LitElement {
   }
 
   /** What the customer has agreed, paid and still owes, from the server's one calculation. No way to pay here. */
-  private payments(c: Commercials | null) {
+  protected payments(c: Commercials | null) {
     if (!c) return html`<p class="card muted">Your payment details appear here once Veda Spaces has set up your project's payment schedule.</p>`;
     if (!c.available || !c.summary) return html`<p class="card" role="status">${c.message ?? 'Your payment details are not available right now.'}</p>`;
     const s = c.summary;
@@ -321,14 +326,14 @@ export class VsPortalProjectPage extends LitElement {
 
   /** Project delivery, as the server states it: what is done, under way, on hold or next, and the handover. No
    * percentage is shown: progress is the state of each piece of work Veda Spaces shares with you. */
-  private delivery(v: PropertyView) {
+  protected delivery(v: PropertyView) {
     if (!v.delivery?.projects.length) {
       return html`<p class="card muted">Progress on site appears here once your project is under way.</p>`;
     }
     return v.delivery.projects.map((d) => this.deliveryProject(v, d));
   }
 
-  private deliveryProject(v: PropertyView, d: DeliveryProject) {
+  protected deliveryProject(v: PropertyView, d: DeliveryProject) {
     const order = ['ACTION_REQUIRED', 'BLOCKED', 'IN_PROGRESS', 'UPCOMING', 'COMPLETED'] as const;
     const words: Record<string, string> = { ACTION_REQUIRED: 'Needs you', BLOCKED: 'On hold', IN_PROGRESS: 'In progress', UPCOMING: 'Coming up', COMPLETED: 'Completed' };
     const pkg = d.package;
@@ -354,7 +359,7 @@ export class VsPortalProjectPage extends LitElement {
     </div>`;
   }
 
-  private reports(v: PropertyView, d: DeliveryProject) {
+  protected reports(v: PropertyView, d: DeliveryProject) {
     const open = this.reporting === d.id;
     return html`<article class="card stack" aria-labelledby=${`reports-${d.id}`}>
       <div class="step-head"><h3 id=${`reports-${d.id}`}>Something not right?</h3></div>
@@ -412,7 +417,7 @@ export class VsPortalProjectPage extends LitElement {
     } finally { this.sending = false; }
   }
 
-  private handover(v: PropertyView, d: DeliveryProject, pkg: DeliveryProject['package']) {
+  protected handover(v: PropertyView, d: DeliveryProject, pkg: DeliveryProject['package']) {
     const h = d.handover;
     return html`<article class="card stack" aria-labelledby=${`handover-${d.id}`}>
       <div class="step-head"><h3 id=${`handover-${d.id}`}>Handover</h3>${stateBadge(h.state, h.label)}</div>
@@ -456,14 +461,14 @@ export class VsPortalProjectPage extends LitElement {
   }
 
   /** In-page navigation: scroll to the section and move focus to its heading (screen readers follow). */
-  private jump(e: Event, id: string) {
+  protected jump(e: Event, id: string) {
     e.preventDefault();
     const heading = this.renderRoot.querySelector<HTMLElement>(`#h-${id}`);
     heading?.scrollIntoView({ block: 'start' });
     heading?.focus({ preventScroll: true });
   }
 
-  private content() {
+  protected content() {
     switch (this.load) {
       case 'loading':
         return html`<div class="card" role="status" aria-live="polite"><vs-skeleton rows="8"></vs-skeleton><span class="sr-only">Loading your project…</span></div>`;

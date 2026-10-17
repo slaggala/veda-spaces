@@ -5318,6 +5318,34 @@
         "title": "PublicEstimateIn",
         "type": "object"
       },
+      "PublicEventIn": {
+        "additionalProperties": false,
+        "description": "Loose types on purpose: the service validates and answers 422 with field errors, never 500.",
+        "properties": {
+          "client": {
+            "default": null,
+            "title": "Client"
+          },
+          "event": {
+            "default": null,
+            "title": "Event"
+          },
+          "referrer_host": {
+            "default": null,
+            "title": "Referrer Host"
+          },
+          "utm_medium": {
+            "default": null,
+            "title": "Utm Medium"
+          },
+          "utm_source": {
+            "default": null,
+            "title": "Utm Source"
+          }
+        },
+        "title": "PublicEventIn",
+        "type": "object"
+      },
       "PublicLeadIn": {
         "additionalProperties": false,
         "properties": {
@@ -24067,6 +24095,40 @@
         "x-requirement": "CQX-002"
       }
     },
+    "/api/v1/public/acquisition/events": {
+      "post": {
+        "operationId": "sales_public_public_event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "summary": "An anonymous funnel beacon: counted once per browser session, event and day (no person)",
+        "tags": [
+          "sales"
+        ],
+        "x-permission": null,
+        "x-permission-any-of": null,
+        "x-rbac-exception": "RBX-011",
+        "x-requirement": "SCA-008"
+      }
+    },
     "/api/v1/public/catalog": {
       "get": {
         "operationId": "catalog_public_public_catalog",
@@ -26845,6 +26907,311 @@
         "x-permission-any-of": null,
         "x-rbac-exception": null,
         "x-requirement": "RBAC-008"
+      }
+    },
+    "/api/v1/sales/demo": {
+      "get": {
+        "operationId": "sales_get_demo",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer-journey demo: a synthetic proposal and project-portal model (no customer data)",
+        "tags": [
+          "sales"
+        ],
+        "x-permission": [
+          "sales.demo.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCA-009"
+      }
+    },
+    "/api/v1/sales/funnel": {
+      "get": {
+        "operationId": "sales_get_funnel",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The acquisition funnel over a period: counts per stage with their basis, channels, lost reasons",
+        "tags": [
+          "sales"
+        ],
+        "x-permission": [
+          "sales.funnel.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCA-007"
+      }
+    },
+    "/api/v1/sales/leads/{lead_id}/progression": {
+      "get": {
+        "operationId": "sales_get_progression",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lead_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One lead's derived sales progression and the records behind it",
+        "tags": [
+          "sales"
+        ],
+        "x-permission": [
+          "sales.pipeline.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCA-006"
+      }
+    },
+    "/api/v1/sales/pipeline": {
+      "get": {
+        "operationId": "sales_get_pipeline",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "enum": [
+                "open",
+                "won",
+                "lost",
+                "closed",
+                "all"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stage",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 30,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Stage"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attention",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 30,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Attention"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Channel"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Owner"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The sales pipeline: live leads with their evidence-derived stage, facts, follow-up state and channel",
+        "tags": [
+          "sales"
+        ],
+        "x-permission": [
+          "sales.pipeline.view"
+        ],
+        "x-permission-any-of": null,
+        "x-rbac-exception": null,
+        "x-requirement": "SCA-006"
       }
     },
     "/api/v1/scope-items/{item_id}": {

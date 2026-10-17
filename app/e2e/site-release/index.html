@@ -12,6 +12,10 @@
   <meta name="veda-turnstile-sitekey" content="">
   <meta name="veda-api-credentials" content="">
   <meta name="veda-policy-version" content="2026-09-v1">
+  <!-- Sales & Customer Acquisition (SCA): the estimator call to action and the anonymous funnel beacon. Empty in the
+       committed site (no estimator link, no beacon); the staging build fills them. -->
+  <meta name="veda-estimator" content="">
+  <meta name="veda-acquisition-analytics" content="">
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Veda Spaces">
@@ -39,7 +43,7 @@
   <link rel="stylesheet" href="assets/styles.css">
   <link rel="stylesheet" href="assets/enhancements.css">
 </head>
-<body>
+<body data-acquisition-page="home">
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <header class="site-header" id="site-header">
     <a class="brandmark" href="#home" aria-label="Veda Spaces home"><img src="assets/veda-logo.png" alt="Veda Spaces"></a>
@@ -64,8 +68,9 @@
         <div class="hero-foot">
           <p>Designed with sense. Built with care.<br>Made unmistakably yours.</p>
           <div class="hero-actions">
-            <a class="button button-light" href="#portfolio">Explore Our Work <span>→</span></a>
-            <a class="button button-ghost" href="#contact">Book a Consultation</a>
+            <a class="button button-light" href="#contact">Book a Consultation <span>→</span></a>
+            <a class="button button-ghost" href="/estimate" data-estimator-only hidden>Estimate my budget</a>
+            <a class="text-link hero-link" href="#portfolio">Explore our work <span>→</span></a>
           </div>
         </div>
       </div>
@@ -149,6 +154,15 @@
       </div>
     </section>
 
+    <section class="after section" id="after">
+      <div class="after-panel">
+        <p class="eyebrow">After you choose Veda Spaces</p>
+        <h2>Know what happens next,<br><em>before you decide.</em></h2>
+        <p>Consultation, site measurement, a written scope and quotation, a recorded decision, then execution, quality checks, snags, handover and after-sales service: every step of your project, explained in plain words.</p>
+        <a class="button button-dark" href="/journey">See how your project will run →</a>
+      </div>
+    </section>
+
     <section class="why section" id="why">
       <div class="why-images"><img src="assets/soft-living.jpg" alt="Soft Modern living room by Veda Spaces" loading="lazy"><img src="assets/warm-living.jpg" alt="Warm Contemporary living room detail" loading="lazy"></div>
       <div class="why-copy"><p class="eyebrow">Our point of view</p><h2>Designed around<br>real life.</h2><p>Good interiors are not just about how a space photographs. They are about how naturally it supports everyday life.</p><ul><li>Function and aesthetics considered together</li><li>Personalised, never template-driven</li><li>Design and execution as one journey</li><li>Materials, lighting and storage as one system</li><li>Attention to the details that make a home last</li></ul></div>
@@ -165,7 +179,7 @@
     </section>
 
     <section class="contact section" id="contact">
-      <div class="contact-copy"><p class="eyebrow">Begin your home</p><h2>Let’s create a home<br><em>that feels yours.</em></h2><p>Whether you are planning a complete home or beginning with an idea, we would love to understand how you want to live.</p><a class="phone" href="tel:+919515125153">+91 95151 25153</a><a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Chat on WhatsApp →</a><a class="instagram-link" href="mailto:interiors@vedaspaces.com">interiors@vedaspaces.com ↗</a><a class="instagram-link" href="https://instagram.com/vedaspaces_" target="_blank" rel="noopener">Instagram @vedaspaces_ ↗</a></div>
+      <div class="contact-copy"><p class="eyebrow">Begin your home</p><h2>Let’s create a home<br><em>that feels yours.</em></h2><p>Whether you are planning a complete home or beginning with an idea, we would love to understand how you want to live.</p><a class="text-link" href="/journey">What happens after you choose us →</a><a class="phone" href="tel:+919515125153">+91 95151 25153</a><a class="whatsapp-link" href="https://wa.me/919515125153" target="_blank" rel="noopener">Chat on WhatsApp →</a><a class="instagram-link" href="mailto:interiors@vedaspaces.com">interiors@vedaspaces.com ↗</a><a class="instagram-link" href="https://instagram.com/vedaspaces_" target="_blank" rel="noopener">Instagram @vedaspaces_ ↗</a></div>
       <form class="contact-form" id="contact-form" novalidate>
         <div class="form-summary full" id="form-summary" role="alert" tabindex="-1" hidden></div>
         <label for="cf-name">Full Name <span class="req">Required</span><input id="cf-name" name="name" required aria-required="true" autocomplete="name" maxlength="150" placeholder="Your name" aria-describedby="cf-name-err"><span class="field-error" id="cf-name-err"></span></label>
@@ -190,13 +204,14 @@
   <footer>
     <div class="footer-main">
       <div class="footer-identity"><a class="footer-brand" href="#home"><img src="assets/veda-logo.png" alt="Veda Spaces"></a><p>Designed with Sense. Built with Care.</p><p>Hyderabad, India</p><p><a href="mailto:interiors@vedaspaces.com">interiors@vedaspaces.com</a></p><p><a href="https://www.vedaspaces.com/">www.vedaspaces.com</a></p></div>
-      <nav aria-label="Footer navigation"><a href="#home">Home</a><a href="#about">About</a><a href="#services">Services</a><a href="#portfolio">Portfolio</a><a href="#process">Process</a><a href="#contact">Contact</a><a href="/warranty">Warranty policy</a></nav>
+      <nav aria-label="Footer navigation"><a href="#home">Home</a><a href="#about">About</a><a href="#services">Services</a><a href="#portfolio">Portfolio</a><a href="#process">Process</a><a href="#contact">Contact</a><a href="/journey">Your journey</a><a href="/warranty">Warranty policy</a><a href="/privacy">Privacy</a></nav>
     </div>
     <div class="footer-bottom"><span>© 2026 Veda Spaces. All rights reserved.</span><span>Residential interiors · Design & execution · Hyderabad</span></div>
   </footer>
 
   <a class="floating-whatsapp" href="https://wa.me/919515125153" target="_blank" rel="noopener" aria-label="Chat with Veda Spaces on WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.4 8.4 0 0 1-12.4 7.4L4 20.2l1.1-4a8.4 8.4 0 1 1 15.4-4.5Zm-8.4-6.9a6.9 6.9 0 0 0-5.9 10.5l.2.3-.7 2.5 2.6-.7.3.2a6.9 6.9 0 1 0 3.5-12.8Zm3.9 9.5c-.2.6-1.1 1.1-1.7 1.2-.4.1-.9.1-1.5-.1-.4-.1-.9-.3-1.5-.5-2.7-1.2-4.4-3.9-4.5-4.1-.1-.2-1.1-1.5-1.1-2.8 0-1.4.7-2 1-2.3.3-.3.7-.4.9-.4h.7c.2 0 .5-.1.7.5l.9 2.1c.1.1.1.3 0 .5l-.3.5-.5.5c-.2.2-.3.3-.1.6.2.3.8 1.3 1.8 2 .9.8 1.7 1 2 .1l.7-.9c.2-.3.5-.2.7-.1l1.9.9c.3.1.5.2.5.4 0 .1 0 .6-.2 1.2Z"/></svg></a>
   <dialog class="project-modal" id="project-modal"><button class="modal-close" aria-label="Close project">×</button><img alt=""><div><p></p><h3></h3></div></dialog>
+  <script src="assets/acquisition.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

@@ -427,6 +427,7 @@ def test_no_route_exposes_a_rate_card(app):
     assert (
         public
         == [
+            "/api/v1/public/acquisition/events",  # SCA (decision log 48): an anonymous funnel count, no data returned
             "/api/v1/public/catalog",
             "/api/v1/public/catalog/estimates",
             "/api/v1/public/catalog/events",
