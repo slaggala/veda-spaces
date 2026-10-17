@@ -302,6 +302,13 @@ def test_public_intake_disabled():
     estimate = (REPO / "app/e2e/site-release/estimate.html").read_text()
     for name in ("veda-estimator", "veda-api-base", "veda-turnstile-sitekey", "veda-api-credentials"):
         assert f'<meta name="{name}" content="">' in estimate, name  # the estimator page is off in production
+    # SCA (decision log 48): the committed site links to no estimator and sends no funnel beacon.
+    journey = (REPO / "app/e2e/site-release/journey.html").read_text()
+    for name in ("veda-estimator", "veda-acquisition-analytics"):
+        assert f'<meta name="{name}" content="">' in html and f'<meta name="{name}" content="">' in journey, name
+    assert '<meta name="veda-acquisition-analytics" content="">' in estimate
+    for name in ("veda-api-base", "veda-api-credentials"):
+        assert f'<meta name="{name}" content="">' in journey, name
 
 
 def test_estimator_flag_is_staging_only():

@@ -19,6 +19,7 @@ from veda.modules.mtq import permissions as mtq_permissions
 from veda.modules.mtq_commercial import permissions as mtq_commercial_permissions
 from veda.modules.portal import permissions as portal_permissions
 from veda.modules.project import permissions as project_permissions
+from veda.modules.sales import permissions as sales_permissions
 from veda.modules.warranty import permissions as warranty_permissions
 
 from .registry_types import PermissionDef, RoleDef
@@ -280,6 +281,7 @@ def _entries() -> tuple[RegistryEntry, ...]:
         ("portal", portal_permissions.PERMISSIONS),
         ("commercials", commercials_permissions.PERMISSIONS),
         ("warranty", warranty_permissions.PERMISSIONS),
+        ("sales", sales_permissions.PERMISSIONS),
     ):
         for d in defs:
             resource, _, action = d.code.partition(".")
@@ -303,6 +305,7 @@ MATRIX: dict[str, dict[str, str]] = {
     **portal_permissions.MATRIX,
     **commercials_permissions.MATRIX,
     **warranty_permissions.MATRIX,
+    **sales_permissions.MATRIX,
 }
 
 SENSITIVE_CODES = frozenset(e.code for e in REGISTRY if e.definition.is_sensitive)

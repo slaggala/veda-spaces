@@ -117,7 +117,7 @@ export function checkV3Approval(approvalFile = V3_APPROVAL, platformFile = PLATF
   }
 }
 
-export function buildSite(src, out, key, estimator = estimatorFlags(process.env)) {
+export function buildSite(src, out, key, estimator = estimatorFlags(process.env), sales = salesFlags(process.env)) {
   if (estimator.enabled && estimator.ux === 'v2') checkV2Approval(join(src, 'assets/estimate-v2-copy.js'), estimator.approvalFile);
   if (estimator.version === 'v3') checkV3Approval(estimator.v3ApprovalFile, estimator.platformFile, estimator.today);
   siteKey(key);
@@ -127,13 +127,24 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
   html = setMeta(html, 'veda-api-base', STAGING_API);
   html = setMeta(html, 'veda-turnstile-sitekey', key);
   html = setMeta(html, 'veda-api-credentials', 'include'); // the Access cookie of the API host (staging only)
+  // SCA: the home page links to the estimator only when the estimator page is on; the anonymous funnel beacon only
+  // when STAGING_SALES_EXPERIENCE=on (the API's VEDA_SALES_EXPERIENCE_ENABLED must be on too, else the beacon gets 404).
+  if (estimator.enabled) html = setMeta(html, 'veda-estimator', 'on');
+  if (sales.enabled) html = setMeta(html, 'veda-acquisition-analytics', 'on');
   writeFileSync(join(out, 'index.html'), html);
+  let journey = readFileSync(join(out, 'journey.html'), 'utf8');
+  journey = setMeta(journey, 'veda-api-base', STAGING_API);
+  journey = setMeta(journey, 'veda-api-credentials', 'include');
+  if (estimator.enabled) journey = setMeta(journey, 'veda-estimator', 'on');
+  if (sales.enabled) journey = setMeta(journey, 'veda-acquisition-analytics', 'on');
+  writeFileSync(join(out, 'journey.html'), journey);
   // The Budgetary Estimate page (ADR-012): the same intake metas; the estimator itself only when STAGING_ESTIMATOR=on,
   // with Essential only unless approved packages are listed (Premium/Luxury need approved rates).
   let est = readFileSync(join(out, 'estimate.html'), 'utf8');
   est = setMeta(est, 'veda-api-base', STAGING_API);
   est = setMeta(est, 'veda-turnstile-sitekey', key);
   est = setMeta(est, 'veda-api-credentials', 'include');
+  if (sales.enabled) est = setMeta(est, 'veda-acquisition-analytics', 'on');
   if (estimator.enabled) {
     est = setMeta(est, 'veda-estimator', 'on');
     est = setMeta(est, 'veda-estimator-packages', estimator.packages.join(','));
@@ -156,6 +167,13 @@ export function buildSite(src, out, key, estimator = estimatorFlags(process.env)
   writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
   rmSync(join(out, 'sitemap.xml'), { force: true });
   checkStaging(out);
+}
+
+/** STAGING_SALES_EXPERIENCE=on switches the site's anonymous funnel beacon on (SCA, decision log 48). */
+export function salesFlags(env) {
+  const value = env.STAGING_SALES_EXPERIENCE || 'off';
+  if (!['on', 'off'].includes(value)) throw new Error(`STAGING_SALES_EXPERIENCE must be on or off (got ${value})`);
+  return { enabled: value === 'on' };
 }
 
 /**

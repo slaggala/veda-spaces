@@ -124,6 +124,9 @@ def reset_process_state() -> None:
     throttle.reset()
     security_events.reset_dedupe()
     http.idempotency_store.clear()
+    from veda.modules.sales import analytics as sales_analytics
+
+    sales_analytics.reset_for_tests()  # the beacon de-duplication set never outlives a test
     turnstile.reset_counter()
     crypto.reset_provider()
     CaptureEmailProvider.clear()

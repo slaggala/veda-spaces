@@ -89,6 +89,7 @@ from veda.modules.project.models import (
     ProjectStage,
     ProjectTransition,
 )
+from veda.modules.sales import models as _sales_models  # noqa: F401  (SCA table, 0215)
 from veda.modules.warranty import models as _warranty_models  # noqa: F401  (WSV tables, 0214)
 from veda.platform.audit.models import AuditLog
 from veda.platform.auth.models import (

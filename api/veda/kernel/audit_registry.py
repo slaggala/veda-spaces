@@ -421,6 +421,8 @@ register(
 register(AuditPolicy("commercial_event", FULL, parent=("commercial_account", "account_id")))
 register(AuditPolicy("catalog_configuration", FULL, excluded=frozenset({"selections", "resolved_request"})))
 register(AuditPolicy("catalog_analytics_daily", FULL, excluded=frozenset({"count"})))
+# --- Sales & Customer Acquisition (0215, decision log 48): one count per day, event and channel; no person, no text.
+register(AuditPolicy("acquisition_event_daily", FULL, excluded=frozenset({"count"})))
 register(AuditPolicy("catalog_claim_control", FULL))
 
 register(AuditPolicy("user_session", EVENT_ONLY, soft_delete=False, exceptions=("EXC-003", "EXC-006")))

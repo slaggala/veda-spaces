@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { APPROVAL, attachmentConnectCsp, attachmentOrigin, buildSite, canonicalSha256, checkStaging, checkV3Approval, estimatorFlags, PRODUCTION_API, readCopy, siteKey, STAGING_API, v3ImageCsp } from './staging-build.mjs';
+import { APPROVAL, attachmentConnectCsp, attachmentOrigin, buildSite, canonicalSha256, checkStaging, checkV3Approval, estimatorFlags, PRODUCTION_API, readCopy, salesFlags, siteKey, STAGING_API, v3ImageCsp } from './staging-build.mjs';
 import { createHash } from 'node:crypto';
 
 const SRC = fileURLToPath(new URL('../e2e/site-release', import.meta.url));
@@ -29,9 +29,38 @@ test('the staging site points at the staging API, with credentials and the widge
 
 test('the committed site stays intake-disabled (production)', () => {
   const html = readFileSync(join(SRC, 'index.html'), 'utf8');
-  for (const name of ['veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials']) {
+  for (const name of ['veda-api-base', 'veda-turnstile-sitekey', 'veda-api-credentials', 'veda-estimator', 'veda-acquisition-analytics']) {
     assert.ok(html.includes(`<meta name="${name}" content="">`), name);
   }
+  const journey = readFileSync(join(SRC, 'journey.html'), 'utf8');
+  for (const name of ['veda-api-base', 'veda-api-credentials', 'veda-estimator', 'veda-acquisition-analytics']) {
+    assert.ok(journey.includes(`<meta name="${name}" content="">`), `journey ${name}`);
+  }
+  // The journey and privacy pages repeat no contact number: they link to the contact section (reference-content policy).
+  for (const page of ['journey.html', 'privacy.html']) {
+    const text = readFileSync(join(SRC, page), 'utf8');
+    assert.ok(!/tel:|wa\.me|@vedaspaces\.com/.test(text), `${page} links to #contact instead of repeating contact details`);
+    assert.ok(!/<style|<script>| style=| on[a-z]+=/.test(text), `${page}: no inline code (production CSP)`);
+  }
+});
+
+test('the sales-experience switch fills the beacon and estimator metas, and nothing else', () => {
+  const off = join(tmp(), 'off');
+  buildSite(SRC, off, KEY, estimatorFlags({}), salesFlags({}));
+  for (const page of ['index.html', 'journey.html', 'estimate.html']) {
+    assert.ok(readFileSync(join(off, page), 'utf8').includes('<meta name="veda-acquisition-analytics" content="">'), page);
+  }
+  assert.ok(readFileSync(join(off, 'index.html'), 'utf8').includes('<meta name="veda-estimator" content="">'), 'no estimator link while the page is off');
+  const on = join(tmp(), 'on');
+  buildSite(SRC, on, KEY, estimatorFlags({ STAGING_ESTIMATOR: 'on' }), salesFlags({ STAGING_SALES_EXPERIENCE: 'on' }));
+  for (const page of ['index.html', 'journey.html', 'estimate.html']) {
+    const text = readFileSync(join(on, page), 'utf8');
+    assert.ok(text.includes('<meta name="veda-acquisition-analytics" content="on">'), page);
+    assert.ok(text.includes('<meta name="veda-estimator" content="on">'), `${page} estimator`);
+  }
+  const journey = readFileSync(join(on, 'journey.html'), 'utf8');
+  assert.ok(journey.includes(`<meta name="veda-api-base" content="${STAGING_API}">`) && journey.includes('<meta name="veda-api-credentials" content="include">'));
+  assert.throws(() => salesFlags({ STAGING_SALES_EXPERIENCE: 'yes' }), /on or off/);
 });
 
 test('a build that names the production API is refused', () => {
