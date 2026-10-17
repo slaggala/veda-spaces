@@ -155,10 +155,10 @@
   },
   "project_delivery": {
     "status": "DECIDED",
-    "decision": "Owner instruction VEDA-SPACES-STAGING-ACTIVATION-AND-WARRANTY-SERVICE (2026-10-16), recorded as given (decision log 46): Project Commercials (PCM-D02, staging only), the Project Lifecycle with project execution, and the customer's delivery view (PEX-D01, CPP-D04) are wired to staging with three flags, VEDA_PROJECT_LIFECYCLE_ENABLED, VEDA_PROJECT_COMMERCIALS_ENABLED and VEDA_PROJECT_DELIVERY_PORTAL_ENABLED, each false by default and separate from every other flag. The delivery view needs the lifecycle and the customer portal. The lifecycle runs with its committed strict defaults: PLB-OD-01..13 stay null and are not recorded here, so every HIGH-risk move stays refused. They may turn on only by a reviewed change that sets the flags true and enablement_record_sha256 to the SHA-256 of infra/config/project-delivery-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, naming every flag it enables, with every evidence field filled. staging-core refuses anything else; the API refuses each flag in production. Rollback: every flag false and the digest null.",
-    "lifecycle_enabled": false,
-    "commercials_enabled": false,
-    "delivery_portal_enabled": false,
-    "enablement_record_sha256": null
+    "decision": "Owner instruction VEDA-SPACES-STAGING-ACTIVATION-AND-WARRANTY-SERVICE (2026-10-16), recorded as given (decision log 46): Project Commercials (PCM-D02, staging only), the Project Lifecycle with project execution, and the customer's delivery view (PEX-D01, CPP-D04) are wired to staging with three flags, VEDA_PROJECT_LIFECYCLE_ENABLED, VEDA_PROJECT_COMMERCIALS_ENABLED and VEDA_PROJECT_DELIVERY_PORTAL_ENABLED, each false by default and separate from every other flag. The delivery view needs the lifecycle and the customer portal. The lifecycle runs with its committed strict defaults: PLB-OD-01..13 stay null and are not recorded here, so every HIGH-risk move stays refused. They may turn on only by a reviewed change that sets the flags true and enablement_record_sha256 to the SHA-256 of infra/config/project-delivery-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, naming every flag it enables, with every evidence field filled. staging-core refuses anything else; the API refuses each flag in production. Rollback: every flag false and the digest null. Enabled on staging by owner approval of 2026-10-17 (Srinivasulu Laggala): the record is APPROVED with every evidence field filled, names all three flags and is bound here by its SHA-256 (decision log entry 49). PLB-OD-01..13 stay null; invoice issue stays fail-closed (PCM-D01 particulars not configured); VEDA_WARRANTY_SERVICE_ENABLED is not wired.",
+    "lifecycle_enabled": true,
+    "commercials_enabled": true,
+    "delivery_portal_enabled": true,
+    "enablement_record_sha256": "404cf513555e8c1c360a749fbc615e356e8799ab146708dd17f49dc02f4b2d8d"
   }
 }

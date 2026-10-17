@@ -858,8 +858,8 @@ run "the_committed_customer_portal_record_is_approved_and_turns_the_portal_on" {
   }
 
   assert {
-    condition     = local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
-    error_message = "the portal is separate: the Project Lifecycle stays off (set only by project_delivery) and customer-proposal viewing is untouched"
+    condition     = !contains(keys(local.cpp_config), "VEDA_PROJECT_LIFECYCLE_ENABLED") && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the portal is separate: the Project Lifecycle is set only by project_delivery and customer-proposal viewing is untouched"
   }
 }
 
@@ -934,14 +934,21 @@ run "the_project_delivery_flags_are_planned_false_when_off" {
   }
 }
 
-run "the_committed_project_delivery_wiring_is_off_with_a_draft_record" {
+run "the_committed_project_delivery_record_is_approved_and_turns_the_three_flags_on" {
   command = plan
 
   assert {
-    condition = (jsondecode(file("../../../config/project-delivery-enablement-record.json")).status == "DRAFT" &&
-      local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "false" && local.app_config["VEDA_PROJECT_COMMERCIALS_ENABLED"] == "false" &&
-    local.app_config["VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"] == "false" && output.project_delivery.enablement_record == null)
-    error_message = "wired off with a DRAFT record until the owner approves it (decision log 46)"
+    condition = (jsondecode(file("../../../config/project-delivery-enablement-record.json")).status == "APPROVED" && local.pdl_record_problems == [] &&
+      local.app_config["VEDA_ENV"] == "staging" && local.app_config["VEDA_PROJECT_LIFECYCLE_ENABLED"] == "true" &&
+      local.app_config["VEDA_PROJECT_COMMERCIALS_ENABLED"] == "true" && local.app_config["VEDA_PROJECT_DELIVERY_PORTAL_ENABLED"] == "true" &&
+    output.project_delivery.enablement_record == filesha256("../../../config/project-delivery-enablement-record.json"))
+    error_message = "owner approval of 2026-10-17 (decision log 49): APPROVED, every evidence field filled, synthetic content only, bound, staging only"
+  }
+
+  assert {
+    condition = (local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false" && local.app_config["VEDA_CUSTOMER_QUOTATION_ACCEPTANCE_ENABLED"] == "false" &&
+    !contains(keys(local.app_config), "VEDA_WARRANTY_SERVICE_ENABLED"))
+    error_message = "project delivery turns no other flag on: the customer-proposal flags stay off and warranty service is not wired"
   }
 }
 
