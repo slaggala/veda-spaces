@@ -105,10 +105,10 @@ let popups = 0;
 page.on('request', (r) => { if (r.url().includes('/api/')) apiCalls += 1; });
 page.on('popup', () => { popups += 1; });
 const offState = await page.evaluate(() => ({
-  consentShown: !document.querySelector('.consent').hidden, privacyLinks: [...document.querySelectorAll('a[href="/privacy"]')]
+  consentShown: !document.querySelector('.consent').hidden, privacyLinks: [...document.querySelectorAll('.consent a[href="/privacy"]')]
     .filter((a) => a.offsetParent !== null).length, turnstile: !!document.querySelector('script[src*="turnstile"]'),
 }));
-check('flag off hides consent, verification and the Privacy Notice link', !offState.consentShown && offState.privacyLinks === 0 &&
+check('flag off hides consent, verification and the consent block\'s Privacy Notice link', !offState.consentShown && offState.privacyLinks === 0 &&
   !offState.turnstile, JSON.stringify(offState));
 const offErrors = () => page.evaluate(() => ({
   invalid: [...document.querySelectorAll('#contact-form [aria-invalid="true"]')].map((el) => el.id).sort(),

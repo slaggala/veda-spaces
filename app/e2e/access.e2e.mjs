@@ -50,7 +50,7 @@ function mailLink(template, email, pathPrefix) {
   for (const f of files.reverse()) {
     // Captured .eml bodies are quoted-printable: undo soft line breaks and =XX escapes.
     const text = fs.readFileSync(f, 'utf8').replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-    const m = text.match(new RegExp(`(http://localhost:5173${pathPrefix}#token=[A-Za-z0-9_-]+)`));
+    const m = text.match(new RegExp(`(${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${pathPrefix}#token=[A-Za-z0-9_-]+)`)); // the API's app origin
     if (text.includes(`To: ${email}`) && m) return m[1];
   }
   throw new Error(`${template} email for ${email} not found`);
@@ -151,7 +151,7 @@ try {
   // Website intake: duplicate phone, idempotent retry, invalid submission.
   const body = (msg) => ({ name: 'Farah Khan', phone: '99887 76655', message: msg, turnstile_token: 'dev-ok', company_website_url: '',
     consent: { acknowledged: true, policy_version: '2026-09-v1' } });
-  const h = (k) => ({ 'Idempotency-Key': k, Origin: 'http://localhost:8000' });
+  const h = (k) => ({ 'Idempotency-Key': k, Origin: process.env.SITE_ON ?? 'http://localhost:8000' });
   const k1 = `dup-a-${Date.now()}-xyz`;
   const a = await api('POST', '/api/v1/public/leads', body('kitchen'), null, h(k1));
   const replay = await api('POST', '/api/v1/public/leads', body('kitchen'), null, h(k1));
