@@ -45,6 +45,8 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.project import events as _project_events  # noqa: F401  (registers handlers)
     from veda.modules.project import notices as _project_notices  # noqa: F401  (registers the delivery handlers)
     from veda.modules.project.routes import api as project_api
+    from veda.modules.sales.routes import api as sales_api
+    from veda.modules.sales.routes import public_api as sales_public_api
     from veda.modules.warranty import events as _warranty_events  # noqa: F401  (registers handlers and the subscriber)
     from veda.modules.warranty import photos as _warranty_photos  # noqa: F401  (binds the service_request entity)
     from veda.modules.warranty.routes import api as warranty_api
@@ -81,6 +83,8 @@ def _register_modules(app: Flask) -> None:
         portal_staff_api,
         commercials_api,
         warranty_api,
+        sales_public_api,
+        sales_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -190,6 +194,10 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             ),
         }
     ),
+    # Sales & Customer Acquisition (decision log 48): the site's anonymous funnel beacon, counted once per browser
+    # session, event and day; 404 unless VEDA_SALES_EXPERIENCE_ENABLED; 1 KiB body, closed schema, per-IP limits; it
+    # stores a count per day, event and channel and nothing about the person.
+    "RBX-011": frozenset({("POST", "/api/v1/public/acquisition/events")}),
     "RBX-006": frozenset(
         {("GET", "/health/live"), ("GET", "/health/ready"), ("GET", "/api/v1/auth/.well-known/jwks.json")}
     ),

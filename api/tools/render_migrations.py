@@ -114,6 +114,7 @@ REVISIONS: dict[str, list[str]] = {
         "service_note",
         "service_event",
     ],
+    "0215_sales_acquisition": ["acquisition_event_daily"],
     "0209_customer_portal": ["portal_account", "portal_access", "portal_sign_in", "portal_session", "portal_event"],
     "0208_project_lifecycle": [
         "project",

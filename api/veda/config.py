@@ -240,6 +240,10 @@ class Settings:
     # effective only with the Project Lifecycle's own flag (the customer side also needs the portal's); it turns
     # neither on.
     warranty_service_enabled: bool = False
+    # Sales & Customer Acquisition Experience (SCA, decision log 48): the staff sales pipeline, funnel reporting, the
+    # customer-journey demo and the site's anonymous funnel beacons. Off by default everywhere (every route answers
+    # 404) and refused in production. It turns no other feature on: it only reads what the other features recorded.
+    sales_experience_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -400,6 +404,7 @@ def load_settings(**overrides) -> Settings:
         project_commercials_enabled=_bool("VEDA_PROJECT_COMMERCIALS_ENABLED", False),
         project_delivery_portal_enabled=_bool("VEDA_PROJECT_DELIVERY_PORTAL_ENABLED", False),
         warranty_service_enabled=_bool("VEDA_WARRANTY_SERVICE_ENABLED", False),
+        sales_experience_enabled=_bool("VEDA_SALES_EXPERIENCE_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -642,6 +647,8 @@ def validate_environment(settings: Settings) -> list[str]:
             )
         if settings.warranty_service_enabled:  # no production decision exists (decision log 47)
             problems.append("VEDA_WARRANTY_SERVICE_ENABLED is not authorised in production (warranty and service)")
+        if settings.sales_experience_enabled:  # no production decision exists (decision log 48)
+            problems.append("VEDA_SALES_EXPERIENCE_ENABLED is not authorised in production (sales and acquisition)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip
