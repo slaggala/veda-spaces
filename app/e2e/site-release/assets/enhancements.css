@@ -174,6 +174,7 @@ footer nav a, footer p a { transition: color .2s ease; }
 .hero-actions [hidden], .journey-actions [hidden] { display: none !important; }
 .after { padding: clamp(3rem, 8vw, 6rem) 4vw; background: var(--cream); }
 .after-panel { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 1.1rem; justify-items: center; }
+.after-panel .eyebrow { color: #6b3f2a; } /* 6.4:1 on the cream panel (AX-05) */
 .after-panel h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.08; margin: 0; }
 .after-panel p { margin: 0; max-width: 60ch; }
 .after-panel .button { min-height: 44px; display: inline-flex; align-items: center; }
