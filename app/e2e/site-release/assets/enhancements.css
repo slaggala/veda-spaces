@@ -178,3 +178,5 @@ footer nav a, footer p a { transition: color .2s ease; }
 .after-panel p { margin: 0; max-width: 60ch; }
 .after-panel .button { min-height: 44px; display: inline-flex; align-items: center; }
 .contact-copy .text-link { display: inline-block; margin: 0 0 .6rem; min-height: 24px; }
+.hero-actions .hero-link { color: #fff; align-self: center; min-height: 44px; display: inline-flex; align-items: center; padding: 0 .4rem; border-bottom: 1px solid rgba(255,255,255,.55); }
+.hero-actions .hero-link:hover, .hero-actions .hero-link:focus-visible { border-bottom-color: #fff; }
