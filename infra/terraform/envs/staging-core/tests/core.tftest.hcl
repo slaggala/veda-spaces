@@ -1037,3 +1037,68 @@ run "the_delivery_view_without_the_customer_portal_refused" {
   }
   expect_failures = [output.project_delivery]
 }
+
+# Sales & Customer Acquisition Experience (decision log 50): one staff-facing flag planned false; it turns on only with
+# an owner-APPROVED, staging-only, synthetic-content-only record bound by its SHA-256 whose approver is not its author.
+run "the_sales_experience_flag_is_planned_false" {
+  command = plan
+
+  assert {
+    condition     = local.app_config["VEDA_SALES_EXPERIENCE_ENABLED"] == "false" && output.sales_experience.enablement_record == null && length(local.sce_config) == 1
+    error_message = "one parameter, false, no record bound (also the rollback state)"
+  }
+
+  assert {
+    condition     = jsondecode(file("../../../config/sales-experience-enablement-record.json")).status == "DRAFT" && contains(local.sce_record_problems, "the record is not APPROVED")
+    error_message = "the committed record is a DRAFT: nothing is enabled by this change"
+  }
+}
+
+run "an_approved_record_turns_the_sales_experience_on" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-sce-on.json"
+    sales_experience_record_path = "tests/fixtures/sce-record-approved.json"
+  }
+
+  assert {
+    condition     = output.sales_experience.enabled == "true" && local.sce_record_problems == [] && local.app_config["VEDA_CUSTOMER_PROPOSAL_ENABLED"] == "false"
+    error_message = "the sales experience on, bound to an approved record; no other flag touched"
+  }
+}
+
+run "the_sales_experience_draft_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-sce-on-draft.json"
+    sales_experience_record_path = "tests/fixtures/sce-record-draft.json"
+  }
+  expect_failures = [output.sales_experience]
+}
+
+run "a_self_approved_sales_experience_record_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-sce-on-self.json"
+    sales_experience_record_path = "tests/fixtures/sce-record-self-approved.json"
+  }
+  expect_failures = [output.sales_experience]
+}
+
+run "a_sales_experience_record_for_production_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-sce-on-production.json"
+    sales_experience_record_path = "tests/fixtures/sce-record-production.json"
+  }
+  expect_failures = [output.sales_experience]
+}
+
+run "a_bound_sales_experience_digest_without_the_flag_refused" {
+  command = plan
+  variables {
+    platform_config_path         = "tests/fixtures/platform-sce-digest-without-flag.json"
+    sales_experience_record_path = "tests/fixtures/sce-record-approved.json"
+  }
+  expect_failures = [output.sales_experience]
+}

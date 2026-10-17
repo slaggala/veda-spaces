@@ -160,5 +160,11 @@
     "commercials_enabled": true,
     "delivery_portal_enabled": true,
     "enablement_record_sha256": "404cf513555e8c1c360a749fbc615e356e8799ab146708dd17f49dc02f4b2d8d"
+  },
+  "sales_experience": {
+    "status": "DECIDED",
+    "decision": "Owner decision SCA-OD-02 = YES (VEDA-SPACES-STAGING-ACTIVATION-AND-E2E-JOURNEY, 2026-10-17), recorded as given (decision log 50): the Sales & Customer Acquisition Experience (decision log 48) is wired to staging with one flag, VEDA_SALES_EXPERIENCE_ENABLED, false by default, separate from every other flag. It is staff-facing (pipeline, funnel, synthetic demo) plus the anonymous site beacon route, which stays unused while the staging Pages build has STAGING_SALES_EXPERIENCE off; the API refuses it in production. It may turn on only by a reviewed change that sets enabled true and enablement_record_sha256 to the SHA-256 of infra/config/sales-experience-enablement-record.json once that record is APPROVED by the owner (an approver other than its author), staging-only, behind Cloudflare Access, synthetic content only, with every evidence field filled. staging-core refuses anything else. SCA-OD-01 (legal review of the privacy notice) is not decided by this entry. Rollback: enabled false and enablement_record_sha256 null.",
+    "enabled": false,
+    "enablement_record_sha256": null
   }
 }
