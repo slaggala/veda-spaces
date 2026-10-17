@@ -49,7 +49,9 @@ DELIVERY        (project, commercials, execution, portal, warranty: shown to pro
 | ruff check and format, mypy ratchet (157 of 157 baseline), OpenAPI snapshot, deploy-check, bandit, secret scan | pass locally and in CI |
 | App: lint, typecheck, token lint, contrast (58 pairs), unit tests (220, 12 new), staging-build tests (16), build | pass locally and in CI |
 | Browser journeys, local alternate-port stack | site 47/47, estimator 33/33, V2 52/52, prototype 47/47, proposal 148/148, promise 82/82, project 97/97, portal 64/64, commercials 123/123, delivery 94/94, warranty 50/50, sales 62/62 (the workspace journey needs port 5173, held by another local stack: covered by CI) |
-| CI on the PR head (run 39017323453) | api (sqlite) pass, api (postgresql) pass, app pass, browser e2e + axe pass (32 of 32 screens without serious or critical violations), infra pass, security pass |
+| CI on the reviewed head (run 39017323453) | api (sqlite) pass, api (postgresql) pass, app pass, browser e2e + axe pass (32 of 32 screens without serious or critical violations), infra pass, security pass |
+| CI on the docs-only follow-up (run 39023001607) | every job green except one check in the sales browser journey ("a stage filter is re-requested from the server"), which counted the table rows while the filtered request was still loading; reproduced locally (2 failures in 6 runs with the requests already correct), fixed by waiting for the filtered rows to render before counting them (no sleep, no retry), 8 of 8 local runs green |
+| CI on the fixed head (run 39041526107) | api (sqlite) pass, api (postgresql) pass, app pass, browser e2e + axe pass, infra pass, security pass |
 | Production | `dist/` untouched; the Pages preview of the branch builds (no production deployment happens before merge) |
 
 ## 4. Independent review and disposition
