@@ -421,34 +421,49 @@ def test_no_route_exposes_a_rate_card(app):
     # Commercials adds the customer's invoices and receipts to it (RBX-010; test_commercials_portal: no internal field).
     # Project delivery adds the customer's two writes (RBX-010, owner decision PEX-D01): an issue report and a handover
     # acknowledgement, neither carrying a rate (test_project_delivery_portal: isolation, no internal field). Customer
-    # documents (CPP-D04) add one image read of an explicitly published document (test_customer_documents).
-    assert public == [
-        "/api/v1/public/catalog",
-        "/api/v1/public/catalog/estimates",
-        "/api/v1/public/catalog/events",
-        "/api/v1/public/catalog/media/<sha>",
-        "/api/v1/public/enquiries",
-        "/api/v1/public/estimates",
-        "/api/v1/public/leads",
-        "/api/v1/public/portal/home",
-        "/api/v1/public/portal/invoices/<invoice_id>",
-        "/api/v1/public/portal/properties/<property_id>",
-        "/api/v1/public/portal/properties/<property_id>/documents/<document_id>/content",
-        "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge",
-        "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/reports",
-        "/api/v1/public/portal/quotations/<quotation_id>",
-        "/api/v1/public/portal/receipts/<receipt_id>",
-        "/api/v1/public/portal/session",
-        "/api/v1/public/portal/sign-in",
-        "/api/v1/public/portal/sign-out",
-        "/api/v1/public/proposal",
-        "/api/v1/public/proposal/acknowledgements",
-        "/api/v1/public/proposal/comparison",
-        "/api/v1/public/proposal/decision",
-        "/api/v1/public/proposal/requests",  # GET (own requests) and POST (ask): two rules
-        "/api/v1/public/proposal/requests",
-        "/api/v1/public/proposal/selections",
-    ]
+    # documents (CPP-D04) add one image read of an explicitly published document (test_customer_documents). Warranty and
+    # service (decision log 47) adds the customer's service requests, their photos and shared evidence, none carrying a
+    # rate (test_warranty_security: isolation, no internal field).
+    assert (
+        public
+        == [
+            "/api/v1/public/catalog",
+            "/api/v1/public/catalog/estimates",
+            "/api/v1/public/catalog/events",
+            "/api/v1/public/catalog/media/<sha>",
+            "/api/v1/public/enquiries",
+            "/api/v1/public/estimates",
+            "/api/v1/public/leads",
+            "/api/v1/public/portal/home",
+            "/api/v1/public/portal/invoices/<invoice_id>",
+            "/api/v1/public/portal/properties/<property_id>",
+            "/api/v1/public/portal/properties/<property_id>/documents/<document_id>/content",
+            "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/handover/acknowledge",
+            "/api/v1/public/portal/properties/<property_id>/projects/<project_id>/reports",
+            "/api/v1/public/portal/properties/<property_id>/service-requests",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/confirm",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/evidence/<evidence_id>/content",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/information",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/complete",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",  # PUT (local upload) and GET (read)
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/reject",
+            "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/withdraw",
+            "/api/v1/public/portal/quotations/<quotation_id>",
+            "/api/v1/public/portal/receipts/<receipt_id>",
+            "/api/v1/public/portal/session",
+            "/api/v1/public/portal/sign-in",
+            "/api/v1/public/portal/sign-out",
+            "/api/v1/public/proposal",
+            "/api/v1/public/proposal/acknowledgements",
+            "/api/v1/public/proposal/comparison",
+            "/api/v1/public/proposal/decision",
+            "/api/v1/public/proposal/requests",  # GET (own requests) and POST (ask): two rules
+            "/api/v1/public/proposal/requests",
+            "/api/v1/public/proposal/selections",
+        ]
+    )
 
 
 # --- rate cards ------------------------------------------------------------------------------------------------------------

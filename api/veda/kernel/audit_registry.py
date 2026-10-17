@@ -353,6 +353,21 @@ register(
 )
 # CPP-D04 (decision log 46): an explicit publication of a project attachment to the customer; the title is customer
 # wording about their home (erased with the lead), the attachment row keeps its own policy.
+# --- Warranty and after-sales service (0214, decision log 47): FULL. Personal data: the customer's words and every
+# free-text note, explanation and resolution (erased with the lead). The entitlement's frozen statements are contract
+# terms (retained, like the quotation's). The timeline holds codes and ids only.
+register(AuditPolicy("warranty_entitlement", FULL, parent=("project", "project_id"), excluded=frozenset({"terms"})))
+register(AuditPolicy("service_request", FULL, parent=("lead", "lead_id"), pii=frozenset({"description", "area"})))
+register(AuditPolicy("service_request_photo", FULL, parent=("service_request", "request_id")))
+register(AuditPolicy("service_assessment", FULL, parent=("service_request", "request_id"),
+                     pii=frozenset({"explanation", "internal_reason", "period_basis"})))  # fmt: skip
+register(AuditPolicy("service_visit", FULL, parent=("service_request", "request_id"),
+                     pii=frozenset({"customer_note", "internal_note", "cancel_reason"})))  # fmt: skip
+register(AuditPolicy("service_resolution", FULL, parent=("service_request", "request_id"),
+                     pii=frozenset({"summary", "internal_note"})))  # fmt: skip
+register(AuditPolicy("service_evidence", FULL, parent=("service_request", "request_id"), pii=frozenset({"caption"})))
+register(AuditPolicy("service_note", FULL, parent=("service_request", "request_id"), pii=frozenset({"text"})))
+register(AuditPolicy("service_event", FULL, parent=("service_request", "request_id")))
 register(AuditPolicy("project_customer_document", FULL, parent=("project", "project_id"),
                      pii=frozenset({"title", "withdrawn_reason"})))  # fmt: skip
 # --- Customer Project Portal (0209): FULL. Personal data: the account's email and name (erased with the account when

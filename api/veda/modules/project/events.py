@@ -170,4 +170,7 @@ def _ready(s: Session, event: OutboxEvent) -> None:
 def _handed_over(s: Session, event: OutboxEvent) -> None:
     p = _project(s, event)
     if p is not None:
+        from . import hooks
+
+        hooks.run_after_handover(s, p, dict(event.payload or {}))
         _send(s, event, p, [*_owners(s, p)], "PROJECT_HANDED_OVER", "{project} was handed over")

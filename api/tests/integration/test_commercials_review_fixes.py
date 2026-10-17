@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -56,13 +56,16 @@ def test_m2_nothing_is_asked_or_invoiced_while_the_schedule_needs_revision(api, 
 
 
 def test_m3_dates_are_india_dates(api, factory):
-    clock.set_clock(lambda: datetime(2026, 10, 16, 20, 30, tzinfo=UTC))  # 02:00 IST on 17 October
+    # 02:00 IST, still the previous day in UTC; in the future, never before rows the session already wrote
+    utc_day = datetime.now(UTC).date() + timedelta(days=1)
+    clock.set_clock(lambda: datetime.combine(utc_day, time(20, 30), tzinfo=UTC))
+    india, after = (utc_day + timedelta(days=1)).isoformat(), (utc_day + timedelta(days=2)).isoformat()
     try:
         t = Commercials(api, factory)
         _, _, acc = t.opened()
-        out = t.pay(acc, 1000, received_on="2026-10-17", method_code="UPI")
-        assert out["position"]["as_of"] == "2026-10-17"
-        assert t.pay(acc, 1000, received_on="2026-10-18", status=422).code == "VALIDATION_FAILED"
+        out = t.pay(acc, 1000, received_on=india, method_code="UPI")
+        assert out["position"]["as_of"] == india
+        assert t.pay(acc, 1000, received_on=after, status=422).code == "VALIDATION_FAILED"
     finally:
         clock.reset()
 

@@ -47,7 +47,7 @@ _LEAD_ACCESS: list[Callable[[str], sa.ColumnElement[bool]]] = []
 
 def bind(binding: EntityBinding) -> None:
     if binding.entity_type not in ENTITY_TYPES:
-        raise RuntimeError(f"{binding.entity_type} is not an attachment entity type (migration 0106 CHECK)")
+        raise RuntimeError(f"{binding.entity_type} is not an attachment entity type (the 0106 CHECK, widened by 0214)")
     _BINDINGS[binding.entity_type] = binding
 
 

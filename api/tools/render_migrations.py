@@ -103,6 +103,17 @@ REVISIONS: dict[str, list[str]] = {
         "project_handover_package",
     ],
     "0213_customer_documents": ["project_customer_document"],
+    "0214_warranty_service": [
+        "warranty_entitlement",
+        "service_request",
+        "service_request_photo",
+        "service_assessment",
+        "service_visit",
+        "service_resolution",
+        "service_evidence",
+        "service_note",
+        "service_event",
+    ],
     "0209_customer_portal": ["portal_account", "portal_access", "portal_sign_in", "portal_session", "portal_event"],
     "0208_project_lifecycle": [
         "project",

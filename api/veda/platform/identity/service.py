@@ -105,6 +105,7 @@ def me_payload(s: Session, ctx) -> dict:
             "project_lifecycle": bool(settings().project_lifecycle_enabled),
             "customer_portal": bool(settings().customer_portal_enabled),
             "project_commercials": bool(settings().project_commercials_enabled),
+            "warranty_service": bool(settings().warranty_service_enabled and settings().project_lifecycle_enabled),
         },
         "version": user.version,
     }

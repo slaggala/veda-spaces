@@ -26,6 +26,7 @@ ENTITY_TYPES = (
     "space_opening",
     "space_electrical_point",
     "measurement_note",
+    "service_request",  # WSV (0214): photos of a post-handover service request
 )
 CATEGORIES = ("SITE_PHOTO", "LASER_READING", "SKETCH", "FLOOR_PLAN", "OTHER")
 UPLOAD_STATUSES = ("AWAITING_UPLOAD", "RECEIVED", "REJECTED")

@@ -1,0 +1,9 @@
+{
+  "schema": "veda.warranty.policy/1",
+  "version": "WSV-POLICY-0",
+  "status": "UNDECIDED",
+  "note": "No warranty or service decision has been recorded by the owner. WSV-D01 (structured warranty coverage terms: period, start trigger, coverage and exclusions per class) is null: warranty periods are shown as information not available and coverage decisions must cite the accepted quotation's own warranty statements. See docs/implementation/warranty-service/WSV-owner-decisions.md.",
+  "decisions": {
+    "WSV-D01": null
+  }
+}

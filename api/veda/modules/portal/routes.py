@@ -22,6 +22,7 @@ from veda.kernel.http import PUBLIC_MAX_BODY, Api, Req, ok, problem_response, re
 from veda.modules.crm.leads.models import Lead
 from veda.modules.mtq import scope as lead_scope
 from veda.modules.project import schemas as PS
+from veda.modules.warranty import schemas as WS
 from veda.platform.identity.models import User
 
 from . import identity, projection
@@ -88,6 +89,11 @@ READ_LIMITS = [("120 per minute", _ip("portal-read")), ("60 per minute", _sessio
 # CPP-D04: images of shared documents, in their own bucket so a page of thumbnails never throttles the property page.
 DOCUMENT_LIMITS = [("240 per minute", _session("portal-document")), ("600 per minute", _ip("portal-document")),
                    ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
+# WSV: a photo's bytes on the local backend (development and tests); staging and production use the pre-signed upload.
+PHOTO_MAX_BODY = 21 * 1024 * 1024
+# WSV: each photo is three calls (declare, upload, finish); a request takes six.
+PHOTO_LIMITS = [("60 per hour", _session("portal-photo")), ("200 per day", _session("portal-photo")),
+                ("120 per hour", _ip("portal-photo")), ("20 per minute", _ip("portal-refused"), {"deduct_when": _refused})]  # fmt: skip
 # PEX: customer writes (reports, acknowledgements). Per session and per network here; per account in the database
 # (at most reports.MAX_OPEN reports waiting for review per account and project).
 WRITE_LIMITS = [("10 per hour", _session("portal-write")), ("30 per day", _session("portal-write")),
@@ -321,3 +327,171 @@ def document_content(req: Req, property_id: str, document_id: str):
     resp.headers["Content-Disposition"] = f'inline; filename="document-{req.query.variant}.webp"'
     resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
     return private(resp)
+
+
+# --- customer: warranty and after-sales service (WSV, decision log 47) -------------------------------------------------
+def _service(req: Req, property_id: str, request_id: str | None = None):
+    """The account's authorised property (and a request of it), only while warranty and service is on; else 404."""
+    from veda.modules.warranty import access as waccess
+    from veda.modules.warranty import customer as wcustomer
+
+    p = principal(req)
+    prop, _lead = projection.property_for(req.session, p.account.id, property_id)
+    if not waccess.customer_enabled():
+        raise not_found()
+    r = wcustomer.request_for(req.session, prop.id, request_id) if request_id else None
+    return p, prop, r
+
+
+def _service_view(req: Req, r, status: int = 200):
+    from veda.modules.warranty import customer as wcustomer
+
+    req.session.flush()
+    req.session.refresh(r)
+    return private(ok({"request": wcustomer.request_view(req.session, r)}, status=status))
+
+
+def _key(req: Req) -> str | None:
+    return req.headers.get("Idempotency-Key") if req.headers is not None else None
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests", rbx="RBX-010", auth="public",
+                    body=WS.ServiceRequestIn, status=201, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS, requirement="WSV-011",
+                    summary="Report a problem noticed after handover (reviewed by Veda Spaces; nothing is assumed)")  # fmt: skip
+def service_submit(req: Req, property_id: str):
+    from veda.modules.warranty import requests as wrequests
+
+    p, prop, _ = _service(req, property_id)
+    r, created = wrequests.submit(req.session, property_id=prop.id, project_id=req.body.project_id, body=req.body,
+                                  channel="PORTAL", account_id=p.account.id, key=_key(req))  # fmt: skip
+    return _service_view(req, r, status=201 if created else 200)
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/information",
+                    rbx="RBX-010", auth="public", body=WS.ServiceInformationIn, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS,
+                    requirement="WSV-011", summary="Answer what Veda Spaces asked about your request")  # fmt: skip
+def service_information(req: Req, property_id: str, request_id: str):
+    from veda.modules.warranty import requests as wrequests
+
+    p, _prop, r = _service(req, property_id, request_id)
+    wrequests.add_information(req.session, r, req.body.text, account_id=p.account.id)
+    return _service_view(req, r)
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/confirm", rbx="RBX-010",
+                    auth="public", max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS, requirement="WSV-015",
+                    summary="Confirm the problem is resolved (repeating it changes nothing)")  # fmt: skip
+def service_confirm(req: Req, property_id: str, request_id: str):
+    from veda.modules.warranty import requests as wrequests
+
+    p, _prop, r = _service(req, property_id, request_id)
+    wrequests.confirm(req.session, r, p.account.id)
+    return _service_view(req, r)
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/reject", rbx="RBX-010",
+                    auth="public", body=WS.ServiceRejectIn, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS,
+                    requirement="WSV-015", summary="Tell Veda Spaces the problem is still not right")  # fmt: skip
+def service_reject(req: Req, property_id: str, request_id: str):
+    from veda.modules.warranty import requests as wrequests
+
+    p, _prop, r = _service(req, property_id, request_id)
+    wrequests.reject(req.session, r, p.account.id, req.body.reason)
+    return _service_view(req, r)
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/withdraw", rbx="RBX-010",
+                    auth="public", body=WS.ServiceWithdrawIn, max_body=PUBLIC_MAX_BODY, limits=WRITE_LIMITS,
+                    requirement="WSV-011", summary="Withdraw your request (repeating it changes nothing)")  # fmt: skip
+def service_withdraw(req: Req, property_id: str, request_id: str):
+    from veda.modules.warranty import requests as wrequests
+
+    p, _prop, r = _service(req, property_id, request_id)
+    wrequests.withdraw(req.session, r, account_id=p.account.id, reason=req.body.reason)
+    return _service_view(req, r)
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/photos", rbx="RBX-010",
+                    auth="public", body=WS.ServicePhotoIn, status=201, max_body=PUBLIC_MAX_BODY, limits=PHOTO_LIMITS,
+                    requirement="WSV-018", summary="Declare a photo of your request, then upload it as instructed")  # fmt: skip
+def service_photo(req: Req, property_id: str, request_id: str):
+    from veda.modules.warranty import photos as wphotos
+
+    p, prop, r = _service(req, property_id, request_id)
+    a, link, created = wphotos.create(req.session, r, p.account.id, req.body, _key(req))
+    req.session.flush()
+    return private(ok({"photo_id": link.id, "upload": wphotos.instructions(a, prop.id, r.id, link.id)},
+                      status=201 if created else 200))  # fmt: skip
+
+
+@customer_api.route("PUT", "/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",
+                    rbx="RBX-010", auth="public", body=WS.ServicePhotoContentIn, max_body=PHOTO_MAX_BODY, limits=PHOTO_LIMITS,
+                    requirement="WSV-018", summary="Local storage only: send the photo's bytes (base64)")  # fmt: skip
+def service_photo_content(req: Req, property_id: str, request_id: str, photo_id: str):
+    from veda.modules.attachments import service as attachments
+    from veda.modules.warranty import access as waccess
+    from veda.modules.warranty import photos as wphotos
+
+    _p, _prop, r = _service(req, property_id, request_id)
+    waccess.lock(req.session, r)
+    waccess.state(r, *wphotos.CUSTOMER_STATES)  # nothing is added to a request the customer is no longer describing
+    _link, a = wphotos.link_for(req.session, r, photo_id)
+    attachments.receive_local(req.session, a, req.body.data_base64)
+    return private(ok({"received": True}))
+
+
+@customer_api.route("POST", "/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/complete",
+                    rbx="RBX-010", auth="public", max_body=PUBLIC_MAX_BODY, limits=PHOTO_LIMITS, requirement="WSV-018",
+                    summary="Finish a photo upload: it is checked, scanned and prepared before anyone sees it")  # fmt: skip
+def service_photo_complete(req: Req, property_id: str, request_id: str, photo_id: str):
+    from veda.modules.attachments import service as attachments
+    from veda.modules.warranty import access as waccess
+    from veda.modules.warranty import photos as wphotos
+
+    _p, _prop, r = _service(req, property_id, request_id)
+    waccess.lock(req.session, r)
+    waccess.state(r, *wphotos.CUSTOMER_STATES)  # nothing is added to a request the customer is no longer describing
+    _link, a = wphotos.link_for(req.session, r, photo_id)
+    attachments.complete(req.session, a)
+    return _service_view(req, r)
+
+
+def _image(att, variant: str):
+    from flask import Response
+
+    from veda.modules.attachments import service as attachments
+
+    try:
+        data = attachments.variant_bytes(att, variant)
+    except ApiError as err:  # never say more than "not found" to a customer
+        raise not_found() from err
+    resp = Response(data, status=200, mimetype="image/webp")
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Disposition"] = f'inline; filename="photo-{variant}.webp"'
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return private(resp)
+
+
+@customer_api.route("GET", "/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",
+                    rbx="RBX-010", auth="public", write=False, query=WS.ServiceImageQuery, limits=DOCUMENT_LIMITS,
+                    requirement="WSV-018", summary="A photo of your request (only through your authorised home)")  # fmt: skip
+def service_photo_image(req: Req, property_id: str, request_id: str, photo_id: str):
+    from veda.modules.attachments import service as attachments
+    from veda.modules.warranty import photos as wphotos
+
+    _p, _prop, r = _service(req, property_id, request_id)
+    _link, a = wphotos.link_for(req.session, r, photo_id)
+    if not attachments.is_available(a):
+        raise not_found()
+    return _image(a, req.query.variant)
+
+
+@customer_api.route("GET", "/portal/properties/<property_id>/service-requests/<request_id>/evidence/<evidence_id>/content",
+                    rbx="RBX-010", auth="public", write=False, query=WS.ServiceImageQuery, limits=DOCUMENT_LIMITS,
+                    requirement="WSV-018", summary="A photo Veda Spaces shared on your request")  # fmt: skip
+def service_evidence_image(req: Req, property_id: str, request_id: str, evidence_id: str):
+    from veda.modules.warranty import photos as wphotos
+
+    _p, _prop, r = _service(req, property_id, request_id)
+    _ev, a = wphotos.evidence_for(req.session, r, evidence_id)
+    return _image(a, req.query.variant)

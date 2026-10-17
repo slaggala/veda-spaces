@@ -35,6 +35,8 @@ APPROVED_METRICS = frozenset(
         "AttachmentCreated", "AttachmentRejected", "AttachmentInfected", "AttachmentWithdrawn", "AttachmentObjectMissing",
         # CQX: a proposal whose frozen document fails its digests (never shown), and refused customer decisions.
         "ProposalIntegrityRefused", "ProposalDecisionRefused",
+        # Project hooks (WSV): a post-handover subscriber failed in its savepoint (the handover stands).
+        "PostHandoverSubscriberFailed",
     }
 )  # fmt: skip
 

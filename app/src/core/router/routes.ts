@@ -27,6 +27,7 @@ const promiseModule = () => import('../../modules/promise/index.js');
 const projectModule = () => import('../../modules/project/index.js');
 const portalModule = () => import('../../modules/portal/index.js');
 const commercialsModule = () => import('../../modules/commercials/index.js');
+const serviceModule = () => import('../../modules/service/index.js');
 
 /** Route table. Each module's routes load on demand (route-level code splitting, 02 §2.1). */
 export const ROUTES: Def[] = [
@@ -88,6 +89,9 @@ export const ROUTES: Def[] = [
   // Commercial › Payments (every API call answers 404 while VEDA_PROJECT_COMMERCIALS_ENABLED is off).
   { path: '/commercials', title: 'Payments', component: 'vs-commercials-list-page', access: 'auth', chrome: true, anyOf: ['commercials.view'], load: commercialsModule },
   { path: '/commercials/:id', title: 'Project commercials', component: 'vs-commercials-page', access: 'auth', chrome: true, anyOf: ['commercials.view'], load: commercialsModule },
+  // After handover › Service (every API call answers 404 while VEDA_WARRANTY_SERVICE_ENABLED is off).
+  { path: '/service', title: 'Service', component: 'vs-service-list-page', access: 'auth', chrome: true, anyOf: ['warranty.service.view'], load: serviceModule },
+  { path: '/service/:id', title: 'Service request', component: 'vs-service-request-page', access: 'auth', chrome: true, anyOf: ['warranty.service.view'], load: serviceModule },
   { path: '/audit', title: 'Audit log', component: 'vs-audit-page', access: 'auth', chrome: true, anyOf: ['audit.read', 'security_event.read'], load: audit },
 ];
 

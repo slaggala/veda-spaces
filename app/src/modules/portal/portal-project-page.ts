@@ -9,7 +9,7 @@ import { portalStyles, stateBadge, when } from './portal-ui.js';
 type Load = 'loading' | 'ready' | 'signed-out' | 'not-found' | 'offline' | 'unavailable';
 
 const SECTIONS = [
-  ['attention', 'Needs you'], ['journey', 'Your journey'], ['delivery', 'Work on your home'], ['payments', 'Payments'], ['quotation', 'Quotation'], ['included', "What's included"],
+  ['attention', 'Needs you'], ['journey', 'Your journey'], ['delivery', 'Work on your home'], ['service', 'Warranty & service'], ['payments', 'Payments'], ['quotation', 'Quotation'], ['included', "What's included"],
   ['commitments', 'Our commitments'], ['your-part', 'Your part'], ['documents', 'Documents'], ['contact', 'Contact'],
 ] as const;
 
@@ -118,6 +118,11 @@ export class VsPortalProjectPage extends LitElement {
     }
   }
 
+  /** Reload the property after a service change, keeping the reader where they are (no focus jump). */
+  private async refresh() {
+    try { this.view = (await portalApi.property(this.routeId)).data; } catch { /* the next full load shows the problem */ }
+  }
+
   private entries(items: Entry[] | null | undefined, empty: string) {
     if (!items?.length) return html`<p class="muted">${empty}</p>`;
     return html`<ul class="bullets">${items.map((i) => html`<li>${i.label ? html`<span class="strong">${i.label}:</span> ` : nothing}${i.text}${i.duration ? html` <span class="muted">(${i.duration})</span>` : nothing}</li>`)}</ul>`;
@@ -178,6 +183,12 @@ export class VsPortalProjectPage extends LitElement {
           <section class="section" id="delivery" aria-labelledby="h-delivery">
             <h2 id="h-delivery" tabindex="-1">Work on your home</h2>
             ${this.delivery(v)}
+          </section>
+
+          <section class="section" id="service" aria-labelledby="h-service">
+            <h2 id="h-service" tabindex="-1">Warranty &amp; service</h2>
+            ${v.warranty ? html`<vs-portal-service .view=${v.warranty} .propertyId=${v.id} @service-changed=${() => this.refresh()}></vs-portal-service>`
+              : html`<p class="card muted">Warranty and service appear here once your home is handed over.</p>`}
           </section>
 
           <section class="section" id="payments" aria-labelledby="h-payments">
@@ -251,6 +262,11 @@ export class VsPortalProjectPage extends LitElement {
   }
 
   private document(d: DocumentEntry) {
+    if (d.kind === 'WARRANTY_SUMMARY') {
+      const w = d as Extract<DocumentEntry, { kind: 'WARRANTY_SUMMARY' }>;
+      return html`<li class="doc"><span><span class="strong">${w.title}</span><br /><span class="small muted">From your handover, ${when(w.issued_on)}</span></span>
+        <a class="btn" href="#service" @click=${(e: Event) => this.jump(e, 'service')}>View<span class="sr-only"> ${w.title}</span></a></li>`;
+    }
     if (d.kind === 'PROJECT_DOCUMENT') {
       const e = d as ProjectDocument;
       return html`<li class="doc shared"><vs-portal-image class="thumb" .propertyId=${this.view?.id ?? ''} .documentId=${e.id} .label=${e.title} .variant=${'thumb'}></vs-portal-image>

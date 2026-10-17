@@ -49,7 +49,7 @@ export interface Me {
   /** MC-3: deployment features that are switched on (absent on older APIs: everything off). */
   features?: Partial<Record<'mtq_site' | 'mtq_estimation' | 'mtq_quotation' | 'customer_proposal' | 'customer_proposal_interaction'
     | 'customer_quotation_acceptance' | 'customer_promise_admin' | 'project_lifecycle'
-    | 'customer_portal' | 'project_commercials', boolean>>;
+    | 'customer_portal' | 'project_commercials' | 'warranty_service', boolean>>;
   version: number;
 }
 

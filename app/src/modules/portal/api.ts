@@ -42,7 +42,7 @@ export interface CommercialDocument {
 /** A document staff explicitly shared on the project (CPP-D04): an image, served only through the portal session. */
 export interface ProjectDocument { kind: 'PROJECT_DOCUMENT'; id: string; document_class: string; label: string; title: string; published_on: string;
   width: number | null; height: number | null; project_id?: string }
-export type DocumentEntry = (QuotationSummary & { kind: string }) | { kind: 'INVOICE' | 'RECEIPT'; id: string; number: string; issued_on: string | null;
+export type DocumentEntry = { kind: 'WARRANTY_SUMMARY'; id: string; title: string; issued_on: string; project_id: string } | (QuotationSummary & { kind: string }) | { kind: 'INVOICE' | 'RECEIPT'; id: string; number: string; issued_on: string | null;
   amount: string; status: string; status_label: string; label?: string | null; due_on?: string | null } | ProjectDocument;
 export interface Entry { code: string; text: string; category?: string; status?: string; stage?: string; label?: string; duration?: string | null }
 export interface PropertyCard {
@@ -70,6 +70,29 @@ export interface DeliveryProject {
 }
 export interface Included { title: string; kind: string; included_count: number; optional_count: number;
   items: { description: string; detail: string | null; status: string; dimensions?: { label: string; value: string }[] }[] }
+/** Warranty and after-sales service (WSV), customer-safe: statements verbatim, statuses in plain words, no internal note. */
+export interface WarrantySummary {
+  state: 'BEFORE_HANDOVER' | 'BEING_PREPARED' | 'REGISTERED'; message?: string; id?: string; handed_over_on?: string; status?: string;
+  status_label?: string; period_note?: string | null;
+  coverage?: { label: string; covers: string; exclusions: string[]; status: string; status_label: string; starts_on: string | null; ends_on: string | null }[];
+  statements?: { kind: string; text: string; source: string }[]; exclusions?: string[]; manufacturer_notes?: string[]; policy_url?: string | null;
+}
+export interface ServiceRequestView {
+  id: string; reference: string; status: string; status_label: string; next: 'YOU' | 'VEDA_SPACES' | null; category: string; description: string;
+  area: string | null; noticed_on: string | null; reported_on: string; project_id: string;
+  photos: { id: string; state: 'AVAILABLE' | 'CHECKING' | 'NOT_AVAILABLE'; added_by: 'YOU' | 'VEDA_SPACES' }[];
+  messages: { from: 'YOU' | 'VEDA_SPACES'; label: string; text: string; on: string }[];
+  coverage: { outcome: string; label: string; explanation: string; chargeable_note: string | null } | null;
+  visits: { kind: string; status: string; planned_on: string; done_on: string | null; note: string | null }[];
+  resolution: { summary: string; outcome: string } | null; evidence: { id: string; caption: string | null }[];
+  can_add_information: boolean; can_add_photos: boolean; can_confirm: boolean; can_reject: boolean; can_withdraw: boolean;
+}
+export interface WarrantyView {
+  available: boolean; categories: { code: string; label: string }[]; max_photos: number;
+  projects: { id: string; handed_over: boolean; warranty: WarrantySummary; requests: ServiceRequestView[]; can_report: boolean }[];
+}
+export interface PhotoUpload { required: boolean; method?: string; url?: string; fields?: Record<string, string>; then?: string }
+
 export interface PropertyView extends PropertyCard {
   journey: Step[]; attention: Attention[]; quotations: QuotationSummary[]; documents: DocumentEntry[]; commercials: Commercials | null;
   included: Included[] | null;
@@ -79,6 +102,7 @@ export interface PropertyView extends PropertyCard {
   responsibilities: null | { client: Entry[] | null; site_readiness: Entry[] | null };
   support: null | { contacts: Omit<Contact, 'source'>[]; escalation: string | null };
   delivery: { available: boolean; projects: DeliveryProject[] } | null;
+  warranty?: WarrantyView | null;
 }
 export interface Home { customer: { name: string }; enquiries: { reference: string; relationship: string; closed: boolean; properties: PropertyCard[] }[];
   project_tracking_available: boolean; delivery_available?: boolean }
@@ -131,6 +155,22 @@ export const portalApi = {
     api.request<{ reference: string; received: boolean; delivery: DeliveryProject }>(
       `${BASE}/properties/${encodeURIComponent(propertyId)}/projects/${encodeURIComponent(projectId)}/reports`,
       { method: 'POST', anonymous: true, headers: headers(), body, idempotencyKey: key }),
+  /** Report a problem after handover (WSV). The key makes a retry the same request, never a second one. */
+  serviceSubmit: (propertyId: string, body: Record<string, unknown>, key: string) =>
+    api.request<{ request: ServiceRequestView }>(`${BASE}/properties/${encodeURIComponent(propertyId)}/service-requests`,
+      { method: 'POST', anonymous: true, headers: headers(), body, idempotencyKey: key }),
+  serviceAct: (propertyId: string, requestId: string, action: 'information' | 'confirm' | 'reject' | 'withdraw', body: Record<string, unknown> = {}) =>
+    api.request<{ request: ServiceRequestView }>(`${BASE}/properties/${encodeURIComponent(propertyId)}/service-requests/${encodeURIComponent(requestId)}/${action}`,
+      { method: 'POST', anonymous: true, headers: headers(), body }),
+  photoDeclare: (propertyId: string, requestId: string, body: { mime_type: string; byte_size: number; sha256: string }, key: string) =>
+    api.request<{ photo_id: string; upload: PhotoUpload }>(`${BASE}/properties/${encodeURIComponent(propertyId)}/service-requests/${encodeURIComponent(requestId)}/photos`,
+      { method: 'POST', anonymous: true, headers: headers(), body, idempotencyKey: key }),
+  photoContent: (propertyId: string, requestId: string, photoId: string, dataBase64: string) =>
+    api.request(`${BASE}/properties/${encodeURIComponent(propertyId)}/service-requests/${encodeURIComponent(requestId)}/photos/${encodeURIComponent(photoId)}/content`,
+      { method: 'PUT', anonymous: true, headers: headers(), body: { data_base64: dataBase64 } }),
+  photoComplete: (propertyId: string, requestId: string, photoId: string) =>
+    api.request<{ request: ServiceRequestView }>(`${BASE}/properties/${encodeURIComponent(propertyId)}/service-requests/${encodeURIComponent(requestId)}/photos/${encodeURIComponent(photoId)}/complete`,
+      { method: 'POST', anonymous: true, headers: headers(), body: {} }),
   /** Confirm receipt of exactly this handover summary (by its digest); repeating it changes nothing. */
   acknowledge: (propertyId: string, projectId: string, packageId: string, sha: string) =>
     api.request<{ acknowledged_on: string; delivery: DeliveryProject }>(
@@ -140,9 +180,13 @@ export const portalApi = {
 
 /** A shared project document's image as a data: URL (the session travels in the header, never in a URL). */
 export async function documentImage(propertyId: string, documentId: string, variant: 'thumb' | 'mobile' | 'desktop' = 'mobile'): Promise<string | null> {
+  return portalImage(`/properties/${encodeURIComponent(propertyId)}/documents/${encodeURIComponent(documentId)}/content`, variant);
+}
+
+/** Any image the portal serves under the session (shared documents, request photos, shared evidence) as a data: URL. */
+export async function portalImage(path: string, variant: 'thumb' | 'mobile' | 'desktop' = 'mobile'): Promise<string | null> {
   try {
-    const r = await fetch(`${api.baseUrl}${BASE}/properties/${encodeURIComponent(propertyId)}/documents/${encodeURIComponent(documentId)}/content?variant=${variant}`,
-      { headers: headers(), credentials: 'include', cache: 'no-store' });
+    const r = await fetch(`${api.baseUrl}${BASE}${path}?variant=${variant}`, { headers: headers(), credentials: 'include', cache: 'no-store' });
     if (!r.ok) return null;
     const blob = await r.blob();
     return await new Promise((resolve) => {

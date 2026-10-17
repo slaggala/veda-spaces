@@ -421,6 +421,15 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
                      else ({"available": False} if money else None)),
     }  # fmt: skip
     if not full:
+        from veda.modules.warranty import customer as warranty_customer
+
+        waiting = sum(
+            1
+            for wp in (warranty_customer.view(s, prop.id) or {}).get("projects", [])
+            for wr in wp["requests"]
+            if wr["next"] == "YOU"
+        )  # the same count the property page shows (review L5)
+        out["attention_count"] += waiting
         return out
     info = (proposal or {}).get("information") or {}
     out.update({
@@ -451,6 +460,20 @@ def property_view(s: Session, account_id: str, prop: Property, lead: Lead, *, fu
     if money and money.get("available"):
         out["documents"] = ([{"kind": "INVOICE", **i} for i in money["invoices"]]
                             + [{"kind": "RECEIPT", **r} for r in money["receipts"]] + out["documents"])  # fmt: skip
+    from veda.modules.warranty import customer as warranty_customer
+
+    warranty = warranty_customer.view(s, prop.id)
+    out["warranty"] = warranty
+    out["documents"] = warranty_customer.documents(warranty) + out["documents"]
+    for wp in (warranty or {}).get("projects", []):
+        for wr in wp["requests"]:
+            if wr["next"] == "YOU":
+                out["attention"] = [{"kind": "SERVICE_ACTION", "status": V.ACTION_REQUIRED,
+                                     "title": f"Service request {wr['reference']}: {wr['status_label'].lower()}",
+                                     "text": "Veda Spaces needs your reply." if wr["status"] == "INFORMATION_REQUESTED"
+                                     else "Please confirm the problem is resolved, or tell us it is still not right.",
+                                     "due": None, "request_id": wr["id"]}] + out["attention"]  # fmt: skip
+    out["attention_count"] = sum(1 for a in out["attention"] if a["status"] == V.ACTION_REQUIRED)
     # CPP-D04: documents staff explicitly published on this property's projects (served only by the portal route)
     out["documents"] = [{**d, "project_id": dp["id"]} for dp in (delivery or {}).get("projects", [])
                         for d in dp.get("documents") or []] + out["documents"]  # fmt: skip

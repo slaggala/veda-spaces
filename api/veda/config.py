@@ -235,6 +235,11 @@ class Settings:
     # their own issue reports and the handover package. Off by default everywhere and refused in production. It shows
     # nothing unless the portal's and the Project Lifecycle's own flags are also on; it turns neither on.
     project_delivery_portal_enabled: bool = False
+    # Warranty and after-sales service (WSV, decision log 47): warranty entitlements registered at handover and
+    # post-handover service requests, for staff and in the portal. Off by default everywhere and refused in production;
+    # effective only with the Project Lifecycle's own flag (the customer side also needs the portal's); it turns
+    # neither on.
+    warranty_service_enabled: bool = False
     spam_review_age_hours: int = 24
     anchor_dir: str | None = None
     anchor_bucket: str | None = None
@@ -394,6 +399,7 @@ def load_settings(**overrides) -> Settings:
         customer_portal_enabled=_bool("VEDA_CUSTOMER_PORTAL_ENABLED", False),
         project_commercials_enabled=_bool("VEDA_PROJECT_COMMERCIALS_ENABLED", False),
         project_delivery_portal_enabled=_bool("VEDA_PROJECT_DELIVERY_PORTAL_ENABLED", False),
+        warranty_service_enabled=_bool("VEDA_WARRANTY_SERVICE_ENABLED", False),
         estimate_retention_days=_intd("VEDA_ESTIMATE_RETENTION_DAYS", 90),
         warranty_policy_url=_str("VEDA_WARRANTY_POLICY_URL", ""),
         anchor_dir=_env("VEDA_ANCHOR_DIR"),
@@ -634,6 +640,8 @@ def validate_environment(settings: Settings) -> list[str]:
             problems.append(
                 "VEDA_PROJECT_DELIVERY_PORTAL_ENABLED is not authorised in production (project delivery in the portal)"
             )
+        if settings.warranty_service_enabled:  # no production decision exists (decision log 47)
+            problems.append("VEDA_WARRANTY_SERVICE_ENABLED is not authorised in production (warranty and service)")
         for flag, on in (("VEDA_CATALOG_ADMIN_ENABLED", settings.catalog_admin_enabled),
                          ("VEDA_CATALOG_MEDIA_DELIVERY_ENABLED", settings.catalog_media_delivery_enabled),
                          ("VEDA_CATALOG_3D_ENABLED", settings.catalog_3d_enabled)):  # fmt: skip

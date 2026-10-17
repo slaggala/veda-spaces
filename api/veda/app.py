@@ -45,6 +45,9 @@ def _register_modules(app: Flask) -> None:
     from veda.modules.project import events as _project_events  # noqa: F401  (registers handlers)
     from veda.modules.project import notices as _project_notices  # noqa: F401  (registers the delivery handlers)
     from veda.modules.project.routes import api as project_api
+    from veda.modules.warranty import events as _warranty_events  # noqa: F401  (registers handlers and the subscriber)
+    from veda.modules.warranty import photos as _warranty_photos  # noqa: F401  (binds the service_request entity)
+    from veda.modules.warranty.routes import api as warranty_api
     from veda.platform.audit.routes import api as audit_api
     from veda.platform.auth.routes import api as auth_api
     from veda.platform.health import api as health_api
@@ -77,6 +80,7 @@ def _register_modules(app: Flask) -> None:
         portal_customer_api,
         portal_staff_api,
         commercials_api,
+        warranty_api,
     ):
         if api.name not in app.blueprints:
             app.register_blueprint(api.blueprint)
@@ -160,6 +164,30 @@ RBX_REGISTER: dict[str, frozenset[tuple[str, str]]] = {
             # Customer documents (decision log 46, CPP-D04): an image staff explicitly published, only through the
             # account's authorised property; 404 unless the delivery view is on.
             ("GET", "/api/v1/public/portal/properties/<property_id>/documents/<document_id>/content"),
+            # Warranty and after-sales service (decision log 47): the customer's requests and photos, only through the
+            # account's authorised property; 404 unless VEDA_WARRANTY_SERVICE_ENABLED (and the lifecycle) is on.
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/information"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/confirm"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/reject"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/withdraw"),
+            ("POST", "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos"),
+            (
+                "PUT",
+                "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",
+            ),
+            (
+                "POST",
+                "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/complete",
+            ),
+            (
+                "GET",
+                "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/photos/<photo_id>/content",
+            ),
+            (
+                "GET",
+                "/api/v1/public/portal/properties/<property_id>/service-requests/<request_id>/evidence/<evidence_id>/content",
+            ),
         }
     ),
     "RBX-006": frozenset(
